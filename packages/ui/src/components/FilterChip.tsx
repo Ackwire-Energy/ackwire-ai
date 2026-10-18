@@ -42,7 +42,7 @@ const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 export const FILTER_SEARCH_AFTER = 8;
 
 /**
- * A filter as a dropdown chip (v2): a 32px pill with the filter's icon, its
+ * A filter as a dropdown chip (v2): a compact control of the ruler (32, r10) with the filter's icon, its
  * name and a chevron. With a value it reads it ("Tipo: Documentos",
  * "#general", "3 canais"), turns raised with the ink ring and gets a × to
  * clear. The glass menu has a search past 8 options, a check on what's

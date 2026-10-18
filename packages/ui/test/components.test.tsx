@@ -59,7 +59,7 @@ describe("Button", () => {
 });
 
 describe("Avatar", () => {
-  test("person is a circle, agent is the cut-corner square; running ring only for agents", () => {
+  test("people and agents share the framed tile; running ring only for agents", () => {
     const { container } = render(
       <>
         <Avatar name="Marina" />
@@ -68,7 +68,8 @@ describe("Avatar", () => {
       </>,
     );
     const [person, agent, notAgent] = Array.from(container.querySelectorAll(".ac-avatar"));
-    expect(person?.className).toBe("ac-avatar");
+    expect(person?.className).toBe("ac-avatar ac-avatar--framed");
+    expect(agent?.className).toContain("ac-avatar--framed");
     expect(person?.textContent).toBe("M");
     expect(agent?.className).toContain("ac-avatar--agent");
     expect(agent?.className).toContain("ac-avatar--running");
@@ -78,6 +79,22 @@ describe("Avatar", () => {
     expect(agent?.getAttribute("data-state")).toBe("thinking");
     expect(notAgent?.className).not.toContain("ac-avatar--running");
     expect(person?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  test("the 18px receipt and the 112px hero stand unframed unless asked", () => {
+    const { container } = render(
+      <>
+        <Avatar kind="agent" name="Ada" size="xs" />
+        <Avatar kind="agent" name="Ada" size="xl" />
+        <Avatar kind="agent" name="Ada" size="xl" framed />
+        <Avatar name="Marina" size="sm" framed={false} />
+      </>,
+    );
+    const [xs, xl, xlFramed, person] = Array.from(container.querySelectorAll(".ac-avatar"));
+    expect(xs?.className).not.toContain("ac-avatar--framed");
+    expect(xl?.className).not.toContain("ac-avatar--framed");
+    expect(xlFramed?.className).toContain("ac-avatar--framed");
+    expect(person?.className).not.toContain("ac-avatar--framed");
   });
 
   test("labelled avatars expose the name", () => {
@@ -284,7 +301,7 @@ describe("Message", () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
     expect(rule(".ac-msg")).toContain("align-items: flex-start");
-    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 36px");
+    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 32px");
     expect(rule(".ac-msg__avatar")).toContain("align-self: flex-start");
   });
 });

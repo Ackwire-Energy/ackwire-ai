@@ -34,14 +34,18 @@ export function MessageWork({
     : compact
       ? workHeader(t, compact)
       : null;
-  const summary = header ? (
+  // A quiet button: "Ver o que ela fez · 7 passos · 38 s" (the numbers when known).
+  const summary = (
     <>
-      <strong>{header.steps}</strong>
-      {header.connectors && ` · ${header.connectors}`}
-      {header.duration && ` · ${header.duration}`}
+      <strong>{t("chat.work.see", agentGrammar(t, agentName))}</strong>
+      {header && (
+        <span className="ac-work__meta">
+          {` · ${header.steps}`}
+          {header.connectors && ` · ${header.connectors}`}
+          {header.duration && ` · ${header.duration}`}
+        </span>
+      )}
     </>
-  ) : (
-    <strong>{t("chat.work.see", agentGrammar(t, agentName))}</strong>
   );
   const steps = run.isError
     ? [{ key: "error", label: t("chat.work.failed"), failed: true }]

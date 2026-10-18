@@ -249,11 +249,19 @@ p {
   background: var(--surface);
   color: var(--ink);
 }
+/*
+ * The work area is its own surface (`--pane`: white in light, the page in dark), beside the sidebar's paper
+ * (`--side`). Pages inside paint `--bg`/`--surface`, so both point at the pane here (telas/RefinoUI.html: no
+ * gray panel around the work).
+ */
 .shell__main {
   flex: 1 1 560px;
   min-width: 0;
   height: 100%;
   overflow-y: auto;
+  --bg: var(--pane);
+  --surface: var(--pane);
+  background: var(--pane);
 }
 .shell__main--chat {
   display: flex;
@@ -630,8 +638,44 @@ p {
   gap: 4px;
   padding: 16px 8px 24px;
 }
+/* Turns are told apart by space (RefinoUI "Nova leitura"): ~10px between messages in a team chat,
+   ~16px in a DM with an agent; the same author within 5 minutes continues the row above. */
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
-  margin-top: var(--space-2);
+  margin-top: 6px;
+}
+.channel__messages > .ac-msg--grouped {
+  margin-top: -4px;
+}
+/* A team chat (channels, threads, DMs between people): left-aligned and full width, the line capped. */
+.shell__main--chat:not(.chat--reading) .ac-msg__text {
+  max-width: 72ch;
+}
+/* A DM with an agent: one centered reading column (~740px), the composer on the same column. */
+.chat--reading {
+  --read-col: 740px;
+}
+.chat--reading .channel__messages {
+  padding-right: 24px;
+  padding-left: 24px;
+}
+.chat--reading .channel__messages > * {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--read-col);
+  margin-right: auto;
+  margin-left: auto;
+}
+/* The row's padding (and hover plate) sits just outside the column, so its text lines up with it. */
+.chat--reading .channel__messages > .ac-msg {
+  max-width: calc(var(--read-col) + 2 * var(--space-4));
+}
+.chat--reading .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
+  margin-top: 12px;
+}
+.chat--reading .channel__composer > * {
+  max-width: var(--read-col);
+  margin-right: auto;
+  margin-left: auto;
 }
 .channel__composer {
   position: relative;
@@ -1306,8 +1350,9 @@ p {
   align-items: center;
 }
 
+/* Icon-only items are square inside the track. */
 .drive-view .ac-seg__item {
-  width: 34px;
+  width: calc(var(--seg-h) - 2 * var(--seg-in));
   padding: 0;
   justify-content: center;
 }
@@ -2412,70 +2457,6 @@ button.drive-where:focus-visible {
   gap: 6px;
   min-width: 0;
 }
-/* v2 segmented (track + raised choice), same as the design system's Segmented. */
-.segmented {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--radius-btn);
-  background: var(--sunken);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
-}
-.segmented button {
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  height: 30px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 9px;
-  cursor: pointer;
-  color: var(--muted);
-  background: transparent;
-  transition:
-    background-color 0.15s,
-    color 0.15s,
-    box-shadow 0.18s var(--out);
-}
-.segmented button[aria-pressed="true"] {
-  color: var(--ink);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-}
-.segmented button:focus-visible,
-.pill:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 24px 12px;
-}
-.pill {
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  color: var(--muted);
-  border: 0;
-  background: var(--sunken);
-  transition:
-    background-color 0.15s,
-    color 0.15s;
-}
-.pill:hover {
-  color: var(--ink);
-}
-.pill[aria-pressed="true"] {
-  color: var(--ink);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-}
 .issue-label {
   margin-left: 0;
   background: var(--surface-sunken);
@@ -2502,18 +2483,86 @@ button.drive-where:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
-/* Markdown inside chat messages: compact, line breaks kept (white-space from .ac-msg__text). */
+/*
+ * Markdown inside chat messages, styled for reading (telas/RefinoUI.html, "Nova leitura"): line breaks
+ * kept (white-space from .ac-msg__text), 14px between paragraphs, 8px into a list and between its items,
+ * a heading opens a section, bold marks without shouting, links in the text's own color.
+ */
 .md--message {
-  gap: 6px;
+  display: block;
   max-width: none;
   line-height: inherit;
 }
-.md--message ul,
+.md--message > * + * {
+  margin-top: 14px;
+}
+.md--message > p + ul,
+.md--message > p + ol {
+  margin-top: 8px;
+}
+.md--message > .md__h {
+  margin: 22px 0 6px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+.md--message > .md__h:first-child {
+  margin-top: 0;
+}
+.md--message > .md__h + * {
+  margin-top: 6px;
+}
+.md--message .md__h strong {
+  font-weight: inherit;
+}
+.md--message strong {
+  font-weight: 600;
+}
+.md--message ul {
+  list-style: none;
+  padding-left: 0;
+}
 .md--message ol {
-  padding-left: 20px;
+  padding-left: 22px;
+}
+.md--message li + li {
+  margin-top: 8px;
+}
+.md--message ul > li:not(.md__task) {
+  position: relative;
+  padding-left: 22px;
+}
+/* A small square pixel marker instead of the default bullet. */
+.md--message ul > li:not(.md__task)::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 0.78em;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--faint);
+}
+.md--message .md__task {
+  margin-left: 0;
+}
+.md--message a.ac-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+.md--message code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--plate);
+  color: var(--ink2);
 }
 .md--message .md__code {
   margin: 0;
+}
+.md--message .md__code code {
+  padding: 0;
+  background: transparent;
 }
 
 /* Profile card triggers (avatar, author name, mention) and the card */
@@ -2692,14 +2741,15 @@ button.drive-where:focus-visible {
   height: 24px;
   font-size: 11px;
 }
+/* A level you press to change: a compact control of the ruler; the legend's copies stay labels (pills). */
 .level-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
+  height: var(--control-h-sm);
   padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--control-r-sm);
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
@@ -2720,6 +2770,8 @@ button.drive-where:focus-visible {
   opacity: 0.6;
 }
 .level-pill--static {
+  height: 24px;
+  border-radius: var(--radius-full);
   cursor: default;
 }
 .level-pill[data-level="none"] {
@@ -2917,9 +2969,9 @@ button.drive-where:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 34px;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  min-height: var(--control-h-md);
+  padding: 0 10px;
+  border-radius: var(--control-r-md);
   color: var(--ink);
   text-decoration: none;
   font-size: 14px;
@@ -3188,7 +3240,7 @@ button.drive-where:focus-visible {
 }
 .cflow__oauth {
   height: auto;
-  min-height: 44px;
+  min-height: var(--control-h-md);
   white-space: normal;
   text-align: center;
 }
@@ -3669,11 +3721,11 @@ button.drive-where:focus-visible {
   all: unset;
   box-sizing: border-box;
   cursor: pointer;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 9px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: var(--control-fs-sm);
   background: var(--raised);
   color: var(--ink);
   box-shadow: var(--e1), var(--top);
@@ -4034,7 +4086,13 @@ button.drive-where:focus-visible {
 /* Sidebar 2026-10: soft pill for the active item (one indicator slides between items), neutral badges. */
 .sidebar {
   position: relative;
-  background: var(--sunken);
+  background: var(--side);
+}
+/* Light: the paper and the white work area meet on a hairline (dark keeps the step in tone; the drawer has its shadow). */
+@media (min-width: 761px) {
+  :root:not([data-theme="dark"]) .sidebar {
+    box-shadow: inset -1px 0 0 var(--line);
+  }
 }
 .sidebar > *,
 .sidebar__scroll > *:not(.sidebar__indicator) {
@@ -4046,7 +4104,7 @@ button.drive-where:focus-visible {
   top: 0;
   left: 0;
   z-index: 0;
-  border-radius: var(--radius-item);
+  border-radius: var(--control-r-md);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   pointer-events: none;
@@ -4059,8 +4117,11 @@ button.drive-where:focus-visible {
       height 0.2s var(--out);
   }
 }
+/* Nav items are default controls of the ruler (40, r12). */
 .sidebar__item {
-  border-radius: var(--radius-item);
+  min-height: var(--control-h-md);
+  padding: 0 10px;
+  border-radius: var(--control-r-md);
   font-size: 14.5px;
   transition:
     background-color 0.15s,
@@ -4098,26 +4159,37 @@ button.drive-where:focus-visible {
   font-size: 15.5px;
   letter-spacing: -0.015em;
 }
+/* "Ir para…" ⌘K: reads as a search field (a default field of the ruler: 40, r12, hairline). */
 .sidebar__jump {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
+  height: var(--control-h-md);
   flex: 1;
   min-width: 0;
-  padding: 0 8px 0 10px;
+  padding: 0 10px 0 var(--control-px-md);
   border: 0;
-  border-radius: var(--radius-item);
-  background: transparent;
+  border-radius: var(--control-r-md);
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
   font: inherit;
-  font-size: 13.5px;
-  color: var(--muted);
+  font-size: var(--control-fs-md);
+  color: var(--faint);
   cursor: pointer;
   text-align: left;
 }
+.sidebar__jump > .ac-icon {
+  width: var(--control-icon-md);
+  height: var(--control-icon-md);
+}
+.sidebar__jump .ac-kbd {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
 .sidebar__jump:hover {
-  background: var(--plate);
-  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--muted);
 }
 .sidebar__jump:focus-visible {
   outline: none;
@@ -4132,8 +4204,6 @@ button.drive-where:focus-visible {
 }
 .sidebar__collapse.ac-btn {
   flex: none;
-  width: 34px;
-  height: 34px;
   color: var(--muted);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -4217,10 +4287,10 @@ button.drive-where:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
-  padding: 0 10px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--control-r-sm);
   background: var(--sunken);
   color: var(--ink2);
   font: inherit;
@@ -4343,12 +4413,12 @@ button.drive-where:focus-visible {
   max-width: none;
   user-select: none;
 }
-/* The round mask over the square: how it shows on the avatar. */
+/* The tile's mask over the square (radius 30%, like the avatar): how it shows on the avatar. */
 .photo-crop__frame::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: var(--radius-full);
+  border-radius: 30%;
   box-shadow: 0 0 0 999px color-mix(in srgb, var(--bg) 55%, transparent);
   pointer-events: none;
 }
@@ -4545,7 +4615,7 @@ button.drive-where:focus-visible {
   width: 18px;
   height: 18px;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: 5px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -4648,6 +4718,12 @@ button.drive-where:focus-visible {
     background-color: transparent;
   }
 }
+/* A long answer that just landed at its start: the same fading plate (never with reduced motion, see ChannelPage). */
+@media (prefers-reduced-motion: no-preference) {
+  .channel__messages .ac-msg--fresh {
+    animation: msg-focus 2.4s var(--out);
+  }
+}
 
 /* Live work in a reply: narration lines and tool calls, stacked like a mini timeline. */
 .live-work {
@@ -4713,11 +4789,11 @@ button.live-call__head:hover {
 .stop-run {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--control-r-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -4911,16 +4987,14 @@ button.live-call__head:hover {
   color: inherit;
   box-shadow: none;
 }
+/* Compact buttons on a track: corners stay concentric (button radius + the 2px inset). */
 .cal-nav {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   padding: 2px;
-  border-radius: var(--radius-full);
+  border-radius: calc(var(--control-r-sm) + 2px);
   background: var(--sunken);
-}
-.cal-nav .ac-btn {
-  border-radius: var(--radius-full);
 }
 .cal-page__body {
   flex: 1 1 auto;
@@ -5764,8 +5838,8 @@ button.live-call__head:hover {
 .sidebar[data-rail="true"] .sidebar__jump {
   position: relative;
   justify-content: center;
-  width: 44px;
-  min-height: 40px;
+  width: var(--control-h-md);
+  min-height: var(--control-h-md);
   padding: 0;
   gap: 0;
 }
@@ -5817,7 +5891,7 @@ button.live-call__head:hover {
   flex: none;
 }
 .sidebar[data-rail="true"] .sidebar__create.ac-btn {
-  width: 44px;
+  width: var(--control-h-md);
   padding: 0;
   justify-content: center;
 }
@@ -6042,12 +6116,12 @@ button.live-call__head:hover {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 30px;
-  height: 30px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--control-r-sm);
   background: var(--sky-glass);
   color: var(--sky-ink);
   cursor: pointer;
@@ -6869,7 +6943,7 @@ a.machine-row__name:hover {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100dvh;
-  background: var(--bg);
+  background: var(--pane);
   color: var(--ink);
 }
 .onb__rail {
@@ -6881,7 +6955,7 @@ a.machine-row__name:hover {
   flex-direction: column;
   gap: 20px;
   padding: 24px 16px;
-  background: var(--sunken);
+  background: var(--side);
   border-right: 1px solid var(--line);
   isolation: isolate;
 }
@@ -6945,10 +7019,9 @@ a.machine-row__name:hover {
   place-items: center;
   border-radius: 8px 8px 8px 3px;
   background: var(--plate);
-  font-family: var(--font-dot);
-  font-variation-settings: "ROND" 100;
   font-size: 13px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .onb__steps li[data-done] .onb__n {
   background: var(--ink);
@@ -7007,8 +7080,6 @@ a.machine-row__name:hover {
 }
 .onb__eyebrow {
   margin: 0;
-  font-family: var(--font-dot);
-  font-variation-settings: "ROND" 100;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -7707,9 +7778,14 @@ a.machine-row__name:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
+/* The agent's name: the large step of the ruler (48, r14), the screen's main field. */
+.newag__big.ac-input {
+  padding: 0 var(--control-px-lg);
+}
 .newag__big.ac-input,
 .newag__big.ac-input-affix {
-  height: 52px;
+  height: var(--control-h-lg);
+  border-radius: var(--control-r-lg);
   font-size: 18px;
   font-weight: 500;
 }
@@ -8038,10 +8114,10 @@ a.machine-row__name:hover {
   box-shadow: var(--chosen-shadow);
 }
 .newag__tog {
-  height: 40px;
-  padding: 0 14px;
+  height: var(--control-h-md);
+  padding: 0 var(--control-px-md);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--control-r-md);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   color: var(--muted);
@@ -9549,13 +9625,15 @@ a.machine-row__name:hover {
   flex-direction: column;
   gap: 2px;
 }
+/* Side sub-nav items are default controls of the ruler, like the sidebar's (40, r12). */
 .agp-subnav__item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px;
+  min-height: var(--control-h-md);
+  padding: 0 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--control-r-md);
   background: transparent;
   color: var(--muted);
   font: inherit;

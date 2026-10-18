@@ -482,6 +482,7 @@ export const en: Translations = {
     callAgent: "Call an agent",
     callAgentMenu: "Agents in this channel",
     newMessages: "New messages",
+    endOfReply: "End of reply",
     mentionSuggestions: "Mention suggestions",
   },
   receipts: {

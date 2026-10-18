@@ -637,7 +637,10 @@
   color: var(--faint);
 }
 .wiki-meta__field .ac-input {
-  height: 32px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  font-size: var(--control-fs-sm);
+  border-radius: var(--control-r-sm);
   min-width: 180px;
 }
 .wiki-meta__hash {
@@ -666,7 +669,12 @@
   font-size: 12px;
   font-weight: 600;
 }
+/* Pressable: a compact control of the ruler, not a pill. */
 button.wiki-chip {
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
+  font-size: var(--control-fs-sm);
   cursor: pointer;
 }
 button.wiki-chip:hover {

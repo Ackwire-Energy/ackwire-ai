@@ -200,7 +200,7 @@ export function Sidebar() {
                 : null
             }
           />
-          <Button asChild variant="ghost" iconOnly style={{ width: 32, height: 32 }}>
+          <Button asChild variant="ghost" size="sm" iconOnly>
             <Link to="/org/$orgId/search" params={{ orgId }} aria-label={t("shell.searchWorkspace")}>
               <Icon name="search" />
             </Link>
@@ -402,7 +402,7 @@ export function Sidebar() {
         )}
         <div className="sidebar__me">
           <AccountMenu budgetUsed={budgetUsed} />
-          <Button asChild variant="ghost" iconOnly style={{ width: 32, height: 32 }}>
+          <Button asChild variant="ghost" size="sm" iconOnly>
             <Link
               to="/org/$orgId/settings"
               params={{ orgId }}

@@ -91,8 +91,18 @@
   color: var(--ink2);
   white-space: nowrap;
 }
+/* Pills are labels; a pressable one is a compact control of the ruler. */
 button.mi-pill {
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm) 0 10px;
+  border-radius: var(--control-r-sm);
   cursor: pointer;
+}
+/* A read-only value in a form row: a default field of the ruler. */
+.mi-pill--field {
+  height: var(--control-h-md);
+  padding: 0 var(--control-px-md);
+  border-radius: var(--control-r-md);
 }
 button.mi-pill:hover {
   background: color-mix(in srgb, var(--ink) 10%, var(--sunken));
@@ -384,16 +394,10 @@ a.mi-ref:hover code {
   height: 14px;
   color: var(--faint);
 }
-/* A small inline select, the height of the card's buttons. */
+/* A small inline select (Select size="sm": the compact step of the ruler, like the card's buttons). */
 .mi-plan__who {
   width: auto;
   min-width: 160px;
-}
-.mi-plan__who .ac-select__trigger {
-  height: 28px;
-  padding-left: 10px;
-  border-radius: 10px;
-  font-size: 13px;
 }
 .mi-plan__foot {
   display: flex;

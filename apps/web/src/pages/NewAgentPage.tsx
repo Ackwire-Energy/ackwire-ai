@@ -1140,11 +1140,11 @@ function NewAgentFlow() {
               )}
             </span>
             {index > 0 ? (
-              <Button variant="ghost" icon="chevronLeft" onClick={back}>
+              <Button variant="ghost" size="lg" icon="chevronLeft" onClick={back}>
                 {t("common.back")}
               </Button>
             ) : (
-              <Button asChild variant="ghost">
+              <Button asChild variant="ghost" size="lg">
                 <Link to="/org/$orgId" params={{ orgId: org.id }}>
                   {t("common.cancel")}
                 </Link>
@@ -1152,6 +1152,7 @@ function NewAgentFlow() {
             )}
             <Button
               variant="primary"
+              size="lg"
               kbd={["↵"]}
               loading={create.isPending}
               aria-disabled={footErrors.length > 0 || undefined}

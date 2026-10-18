@@ -221,7 +221,7 @@ export function NewMissionDialog({
             </div>
             <div className="mi-field">
               <span className="mi-field__label">{t("missions.new.computer")}</span>
-              <span className="mi-pill" style={{ height: 40, borderRadius: 12 }}>
+              <span className="mi-pill mi-pill--field">
                 <MachineIcon machineId={machine?.id} />
                 {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
                 {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}

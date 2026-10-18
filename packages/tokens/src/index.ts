@@ -10,6 +10,9 @@ export interface ThemeColors {
   raised: string;
   raised2: string;
   sunken: string;
+  /** The app shell: the sidebar's paper and the work area beside it. */
+  side: string;
+  pane: string;
   bookPage: string;
   bookLine: string;
   glass: string;
@@ -47,16 +50,18 @@ export interface ThemeColors {
 }
 
 export const light: ThemeColors = {
-  bg: "#f4f4f1",
+  bg: "#fbfbfa",
   raised: "#ffffff",
   raised2: "#ffffff",
-  sunken: "#ebebe7",
+  sunken: "#f3f3f0",
+  side: "#f8f8f6",
+  pane: "#ffffff",
   bookPage: "#fffdf6",
   bookLine: "#cfc8b6",
   glass: "rgba(255, 255, 255, 0.72)",
   glassSolid: "#fbfbf9",
-  line: "rgba(23, 23, 22, 0.08)",
-  line2: "rgba(23, 23, 22, 0.14)",
+  line: "rgba(23, 23, 22, 0.07)",
+  line2: "rgba(23, 23, 22, 0.12)",
   lineStrong: "#82827d",
   ink: "#151514",
   ink2: "#2a2a28",
@@ -74,12 +79,12 @@ export const light: ThemeColors = {
   plate: "rgba(127, 127, 127, 0.1)",
   plateSoft: "rgba(127, 127, 127, 0.06)",
   scrim: "rgba(10, 10, 10, 0.32)",
-  surface: "#f4f4f1",
+  surface: "#fbfbfa",
   surfaceRaised: "#ffffff",
-  surfaceSunken: "#ebebe7",
+  surfaceSunken: "#f3f3f0",
   inkMuted: "#5c5c58",
   action: "#151514",
-  onAction: "#f4f4f1",
+  onAction: "#fbfbfa",
   attention: "#9a5b00",
   onAttention: "#ffffff",
   attentionSoft: "#fbeed5",
@@ -91,6 +96,8 @@ export const dark: ThemeColors = {
   raised: "#1c1c1b",
   raised2: "#242423",
   sunken: "#0a0a09",
+  side: "#0a0a09",
+  pane: "#0f0f0e",
   bookPage: "#ebe6d8",
   bookLine: "#a59e8c",
   glass: "rgba(30, 30, 28, 0.66)",
@@ -147,17 +154,17 @@ export const shadows: Record<ThemeName, Record<ShadowName, ShadowLayer[]>> = {
     e1: [
       { x: 0, y: 1, blur: 1, spread: 0, color: "rgba(23, 23, 22, 0.04)" },
       { x: 0, y: 2, blur: 4, spread: -1, color: "rgba(23, 23, 22, 0.05)" },
-      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.08)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.07)" },
     ],
     e2: [
       { x: 0, y: 1, blur: 1, spread: 0, color: "rgba(23, 23, 22, 0.04)" },
       { x: 0, y: 6, blur: 16, spread: -4, color: "rgba(23, 23, 22, 0.1)" },
-      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.08)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.07)" },
     ],
     e3: [
       { x: 0, y: 2, blur: 4, spread: 0, color: "rgba(23, 23, 22, 0.04)" },
       { x: 0, y: 24, blur: 56, spread: -16, color: "rgba(23, 23, 22, 0.3)" },
-      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.14)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.12)" },
     ],
     top: [{ x: 0, y: 1, blur: 0, spread: 0, color: "rgba(255, 255, 255, 0.9)", inset: true }],
   },

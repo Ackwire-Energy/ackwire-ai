@@ -48,6 +48,8 @@ describe("DatePicker", () => {
     await click(trigger);
     expect(body().queryByRole("button", { name: "Tirar o prazo" })).toBeNull();
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
-    expect(css).toMatch(/\.ac-select--sm \.ac-select__trigger,\s*\.ac-date__trigger--sm \{\s*height: 34px;/);
+    expect(css).toMatch(
+      /\.ac-select--sm \.ac-select__trigger,\s*\.ac-date__trigger--sm \{\s*height: var\(--control-h-sm\);/,
+    );
   });
 });

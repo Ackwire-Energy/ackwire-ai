@@ -87,7 +87,7 @@ export function SignupPage({ redirect }: { redirect?: string }) {
             required
           />
         </Field>
-        <Button type="submit" variant="primary" block disabled={!ok || pending}>
+        <Button type="submit" variant="primary" size="lg" block disabled={!ok || pending}>
           {t("auth.createAccount")}
         </Button>
         <p className="auth__fine">

@@ -120,6 +120,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
+import { readingLanding } from "@/chat/reading";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
@@ -656,6 +657,81 @@ function ChannelView({
     stick.current = false;
     autoScrollUntil.current = 0;
   };
+  // Long answers open at their start (RefinoUI "Nova leitura"): agent rows (`data-read-id`, the run's
+  // id, shared by the live row and its final message) that already landed, and whether one is held
+  // with its first line at the top ("Fim da resposta" shows until the person reaches the end).
+  const landed = useRef(new Set<string>());
+  // When the first page arrived (rows before that, and right after, are the conversation opening).
+  const readyAt = useRef(0);
+  if (messages.isSuccess && !readyAt.current) readyAt.current = Date.now();
+  const [holding, setHolding] = useState(false);
+  const holdingRef = useRef(false);
+  const setHold = (on: boolean) => {
+    holdingRef.current = on;
+    setHolding(on);
+  };
+  /** The newest row, when it is an agent's answer. */
+  const newestAnswer = () => {
+    const rows = scroller.current?.querySelectorAll<HTMLElement>(".ac-msg");
+    const last = rows?.[rows.length - 1];
+    return last?.dataset.readId ? last : null;
+  };
+  /** The person saw the end of the conversation: its newest answer never jumps back to its start. */
+  const markRead = () => {
+    const id = newestAnswer()?.dataset.readId;
+    if (id) landed.current.add(id);
+  };
+  const reducedMotion = usePrefersReducedMotion();
+  const reducedMotionRef = useRef(reducedMotion);
+  reducedMotionRef.current = reducedMotion;
+  const [unseen, setUnseen] = useState(false);
+  const openedAt = useRef(Date.now());
+  /**
+   * At the bottom: follow it, unless the newest row is an agent's answer taller than the list. That
+   * one lands once with its first line at the top (and a brief highlight); then nothing pulls the list.
+   */
+  const follow = (smooth = false) => {
+    const el = scroller.current;
+    if (!el) return;
+    const row = newestAnswer();
+    const id = row?.dataset.readId;
+    // Rows there while the conversation opens were already read: it opens at the end.
+    const opening = !readyAt.current || Date.now() - readyAt.current < 1500;
+    if (row && id && opening) landed.current.add(id);
+    else if (row && id && !landed.current.has(id)) {
+      const box = el.getBoundingClientRect();
+      const rect = row.getBoundingClientRect();
+      const land = readingLanding({
+        scrollTop: el.scrollTop,
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        rowTop: rect.top - box.top + el.scrollTop,
+        rowHeight: rect.height,
+      });
+      if (land.held) {
+        landed.current.add(id);
+        stick.current = false;
+        setHold(true);
+        setUnseen(false);
+        if (smooth && !reducedMotionRef.current && typeof el.scrollTo === "function") {
+          autoScrollUntil.current = Date.now() + 600;
+          el.scrollTo({ top: land.top, behavior: "smooth" });
+        } else el.scrollTop = land.top;
+        if (!reducedMotionRef.current) {
+          row.classList.add("ac-msg--fresh");
+          setTimeout(() => row.classList.remove("ac-msg--fresh"), HIGHLIGHT_MS);
+        }
+        return;
+      }
+    }
+    if (smooth && !reducedMotionRef.current && typeof el.scrollTo === "function") {
+      autoScrollUntil.current = Date.now() + 600;
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } else el.scrollTop = el.scrollHeight;
+    setUnseen(false);
+  };
+  const followRef = useRef(follow);
+  followRef.current = follow;
   // Pinned to the bottom: anything that grows later (images, cards, the skeleton turning into
   // messages, fonts) keeps the latest message in view until the person scrolls.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the list only exists for members; re-attach when it appears
@@ -663,7 +739,7 @@ function ChannelView({
     const el = scroller.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const pin = () => {
-      if (stick.current && Date.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
+      if (stick.current && Date.now() >= autoScrollUntil.current) followRef.current();
     };
     const ro = new ResizeObserver(pin);
     const watch = () => {
@@ -678,14 +754,13 @@ function ChannelView({
       mo?.disconnect();
     };
   }, [isMember]);
-  const reducedMotion = usePrefersReducedMotion();
-  const [unseen, setUnseen] = useState(false);
   const runCount = useStreams((s) => scopedRuns(s).length);
   const streamSize = useStreams((s) => scopedRuns(s).reduce((n, r) => n + r.text.length, 0));
   const lastKey = timeline.at(-1)?.key;
   const previousLastKey = useRef(lastKey);
-  const openedAt = useRef(Date.now());
+  /** The person asked for the end ("Novas mensagens", "Fim da resposta", a correction sent). */
   const toBottom = (smooth = false) => {
+    markRead();
     const el = scroller.current;
     if (el) {
       if (smooth && !reducedMotion && typeof el.scrollTo === "function") {
@@ -694,6 +769,7 @@ function ChannelView({
       } else el.scrollTop = el.scrollHeight;
     }
     stick.current = true;
+    setHold(false);
     setUnseen(false);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever rows or streaming text grow
@@ -703,8 +779,9 @@ function ChannelView({
     const newRow = previousLastKey.current !== lastKey;
     const settled = previousLastKey.current !== undefined && Date.now() - openedAt.current > 1500;
     previousLastKey.current = lastKey;
-    if (stick.current) toBottom(newRow && settled);
-    else if (newRow || runCount > 0) setUnseen(true);
+    if (stick.current) follow(newRow && settled);
+    // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
+    else if ((newRow || runCount > 0) && !holdingRef.current) setUnseen(true);
   }, [lastKey, runCount, streamSize]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the rows are there
@@ -911,10 +988,7 @@ function ChannelView({
   // without waiting for observers (some environments have none).
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the data changes
   useLayoutEffect(() => {
-    if (stick.current && Date.now() >= autoScrollUntil.current) {
-      const el = scroller.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    }
+    if (stick.current && Date.now() >= autoScrollUntil.current) follow();
   }, [messages.dataUpdatedAt, timeline.length]);
 
   // `?m=` (or a quote clicked): find the message (paging back up to FOCUS_MAX_PAGES), scroll to it,
@@ -1113,8 +1187,7 @@ function ChannelView({
     resend: (body) => send(body),
     focusComposer: () => composer.current?.focus(),
     followBottom: () => {
-      const el = scroller.current;
-      if (el && stick.current && Date.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
+      if (stick.current && Date.now() >= autoScrollUntil.current) follow();
     },
     channelAgents,
     // In a thread view everything already goes to the thread.
@@ -1147,6 +1220,7 @@ function ChannelView({
     },
   };
 
+  const reading = Boolean(chrome?.dmAgentId) && !thread;
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
     t("newAgent.and"),
@@ -1161,7 +1235,9 @@ function ChannelView({
   return (
     <ChannelActionsContext.Provider value={actions}>
       <ChannelThreadsContext.Provider value={threadsView}>
-        <main className="shell__main shell__main--chat">
+        {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
+            are a left-aligned team chat (telas/RefinoUI.html, "Conversa: Nova leitura"). */}
+        <main className={cx("shell__main shell__main--chat", reading && "chat--reading")}>
           {chrome?.header ?? (
             <header className="channel__header">
               <NavToggle />
@@ -1245,6 +1321,11 @@ function ChannelView({
                   if (near && !stick.current && !(byPerson && movedDown)) return;
                   stick.current = near;
                   if (near) setUnseen(false);
+                  // The person reached the end by themselves: the answer was read, the hold is over.
+                  if (near && byPerson) {
+                    markRead();
+                    if (holdingRef.current) setHold(false);
+                  }
                 }}
               >
                 {/* Pushes short channels down, next to the composer. */}
@@ -1314,7 +1395,15 @@ function ChannelView({
                   <LiveRunSlot key={runId} runId={runId} />
                 ))}
               </section>
-              {unseen && (
+              {holding && (
+                <div className="channel__pill">
+                  <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
+                    <Icon name="chevronDown" size={16} />
+                    {t("channel.endOfReply")}
+                  </Button>
+                </div>
+              )}
+              {unseen && !holding && (
                 <div className="channel__pill">
                   <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
                     {t("channel.newMessages")}
@@ -1411,6 +1500,7 @@ function ChannelView({
                       sendText={t("channel.send")}
                       attachLabel={t("channel.attach")}
                       pills={composerPills}
+                      inlinePills={reading}
                       links={{
                         listLabel: t("wiki.editor.suggest"),
                         search: (q) =>
@@ -1749,6 +1839,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       status={waiting ? { icon: "waiting", label: t("channel.waitingApproval") } : undefined}
       data-live={run.status}
       data-run-id={run.runId}
+      data-read-id={run.runId}
     >
       {!failed && !waiting && !canceled && <span className="ac-visually-hidden">{t("channel.writing")}</span>}
       {failed ? (
@@ -2132,6 +2223,8 @@ export const TimelineMessage = memo(function TimelineMessage({
     <Message
       agent={m.author.type === "agent"}
       data-message-id={m.id}
+      // An agent's answer: lands at its start when long (same id as its live row, so only once).
+      data-read-id={m.author.type === "agent" && !m.local ? (m.agentRunId ?? m.id) : undefined}
       grouped={grouped}
       entering={entering && !replacesLive}
       className={cx(m.local && `ac-msg--local ac-msg--${m.local}`, contextMark && "msg--context")}

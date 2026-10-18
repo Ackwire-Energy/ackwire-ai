@@ -64,7 +64,7 @@ export function LoginPage({ redirect, email: initialEmail }: { redirect?: string
             required
           />
         </Field>
-        <Button type="submit" variant="primary" block disabled={pending || !email || !password}>
+        <Button type="submit" variant="primary" size="lg" block disabled={pending || !email || !password}>
           {t("auth.signIn")}
         </Button>
         {hasSocial && (

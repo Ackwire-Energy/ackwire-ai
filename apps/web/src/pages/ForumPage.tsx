@@ -24,6 +24,7 @@ import {
   type IconName,
   SearchInput,
   Segmented,
+  Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -164,7 +165,17 @@ export function ForumPage() {
               </div>
             </section>
           )}
-          <div className="forum-tools">
+          <Toolbar
+            actions={
+              <SearchInput
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t("forum.search")}
+                aria-label={t("forum.search")}
+                className="forum-tools__search"
+              />
+            }
+          >
             <Segmented
               label={t("forum.filters")}
               value={filter}
@@ -186,15 +197,7 @@ export function ForumPage() {
               countText={(n) => t("forum.agentCount", { count: n })}
               clearLabel={copy.clearOf(t("forum.agentFilter"))}
             />
-            <span className="forum-grow" />
-            <SearchInput
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t("forum.search")}
-              aria-label={t("forum.search")}
-              className="forum-tools__search"
-            />
-          </div>
+          </Toolbar>
           {shown.length > 0 ? (
             <section className="forum-group" aria-labelledby="forum-list-h">
               <div className="forum-gh">

@@ -14,7 +14,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    * delete; `ghost` in toolbars.
    */
   variant?: ButtonVariant;
-  size?: "md" | "sm";
+  /** The control ruler: `md` 40 (default), `sm` 32 (toolbars, rows, composer), `lg` 48 (only a full screen's main action). */
+  size?: "md" | "sm" | "lg";
   /** Leading icon. With `iconOnly`, the only content (then `aria-label` is required). */
   icon?: IconName;
   iconOnly?: boolean;
@@ -49,7 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   const classes = cx(
     "ac-btn",
     variant !== "default" && `ac-btn--${variant}`,
-    size === "sm" && "ac-btn--sm",
+    size !== "md" && `ac-btn--${size}`,
     iconOnly && "ac-btn--icon",
     block && "ac-btn--block",
     loading && "ac-btn--loading",

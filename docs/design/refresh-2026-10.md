@@ -67,3 +67,11 @@ Onest com `font-feature-settings: "ss01", "tnum"`. Escala: 12 (meta) · 13 (pequ
 - **Paleta ⌘K**: vidro, raio 20, busca no topo, grupos "Ir para" (canais, agentes, seções das configurações) e "Pedir a um agente" (abre a DM com o texto). Setas e Enter; Esc fecha.
 - **Checkbox / switch / abas**: o check desenha o traço (`stroke-dashoffset`), o switch desliza o polegar com mola, as abas e o segmentado usam a pílula deslizante.
 - **Cards e seções**: `raised` + e1 + top, raio 14 (seções 20); interativos sobem para e2 no hover. Esqueletos usam `sunken`.
+
+## Refino 2026-10-18 (telas/RefinoUI.html)
+
+- **Light menos cinza:** área de trabalho branca (`--pane`), menu lateral em papel quase branco (`--side`), campos brancos com contorno fino. Cinza só no trilho de campos/segmentado e no estado escolhido. Dark igual.
+- **Régua de controles:** tudo que se clica ou digita tem uma de três alturas, 32 (compacto), 40 (padrão) e 48 (só a ação principal de uma tela inteira), com raio de 30% da altura (10/12/14), lado 12/14/16, texto 13/14/15 e ícone 16/18/20 (`--control-*`). Pílula só para etiqueta que não se clica (status, contador, menção). Segmentado: itens 4px para dentro (3px no 32), raio de dentro = raio de fora − recuo.
+- **Avatar:** agente e pessoa no mesmo quadro (raio 30% do lado). O agente fica em pé dentro do próprio céu em pixel (moldura "Céu"). O recibo de 18px e as cenas grandes (xl) ficam sem quadro.
+- **Doto:** só em ocasião especial (".chat" do logo, landing, número grande de destaque). Contadores, badges, medidas e porcentagens usam a fonte normal com algarismos tabulares.
+- **Conversa:** texto 15,5/1,7 em `--ink`, linha de ~68 caracteres, sem balão. DM com agente em coluna central (~740px); canal, thread e DM entre pessoas alinhados à esquerda com a linha limitada. Mensagens seguidas do mesmo autor se agrupam; ações aparecem ao passar o mouse. Resposta longa abre na primeira linha, com o botão "Fim da resposta".

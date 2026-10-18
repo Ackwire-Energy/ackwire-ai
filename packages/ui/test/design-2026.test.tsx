@@ -127,9 +127,10 @@ describe("the count chip", () => {
     ]) {
       expect(rule).toContain(decl);
     }
-    // Digits come from the shared count rule: Doto, tabular.
+    // Digits come from the shared count rule: the text face, tabular (Doto is only for special moments).
     const counts = /\.ac-num,[^{]*\.ac-countchip,[^{]*\{([^}]*)\}/.exec(css)?.[1] ?? "";
-    expect(counts).toContain("font-family: var(--font-dot");
+    expect(counts).toContain("font-family: var(--font-sans)");
+    expect(counts).not.toContain("--font-dot");
     expect(counts).toContain("font-variant-numeric: tabular-nums");
   });
 });
@@ -181,11 +182,13 @@ describe("list toolbars", () => {
     expect(container.querySelector(".ac-toolbar__actions")?.textContent).toBe("Novo");
   });
 
-  test("one shape: pills on the field surface; pressed and set chips are filled neutral; phones scroll the filters", async () => {
+  test("one shape: ruler controls on the field surface; pressed and set chips are filled neutral; phones scroll the filters", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) =>
       new RegExp(`(^|\\n)${selector.replace(/[.[\]()"=]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
-    expect(rule(".ac-searchfield")).toContain("border-radius: var(--radius-full)");
+    expect(rule(".ac-searchfield")).toContain("border-radius: var(--tool-r, var(--control-r-md))");
+    expect(rule(".ac-filtertoggle")).toContain("border-radius: var(--tool-r, var(--control-r-sm))");
+    expect(rule(".ac-filter")).toContain("border-radius: var(--tool-r, var(--control-r-sm))");
     expect(rule(".ac-searchfield")).toContain("background: var(--field-bg)");
     expect(rule(".ac-filtertoggle")).toContain("background: var(--field-bg)");
     expect(rule('.ac-filtertoggle[aria-pressed="true"]')).toContain("background: var(--ink)");
@@ -197,15 +200,20 @@ describe("list toolbars", () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) =>
       new RegExp(`(^|\\n)${selector.replace(/[.[\]()"=]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
-    for (const sel of [".ac-searchfield", ".ac-filtertoggle", ".ac-filter"]) {
-      expect(rule(sel)).toContain("height: var(--tool-h, 36px)");
+    // A search on its own is a default field (40); filters default to the compact step (32).
+    expect(rule(".ac-searchfield")).toContain("height: var(--tool-h, var(--control-h-md))");
+    for (const sel of [".ac-filtertoggle", ".ac-filter"]) {
+      expect(rule(sel)).toContain("height: var(--tool-h, var(--control-h-sm))");
     }
-    expect(rule(".ac-toolbar")).toContain("--tool-h: 36px");
-    expect(rule(".ac-toolbar--sm")).toContain("--tool-h: 32px");
-    expect(rule(".ac-searchfield--sm")).toContain("--tool-h: 32px");
+    // A list's row is compact: everything in a Toolbar reads the row's step.
+    expect(rule(".ac-toolbar")).toContain("--tool-h: var(--control-h-sm)");
+    expect(rule(".ac-toolbar--sm")).toContain("--tool-h: var(--control-h-sm)");
+    expect(rule(".ac-searchfield--sm")).toContain("--tool-h: var(--control-h-sm)");
+    expect(rule(".ac-toolbar .ac-seg")).toContain("--seg-h: var(--tool-h)");
+    expect(rule(".ac-toolbar .ac-btn")).toContain("height: var(--tool-h)");
     // Touch grows the whole row together, never one control alone.
     expect(css).toMatch(
-      /@media \(pointer: coarse\) \{\s*\.ac-toolbar,\s*\.ac-searchfield,\s*\.ac-filtertoggle,\s*\.ac-filter \{\s*--tool-h: 40px;/,
+      /@media \(pointer: coarse\) \{\s*\.ac-toolbar,\s*\.ac-searchfield,\s*\.ac-filtertoggle,\s*\.ac-filter \{\s*--tool-h: var\(--control-h-md\);/,
     );
   });
 });
@@ -356,17 +364,19 @@ describe("composer", () => {
     expect(body().queryByRole("listbox", { name: "Comandos" })).toBeNull();
   });
 
-  test("send morphs: a dim square without text, 'Enviar ↵' with text; same accessible name", async () => {
+  test("send: the compact primary square, off without text; same accessible name", async () => {
     render(<Harness onSend={() => {}} onCommand={() => {}} />);
     const send = body().getByRole("button", { name: "Enviar" });
+    expect(send.className).toContain("ac-btn--primary");
+    expect(send.className).toContain("ac-btn--sm");
     expect(send.hasAttribute("data-ready")).toBe(false);
-    expect(send.textContent).toBe("");
+    expect(send.hasAttribute("disabled")).toBe(true);
+    expect(send.getAttribute("title")).toBe("Enviar ↵");
     await act(async () =>
       fireEvent.change(body().getByRole("combobox", { name: "Mensagem para Theo" }), { target: { value: "oi" } }),
     );
     const ready = body().getByRole("button", { name: "Enviar" });
     expect(ready.hasAttribute("data-ready")).toBe(true);
-    expect(ready.textContent).toBe("Enviar↵");
     expect(ready.hasAttribute("disabled")).toBe(false);
   });
 });

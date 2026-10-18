@@ -20,10 +20,12 @@ import {
   DetailsSection,
   EmptyState,
   ExpiryFuse,
+  FilterToggle,
   Icon,
   type IconName,
   Kbd,
   SearchInput,
+  Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -229,14 +231,18 @@ export function ApprovalsPage() {
   }, [all, openId, refusing, order, setOpenId]);
 
   const pill = (f: Filter) => (
-    <button key={f} type="button" className="ap-pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-      {t(`approvals.filter.${f}`)}
-      <span className="ap-pill__count ac-num" aria-hidden="true">
-        {f === "all"
+    <FilterToggle
+      key={f}
+      pressed={filter === f}
+      onPressedChange={() => setFilter(f)}
+      count={
+        f === "all"
           ? all.length
-          : all.filter((a) => bucketOf(approvalPhase(a)) === f).length + (f === "pending" ? commands : 0)}
-      </span>
-    </button>
+          : all.filter((a) => bucketOf(approvalPhase(a)) === f).length + (f === "pending" ? commands : 0)
+      }
+    >
+      {t(`approvals.filter.${f}`)}
+    </FilterToggle>
   );
   const waiters = [...new Set(mine.map((a) => a.agentId))];
 
@@ -264,19 +270,20 @@ export function ApprovalsPage() {
             {t("approvals.guard")}
           </p>
         </header>
-        <div className="ap-tools">
-          <SearchInput
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t("approvals.search")}
-            aria-label={t("approvals.search")}
-            className="ap-tools__search"
-          />
-          {/* biome-ignore lint/a11y/useSemanticElements: filter pills */}
-          <div className="ap-pills" role="group" aria-label={t("approvals.filters")}>
-            {FILTERS.map(pill)}
-          </div>
-        </div>
+        <Toolbar
+          label={t("approvals.filters")}
+          search={
+            <SearchInput
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("approvals.search")}
+              aria-label={t("approvals.search")}
+              className="ap-tools__search"
+            />
+          }
+        >
+          {FILTERS.map(pill)}
+        </Toolbar>
 
         {filter === "pending" && waiters.length > 1 && (
           <div className="ap-waiters">

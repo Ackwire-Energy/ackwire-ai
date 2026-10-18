@@ -80,7 +80,7 @@ export function WorkingStack({ entries }: { entries: ActivityEntry[] }) {
   );
 }
 
-/** "0:41" next to a question that is out (Doto); null when nobody is asking. */
+/** "0:41" next to a question that is out (tabular figures); null when nobody is asking. */
 export function ConsultClock({ entries, now }: { entries: ActivityEntry[]; now: number }) {
   const { t } = useTranslation();
   const asking = entries.find((e) => e.consult?.status === "asking")?.consult;

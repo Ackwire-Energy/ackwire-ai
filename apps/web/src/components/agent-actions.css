@@ -2,7 +2,7 @@
  * Receipts under an agent's reply (telas/FazerDesfazer.html, "undo"): one
  * change is a quiet sunken row (A); several are a sunken group with
  * "N mudanças · há X" and Desfazer tudo (B). Neutral surfaces, icon tiles,
- * the countdown in Doto. Undone rows are struck through and dimmed.
+ * the countdown in tabular figures. Undone rows are struck through and dimmed.
  */
 .ag-rcs {
   margin-top: 8px;
@@ -62,10 +62,10 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 28px;
-  padding: 0 8px;
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--control-r-sm);
   background: none;
   color: var(--ink);
   font: inherit;

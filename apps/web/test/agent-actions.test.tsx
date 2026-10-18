@@ -83,7 +83,7 @@ const click = async (el: HTMLElement) => {
 };
 
 describe("receipts under the agent's reply (FazerDesfazer A/B)", () => {
-  test("one change: a quiet row with the sentence, the target links to the issue, Desfazer with the time in Doto", async () => {
+  test("one change: a quiet row with the sentence, the target links to the issue, Desfazer with the time in tabular figures", async () => {
     await open(withActions([action()]));
     const group = receipts();
     const row = group.querySelector(".ag-rc") as HTMLElement;

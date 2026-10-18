@@ -6,9 +6,10 @@ import { CountChip } from "./Chip";
 /**
  * List screens use Toolbar + SearchField + FilterChip / FilterToggle (and
  * Segmented for views); don't style search inputs or filter rows per screen.
- * One shape for all of them: 36px pills (32px `sm`, in dialogs and panels),
- * the same field background and hairline as FilterChip, filled neutral when
- * pressed or set.
+ * One shape for all of them, from the control ruler (tokens.css --control-*):
+ * a Toolbar's row is compact (32, r10; 40 on touch), a SearchField on its own
+ * is a default field (40, r12; `sm` 32 in dialogs and panels), the same field
+ * background and hairline as FilterChip, filled neutral when pressed or set.
  */
 
 export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
@@ -22,7 +23,7 @@ export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElem
   shortcut?: ReactNode;
 }
 
-/** The search box of every list: a pill with the search icon and, with text, a ×. Role `searchbox`. */
+/** The search box of every list: a field of the ruler with the search icon and, with text, a ×. Role `searchbox`. */
 export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
   { size = "md", onClear, clearLabel, shortcut, className, value, ...rest },
   ref,
@@ -57,7 +58,7 @@ export interface FilterToggleProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   children: ReactNode;
 }
 
-/** An on/off filter ("Precisa de você", "Abertas 6"): the FilterChip pill; pressed = filled neutral. */
+/** An on/off filter ("Precisa de você", "Abertas 6"): the FilterChip shape; pressed = filled neutral. */
 export function FilterToggle({
   pressed,
   onPressedChange,

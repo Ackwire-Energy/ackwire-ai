@@ -216,17 +216,23 @@ samp {
   --field-ring: 0 0 0 4px color-mix(in srgb, var(--ink) 10%, transparent);
   --field-ring-danger: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
 }
+/* Light (telas/RefinoUI.html): fields are white with a hairline; gray stays for tracks and chosen states. */
+:root:not([data-theme="dark"]),
+[data-theme="light"] {
+  --field-bg: #ffffff;
+  --field-line: rgba(23, 23, 22, 0.13);
+}
 .ac-input {
   box-sizing: border-box;
-  height: 40px;
+  height: var(--control-h-md);
   width: 100%;
-  padding: 0 14px;
+  padding: 0 var(--control-px-md);
   font: inherit;
-  font-size: 15px;
+  font-size: var(--control-fs-md);
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
-  border-radius: var(--radius-item);
+  border-radius: var(--control-r-md);
   transition:
     background-color 0.15s,
     border-color 0.15s,
@@ -264,10 +270,11 @@ textarea.ac-input {
 .ac-input-affix {
   display: flex;
   align-items: center;
-  height: 40px;
+  height: var(--control-h-md);
   box-sizing: border-box;
+  font-size: var(--control-fs-md);
   border: 1px solid var(--field-line);
-  border-radius: var(--radius-item);
+  border-radius: var(--control-r-md);
   background: var(--field-bg);
   overflow: hidden;
   transition:
@@ -494,30 +501,34 @@ textarea.ac-input {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
+  padding: 6px var(--space-4);
 }
 .ac-msg--grouped {
-  padding-top: 0;
+  padding-top: 2px;
 }
+/* The face is 32px in the feed (telas/RefinoUI.html, "Nova leitura"). */
 .ac-msg__avatar,
 .ac-msg__gutter {
-  flex: 0 0 36px;
-  width: 36px;
+  flex: 0 0 32px;
+  width: 32px;
   display: flex;
   justify-content: center;
 }
 .ac-msg__avatar {
   /* Top of the avatar on the author line, never centered on a long message. */
   align-self: flex-start;
-  margin-top: 2px;
 }
 .ac-msg__avatar > * {
   align-self: flex-start;
 }
+.ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
+  width: 32px;
+  height: 32px;
+}
 .ac-msg__gutter-time {
   font-size: 11px;
-  line-height: 22px;
-  color: var(--ink-muted);
+  line-height: 26px;
+  color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   visibility: hidden;
@@ -530,18 +541,21 @@ textarea.ac-input {
   min-width: 0;
   flex: 1;
 }
+/* Name and time on a line as tall as the face; turns are told apart by space, name and face only. */
 .ac-msg__head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
+  line-height: 32px;
 }
 .ac-msg__author {
-  font-weight: 600;
+  font-size: 14.5px;
+  font-weight: 650;
 }
 .ac-msg__time {
-  font-size: 13px;
-  color: var(--ink-muted);
+  font-size: 12px;
+  color: var(--faint);
 }
 .ac-msg__meta {
   font-size: 12px;
@@ -633,12 +647,14 @@ textarea.ac-input {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+/* Inline code on a plate (mono only for code). */
 .ac-msg__text code {
   font-family: var(--font-mono);
-  font-size: 13px;
-  background: var(--surface-sunken);
-  padding: 1px var(--space-1);
-  border-radius: var(--radius-cut);
+  font-size: 12.5px;
+  background: var(--plate);
+  color: var(--ink2);
+  padding: 2px 6px;
+  border-radius: 6px;
 }
 .ac-msg__text pre {
   margin: var(--space-2) 0;
@@ -946,15 +962,15 @@ textarea.ac-input {
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  height: 40px;
+  height: var(--control-h-md);
   box-sizing: border-box;
-  padding: 0 var(--space-2) 0 14px;
+  padding: 0 var(--space-3) 0 var(--control-px-md);
   font: inherit;
-  font-size: 15px;
+  font-size: var(--control-fs-md);
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
-  border-radius: var(--radius-item);
+  border-radius: var(--control-r-md);
   cursor: pointer;
   text-align: left;
   transition:
@@ -1008,8 +1024,10 @@ textarea.ac-input {
 }
 .ac-select--sm .ac-select__trigger,
 .ac-date__trigger--sm {
-  height: 34px;
-  font-size: 14px;
+  height: var(--control-h-sm);
+  padding: 0 10px 0 var(--control-px-sm);
+  font-size: var(--control-fs-sm);
+  border-radius: var(--control-r-sm);
 }
 
 /* Menu (listbox of the Select, dropdown menus) */
@@ -1316,10 +1334,10 @@ textarea.ac-input {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 36px;
+  min-height: var(--control-h-md);
   box-sizing: border-box;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-item);
+  border-radius: var(--control-r-md);
   font-size: 14px;
   cursor: pointer;
   color: var(--ink);
@@ -2132,7 +2150,7 @@ a.ac-list__row:focus-visible {
   color: var(--ink);
   font-weight: 650;
 }
-/* How long the question has been out (Doto, like every count) */
+/* How long the question has been out (tabular figures, like every count) */
 .ac-typing__clock {
   flex: none;
   font-size: 12px;
@@ -2788,12 +2806,13 @@ a.ac-list__row:focus-visible {
   --b1-light: rgba(255, 255, 255, 0.12);
 }
 
-/* Buttons: b1 (primary), b2 (default), ghost */
+/* Buttons: b1 (primary), b2 (default), ghost. Sizes follow the control ruler (tokens.css --control-*). */
 .ac-btn {
-  height: 40px;
-  padding: 0 16px;
+  height: var(--control-h-md);
+  padding: 0 var(--control-px-md);
+  font-size: var(--control-fs-md);
   border: 0;
-  border-radius: var(--radius-btn);
+  border-radius: var(--control-r-md);
   letter-spacing: -0.005em;
   background: var(--raised);
   color: var(--ink);
@@ -2871,21 +2890,42 @@ a.ac-list__row:focus-visible {
 .ac-btn--ghost[disabled] {
   background: transparent;
 }
-.ac-btn--sm {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
+.ac-btn .ac-icon {
+  width: var(--control-icon-md);
+  height: var(--control-icon-md);
 }
+.ac-btn--sm {
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  gap: 6px;
+  font-size: var(--control-fs-sm);
+  border-radius: var(--control-r-sm);
+}
+.ac-btn--sm .ac-icon {
+  width: var(--control-icon-sm);
+  height: var(--control-icon-sm);
+}
+.ac-btn--lg {
+  height: var(--control-h-lg);
+  padding: 0 var(--control-px-lg);
+  gap: 10px;
+  font-size: var(--control-fs-lg);
+  border-radius: var(--control-r-lg);
+}
+.ac-btn--lg .ac-icon {
+  width: var(--control-icon-lg);
+  height: var(--control-icon-lg);
+}
+/* Icon buttons are square, same shape as the rest of the ruler (no round plates). */
 .ac-btn--icon {
-  width: 40px;
+  width: var(--control-h-md);
   padding: 0;
 }
 .ac-btn--sm.ac-btn--icon {
-  width: 32px;
+  width: var(--control-h-sm);
 }
-/* Icon buttons: a round hover plate. */
-.ac-btn--ghost.ac-btn--icon {
-  border-radius: var(--radius-full);
+.ac-btn--lg.ac-btn--icon {
+  width: var(--control-h-lg);
 }
 .ac-btn__kbd {
   display: inline-flex;
@@ -2922,8 +2962,9 @@ a.ac-list__row:focus-visible {
 
 /* Split button */
 .ac-split {
+  --split-r: var(--control-r-md);
   display: inline-flex;
-  border-radius: var(--radius-btn);
+  border-radius: var(--split-r);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
 }
@@ -2933,11 +2974,14 @@ a.ac-list__row:focus-visible {
   border-radius: 0;
 }
 .ac-split > .ac-btn:first-child {
-  border-radius: var(--radius-btn) 0 0 var(--radius-btn);
+  border-radius: var(--split-r) 0 0 var(--split-r);
 }
 .ac-split > :last-child,
 .ac-split > :last-child .ac-btn {
-  border-radius: 0 var(--radius-btn) var(--radius-btn) 0;
+  border-radius: 0 var(--split-r) var(--split-r) 0;
+}
+.ac-toolbar .ac-split {
+  --split-r: var(--tool-r);
 }
 .ac-split > :last-child {
   border-left: 1px solid var(--line);
@@ -2946,12 +2990,20 @@ a.ac-list__row:focus-visible {
   background: var(--plate-soft);
 }
 
-/* Segmented control with the sliding pill */
+/*
+ * Segmented control with the sliding pill. The track is a control of the ruler (40, or 32 small); items sit
+ * 4px inside (3px small) with concentric corners (outer radius − inset).
+ */
 .ac-seg {
+  --seg-h: var(--control-h-md);
+  --seg-r: var(--control-r-md);
+  --seg-in: 4px;
   position: relative;
   display: inline-flex;
-  padding: 3px;
-  border-radius: var(--radius-btn);
+  box-sizing: border-box;
+  height: var(--seg-h);
+  padding: var(--seg-in);
+  border-radius: var(--seg-r);
   background: var(--sunken);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
@@ -2964,12 +3016,12 @@ a.ac-list__row:focus-visible {
   justify-content: center;
   gap: 6px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--control-fs-sm);
   font-weight: 600;
-  height: 30px;
-  padding: 0 14px;
+  height: calc(var(--seg-h) - 2 * var(--seg-in));
+  padding: 0 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: calc(var(--seg-r) - var(--seg-in));
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -2978,17 +3030,17 @@ a.ac-list__row:focus-visible {
   white-space: nowrap;
 }
 /*
- * Counts in Doto (dot matrix, rounded dots): every number that counts
- * something shares this face. Screens put `ac-num` on their own count spans;
- * content numbers (dates, #123, prices, code) keep the text face.
+ * Counts: the text face (Onest) with tabular figures, so a number that
+ * changes never shifts its row. Screens put `ac-num` on their own count spans.
+ * Doto (dot matrix) is kept for rare special moments only (the wordmark's
+ * ".chat", the landing, a big hero number), never for ordinary counts.
  */
 .ac-num,
 .ac-count,
 .ac-countchip,
 .ac-tab__count,
 .ac-msg__reaction-count {
-  font-family: var(--font-dot, var(--font-mono));
-  font-variation-settings: "ROND" 100;
+  font-family: var(--font-sans);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -3026,9 +3078,14 @@ a.ac-list__row:focus-visible {
 .ac-seg__item[data-on] .ac-countchip {
   color: var(--ink2);
 }
+.ac-seg--sm {
+  --seg-h: var(--control-h-sm);
+  --seg-r: var(--control-r-sm);
+  --seg-in: 3px;
+}
 .ac-seg--sm .ac-seg__item {
-  height: 26px;
   padding: 0 10px;
+  font-size: 12.5px;
 }
 .ac-seg__item[data-on] {
   color: var(--ink);
@@ -3045,12 +3102,12 @@ a.ac-list__row:focus-visible {
 }
 .ac-seg__pill {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
+  top: var(--seg-in);
+  bottom: var(--seg-in);
   left: 0;
   width: var(--w);
   transform: translateX(var(--x));
-  border-radius: 9px;
+  border-radius: calc(var(--seg-r) - var(--seg-in));
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
 }
@@ -3275,15 +3332,17 @@ a.ac-list__row:focus-visible {
   background: var(--ink);
 }
 
-/* People: a round neutral gradient with initials; presence dot */
+/* People: the tile (a rounded square, radius 30% of the side) in a neutral gradient with initials or a photo; presence dot on the corner */
 .ac-avatar {
   background: linear-gradient(160deg, var(--person-a), var(--person-b));
   color: var(--person-ink);
   font-weight: 650;
+  border-radius: 30%;
 }
 .ac-avatar__presence {
   right: -1px;
   bottom: -1px;
+  z-index: 2;
   background: var(--ok);
   box-shadow: 0 0 0 2px var(--raised);
 }
@@ -3312,6 +3371,41 @@ a.ac-list__row:focus-visible {
   border-radius: inherit;
   border-bottom-left-radius: inherit;
 }
+/*
+ * The tile (telas/RefinoUI.html, "Molduras" → Céu), agents and people alike:
+ * radius 30% of the side, an inset hairline and a faint top highlight. The
+ * agent's canvas is the tile itself (its own pixel sky, the agent standing in
+ * it); the soft tint only shows until the first draw.
+ */
+.ac-avatar.ac-avatar--framed {
+  border-radius: 30%;
+}
+.ac-avatar--framed.ac-avatar--agent {
+  background: color-mix(in srgb, var(--av-top, var(--agent)) 14%, var(--raised));
+}
+.ac-avatar--framed::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+[data-theme="dark"] .ac-avatar--framed::before {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.ac-avatar--framed .ac-avatar__canvas {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
 @media (prefers-reduced-motion: no-preference) {
   .ac-avatar--running::after {
     animation: ac-halo 1.6s var(--out) infinite;
@@ -3328,67 +3422,99 @@ a.ac-list__row:focus-visible {
   }
 }
 
-/* Messages: a faint hover plate; the action bar fades in */
+/* Messages: a faint hover plate; the action bar fades in (telas/RefinoUI.html, "Nova leitura") */
 .ac-msg {
-  border-radius: var(--radius-lg);
-  transition: background-color 0.15s;
+  border-radius: 14px;
+  transition: background-color 0.12s;
 }
 .ac-msg:hover {
   background: var(--plate-soft);
 }
-/* Solid, and lifted above the author line: it may cover the tail of the message above, never this one's text. */
+/* A raised bar of 32px ghost icon buttons at the row's top-right: react, reply, more. Hidden at rest,
+   shown on hover and on keyboard focus inside the row. */
 .ac-msg__actions {
-  top: -28px;
-  right: 12px;
+  top: -14px;
+  right: 10px;
   z-index: var(--z-sticky);
+  padding: 3px;
   border: 0;
-  border-radius: var(--radius-item);
-  background: var(--glass-solid);
-  box-shadow: var(--e2), var(--top);
-  transition: opacity 0.15s var(--out);
+  border-radius: 13px;
+  background: var(--raised);
+  box-shadow: var(--e2);
+  transform: translateY(4px);
+  transition:
+    opacity 0.12s,
+    transform 0.16s var(--out);
+}
+.ac-msg:hover .ac-msg__actions,
+.ac-msg:focus-within .ac-msg__actions,
+.ac-msg__actions[data-open="true"],
+.ac-msg__actions:has([aria-expanded="true"]) {
+  transform: none;
+}
+.ac-msg__actions .ac-btn--sm {
+  min-width: 32px;
 }
 /* The row being hovered stays above its neighbours, so its bar is never under the next row. */
 .ac-msg:hover,
 .ac-msg:focus-within {
   z-index: var(--z-lifted);
 }
+/* Reading: 15.5px / 1.7 in the ink color, about 68 characters a line (72 in a team chat). */
 .ac-msg__text {
-  line-height: 1.62;
-  color: var(--ink2);
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--ink);
+  max-width: 68ch;
 }
 
-/* Work summary under an agent message: "4 passos · himetrica, Drive · 12 s" */
+/* Work under an agent message: a quiet 32px button ("Ver o que ela fez · 7 passos · 38 s");
+   the steps open in a hairline card below it. */
 .ac-work {
-  margin-top: 10px;
-  border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px var(--line);
-  overflow: hidden;
+  margin-top: 16px;
   max-width: 560px;
 }
 .ac-work__head {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 14px;
+  gap: 8px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 12px 0 10px;
   border: 0;
+  border-radius: 10px;
   background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: 13px;
   color: var(--muted);
   cursor: pointer;
   text-align: left;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
+}
+.ac-work__head > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ac-work__head:hover {
   background: var(--plate-soft);
+  color: var(--ink);
 }
 .ac-work__head:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring);
 }
 .ac-work__head strong {
-  color: var(--ink2);
-  font-weight: 600;
+  color: inherit;
+  font-weight: 550;
+}
+.ac-work__meta {
+  color: var(--faint);
+  font-weight: 400;
 }
 .ac-work__chev {
   flex: none;
@@ -3398,9 +3524,11 @@ a.ac-list__row:focus-visible {
   transform: rotate(90deg);
 }
 .ac-work__steps {
-  margin: 0;
-  padding: 0 0 6px;
+  margin: 8px 0 0;
+  padding: 6px 0;
   list-style: none;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .ac-work__step {
   display: flex;
@@ -3450,38 +3578,46 @@ a.ac-list__row:focus-visible {
   }
 }
 
-/* Reactions */
+/* Reactions: compact 32px toggles (rounded rect, not pills); counts in the text face. */
 .ac-reacts {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .ac-react {
-  height: 26px;
-  padding: 0 9px;
-  border-radius: var(--radius-full);
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
   border: 0;
-  background: var(--sunken);
+  background: color-mix(in srgb, var(--sunken) 40%, var(--raised));
+  box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 550;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
   transition:
-    transform 0.2s var(--spring),
-    background-color 0.15s;
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+.ac-react .tabular {
+  font-variant-numeric: tabular-nums;
 }
 .ac-react:hover {
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--plate-soft) 100%, var(--raised));
+  color: var(--ink);
 }
 .ac-react[aria-pressed="true"] {
-  background: var(--raised);
+  background: var(--sunken);
   color: var(--ink);
-  box-shadow: var(--e1), var(--top);
+  box-shadow:
+    inset 0 1px 3px rgba(23, 23, 22, 0.12),
+    inset 0 0 0 1px var(--line);
 }
 .ac-react:focus-visible {
   outline: none;
@@ -3507,10 +3643,12 @@ a.ac-list__row:focus-visible {
   background: var(--sunken);
   box-shadow: var(--e1);
 }
+/* Lower (RefinoUI "Nova leitura"): one 32px line at rest, the toolbar 4px under it. */
 .ac-composer textarea {
   font-size: 15.5px;
   line-height: 22px;
-  padding: 16px 18px 6px;
+  min-height: 32px;
+  padding: 12px 16px 2px;
 }
 .ac-composer textarea::placeholder {
   color: var(--faint);
@@ -3519,7 +3657,7 @@ a.ac-list__row:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px 10px 12px;
+  padding: 4px 8px 8px 10px;
 }
 .ac-composer__pills {
   display: flex;
@@ -3539,15 +3677,15 @@ a.ac-list__row:focus-visible {
 .ac-composer__tools .ac-btn + .ac-composer__send {
   margin-left: 0;
 }
-/* Context pills: neutral; the target agent carries its own identity */
+/* Context chips: neutral; the target agent carries its own identity. Compact controls of the ruler. */
 .ac-composer__pill,
 .ac-composer__agent {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
+  height: var(--control-h-sm);
   padding: 0 10px;
-  border-radius: var(--radius-full);
+  border-radius: var(--control-r-sm);
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
@@ -3561,38 +3699,45 @@ a.ac-list__row:focus-visible {
   background: var(--agent-soft);
   color: var(--agent);
 }
+/* Send: a compact primary button of the ruler (32, r10), dim until there is something to send. */
 .ac-composer__send {
   margin-left: auto;
   flex: none;
-  height: 34px;
-  min-width: 34px;
+  height: var(--control-h-sm);
+  min-width: var(--control-h-sm);
   padding: 0;
-  border-radius: 11px;
+  border-radius: var(--control-r-sm);
   border: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--control-fs-sm);
   font-weight: 600;
   cursor: pointer;
-  background: var(--sunken);
-  color: var(--faint);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 82%, var(--bg)) 0%, var(--ink) 100%);
+  color: var(--bg);
+  box-shadow:
+    inset 0 1px 0 var(--b1-light),
+    0 1px 2px rgba(0, 0, 0, 0.18);
+  opacity: 0.32;
   transition:
-    background-color 0.25s var(--spring),
-    color 0.25s var(--spring),
+    opacity 0.25s var(--spring),
     padding 0.25s var(--spring),
     transform 0.18s var(--spring);
 }
 .ac-composer__send[data-ready] {
-  padding: 0 12px;
-  background: var(--ink);
-  color: var(--bg);
+  opacity: 1;
   cursor: pointer;
 }
 .ac-composer__send[disabled] {
   cursor: default;
+}
+/* Off, it stays the primary square, only dimmed (not the generic disabled gray). */
+.ac-composer__send.ac-btn[disabled] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 82%, var(--bg)) 0%, var(--ink) 100%);
+  color: var(--bg);
 }
 .ac-composer__send:active:not([disabled]) {
   transform: scale(0.96);
@@ -3645,6 +3790,30 @@ a.ac-list__row:focus-visible {
 .ac-composer__tools--format .ac-composer__pills {
   flex-basis: 100%;
 }
+/* Inline pills (a DM with an agent): its chip opens the toolbar row, a hairline before the tools. */
+.ac-composer--inline-pills .ac-composer__tools--format .ac-composer__pills {
+  flex: 0 1 auto;
+  flex-basis: auto;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.ac-composer--inline-pills .ac-composer__pills::after {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px 0 2px;
+  background: var(--line2);
+}
+.ac-composer--inline-pills .ac-composer__agent {
+  padding: 0 10px 0 4px;
+  background: var(--plate-soft);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 550;
+}
 .ac-composer__tools--format .ac-composer__send,
 .ac-composer__tools--format .ac-btn + .ac-composer__send {
   margin-left: auto;
@@ -3673,10 +3842,10 @@ a.ac-list__row:focus-visible {
   background: var(--line);
 }
 .ac-composer__format-btn {
-  width: 30px;
-  height: 30px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   border: 0;
-  border-radius: var(--radius-item);
+  border-radius: var(--control-r-sm);
   background: transparent;
   color: var(--muted);
   display: inline-flex;
@@ -3796,7 +3965,7 @@ a.ac-list__row:focus-visible {
   width: 22px;
   height: 22px;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   display: inline-flex;
@@ -3832,10 +4001,11 @@ a.ac-list__row:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
+  height: var(--control-h-sm);
   padding: 0 10px;
-  border-radius: var(--radius-item);
-  background: var(--sunken);
+  border-radius: var(--control-r-sm);
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
   color: var(--faint);
 }
 .ac-emoji__search:focus-within {
@@ -3848,7 +4018,7 @@ a.ac-list__row:focus-visible {
   outline: none;
   background: transparent;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--control-fs-sm);
   color: var(--ink);
 }
 .ac-emoji__search input::placeholder {
@@ -3859,10 +4029,10 @@ a.ac-list__row:focus-visible {
   justify-content: space-between;
 }
 .ac-emoji__tab {
-  width: 32px;
-  height: 30px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   border: 0;
-  border-radius: var(--radius-item);
+  border-radius: var(--control-r-sm);
   background: transparent;
   font-size: 17px;
   line-height: 1;
@@ -3946,12 +4116,27 @@ a.ac-list__row:focus-visible {
   font-size: 15px;
   line-height: 1;
 }
+/* "+": a ghost square that shows with the row's hover or focus (always on touch screens). */
 .ac-react--add {
   padding: 0 7px;
+  background: transparent;
+  box-shadow: none;
   color: var(--faint);
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 .ac-react--add:hover {
   color: var(--ink);
+}
+.ac-msg:hover .ac-react--add,
+.ac-msg:focus-within .ac-react--add,
+.ac-react--add[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .ac-react--add {
+    opacity: 1;
+  }
 }
 .ac-react[disabled] {
   cursor: default;
@@ -4136,10 +4321,10 @@ a.ac-list__row:focus-visible {
   border: 0;
 }
 .ac-recur__day {
-  width: 32px;
-  height: 32px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--control-r-sm);
   background: var(--sunken);
   color: var(--ink2);
   font: inherit;
@@ -4308,14 +4493,12 @@ a.ac-list__row:focus-visible {
   font-size: 12px;
   color: var(--ink2);
 }
-/* Every control in the period row is 40px tall. */
+/* Every control in the period row is one default step of the ruler. */
 .ac-recur__period .ac-select__trigger,
 .ac-recur__period .ac-input {
-  height: 40px;
+  height: var(--control-h-md);
 }
 .ac-recur__ends.ac-seg {
-  height: 40px;
-  box-sizing: border-box;
   align-self: stretch;
 }
 .ac-recur__ends .ac-seg__item {
@@ -4329,13 +4512,15 @@ a.ac-list__row:focus-visible {
 
 /*
  * List toolbars: Toolbar + SearchField + FilterChip / FilterToggle. One
- * shape: pills of one height (`--tool-h`: 36px, 32px small, 40px on touch),
- * the field background and hairline; pressed or set = filled neutral. The
- * search, the toggles and the chips all read `--tool-h`, so a row of them
- * always lines up, inside a Toolbar or not. Screens don't restyle these.
+ * shape from the control ruler: a list's row is compact (`--tool-h` 32, r10;
+ * 40 r12 on touch), the field background and hairline; pressed or set =
+ * filled neutral. The search, the toggles, the chips and a view switch all
+ * read `--tool-h`/`--tool-r`, so a row of them always lines up. A search
+ * field on its own is a default control (40). Screens don't restyle these.
  */
 .ac-toolbar {
-  --tool-h: 36px;
+  --tool-h: var(--control-h-sm);
+  --tool-r: var(--control-r-sm);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -4343,7 +4528,13 @@ a.ac-list__row:focus-visible {
   min-width: 0;
 }
 .ac-toolbar--sm {
-  --tool-h: 32px;
+  --tool-h: var(--control-h-sm);
+  --tool-r: var(--control-r-sm);
+}
+.ac-toolbar .ac-seg {
+  --seg-h: var(--tool-h);
+  --seg-r: var(--tool-r);
+  --seg-in: 3px;
 }
 .ac-toolbar__search {
   flex: 0 1 280px;
@@ -4366,6 +4557,30 @@ a.ac-list__row:focus-visible {
   align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+/* Buttons and selects in the row take the row's step, so "Nova issue" lines up with the search. */
+.ac-toolbar .ac-btn {
+  height: var(--tool-h);
+  padding: 0 var(--control-px-sm);
+  gap: 6px;
+  font-size: var(--control-fs-sm);
+}
+.ac-toolbar .ac-btn:not(.ac-split .ac-btn) {
+  border-radius: var(--tool-r);
+}
+.ac-toolbar .ac-btn .ac-icon {
+  width: var(--control-icon-sm);
+  height: var(--control-icon-sm);
+}
+.ac-toolbar .ac-btn--icon {
+  width: var(--tool-h);
+  padding: 0;
+}
+.ac-toolbar .ac-select__trigger {
+  height: var(--tool-h);
+  padding-left: var(--control-px-sm);
+  font-size: var(--control-fs-sm);
+  border-radius: var(--tool-r);
 }
 @media (max-width: 760px) {
   /* Phone: the search takes the line; the filters scroll sideways in one row. */
@@ -4401,29 +4616,30 @@ a.ac-list__row:focus-visible {
   flex: none;
   width: 100%;
   min-width: 0;
-  height: var(--tool-h, 36px);
-  border-radius: var(--radius-full);
+  height: var(--tool-h, var(--control-h-md));
+  border-radius: var(--tool-r, var(--control-r-md));
   background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--field-line);
   color: var(--ink);
   transition:
     background-color 0.15s var(--out),
     box-shadow 0.15s var(--out);
 }
 .ac-searchfield--sm {
-  --tool-h: 32px;
+  --tool-h: var(--control-h-sm);
+  --tool-r: var(--control-r-sm);
 }
-/* Touch: 40px targets for the whole row (search, toggles, chips), still one height. */
+/* Touch: the default step (40, r12) for the whole row (search, toggles, chips, view switch), still one height. */
 @media (pointer: coarse) {
   .ac-toolbar,
   .ac-searchfield,
   .ac-filtertoggle,
   .ac-filter {
-    --tool-h: 40px;
+    --tool-h: var(--control-h-md);
+    --tool-r: var(--control-r-md);
   }
-  /* A view switch in the row grows with it (3px track padding each side). */
-  .ac-toolbar .ac-seg__item {
-    height: calc(var(--tool-h) - 6px);
+  .ac-toolbar .ac-seg {
+    --seg-in: 4px;
   }
 }
 .ac-searchfield:hover {
@@ -4432,7 +4648,7 @@ a.ac-list__row:focus-visible {
 .ac-searchfield:focus-within {
   background: var(--raised);
   box-shadow:
-    inset 0 0 0 1px var(--line2),
+    inset 0 0 0 1px var(--field-line),
     var(--field-ring);
 }
 .ac-searchfield__icon {
@@ -4454,10 +4670,16 @@ a.ac-list__row:focus-visible {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--control-fs-md);
 }
-.ac-searchfield--sm .ac-searchfield__input {
-  font-size: 13.5px;
+.ac-searchfield--sm .ac-searchfield__input,
+.ac-toolbar .ac-searchfield__input {
+  padding-left: 34px;
+  font-size: var(--control-fs-sm);
+}
+.ac-toolbar .ac-searchfield__icon,
+.ac-searchfield--sm .ac-searchfield__icon {
+  left: 11px;
 }
 .ac-searchfield__input::placeholder {
   color: var(--faint);
@@ -4479,6 +4701,18 @@ a.ac-list__row:focus-visible {
 .ac-searchfield:focus-within .ac-searchfield__hint {
   display: none;
 }
+/* Key hints follow the field's step: 20 (r6) in a default field, 18 (r5) in a compact one. */
+.ac-searchfield__hint .ac-kbd {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+.ac-searchfield--sm .ac-searchfield__hint .ac-kbd,
+.ac-toolbar .ac-searchfield__hint .ac-kbd {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
 @media (max-width: 760px) {
   .ac-searchfield__hint {
     display: none;
@@ -4494,7 +4728,7 @@ a.ac-list__row:focus-visible {
   width: 22px;
   height: 22px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 6px;
   background: var(--sunken);
   color: var(--ink2);
   cursor: pointer;
@@ -4512,12 +4746,12 @@ a.ac-list__row:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: var(--tool-h, 36px);
-  padding: 0 12px;
+  height: var(--tool-h, var(--control-h-sm));
+  padding: 0 var(--control-px-sm);
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--tool-r, var(--control-r-sm));
   background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--field-line);
   color: var(--ink2);
   font: inherit;
   font-size: 13px;
@@ -4558,7 +4792,7 @@ a.ac-list__row:focus-visible {
   color: var(--bg);
 }
 
-/* Filter chips (v2): soft pills that read their value; filled neutral when set */
+/* Filter chips (v2): controls of the ruler that read their value; filled neutral when set */
 .ac-filterbar {
   display: flex;
   flex-wrap: wrap;
@@ -4568,10 +4802,10 @@ a.ac-list__row:focus-visible {
 .ac-filter {
   display: inline-flex;
   align-items: center;
-  height: var(--tool-h, 36px);
-  border-radius: var(--radius-full);
+  height: var(--tool-h, var(--control-h-sm));
+  border-radius: var(--tool-r, var(--control-r-sm));
   background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--field-line);
   color: var(--ink2);
   transition:
     background-color 0.15s var(--out),
@@ -4600,9 +4834,9 @@ a.ac-list__row:focus-visible {
   align-items: center;
   gap: 6px;
   height: 100%;
-  padding: 0 10px 0 12px;
+  padding: 0 10px 0 var(--control-px-sm);
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: inherit;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -4640,7 +4874,7 @@ a.ac-list__row:focus-visible {
   height: 22px;
   margin-right: 5px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 6px;
   background: var(--sunken);
   color: var(--ink2);
   cursor: pointer;
@@ -4775,20 +5009,24 @@ a.ac-list__row:focus-visible {
     transform: none;
   }
 }
+/* Touch: compact controls grow to the default step of the ruler (40, r12). */
 @media (pointer: coarse) {
   .ac-btn--sm {
-    min-height: 40px;
+    min-height: var(--control-h-md);
+    border-radius: var(--control-r-md);
   }
   .ac-btn--sm.ac-btn--icon {
-    min-width: 40px;
+    min-width: var(--control-h-md);
   }
   .ac-composer__format-btn {
-    width: 40px;
-    height: 40px;
+    width: var(--control-h-md);
+    height: var(--control-h-md);
+    border-radius: var(--control-r-md);
   }
   .ac-composer__send {
-    height: 40px;
-    min-width: 40px;
+    height: var(--control-h-md);
+    min-width: var(--control-h-md);
+    border-radius: var(--control-r-md);
   }
   .ac-composer__file-remove {
     width: 32px;

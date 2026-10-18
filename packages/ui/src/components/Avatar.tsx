@@ -35,6 +35,13 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   expression?: Expression;
   /** Agents only: plays the face started by `playAgentReaction(reactionKey, …)` (a message id). */
   reactionKey?: string;
+  /**
+   * The tile (telas/RefinoUI.html): a rounded square with a hairline, the
+   * agent standing in its own pixel sky. On by default; off for the 18px
+   * receipts (`xs`) and the 112px hero (`xl`), where the agent stands on the
+   * page's own sky.
+   */
+  framed?: boolean;
 }
 
 /** A steady number per name, so agents next to each other move out of step. */
@@ -54,12 +61,14 @@ function AgentBody({
   expression,
   name,
   reactionKey,
+  framed,
 }: {
   appearance: AgentAppearance | undefined;
   state: AgentState;
   expression: Expression | undefined;
   name: string;
   reactionKey?: string;
+  framed: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const look = useRef<ReturnType<LiveAgent["look"]>>({ state, seed: 0 });
@@ -71,6 +80,7 @@ function AgentBody({
     expression,
     seed: seedOf(name),
     reactionKey,
+    framed,
   };
   const live = useRef<LiveAgent | null>(null);
   useLayoutEffect(() => {
@@ -90,7 +100,7 @@ function AgentBody({
   // biome-ignore lint/correctness/useExhaustiveDependencies: redraw when what is drawn changes
   useLayoutEffect(() => {
     if (live.current) drawLive(live.current, typeof performance === "object" ? performance.now() / 1000 : 0);
-  }, [color, eyes, accessory, state, expression]);
+  }, [color, eyes, accessory, state, expression, framed]);
   return <canvas className="ac-avatar__canvas" ref={canvas} />;
 }
 
@@ -103,10 +113,13 @@ export function initialsOf(name: string): string {
 }
 
 /**
- * People are circles with initials (or a photo) and an optional presence
- * dot. Agents are the living symbol from the agent engine: the dithered body
- * with the cut corner, white eyes and a pixel accessory, turning its head,
- * blinking and now and then making a face (see `state` and `expression`).
+ * One tile for everyone: a rounded square (radius 30% of the side) with a
+ * hairline and a faint top highlight. People show their photo or initials in
+ * it, with an optional presence dot on the corner. Agents are the living
+ * symbol from the agent engine standing in their own pixel sky: the dithered
+ * body with the cut corner, white eyes and a pixel accessory, turning its
+ * head, blinking and now and then making a face (see `state` and
+ * `expression`). Unframed (`xs`, `xl`), the agent stands on its own.
  */
 export function Avatar({
   kind = "person",
@@ -121,10 +134,12 @@ export function Avatar({
   labelled,
   expression,
   reactionKey,
+  framed,
   className,
   style,
   ...rest
 }: AvatarProps) {
+  const tile = framed ?? (size !== "xs" && size !== "xl");
   const a11y = labelled ? ({ role: "img", "aria-label": name } as const) : ({ "aria-hidden": true } as const);
   const agent = kind === "agent";
   const mood: AgentState = state ?? (running ? "thinking" : "idle");
@@ -134,6 +149,7 @@ export function Avatar({
         "ac-avatar",
         kind === "agent" && "ac-avatar--agent",
         size !== "md" && `ac-avatar--${size}`,
+        tile && "ac-avatar--framed",
         agent && mood !== "idle" && mood !== "waiting" && "ac-avatar--running",
         agent && mood !== "idle" && `ac-avatar--${mood}`,
         className,
@@ -149,7 +165,14 @@ export function Avatar({
       {...rest}
     >
       {agent ? (
-        <AgentBody appearance={appearance} state={mood} expression={expression} name={name} reactionKey={reactionKey} />
+        <AgentBody
+          appearance={appearance}
+          state={mood}
+          expression={expression}
+          name={name}
+          reactionKey={reactionKey}
+          framed={tile}
+        />
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />
       ) : (

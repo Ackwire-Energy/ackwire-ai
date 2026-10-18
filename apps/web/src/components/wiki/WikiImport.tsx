@@ -142,7 +142,7 @@ export function VaultDropZone({
   );
 }
 
-/** "14 notas · 4 pastas · 18 links · 3 anexos" in Doto (`ac-num`). */
+/** "14 notas · 4 pastas · 18 links · 3 anexos" with tabular figures (`ac-num`). */
 export function VaultStats({ report }: { report: VaultReport }) {
   const { t } = useTranslation();
   const stats: [number, string][] = [

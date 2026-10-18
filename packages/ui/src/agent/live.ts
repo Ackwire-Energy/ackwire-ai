@@ -5,6 +5,7 @@
  * gaze point (the landing's pointer): avatars inside an element marked
  * `data-gaze` turn their heads toward it.
  */
+import { avatarSky } from "../sky/avatar";
 import { ACCESSORY_REACH, type DrawAgentOptions, drawAccessory, drawAgent, idlePose, type Pose } from "./engine.js";
 
 export interface LiveAgent {
@@ -21,6 +22,8 @@ export interface LiveAgent {
     seed: number;
     /** Plays the transient face started by `playAgentReaction` with this key (e.g. a message id). */
     reactionKey?: string;
+    /** Stands in its tile: its own pixel sky fills the box and the agent stands inside it (telas/RefinoUI.html). */
+    framed?: boolean;
   };
 }
 
@@ -139,7 +142,16 @@ function poseFor(a: ReturnType<LiveAgent["look"]>, t: number, box: HTMLElement, 
   return pose;
 }
 
-/** Draws one agent now (sizes the canvas to the box, with room for accessories). */
+/** Smallest framed tile (CSS px) that still shows the accessory. */
+const FRAMED_ACCESSORY_MIN = 26;
+
+const isDark = (el: Element) => el.closest("[data-theme]")?.getAttribute("data-theme") === "dark";
+
+/**
+ * Draws one agent now. Framed: the canvas is the tile (the agent's sky, then
+ * the agent standing in it). Unframed: the canvas is a bit larger than the
+ * box, with room for accessories.
+ */
 export function drawLive(agent: LiveAgent, t: number) {
   const { canvas, box } = agent;
   const size = box.clientWidth;
@@ -152,6 +164,10 @@ export function drawLive(agent: LiveAgent, t: number) {
   }
   if (!ctx) return;
   const dpr = Math.min(2, typeof devicePixelRatio === "number" ? devicePixelRatio : 1);
+  if (agent.look().framed) {
+    drawFramed(agent, ctx, size, dpr, t);
+    return;
+  }
   const R = ACCESSORY_REACH;
   const w = Math.round(size * (1 + R.left + R.right) * dpr);
   const h = Math.round(size * (1 + R.top + R.bottom) * dpr);
@@ -162,16 +178,8 @@ export function drawLive(agent: LiveAgent, t: number) {
   ctx.clearRect(0, 0, w, h);
   const look = agent.look();
   const s = size * dpr;
-  const gazing = !!gaze && !!box.closest("[data-gaze]");
-  const still = reduced();
-  let pose = poseFor(look, still ? 0 : t, box, gazing);
-  let hop = 0;
-  const playing = agentReactionOf(look.reactionKey);
-  if (playing) {
-    const face = reactionPose(playing.kind, playing.elapsed, still);
-    pose = { ...pose, ...face.pose };
-    hop = face.hop * s;
-  }
+  const { pose, hop: lift } = livePose(agent, t);
+  const hop = lift * s;
   drawAgent(ctx, R.left * s, R.top * s - hop, s, {
     color: look.color,
     eyes: look.eyes,
@@ -181,6 +189,67 @@ export function drawLive(agent: LiveAgent, t: number) {
       ? (g, side, frame) => drawAccessory(g, side, look.accessory as string, frame, t, look.state === "thinking")
       : undefined,
   });
+}
+
+/** The pose for this frame, with a playing reaction's face and hop (a fraction of the body). */
+function livePose(agent: LiveAgent, t: number): { pose: Pose; hop: number } {
+  const look = agent.look();
+  const gazing = !!gaze && !!agent.box.closest("[data-gaze]");
+  const still = reduced();
+  const pose = poseFor(look, still ? 0 : t, agent.box, gazing);
+  const playing = agentReactionOf(look.reactionKey);
+  if (!playing) return { pose, hop: 0 };
+  const face = reactionPose(playing.kind, playing.elapsed, still);
+  return { pose: { ...pose, ...face.pose }, hop: face.hop };
+}
+
+/**
+ * The tile (telas/RefinoUI.html, "Céu"): the agent's pixel sky fills the
+ * canvas; the agent stands centered, feet near the bottom edge, smaller with
+ * an accessory so it has room above (accessories only from 26px).
+ */
+function drawFramed(agent: LiveAgent, ctx: CanvasRenderingContext2D, size: number, dpr: number, t: number) {
+  const { canvas, box } = agent;
+  const s = Math.round(size * dpr);
+  if (canvas.width !== s || canvas.height !== s) {
+    canvas.width = s;
+    canvas.height = s;
+  }
+  ctx.clearRect(0, 0, s, s);
+  const look = agent.look();
+  const sky = avatarSky(look.color, s, isDark(box));
+  if (sky) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sky, 0, 0, s, s);
+  }
+  const accessory = size >= FRAMED_ACCESSORY_MIN ? look.accessory : undefined;
+  const inner = s * (accessory ? 0.6 : 0.66);
+  const x = (s - inner) / 2;
+  const y = s - inner - s * (accessory ? 0.1 : 0.14);
+  const { pose, hop } = livePose(agent, t);
+  drawAgent(ctx, x, y - hop * inner, inner, {
+    color: look.color,
+    eyes: look.eyes,
+    pose,
+    cells: size <= 32 ? 12 : undefined,
+    after: accessory
+      ? (g, side, frame) => drawAccessory(g, side, accessory, frame, t, look.state === "thinking")
+      : undefined,
+  });
+}
+
+/** Redraws every agent at once (a new theme changes their skies; the loop may be standing still). */
+function redrawAll() {
+  const t = clock() / 1000;
+  for (const a of agents) drawLive(a, t);
+}
+
+let themeWatch: MutationObserver | null = null;
+function watchTheme() {
+  if (themeWatch || typeof MutationObserver === "undefined" || typeof document === "undefined") return;
+  themeWatch = new MutationObserver(redrawAll);
+  // Subtree: a page can theme its own part (the landing's `data-theme`).
+  themeWatch.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["data-theme"] });
 }
 
 function tick(now: number) {
@@ -196,6 +265,7 @@ function tick(now: number) {
 /** Starts drawing an agent; returns the cleanup. */
 export function addLiveAgent(agent: LiveAgent): () => void {
   agents.add(agent);
+  watchTheme();
   if (typeof IntersectionObserver === "function") {
     observer ??= new IntersectionObserver((entries) => {
       for (const e of entries) {

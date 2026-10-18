@@ -53,72 +53,6 @@
 .ap-head__guard-icon {
   display: inline-flex;
 }
-.ap-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.ap-tools__search {
-  flex: 0 1 260px;
-  min-width: 0;
-}
-.ap-pills {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 2px;
-  min-width: 0;
-}
-.ap-pills::-webkit-scrollbar {
-  display: none;
-}
-.ap-pill {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  color: var(--ink2);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    transform 0.18s var(--spring),
-    box-shadow 0.15s,
-    background 0.15s,
-    color 0.15s;
-}
-.ap-pill:hover {
-  box-shadow: var(--e2), var(--top);
-}
-.ap-pill:active {
-  transform: scale(0.96);
-}
-.ap-pill:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.ap-pill[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--bg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-.ap-pill__count {
-  font-size: 12px;
-  color: var(--faint);
-}
-.ap-pill[aria-pressed="true"] .ap-pill__count {
-  color: color-mix(in srgb, var(--bg) 65%, transparent);
-}
 
 /* ── Who is waiting on you ──────────────────────────────────────────────── */
 .ap-waiters {
@@ -410,10 +344,10 @@
   gap: 6px;
 }
 .ap-refuse__suggest button {
-  height: 28px;
-  padding: 0 10px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--control-r-sm);
   background: var(--sunken);
   color: var(--muted);
   font: inherit;
@@ -766,9 +700,6 @@
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
-  .ap-tools__search {
-    flex: 1 1 100%;
-  }
   .ap-card {
     grid-template-columns: 36px minmax(0, 1fr);
     gap: 4px 10px;

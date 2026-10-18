@@ -125,8 +125,9 @@ export function Markdown({ source, variant = "document", mention, wikiLink, embe
     switch (b.type) {
       case "heading": {
         if (message) {
+          // Opens a section (more air above), still a bold line rather than a document heading.
           return (
-            <p key={k}>
+            <p key={k} className="md__h">
               <strong>{inline(b.text, k)}</strong>
             </p>
           );

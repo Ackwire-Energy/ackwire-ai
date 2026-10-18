@@ -117,7 +117,7 @@ export const AffixInput = forwardRef<HTMLInputElement, InputProps & { prefix: Re
 });
 
 /**
- * Search box above a list: the shared SearchField (a pill; `size="sm"` in
+ * Search box above a list: the shared SearchField (a field of the ruler; `size="sm"` in
  * dialogs and panels). Kept under this name for existing screens.
  */
 export const SearchInput = SearchField;

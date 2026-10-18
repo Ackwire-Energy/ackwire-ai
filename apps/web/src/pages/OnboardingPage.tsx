@@ -834,12 +834,13 @@ export function OnboardingPage() {
             </Button>
           )}
           {showSkip && (
-            <Button variant="ghost" onClick={() => void advance(true).catch(() => {})} disabled={busy}>
+            <Button variant="ghost" size="lg" onClick={() => void advance(true).catch(() => {})} disabled={busy}>
               {t("onboarding.skip")}
             </Button>
           )}
           <Button
             variant="primary"
+            size="lg"
             onClick={() => void advance().catch(() => {})}
             disabled={blocked || busy}
             loading={busy}

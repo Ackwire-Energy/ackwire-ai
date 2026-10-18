@@ -488,6 +488,7 @@ export const ptBR = {
     callAgent: "Chamar um agente",
     callAgentMenu: "Agentes deste canal",
     newMessages: "Novas mensagens",
+    endOfReply: "Fim da resposta",
     mentionSuggestions: "Sugestões de menção",
   },
   receipts: {

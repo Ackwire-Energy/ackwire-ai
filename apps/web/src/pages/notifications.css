@@ -246,9 +246,9 @@
   gap: 6px;
 }
 .nt-sug button {
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 999px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
   border: 0;
   background: var(--sunken);
   font: inherit;
@@ -488,11 +488,11 @@
   align-items: center;
   gap: 4px;
   margin-top: 6px;
-  height: 26px;
-  padding: 0 8px 0 6px;
+  height: var(--control-h-sm);
+  padding: 0 10px 0 6px;
   margin-left: -6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--control-r-sm);
   background: transparent;
   font: inherit;
   font-size: 12.5px;
@@ -616,7 +616,7 @@
   display: flex;
   gap: 2px;
   padding: 3px;
-  border-radius: 12px;
+  border-radius: calc(var(--control-r-sm) + 3px);
   background: var(--raised);
   box-shadow: var(--e2), var(--top);
   opacity: 0;
@@ -641,9 +641,9 @@
 }
 .nt-nb {
   position: relative;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--control-r-sm);
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -953,9 +953,9 @@
   }
   .nt-nb {
     width: auto;
-    height: 32px;
+    height: var(--control-h-sm);
     padding: 0 10px;
-    border-radius: 10px;
+    border-radius: var(--control-r-sm);
     background: var(--raised);
     box-shadow: var(--e1), var(--top);
     font-size: 12.5px;
@@ -966,7 +966,7 @@
     display: inline;
   }
   .nt-nb[data-act="open"] {
-    width: 32px;
+    width: var(--control-h-sm);
     padding: 0;
   }
   .nt-nb[data-act="open"] .nt-nb__label {

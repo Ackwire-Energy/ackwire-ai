@@ -22,7 +22,7 @@ import {
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
 import { type EmojiPickerLabels, EmojiPickerPopover } from "./EmojiPicker";
-import { Kbd, modKey } from "./Kbd";
+import { modKey } from "./Kbd";
 import { Spinner } from "./Skeleton";
 
 /** Names of the formatting buttons (also their tooltips, with the shortcut). */
@@ -114,7 +114,12 @@ export interface ComposerProps {
   links?: ComposerMentions;
   /** Context pills under the text (the target agent, the active skill). */
   pills?: ReactNode;
-  /** Shown in the send button once there is text ("Enviar"); the key hint follows. */
+  /**
+   * The pills sit in the toolbar row, left of the formatting tools, after a
+   * hairline (a DM with an agent: its chip is context, not a second line).
+   */
+  inlinePills?: boolean;
+  /** The send button's tooltip, with the key hint ("Enviar ↵"). */
   sendText?: string;
   /** Formatting toolbar (bold, italic, lists…) and its ⌘/Ctrl shortcuts, writing Markdown. */
   format?: ComposerFormatLabels;
@@ -301,6 +306,7 @@ export function Composer({
   commands,
   links,
   pills,
+  inlinePills,
   sendText,
   format,
   emoji,
@@ -529,7 +535,7 @@ export function Composer({
         {/* biome-ignore lint/a11y/noStaticElementInteractions: files dropped anywhere on the card (the attach button is the accessible way) */}
         <div
           ref={box}
-          className={cx("ac-composer", className)}
+          className={cx("ac-composer", inlinePills && "ac-composer--inline-pills", className)}
           data-disabled={disabled || undefined}
           data-dragging={dragging || undefined}
           onDragOver={
@@ -606,25 +612,19 @@ export function Composer({
                 }}
               />
             )}
-            {/* Grows from a dim square into "Enviar ↵" once there is text. */}
-            <button
-              type="button"
+            {/* The compact primary square (32px): dim until there is something to send. */}
+            <Button
+              variant="primary"
+              size="sm"
+              iconOnly
+              icon="send"
               className="ac-composer__send"
               data-ready={ready ? "" : undefined}
               aria-label={sendLabel}
+              title={sendText ? `${sendText} ↵` : undefined}
               onClick={send}
               disabled={!ready}
-            >
-              {sendText && ready && (
-                <span className="ac-composer__send-text" aria-hidden="true">
-                  {sendText}
-                  <Kbd>↵</Kbd>
-                </span>
-              )}
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-              </svg>
-            </button>
+            />
           </div>
         </div>
       </RPopover.Anchor>

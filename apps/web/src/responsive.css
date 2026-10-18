@@ -156,6 +156,11 @@
     padding-right: 12px;
     padding-left: 12px;
   }
+  /* The reading column takes the whole phone width (16px gutter). */
+  .chat--reading .channel__messages {
+    padding-right: 4px;
+    padding-left: 4px;
+  }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
   }
@@ -247,10 +252,9 @@
 @media (pointer: coarse) {
   .sidebar__item,
   .sidebar__jump,
-  .settings__link,
-  .pill {
+  .settings__link {
     height: auto;
-    min-height: 40px;
+    min-height: var(--control-h-md);
   }
   /* Keyboard shortcuts mean nothing on a touch screen. */
   .sidebar__jump .ac-kbd,
@@ -388,8 +392,11 @@
   .agp-quick {
     margin-left: 0;
   }
+  /* The track keeps the ruler's height: it scrolls sideways instead of wrapping. */
   .agp-toolbar .ac-seg {
-    flex-wrap: wrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .agp-run {
     grid-template-columns: minmax(0, 1fr) auto;
