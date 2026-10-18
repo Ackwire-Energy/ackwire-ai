@@ -103,8 +103,10 @@ export function ZoomableImage({
   });
 
   const pan = usePanGesture({
-    // Not zoomed: only a vertical drag (closing); the pager keeps the horizontal swipe.
-    ...(zoomed ? {} : { activeOffsetY: [-12, 12] as [number, number], failOffsetX: [-14, 14] as [number, number] }),
+    // Not zoomed: only a vertical drag (closing); the pager keeps the horizontal swipe. Zoomed: any
+    // direction moves the picture. Plain values, no spread: the worklets plugin rejects a spread here.
+    activeOffsetY: zoomed ? [-1, 1] : [-12, 12],
+    failOffsetX: zoomed ? [-10_000, 10_000] : [-14, 14],
     maxPointers: zoomed ? 2 : 1,
     onBegin: () => {
       "worklet";
