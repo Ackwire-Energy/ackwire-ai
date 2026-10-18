@@ -2,11 +2,12 @@ import { type ApiClient, type ArtifactDetail, keys, useApi } from "@agenteschat/
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
+import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { Linking, Platform } from "react-native";
+import { Platform } from "react-native";
 import { API_URL } from "@/config";
 import { appHeaders, readCookie } from "@/lib/auth";
-import { driveWebUrl, resolveDownloadUrl, type ShareSource, safeFileName, shareSource } from "./logic";
+import { resolveDownloadUrl, type ShareSource, safeFileName, shareSource } from "./logic";
 
 /**
  * Getting at a file's bytes: the short-lived download link (with the session when the link is ours),
@@ -113,7 +114,16 @@ export async function saveToPhotos(api: ApiClient, orgId: string, a: ArtifactDet
   return true;
 }
 
-/** Ver no Drive: the app has no Drive screen yet, so the web Drive opens at the file. */
-export function openInDrive(orgId: string, a: Pick<ArtifactDetail, "id" | "shownVersion" | "version">) {
-  return Linking.openURL(driveWebUrl(API_URL, orgId, a.id, a.shownVersion < a.version ? a.shownVersion : undefined));
+/**
+ * Ver no Drive: closes the viewer and opens the app's Drive with the file outlined (back on the Drive when the
+ * viewer was opened from it).
+ */
+export function openInDrive(_orgId: string, a: Pick<ArtifactDetail, "id" | "shownVersion" | "version">) {
+  if (router.canGoBack()) router.back();
+  return new Promise<void>((resolve) =>
+    setTimeout(() => {
+      router.navigate({ pathname: "/drive", params: { artifact: a.id } });
+      resolve();
+    }, 60),
+  );
 }

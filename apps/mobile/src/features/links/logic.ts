@@ -13,6 +13,7 @@ export type AppHref =
   | `/approval/${string}`
   | `/mission/${string}`
   | `/agent/${string}`
+  | `/issues/${number}`
   | "/activity"
   | "/threads";
 

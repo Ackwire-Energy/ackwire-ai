@@ -43,6 +43,10 @@ function AppStack() {
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="account-delete" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="issues/new" options={formSheet} />
+      <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="approval/[id]" options={approvalSheet} />
       <Stack.Screen name="me" options={meSheet} />
       <Stack.Screen name="new" options={newSheet} />
