@@ -755,6 +755,58 @@ canvas.sky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixe
 .stab svg.i{width:26px;height:26px;stroke-width:1.9}
 .stab.on{background:color-mix(in srgb,var(--ink) 9%,var(--glass))}
 
+/* files: inline previews + viewer */
+.shot{display:block;border-radius:14px;overflow:hidden;box-shadow:0 0 0 .5px var(--line2);background:#f5efe6;position:relative}
+.shot .web{position:absolute;inset:0;padding:10px}
+.shot .web i{display:block;border-radius:3px;background:#d9cbb6;margin-bottom:6px}
+.shot .web .hero{height:42%;border-radius:8px;background:linear-gradient(135deg,#2f6f73,#88b7a9);margin-bottom:8px}
+.imgs{display:grid;grid-template-columns:1.4fr 1fr;gap:6px;margin-top:8px;max-width:300px}
+.imgs .shot{aspect-ratio:3/4}
+.imgs .shot:first-child{aspect-ratio:auto;grid-row:span 1}
+.fcard{display:flex;align-items:center;gap:12px;margin-top:8px;padding:10px 12px;border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top);max-width:300px}
+.fcard .ft{width:40px;height:48px;border-radius:8px;background:var(--sunken);display:grid;place-items:center;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.04em;position:relative}
+.fcard .ft::after{content:"";position:absolute;top:0;right:0;width:12px;height:12px;background:linear-gradient(225deg,var(--bg) 50%,color-mix(in srgb,var(--ink) 10%,var(--sunken)) 50%);border-radius:0 8px 0 3px}
+.fcard .tx{flex:1;min-width:0}
+.fcard b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fcard span.s{display:block;font-size:13px;color:var(--faint)}
+.viewer{position:absolute;inset:0;background:#000;color:#fff;z-index:60;display:flex;flex-direction:column}
+.viewer .vt{display:flex;align-items:center;gap:10px;padding:56px 14px 10px}
+.viewer .vt .gb{background:rgba(255,255,255,.14);color:#fff;box-shadow:none}
+.viewer .vt .tx{flex:1;min-width:0;text-align:center}
+.viewer .vt b{display:block;font-size:15px;font-weight:600}
+.viewer .vt span{display:block;font-size:12.5px;color:rgba(255,255,255,.6)}
+.viewer .stage2{flex:1;min-height:0;overflow:hidden;display:grid;place-items:center;padding:0 0 10px}
+.viewer .stage2 .shot{height:100%;max-width:100%;aspect-ratio:9/16;border-radius:0;box-shadow:none}
+.viewer .dots{display:flex;justify-content:center;gap:6px;padding:6px 0}
+.viewer .dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.35)}
+.viewer .dots i.on{background:#fff}
+.viewer .vb{display:flex;justify-content:space-around;padding:10px 20px 38px}
+.viewer .vb button{display:flex;flex-direction:column;align-items:center;gap:5px;border:0;background:none;color:#fff;font-size:11.5px;font-weight:600}
+.viewer .vb button span.c{width:46px;height:46px;border-radius:23px;background:rgba(255,255,255,.14);display:grid;place-items:center}
+.viewer .vb svg.i{width:21px;height:21px}
+.docv{position:absolute;inset:0;background:var(--bg);z-index:60;display:flex;flex-direction:column}
+.docv .vt{display:flex;align-items:center;gap:10px;padding:56px 14px 10px}
+.docv .vt .tx{flex:1;min-width:0;text-align:center}
+.docv .vt b{display:block;font-size:15px;font-weight:600}
+.docv .vt span{display:block;font-size:12.5px;color:var(--faint)}
+.docv .page{flex:1;margin:4px 16px 0;border-radius:14px 14px 0 0;background:var(--raised);box-shadow:var(--e1);padding:20px 18px;overflow:hidden}
+.docv .page h3{font-family:var(--display);font-weight:300;font-size:24px;line-height:1.15;margin-bottom:10px}
+.docv .page p{font-size:14.5px;line-height:1.5;color:var(--ink2);margin-bottom:10px}
+.docv .page li{font-size:14.5px;line-height:1.5;color:var(--ink2);margin-left:18px}
+.docv .vb{display:flex;gap:10px;padding:12px 16px 38px;background:var(--bg);box-shadow:0 -.5px 0 var(--line2)}
+.docv .vb button{flex:1;height:46px;border-radius:23px;border:0;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:15px;font-weight:600;background:var(--sunken);color:var(--ink)}
+.docv .vb button.pri{background:var(--ink);color:var(--bg)}
+.docv .vb svg.i{width:17px;height:17px}
+.share{position:absolute;left:8px;right:8px;bottom:8px;z-index:70;border-radius:28px;background:var(--raised);box-shadow:0 -10px 40px -10px rgba(0,0,0,.35);padding:12px 14px 30px}
+.share .hd{display:flex;align-items:center;gap:10px;padding:4px 4px 12px;border-bottom:.5px solid var(--line2)}
+.share .apps{display:flex;gap:16px;padding:14px 4px}
+.share .apps span{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.share .apps i{width:56px;height:56px;border-radius:14px;display:block}
+.share .acts{border-radius:12px;background:var(--sunken);overflow:hidden}
+.share .acts div{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;font-size:15.5px;position:relative}
+.share .acts div+div::before{content:"";position:absolute;top:0;left:14px;right:0;height:.5px;background:var(--line2)}
+.share .acts svg.i{width:19px;height:19px;color:var(--ink2)}
+
 @media (max-width:760px){.intro{padding:14px 16px 0}.stage{padding:16px 0 30px}}
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
 </style>
@@ -1676,6 +1728,29 @@ S.sTab = () => `<div class="scroll" style="padding-top:64px">
   ${secH("Recentes", null, null, "tight")}<div class="cl">${ROWS.filter((r) => r.id === "theo" || r.id === "produto" || r.id === "nina").map(rowHTML).join("")}</div>
 </div>${tabsR("search")}`;
 
+I.share = I.share || sv('<path d="M12 3.5v11M8 7.5l4-4 4 4"/><path d="M6.5 11H6a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 18 11h-.5"/>');
+I.dl = I.dl || sv('<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>');
+I.photos = I.photos || sv('<rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/>');
+I.drive = I.drive || sv('<path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>');
+const webShot = () => `<span class="web"><i style="width:40%;height:8px"></i><span class="hero" style="display:block"></span><i style="width:80%;height:10px"></i><i style="width:60%;height:8px"></i><i style="width:46%;height:18px;border-radius:9px;background:#2f6f73"></i></span>`;
+const chatFiles = (extra = "") => `<div class="chat" style="position:absolute;inset:0"><div class="scroll" data-end style="padding-top:150px;padding-bottom:150px">
+  <div class="me"><p>tu consegue abrir o site do viajolo.example e me mandar um print?</p></div>
+  ${agMsg("theo", `<p>Aqui o print da home do viajolo.example. O site abriu na versão em português.</p>
+    <div class="imgs"><span class="shot" style="aspect-ratio:3/4">${webShot()}</span><span class="shot" style="aspect-ratio:3/4">${webShot()}</span></div>
+    <div class="fcard"><span class="ft">MD</span><span class="tx"><b>Resumo da home do Viajolo.md</b><span class="s">Documento · 4 KB</span></span></div>`, "10:03")}
+</div>${chatNav("theo", "Marketing")}${cmpA()}${extra}</div>`;
+S.fChat = () => chatFiles();
+S.fImg = () => chatFiles(`<div class="viewer"><div class="vt"><button class="gb" type="button" aria-label="Fechar">${I.x}</button><span class="tx"><b>home-viajolo.png</b><span>Theo · hoje 10:03</span></span><button class="gb" type="button" aria-label="Mais">${I.more}</button></div>
+  <div class="stage2"><span class="shot">${webShot()}</span></div><div class="dots"><i class="on"></i><i></i></div>
+  <div class="vb"><button type="button"><span class="c">${I.share}</span>Compartilhar</button><button type="button"><span class="c">${I.photos}</span>Salvar em Fotos</button><button type="button"><span class="c">${I.drive}</span>Ver no Drive</button></div></div>`);
+S.fDoc = () => chatFiles(`<div class="docv"><div class="vt"><button class="gb" type="button" aria-label="Fechar">${I.x}</button><span class="tx"><b>Resumo da home do Viajolo.md</b><span>Documento · 4 KB · Theo</span></span><button class="gb" type="button" aria-label="Mais">${I.more}</button></div>
+  <div class="page"><h3>Home do Viajolo</h3><p>A página abre na versão em português e mostra, de cima para baixo:</p><ul><li>o banner do app para iPhone, com o link da App Store;</li><li>o título “Para onde é a próxima?”;</li><li>a busca com o botão “Planejar grátis”;</li><li>o selo “Mais de 55 mil viagens já montadas”.</li></ul></div>
+  <div class="vb"><button type="button">${I.drive}Ver no Drive</button><button class="pri" type="button">${I.share}Compartilhar</button></div></div>`);
+S.fShare = () => chatFiles(`<div class="viewer"><div class="vt"><button class="gb" type="button">${I.x}</button><span class="tx"><b>home-viajolo.png</b><span>Theo · hoje 10:03</span></span><button class="gb" type="button">${I.more}</button></div><div class="stage2"><span class="shot">${webShot()}</span></div></div>
+  <div class="dim" style="z-index:65"></div><div class="share"><div class="hd"><span class="shot" style="width:40px;height:52px;border-radius:6px">${webShot()}</span><span><b style="font-size:15px">home-viajolo.png</b><span style="display:block;font-size:12.5px;color:var(--faint)">PNG · 312 KB</span></span></div>
+  <div class="apps"><span><i style="background:#34c759"></i>Mensagens</span><span><i style="background:#25d366"></i>WhatsApp</span><span><i style="background:#0a84ff"></i>Mail</span><span><i style="background:#8e8e93"></i>Notas</span></div>
+  <div class="acts"><div>Copiar${I.copy}</div><div>Salvar imagem${I.dl}</div><div>Salvar em Arquivos${I.drive}</div></div></div>`);
+
 /* ---------- views ---------- */
 const VIEWS = {
   composer: { tab: "Caixa de mensagem", title: "A caixa de mensagem",
@@ -1706,6 +1781,14 @@ const VIEWS = {
       { s: "sTab", cap: "Busca na barra de abas", sub: "A busca vira um botão redondo separado na barra de baixo, como no Música do iPhone (a aba de busca do iOS 26). Abre a tela Buscar: campo no topo e as conversas recentes." },
       { s: "sOpen", cap: "Buscando", sub: "Digitou: resultados agrupados (Conversas, Mensagens), Cancelar volta." },
       { s: "wD1", cap: "B + C · Aberta", sub: "Toque na faixa: ela abre no cartão em pilha (C), com Revisar e “e mais 2”. Toque de novo (ou role a lista) e ela fecha." },
+    ] },
+  files: { tab: "Arquivos", title: "Imagens e arquivos dentro do app",
+    desc: "Hoje: “Arquivo · Toque para abrir” sem nome, e o toque abre o link no navegador. Proposta: imagens aparecem na conversa; arquivos mostram nome, tipo e tamanho; o toque abre uma tela de visualização no próprio app, com compartilhar (a folha do iPhone: salvar imagem, salvar em Arquivos, mandar por outro app) e ver no Drive.",
+    phones: [
+      { s: "fChat", cap: "Na conversa", sub: "Os prints aparecem como imagens (toque abre). O documento mostra nome, tipo e tamanho." },
+      { s: "fImg", cap: "Imagem aberta", sub: "Tela cheia, escura. Pinça para zoom, arraste para baixo para fechar, deslize entre as imagens. Compartilhar, Salvar em Fotos, Ver no Drive." },
+      { s: "fDoc", cap: "Documento aberto", sub: "Markdown, texto e PDF mostrados no app. Ver no Drive e Compartilhar." },
+      { s: "fShare", cap: "Compartilhar", sub: "A folha de compartilhar do iPhone com o arquivo de verdade: outros apps, Copiar, Salvar imagem, Salvar em Arquivos." },
     ] },
   voce: { tab: "Você", title: "Você, organizado",
     desc: "Hoje tudo numa folha só: workspaces, aparência, notificações, idioma e conta, com estilos diferentes. Proposta: como os Ajustes do iPhone, uma lista curta; o que tem opções vira tela própria.",
