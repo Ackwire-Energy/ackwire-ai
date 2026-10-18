@@ -1,11 +1,10 @@
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { type ReactElement, type ReactNode, useMemo } from "react";
+import { type ReactElement, type ReactNode, useMemo, useState } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
-import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
-import { progress } from "@/lib/parallax";
 import { CoverBarBackdrop, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
 import { Text } from "./Text";
@@ -22,12 +21,10 @@ export interface LargeTitleScreenProps {
   /** Native buttons on the bar's leading side (iOS). */
   leftActions?: HeaderAction[];
   /**
-   * Revealed above the content when the list is pulled down, bottom first, only in the strip the
-   * overscroll opens under the bar (below the refresh spinner's room); iOS only, where scroll views
-   * bounce. `pullDownHeight` is its height.
+   * A header above the large title (Conversas: the greeting over the sky), part of the content: seen at rest,
+   * it scrolls away with the list. It gets `reach`, how far its art should extend up behind the clear bar.
    */
-  pullDown?: ReactNode;
-  pullDownHeight?: number;
+  header?: (reach: number) => ReactNode;
   children?: ReactNode;
   refreshControl?: ReactElement<RefreshControlProps>;
   /** Room under the content (default 24; the system already keeps content clear of the tab bar). */
@@ -48,8 +45,7 @@ export function LargeTitleScreen({
   actions,
   left,
   leftActions,
-  pullDown,
-  pullDownHeight = 0,
+  header,
   children,
   refreshControl,
   bottomInset = 24,
@@ -62,33 +58,20 @@ export function LargeTitleScreen({
   // height): the automatic adjustment didn't apply inside the system tabs, so the list rested under the bar
   // with the large title hidden, shown only while pulled. Android lays it out from the top, under the bar.
   const { y, onScroll } = useCoverScroll(IOS ? headerHeight : 0);
-  const titleFade = useScrollFade(y, 0, TITLE_GONE);
-  // The pull-down header lives only in the strip the overscroll reveals: between the bar's bottom edge
-  // (where the content rests, y = 0) and the content's top, less the room at the top where the refresh
-  // spinner turns. Nothing of it is ever under the clear bar or the status bar, at rest, while pulling or
-  // while bouncing back. The window is clipped and moved by transforms (no layout per frame): it is
-  // `pullDownHeight` tall above the content, slid down by what is not revealed, and the header inside is
-  // slid back up so it stays anchored to the content's top (bottom first: the crew, then the text).
-  const pullWindow = useAnimatedStyle(() => {
-    const shown = Math.min(Math.max(-y.value - PULL_ROOM, 0), pullDownHeight);
-    return {
-      opacity: shown > 0 ? progress(shown, 0, PULL_FADE) : 0,
-      transform: [{ translateY: pullDownHeight - shown }],
-    };
-  });
-  const pullAnchor = useAnimatedStyle(() => {
-    const shown = Math.min(Math.max(-y.value - PULL_ROOM, 0), pullDownHeight);
-    return { transform: [{ translateY: shown - pullDownHeight }] };
-  });
+  // The header's height: the large title (and the bar's title) start below it.
+  const [headerH, setHeaderH] = useState(0);
+  const titleFade = useScrollFade(y, headerH, headerH + TITLE_GONE);
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
   const options = useMemo<NativeStackNavigationOptions>(
     () => ({
       ...actionOptions,
       title,
-      headerTitle: () => <FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />,
+      headerTitle: () => (
+        <FadingHeaderTitle y={y} from={headerH + BAR_TITLE_FROM} to={headerH + BAR_TITLE_TO} text={title} />
+      ),
     }),
-    [actionOptions, title, y],
+    [actionOptions, title, y, headerH],
   );
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -110,15 +93,13 @@ export function LargeTitleScreen({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingTop: IOS ? 0 : headerHeight, paddingBottom: bottomInset }}
         >
-          {pullDown && IOS ? (
-            <Animated.View
-              style={[styles.pullDown, { top: -pullDownHeight, height: pullDownHeight }, pullWindow]}
-              pointerEvents="box-none"
+          {header ? (
+            <View
+              style={IOS ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}
+              onLayout={(e) => setHeaderH(e.nativeEvent.layout.height - (IOS ? headerHeight : 0))}
             >
-              <Animated.View style={[styles.pullDownContent, { height: pullDownHeight }, pullAnchor]}>
-                {pullDown}
-              </Animated.View>
-            </Animated.View>
+              {header(IOS ? headerHeight : 0)}
+            </View>
           ) : null}
           <Animated.View style={[styles.head, titleFade]}>
             <Text variant="display" accessibilityRole="header" numberOfLines={1}>
@@ -133,7 +114,7 @@ export function LargeTitleScreen({
           {children}
         </Animated.ScrollView>
       </LivePause>
-      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} />
+      <CoverBarBackdrop y={y} from={Math.max(0, headerH - 40)} to={headerH + 12} height={headerHeight} />
     </View>
   );
 }
@@ -147,18 +128,9 @@ const TITLE_GONE = 40;
 /** The bar's title fades in over this stretch, as the large title leaves. */
 const BAR_TITLE_FROM = 28;
 const BAR_TITLE_TO = 48;
-/**
- * The top of the pulled strip stays clear for the refresh spinner (UIRefreshControl is 60pt tall and the
- * list rests pulled by that much while refreshing), so the header never covers it.
- */
-const PULL_ROOM = 64;
-/** The pull-down header fades in over its first stretch revealed. */
-const PULL_FADE = 56;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
   subtitle: { marginTop: 2 },
-  pullDown: { position: "absolute", left: 0, right: 0, overflow: "hidden" },
-  pullDownContent: { position: "absolute", left: 0, right: 0, top: 0 },
 });

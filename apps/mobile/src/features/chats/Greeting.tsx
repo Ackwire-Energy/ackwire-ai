@@ -8,9 +8,6 @@ import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook, firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
 
-/** Height of the pull-down greeting (only the bounce shows it, bottom first). */
-export const GREETING_HEIGHT = 236;
-
 /** The examples under "Comece pelo seu primeiro agente": each fills "o que faz" of a new agent. */
 const EXAMPLES = [
   { key: "support", icon: "chat" },
@@ -30,17 +27,18 @@ function useGreeting() {
 }
 
 /**
- * The old Início's sky, as the header revealed by pulling Conversas down: the greeting, who is working
- * and what waits on you, and the crew (working ones bigger, with their orbit and name).
+ * The old Início's sky on top of Conversas, seen at rest and scrolling away with the list: the greeting,
+ * who is working and what waits on you, and the crew (working ones bigger, with their orbit and name).
+ * `reach`: how far the sky extends up behind the clear bar.
  */
-export function PullDownGreeting({ busy, waiting }: { busy: ReadonlySet<string>; waiting: number }) {
+export function Greeting({ busy, waiting, reach }: { busy: ReadonlySet<string>; waiting: number; reach: number }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const greeting = useGreeting();
   const crew = crewOf(dir.agents, busy, 5);
   return (
     <View style={styles.pull}>
-      <Sky color="sky" depth={0.95} style={StyleSheet.absoluteFill} />
+      <Sky color="sky" depth={0.95} style={[StyleSheet.absoluteFill, { top: -reach }]} />
       <Text variant="display" accessibilityRole="header">
         {greeting}
       </Text>
@@ -149,7 +147,7 @@ export function FirstAgentEmpty() {
 }
 
 const styles = StyleSheet.create({
-  pull: { flex: 1, justifyContent: "flex-end", paddingHorizontal: 20, paddingBottom: 18 },
+  pull: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 18 },
   sub: { marginTop: 4 },
   crew: { flexDirection: "row", alignItems: "flex-end", gap: 16, marginTop: 16, minHeight: 60 },
   ag: { alignItems: "center", gap: 3 },

@@ -11,7 +11,7 @@ import { useOrgId, usePullRefresh } from "../shared/hooks";
 import { useConversations, useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
-import { FirstAgentEmpty, GREETING_HEIGHT, PullDownGreeting } from "./Greeting";
+import { FirstAgentEmpty, Greeting } from "./Greeting";
 import {
   CHAT_FILTERS,
   type ChatFilter,
@@ -33,7 +33,7 @@ const WORKING_POLL_MS = 20_000;
  * activity, under the native large title with Você and "+" (Novo) in the bar, and the search field on top of
  * the list (in the content, not the bar: anything React inside the native bar keeps the large title from
  * collapsing on iOS). "Esperando você" sits on top when something waits (requests, missions, agents' questions);
- * pulling the list down shows the old Início's sky (greeting and crew). Empty, it invites the first agent.
+ * the old Início's sky (greeting and crew) sits on top. Empty, it invites the first agent.
  */
 export function ChatsScreen() {
   const { t } = useTranslation();
@@ -79,8 +79,7 @@ export function ChatsScreen() {
     <LargeTitleScreen
       title={t("mobile.chats.title")}
       {...header}
-      pullDown={showResults || empty ? undefined : <PullDownGreeting busy={busy} waiting={waiting} />}
-      pullDownHeight={GREETING_HEIGHT}
+      header={showResults || empty ? undefined : (reach) => <Greeting busy={busy} waiting={waiting} reach={reach} />}
       refreshControl={
         showResults ? undefined : <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
       }
