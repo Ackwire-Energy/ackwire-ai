@@ -281,9 +281,11 @@ describe("Criar agente: what gets created", () => {
     await click(screen().getByRole("checkbox", { name: "#general" }));
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /^João/);
     const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
-    expect(within(audience).getByRole("radio", { name: /^Todos do workspace/ }).getAttribute("aria-checked")).toBe(
-      "true",
-    );
+    expect(
+      within(audience)
+        .getByRole("radio", { name: /^Todos do workspace/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     await click(within(audience).getByRole("radio", { name: /^Só algumas pessoas/ }));
     expect(document.body.textContent).toContain("João sempre pode, como responsável.");
     await click(screen().getAllByLabelText(/Walter/)[0] as HTMLElement);
