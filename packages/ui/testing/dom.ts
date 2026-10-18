@@ -140,8 +140,12 @@ export function detachDom() {
 /** Call at the top level of every DOM test file. */
 export function setupDom() {
   beforeAll(attachDom);
-  afterAll(() => {
+  afterAll(async () => {
     s().window.document.body.innerHTML = "";
+    // Let React's scheduler finish work queued by the file's last test (it runs on a MessageChannel
+    // task and reads `window.event`); detaching first made it throw "window is not defined" between
+    // files, now and then.
+    for (let i = 0; i < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
     detachDom();
   });
 }
