@@ -68,6 +68,7 @@ import type {
   MachineAccessReduce,
   MachineTask,
   MailAccount,
+  MailActionName,
   MailFolder,
   MailImapInput,
   MailProviders,
@@ -836,7 +837,11 @@ export interface ApiClient {
       input: { provider: "gmail" | "outlook"; label?: string },
     ): Promise<{ accountId: string; redirectUrl: string }>;
     /** A new name, or a new app password (reconnects an IMAP mailbox). */
-    update(orgId: string, accountId: string, input: { label?: string; password?: string }): Promise<MailAccount>;
+    update(
+      orgId: string,
+      accountId: string,
+      input: { label?: string; password?: string; offActions?: MailActionName[] },
+    ): Promise<MailAccount>;
     disconnect(orgId: string, accountId: string): Promise<void>;
     folders(orgId: string, accountId: string): Promise<MailFolder[]>;
     /** An agent's access and rules per mailbox. */

@@ -28,6 +28,7 @@ function mailApi(accounts: Partial<MailAccount>[] = []) {
     provider: "imap",
     via: "imap",
     address: `caixa${i + 1}@acme.com.br`,
+    offActions: [],
     label: `caixa${i + 1}@acme.com.br`,
     status: "active",
     lastError: null,
@@ -124,7 +125,7 @@ describe("Conectores → Email", () => {
     expect(approval.textContent).toContain("Enviar");
     expect(approval.textContent).toContain("Responder");
     expect(approval.textContent).toContain("Encaminhar");
-    expect(within(flow()).getByRole("region", { name: "Desligado" }).textContent).toContain("Apagar");
+    expect(within(flow()).getByRole("region", { name: "Só por agente" }).textContent).toContain("Apagar");
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     // Step 3: a level per agent.
     await settle(4);
@@ -186,6 +187,20 @@ describe("Conectores → Email", () => {
     await renderApp(`/org/${ORG_ID}/settings/connectors?mail=failed`, { api: other.api });
     await settle(8);
     expect(screen().getByText("Não deu para conectar o email. Tente de novo.")).toBeTruthy();
+  });
+
+  test("'O que faz': each action turns on or off for the mailbox; Continuar saves only what changed", async () => {
+    const { api, state } = mailApi([{ provider: "gmail", via: "composio", preset: null, address: "new@gmail.com" }]);
+    await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected`, { api });
+    await settle(8);
+    const dialog = screen().getByRole("dialog", { name: "O que new@gmail.com faz" });
+    await click(within(dialog).getByRole("switch", { name: "Enviar nesta caixa" }));
+    expect(within(dialog).getByText("Desligado: nenhum agente faz isso nesta caixa.")).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Continuar" }));
+    expect(state.calls.find((c) => c.method === "mail.update")?.args.slice(1)).toEqual([
+      "mail-1",
+      { offActions: ["send"] },
+    ]);
   });
 
   test("'Precisa reconectar': a new app password (PATCH), or Gmail signs in again", async () => {

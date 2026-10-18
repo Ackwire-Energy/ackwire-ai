@@ -59,6 +59,12 @@ export const mailAccounts = pgTable(
     secretCiphertext: text(),
     wrappedDataKey: text(),
     kekId: text(),
+    /**
+     * Actions turned off for this mailbox for every agent (the connect flow's
+     * "O que faz"): `search`, `read`, `folders`, `draft`, `organize`, `send`,
+     * `reply`, `forward`, `delete`.
+     */
+    offActions: text().array().notNull().default(sql`'{}'::text[]`),
     /** IMAP: the server's name for the sent folder (SMTP doesn't keep a copy). */
     sentFolder: text(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),

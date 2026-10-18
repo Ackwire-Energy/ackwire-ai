@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { fakeMailAuthError } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import { grantScopes, isSensitive, mailSlugs, UNTRUSTED_NOTE, wrapUntrusted } from "../src";
+import { grantScopes, isSensitive, mailSlugs, UNTRUSTED_NOTE, updateMailAccount, wrapUntrusted } from "../src";
 import { giveMail, imapAccount, type MailFixture, mailSetup, runContext } from "./mail-fixtures";
 
 let m: MailFixture;
@@ -46,6 +46,29 @@ test("tools follow the agent's level on each mailbox; sends ask unless the polic
   ).toBe(false);
   const trash = after.find((t) => t.name === "mail_support_trash");
   expect(trash && isSensitive(trash)).toBe(true);
+});
+
+test("actions turned off for a mailbox never become tools, whatever the agent holds", async () => {
+  m = await mailSetup();
+  const account = await imapAccount(m);
+  const ctx = await runContext(m.f);
+  await giveMail(m, account.id, "read_write", {}, true);
+  const r = await updateMailAccount(m.deps, m.f.owner.id, m.f.org.id, account.id, {
+    offActions: ["send", "forward", "organize", "delete"],
+  });
+  expect(r.ok && r.account.offActions).toEqual(["send", "forward", "organize", "delete"]);
+  const names = (await m.tools.list(ctx)).map((t) => t.name).filter((n) => n.startsWith("mail_"));
+  expect(names).toEqual([
+    "mail_support_attachment",
+    "mail_support_draft",
+    "mail_support_folders",
+    "mail_support_read",
+    "mail_support_reply",
+    "mail_support_search",
+  ]);
+  await expect(
+    updateMailAccount(m.deps, m.f.owner.id, m.f.org.id, account.id, { offActions: ["launch"] }),
+  ).rejects.toThrow("Unknown mail actions");
 });
 
 test("slugs are short, [a-z0-9] and unique per org", () => {

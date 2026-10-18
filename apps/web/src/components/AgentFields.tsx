@@ -524,10 +524,19 @@ export function BudgetField({
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { amount } = readBudget(value);
+  // A quick amount lights its button and leaves "Outro valor" empty; the field only holds an amount of its own
+  // (while typing it keeps what was typed, even "10").
+  const [typing, setTyping] = useState(false);
+  const quick = amount !== null && (QUICK_BUDGETS as readonly number[]).includes(amount);
+  const custom = value.trim() !== "" && (typing || !quick);
+  const pick = (next: string) => {
+    setTyping(false);
+    onChange(next);
+  };
   return (
     <div className="newag__money">
       {defaultBudget !== undefined && (
-        <button type="button" className="newag__tog" aria-pressed={!value.trim()} onClick={() => onChange("")}>
+        <button type="button" className="newag__tog" aria-pressed={!value.trim()} onClick={() => pick("")}>
           {t("agent.budgetDefaultChoice", { amount: usd(t, locale, defaultBudget) })}
         </button>
       )}
@@ -536,8 +545,8 @@ export function BudgetField({
           key={v}
           type="button"
           className="newag__tog"
-          aria-pressed={amount === v}
-          onClick={() => onChange(String(v))}
+          aria-pressed={amount === v && !custom}
+          onClick={() => pick(String(v))}
         >
           {usd(t, locale, v)}
         </button>
@@ -546,13 +555,15 @@ export function BudgetField({
         label={<span className="ac-visually-hidden">{t("newAgent.budget")}</span>}
         id={id}
         error={error}
-        className="newag__money-field"
+        className={custom ? "newag__money-field newag__money-field--on" : "newag__money-field"}
       >
         <AffixInput
           prefix="US$"
           inputMode="decimal"
-          value={value}
+          value={custom ? value : ""}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setTyping(true)}
+          onBlur={() => setTyping(false)}
           placeholder={t("agent.budgetOther")}
         />
       </Field>

@@ -2,7 +2,8 @@
  * Mailboxes for agents (ADR 0038): the rules the screens share. DOM-free.
  */
 import { ApiError } from "../api/http";
-import type { MailAccount, MailConnectError, MailPolicy, MailPreset } from "../api/types";
+import type { AgentMailbox, MailAccount, MailConnectError, MailPolicy, MailPreset } from "../api/types";
+import type { Level } from "./access-levels";
 
 /** The cards in the catalog's "Email" group. */
 export type MailChoice = "gmail" | "outlook" | "icloud" | "other";
@@ -62,6 +63,9 @@ export function splitAddresses(text: string): { valid: string[]; invalid: string
 }
 
 export const DEFAULT_DAILY_CAP = 25;
+
+/** The connectors' level (Sem acesso · Ler · Ler e escrever) as the mail API says it. */
+export const toMailLevel = (level: Level): AgentMailbox["level"] => (level === "write" ? "read_write" : level);
 
 /** A new agent's rules for a mailbox: every folder, anyone, asks before each send. */
 export const defaultPolicy = (): MailPolicy => ({

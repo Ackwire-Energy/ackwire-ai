@@ -5198,13 +5198,16 @@ export const ptBR = {
       blocked_host: "Esse servidor não é permitido. Use o endereço público do seu provedor.",
       unknown: "Não deu para conectar agora. Tente de novo em instantes.",
     },
+    actionToggle: "{{name}} nesta caixa",
+    actionOff: "Desligado: nenhum agente faz isso nesta caixa.",
+    actionsError: "Não deu para salvar. Tente de novo.",
     toolsLead:
-      "O que os agentes podem fazer em {{name}}. Enviar, responder e encaminhar sempre pedem aprovação no chat, mostrando para quem vai e o texto.",
+      "O que os agentes podem fazer em {{name}}. Desligue o que nenhum agente deve fazer. Enviar, responder e encaminhar sempre pedem aprovação no chat, mostrando para quem vai e o texto.",
     group: {
       read: "Lê",
       write: "Escreve",
       approval: "Sempre pede aprovação",
-      off: "Desligado",
+      off: "Só por agente",
     },
     action: {
       search: { name: "Buscar emails", text: "Procura por remetente, assunto ou texto." },
@@ -5215,7 +5218,7 @@ export const ptBR = {
       send: { name: "Enviar", text: "Um email novo." },
       reply: { name: "Responder", text: "Responde na mesma conversa." },
       forward: { name: "Encaminhar", text: "Encaminha um email recebido." },
-      delete: { name: "Apagar", text: "Fica desligado. Você liga por agente, e mesmo assim pede aprovação." },
+      delete: { name: "Apagar", text: "Cada agente precisa de permissão própria, e mesmo assim pede aprovação." },
     },
     whoLead: "As regras de cada agente (pastas, remetentes, para quem envia) ficam na página do agente.",
     status: { pending: "Conectando", active: "Ativo", needs_reconnect: "Precisa reconectar" },
