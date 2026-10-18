@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { CHROME_MAX_SCALE, Icon, Text, useLivePaused, useTheme, useToast } from "@/ui";
+import { CHROME_MAX_SCALE, Icon, PressScale, systemText, Text, useLivePaused, useTheme, useToast, weights } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -26,8 +26,8 @@ import {
 } from "./actions";
 
 /**
- * What the agent changed with this reply (ADR 0037 round 2, FazerDesfazer.html): one change is a sunken
- * row with Desfazer and the time left (A); two or more are a group with "N mudanças · há X" and
+ * What the agent changed with this reply (ADR 0037 round 2, FazerDesfazer.html, MobileIntencional.html):
+ * one change is a sunken row with a raised Desfazer and the time left under the sentence (system font) (A); two or more are a group with "N mudanças · há X" and
  * Desfazer tudo (B). Undone rows are struck through with "Desfeito por …" and Refazer; past the window
  * they stay as plain history. Optimistic, rolled back with a toast when the server refuses.
  */
@@ -108,13 +108,21 @@ function ReceiptList({
   if (!group) {
     const { a, v } = rows[0] as { a: AgentAction; v: ReceiptView };
     return (
-      <View>
-        <View style={[styles.one, { backgroundColor: c.sunken }, v.struck && styles.doneRow]}>
-          <IconTile kind={a} />
+      <View style={[styles.one, { backgroundColor: c.sunken }]}>
+        <IconTile kind={a} />
+        <View style={styles.grow}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
-          <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
+          {v.button === "undo" && v.timeLeft ? (
+            <RNText
+              maxFontSizeMultiplier={CHROME_MAX_SCALE}
+              style={[systemText("caption"), styles.left, { color: c.faint }]}
+            >
+              {t("agentActions.timeLeft", { time: v.timeLeft })}
+            </RNText>
+          ) : null}
+          {a.undoneAt ? <UndoneBy action={a} /> : null}
         </View>
-        {a.undoneAt ? <UndoneBy action={a} /> : null}
+        <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
       </View>
     );
   }
@@ -153,9 +161,9 @@ function ReceiptList({
 }
 
 function IconTile({ kind: a }: { kind: AgentAction }) {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   return (
-    <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
+    <View style={[styles.tile, { backgroundColor: colors.raised }]}>
       <Icon name={receiptIcon(a.kind)} size={14} color={colors.ink2} />
     </View>
   );
@@ -187,16 +195,21 @@ function Sentence({
   return (
     <Text
       variant={size === "one" ? "small" : "footnote"}
-      tone={size === "one" ? "muted" : "ink2"}
-      numberOfLines={1}
-      style={[styles.grow, struck && styles.struck]}
+      tone={struck ? "faint" : "ink2"}
+      numberOfLines={size === "one" ? 2 : 1}
+      style={[size === "one" && styles.oneText, struck && styles.struck]}
       onPress={open}
       accessibilityRole={open ? "link" : undefined}
       suppressHighlighting
     >
       {runs.map((r, i) =>
         r.bold ? (
-          <Text key={String(i)} variant={size === "one" ? "small" : "footnote"} tone="ink" style={styles.bold}>
+          <Text
+            key={String(i)}
+            variant={size === "one" ? "small" : "footnote"}
+            tone={struck ? "faint" : "ink"}
+            style={[size === "one" && styles.oneText, styles.bold]}
+          >
             {r.text}
           </Text>
         ) : (
@@ -223,7 +236,10 @@ function UndoneBy({ action: a }: { action: AgentAction }) {
   );
 }
 
-/** Desfazer (with the time left in Doto) or Refazer; nothing once settled or for who may not use it. */
+/**
+ * Desfazer or Refazer: a raised pill next to one change (the time left is the line under the sentence),
+ * a quiet word in a group; nothing once settled or for who may not use it.
+ */
 function RowButton({
   view: v,
   big = false,
@@ -236,36 +252,34 @@ function RowButton({
   onRedo: () => void;
 }) {
   const { t } = useTranslation();
-  const { colors, fonts } = useTheme();
+  const { colors, shadows } = useTheme();
   if (!v.button) return null;
-  if (v.button === "redo")
+  const redo = v.button === "redo";
+  const label = redo ? t("agentActions.redo") : t("agentActions.undo");
+  if (big)
     return (
-      <Pressable onPress={onRedo} accessibilityRole="button" hitSlop={8}>
-        <Text variant={big ? "small" : "footnote"} tone={big ? "ink" : "muted"} style={styles.bold}>
-          {t("agentActions.redo")}
-        </Text>
-      </Pressable>
-    );
-  return (
-    <Pressable
-      onPress={onUndo}
-      accessibilityRole="button"
-      accessibilityLabel={big ? `${t("agentActions.undo")}, ${v.timeLeft}` : t("agentActions.undo")}
-      hitSlop={8}
-      style={styles.u}
-    >
-      {big ? <Icon name="undo" size={14} color={colors.ink} /> : null}
-      <Text variant={big ? "small" : "footnote"} tone={big ? "ink" : "muted"} style={styles.bold}>
-        {t("agentActions.undo")}
-      </Text>
-      {big && v.timeLeft ? (
+      <PressScale
+        to={0.95}
+        haptic={false}
+        onPress={redo ? onRedo : onUndo}
+        accessibilityRole="button"
+        accessibilityLabel={!redo && v.timeLeft ? `${label}, ${v.timeLeft}` : label}
+        hitSlop={6}
+        style={[styles.u, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+      >
         <RNText
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={{ fontFamily: fonts.dot, fontSize: 12, color: colors.faint, fontVariant: ["tabular-nums"] }}
+          style={[systemText("footnote", weights.semibold), styles.uText, { color: colors.ink }]}
         >
-          {v.timeLeft}
+          {label}
         </RNText>
-      ) : null}
+      </PressScale>
+    );
+  return (
+    <Pressable onPress={redo ? onRedo : onUndo} accessibilityRole="button" hitSlop={8}>
+      <Text variant="footnote" tone="muted" style={styles.bold}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -275,21 +289,23 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   struck: { textDecorationLine: "line-through" },
   one: {
-    marginTop: 8,
+    marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-    paddingLeft: 9,
+    gap: 10,
+    minHeight: 50,
+    paddingVertical: 9,
+    paddingLeft: 12,
     paddingRight: 10,
-    borderRadius: 14,
-    maxWidth: 340,
+    borderRadius: 16,
   },
-  doneRow: { opacity: 0.75 },
+  oneText: { fontSize: 14.5, lineHeight: 19 },
+  left: { marginTop: 1, fontVariant: ["tabular-nums"] },
   tile: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  u: { flexDirection: "row", alignItems: "center", gap: 5 },
-  undoneBy: { marginTop: 4 },
-  group: { marginTop: 8, borderRadius: 16, overflow: "hidden", maxWidth: 340 },
+  u: { height: 32, paddingHorizontal: 13, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  uText: { fontSize: 14 },
+  undoneBy: { marginTop: 2 },
+  group: { marginTop: 12, borderRadius: 16, overflow: "hidden" },
   hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, paddingHorizontal: 12 },
   it: {
     flexDirection: "row",

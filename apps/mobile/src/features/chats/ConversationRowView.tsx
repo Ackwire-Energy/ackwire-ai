@@ -1,36 +1,42 @@
 import { router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Count, Icon, PixelOrbit, Text } from "@/ui";
+import { StyleSheet, View } from "react-native";
+import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, ListRow, PixelOrbit, Text } from "@/ui";
+import { workTitle } from "../agents/work";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { type ConversationRow, type LastLine, threadRowLines } from "./logic";
+import type { AgentRowState } from "./now";
 
-/** The avatar column (and where the hairline between rows starts). */
-const AVATAR = 52;
-const INSET = 14 + AVATAR + 12;
+/** The avatar column. */
+const AVATAR = LIST_AVATAR;
 
 /**
- * One conversation in the list (MobileConversas.html): the agent's living body (moving while it works),
- * a person's face, or the tile of a channel; the name and the time; the last line ("Nome: …", two lines),
- * or "trabalhando…" with the pixel orbit when an agent is on it; the unread count in Doto. Threads and
- * missions (MobileRefinos.html `trowApp`) add a faint line with what and where ("Missão · #canal"): a
- * mission shows its agent, its state and items ("Esperando você · 4 de 9 itens") and what waits on you in
- * it; a thread shows the face and the line of its last reply. `live`: the agent moves (the first rows only).
+ * One conversation in the list (MobileConversas.html, readable per MobileIntencional.html), in the shared
+ * `ListRow`: the agent's living body (moving while it works), a person's face, or the tile of a channel;
+ * the name and the time; the last line ("Nome: …", two lines). An agent's row says what matters instead
+ * (`agent`): it waits on your ok (amber, "espera seu ok · PR #128"), or what it is doing with the pixel
+ * orbit. Unread: bold name, darker time and preview, the count. Threads and missions (MobileRefinos.html
+ * `trowApp`) add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
+ * and items ("Esperando você · 4 de 9 itens") and what waits on you in it; a thread shows the face and the
+ * line of its last reply. `live`: the agent moves (the first rows only).
  */
 export const ConversationRowView = memo(function ConversationRowView({
   row: r,
   divider = false,
   live = false,
+  agent,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
   divider?: boolean;
   live?: boolean;
+  /** An agent DM: it waits on you, or what it is doing (from `agentRowState`). */
+  agent?: AgentRowState;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -42,7 +48,8 @@ export const ConversationRowView = memo(function ConversationRowView({
     return { who, text: last.text };
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
-  const working = r.kind === "channel" ? false : r.working;
+  const agentState = agentDm ? (agent ?? null) : null;
+  const working = r.kind === "channel" ? false : r.working || agentState?.kind === "working";
   const leading =
     r.kind === "dm" ? (
       agentDm ? (
@@ -80,22 +87,41 @@ export const ConversationRowView = memo(function ConversationRowView({
     line = (
       <View style={styles.work}>
         {lines.state === "working" ? <PixelOrbit color={orbitColor} size={13} /> : null}
-        {lines.state === "waiting" ? <Icon name="shield" size={14} color={c.ink2} /> : null}
-        <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-          <Text variant="small" tone={lead ? "ink2" : "muted"} style={lead ? styles.em : undefined}>
+        {lines.state === "waiting" ? <Icon name="shield" size={14} color={c.amber} /> : null}
+        <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
+          <Text
+            variant="small"
+            tone={lead ? "ink2" : "muted"}
+            style={[LIST_PREVIEW, lead ? styles.em : null, lines.state === "waiting" ? { color: c.amber } : null]}
+          >
             {state}
           </Text>
           {` · ${progress}`}
         </Text>
       </View>
     );
+  } else if (agentState?.kind === "waiting") {
+    const verb = t(`mobile.homeNow.rowWait.${agentState.wait}`);
+    label = [verb, agentState.title].filter(Boolean).join(" · ");
+    line = (
+      <View style={styles.work}>
+        <Icon name="shield" size={14} color={c.amber} />
+        <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
+          <Text variant="small" style={[LIST_PREVIEW, styles.em, { color: c.amber }]}>
+            {verb}
+          </Text>
+          {agentState.title ? ` · ${agentState.title}` : ""}
+        </Text>
+      </View>
+    );
   } else if (working && r.kind !== "mission") {
-    label = t("mobile.chats.working");
+    const doing = agentState?.kind === "working" ? workTitle(t, agentState.work) : "";
+    label = doing ? t("mobile.homeNow.doingLabel", { what: doing }) : t("mobile.chats.working");
     line = (
       <View style={styles.work}>
         <PixelOrbit color={orbitColor} size={13} />
-        <Text variant="small" tone="ink2" numberOfLines={1} style={[styles.em, styles.shrink]}>
-          {label}
+        <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.em, styles.shrink]}>
+          {doing || t("mobile.chats.working")}
         </Text>
       </View>
     );
@@ -105,9 +131,9 @@ export const ConversationRowView = memo(function ConversationRowView({
     const lead = last.who;
     label = lead ? `${lead}: ${text}` : text;
     line = (
-      <Text variant="small" tone="muted" numberOfLines={lines ? 1 : 2} style={styles.last}>
+      <Text variant="small" tone={r.unread > 0 ? "ink2" : "muted"} numberOfLines={lines ? 1 : 2} style={LIST_PREVIEW}>
         {lead ? (
-          <Text variant="small" tone="ink2">
+          <Text variant="small" tone="ink2" style={[LIST_PREVIEW, styles.em]}>
             {`${lead}: `}
           </Text>
         ) : null}
@@ -133,58 +159,30 @@ export const ConversationRowView = memo(function ConversationRowView({
     .join(", ");
 
   return (
-    <Pressable
+    <ListRow
       onPress={open}
       accessibilityRole="button"
       accessibilityLabel={a11y}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
-    >
-      {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
-      <View style={styles.avatar}>{leading}</View>
-      <View style={styles.tx}>
-        <View style={styles.l1}>
-          <Text variant="title" numberOfLines={1} style={styles.shrink}>
-            {name}
-          </Text>
-          <View style={styles.grow} />
-          {r.at ? (
-            <Text variant="small" tone="faint">
-              {when.short(r.at)}
-            </Text>
-          ) : null}
-        </View>
-        {placeLine ? (
+      divider={divider}
+      unread={r.unread > 0}
+      leading={leading}
+      title={name}
+      time={r.at ? when.short(r.at) : null}
+      over={
+        placeLine ? (
           <Text variant="caption" tone="faint" numberOfLines={1}>
             {r.kind === "thread" && r.closed ? `${placeLine} · ${t("mobile.chats.closed")}` : placeLine}
           </Text>
-        ) : null}
-        <View style={styles.l2}>
-          <View style={styles.grow}>{line}</View>
-          {badge > 0 ? <Count value={badge} max={99} inverted /> : null}
-        </View>
-      </View>
-    </Pressable>
+        ) : null
+      }
+      sub={line}
+      trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
+    />
   );
 });
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-    paddingLeft: 14,
-    paddingRight: 16,
-    minHeight: 76,
-  },
-  divider: { position: "absolute", top: 0, left: INSET, right: 0, height: StyleSheet.hairlineWidth },
-  avatar: { width: AVATAR, height: AVATAR, alignItems: "center", justifyContent: "center" },
-  tx: { flex: 1, minWidth: 0, gap: 1 },
-  l1: { flexDirection: "row", alignItems: "baseline", gap: 6 },
-  l2: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
-  last: { lineHeight: 20 },
   work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0 },
   em: { fontWeight: "500" },
 });

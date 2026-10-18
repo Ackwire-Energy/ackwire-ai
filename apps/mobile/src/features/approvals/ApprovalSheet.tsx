@@ -2,20 +2,20 @@ import { useApproval, useChannels, useDecideApproval } from "@agenteschat/client
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Fuse, HoldButton, SheetScreen, Text, useToast } from "@/ui";
+import { Button, HoldButton, SheetScreen, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
-import { agentLook, fuseRemaining, genderOf, minutesLeft } from "../shared/logic";
+import { genderOf } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { approvalFacts, approvalRisk, approvalTraits } from "./logic";
-
-const TRAIT_ICON = { production: "server", irreversible: "x", reversible: "back", external: "send" } as const;
+import { approvalRisk } from "./logic";
+import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "./parts";
 
 /**
  * A request, from anywhere (deep link `approval/<id>`): who asks, the exact
- * action and its values, the fuse. High risk takes a hold; refusing can say
- * why ("ajuda o agente a aprender").
+ * action, what it affects, the details table, what the agent said before and
+ * the amber fuse (MobileIntencional.html). High risk takes a hold; refusing
+ * can say why ("ajuda o agente a aprender").
  */
 export function ApprovalSheet({
   id,
@@ -75,7 +75,6 @@ export function ApprovalSheet({
   } else {
     const pending = a.status === "pending" && new Date(a.expiresAt).getTime() > now;
     const high = approvalRisk(a) === "high";
-    const facts = approvalFacts(a.params);
     const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name : undefined;
     body = (
       <>
@@ -122,38 +121,12 @@ export function ApprovalSheet({
                 {a.detail}
               </Text>
             ) : null}
-            {facts.length > 0 || a.connector ? (
-              <Card>
-                {a.connector ? (
-                  <Fact label={t("mobile.approval.via")} value={a.connectorAccount ?? a.connector} first />
-                ) : null}
-                {facts.map(([k, v], i) => (
-                  <Fact key={k} label={k} value={v} first={i === 0 && !a.connector} />
-                ))}
-              </Card>
-            ) : null}
-            {approvalTraits(a).length > 0 ? (
-              <View style={styles.chips}>
-                {approvalTraits(a).map((tr) => (
-                  <Chip key={tr} icon={TRAIT_ICON[tr]} label={t(`mobile.approval.trait.${tr}`)} />
-                ))}
-              </View>
-            ) : null}
-            {a.why ? (
-              <Text variant="small" tone="muted" style={styles.detail}>
-                {t("mobile.approval.why", { name, text: a.why })}
-              </Text>
-            ) : null}
+            <ApprovalTraits approval={a} />
+            <ApprovalDetails approval={a} max={6} />
+            <ApprovalSaid approval={a} name={name} />
             {pending ? (
               <>
-                <View style={styles.fuse}>
-                  <View style={styles.grow}>
-                    <Fuse color={agentLook(agent).color} remaining={fuseRemaining(a.createdAt, a.expiresAt, now)} />
-                  </View>
-                  <Text variant="caption" tone="faint">
-                    {t("mobile.approval.expiresIn", { count: minutesLeft(a.expiresAt, now) })}
-                  </Text>
-                </View>
+                <ApprovalFuse approval={a} />
                 {a.canDecide ? (
                   <>
                     <View style={styles.acts}>
@@ -208,30 +181,12 @@ export function ApprovalSheet({
   );
 }
 
-function Fact({ label, value, first }: { label: string; value: string; first?: boolean }) {
-  const c = useColors();
-  return (
-    <View style={[styles.kv, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}>
-      <Text variant="small" tone="muted" style={styles.grow}>
-        {label}
-      </Text>
-      <Text variant="small" tone="ink" style={[styles.bold, styles.value]} numberOfLines={3}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   in: { gap: 12 },
   who: { flexDirection: "row", alignItems: "center", gap: 10 },
   grow: { flex: 1 },
   bold: { fontWeight: "600" },
   detail: { marginTop: -2 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  fuse: { flexDirection: "row", alignItems: "center", gap: 10 },
   acts: { gap: 8 },
   note: { textAlign: "center" },
-  kv: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  value: { maxWidth: "60%", textAlign: "right" },
 });

@@ -1030,6 +1030,27 @@ export const useMemory = (orgId: string, agentId: string) => {
   return useQuery({ queryKey: keys.memory(orgId, agentId), queryFn: () => api.memory.list(orgId, agentId) });
 };
 
+/** "O que sabe sobre você": the agent's memories that came from the viewer, each with the message. */
+export const useMemoryAboutMe = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.memoryAboutMe(orgId, agentId),
+    queryFn: () => api.memory.list(orgId, agentId, { about: "me" }),
+    enabled,
+  });
+};
+
+/** "O que fez por você": the agent's receipts, files and approvals that involve the viewer. */
+export function useAgentForYou(orgId: string, agentId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentForYou(orgId, agentId),
+    queryFn: () => part(api, "agentForYou").get(orgId, agentId),
+    enabled: enabled && Boolean(api.agentForYou),
+    staleTime: 15_000,
+  });
+}
+
 export function useMemoryAction(orgId: string, agentId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2194,7 +2215,7 @@ export function useNotificationReply(orgId: string) {
 // ── Phone app: read state, pins, following, working now, reminders ─────────────
 
 /** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
-function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions">(
+function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions" | "agentForYou">(
   api: ApiClient,
   name: K,
 ): NonNullable<ApiClient[K]> {

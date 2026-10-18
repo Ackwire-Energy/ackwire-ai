@@ -31,6 +31,11 @@ export interface LargeTitleScreenProps {
   bottomInset?: number;
   /** The person starts scrolling the list (Conversas closes its open "Esperando você" card). */
   onScrollBeginDrag?: () => void;
+  /**
+   * The grouped gray background (Atividade, settings-like screens) with white cards on it; lists and chat
+   * stay on the plain (white, in light) background.
+   */
+  grouped?: boolean;
 }
 
 /**
@@ -52,6 +57,7 @@ export function LargeTitleScreen({
   refreshControl,
   bottomInset = 24,
   onScrollBeginDrag,
+  grouped = false,
 }: LargeTitleScreenProps) {
   const { colors } = useTheme();
   const focused = useIsFocused();
@@ -77,7 +83,7 @@ export function LargeTitleScreen({
     [actionOptions, title, y, headerH],
   );
   return (
-    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+    <View style={[styles.screen, { backgroundColor: grouped ? colors.grouped : colors.bg }]}>
       <Stack.Screen options={options} />
       <LivePause paused={!focused}>
         <Animated.ScrollView
@@ -124,8 +130,8 @@ export function LargeTitleScreen({
 }
 
 const IOS = Platform.OS === "ios";
-/** Room for the system tab bar over the list's end (iOS; the bar floats over the content). */
-const TAB_BAR = 56;
+/** Room for the system tab bar over the list's end (iOS; the floating bar and its margin), so the last row clears it. */
+const TAB_BAR = 76;
 
 /** Scroll (from rest) by which the large title has faded out under the bar. */
 const TITLE_GONE = 40;

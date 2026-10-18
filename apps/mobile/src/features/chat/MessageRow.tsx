@@ -84,6 +84,73 @@ export const MessageRow = memo(function MessageRow({
   const question = isAgent ? questionOf(meta) : null;
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
   const issueWork = issueWorkOf(meta);
+  // My own message: a light bubble on the right, no face or name (MobileIntencional.html, `.me`).
+  const mine = !routine && m.author.type === "person" && Boolean(meId) && m.author.id === meId;
+
+  const cards = (
+    <>
+      {issueWork ? (
+        <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
+      ) : null}
+      {thread && !meta?.missionStart ? (
+        <View style={mine ? styles.meEnd : undefined}>
+          <ThreadLink thread={thread} />
+        </View>
+      ) : null}
+      {meta?.missionStart ? <MissionCard threadId={m.id} /> : null}
+      {link ? <MissionCard missionId={link.missionId} /> : null}
+      {plan ? <PlanCard missionId={plan.missionId} goal={plan.goal} /> : null}
+      {review ? <ReviewCard missionId={review.missionId} reviewId={review.id} /> : null}
+      {decision ? <DecisionCard missionId={decision.missionId} decisionId={decision.id} /> : null}
+      <View style={mine ? styles.meEnd : undefined}>
+        <Reactions message={m} meId={meId} />
+      </View>
+      {m.local === "pending" ? (
+        <Text variant="caption" tone="faint" style={mine ? styles.meStatus : undefined}>
+          {t("mobile.chat.sending")}
+        </Text>
+      ) : m.local === "failed" ? (
+        <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={8}>
+          <Text variant="caption" tone="danger" style={mine ? styles.meStatus : undefined}>
+            {t("mobile.chat.failed")}
+          </Text>
+        </Pressable>
+      ) : null}
+    </>
+  );
+
+  if (mine)
+    return (
+      <Pressable
+        onLongPress={() => {
+          tapHaptic();
+          onLongPress(m);
+        }}
+        delayLongPress={380}
+        accessibilityHint={t("mobile.chat.longPressHint")}
+        style={({ pressed }) => [styles.me, grouped && styles.meCont, pressed && styles.mePressed]}
+      >
+        {m.pinned ? (
+          <View style={[styles.pinLine, styles.meEnd]}>
+            <PinMark />
+            <Text variant="caption" tone="faint">
+              {t("mobile.pins.mark")}
+            </Text>
+          </View>
+        ) : null}
+        {body ? (
+          <View style={[styles.bubble, { backgroundColor: c.bubble }]}>
+            <MessageText body={body} muted={m.local === "pending"} />
+          </View>
+        ) : null}
+        {files.length > 0 ? (
+          <View style={styles.meFiles}>
+            <MessageFiles files={files} align="end" />
+          </View>
+        ) : null}
+        <View style={styles.meCards}>{cards}</View>
+      </Pressable>
+    );
 
   return (
     <Pressable
@@ -111,20 +178,20 @@ export const MessageRow = memo(function MessageRow({
       <View style={styles.body}>
         {grouped ? null : routine ? (
           <View style={styles.who}>
-            <Text variant="footnote" tone="ink" style={[styles.name, styles.shrink]} numberOfLines={1}>
+            <Text variant="footnote" tone="ink2" style={[styles.name, styles.shrink]} numberOfLines={1}>
               {t("channel.routineAuthor", { name: routine.name })}
             </Text>
             <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
               {t("channel.routineBy", { name })}
             </Text>
-            <Text variant="caption" tone="faint">
+            <Text variant="footnote" tone="faint">
               {when.time(m.createdAt)}
             </Text>
             {m.pinned ? <PinMark /> : null}
           </View>
         ) : (
           <View style={styles.who}>
-            <Text variant="footnote" tone="ink" style={styles.name} numberOfLines={1}>
+            <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
               {name}
             </Text>
             {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
@@ -134,7 +201,7 @@ export const MessageRow = memo(function MessageRow({
                 {agent.role}
               </Text>
             ) : null}
-            <Text variant="caption" tone="faint">
+            <Text variant="footnote" tone="faint">
               {when.time(m.createdAt)}
             </Text>
             {m.pinned ? <PinMark /> : null}
@@ -175,27 +242,7 @@ export const MessageRow = memo(function MessageRow({
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
-        {issueWork ? (
-          <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
-        ) : null}
-        {thread && !meta?.missionStart ? <ThreadLink thread={thread} /> : null}
-        {meta?.missionStart ? <MissionCard threadId={m.id} /> : null}
-        {link ? <MissionCard missionId={link.missionId} /> : null}
-        {plan ? <PlanCard missionId={plan.missionId} goal={plan.goal} /> : null}
-        {review ? <ReviewCard missionId={review.missionId} reviewId={review.id} /> : null}
-        {decision ? <DecisionCard missionId={decision.missionId} decisionId={decision.id} /> : null}
-        <Reactions message={m} meId={meId} />
-        {m.local === "pending" ? (
-          <Text variant="caption" tone="faint">
-            {t("mobile.chat.sending")}
-          </Text>
-        ) : m.local === "failed" ? (
-          <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={8}>
-            <Text variant="caption" tone="danger">
-              {t("mobile.chat.failed")}
-            </Text>
-          </Pressable>
-        ) : null}
+        {cards}
       </View>
     </Pressable>
   );
@@ -280,12 +327,29 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
 }
 
 const styles = StyleSheet.create({
-  msg: { flexDirection: "row", gap: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  cont: { paddingTop: 0 },
+  // Readable turns (MobileIntencional.html): more room between turns, a quieter name and time.
+  msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
+  cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  who: { flexDirection: "row", alignItems: "baseline", gap: 7 },
-  name: { fontWeight: "600" },
+  who: { flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 3 },
+  name: { fontWeight: "600", fontSize: 14, lineHeight: 19 },
+  me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
+  meCont: { paddingTop: 2, marginTop: 0 },
+  mePressed: { opacity: 0.7 },
+  meEnd: { alignSelf: "flex-end" },
+  bubble: {
+    maxWidth: "100%",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderTopLeftRadius: 21,
+    borderTopRightRadius: 21,
+    borderBottomLeftRadius: 21,
+    borderBottomRightRadius: 6,
+  },
+  meFiles: { alignSelf: "stretch" },
+  meCards: { alignSelf: "stretch" },
+  meStatus: { marginTop: 4, textAlign: "right" },
   shrink: { flexShrink: 1 },
   pin: { alignSelf: "center" },
   routineMark: { width: 32, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },

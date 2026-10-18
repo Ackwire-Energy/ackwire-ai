@@ -1,4 +1,4 @@
-import type { AppNotification, NotificationActor } from "@agenteschat/client";
+import type { AppNotification, NotificationActor, Routine } from "@agenteschat/client";
 import { daysAgo } from "../shared/logic";
 
 /**
@@ -78,3 +78,47 @@ export const placeOf = (n: AppNotification) => n.source.label ?? "";
 
 /** Emojis a reaction card shows (at most 5, from the server). */
 export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.latest.emojis ?? []).slice(0, 5) : []);
+
+// ── Esperando você as cards, and what comes next (MobileIntencional.html, Atividade) ─────────────
+
+/** What a waiting item asks of you: approve, answer an agent, take your turn at the table. */
+export type WaitingCardKind = "approval" | "question" | "forum";
+
+export interface WaitingCard {
+  kind: WaitingCardKind;
+  /** The exact request: the action to approve, the question, the topic. */
+  title: string;
+  /** Only requests expire. */
+  expiresAt: string | null;
+  /** The one button: "Revisar" (a request) or "Responder". */
+  action: "review" | "answer";
+}
+
+/** A waiting inbox item as a card: who asks (`actors`), the kind, the exact request, the deadline, one button. */
+export function waitingCardOf(n: Pick<AppNotification, "kind" | "latest">): WaitingCard {
+  const l = n.latest;
+  if (n.kind === "approval")
+    return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
+  if (n.kind === "forum_turn")
+    return { kind: "forum", title: l.title ?? l.text ?? "", expiresAt: null, action: "answer" };
+  return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
+}
+
+/** The next real thing coming: the soonest run of an active routine, still ahead. */
+export function nextRoutine<T extends Pick<Routine, "active" | "nextRunAt">>(routines: readonly T[], now = Date.now()) {
+  let next: T | null = null;
+  for (const r of routines) {
+    if (!r.active || !r.nextRunAt) continue;
+    const at = new Date(r.nextRunAt).getTime();
+    if (!(at > now)) continue;
+    if (!next || at < new Date(next.nextRunAt as string).getTime()) next = r;
+  }
+  return next;
+}
+
+/** How "when" is said for the next event: today, tomorrow, or a later day. */
+export function upcomingDay(iso: string, now = new Date()): "today" | "tomorrow" | "later" {
+  const days = -daysAgo(iso, now);
+  if (days <= 0) return "today";
+  return days === 1 ? "tomorrow" : "later";
+}

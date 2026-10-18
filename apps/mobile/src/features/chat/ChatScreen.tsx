@@ -48,6 +48,8 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { FirstDay } from "./FirstDay";
+import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
 import { StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
 import { useChatLive } from "./live";
@@ -119,6 +121,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const missionQ = useThreadMission(orgId, threadId);
   const mission = missionQ.data ?? null;
   const dmAgentId = dm?.with.type === "agent" ? dm.with.id : null;
+  const dmAgent = dmAgentId ? dir.agentById.get(dmAgentId) : undefined;
   const member = dm ? true : (channel?.isMember ?? true);
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   const join = useJoinChannel(orgId, channelId);
@@ -601,21 +604,20 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     : dm
       ? t("mobile.chat.messageTo", { name: dm.with.name })
       : t("mobile.chat.messageIn", { channel: channel ? `#${channel.name}` : "" });
-  const suggestions =
-    !isThread && list.length < 6
-      ? dmAgentId
-        ? [
-            { icon: "sparkle" as const, label: t("mobile.chat.suggest.doing") },
-            { icon: "target" as const, label: t("mobile.chat.suggest.task") },
-          ]
-        : channel
-          ? [
-              { icon: "sparkle" as const, label: t("mobile.chat.suggest.summary") },
-              { icon: "target" as const, label: t("mobile.chat.suggest.task") },
-              { icon: "list" as const, label: t("mobile.chat.suggest.todo") },
-            ]
-          : []
-      : [];
+  // What to say next comes from the latest card (MobileIntencional.html): a code change, a file; none
+  // while the agent works, asks or waits for an approval.
+  const people = useMemo(
+    () => [...dir.memberById.values()].map((p) => ({ id: p.userId, name: p.name })),
+    [dir.memberById],
+  );
+  const suggestions = useMemo(
+    () =>
+      composerSuggestions({ messages: list, meId, people }).map((x) => ({
+        icon: x.icon,
+        label: t(`mobile.chat.intent.suggest.${x.key}`, x.values ?? {}),
+      })),
+    [list, meId, people, t],
+  );
   rowsRef.current = rows;
   const pinned = mission && isOpenMission(mission) ? mission : null;
   const loading = isThread ? threadMessages.isLoading : top.isLoading;
@@ -625,13 +627,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       switch (item.kind) {
         case "day":
           return (
-            <Text variant="caption" tone="faint" style={styles.day}>
+            <Text variant="footnote" tone="faint" style={styles.day}>
               {when.day(item.iso)}
             </Text>
           );
         case "marker":
           return (
-            <Text variant="caption" tone="faint" style={styles.day}>
+            <Text variant="footnote" tone="faint" style={styles.day}>
               {item.text}
             </Text>
           );
@@ -707,11 +709,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             <Text tone="faint">{t("mobile.common.loading")}</Text>
           </View>
         ) : !showList ? (
-          <View style={[styles.center, { paddingBottom: composerHeight }]}>
-            <Text tone="faint" style={styles.emptyText}>
-              {dmAgentId ? t("mobile.chat.emptyAgent", { name: dm?.with.name ?? "" }) : t("mobile.chat.empty")}
-            </Text>
-          </View>
+          dmAgent && !isThread ? (
+            <FirstDay agent={dmAgent} bottomInset={composerHeight} onAsk={onSend} />
+          ) : (
+            <View style={[styles.center, { paddingBottom: composerHeight }]}>
+              <Text tone="faint" style={styles.emptyText}>
+                {t("mobile.chat.empty")}
+              </Text>
+            </View>
+          )
         ) : (
           <KeyboardAwareLegendList
             ref={listRef}
@@ -824,7 +830,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   emptyText: { textAlign: "center" },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
-  day: { alignSelf: "center", textAlign: "center", marginTop: 10, marginBottom: 4, fontWeight: "600" },
+  day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },
   composerDock: { position: "absolute", left: 0, right: 0, bottom: 0 },

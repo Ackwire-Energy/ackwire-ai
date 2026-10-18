@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
-import { Count, Icon, LIST_INSET, Text } from "@/ui";
+import { Count, Icon, LIST_INSET, Text, weights } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { HOME_SECTIONS, type HomeSection, parseCollapsed, toggleCollapsed } from "./logic";
 
@@ -30,7 +30,7 @@ export function useCollapsedSections<K extends string = HomeSection>(
 }
 
 /**
- * A section of Conversas (MobileHomeAgentes.html `.sec`): the title, its count in Doto and a chevron that
+ * A section of Conversas (MobileHomeAgentes.html `.sec`): the title, its count (medium, faint) and a chevron that
  * turns when collapsed; tapping the header collapses or opens it.
  */
 export function CollapsibleSection({
@@ -62,7 +62,7 @@ export function CollapsibleSection({
         <Text variant="small" tone="ink" style={styles.title} accessibilityRole="header" numberOfLines={1}>
           {title}
         </Text>
-        <Count value={count} size={15} color={c.faint} />
+        <Count value={count} size={15} weight={weights.medium} color={c.faint} />
         <View style={styles.grow} />
         <Animated.View style={chevron}>
           <Icon name="chev" size={16} color={c.faint} />
@@ -91,7 +91,7 @@ export function SeeAllRow({ label, onPress }: { label: string; onPress: () => vo
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 18, paddingHorizontal: 20, paddingBottom: 6 },
+  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 6 },
   pressed: { opacity: 0.6 },
   title: { fontWeight: "600", flexShrink: 1 },
   grow: { flex: 1 },

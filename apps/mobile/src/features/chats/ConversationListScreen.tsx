@@ -4,16 +4,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState, Text } from "@/ui";
 import { useColors, usePullRefresh } from "../shared/hooks";
 import { FocusLive, PushedHeader } from "../shared/parts";
-import { useConversations } from "../shared/queries";
+import { useConversations, useWorkingNow } from "../shared/queries";
 import { ConversationRowView } from "./ConversationRowView";
 import { type ListKind, rowsOfKind } from "./logic";
+import { useAgentRowStates } from "./useHomeNow";
+import { useWaitingItems } from "./WaitingStrip";
 
 /** Rows whose agent moves (a long list stays light). */
 const LIVE_ROWS = 8;
 
 /**
  * Every conversation of one kind, pushed from a section's "Ver todos" on Conversas (agents, channels,
- * people), by latest activity, in Conversas' rows.
+ * people), by latest activity, in Conversas' rows (an agent's says it waits on you, or what it is doing).
  */
 export function ConversationListScreen({ kind }: { kind: ListKind }) {
   const { t } = useTranslation();
@@ -21,6 +23,9 @@ export function ConversationListScreen({ kind }: { kind: ListKind }) {
   const insets = useSafeAreaInsets();
   const list = useConversations();
   const rows = rowsOfKind(list.rows, kind);
+  const work = useWorkingNow();
+  const waiting = useWaitingItems();
+  const agentStates = useAgentRowStates(list.rows, work, waiting.items);
   const pull = usePullRefresh(list.refetch);
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -38,7 +43,15 @@ export function ConversationListScreen({ kind }: { kind: ListKind }) {
           ) : rows.length === 0 ? (
             <EmptyState title={t("mobile.chats.empty")} />
           ) : (
-            rows.map((r, i) => <ConversationRowView key={r.key} row={r} divider={i > 0} live={i < LIVE_ROWS} />)
+            rows.map((r, i) => (
+              <ConversationRowView
+                key={r.key}
+                row={r}
+                divider={i > 0}
+                live={i < LIVE_ROWS}
+                agent={agentStates.get(r.key)}
+              />
+            ))
           )}
         </ScrollView>
       </FocusLive>

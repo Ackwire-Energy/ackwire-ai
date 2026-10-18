@@ -68,3 +68,27 @@ export function waitingApprovals(list: Approval[], now = Date.now()): Approval[]
     .filter((a) => a.status === "pending" && a.canDecide && new Date(a.expiresAt).getTime() > now)
     .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
 }
+
+/**
+ * The details table of a request (MobileIntencional.html, "Por onde / Muda / Testes"): where it goes
+ * (`via`: the connector and its account) first, then the exact values it runs with. Only what the
+ * request carries; nothing is made up. `label: null` is the "Por onde" row (its label is translated).
+ */
+export function approvalTable(
+  a: Pick<Approval, "params" | "connector" | "connectorAccount">,
+  max = 3,
+  connectorName: (id: string) => string = (id) => id,
+): { label: string | null; value: string }[] {
+  const via = a.connector ? [connectorName(a.connector), a.connectorAccount].filter(Boolean).join(" · ") : "";
+  const rows: { label: string | null; value: string }[] = via ? [{ label: null, value: via }] : [];
+  for (const [label, value] of approvalFacts(a.params, max)) rows.push({ label, value });
+  return rows.slice(0, max);
+}
+
+/** What the agent said right before asking: its `why`, else the last turn of the trail. */
+export function approvalSaid(a: Pick<Approval, "why" | "trail">): string | null {
+  const why = a.why?.trim();
+  if (why) return why;
+  const last = a.trail?.at(-1)?.text.trim();
+  return last || null;
+}

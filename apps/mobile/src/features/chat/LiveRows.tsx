@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, Pressable, Text as RNText, StyleSheet, View }
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
-import { CHROME_MAX_SCALE, fonts, Icon, PixelOrbit, Text, useReducedMotion, useTheme } from "@/ui";
+import { CHROME_MAX_SCALE, Icon, PixelOrbit, Text, useReducedMotion, useTheme } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -24,7 +24,7 @@ export function StreamingRow({ run }: { run: LiveRun }) {
       </View>
       <View style={styles.body}>
         <View style={styles.who}>
-          <Text variant="footnote" tone="ink" style={styles.name}>
+          <Text variant="footnote" tone="ink2" style={styles.name}>
             {agent?.name ?? ""}
           </Text>
           {agent?.role ? (
@@ -156,7 +156,7 @@ export function WorkingLine({
           <RNText
             accessibilityLabel={t("chat.consult.clock", { time: clock })}
             maxFontSizeMultiplier={CHROME_MAX_SCALE}
-            style={[styles.clock, { color: c.muted, fontFamily: fonts.dot }]}
+            style={[styles.clock, { color: c.muted }]}
           >
             {clock}
           </RNText>
@@ -198,11 +198,12 @@ function StopGlyph({ color }: { color: string }) {
 }
 
 const styles = StyleSheet.create({
-  msg: { flexDirection: "row", gap: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  // Same turn as a saved message (MessageRow): the reply replaces it in place.
+  msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  who: { flexDirection: "row", alignItems: "baseline", gap: 7 },
-  name: { fontWeight: "600" },
+  who: { flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 3 },
+  name: { fontWeight: "600", fontSize: 14, lineHeight: 19 },
   shrink: { flexShrink: 1 },
   dock: { paddingHorizontal: 4, paddingBottom: 6, alignItems: "flex-start" },
   said: { marginBottom: 4, alignSelf: "stretch" },
@@ -225,7 +226,7 @@ const styles = StyleSheet.create({
   overlap: { marginLeft: -5 },
   words: { flexShrink: 1 },
   ink: { fontWeight: "600" },
-  clock: { fontSize: 12 },
+  clock: { fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
   sep: { width: StyleSheet.hairlineWidth * 2, height: 16, marginLeft: 4, marginRight: 2 },
   stop: { width: 28, height: 28, borderRadius: 999, alignItems: "center", justifyContent: "center" },
   stopRing: {

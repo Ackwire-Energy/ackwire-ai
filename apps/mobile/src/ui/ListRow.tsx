@@ -1,23 +1,38 @@
 import type { ReactNode } from "react";
-import { Pressable, type PressableProps, StyleSheet, View } from "react-native";
+import { Platform, Pressable, type PressableProps, StyleSheet, type TextStyle, View } from "react-native";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
+import { weights } from "./type-scale";
 
 /** The avatar column of a full-width list row (52pt: an agent's body, a person's photo, a tile). */
 export const LIST_AVATAR = 52;
+/** The gap between the avatar and the text. */
+const GAP = 13;
 /** Where the hairline between rows starts: the text column. */
-export const LIST_INSET = 14 + LIST_AVATAR + 12;
+export const LIST_INSET = 14 + LIST_AVATAR + GAP;
+
+const IOS = Platform.OS === "ios";
+
+/**
+ * A row's second line, readable (MobileIntencional.html `.cr .l2 p`): 15.5/21 on iOS (Android keeps its
+ * 14/20 body medium). For any text that sits in that line (a preview, what an agent is doing).
+ */
+export const LIST_PREVIEW: TextStyle = IOS ? { fontSize: 15.5, lineHeight: 21 } : { lineHeight: 20 };
+/** The time on line 1: 14.5 on iOS, tabular figures. */
+export const LIST_TIME: TextStyle = { ...(IOS ? { fontSize: 14.5 } : null), fontVariant: ["tabular-nums"] };
 
 export interface ListRowProps extends Omit<PressableProps, "style" | "children"> {
   /** The 52pt avatar box's content. */
   leading: ReactNode;
-  /** Line 1 (a string is drawn as the bold name). */
+  /** Line 1 (a string is drawn as the semibold name; bold when unread). */
   title: ReactNode;
   /** Lines of the title (default 1). */
   titleLines?: number;
-  /** On the right of line 1 (the time, faint). */
+  /** On the right of line 1 (the time, faint; darker when unread). */
   time?: string | null;
-  /** Line 2 (a string is drawn muted, up to two lines). */
+  /** A small faint line under the title (what and where: "Missão · #canal"). */
+  over?: ReactNode;
+  /** Line 2 (a string is drawn in the readable secondary color, up to two lines). */
   sub?: ReactNode;
   /** On the right of line 2 (a count badge, a state). */
   trailing?: ReactNode;
@@ -25,34 +40,49 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
   divider?: boolean;
   /** A small ink dot left of the avatar (unread). */
   dot?: boolean;
+  /** Something new in it: the name bold, the time and the preview darker. */
+  unread?: boolean;
+  /** The row's own background (in a white card on grouped gray: `raised`). Default: clear. */
+  background?: string;
 }
 
 /**
- * One full-width row of a list (MobileConversas.html): no card, the 52pt avatar, the bold name and the time
- * on line 1, the muted text (two lines) with a badge or state on line 2, hairlines inset to the text.
- * Used by Atividade; Conversas' row has the same metrics.
+ * One full-width row of a list (MobileConversas.html, readable per MobileIntencional.html): no card, the
+ * 52pt avatar, the semibold 17 name and the time on line 1, the preview (15.5/21, two lines) with a badge or
+ * state on line 2, hairlines inset to the text, about 82pt tall. Unread: bold name, darker time and preview.
+ * Conversas, Atividade and Agentes use it.
  */
 export function ListRow({
   leading,
   title,
   titleLines = 1,
   time,
+  over,
   sub,
   trailing,
   divider = false,
   dot = false,
+  unread = false,
+  background,
   ...press
 }: ListRowProps) {
   const { colors: c } = useTheme();
   return (
-    <Pressable {...press} style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}>
+    <Pressable
+      {...press}
+      style={({ pressed }) => [
+        styles.row,
+        background ? { backgroundColor: background } : null,
+        pressed && { backgroundColor: c.sunken },
+      ]}
+    >
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
       {dot ? <View style={[styles.dot, { backgroundColor: c.ink }]} /> : null}
       <View style={styles.avatar}>{leading}</View>
       <View style={styles.tx}>
         <View style={styles.l1}>
           {typeof title === "string" ? (
-            <Text variant="title" numberOfLines={titleLines} style={styles.shrink}>
+            <Text variant="title" numberOfLines={titleLines} style={[styles.shrink, unread && styles.unreadName]}>
               {title}
             </Text>
           ) : (
@@ -60,16 +90,21 @@ export function ListRow({
           )}
           <View style={styles.grow} />
           {time ? (
-            <Text variant="small" tone="faint" style={styles.time}>
+            <Text
+              variant="small"
+              tone={unread ? "ink2" : "faint"}
+              style={[styles.time, LIST_TIME, unread && styles.unreadTime]}
+            >
               {time}
             </Text>
           ) : null}
         </View>
+        {over}
         {sub || trailing ? (
           <View style={styles.l2}>
             <View style={styles.grow}>
               {typeof sub === "string" ? (
-                <Text variant="small" tone="muted" numberOfLines={2} style={styles.last}>
+                <Text variant="small" tone={unread ? "ink2" : "muted"} numberOfLines={2} style={LIST_PREVIEW}>
                   {sub}
                 </Text>
               ) : (
@@ -88,20 +123,21 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
+    gap: GAP,
+    paddingVertical: 12,
     paddingLeft: 14,
     paddingRight: 16,
-    minHeight: 76,
+    minHeight: 82,
   },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
   dot: { position: "absolute", left: 3, top: "50%", marginTop: -4, width: 8, height: 8, borderRadius: 4 },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
-  tx: { flex: 1, minWidth: 0, gap: 1 },
-  l1: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  l2: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  tx: { flex: 1, minWidth: 0, gap: 2 },
+  l1: { flexDirection: "row", alignItems: "center", gap: 6 },
+  l2: { flexDirection: "row", alignItems: "center", gap: 10 },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
-  time: { paddingTop: 1 },
-  last: { lineHeight: 20 },
+  unreadName: { fontWeight: weights.bold },
+  time: { flexShrink: 0 },
+  unreadTime: { fontWeight: weights.medium },
 });

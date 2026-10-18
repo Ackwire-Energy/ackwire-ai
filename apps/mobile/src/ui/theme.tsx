@@ -1,24 +1,17 @@
-import {
-  dark as darkColors,
-  light as lightColors,
-  motion as motionCurves,
-  radius as radii,
-  type ShadowLayer,
-  shadows as shadowLayers,
-  type ThemeColors,
-} from "@agenteschat/tokens";
+import { motion as motionCurves, radius as radii, type ShadowLayer } from "@agenteschat/tokens";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AccessibilityInfo, Platform, useColorScheme } from "react-native";
 import { readValue, STORED, writeValue } from "@/lib/storage";
-
-export { weights } from "./type-scale";
+import { type AppColors, appColors, appShadows, type Scheme } from "./palette";
 
 /**
- * The theme for React Native, from `@agenteschat/tokens` (tokens.css is the source of truth).
- * Rules (design system): neutral cards, chips with icons (never colored dots), the brand blue only for
- * agent identity, names in ink, the mono font only for code, Doto for every count.
+ * The theme for React Native, from `@agenteschat/tokens` (tokens.css is the source of truth), with the light
+ * theme made native like iOS (`palette.ts`). Rules (design system): neutral cards, chips with icons (never
+ * colored dots), the brand blue only for agent identity, amber only for what waits on you, names in ink,
+ * the mono font only for code; counts in the system font (Doto only for a rare hero number).
  */
-export type Scheme = "light" | "dark";
+export type { AppColors, Scheme } from "./palette";
+export { weights } from "./type-scale";
 export type ThemePreference = "system" | Scheme;
 
 /** A token shadow as React Native's `boxShadow` string (New Architecture: layers, spread and inset). */
@@ -32,7 +25,7 @@ export const boxShadow = (layers: readonly ShadowLayer[]) =>
 export const fonts = {
   /** Funnel Display Light: large titles. */
   display: "FunnelDisplay-Light",
-  /** Doto, ROND 100 instance (weight 600): every count. */
+  /** Doto, ROND 100 instance (weight 600): only a rare large hero number (`Count hero`). */
   dot: "Doto",
   /** Code only. */
   mono: Platform.select({ ios: "Menlo", default: "monospace" }),
@@ -53,7 +46,7 @@ export const motion = {
 
 export interface Theme {
   scheme: Scheme;
-  colors: ThemeColors;
+  colors: AppColors;
   shadows: { e1: string; e2: string; e3: string; top: string };
   radius: typeof radii;
   fonts: typeof fonts;
@@ -65,10 +58,10 @@ export interface Theme {
 }
 
 export function makeTheme(scheme: Scheme, reducedMotion = false): Omit<Theme, "preference" | "setPreference"> {
-  const s = shadowLayers[scheme];
+  const s = appShadows(scheme);
   return {
     scheme,
-    colors: scheme === "dark" ? darkColors : lightColors,
+    colors: appColors(scheme),
     shadows: { e1: boxShadow(s.e1), e2: boxShadow(s.e2), e3: boxShadow(s.e3), top: boxShadow(s.top) },
     radius: radii,
     fonts,

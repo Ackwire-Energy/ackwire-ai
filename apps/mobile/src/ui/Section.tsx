@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { Count } from "./Count";
 import { Text } from "./Text";
+import { useTheme } from "./theme";
+import { weights } from "./type-scale";
 
 export interface SectionProps {
   title: string;
@@ -10,15 +12,16 @@ export interface SectionProps {
   children?: ReactNode;
 }
 
-/** A titled block of the screen (header in faint, the count in Doto, an optional action on the right). */
+/** A titled block of the screen (header in faint, the count beside it, an optional action on the right). */
 export function Section({ title, count, action, children }: SectionProps) {
+  const { colors } = useTheme();
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingBottom: 10 }}>
         <Text variant="label" accessibilityRole="header" style={{ flexShrink: 1 }}>
           {title}
         </Text>
-        {count !== undefined ? <Count value={count} size={14} /> : null}
+        {count !== undefined ? <Count value={count} size={14} weight={weights.medium} color={colors.faint} /> : null}
         <View style={{ flex: 1 }} />
         {action ? (
           <Pressable onPress={action.onPress} accessibilityRole="button" hitSlop={8}>

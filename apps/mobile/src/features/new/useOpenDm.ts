@@ -7,7 +7,11 @@ import { chatHref } from "../links/logic";
 import { useOrgId } from "../shared/hooks";
 import { closeSheetsAndOpen } from "./parts";
 
-/** Opens (or creates) the direct conversation with an agent or a person, closing the sheets on the way. */
+/**
+ * Opens (or creates) the direct conversation with an agent or a person, closing the sheets on the way.
+ * `then` runs first with the conversation's id (a request from "Novo" is posted there); if it fails, the
+ * sheets stay open with what was typed.
+ */
 export function useOpenDm() {
   const { t } = useTranslation();
   const api = useApi();
@@ -15,10 +19,11 @@ export function useOpenDm() {
   const qc = useQueryClient();
   const toast = useToast();
   return useCallback(
-    (target: { agentId: string } | { userId: string }) =>
+    (target: { agentId: string } | { userId: string }, then?: (channelId: string) => Promise<unknown>) =>
       api.dms
         .open(orgId, target)
-        .then(({ channelId }) => {
+        .then(async ({ channelId }) => {
+          if (then) await then(channelId);
           void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
           closeSheetsAndOpen(chatHref(channelId));
         })

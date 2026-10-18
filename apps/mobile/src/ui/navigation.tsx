@@ -208,7 +208,8 @@ export const coverBarOptions: NativeStackNavigationOptions = {
 
 /**
  * A native form sheet (Requests, Você): drag to dismiss, detents, the grabber, and on iOS the screen behind
- * scales back. `detents` are fractions of the screen height, ascending.
+ * scales back. `detents` are fractions of the screen height, ascending. Sheets sit on the grouped gray
+ * (white cards on it, like iOS); `raised` for a sheet that is one white card.
  */
 export function useFormSheetOptions(
   detents: number[],
@@ -225,7 +226,7 @@ export function useFormSheetOptions(
       sheetGrabberVisible: true,
       sheetCornerRadius: 28,
       sheetExpandsWhenScrolledToEdge: true,
-      contentStyle: { backgroundColor: background === "raised" ? colors.raised : colors.bg },
+      contentStyle: { backgroundColor: background === "raised" ? colors.raised : colors.grouped },
     }),
     [key, background, colors],
   );

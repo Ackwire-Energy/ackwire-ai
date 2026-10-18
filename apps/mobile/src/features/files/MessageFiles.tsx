@@ -14,7 +14,8 @@ import { useArtifacts, useRemoteFile } from "./source";
 /**
  * A message's files (MobileRefinos.html, "Na conversa"): pictures inline (one at its own shape, or two
  * side by side), tapping opens the viewer at that picture; other files as a card with the type's tile,
- * the real name and "Documento · 4 KB", tapping opens the document screen.
+ * the real name and "Documento · 4 KB", tapping opens the document screen. `align="end"`: the viewer's own
+ * message, its files sit on the right.
  */
 
 export interface MessageFile {
@@ -29,7 +30,7 @@ const MAX_WIDTH = 300;
 const GAP = 6;
 const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"]);
 
-export function MessageFiles({ files }: { files: MessageFile[] }) {
+export function MessageFiles({ files, align = "start" }: { files: MessageFile[]; align?: "start" | "end" }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const live = files.filter((f) => !f.deleted);
@@ -66,7 +67,7 @@ export function MessageFiles({ files }: { files: MessageFile[] }) {
   };
 
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={styles.wrap}>
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[styles.wrap, align === "end" && styles.end]}>
       {images.length > 0 ? (
         <View style={[styles.images, { width: blockWidth }]}>
           {imageRows(images.length).map((row) => (
@@ -255,6 +256,7 @@ function RemovedCard() {
 
 const styles = StyleSheet.create({
   wrap: { alignSelf: "stretch" },
+  end: { alignItems: "flex-end" },
   images: { marginTop: 8, gap: GAP },
   row: { flexDirection: "row", gap: GAP },
   shot: { borderRadius: 14, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },

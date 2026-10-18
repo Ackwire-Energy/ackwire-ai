@@ -3,7 +3,8 @@
  *
  * Body and UI text use the system font (SF Pro on iOS, Roboto on Android) at the platform's own sizes:
  * Apple's HIG text styles at the default Dynamic Type size, Material 3 on Android. The brand stays in
- * the large title (Funnel Display, `display` in `Text`), counts (Doto, `Count`) and code (mono).
+ * the large title (Funnel Display, `display` in `Text`), a rare hero number (Doto, `Count hero`) and code
+ * (mono). Counts, badges, times and countdowns are the system font, semibold, tabular (`countStyle`).
  * Every style scales with the person's text size setting; dense chrome caps its growth with
  * `CHROME_MAX_SCALE`.
  */
@@ -82,4 +83,17 @@ export function typeScale(os: OS): Record<TypeStyle, TypeMetrics> {
 export function typeStyle(os: OS, style: TypeStyle, fontWeight?: Weight): TypeMetrics {
   const base = typeScale(os)[style];
   return fontWeight ? { ...base, fontWeight } : base;
+}
+
+/**
+ * A number in the chrome (unread badges, section counts, times, "expira em", the undo countdown): the system
+ * font, semibold, tabular figures so it doesn't jump as it changes. Doto is only for a rare hero number.
+ */
+export function countStyle(fontSize: number, fontWeight: Weight = weights.semibold) {
+  return {
+    fontSize,
+    lineHeight: Math.round(fontSize * 1.2),
+    fontWeight,
+    fontVariant: ["tabular-nums"] as ["tabular-nums"],
+  };
 }

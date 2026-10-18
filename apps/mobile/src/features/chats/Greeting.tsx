@@ -7,13 +7,8 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook, firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
-
-/** The examples under "Comece pelo seu primeiro agente": each fills "o que faz" of a new agent. */
-const EXAMPLES = [
-  { key: "support", icon: "chat" },
-  { key: "reports", icon: "doc" },
-  { key: "weekly", icon: "clock" },
-] as const;
+import { FIRST_AGENT_EXAMPLES } from "./examples";
+import { type FinishedItem, finishedKey, greetingLine } from "./now";
 
 /** The look of an agent still to be born (the new-agent sheet and the empty state). */
 export const NEWBORN = { color: "indigo", eyes: "round" } as const;
@@ -29,31 +24,113 @@ function useGreeting() {
 /** Faces of working agents drawn over the greeting (the rest is the count). */
 const FACES = 4;
 
+/** Opens Agentes (who is working, doing what). */
+const openAgents = () => router.navigate("/agents");
+
 /**
- * The one-line greeting on top of Conversas (MobileHomeAgentes.html `.gmini`), seen at rest and scrolling
- * away with the list: "Boa noite, Walter", how many agents are working with the pixel orbit, and the faces of
- * the ones working (moving), over a light sky that fades out. `reach`: how far the sky extends up behind
- * the clear bar.
+ * The one-line greeting on top of Conversas (MobileHomeAgentes.html `.gmini`; MobileIntencional.html, A),
+ * seen at rest and scrolling away with the list: "Boa noite, Walter", then what changed: what an agent
+ * finished ("Theo terminou “…”", opens where it happened) and how many work now (opens Agentes), with the
+ * faces of the ones working (moving), over a light sky that fades out. `reach`: how far the sky extends up
+ * behind the clear bar.
  */
-export function Greeting({ working, reach }: { working: readonly string[]; reach: number }) {
+export function Greeting({
+  working,
+  finished,
+  onFinishedPress,
+  reach,
+}: {
+  working: readonly string[];
+  /** The newest thing an agent finished (null: nothing new). */
+  finished: FinishedItem | null;
+  /** Tapped what finished (it opens there and is taken off). */
+  onFinishedPress?: (f: FinishedItem) => void;
+  reach: number;
+}) {
   const { t } = useTranslation();
+  const c = useColors();
   const dir = useDirectory();
   const greeting = useGreeting();
   const color = agentLook(working[0] ? dir.agentById.get(working[0]) : undefined).color;
-  const line =
-    working.length > 0 ? t("mobile.chats.workingNowLine", { count: working.length }) : t("mobile.chats.nobodyWorking");
+  const line = greetingLine(finished, working.length);
+  const workingText =
+    line.kind === "finished"
+      ? t("mobile.homeNow.working", { count: line.working })
+      : line.kind === "working"
+        ? t("mobile.chats.workingNowLine", { count: line.working })
+        : t("mobile.chats.nobodyWorking");
+  const finishedName = line.kind === "finished" ? (dir.agentById.get(line.finished.agentId)?.name ?? "") : "";
+  const finishedText =
+    line.kind === "finished" ? t(finishedKey(line.finished), { what: line.finished.what ?? "" }) : "";
+  const openFinished = (f: FinishedItem) => {
+    onFinishedPress?.(f);
+    router.push(f.href ?? `/agent/${f.agentId}`);
+  };
+  const workingPart = (
+    <View style={styles.part}>
+      {line.kind !== "idle" && working.length > 0 ? <PixelOrbit color={color} size={9} /> : null}
+      <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+        {workingText}
+      </Text>
+    </View>
+  );
   return (
     <View style={styles.mini}>
       <Sky color="sky" depth={0.9} fade={0.45} style={[StyleSheet.absoluteFill, { top: -reach }]} />
-      <View style={styles.grow} accessible accessibilityLabel={`${greeting}. ${line}`}>
+      <View style={styles.grow}>
         <Text variant="small" tone="ink" style={styles.bold} numberOfLines={1} accessibilityRole="header">
           {greeting}
         </Text>
         <View style={styles.line}>
-          {working.length > 0 ? <PixelOrbit color={color} size={9} /> : null}
-          <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-            {line}
-          </Text>
+          {line.kind === "finished" ? (
+            <>
+              <Pressable
+                onPress={() => openFinished(line.finished)}
+                accessibilityRole="button"
+                accessibilityLabel={`${finishedName} ${finishedText}`}
+                hitSlop={8}
+                style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
+              >
+                <Icon name="checkc" size={13} color={c.muted} />
+                <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+                  {finishedName ? (
+                    <Text variant="footnote" tone="ink2" style={styles.bold}>
+                      {`${finishedName} `}
+                    </Text>
+                  ) : null}
+                  {finishedText}
+                </Text>
+              </Pressable>
+              {line.working > 0 ? (
+                <>
+                  <Text variant="footnote" tone="faint">
+                    ·
+                  </Text>
+                  <Pressable
+                    onPress={openAgents}
+                    accessibilityRole="button"
+                    accessibilityLabel={workingText}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.noShrink, pressed && styles.pressed]}
+                  >
+                    {workingPart}
+                  </Pressable>
+                </>
+              ) : null}
+            </>
+          ) : line.kind === "working" ? (
+            <Pressable
+              onPress={openAgents}
+              accessibilityRole="button"
+              accessibilityLabel={workingText}
+              hitSlop={8}
+              style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
+            >
+              {workingPart}
+            </Pressable>
+          ) : (
+            workingPart
+          )}
         </View>
       </View>
       {working.length > 0 ? (
@@ -76,8 +153,9 @@ export function Greeting({ working, reach }: { working: readonly string[]; reach
 }
 
 /**
- * Conversas with nothing in it yet: the sky with an agent about to be born, "Novo agente" and "Novo
- * canal", and examples of what an agent can do (each opens "Novo agente" with "o que faz" filled in).
+ * Conversas with nothing in it yet (MobileIntencional.html, "Primeiro dia"): the sky with an agent about to
+ * be born, one primary "Criar meu primeiro agente", and examples of what an agent can do (each opens "Novo
+ * agente" with "o que faz" filled in).
  */
 export function FirstAgentEmpty() {
   const { t } = useTranslation();
@@ -89,32 +167,31 @@ export function FirstAgentEmpty() {
     <View>
       <View style={[styles.empty, surface]}>
         <View style={styles.emptySky}>
-          <Sky color="indigo" depth={0.9} style={StyleSheet.absoluteFill} />
+          <Sky color="indigo" depth={0.9} surface="raised" style={StyleSheet.absoluteFill} />
           <AgentAvatar agent={NEWBORN} size={78} />
         </View>
-        <Text variant="display" style={styles.center} accessibilityRole="header">
+        <Text variant="display2" style={styles.center} accessibilityRole="header">
           {t("mobile.chats.first.title")}
         </Text>
         <Text variant="small" tone="muted" style={[styles.center, styles.emptyText]}>
-          {t("mobile.chats.first.subtitle")}
+          {t("mobile.homeNow.first.subtitle")}
         </Text>
         <View style={styles.acts}>
-          <Button variant="primary" wide icon="plus" label={t("mobile.agents.new")} onPress={() => newAgent()} />
           <Button
-            variant="secondary"
+            variant="primary"
             wide
-            icon="hash"
-            label={t("mobile.chats.newChannel")}
-            onPress={() => router.push("/new-channel")}
+            icon="plus"
+            label={t("mobile.homeNow.first.create")}
+            onPress={() => newAgent()}
           />
         </View>
       </View>
       <View style={styles.ideas}>
         <Text variant="label" style={styles.ideasTitle}>
-          {t("mobile.chats.first.examples")}
+          {t("mobile.homeNow.first.examples")}
         </Text>
         <Card>
-          {EXAMPLES.map((ex, i) => (
+          {FIRST_AGENT_EXAMPLES.map((ex, i) => (
             <Pressable
               key={ex.key}
               onPress={() => newAgent(t(`mobile.chats.first.example.${ex.key}.what`))}
@@ -146,7 +223,10 @@ export function FirstAgentEmpty() {
 const styles = StyleSheet.create({
   mini: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 6 },
   line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
+  part: { flexDirection: "row", alignItems: "center", gap: 4 },
   shrink: { flexShrink: 1 },
+  noShrink: { flexShrink: 0 },
+  pressed: { opacity: 0.6 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -8 },
   empty: { marginHorizontal: 16, marginTop: 6, borderRadius: 28, overflow: "hidden", padding: 22, paddingTop: 0 },

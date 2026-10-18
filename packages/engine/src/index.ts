@@ -1,5 +1,6 @@
 export * from "./access";
 export * from "./agent-actions";
+export * from "./agent-for-you";
 export * from "./agent-import";
 export * from "./agent-undo";
 export * from "./agents";

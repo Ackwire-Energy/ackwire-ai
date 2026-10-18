@@ -13,7 +13,7 @@ export interface ChipProps {
   leading?: ReactNode;
 }
 
-/** A small neutral tag: sunken pill, muted text. */
+/** A small neutral tag: a light gray pill, muted text. */
 export function Chip({ icon, label, leading }: ChipProps) {
   const { colors } = useTheme();
   return (
@@ -25,7 +25,7 @@ export function Chip({ icon, label, leading }: ChipProps) {
         minHeight: 24,
         paddingHorizontal: 9,
         borderRadius: 999,
-        backgroundColor: colors.sunken,
+        backgroundColor: colors.chip,
         alignSelf: "flex-start",
       }}
     >

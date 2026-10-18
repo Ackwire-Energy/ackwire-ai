@@ -9,6 +9,7 @@ import type {
   AgentChannel,
   AgentComputer,
   AgentDetail,
+  AgentForYou,
   AgentMailbox,
   AgentQuestion,
   AgentSecret,
@@ -156,6 +157,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       redo: (orgId, actionId) => request<AgentAction>(`${org(orgId)}/actions/${enc(actionId)}/redo`, { json: {} }),
       undoMessage: (orgId, messageId) =>
         request<UndoAllResult>(`${org(orgId)}/messages/${enc(messageId)}/actions/undo`, { json: {} }),
+    },
+    agentForYou: {
+      get: (orgId, agentId, limit) =>
+        request<AgentForYou>(`${org(orgId)}/agents/${enc(agentId)}/for-you`, { query: { limit } }),
     },
     pins: {
       list: async (orgId, channelId) =>
@@ -399,8 +404,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ).hits,
     },
     memory: {
-      list: async (orgId, agentId) =>
-        (await request<{ memories: Memory[] }>(`${org(orgId)}/agents/${enc(agentId)}/memories`)).memories,
+      list: async (orgId, agentId, filter) =>
+        (
+          await request<{ memories: Memory[] }>(`${org(orgId)}/agents/${enc(agentId)}/memories`, {
+            query: { about: filter?.about },
+          })
+        ).memories,
       edit: (orgId, id, text) =>
         request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { text } }),
       setPinned: (orgId, id, pinned) =>

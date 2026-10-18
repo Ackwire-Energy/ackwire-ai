@@ -610,6 +610,8 @@ export interface Memory {
   /** Set when a person edited it ("Editado por você · agora"). */
   editedByUserId: string | null;
   updatedAt: string;
+  /** `about: "me"` only: the viewer's message it came from ("Você disse hoje, nesta conversa"). */
+  from?: { messageId: string; channelId: string; threadId: string | null; dm: boolean; at: string } | null;
 }
 
 export type ProposalStatus = "pending" | "accepted" | "refused";
@@ -946,6 +948,35 @@ export interface AgentAction {
   undoneAt: string | null;
   undoneByUserId: string | null;
   redoneAt: string | null;
+}
+
+/** One line of "O que fez por você" (`GET …/agents/{id}/for-you`). */
+export type AgentForYouItem =
+  | { type: "action"; at: string; channelId: string; action: AgentAction }
+  | {
+      type: "file";
+      at: string;
+      file: { id: string; kind: ArtifactKind; title: string; channelId: string | null; threadId: string | null };
+    }
+  | {
+      type: "approval";
+      at: string;
+      approval: {
+        id: string;
+        title: string;
+        status: ApprovalStatus;
+        channelId: string;
+        threadId: string;
+        /** Pending, and the viewer may decide it ("espera seu ok"). */
+        waitingOnYou: boolean;
+      };
+    };
+
+/** What an agent did for the viewer: their receipts, its files where both are, approvals on them; newest first. */
+export interface AgentForYou {
+  items: AgentForYouItem[];
+  /** Items since the first day of this month. */
+  monthCount: number;
 }
 
 /** `POST …/messages/{messageId}/actions/undo` (Desfazer tudo). */

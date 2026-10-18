@@ -4,6 +4,8 @@ import {
   approvalAction,
   approvalFacts,
   approvalRisk,
+  approvalSaid,
+  approvalTable,
   approvalTraits,
   humanKey,
   waitingApprovals,
@@ -118,5 +120,39 @@ describe("missions", () => {
     ).toEqual(["a"]);
     expect(hoursSince(null)).toBeNull();
     expect(hoursSince("2026-10-17T00:00:00.000Z", Date.parse("2026-10-17T14:30:00.000Z"))).toBe(14);
+  });
+});
+
+describe("the exact request", () => {
+  test("the details table: where it goes first, then the values, at most three rows", () => {
+    const a = approval({
+      id: "ap",
+      connector: "github",
+      connectorAccount: "acme/app",
+      params: { pull_number: 128, base: "main", method: "squash", extra: "x" },
+    });
+    expect(approvalTable(a, 3, (id) => (id === "github" ? "GitHub" : id))).toEqual([
+      { label: null, value: "GitHub · acme/app" },
+      { label: "Pull number", value: "128" },
+      { label: "Base", value: "main" },
+    ]);
+    expect(approvalTable(approval({ id: "b", params: { title: "Oi" } }))).toEqual([{ label: "Title", value: "Oi" }]);
+  });
+
+  test("what the agent said before: its why, else the last turn", () => {
+    expect(approvalSaid(approval({ id: "a", why: " Os testes passaram. " }))).toBe("Os testes passaram.");
+    expect(
+      approvalSaid(
+        approval({
+          id: "b",
+          why: null,
+          trail: [
+            { text: "Primeiro", at: "2026-10-18T10:00:00Z" },
+            { text: "Por último", at: "2026-10-18T10:01:00Z" },
+          ],
+        }),
+      ),
+    ).toBe("Por último");
+    expect(approvalSaid(approval({ id: "c", why: null }))).toBeNull();
   });
 });

@@ -36,7 +36,7 @@ export { Icon, type IconName, type IconProps } from "./Icon";
 export { IconButton, type IconButtonProps } from "./IconButton";
 export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
-export { LIST_AVATAR, LIST_INSET, ListRow, type ListRowProps } from "./ListRow";
+export { LIST_AVATAR, LIST_INSET, LIST_PREVIEW, LIST_TIME, ListRow, type ListRowProps } from "./ListRow";
 export {
   CoverTabStack,
   coverBarOptions,
@@ -63,6 +63,7 @@ export { systemText, Text, type TextProps, type TextTone, type TextVariant } fro
 export { ToastHost, type ToastInput, useToast } from "./Toast";
 export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";
 export {
+  type AppColors,
   boxShadow,
   fonts,
   motion,
@@ -74,4 +75,4 @@ export {
   useTheme,
   weights,
 } from "./theme";
-export { CHROME_MAX_SCALE, type TypeStyle, typeScale } from "./type-scale";
+export { CHROME_MAX_SCALE, countStyle, type TypeStyle, typeScale } from "./type-scale";

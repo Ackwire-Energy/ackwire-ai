@@ -1,39 +1,40 @@
-import { useDms, useWorkingRuns } from "@agenteschat/client";
+import { useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import { Chip, EmptyState, LargeTitleScreen, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
-import { useOpenDm } from "../new/useOpenDm";
+import { Chip, EmptyState, Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
-import { useWorkingNow } from "../shared/queries";
+import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
-import { agoOf, type TeamLine, teamLines } from "./logic";
+import { agoOf, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
 
 /** Rows whose agent moves (a long team stays light). */
 const LIVE_ROWS = 8;
 
 /**
- * Agentes (MobileHomeAgentes.html, Recomendada): the team in Conversas' rows. "Trabalhando agora" (moving,
- * since when, and what each one is on, with the pixel orbit), then "Livres" (its last conversation and when).
- * Tapping an agent opens the direct conversation with it (its profile is in that conversation's bar; one that
- * doesn't talk to you opens its profile); "Novo agente" at the end.
+ * Agentes (MobileIntencional.html, "Aba Agentes"): the team in Conversas' rows, who needs you first.
+ * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
+ * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked). Tapping an agent
+ * opens its profile (Conversar is one tap there); "Novo agente" at the end.
  */
 export function AgentsScreen() {
   const { t } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
   const header = useTabHeader();
-  const openDm = useOpenDm();
   const orgId = useOrgId();
   const runs = useWorkingRuns(orgId);
   const dms = useDms(orgId);
+  const approvals = useApprovals(orgId);
   const work = useWorkingNow();
-  const { working, free } = teamLines(dir.agents, work, dms.data ?? []);
-  const pull = usePullRefresh(() => Promise.allSettled([runs.refetch(), dms.refetch()]));
+  const asking = useWaitingApprovals();
+  const { waiting, working, free } = teamLines(dir.agents, work, dms.data ?? [], asking);
+  const busy = waiting.length + working.length;
+  const pull = usePullRefresh(() => Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch()]));
   const total = dir.agents.length;
   return (
     <LargeTitleScreen
@@ -43,11 +44,19 @@ export function AgentsScreen() {
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {dir.loading ? null : total === 0 ? <EmptyState title={t("mobile.agents.empty")} sky /> : null}
+      {waiting.length > 0 ? (
+        <>
+          <SectionHeader title={t("mobile.intentAgents.waitingSection")} count={waiting.length} />
+          {waiting.map((l, i) => (
+            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={i < LIVE_ROWS} />
+          ))}
+        </>
+      ) : null}
       {working.length > 0 ? (
         <>
           <SectionHeader title={t("mobile.home.workingNow")} count={working.length} />
           {working.map((l, i) => (
-            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={i < LIVE_ROWS} onOpen={openDm} />
+            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={waiting.length + i < LIVE_ROWS} />
           ))}
         </>
       ) : null}
@@ -55,7 +64,7 @@ export function AgentsScreen() {
         <>
           <SectionHeader title={t("mobile.agents.freeSection")} count={free.length} />
           {free.map((l, i) => (
-            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={working.length + i < LIVE_ROWS} onOpen={openDm} />
+            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={busy + i < LIVE_ROWS} />
           ))}
         </>
       ) : null}
@@ -73,34 +82,35 @@ export function AgentsScreen() {
   );
 }
 
-/** One agent (`.arow`): its body, the name and role, since when or its last conversation, then what it is on or said. */
-function AgentRow({
-  line: l,
-  divider,
-  live,
-  onOpen,
-}: {
-  line: TeamLine;
-  divider: boolean;
-  live: boolean;
-  onOpen: ReturnType<typeof useOpenDm>;
-}) {
+/**
+ * One agent (`.arow`): its body, the name and role, then what it needs from you (the exact request), what it is
+ * on (since when), or its role in plain words (when you last talked).
+ */
+function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean; live: boolean }) {
   const { t } = useTranslation();
+  const c = useColors();
   const when = useWhen();
   const now = useNow();
-  const { agent: a, work: w } = l;
-  const time = l.at ? (w ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
-  const sub = w ? workTitle(t, w) : (l.preview ?? "");
-  const open = () => {
-    if (a.canTalk === false) router.push(`/agent/${a.id}`);
-    else void onOpen({ agentId: a.id });
-  };
+  const { agent: a, work: w, approval } = l;
+  const busy = Boolean(approval || w);
+  const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
+  const sub = approval
+    ? l.waitingCount > 1
+      ? t("mobile.intentAgents.waitingMore", { title: approval.title, count: l.waitingCount - 1 })
+      : t("mobile.intentAgents.waitingLine", { title: approval.title })
+    : w
+      ? workTitle(t, w)
+      : (plainRole(a.instructions) ?? l.preview ?? "");
   return (
     <ListRow
-      onPress={open}
+      onPress={() => router.push(`/agent/${a.id}`)}
       accessibilityRole="button"
       accessibilityLabel={[
-        w ? t("mobile.agents.workingLabel", { name: a.name }) : a.name,
+        approval
+          ? t("mobile.intentAgents.waitingLabel", { name: a.name })
+          : w
+            ? t("mobile.agents.workingLabel", { name: a.name })
+            : a.name,
         a.role.trim() || null,
         time,
         sub || null,
@@ -123,15 +133,22 @@ function AgentRow({
       }
       time={time}
       sub={
-        w ? (
+        approval ? (
+          <View style={styles.work}>
+            <Icon name="shield" size={13} color={c.amber} />
+            <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.medium, styles.shrink]}>
+              {sub}
+            </Text>
+          </View>
+        ) : w ? (
           <View style={styles.work}>
             <PixelOrbit color={agentLook(a).color} size={12} />
-            <Text variant="small" tone="ink2" numberOfLines={1} style={[styles.medium, styles.shrink]}>
+            <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.medium, styles.shrink]}>
               {sub}
             </Text>
           </View>
         ) : sub ? (
-          <Text variant="small" tone="muted" numberOfLines={1}>
+          <Text variant="small" tone="muted" numberOfLines={1} style={LIST_PREVIEW}>
             {sub}
           </Text>
         ) : null

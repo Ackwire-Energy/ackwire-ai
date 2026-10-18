@@ -5,6 +5,7 @@ import { CHROME_MAX_SCALE, type OS, type TypeStyle, typeStyle, type Weight, weig
 
 export type TextVariant =
   | "display"
+  | "display2"
   | "title2"
   | "title"
   | "body"
@@ -24,6 +25,7 @@ export interface TextProps extends RNTextProps {
 
 const DEFAULT_TONE: Record<TextVariant, TextTone> = {
   display: "ink",
+  display2: "ink",
   title2: "ink",
   title: "ink",
   body: "ink",
@@ -43,7 +45,7 @@ export function systemText(style: TypeStyle, fontWeight?: Weight): TextStyle {
 }
 
 /** Where each variant sits on the native scale (`display` is the brand's large title, not the system font). */
-const VARIANT_STYLE: Record<Exclude<TextVariant, "display">, [TypeStyle, Weight?]> = {
+const VARIANT_STYLE: Record<Exclude<TextVariant, "display" | "display2">, [TypeStyle, Weight?]> = {
   title2: ["title2", weights.semibold],
   title: ["headline"],
   body: ["body"],
@@ -56,18 +58,24 @@ const VARIANT_STYLE: Record<Exclude<TextVariant, "display">, [TypeStyle, Weight?
 };
 
 /**
- * Variants: display 34 (Funnel Display Light, the brand), title2 22 semibold, title 17 semibold (headline),
+ * Variants: display 34 (Funnel Display Light, the brand; the large titles), display2 30 (the same, for a
+ * question or a heading inside a screen: "O que você precisa?", an empty state), title2 22 semibold, title 17 semibold (headline),
  * body 17/22, callout 16/21, subhead/small 15/20, footnote 13/18, label 13 semibold, caption 12/16
  * (iOS HIG sizes; Material 3 on Android). Everything but display uses the system font.
  */
 export function variantStyle(variant: TextVariant, fonts: ReturnType<typeof useTheme>["fonts"]): TextStyle {
   if (variant === "display") return { fontFamily: fonts.display, fontSize: 34, lineHeight: 37, letterSpacing: -0.68 };
+  if (variant === "display2") return { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6 };
   const [style, weight] = VARIANT_STYLE[variant];
   return systemText(style, weight);
 }
 
 /** Variants that are chrome (timestamps, meta) or already big grow less with the text size setting. */
-const MAX_SCALE: Partial<Record<TextVariant, number>> = { display: CHROME_MAX_SCALE, caption: CHROME_MAX_SCALE };
+const MAX_SCALE: Partial<Record<TextVariant, number>> = {
+  display: CHROME_MAX_SCALE,
+  display2: CHROME_MAX_SCALE,
+  caption: CHROME_MAX_SCALE,
+};
 
 /** Text in the design system's scale and tones. Names stay in ink; counts use `Count`. */
 export function Text({ variant = "body", tone, style, maxFontSizeMultiplier, ...rest }: TextProps) {

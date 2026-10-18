@@ -1,30 +1,54 @@
-import { type AppNotification, useNotificationAction, useNotifications } from "@agenteschat/client";
+import {
+  type AppNotification,
+  type Routine,
+  useNotificationAction,
+  useNotifications,
+  useRoutines,
+} from "@agenteschat/client";
 import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import {
-  EmptyState,
+  Button,
+  Card,
   Filters,
+  Fuse,
   Icon,
   LargeTitleScreen,
   LIST_AVATAR,
   LIST_INSET,
   ListRow,
   SectionHeader,
+  Sky,
   Text,
+  weights,
 } from "@/ui";
 import { notificationHref } from "../links/logic";
-import { Face } from "../shared/Face";
-import { useColors, useDirectory, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
-import { Tile, tapHaptic } from "../shared/parts";
+import { AgentFace, Face } from "../shared/Face";
+import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
+import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
+import { Tile, tapHaptic, useSurface } from "../shared/parts";
 import { useTabHeader } from "../shared/tabHeader";
-import { type ActivityFilter, activitySections, type DayGroup, emojisOf, placeOf, subtitleOf, whoOf } from "./logic";
+import {
+  type ActivityFilter,
+  activitySections,
+  type DayGroup,
+  emojisOf,
+  nextRoutine,
+  placeOf,
+  subtitleOf,
+  upcomingDay,
+  waitingCardOf,
+  whoOf,
+} from "./logic";
 
 /**
- * Atividade (D46): what waits on you on top, then the rest by day, grouped
- * as the server groups them, in Conversas' full-width rows under `.sec-h` headers. Swipe right to mark read or unread, left for
- * "Feito". Tapping opens where it happened.
+ * Atividade (D46; MobileIntencional.html): on the grouped gray, what waits on you on top as cards (who asks,
+ * the kind, the exact request, the deadline and one button: Revisar or Responder), or, with nothing
+ * waiting, "Nada esperando você" and the next real event (a routine's next run); then the rest by day in
+ * white inset cards. Swipe a row right to mark read or unread, left for "Feito". Tapping opens where it
+ * happened.
  */
 export function ActivityScreen() {
   const { t } = useTranslation();
@@ -46,6 +70,7 @@ export function ActivityScreen() {
     <LargeTitleScreen
       title={t("mobile.activity.title")}
       {...header}
+      grouped
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <Filters
@@ -56,24 +81,28 @@ export function ActivityScreen() {
         value={filter}
         onChange={(key) => setFilter(key as ActivityFilter)}
       />
-      <View style={styles.list}>
-        {waiting.length > 0 ? (
-          <>
-            <SectionHeader title={t("mobile.home.waiting")} count={counts?.waiting ?? waiting.length} />
-            {waiting.map((n, i) => (
-              <ActivityRow key={n.id} item={n} divider={i > 0} />
+      {waiting.length > 0 ? (
+        <>
+          <SectionHeader title={t("mobile.home.waiting")} count={counts?.waiting ?? waiting.length} />
+          <View style={styles.cards}>
+            {waiting.map((n) => (
+              <WaitingCardView key={n.id} item={n} />
             ))}
-          </>
-        ) : null}
-        {days.map(([group, groupItems]) => (
-          <View key={group}>
-            <SectionHeader title={t(`mobile.activity.day.${group satisfies DayGroup}`)} />
+          </View>
+        </>
+      ) : !list.isLoading ? (
+        <AllClear />
+      ) : null}
+      {days.map(([group, groupItems]) => (
+        <View key={group}>
+          <SectionHeader title={t(`mobile.activity.day.${group satisfies DayGroup}`)} />
+          <Card style={styles.inset}>
             {groupItems.map((n, i) => (
               <ActivityRow key={n.id} item={n} divider={i > 0} />
             ))}
-          </View>
-        ))}
-      </View>
+          </Card>
+        </View>
+      ))}
       {list.hasNextPage ? (
         <Pressable onPress={() => void list.fetchNextPage()} accessibilityRole="button" style={styles.more}>
           <Text variant="small" tone="muted">
@@ -81,10 +110,164 @@ export function ActivityScreen() {
           </Text>
         </Pressable>
       ) : null}
-      {!list.isLoading && waiting.length === 0 && days.length === 0 ? (
-        <EmptyState title={t("mobile.activity.empty")} sky />
-      ) : null}
     </LargeTitleScreen>
+  );
+}
+
+/**
+ * One thing waiting on you (`.wyA`): who asks and the kind (amber, the waiting color), the exact request,
+ * the fuse and "expira em" (requests) or where and when, and one button: Revisar or Responder.
+ */
+function WaitingCardView({ item: n }: { item: AppNotification }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const c = useColors();
+  const dir = useDirectory();
+  const when = useWhen();
+  const now = useNow();
+  const surface = useSurface();
+  const act = useNotificationAction(orgId);
+  const card = waitingCardOf(n);
+  const href = notificationHref(n);
+  const actor = n.actors[0];
+  const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
+  const name = dir.nameOf(who);
+  const kind = t(`mobile.activityNow.kind.${card.kind}`);
+  const minutes = card.expiresAt ? minutesLeft(card.expiresAt, now) : null;
+  const place = placeOf(n);
+  const where = [place ? t("mobile.chats.waitIn", { where: place }) : null, when.short(n.updatedAt)]
+    .filter(Boolean)
+    .join(" · ");
+  const button = t(`mobile.activityNow.${card.action}`);
+  const open = () => {
+    if (n.readAt === null) act.mutate({ type: "read", item: n, read: true });
+    if (href) router.push(href);
+  };
+  return (
+    <View
+      style={[styles.wcard, surface]}
+      accessible={!href}
+      accessibilityLabel={[name, kind, card.title].filter(Boolean).join(", ")}
+    >
+      <View style={styles.hd}>
+        {who ? <Face who={who} size={22} live={false} /> : null}
+        {name ? (
+          <Text variant="footnote" tone="ink" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
+            {name}
+          </Text>
+        ) : null}
+        <View style={styles.grow} />
+        <View style={styles.kind}>
+          <Icon name={KIND_ICON[card.kind]} size={13} color={c.amber} />
+          <Text variant="footnote" style={[styles.semibold, { color: c.amber }]}>
+            {kind}
+          </Text>
+        </View>
+      </View>
+      {card.title ? (
+        <Text variant="callout" tone="ink" numberOfLines={3} style={styles.semibold}>
+          {card.title}
+        </Text>
+      ) : null}
+      <View style={styles.ft}>
+        {minutes !== null && card.expiresAt ? (
+          <>
+            <Fuse color="amber" remaining={fuseRemaining(n.createdAt, card.expiresAt, now)} style={styles.fuse} />
+            <Text variant="caption" numberOfLines={1} style={[styles.when, { color: c.amber }]}>
+              {t("mobile.approval.expiresIn", { count: minutes })}
+            </Text>
+          </>
+        ) : (
+          <Text variant="caption" tone="faint" numberOfLines={1} style={[styles.when, styles.shrink]}>
+            {where}
+          </Text>
+        )}
+        <View style={styles.grow} />
+        {href ? <Button variant="primary" size="sm" label={button} onPress={open} /> : null}
+      </View>
+    </View>
+  );
+}
+
+const KIND_ICON = { approval: "shield", question: "help", forum: "chat" } as const;
+
+/** Faces of the crew drawn over "Nada esperando você". */
+const CREW = 3;
+
+/**
+ * Nothing waits on you (`.allok`): a bit of sky with the crew, "Nada esperando você", one calm line, and the
+ * next real event when there is one (a routine's next run: who, what, when).
+ */
+function AllClear() {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const c = useColors();
+  const dir = useDirectory();
+  const surface = useSurface();
+  const routines = useRoutines(orgId);
+  const crew = dir.agents.slice(0, CREW);
+  const next = useMemo(() => nextRoutine<Routine>(routines.data ?? []), [routines.data]);
+  const nextAgent = next ? dir.agentById.get(next.agentId) : undefined;
+  return (
+    <View style={[styles.clear, surface]}>
+      <View style={styles.clearSky}>
+        <Sky color={agentLook(crew[0]).color} depth={0.8} surface="raised" style={StyleSheet.absoluteFill} />
+        <View style={styles.crew}>
+          {crew.map((a, i) => (
+            <AgentFace key={a.id} agentId={a.id} size={i === 0 ? 46 : 40} live={false} />
+          ))}
+        </View>
+      </View>
+      <Text variant="display2" accessibilityRole="header" style={styles.clearTitle}>
+        {t("mobile.activityNow.clear.title")}
+      </Text>
+      <Text variant="small" tone="muted" style={styles.clearText}>
+        {t("mobile.activityNow.clear.text")}
+      </Text>
+      {next ? (
+        <View style={[styles.next, { backgroundColor: c.sunken }]}>
+          {nextAgent ? <AgentFace agentId={nextAgent.id} size={26} live={false} /> : <Tile icon="clock" size={26} />}
+          <View style={styles.grow}>
+            <Text variant="small" tone="ink2" numberOfLines={1}>
+              {t("mobile.activityNow.next.title", { name: next.name })}
+            </Text>
+            <NextWhen routine={next} agent={nextAgent?.name ?? ""} />
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** "Rotina da Iris · hoje às 18:00". */
+function NextWhen({ routine, agent }: { routine: Pick<Routine, "nextRunAt">; agent: string }) {
+  const { t } = useTranslation();
+  const when = useWhen();
+  const c = useColors();
+  if (!routine.nextRunAt) return null;
+  const iso = routine.nextRunAt;
+  const day = upcomingDay(iso);
+  const time = when.time(iso);
+  const date =
+    day === "today"
+      ? t("mobile.activityNow.next.today", { time })
+      : day === "tomorrow"
+        ? t("mobile.activityNow.next.tomorrow", { time })
+        : t("mobile.activityNow.next.later", {
+            day: new Intl.DateTimeFormat(when.locale, { weekday: "short", day: "numeric", month: "short" })
+              .format(new Date(iso))
+              .replace(/\./g, ""),
+            time,
+          });
+  return (
+    <View style={styles.nextWhen}>
+      <Icon name="clock" size={12} color={c.faint} />
+      <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+        {agent
+          ? t("mobile.activityNow.next.routineOf", { agent, when: date })
+          : t("mobile.activityNow.next.routine", { when: date })}
+      </Text>
+    </View>
   );
 }
 
@@ -163,7 +346,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
         <View style={styles.back}>
           <Face who={faceOf(faces[0])} size={STACKED} live={false} />
         </View>
-        <View style={[styles.front, { backgroundColor: c.bg, borderRadius: STACKED / 2 + 2 }]}>
+        <View style={[styles.front, { backgroundColor: c.raised, borderRadius: STACKED / 2 + 2 }]}>
           <Face who={faceOf(faces[1])} size={STACKED} live={false} />
         </View>
       </View>
@@ -185,7 +368,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           <Icon name="archive" size={18} color={c.muted} />
         </View>
       </View>
-      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.bg }} {...responder.panHandlers}>
+      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.raised }} {...responder.panHandlers}>
         <ListRow
           onPress={open}
           accessibilityRole="button"
@@ -227,7 +410,32 @@ const faceOf = (a: AppNotification["actors"][number] | undefined) =>
   a ? { type: a.type === "agent" ? "agent" : "person", id: a.id } : null;
 
 const styles = StyleSheet.create({
-  list: { marginTop: 4 },
+  inset: { marginHorizontal: 16 },
+  cards: { gap: 10, paddingHorizontal: 16 },
+  wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
+  hd: { flexDirection: "row", alignItems: "center", gap: 8 },
+  kind: { flexDirection: "row", alignItems: "center", gap: 4 },
+  ft: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 36 },
+  fuse: { flex: 0, width: 90 },
+  when: { fontWeight: weights.medium, fontVariant: ["tabular-nums"] },
+  semibold: { fontWeight: weights.semibold },
+  grow: { flex: 1, minWidth: 0 },
+  shrink: { flexShrink: 1 },
+  clear: { marginHorizontal: 16, marginTop: 4, borderRadius: 26, overflow: "hidden", padding: 20, paddingTop: 0 },
+  clearSky: { height: 108, marginHorizontal: -20, alignItems: "center", justifyContent: "flex-end", paddingBottom: 10 },
+  crew: { flexDirection: "row", alignItems: "flex-end", gap: 16 },
+  clearTitle: { fontSize: 26, lineHeight: 30, letterSpacing: -0.5, textAlign: "center" },
+  clearText: { textAlign: "center", marginTop: 6 },
+  next: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 14,
+    padding: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  nextWhen: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 },
   stack: { width: LIST_AVATAR, height: LIST_AVATAR },
   back: { position: "absolute", top: 0, left: 0 },
   front: { position: "absolute", right: -2, bottom: -2, padding: 2 },

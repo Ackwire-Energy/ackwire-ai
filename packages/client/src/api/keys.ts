@@ -38,6 +38,9 @@ export const keys = {
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
   memory: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory"] as const,
+  /** Under `memory`: invalidating an agent's memories also refreshes "O que sabe sobre você". */
+  memoryAboutMe: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory", "me"] as const,
+  agentForYou: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "for-you"] as const,
   proposals: (orgId: string) => ["org", orgId, "proposals"] as const,
   dms: (orgId: string) => ["org", orgId, "dms"] as const,
   storage: (orgId: string) => ["org", orgId, "storage"] as const,

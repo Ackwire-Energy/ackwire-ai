@@ -12,12 +12,13 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Count, Fuse, HoldButton, Icon, Text, useToast } from "@/ui";
-import { approvalFacts, approvalRisk } from "../approvals/logic";
+import { Button, Chip, Count, HoldButton, Icon, Text, useToast } from "@/ui";
+import { approvalRisk } from "../approvals/logic";
+import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
-import { agentLook, fuseRemaining, genderOf, minutesLeft, previewOf } from "../shared/logic";
+import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
@@ -31,12 +32,11 @@ import { threadFaces } from "./logic";
 
 // ── Steps ────────────────────────────────────────────────────────────────────
 
-/** "3 passos" under an agent's reply; opening it loads what it did. */
+/** "3 passos" under an agent's reply, a quiet pill; opening it loads what it did, one line per step. */
 export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
-  const surface = useSurface();
   const [open, setOpen] = useState(false);
   const run = useRun(orgId, open ? runId : null);
   const work = run.data ? workFromSteps(run.data.steps, run.data.run) : null;
@@ -56,7 +56,7 @@ export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
       ].sort((a, b) => a.at - b.at)
     : [];
   return (
-    <View style={[styles.box, surface]}>
+    <View style={styles.steps}>
       <Pressable
         onPress={() => {
           tapHaptic();
@@ -64,35 +64,37 @@ export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
         }}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        style={styles.head}
+        style={({ pressed }) => [styles.stp, { backgroundColor: c.sunken }, pressed && styles.pressed]}
       >
-        <Icon name="check" size={16} color={c.ok} />
-        <Text variant="small" tone="ink" style={styles.bold}>
+        <Icon name="check" size={14} color={c.muted} />
+        <Text variant="footnote" tone="muted" style={styles.medium}>
           {t("mobile.chat.steps", { count: steps })}
         </Text>
-        <View style={styles.grow} />
         <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={16} color={c.faint} />
+          <Icon name="chev" size={13} color={c.muted} />
         </View>
       </Pressable>
       {open ? (
-        <View style={styles.body}>
+        <View style={[styles.stl, { backgroundColor: c.sunken }]}>
           {run.isError ? (
-            <Text variant="small" tone="muted">
+            <Text variant="small" tone="muted" style={styles.stlNote}>
               {t("mobile.chat.stepsFailed")}
             </Text>
           ) : !work ? (
-            <Text variant="small" tone="faint">
+            <Text variant="small" tone="faint" style={styles.stlNote}>
               {t("mobile.common.loading")}
             </Text>
           ) : lines.length === 0 ? (
-            <Text variant="small" tone="muted">
+            <Text variant="small" tone="muted" style={styles.stlNote}>
               {t("mobile.chat.stepsNone")}
             </Text>
           ) : (
-            lines.map((l) => (
-              <View key={l.key} style={styles.step}>
-                {l.note ? <Icon name="chat" size={16} color={c.faint} /> : <Icon name="check" size={16} color={c.ok} />}
+            lines.map((l, i) => (
+              <View
+                key={l.key}
+                style={[styles.step, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 }]}
+              >
+                {l.note ? <Icon name="chat" size={15} color={c.faint} /> : <Icon name="check" size={15} color={c.ok} />}
                 <Text variant="small" tone={l.note ? "muted" : "ink2"} style={styles.grow}>
                   {l.text}
                 </Text>
@@ -187,7 +189,6 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
   const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
-  const now = useNow();
   const toast = useToast();
   const surface = useSurface();
   const raised = useSurface("e2");
@@ -206,11 +207,9 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
       </View>
     );
   }
-  const agent = dir.agentById.get(a.agentId);
-  const name = agent?.name ?? "";
+  const name = dir.agentById.get(a.agentId)?.name ?? "";
   const g = genderOf(name);
   const high = approvalRisk(a) === "high";
-  const facts = approvalFacts(a.params, 3);
   const approve = () =>
     decide.mutate(
       { id: a.id, decision: "approve" },
@@ -229,8 +228,8 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
   return (
     <View style={[styles.askcard, raised]}>
       <View style={styles.label}>
-        <Icon name="shield" size={15} color={c.muted} />
-        <Text variant="caption" tone="muted" style={[styles.bold, styles.grow]}>
+        <Icon name="shield" size={15} color={c.amber} />
+        <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]}>
           {t("mobile.chat.approval.asks")}
         </Text>
         {high ? <Chip label={t("mobile.approval.highRisk")} /> : null}
@@ -238,30 +237,11 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
       <Text variant="title" style={styles.h4}>
         {a.title}
       </Text>
-      {facts.length > 0 ? (
-        <View style={[styles.facts, { backgroundColor: c.sunken }]}>
-          {facts.map(([k, v], i) => (
-            <View
-              key={k}
-              style={[styles.fact, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 }]}
-            >
-              <Text variant="small" tone="muted" style={styles.factKey} numberOfLines={1}>
-                {k}
-              </Text>
-              <Text variant="small" tone="ink" style={styles.grow} numberOfLines={2}>
-                {v}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <View style={styles.fuse}>
-        <View style={styles.grow}>
-          <Fuse color={agentLook(agent).color} remaining={fuseRemaining(a.createdAt, a.expiresAt, now)} />
-        </View>
-        <Text variant="caption" tone="faint">
-          {t("mobile.approval.expiresIn", { count: minutesLeft(a.expiresAt, now) })}
-        </Text>
+      <View style={styles.askBody}>
+        <ApprovalTraits approval={a} />
+        <ApprovalDetails approval={a} />
+        <ApprovalSaid approval={a} name={name} />
+        <ApprovalFuse approval={a} />
       </View>
       {a.canDecide ? (
         <View style={styles.acts}>
@@ -466,8 +446,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  body: { paddingHorizontal: 14, paddingBottom: 12, gap: 2 },
-  step: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 5 },
+  steps: { marginTop: 4, marginBottom: 8, alignItems: "flex-start" },
+  stp: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 30,
+    paddingLeft: 9,
+    paddingRight: 11,
+    borderRadius: 15,
+  },
+  stl: { alignSelf: "stretch", marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 14 },
+  stlNote: { paddingVertical: 6 },
+  step: { flexDirection: "row", alignItems: "flex-start", gap: 9, paddingVertical: 6 },
   csBody: { paddingLeft: 40, paddingRight: 14, paddingBottom: 14, gap: 2 },
   gap: { marginTop: 8 },
   foot: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
@@ -478,7 +469,7 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
   done: {
-    marginTop: 8,
+    marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -486,15 +477,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
   },
-  askcard: { marginTop: 8, padding: 14, borderRadius: 20 },
+  askcard: { marginTop: 12, padding: 14, borderRadius: 20 },
   label: { flexDirection: "row", alignItems: "center", gap: 6 },
-  h4: { marginTop: 6, marginBottom: 10, fontSize: 18, lineHeight: 23 },
-  facts: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 12 },
-  fact: { flexDirection: "row", gap: 10, paddingVertical: 7 },
-  factKey: { width: 92 },
-  fuse: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  medium: { fontWeight: "500" },
+  h4: { marginTop: 6, marginBottom: 10, fontSize: 18, lineHeight: 23, letterSpacing: -0.27 },
+  askBody: { gap: 12, marginBottom: 12 },
   acts: { flexDirection: "row", gap: 8, alignItems: "center" },
-  qcard: { marginTop: 8, padding: 14, borderRadius: 20 },
+  qcard: { marginTop: 12, padding: 14, borderRadius: 20 },
   qtitle: { marginTop: 5, marginBottom: 12 },
   opts: { gap: 6 },
   opt: {
@@ -508,7 +497,7 @@ const styles = StyleSheet.create({
   optPressed: { transform: [{ scale: 0.98 }] },
   other: { backgroundColor: "transparent", borderWidth: 1 },
   qdone: {
-    marginTop: 8,
+    marginTop: 12,
     alignSelf: "flex-start",
     maxWidth: "100%",
     flexDirection: "row",

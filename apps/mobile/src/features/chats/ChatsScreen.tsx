@@ -13,6 +13,7 @@ import { ConversationRowView } from "./ConversationRowView";
 import { FirstAgentEmpty, Greeting } from "./Greeting";
 import { CollapsibleSection, SeeAllRow, useCollapsedSections } from "./HomeSection";
 import { homeSections, type ListKind } from "./logic";
+import { useAgentRowStates, useFinished } from "./useHomeNow";
 import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
 
 /** Rows of the home whose agent moves (a long list stays light). */
@@ -24,11 +25,12 @@ const WORKING_POLL_MS = 20_000;
 export const openKindList = (kind: ListKind) => router.push(`/conversations/${kind}`);
 
 /**
- * Conversas, the home (MobileHomeAgentes.html, Recomendada; MobileRefinos.html): the one-line greeting over a
- * light sky, the native large title with Você and "+" (Novo) in the bar, the "Esperando você" strip (only while
- * something waits; it opens into the first item's card, and scrolling closes it), then Agentes, Canais and
- * Pessoas by latest activity, each collapsible (remembered), five rows and "Ver todos". Search and Threads
- * have their own tabs. Empty, it invites the first agent.
+ * Conversas, the home (MobileHomeAgentes.html, Recomendada; MobileRefinos.html; MobileIntencional.html, A): the
+ * greeting over a light sky with what changed (what an agent finished, how many work), the native large title
+ * with Você and "+" (Novo) in the bar, the "Esperando você" strip (only while something waits; it opens into
+ * the first item's card, and scrolling closes it), then Agentes, Canais and Pessoas by latest activity, each
+ * collapsible (remembered), five rows and "Ver todos". An agent's row says it waits on your ok, or what it is
+ * doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  */
 export function ChatsScreen() {
   const { t } = useTranslation();
@@ -52,6 +54,8 @@ export function ChatsScreen() {
   const working = workByAgent(work)
     .map((w) => w.agentId)
     .filter((id) => dir.agentById.has(id));
+  const finished = useFinished(work, list.rows);
+  const agentStates = useAgentRowStates(list.rows, work, waiting.items);
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch()]));
   const sections = homeSections(list.rows);
   const empty = !list.loading && list.rows.length === 0;
@@ -62,7 +66,18 @@ export function ChatsScreen() {
     <LargeTitleScreen
       title={t("mobile.chats.title")}
       {...header}
-      header={empty ? undefined : (reach) => <Greeting working={working} reach={reach} />}
+      header={
+        empty
+          ? undefined
+          : (reach) => (
+              <Greeting
+                working={working}
+                finished={finished.finished}
+                onFinishedPress={(f) => finished.dismiss(f.key)}
+                reach={reach}
+              />
+            )
+      }
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
       onScrollBeginDrag={waitOpen ? () => setWaitOpen(false) : undefined}
     >
@@ -85,7 +100,13 @@ export function ChatsScreen() {
               onToggle={() => toggle(s.key)}
             >
               {s.rows.map((r, i) => (
-                <ConversationRowView key={r.key} row={r} divider={i > 0} live={!off && live++ < LIVE_ROWS} />
+                <ConversationRowView
+                  key={r.key}
+                  row={r}
+                  divider={i > 0}
+                  live={!off && live++ < LIVE_ROWS}
+                  agent={agentStates.get(r.key)}
+                />
               ))}
               {s.more ? (
                 <SeeAllRow label={t(`mobile.chats.seeAll.${s.key}`)} onPress={() => openKindList(s.key)} />

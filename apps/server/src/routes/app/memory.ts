@@ -43,6 +43,20 @@ const Memory = z
     supersedes: z.string().nullable().openapi({ description: "The text this one replaced." }),
     editedByUserId: z.string().nullable(),
     updatedAt: z.string(),
+    from: z
+      .object({
+        messageId: z.uuid(),
+        channelId: z.uuid(),
+        threadId: z.string().nullable(),
+        dm: z.boolean().openapi({ description: "Said in a direct conversation." }),
+        at: z.string(),
+      })
+      .nullable()
+      .optional()
+      .openapi({
+        description:
+          '`?about=me` only: the viewer\'s message it came from (newest), to say "Você disse hoje, nesta conversa".',
+      }),
   })
   .openapi("Memory");
 
@@ -163,6 +177,52 @@ async function memoryViews(db: Database, items: ContextItem[]) {
   });
 }
 
+/** What "O que sabe sobre você" lists (summaries and open questions are the agent's own bookkeeping). */
+const ABOUT_KINDS = new Set<ContextItem["kind"]>(["fact", "decision", "lesson", "preference", "note"]);
+
+/** Items saved from the viewer's own messages → the newest such message (where and when they said it). */
+async function viewerSources(db: Database, orgId: string, viewerId: string, items: ContextItem[]) {
+  const out = new Map<
+    string,
+    { messageId: string; channelId: string; threadId: string | null; dm: boolean; at: string }
+  >();
+  const ids = [...new Set(items.flatMap((i) => i.sourceIds))];
+  if (ids.length === 0) return out;
+  const said = await db
+    .select({
+      id: schema.messages.id,
+      channelId: schema.messages.channelId,
+      threadId: schema.messages.threadId,
+      createdAt: schema.messages.createdAt,
+      kind: schema.channels.kind,
+    })
+    .from(schema.messages)
+    .innerJoin(schema.channels, eq(schema.channels.id, schema.messages.channelId))
+    .where(
+      and(
+        eq(schema.messages.orgId, orgId),
+        inArray(schema.messages.id, ids),
+        eq(schema.messages.authorType, "person"),
+        eq(schema.messages.authorUserId, viewerId),
+      ),
+    );
+  const byId = new Map(said.map((m) => [m.id, m]));
+  for (const item of items) {
+    const newest = item.sourceIds
+      .flatMap((id) => (byId.get(id) ? [byId.get(id) as (typeof said)[number]] : []))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    if (!newest) continue;
+    out.set(item.id, {
+      messageId: newest.id,
+      channelId: newest.channelId,
+      threadId: newest.threadId,
+      dm: newest.kind === "dm",
+      at: newest.createdAt.toISOString(),
+    });
+  }
+  return out;
+}
+
 /** Lines kept or removed in the diff = the text before. */
 const beforeOf = (diff: string) =>
   diff
@@ -261,12 +321,19 @@ export function memoryRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "What an agent knows: its notes and lessons (archived included, flagged)",
-      request: { params: OrgParams.extend({ agentId: z.uuid() }) },
+      description:
+        "`about=me`: only what came from the viewer (saved from their messages, or written by them), " +
+        "each with `from` (the message it came from).",
+      request: {
+        params: OrgParams.extend({ agentId: z.uuid() }),
+        query: z.object({ about: z.enum(["me"]).optional() }),
+      },
       responses: { 200: json(z.object({ memories: z.array(Memory) })), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      await requirePermission(db, c.get("user").id, orgId, "read");
+      const viewerId = c.get("user").id;
+      await requirePermission(db, viewerId, orgId, "read");
       if (!(await getAgent(db, orgId, agentId))) throw new NotFoundError("Agent not found");
       const rows = await db
         .select()
@@ -275,7 +342,14 @@ export function memoryRoutes(deps: AppDeps) {
       const current = rows
         .filter((r) => !r.supersededBy)
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.getTime() - a.updatedAt.getTime());
-      return c.json({ memories: await memoryViews(db, current) }, 200);
+      if (c.req.valid("query").about !== "me") return c.json({ memories: await memoryViews(db, current) }, 200);
+      const mine = await viewerSources(db, orgId, viewerId, current);
+      const about = current.filter(
+        (i) =>
+          ABOUT_KINDS.has(i.kind) && (mine.has(i.id) || (i.createdByKind === "person" && i.createdById === viewerId)),
+      );
+      const views = await memoryViews(db, about);
+      return c.json({ memories: views.map((v) => ({ ...v, from: mine.get(v.id) ?? null })) }, 200);
     },
   );
 

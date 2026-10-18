@@ -20,7 +20,7 @@ import {
 } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
-import { agentLook, fuseRemaining } from "../shared/logic";
+import { fuseRemaining } from "../shared/logic";
 import { useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { missionsWaiting, openQuestions } from "./logic";
@@ -60,7 +60,7 @@ const openWaitingActivity = () =>
 /**
  * "Esperando você" (MobileRefinos.html, B + C) on top of Conversas and Threads. Closed: a dark ink strip, full
  * width, like a live activity: the first item's agent (moving), "Theo precisa do seu ok · expira em 46 min" and
- * the count in Doto, with two copies of the strip peeking out under it while more wait. Tapped, it springs
+ * the count, with two copies of the strip peeking out under it while more wait. Tapped, it springs
  * open into the card: who asks and the kind, the title, the fuse, Revisar, and "e mais N esperando você"
  * (Atividade on Esperando). Tapping the strip again, or scrolling the list (`open` is the screen's), closes it.
  * Nothing waiting: nothing.
@@ -198,11 +198,9 @@ function WaitingCard({
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
-  const dir = useDirectory();
   const now = useNow();
   const { name, verb, line } = useLine(item);
   const minutes = waitingMinutes(item, now);
-  const agent = item.agentId ? dir.agentById.get(item.agentId) : undefined;
   const review = () => {
     if (item.href) router.push(item.href);
     else openWaitingActivity();
@@ -245,8 +243,8 @@ function WaitingCard({
         <View style={styles.ft}>
           {minutes !== null && item.expiresAt && item.createdAt ? (
             <>
-              <Fuse color={agentLook(agent).color} remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} />
-              <Text variant="caption" tone="faint" numberOfLines={1}>
+              <Fuse color="amber" remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} />
+              <Text variant="caption" numberOfLines={1} style={[styles.expiry, { color: c.amber }]}>
                 {t("mobile.approval.expiresIn", { count: minutes })}
               </Text>
             </>
@@ -322,6 +320,7 @@ const styles = StyleSheet.create({
   cardTap: { gap: 9 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { fontWeight: weights.semibold },
+  expiry: { fontWeight: weights.medium, fontVariant: ["tabular-nums"] },
   ft: { flexDirection: "row", alignItems: "center", gap: 10 },
   more: {
     flexDirection: "row",

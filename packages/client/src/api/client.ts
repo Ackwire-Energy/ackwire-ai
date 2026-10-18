@@ -9,6 +9,7 @@ import type {
   AgentChannel,
   AgentComputer,
   AgentDetail,
+  AgentForYou,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
@@ -399,7 +400,8 @@ export interface ApiClient {
   };
 
   memory: {
-    list(orgId: string, agentId: string): Promise<Memory[]>;
+    /** `about: "me"`: only what came from the viewer, each with `from` (the message). */
+    list(orgId: string, agentId: string, filter?: { about?: "me" }): Promise<Memory[]>;
     edit(orgId: string, memoryId: string, text: string): Promise<Memory>;
     setPinned(orgId: string, memoryId: string, pinned: boolean): Promise<Memory>;
     setArchived(orgId: string, memoryId: string, archived: boolean): Promise<Memory>;
@@ -814,6 +816,10 @@ export interface ApiClient {
     redo(orgId: string, actionId: string): Promise<AgentAction>;
     /** Desfazer tudo: every receipt of the message still undoable, newest first. */
     undoMessage(orgId: string, messageId: string): Promise<UndoAllResult>;
+  };
+  /** "O que fez por você": what an agent did that involves the viewer (agent profile). */
+  agentForYou?: {
+    get(orgId: string, agentId: string, limit?: number): Promise<AgentForYou>;
   };
   /** Follow or mute a thread (replies notify and count as unread only while you follow). */
   threadFollows?: {

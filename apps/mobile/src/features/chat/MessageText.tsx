@@ -21,7 +21,7 @@ export const MessageText = memo(function MessageText({
 }) {
   const c = useColors();
   const blocks = useMemo(() => parseBlocks(body), [body]);
-  const tone = muted ? "muted" : "ink2";
+  const tone = muted ? "muted" : "ink";
   const last = blocks.length - 1;
   const caret = streaming ? <Caret /> : null;
   return (
@@ -42,7 +42,7 @@ export const MessageText = memo(function MessageText({
           case "heading":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone="ink" style={styles.heading}>
+              <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading]}>
                 <Spans inline={b.inline} />
                 {end}
               </Text>
@@ -51,10 +51,10 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={styles.bullet}>
-                <Text variant="body" tone="faint" style={styles.mark}>
+                <Text variant="body" tone="faint" style={[styles.line, styles.mark]}>
                   {b.ordinal ? `${b.ordinal}.` : "•"}
                 </Text>
-                <Text variant="body" tone={tone} style={styles.flex}>
+                <Text variant="body" tone={tone} style={[styles.line, styles.flex]}>
                   <Spans inline={b.inline} />
                   {end}
                 </Text>
@@ -64,7 +64,7 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={[styles.quote, { borderLeftColor: c.line2 ?? c.line }]}>
-                <Text variant="body" tone="muted">
+                <Text variant="body" tone="muted" style={styles.line}>
                   <Spans inline={b.inline} />
                   {end}
                 </Text>
@@ -73,7 +73,7 @@ export const MessageText = memo(function MessageText({
           default:
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone={tone} selectable>
+              <Text key={i} variant="body" tone={tone} style={styles.line} selectable>
                 <Spans inline={b.inline} />
                 {end}
               </Text>
@@ -141,7 +141,9 @@ function Caret() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6, marginTop: 1 },
+  wrap: { gap: 8, marginTop: 1 },
+  /** Readable turns (MobileIntencional.html): 17 with a line-height of ~1.42. */
+  line: { lineHeight: 24 },
   flex: { flex: 1 },
   heading: { fontWeight: "700" },
   bullet: { flexDirection: "row", gap: 8, paddingLeft: 2 },

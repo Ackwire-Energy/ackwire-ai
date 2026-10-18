@@ -10,11 +10,16 @@ export interface SkyProps {
   depth?: number;
   /** Fade to the bottom from this height share (default 0.55, as on the web). */
   fade?: number;
+  /**
+   * The surface it blends into (prototype `data-surf`): the screen's background (default), a raised card,
+   * or the grouped gray.
+   */
+  surface?: "bg" | "raised" | "grouped";
   style?: StyleProp<ViewStyle>;
 }
 
 /** The pixel sky (home greeting, agent cover, auth): a glow low in the middle and a few stars. */
-export function Sky({ color = "sky", depth = 0.9, fade = 0.55, style }: SkyProps) {
+export function Sky({ color = "sky", depth = 0.9, fade = 0.55, surface = "bg", style }: SkyProps) {
   const { colors } = useTheme();
-  return <Dither kind="sky" tones={fromSurface(colors.bg, depth, color)} pixel={4} fade={fade} style={style} />;
+  return <Dither kind="sky" tones={fromSurface(colors[surface], depth, color)} pixel={4} fade={fade} style={style} />;
 }

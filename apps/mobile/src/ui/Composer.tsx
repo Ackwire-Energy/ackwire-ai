@@ -31,8 +31,11 @@ export interface ComposerProps {
   placeholder: string;
   onSend: (text: string) => void;
   onPlus: () => void;
-  /** Pills above the field; tapping one puts its text in the field. */
-  suggestions?: { icon: IconName; label: string }[];
+  /**
+   * Pills above the field while it is empty; tapping one puts its `text` (default: the `label`) in the field
+   * ("Pedir revisão do Caio" fills "Pede para o Caio revisar antes").
+   */
+  suggestions?: { icon: IconName; label: string; text?: string }[];
   /** The field's `nativeID` (the chat links it to the keyboard's drag-to-dismiss area). */
   inputNativeID?: string;
   /** A small face inside the empty field, before the placeholder (a DM with an agent: who you write to). */
@@ -106,7 +109,7 @@ export function Composer({
   return (
     <View>
       {token && mention ? mention({ query: token.query, pick }) : null}
-      {suggestions && suggestions.length > 0 && !token ? (
+      {suggestions && suggestions.length > 0 && !token && !has ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -116,7 +119,7 @@ export function Composer({
           {suggestions.map((s) => (
             <PressScale
               key={s.label}
-              onPress={() => put(s.label)}
+              onPress={() => put(s.text ?? s.label)}
               accessibilityRole="button"
               style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
             >
