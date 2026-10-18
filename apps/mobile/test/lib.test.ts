@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readDeleteResponse } from "../src/features/account/result";
 import { chooseOrg } from "../src/lib/org-choice";
+import { photoSource } from "../src/lib/photo";
 import { deviceBody, devicePath, readPushData } from "../src/lib/push-payload";
 import { createSocketFactory } from "../src/lib/socket";
 import { authErrorKey, isEmail } from "../src/lib/validate";
@@ -90,4 +91,27 @@ test("every icon of the prototype is there", () => {
       " ",
     );
   for (const name of required) expect(ICON_NAMES).toContain(name as (typeof ICON_NAMES)[number]);
+});
+
+describe("person photo", () => {
+  const base = "https://agentes.chat";
+  const headers = { "X-Agentes-Client": "mobile", Cookie: "s=1" };
+  test("a photo uploaded here loads from the API with the session", () => {
+    expect(photoSource("/api/app/avatars/u1/a.png", base, headers)).toEqual({
+      uri: "https://agentes.chat/api/app/avatars/u1/a.png",
+      headers,
+    });
+    expect(photoSource("https://agentes.chat/api/app/avatars/u1/a.png", base, headers)?.headers).toEqual(headers);
+  });
+  test("a provider's photo loads without our cookie", () => {
+    expect(photoSource("https://lh3.googleusercontent.com/a/x", base, headers)).toEqual({
+      uri: "https://lh3.googleusercontent.com/a/x",
+    });
+  });
+  test("nothing usable keeps the initial", () => {
+    expect(photoSource(null, base, headers)).toBeNull();
+    expect(photoSource("  ", base, headers)).toBeNull();
+    expect(photoSource("//evil.example/x.png", base, headers)).toBeNull();
+    expect(photoSource("javascript:alert(1)", base, headers)).toBeNull();
+  });
 });

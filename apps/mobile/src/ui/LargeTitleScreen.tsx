@@ -2,8 +2,9 @@ import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-rou
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ReactElement, type ReactNode, useMemo } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { LivePause } from "@/agent/live";
+import { progress } from "@/lib/parallax";
 import { CoverBarBackdrop, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
 import { Text } from "./Text";
@@ -59,6 +60,9 @@ export function LargeTitleScreen({
   // from the top of the screen, under the bar.
   const { y, onScroll } = useCoverScroll(IOS ? headerHeight : 0);
   const titleFade = useScrollFade(y, 0, TITLE_GONE);
+  // The pull-down header sits above the first row, and on iOS the clear bar lies over that strip: at rest
+  // it must not show behind the bar. It appears only as the list is pulled past rest (y < 0).
+  const pullReveal = useAnimatedStyle(() => ({ opacity: progress(-y.value, PULL_FROM, PULL_TO) }));
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
   const options = useMemo<NativeStackNavigationOptions>(
@@ -83,9 +87,12 @@ export function LargeTitleScreen({
           contentContainerStyle={{ paddingTop: IOS ? 0 : headerHeight, paddingBottom: bottomInset }}
         >
           {pullDown && IOS ? (
-            <View style={[styles.pullDown, { top: -pullDownHeight, height: pullDownHeight }]} pointerEvents="box-none">
+            <Animated.View
+              style={[styles.pullDown, { top: -pullDownHeight, height: pullDownHeight }, pullReveal]}
+              pointerEvents="box-none"
+            >
               {pullDown}
-            </View>
+            </Animated.View>
           ) : null}
           <Animated.View style={[styles.head, titleFade]}>
             <Text variant="display" accessibilityRole="header" numberOfLines={1}>
@@ -112,6 +119,9 @@ const TITLE_GONE = 40;
 /** The bar's title fades in over this stretch, as the large title leaves. */
 const BAR_TITLE_FROM = 28;
 const BAR_TITLE_TO = 48;
+/** The pull-down header fades in over this much pull past rest (hidden at rest). */
+const PULL_FROM = 4;
+const PULL_TO = 72;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },

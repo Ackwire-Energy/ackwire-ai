@@ -20,6 +20,7 @@ import {
 } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { ActionList } from "../shared/parts";
+import { usePersonPhoto } from "../shared/photo";
 
 /**
  * Você: who you are and where, switching organizations, Aparência, push,
@@ -54,12 +55,13 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
   };
 
   const name = me.data?.user.name ?? "";
+  const photo = usePersonPhoto(me.data?.user.image);
   const role = org.org ? t(`mobile.me.role.${org.org.role}`) : "";
   return (
     <SheetScreen>
       <View style={styles.in}>
         <View style={styles.head}>
-          <PersonAvatar name={name || "?"} size={44} />
+          <PersonAvatar name={name || "?"} size={44} photo={photo} />
           <View style={styles.grow}>
             <Text variant="title">{name}</Text>
             <Text variant="small" tone="muted">

@@ -1,6 +1,7 @@
 import { AgentAvatar, PersonAvatar } from "@/ui";
 import { useDirectory } from "./hooks";
 import { agentLook } from "./logic";
+import { usePersonPhoto } from "./photo";
 
 /**
  * A person's or an agent's face. Agents are living bodies; long lists pass
@@ -18,11 +19,13 @@ export function Face({
   live?: boolean;
 }) {
   const dir = useDirectory();
+  const member = who?.type !== "agent" && who?.id ? dir.memberById.get(who.id) : undefined;
+  const photo = usePersonPhoto(member ? (member.avatarUrl ?? member.image) : null);
   if (who?.type === "agent") {
     const agent = who.id ? dir.agentById.get(who.id) : undefined;
     return <AgentAvatar agent={agentLook(agent)} size={size} mode={mode} live={live} />;
   }
-  return <PersonAvatar name={dir.nameOf(who) || "?"} size={size} />;
+  return <PersonAvatar name={dir.nameOf(who) || "?"} size={size} photo={photo} />;
 }
 
 /** An agent by id (its look from the directory). */
