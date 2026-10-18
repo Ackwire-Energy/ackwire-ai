@@ -649,6 +649,7 @@ export function useMailAction(orgId: string) {
         label?: string;
         password?: string;
         offActions?: MailActionName[];
+        askActions?: MailActionName[];
       }) => api.mail.update(orgId, accountId, input),
       onSuccess: done,
       meta: { silent: true },

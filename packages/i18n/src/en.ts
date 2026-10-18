@@ -5188,11 +5188,20 @@ export const en: Translations = {
       blocked_host: "That server isn't allowed. Use your provider's public address.",
       unknown: "Couldn't connect right now. Try again in a moment.",
     },
-    actionToggle: "{{name}} in this mailbox",
-    actionOff: "Off: no agent does this in this mailbox.",
     actionsError: "Couldn't save. Try again.",
+    rulesStep: "Rules",
+    rulesTitle: "Rules in {{name}}",
+    rulesLead:
+      "Optional. Choose what each agent reads and who it sends to in {{name}}. Without rules it sees every folder and every send asks.",
+    rulesAgent: "Agent",
+    rulesSave: "Save rules",
+    rulesSkip: "Done",
+    rulesSaved: "Rules saved.",
+    rulesLater: "You can change this later on each agent's page.",
+    rulesRead: "What it reads",
+    rulesSend: "What it sends",
     toolsLead:
-      "What agents can do in {{name}}. Turn off what no agent should do. Sending, replying and forwarding always ask for approval in the chat, showing who it goes to and the text.",
+      "What agents can do in {{name}}. Turn off what no agent should do, or ask for approval for drafts and organizing too. Sending, replying and forwarding always ask for approval in the chat, showing who it goes to and the text.",
     group: {
       read: "Reads",
       write: "Writes",

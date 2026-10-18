@@ -71,6 +71,27 @@ test("actions turned off for a mailbox never become tools, whatever the agent ho
   ).rejects.toThrow("Unknown mail actions");
 });
 
+test("drafts and organizing can be made to ask in a mailbox; sends can't be made not to", async () => {
+  m = await mailSetup();
+  const account = await imapAccount(m);
+  const ctx = await runContext(m.f);
+  await giveMail(m, account.id, "read_write", { sendWithoutAsking: true, allowedRecipients: ["@acme.com"] }, true);
+  const r = await updateMailAccount(m.deps, m.f.owner.id, m.f.org.id, account.id, { askActions: ["organize"] });
+  expect(r.ok && r.account.askActions).toEqual(["organize"]);
+  const tools = await m.tools.list(ctx);
+  const sensitive = (name: string) => {
+    const tool = tools.find((t) => t.name === `mail_support_${name}`);
+    return tool ? isSensitive(tool) : null;
+  };
+  expect([sensitive("move"), sensitive("mark"), sensitive("archive")]).toEqual([true, true, true]);
+  expect(sensitive("draft")).toBe(false);
+  // The agent's rules let it send to @acme.com without asking; the mailbox setting doesn't change that.
+  expect(sensitive("send")).toBe(false);
+  await expect(
+    updateMailAccount(m.deps, m.f.owner.id, m.f.org.id, account.id, { askActions: ["send"] }),
+  ).rejects.toThrow("can't be made to ask");
+});
+
 test("slugs are short, [a-z0-9] and unique per org", () => {
   const slugs = mailSlugs([
     { id: "a", address: "Support.Team+x@acme.com" },

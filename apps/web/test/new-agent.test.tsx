@@ -279,6 +279,7 @@ describe("Criar agente: what gets created", () => {
         preset: "icloud",
         createdAt: new Date().toISOString(),
         offActions: [],
+        askActions: [],
         agents: [],
       },
     ];

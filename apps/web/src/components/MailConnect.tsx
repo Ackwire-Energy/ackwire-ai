@@ -1,11 +1,4 @@
-import type {
-  Agent,
-  MailAccount,
-  MailActionName,
-  MailConnectError,
-  MailPolicy,
-  MailProviders,
-} from "@agenteschat/client";
+import type { Agent, MailAccount, MailConnectError, MailPolicy, MailProviders } from "@agenteschat/client";
 import { keys, useAgentMail, useAgents, useMailAction, useMailProviders } from "@agenteschat/client";
 import { LEVELS, type Level } from "@agenteschat/client/lib/access-levels";
 import { relativeTime } from "@agenteschat/client/lib/format";
@@ -16,7 +9,9 @@ import {
   isAddress,
   MAIL_ACTIONS,
   type MailChoice,
+  mailActionsFrom,
   mailErrorOf,
+  mailReviewTools,
   normalizePolicy,
   toMailLevel,
 } from "@agenteschat/client/lib/mail";
@@ -25,7 +20,6 @@ import {
   AvatarStack,
   Button,
   Chip,
-  CountChip,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -34,8 +28,6 @@ import {
   Input,
   Segmented,
   Select,
-  Switch,
-  ToolLevelSwatch,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -45,8 +37,9 @@ import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
-import { MailRulesPanel, rulesCount } from "@/components/MailRules";
+import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
+import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 
@@ -95,7 +88,10 @@ export function MailIcon({ choice, size = "md" }: { choice: MailChoice; size?: "
 export const mailAuthKind = (choice: MailChoice) =>
   choice === "gmail" || choice === "outlook" ? "oneClick" : "appPassword";
 
-export type MailFlowState = { step: 0; choice: MailChoice } | { step: 1 | 2; account: MailAccount };
+export type MailFlowState =
+  | { step: 0; choice: MailChoice }
+  | { step: 1 | 2; account: MailAccount }
+  | { step: 3; account: MailAccount; agentIds: string[] };
 
 /** The connect flow for a mailbox: the same dialog, steps and footer as the other connectors. */
 export function MailConnectFlow({
@@ -116,7 +112,9 @@ export function MailConnectFlow({
       ? t("connectFlow.connectTitle", { name })
       : flow.step === 1
         ? t("connectFlow.toolsTitle", { name })
-        : t("connectFlow.whoTitle", { name });
+        : flow.step === 2
+          ? t("connectFlow.whoTitle", { name })
+          : t("mail.rulesTitle", { name });
   return (
     <Dialog
       open
@@ -132,9 +130,9 @@ export function MailConnectFlow({
       className="cflow"
     >
       <ol className="cflow__steps" aria-label={t("connectFlow.steps")}>
-        {([0, 1, 2] as const).map((i) => (
+        {([0, 1, 2, 3] as const).map((i) => (
           <li key={i} data-on={i <= flow.step || undefined} aria-current={i === flow.step ? "step" : undefined}>
-            <span className="ac-visually-hidden">{t(`connectFlow.step.${i}`)}</span>
+            <span className="ac-visually-hidden">{i === 3 ? t("mail.rulesStep") : t(`connectFlow.step.${i}`)}</span>
           </li>
         ))}
       </ol>
@@ -156,6 +154,15 @@ export function MailConnectFlow({
           key={flow.account.id}
           account={flow.account}
           onBack={() => onChange({ step: 1, account: flow.account })}
+          onRules={(agentIds) => onChange({ step: 3, account: flow.account, agentIds })}
+          onClose={onClose}
+        />
+      )}
+      {flow.step === 3 && (
+        <RulesStep
+          account={flow.account}
+          agentIds={flow.agentIds}
+          onBack={() => onChange({ step: 2, account: flow.account })}
           onClose={onClose}
         />
       )}
@@ -395,35 +402,34 @@ export function ImapStep({
   );
 }
 
-/** Step 2: what agents may do in this mailbox; each action turns on or off for every agent. */
+/** Step 2: what agents may do in this mailbox, in the standard tool review (Consulta · Muda · Aprovação · Desligada). */
 function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNext: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const toast = useToast();
   const { update } = useMailAction(org.id);
-  const [off, setOff] = useState<Set<MailActionName>>(() => new Set(account.offActions ?? []));
-  const changed = off.size !== (account.offActions ?? []).length || (account.offActions ?? []).some((a) => !off.has(a));
+  const tools = mailReviewTools(t, account);
+  const [state, setState] = useState<ToolReviewState>({ levels: {}, decided: new Set() });
   const next = () => {
-    if (!changed) return onNext();
-    update.mutate({ accountId: account.id, offActions: [...off] }, { onSuccess: onNext });
+    const chosen = mailActionsFrom(tools, state.levels);
+    const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+    if (same(chosen.offActions, account.offActions) && same(chosen.askActions, account.askActions)) return onNext();
+    update.mutate({ accountId: account.id, ...chosen }, { onSuccess: onNext });
   };
   return (
     <>
-      <DialogBody className="cflow__body">
+      <DialogBody className="cflow__body tr-body">
         <p className="muted cflow__text">{t("mail.toolsLead", { name: account.address })}</p>
-        <MailActionsList
-          off={off}
-          onToggle={(action, on) =>
-            setOff((prev) => {
-              const s = new Set(prev);
-              if (on) s.delete(action);
-              else s.add(action);
-              return s;
-            })
-          }
+        <ToolReview
+          name={account.address}
+          tools={tools}
+          state={state}
+          onChange={setState}
+          onMoved={(m) => toast.show(m)}
         />
         {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
       </DialogBody>
-      <DialogFooter bar>
+      <DialogFooter bar note={reviewNote(t, tools, state)}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={next}>
           {t("connectFlow.next")}
@@ -433,84 +439,22 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
   );
 }
 
-export function MailActionsList({
-  off,
-  onToggle,
-}: {
-  off: Set<MailActionName>;
-  onToggle: (action: MailActionName, on: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="mail-actions">
-      {(["read", "write", "approval", "off"] as const).map((level) => (
-        <section key={level} aria-label={t(`mail.group.${level}`)}>
-          <h3 className="cflow-group__title">
-            <ToolLevelSwatch level={level} />
-            {t(`mail.group.${level}`)}
-            <CountChip size="sm">{MAIL_ACTIONS[level].length}</CountChip>
-          </h3>
-          <ul className="cflow-tools">
-            {MAIL_ACTIONS[level].map((a) => (
-              <li key={a} className="cflow-tool" data-off={off.has(a) || undefined}>
-                <span className="cflow-tool__text">
-                  <span className="cflow-tool__name">{t(`mail.action.${a}.name`)}</span>
-                  <span className="cflow-tool__desc">
-                    {off.has(a) ? t("mail.actionOff") : t(`mail.action.${a}.text`)}
-                  </span>
-                </span>
-                <Switch
-                  checked={!off.has(a)}
-                  onCheckedChange={(on) => onToggle(a, on)}
-                  aria-label={t("mail.actionToggle", { name: t(`mail.action.${a}.name`) })}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-  );
-}
-
 const toLevel = (l: "none" | "read" | "read_write" | undefined): Level =>
   l === "read_write" ? "write" : l === "read" ? "read" : "none";
 
-/** "Regras" under an agent with access: which folders it reads, from whom, to whom it sends. */
-function AgentMailRules({
-  agentId,
+/** Step 3: one level per agent; each saves that agent's access to this mailbox (rules kept). Then the rules. */
+function WhoStep({
   account,
-  policy,
-  onChange,
+  onBack,
+  onRules,
+  onClose,
 }: {
-  agentId: string;
   account: MailAccount;
-  policy: MailPolicy | undefined;
-  onChange: (policy: MailPolicy) => void;
+  onBack: () => void;
+  /** Some agent has access: go on to its rules. */
+  onRules: (agentIds: string[]) => void;
+  onClose: () => void;
 }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const saved = useAgentMail(org.id, agentId).data?.find((m) => m.accountId === account.id);
-  const shown = policy ?? (saved ? { ...defaultPolicy(), ...saved.policy } : defaultPolicy());
-  const count = rulesCount(shown);
-  return (
-    <details className="mail-rules cflow-agent__rules">
-      <summary aria-label={t("mail.agent.rulesOf", { address: account.address })}>
-        <Icon name="filter" size={14} />
-        <span>{t("mail.agent.rules")}</span>
-        {count > 0 ? (
-          <CountChip size="sm">{count}</CountChip>
-        ) : (
-          <span className="small muted">{t("mail.agent.noRules")}</span>
-        )}
-      </summary>
-      <MailRulesPanel accountId={account.id} address={account.address} policy={shown} onChange={onChange} />
-    </details>
-  );
-}
-
-/** Step 3: one level per agent; each saves that agent's access to this mailbox (rules kept). */
-function WhoStep({ account, onBack, onClose }: { account: MailAccount; onBack: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -520,29 +464,28 @@ function WhoStep({ account, onBack, onClose }: { account: MailAccount; onBack: (
   const list = agents.data ?? [];
   const current = (agentId: string) => toLevel(account.agents.find((a) => a.agentId === agentId)?.level);
   const [who, setWho] = useState<Record<string, Level>>({});
-  // Rules edited here (which folders, senders…); untouched agents keep what they have.
-  const [rules, setRules] = useState<Record<string, MailPolicy>>({});
   const levelOf = (agentId: string) => who[agentId] ?? current(agentId);
   const levelLabel = (l: Level) => t(`access.level.${l}`);
+  const granted = list.filter((a) => levelOf(a.id) !== "none");
 
   const grant = useMutation({
     mutationFn: async () => {
-      const changed = list.filter((a) => levelOf(a.id) !== current(a.id) || rules[a.id] !== undefined);
+      const changed = list.filter((a) => levelOf(a.id) !== current(a.id));
       for (const a of changed) {
         // Keep the agent's rules for this mailbox; only the level changes here.
         const saved = (await api.mail.agent(org.id, a.id)).find((m) => m.accountId === account.id);
         await api.mail.setAgent(org.id, a.id, account.id, {
           level: toMailLevel(levelOf(a.id)),
           canDelete: saved?.canDelete ?? false,
-          policy: normalizePolicy(rules[a.id] ?? saved?.policy ?? defaultPolicy()),
+          policy: saved?.policy ?? defaultPolicy(),
         });
       }
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.mail(org.id) });
-      const count = list.filter((a) => levelOf(a.id) !== "none").length;
-      toast.show(t("connectFlow.saved", { count, name: account.address }));
-      onClose();
+      toast.show(t("connectFlow.saved", { count: granted.length, name: account.address }));
+      if (granted.length > 0) onRules(granted.map((a) => a.id));
+      else onClose();
     },
   });
 
@@ -584,14 +527,6 @@ function WhoStep({ account, onBack, onClose }: { account: MailAccount; onBack: (
                     onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
                     options={LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
                   />
-                  {levelOf(a.id) !== "none" && (
-                    <AgentMailRules
-                      agentId={a.id}
-                      account={account}
-                      policy={rules[a.id]}
-                      onChange={(policy) => setRules((r) => ({ ...r, [a.id]: policy }))}
-                    />
-                  )}
                 </li>
               ))}
             </ul>
@@ -611,10 +546,118 @@ function WhoStep({ account, onBack, onClose }: { account: MailAccount; onBack: (
           loading={grant.isPending}
           onClick={() => grant.mutate()}
         >
-          {t("connectFlow.grant")}
+          {granted.length > 0 ? t("connectFlow.next") : t("connectFlow.grant")}
         </Button>
       </DialogFooter>
     </>
+  );
+}
+
+/**
+ * Step 4: the rules of each agent with access (which folders it reads, from
+ * whom, to whom it sends), one agent at a time. Optional: without rules an
+ * agent sees every folder and every send asks.
+ */
+function RulesStep({
+  account,
+  agentIds,
+  onBack,
+  onClose,
+}: {
+  account: MailAccount;
+  agentIds: string[];
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const agents = (useAgents(org.id).data ?? []).filter((a) => agentIds.includes(a.id));
+  const [agentId, setAgentId] = useState(agentIds[0] ?? "");
+  const [edits, setEdits] = useState<Record<string, MailPolicy>>({});
+  const save = useMutation({
+    mutationFn: async () => {
+      for (const [id, policy] of Object.entries(edits)) {
+        const saved = (await api.mail.agent(org.id, id)).find((m) => m.accountId === account.id);
+        if (!saved || saved.level === "none") continue;
+        await api.mail.setAgent(org.id, id, account.id, {
+          level: saved.level,
+          canDelete: saved.canDelete,
+          policy: normalizePolicy(policy),
+        });
+      }
+    },
+    onSuccess: () => {
+      for (const id of Object.keys(edits)) void qc.invalidateQueries({ queryKey: keys.agentMail(org.id, id) });
+      if (Object.keys(edits).length > 0) toast.show(t("mail.rulesSaved"));
+      onClose();
+    },
+  });
+  const agent = agents.find((a) => a.id === agentId);
+  return (
+    <>
+      <DialogBody className="cflow__body">
+        <p className="muted cflow__text">{t("mail.rulesLead", { name: account.address })}</p>
+        {agents.length > 1 && (
+          <Segmented
+            size="sm"
+            label={t("mail.rulesAgent")}
+            value={agentId}
+            onValueChange={setAgentId}
+            options={agents.map((a) => ({ value: a.id, label: a.name }))}
+          />
+        )}
+        {agent && (
+          <AgentRules
+            key={agent.id}
+            agentId={agent.id}
+            name={agent.name}
+            account={account}
+            policy={edits[agent.id]}
+            onChange={(policy) => setEdits((e) => ({ ...e, [agent.id]: policy }))}
+          />
+        )}
+        {save.isError && <Alert>{t("mail.agent.saveError.unknown")}</Alert>}
+      </DialogBody>
+      <DialogFooter bar note={t("mail.rulesLater")}>
+        <Button onClick={onBack}>{t("connectFlow.back")}</Button>
+        <Button variant="primary" disabled={save.isPending} loading={save.isPending} onClick={() => save.mutate()}>
+          {Object.keys(edits).length > 0 ? t("mail.rulesSave") : t("mail.rulesSkip")}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+/** One agent's rules in step 4, starting from what it has. */
+function AgentRules({
+  agentId,
+  name,
+  account,
+  policy,
+  onChange,
+}: {
+  agentId: string;
+  name: string;
+  account: MailAccount;
+  policy: MailPolicy | undefined;
+  onChange: (policy: MailPolicy) => void;
+}) {
+  const { org } = useOrg();
+  const saved = useAgentMail(org.id, agentId);
+  if (saved.isLoading) return <LoadingList count={2} />;
+  const mine = saved.data?.find((m) => m.accountId === account.id);
+  const shown = policy ?? (mine ? { ...defaultPolicy(), ...mine.policy } : defaultPolicy());
+  return (
+    <div className="mail-rules-step">
+      <span className="mail-rules-step__who">
+        <AgentAvatar agentId={agentId} name={name} size="sm" />
+        <b>{name}</b>
+      </span>
+      <MailRulesPanel accountId={account.id} address={account.address} policy={shown} onChange={onChange} />
+    </div>
   );
 }
 

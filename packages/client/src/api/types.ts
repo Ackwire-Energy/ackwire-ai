@@ -3115,6 +3115,8 @@ export interface MailAccount {
   createdAt: string;
   /** Actions turned off in this mailbox for every agent ("O que faz"). */
   offActions: MailActionName[];
+  /** Actions that always ask a person in this mailbox (`draft`, `organize`). */
+  askActions: MailActionName[];
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }

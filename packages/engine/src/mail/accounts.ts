@@ -47,6 +47,8 @@ export interface MailAccountView {
   createdAt: string;
   /** Actions turned off for every agent (see `MAIL_ACTIONS`). */
   offActions: MailAction[];
+  /** Actions that always ask a person in this mailbox (only `draft` and `organize` can; sends and deletes always do). */
+  askActions: MailAction[];
   agents: { agentId: string; level: "read" | "read_write"; canDelete: boolean }[];
 }
 
@@ -63,6 +65,8 @@ export const MAIL_ACTIONS = [
   "delete",
 ] as const;
 export type MailAction = (typeof MAIL_ACTIONS)[number];
+/** The actions that can be made to ask (the rest read, or always ask). */
+export const ASKABLE_MAIL_ACTIONS: readonly MailAction[] = ["draft", "organize"];
 
 const aadFor = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
 /** Our Composio user id for an organization. */
@@ -129,6 +133,7 @@ export function mailAccountView(row: MailAccountRow, grants?: Map<string, Set<st
     preset: row.preset,
     createdAt: row.createdAt.toISOString(),
     offActions: row.offActions.filter((a): a is MailAction => (MAIL_ACTIONS as readonly string[]).includes(a)),
+    askActions: row.askActions.filter((a): a is MailAction => (ASKABLE_MAIL_ACTIONS as readonly string[]).includes(a)),
     agents,
   };
 }
@@ -491,7 +496,7 @@ export async function updateMailAccount(
   actorId: string,
   orgId: string,
   accountId: string,
-  input: { label?: string; password?: string; offActions?: string[] },
+  input: { label?: string; password?: string; offActions?: string[]; askActions?: string[] },
 ): Promise<{ ok: true; account: MailAccountView } | { ok: false; error: MailTestError }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const row = await loadAccount(deps.db, orgId, accountId);
@@ -501,6 +506,12 @@ export async function updateMailAccount(
     const unknown = input.offActions.filter((a) => !(MAIL_ACTIONS as readonly string[]).includes(a));
     if (unknown.length > 0) throw new ValidationError(`Unknown mail actions: ${unknown.join(", ")}`, "mail.action");
     set.offActions = [...new Set(input.offActions)];
+  }
+  if (input.askActions !== undefined) {
+    const wrong = input.askActions.filter((a) => !(ASKABLE_MAIL_ACTIONS as readonly string[]).includes(a));
+    if (wrong.length > 0)
+      throw new ValidationError(`These actions can't be made to ask: ${wrong.join(", ")}`, "mail.action");
+    set.askActions = [...new Set(input.askActions)];
   }
   if (input.password !== undefined) {
     if (row.via !== "imap") throw new ValidationError("Only IMAP mailboxes have a password", "mail.no_password");

@@ -271,7 +271,8 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         scope: SCOPE_OF[effect],
         connectionId: account.id,
         connectorLabel: "Email",
-        sensitive: effect === "delete" || (effect === "send" && askToSend),
+        sensitive:
+          effect === "delete" || (effect === "send" && askToSend) || account.askActions.includes(actionOf(verb)),
         ...extra,
       };
     };

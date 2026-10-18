@@ -840,7 +840,7 @@ export interface ApiClient {
     update(
       orgId: string,
       accountId: string,
-      input: { label?: string; password?: string; offActions?: MailActionName[] },
+      input: { label?: string; password?: string; offActions?: MailActionName[]; askActions?: MailActionName[] },
     ): Promise<MailAccount>;
     disconnect(orgId: string, accountId: string): Promise<void>;
     folders(orgId: string, accountId: string): Promise<MailFolder[]>;

@@ -29,6 +29,7 @@ function mailApi(accounts: Partial<MailAccount>[] = []) {
     via: "imap",
     address: `caixa${i + 1}@acme.com.br`,
     offActions: [],
+    askActions: [],
     label: `caixa${i + 1}@acme.com.br`,
     status: "active",
     lastError: null,
@@ -119,13 +120,10 @@ describe("Conectores → Email", () => {
     await settle(4);
     const connect = state.calls.filter((c) => c.method === "mail.connectImap").at(-1);
     expect(connect?.args[1]).toEqual({ preset: "icloud", address: "ana@icloud.com", password: "[redacted]" });
-    // Step 2: what it does, by level.
+    // Step 2: what it does, in the standard tool review (nothing to decide: all sorted).
     expect(screen().getByRole("dialog", { name: "O que ana@icloud.com faz" })).toBeTruthy();
-    const approval = within(flow()).getByRole("region", { name: "Sempre pede aprovação" });
-    expect(approval.textContent).toContain("Enviar");
-    expect(approval.textContent).toContain("Responder");
-    expect(approval.textContent).toContain("Encaminhar");
-    expect(within(flow()).getByRole("region", { name: "Só por agente" }).textContent).toContain("Apagar");
+    expect(within(flow()).getByRole("button", { name: /^E-mails/ })).toBeTruthy();
+    expect(within(flow()).getByRole("button", { name: /^Pastas/ })).toBeTruthy();
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     // Step 3: a level per agent.
     await settle(4);
@@ -138,7 +136,7 @@ describe("Conectores → Email", () => {
     await click(
       within(within(flow()).getByRole("radiogroup", { name: "Nível de Atlas" })).getByRole("radio", { name: "Ler" }),
     );
-    await click(within(flow()).getByRole("button", { name: "Liberar" }));
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(6);
     const sets = state.calls
       .filter((c) => c.method === "mail.setAgent")
@@ -147,6 +145,20 @@ describe("Conectores → Email", () => {
       [ADA_ID, "read_write"],
       [ATLAS_ID, "read"],
     ]);
+    // Step 4: the rules, one agent at a time; Atlas only reads the inbox.
+    expect(screen().getByRole("dialog", { name: "Regras em ana@icloud.com" })).toBeTruthy();
+    await click(
+      within(within(flow()).getByRole("radiogroup", { name: "Agente" })).getByRole("radio", { name: "Atlas" }),
+    );
+    await settle(4);
+    await click(within(flow()).getByRole("checkbox", { name: "Caixa de entrada" }));
+    await click(within(flow()).getByRole("button", { name: "Salvar regras" }));
+    await settle(6);
+    const rules = state.calls.filter((c) => c.method === "mail.setAgent").at(-1);
+    expect(rules?.args[1]).toBe(ATLAS_ID);
+    expect(rules?.args[3]).toEqual(
+      expect.objectContaining({ level: "read", policy: expect.objectContaining({ folders: ["INBOX"] }) }),
+    );
     // The new row: the mailbox, active, used by 2 agents.
     const row = screen()
       .getByRole("button", { name: "Quem usa ana@icloud.com" })
@@ -189,17 +201,31 @@ describe("Conectores → Email", () => {
     expect(screen().getByText("Não deu para conectar o email. Tente de novo.")).toBeTruthy();
   });
 
-  test("'O que faz': each action turns on or off for the mailbox; Continuar saves only what changed", async () => {
+  test("'O que faz': the standard review; reads only Consulta · Desligada, sends only Aprovação · Desligada", async () => {
     const { api, state } = mailApi([{ provider: "gmail", via: "composio", preset: null, address: "new@gmail.com" }]);
     await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected`, { api });
     await settle(8);
     const dialog = screen().getByRole("dialog", { name: "O que new@gmail.com faz" });
-    await click(within(dialog).getByRole("switch", { name: "Enviar nesta caixa" }));
-    expect(within(dialog).getByText("Desligado: nenhum agente faz isso nesta caixa.")).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: /^E-mails/ }));
+    const levels = (name: string) =>
+      within(within(dialog).getByRole("radiogroup", { name: `Nível de ${name}` }))
+        .getAllByRole("radio")
+        .map((r) => r.textContent);
+    expect(levels("Ler emails")).toEqual(["Consulta", "Desligada"]);
+    expect(levels("Enviar")).toEqual(["Aprovação", "Desligada"]);
+    expect(levels("Organizar")).toEqual(["Muda", "Aprovação", "Desligada"]);
+    const pick = (name: string, level: string) =>
+      click(
+        within(within(dialog).getByRole("radiogroup", { name: `Nível de ${name}` })).getByRole("radio", {
+          name: level,
+        }),
+      );
+    await pick("Enviar", "Desligada");
+    await pick("Organizar", "Aprovação");
     await click(within(dialog).getByRole("button", { name: "Continuar" }));
     expect(state.calls.find((c) => c.method === "mail.update")?.args.slice(1)).toEqual([
       "mail-1",
-      { offActions: ["send"] },
+      { offActions: ["send"], askActions: ["organize"] },
     ]);
   });
 

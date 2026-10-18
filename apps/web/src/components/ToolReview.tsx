@@ -56,7 +56,7 @@ function LevelControl({
   onChange: (level: ToolDecision) => void;
 }) {
   const { t } = useTranslation();
-  const opts = tool.sensitive ? SENSITIVE_LEVELS : REVIEW_LEVELS;
+  const opts = tool.levels ?? (tool.sensitive ? SENSITIVE_LEVELS : REVIEW_LEVELS);
   return (
     <Segmented
       size="sm"

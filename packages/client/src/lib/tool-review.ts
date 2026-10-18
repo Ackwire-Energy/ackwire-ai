@@ -33,6 +33,8 @@ export interface ReviewTool {
   pending: boolean;
   /** The label people had (approval cards); saved back as is. */
   savedLabel: string;
+  /** The levels this tool can take, when fewer than the usual (email: reads only Consulta · Desligada). */
+  levels?: ToolDecision[];
 }
 
 type TT = (key: string, options: { defaultValue: string }) => string;

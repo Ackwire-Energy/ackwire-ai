@@ -62,6 +62,7 @@ const MailAccount = z
     preset: z.string().nullable(),
     createdAt: z.string(),
     offActions: z.array(MailActionName),
+    askActions: z.array(MailActionName),
     agents: z.array(z.object({ agentId: z.uuid(), level: z.enum(["read", "read_write"]), canDelete: z.boolean() })),
   })
   .openapi("MailAccount");
@@ -242,6 +243,10 @@ export function mailRoutes(deps: AppDeps) {
             label: z.string().max(80).optional(),
             password: z.string().min(1).max(500).optional(),
             offActions: z.array(MailActionName).max(9).optional(),
+            askActions: z
+              .array(z.enum(["draft", "organize"]))
+              .max(2)
+              .optional(),
           }),
         ),
       },

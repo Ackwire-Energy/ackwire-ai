@@ -65,6 +65,11 @@ export const mailAccounts = pgTable(
      * `reply`, `forward`, `delete`.
      */
     offActions: text().array().notNull().default(sql`'{}'::text[]`),
+    /**
+     * Actions that ask a person every time in this mailbox, whatever the
+     * agent's rules (`draft`, `organize`; sends and deletes always ask).
+     */
+    askActions: text().array().notNull().default(sql`'{}'::text[]`),
     /** IMAP: the server's name for the sent folder (SMTP doesn't keep a copy). */
     sentFolder: text(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),

@@ -5198,11 +5198,20 @@ export const ptBR = {
       blocked_host: "Esse servidor não é permitido. Use o endereço público do seu provedor.",
       unknown: "Não deu para conectar agora. Tente de novo em instantes.",
     },
-    actionToggle: "{{name}} nesta caixa",
-    actionOff: "Desligado: nenhum agente faz isso nesta caixa.",
     actionsError: "Não deu para salvar. Tente de novo.",
+    rulesStep: "Regras",
+    rulesTitle: "Regras em {{name}}",
+    rulesLead:
+      "Opcional. Escolha o que cada agente lê e para quem envia em {{name}}. Sem regras, ele vê todas as pastas e todo envio pede aprovação.",
+    rulesAgent: "Agente",
+    rulesSave: "Salvar regras",
+    rulesSkip: "Concluir",
+    rulesSaved: "Regras salvas.",
+    rulesLater: "Dá para mudar depois na página de cada agente.",
+    rulesRead: "O que lê",
+    rulesSend: "O que envia",
     toolsLead:
-      "O que os agentes podem fazer em {{name}}. Desligue o que nenhum agente deve fazer. Enviar, responder e encaminhar sempre pedem aprovação no chat, mostrando para quem vai e o texto.",
+      "O que os agentes podem fazer em {{name}}. Desligue o que nenhum agente deve fazer, ou peça aprovação também para rascunhos e para organizar. Enviar, responder e encaminhar sempre pedem aprovação no chat, mostrando para quem vai e o texto.",
     group: {
       read: "Lê",
       write: "Escreve",

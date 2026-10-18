@@ -1,9 +1,20 @@
 /**
  * Mailboxes for agents (ADR 0038): the rules the screens share. DOM-free.
  */
+
+import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
-import type { AgentMailbox, MailAccount, MailConnectError, MailPolicy, MailPreset } from "../api/types";
+import type {
+  AgentMailbox,
+  MailAccount,
+  MailActionName,
+  MailConnectError,
+  MailPolicy,
+  MailPreset,
+  ToolDecision,
+} from "../api/types";
 import type { Level } from "./access-levels";
+import type { ReviewTool } from "./tool-review";
 
 /** The cards in the catalog's "Email" group. */
 export type MailChoice = "gmail" | "outlook" | "icloud" | "other";
@@ -101,4 +112,54 @@ export type MailAction = (typeof MAIL_ACTIONS)[keyof typeof MAIL_ACTIONS][number
 /** The newest mailbox (back from Gmail/Outlook: the one that just came in). */
 export function newestAccount(accounts: MailAccount[]): MailAccount | null {
   return [...accounts].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+}
+
+/** Each action's usual level and the levels it can take in "O que faz" (the standard tool review). */
+const ACTION_LEVELS: Record<MailActionName, { level: "read" | "write" | "approval"; levels: ToolDecision[] }> = {
+  search: { level: "read", levels: ["read", "off"] },
+  read: { level: "read", levels: ["read", "off"] },
+  folders: { level: "read", levels: ["read", "off"] },
+  draft: { level: "write", levels: ["write", "approval", "off"] },
+  organize: { level: "write", levels: ["write", "approval", "off"] },
+  send: { level: "approval", levels: ["approval", "off"] },
+  reply: { level: "approval", levels: ["approval", "off"] },
+  forward: { level: "approval", levels: ["approval", "off"] },
+  delete: { level: "approval", levels: ["approval", "off"] },
+};
+
+/** A mailbox's actions as the standard tool review shows them, with the mailbox's current choices. */
+export function mailReviewTools(t: TFunction, account: Pick<MailAccount, "offActions" | "askActions">): ReviewTool[] {
+  return (Object.keys(ACTION_LEVELS) as MailActionName[]).map((name) => {
+    const { level, levels } = ACTION_LEVELS[name];
+    const label = t(`mail.action.${name}.name`);
+    const current: ToolDecision = account.offActions.includes(name)
+      ? "off"
+      : account.askActions.includes(name)
+        ? "approval"
+        : level;
+    return {
+      name,
+      label,
+      description: t(`mail.action.${name}.text`),
+      subject: name === "folders" ? "folder" : "email",
+      level: current,
+      suggested: level,
+      reason: null,
+      sensitive: level === "approval",
+      pending: false,
+      savedLabel: label,
+      levels,
+    };
+  });
+}
+
+/** What the review's choices mean for the mailbox: actions turned off, and those that must ask. */
+export function mailActionsFrom(tools: ReviewTool[], levels: Record<string, ToolDecision>) {
+  const of = (tool: ReviewTool) => levels[tool.name] ?? tool.level;
+  const names = (want: ToolDecision) =>
+    tools.filter((tool) => of(tool) === want).map((tool) => tool.name as MailActionName);
+  return {
+    offActions: names("off"),
+    askActions: names("approval").filter((n) => ACTION_LEVELS[n].level !== "approval"),
+  };
 }
