@@ -31,7 +31,10 @@ let remotes = "";
 let source = "";
 const saved = { global: process.env.GIT_CONFIG_GLOBAL, nosystem: process.env.GIT_CONFIG_NOSYSTEM };
 
-const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+// `env` passed explicitly: Bun's child_process otherwise uses the environment from start-up, without the
+// GIT_CONFIG_GLOBAL set below (CI has no git identity of its own).
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync("git", args, { cwd, encoding: "utf8", env: process.env }).trim();
 
 beforeAll(() => {
   root = tempDir("gitsync-");

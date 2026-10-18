@@ -177,7 +177,8 @@ describe("server confirmation and the safety timeout", () => {
 describe("receipts when the mention doesn't start a new run", () => {
   const person = (id: string, mentioned: string[], extra: Partial<Message> = {}) =>
     ({ id, author: { type: "person", id: "u" }, mentionedAgentIds: mentioned, ...extra }) as unknown as Message;
-  const ev = (e: Partial<ChannelEvent> & { type: string }) => ({ channelId: "c1", ...e }) as ChannelEvent;
+  // Loose on purpose: some events (agent.run.steered) live in the client stream union, not ChannelEvent.
+  const ev = (e: Record<string, unknown> & { type: string }) => ({ channelId: "c1", ...e }) as unknown as ChannelEvent;
 
   test("a mention steered into the agent's task: never 'nobody'; picked from the list receipts", () => {
     // The old list receipts (no run of its own, nothing blocked): seen only, not "nobody".
