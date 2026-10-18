@@ -330,6 +330,28 @@ export const extraIcons = {
   brainClaudeCode: BRAIN_CLAUDE_CODE,
   brainCodex: BRAIN_CODEX,
   brainAgent: BRAIN_AGENT,
+  /** Who can talk to an agent: everyone in the workspace (a small crowd). */
+  audienceEveryone: [
+    ["circle", { cx: "10", cy: "7.25", r: "2.5" }],
+    ["path", { d: "M5.5 16c.6-2.6 2.3-4 4.5-4s3.9 1.4 4.5 4" }],
+    ["circle", { cx: "4.75", cy: "8.75", r: "1.75" }],
+    ["path", { d: "M1.75 15c.3-1.55 1.25-2.55 2.5-2.85" }],
+    ["circle", { cx: "15.25", cy: "8.75", r: "1.75" }],
+    ["path", { d: "M18.25 15c-.3-1.55-1.25-2.55-2.5-2.85" }],
+  ],
+  /** Who can talk to an agent: only the people you pick (a person and a check). */
+  audiencePeople: [
+    ["circle", { cx: "8", cy: "7", r: "2.75" }],
+    ["path", { d: "M3 16.25c.65-2.85 2.5-4.4 5-4.4 1.2 0 2.25.35 3.1 1" }],
+    ["path", { d: "m12.5 14.75 1.75 1.75 3.5-3.75" }],
+  ],
+  /** Who can talk to an agent: only the person responsible (a person and a lock). */
+  audienceOwner: [
+    ["circle", { cx: "8", cy: "7", r: "2.75" }],
+    ["path", { d: "M3 16.25c.65-2.85 2.5-4.4 5-4.4 1 0 1.9.25 2.65.7" }],
+    ["rect", { x: "12.25", y: "12.75", width: "5.5", height: "4.25", rx: "1" }],
+    ["path", { d: "M13.5 12.75v-1.1a1.5 1.5 0 0 1 3 0v1.1" }],
+  ],
   /** NovoAgente.html: sensitive actions always ask for approval. */
   shield: [["path", { d: "M10 3 4 5.5v4.5c0 3.6 2.6 6.4 6 7 3.4-.6 6-3.4 6-7V5.5z" }]],
   /** NovoAgente.html: "Conectar outro app". */

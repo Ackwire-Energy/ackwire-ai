@@ -281,10 +281,10 @@ describe("Criar agente: what gets created", () => {
     await click(screen().getByRole("checkbox", { name: "#general" }));
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /^João/);
     const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
-    expect(within(audience).getByRole("radio", { name: "Todos do workspace" }).getAttribute("aria-checked")).toBe(
+    expect(within(audience).getByRole("radio", { name: /^Todos do workspace/ }).getAttribute("aria-checked")).toBe(
       "true",
     );
-    await click(within(audience).getByRole("radio", { name: "Só algumas pessoas" }));
+    await click(within(audience).getByRole("radio", { name: /^Só algumas pessoas/ }));
     expect(document.body.textContent).toContain("João sempre pode, como responsável.");
     await click(screen().getAllByLabelText(/Walter/)[0] as HTMLElement);
     await proceed(2);
@@ -304,11 +304,11 @@ describe("Criar agente: what gets created", () => {
     await proceed(3);
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
     const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
-    await click(within(audience).getByRole("radio", { name: "Só o responsável" }));
+    await click(within(audience).getByRole("radio", { name: /^Só o responsável/ }));
     await click(continueButton());
     expect(title()).toBe("Onde trabalha e com quem");
     expect(screen().getAllByText("Defina um responsável para usar esta opção.").length).toBeGreaterThan(0);
-    await click(within(audience).getByRole("radio", { name: "Todos do workspace" }));
+    await click(within(audience).getByRole("radio", { name: /^Todos do workspace/ }));
     await proceed();
     expect(title()).toBe("Modelo e orçamento");
   });

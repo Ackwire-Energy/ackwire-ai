@@ -5,10 +5,12 @@ import {
   Avatar,
   Checkbox,
   Chip,
+  Icon,
+  type IconName,
+  OptionList,
   RadioCard,
   RadioGroup,
   SearchField,
-  Segmented,
   Token,
   TokenList,
 } from "@agenteschat/ui";
@@ -16,6 +18,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+
+/** A picture per choice: the whole workspace, the people you pick, only the person responsible. */
+const AUDIENCE_ICON: Record<AudienceMode, IconName> = {
+  everyone: "audienceEveryone",
+  people: "audiencePeople",
+  owner: "audienceOwner",
+};
 
 const MODES: AudienceMode[] = ["everyone", "people", "owner"];
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -78,15 +87,23 @@ export function AudienceChoice({
     <div className="stack-4" style={{ gap: 12 }}>
       {compact ? (
         <>
-          <Segmented
-            label={t("audience.title", g)}
+          <OptionList
+            aria-label={t("audience.title", g)}
+            layout="cards"
             value={value.mode}
             onValueChange={(mode) => onChange({ mode, userIds: value.userIds })}
-            options={MODES.map((mode) => ({ value: mode, label: t(`audience.mode.${mode}`) }))}
+            options={MODES.map((mode) => ({
+              value: mode,
+              leading: (
+                <span className="audience-card__icon">
+                  <Icon name={AUDIENCE_ICON[mode]} size={20} />
+                </span>
+              ),
+              title: t(`audience.mode.${mode}`),
+              description: modeText(mode),
+            }))}
           />
-          <span className="small muted">
-            {modeText(value.mode)} {t("audience.notListed")}
-          </span>
+          {value.mode !== "everyone" && <span className="small muted">{t("audience.notListed")}</span>}
         </>
       ) : (
         <RadioGroup

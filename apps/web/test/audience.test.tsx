@@ -36,8 +36,8 @@ describe("Quem pode falar com a Ada", () => {
     const state = await go(`agents/${ADA_ID}?tab=settings&sec=audience`);
     const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
     const group = within(section).getByRole("radiogroup", { name: "Quem pode falar com a Ada" });
-    expect(within(group).getByRole("radio", { name: "Todos do workspace" }).getAttribute("aria-checked")).toBe("true");
-    await click(within(group).getByRole("radio", { name: "Só algumas pessoas" }));
+    expect(within(group).getByRole("radio", { name: /^Todos do workspace/ }).getAttribute("aria-checked")).toBe("true");
+    await click(within(group).getByRole("radio", { name: /^Só algumas pessoas/ }));
     // The owner (João) always can; he isn't in the list.
     expect(section.textContent).toContain("João sempre pode, como responsável.");
     await click(within(section).getAllByLabelText(/Walter/)[0] as HTMLElement);
