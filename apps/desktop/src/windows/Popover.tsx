@@ -140,6 +140,15 @@ export function Popover() {
       toast(t("desktop.common.error"), "alert");
     }
   };
+  /** Drops every organization's connection and opens it again at once (a stuck or half-open one). */
+  const doReconnect = async () => {
+    try {
+      await store.requestAll({ type: "reconnect" });
+      toast(t("desktop.tray.reconnecting"), "refresh");
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+    }
+  };
   const plusHour = async () => {
     if (!pause) return;
     try {
@@ -216,7 +225,15 @@ export function Popover() {
           </Banner>
         )}
         {allOffline && !refused && !outdated && (
-          <Banner lead={<PixelSpinner size={16} />} title={t("desktop.tray.offlineTitle")}>
+          <Banner
+            lead={<PixelSpinner size={16} />}
+            title={t("desktop.tray.offlineTitle")}
+            actions={
+              <Button size="sm" icon="refresh" onClick={() => void doReconnect()}>
+                {t("desktop.tray.reconnect")}
+              </Button>
+            }
+          >
             {t("desktop.tray.offlineBody")}
           </Banner>
         )}
@@ -315,6 +332,11 @@ export function Popover() {
                 )}
               </>
             )
+          )}
+          {homes.length > 0 && (
+            <MenuRow icon="refresh" onClick={() => void doReconnect()}>
+              {t("desktop.tray.reconnect")}
+            </MenuRow>
           )}
           <MenuRow icon="plus" onClick={addOrg}>
             {t("desktop.tray.addOrg")}

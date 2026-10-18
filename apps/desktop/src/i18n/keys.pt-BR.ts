@@ -59,6 +59,8 @@ export const desktopPtBR = {
     pausedTomorrow: "Pausado até amanhã às 9h",
     pausedManual: "Pausado até você retomar",
     resumed: "Agentes de volta",
+    reconnect: "Reconectar",
+    reconnecting: "Reconectando ao agentes.chat…",
     offlineTitle: "Sem internet. Tentando de novo…",
     offlineBody:
       "O que já começou continua rodando aqui e manda o resultado quando a conexão voltar. Nada novo começa até lá.",

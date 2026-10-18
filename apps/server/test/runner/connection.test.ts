@@ -202,6 +202,28 @@ test("reconnects when the socket closes, and when no ping arrives for two heartb
   expect((await done).reason).toBe("stopped");
 }, 15_000);
 
+test("reconnect(): drops the welcomed socket and dials again without backoff; while backing off, dials now", async () => {
+  const { sockets, connection, lines } = setup({ random: () => 0.99 });
+  const done = connection.run();
+  await waitFor(() => sockets.length === 1);
+  const first = sock(sockets, 0);
+  first.handlers.onOpen();
+  first.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+  connection.reconnect();
+  await waitFor(() => sockets.length === 2, 300);
+  expect(first.closed).toBe(true);
+  expect(lines).toContain("reconnecting now (asked by the app)");
+
+  // The server drops it before welcome: a backoff starts; reconnect() cuts it short.
+  sock(sockets, 1).handlers.onClose(1006, "");
+  await waitFor(() => lines.some((l) => l.startsWith("disconnected; reconnecting in")));
+  connection.reconnect();
+  await waitFor(() => sockets.length === 3, 300);
+
+  connection.stop();
+  expect((await done).reason).toBe("stopped");
+});
+
 test("requests run concurrently up to 8; beyond that the runner answers busy; cancel aborts", async () => {
   const ws = tempDir();
   dirs.push(ws);

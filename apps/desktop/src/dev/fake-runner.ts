@@ -302,6 +302,10 @@ export class FakeRunner {
         this.paused = { paused: false };
         this.emit({ kind: "status", status: this.status() });
         return reply({ paused: this.paused });
+      case "reconnect":
+        if (!s) return fail("not_paired", "not paired");
+        this.emit({ kind: "status", status: this.status() });
+        return reply({ reconnecting: true });
       case "activity": {
         const all = (s?.activity ?? [])
           .filter((e) => !msg.agentId || e.agent?.id === msg.agentId)

@@ -756,6 +756,16 @@ export class RunnerDaemon implements RequestObserver {
     return this.config;
   }
 
+  /** The app's "Reconnect": the socket is dropped and dialed again at once. */
+  reconnect(): { reconnecting: boolean } {
+    this.requirePaired();
+    const s = this.session;
+    if (!s) return { reconnecting: false };
+    this.opts.log("reconnect asked by the app");
+    s.connection.reconnect();
+    return { reconnecting: true };
+  }
+
   // ── Pause ──────────────────────────────────────────────────────────────────
 
   pause(until: string | null): RunnerPause {

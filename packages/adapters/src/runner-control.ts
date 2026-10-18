@@ -156,6 +156,12 @@ export type ControlRequest =
   | { type: "tools.set"; tool: keyof RunnerTools; on: boolean }
   | { type: "access.pending" }
   | { type: "access.answer"; requestId: string; decision: "granted" | "denied"; scope: "agent" | "all" }
+  /**
+   * Drops the connection to the server and opens it again at once (the app's
+   * "Reconnect"). `reconnecting: false` when there is no connection to drop
+   * (not paired, or refused). An older runner answers `bad_request`.
+   */
+  | { type: "reconnect" }
   /** Finish what's running briefly, then exit 0 (the app quits). */
   | { type: "shutdown" };
 
@@ -184,6 +190,7 @@ export interface ControlReplies {
   "tools.set": RunnerAccess;
   "access.pending": { requests: ControlAccessRequest[] };
   "access.answer": { access: RunnerAccess };
+  reconnect: { reconnecting: boolean };
   shutdown: { stopping: true };
 }
 

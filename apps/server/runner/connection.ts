@@ -125,6 +125,8 @@ interface SessionEnd {
  */
 export class RunnerConnection {
   private stopped = false;
+  /** `reconnect()` was asked: the next dial goes out at once (no backoff). */
+  private redial = false;
   private endSession?: () => void;
   private wake?: () => void;
   /** The welcomed session's sender (null while connecting or down). */
@@ -153,6 +155,12 @@ export class RunnerConnection {
       const end = await this.session();
       if (end.outcome) return end.outcome;
       if (this.stopped) break;
+      if (this.redial) {
+        this.redial = false;
+        attempt = 0;
+        this.log("reconnecting now (asked by the app)");
+        continue;
+      }
       if (end.welcomed) attempt = 0;
       const delay = backoffDelay(attempt, this.opts.random);
       attempt++;
@@ -160,6 +168,19 @@ export class RunnerConnection {
       await this.sleep(delay);
     }
     return { exitCode: 0, reason: "stopped", message: "stopped" };
+  }
+
+  /**
+   * Drops the socket and dials again at once (the app's "Reconnect"): what
+   * runs on this session is aborted like on any disconnect (the server
+   * resumes an interrupted agent turn when the new socket says hello).
+   */
+  reconnect() {
+    if (this.stopped) return;
+    if (this.endSession) {
+      this.redial = true;
+      this.endSession();
+    } else this.wake?.(); // waiting out a backoff: dial now
   }
 
   /** Closes the socket, aborts running requests and makes `run()` return. */

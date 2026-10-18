@@ -57,6 +57,8 @@ export const desktopEn: DesktopTranslations = {
     pausedTomorrow: "Paused until tomorrow at 9 AM",
     pausedManual: "Paused until you resume",
     resumed: "Agents are back",
+    reconnect: "Reconnect",
+    reconnecting: "Reconnecting to agentes.chat…",
     offlineTitle: "No internet. Trying again…",
     offlineBody:
       "What already started keeps running here and sends the result when the connection is back. Nothing new starts until then.",

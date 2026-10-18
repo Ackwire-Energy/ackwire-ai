@@ -228,6 +228,26 @@ test("paired: status and hello carry pause and access; pause/resume persist, go 
   expect(s.closed).toBe(true);
 });
 
+test("reconnect from the app: the socket is dropped and dialed again at once, with a fresh hello", async () => {
+  const unpaired = tempDir("home-");
+  dirs.push(unpaired);
+  const u = control(unpaired);
+  expect(await u.request({ type: "reconnect" })).toMatchObject({ ok: false, error: { code: "not_paired" } });
+
+  const { home } = pairedHome();
+  const c = control(home);
+  const first = await c.connect();
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "online"));
+  const started = Date.now();
+  expect(await c.data({ type: "reconnect" })).toEqual({ reconnecting: true });
+  await waitFor(() => first.closed);
+  // No backoff: the next socket is dialed right away and says hello again.
+  const second = await c.connect();
+  expect(second).not.toBe(first);
+  expect(Date.now() - started).toBeLessThan(700);
+  expect(second.of("hello")[0]).toMatchObject({ type: "hello", token: TOKEN });
+});
+
 test("every status (events and replies) carries a seq that only grows, in the order written", async () => {
   const { home } = pairedHome();
   const c = control(home);

@@ -106,6 +106,8 @@ export class ControlServer {
         return { requests: d.accessPending() };
       case "access.answer":
         return d.accessAnswer(str(m.requestId), m.decision, m.scope === "all" ? "all" : "agent");
+      case "reconnect":
+        return d.reconnect();
       case "shutdown":
         return { stopping: true };
       default:
