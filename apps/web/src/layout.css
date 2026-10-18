@@ -9836,3 +9836,23 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
+
+/* Budget: the month at a glance (spent, the bar with the 80% alert mark) and the numbers as items. */
+.agp-spent__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.agp-spent__stats li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.agp-spent__stats .ac-icon {
+  color: var(--faint);
+}

@@ -104,8 +104,20 @@ export function Alert({
 }
 
 /** Usage meter (budget). The bar is ink, never a status color. */
-export function Meter({ value, max, label }: { value: number; max: number; label: string }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+export function Meter({
+  value,
+  max,
+  label,
+  marks,
+}: {
+  value: number;
+  max: number;
+  label: string;
+  /** Ticks on the track, in percent (e.g. 80 for "aviso em 80%"). */
+  marks?: number[];
+}) {
+  const exact = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const pct = Math.round(exact);
   return (
     // biome-ignore lint/a11y/useSemanticElements: the native <meter> has a native look we never show
     <div
@@ -116,7 +128,11 @@ export function Meter({ value, max, label }: { value: number; max: number; label
       aria-valuemax={max}
       aria-valuenow={value}
     >
-      <div className="ac-meter__bar" style={{ width: `${pct}%` }} />
+      {/* Anything above zero keeps a visible sliver, so 0.9% doesn't read as empty. */}
+      <div className="ac-meter__bar" style={{ width: exact > 0 ? `max(6px, ${pct}%)` : 0 }} />
+      {marks?.map((m) => (
+        <span key={m} className="ac-meter__mark" style={{ left: `${m}%` }} aria-hidden="true" />
+      ))}
     </div>
   );
 }

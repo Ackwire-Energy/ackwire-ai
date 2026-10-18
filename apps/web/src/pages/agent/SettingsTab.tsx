@@ -349,16 +349,21 @@ export function SettingsTab({
                   </>
                 )}
               </div>
-              <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} />
-              <span className="small muted">
-                {t("agentPage.settings.budgetStats", {
-                  runs: t("agent.runsCount", { count: detail.data?.runsThisMonth ?? 0 }),
-                  tokens: t("agent.tokensCount", {
-                    tokens: formatTokensShort(t, locale, detail.data?.tokensThisMonth ?? 0),
-                  }),
-                  who: ownerFirst ?? t("agentPage.settings.theAdmins"),
-                })}
-              </span>
+              <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} marks={[80]} />
+              <ul className="agp-spent__stats">
+                <li>
+                  <Icon name="bolt" size={14} />
+                  {t("agent.runsCount", { count: detail.data?.runsThisMonth ?? 0 })}
+                </li>
+                <li>
+                  <Icon name="coin" size={14} />
+                  {t("agent.tokensCount", { tokens: formatTokensShort(t, locale, detail.data?.tokensThisMonth ?? 0) })}
+                </li>
+                <li>
+                  <Icon name="bell" size={14} />
+                  {t("agentPage.settings.budgetAlert", { who: ownerFirst ?? t("agentPage.settings.theAdmins") })}
+                </li>
+              </ul>
             </div>
             {can("budget") && draft.budget !== undefined && saved.budget !== undefined ? (
               <div className="agp-field">
@@ -369,21 +374,10 @@ export function SettingsTab({
                   onChange={(v) => set("budget", v)}
                   defaultBudget={defaultBudget}
                   error={errors.budget}
-                >
-                  {draft.budget.trim() && (
-                    <Button variant="ghost" size="sm" className="agp-self-center" onClick={() => set("budget", "")}>
-                      {t("agentPage.settings.useDefault")}
-                    </Button>
-                  )}
-                </BudgetField>
+                />
                 <WasLine changeKey="budget" />
                 {!errors.budget && (
-                  <span className="small muted">
-                    {defaultBudget === undefined
-                      ? t("agent.budgetDefaultHelp")
-                      : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}{" "}
-                    {t("agent.budgetHelp", { ...g, ownerNote: "" }).trim()}
-                  </span>
+                  <span className="small muted">{t("agent.budgetHelp", { ...g, ownerNote: "" }).trim()}</span>
                 )}
               </div>
             ) : (

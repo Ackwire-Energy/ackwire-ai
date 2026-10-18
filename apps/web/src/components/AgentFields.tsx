@@ -541,20 +541,11 @@ export function BudgetField({
   const { amount } = readBudget(value);
   return (
     <div className="newag__money">
-      <Field
-        label={<span className="ac-visually-hidden">{t("newAgent.budget")}</span>}
-        id={id}
-        error={error}
-        className="newag__money-field"
-      >
-        <AffixInput
-          prefix="US$"
-          inputMode="decimal"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={defaultBudget === undefined ? undefined : new Intl.NumberFormat(locale).format(defaultBudget)}
-        />
-      </Field>
+      {defaultBudget !== undefined && (
+        <button type="button" className="newag__tog" aria-pressed={!value.trim()} onClick={() => onChange("")}>
+          {t("agent.budgetDefaultChoice", { amount: usd(t, locale, defaultBudget) })}
+        </button>
+      )}
       {QUICK_BUDGETS.map((v) => (
         <button
           key={v}
@@ -566,6 +557,20 @@ export function BudgetField({
           {usd(t, locale, v)}
         </button>
       ))}
+      <Field
+        label={<span className="ac-visually-hidden">{t("newAgent.budget")}</span>}
+        id={id}
+        error={error}
+        className="newag__money-field"
+      >
+        <AffixInput
+          prefix="US$"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={t("agent.budgetOther")}
+        />
+      </Field>
       {children}
     </div>
   );
