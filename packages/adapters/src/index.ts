@@ -16,6 +16,7 @@ export * from "./email";
 export * from "./keys";
 export * from "./machine-protocol";
 export * from "./mail";
+export * from "./mail-fake";
 export * from "./presence";
 export * from "./pubsub";
 export * from "./push";
