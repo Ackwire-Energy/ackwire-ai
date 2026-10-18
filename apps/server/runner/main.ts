@@ -37,6 +37,7 @@ import { RUNNER_VERSION } from "./errors";
 import { runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
+import { adoptLoginPath } from "./login-path";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
 import { devicePair, formatUserCode, PairingError } from "./pairing";
 import { installService, serviceStatus, uninstallService } from "./service";
@@ -281,6 +282,8 @@ async function app(): Promise<number> {
   process.once("SIGTERM", () => ac.abort());
   process.once("SIGINT", () => ac.abort());
   write(`agentes-runner ${RUNNER_VERSION} (app mode, home ${home})`);
+  // Opened from Finder: the bare macOS PATH finds neither the coding CLIs nor the person's tools.
+  adoptLoginPath(write);
   try {
     return await runControl({
       home,
