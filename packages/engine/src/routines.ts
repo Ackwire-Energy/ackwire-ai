@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { MailAdapters, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, isNotNull, isNull, lte, rowsOf, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
@@ -11,6 +11,15 @@ import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
 import { createForumTopic } from "./forum";
+import {
+  checkWatchable,
+  type MailFilter,
+  type MailWatchRow,
+  normalizeMailFilter,
+  resetMailWatchState,
+  syncMailWatch,
+  watchesOf,
+} from "./mail/watches";
 import { getOrgSettings } from "./management";
 import { getMessage, insertMessageWithRuns, messageView, postPersonMessage, replyExcerpt } from "./messages";
 import { notifyRoutineRun } from "./notification-producers";
@@ -48,6 +57,8 @@ export const ROUTINE_EVENTS = [
   "github.pr_opened",
   "issue.created",
   "deploy.succeeded",
+  /** New mail in a watched mailbox folder (only through an `email` trigger: it needs a watch). */
+  "email.received",
 ] as const;
 export type RoutineEvent = (typeof ROUTINE_EVENTS)[number];
 
@@ -64,7 +75,19 @@ export type RoutineTrigger =
     }
   | { type: "event"; event: RoutineEvent }
   /** A one-off (reminders): fires once at `at`, then the routine is done (inactive). */
-  | { type: "once"; at: string; timezone: string; description: string };
+  | { type: "once"; at: string; timezone: string; description: string }
+  /**
+   * New mail in a mailbox folder (ADR 0038), filtered; stored as the event
+   * `email.received` plus a `mail_watches` row. `status`: the watch's state
+   * (`needs_reconnect` when the mailbox must be reconnected).
+   */
+  | {
+      type: "email";
+      accountId: string;
+      folder: string;
+      filter: MailFilter;
+      status?: "active" | "needs_reconnect" | "error";
+    };
 
 export interface RoutineRunView {
   id: string;
@@ -118,7 +141,9 @@ export type RoutineTriggerInput =
     }
   | { type: "event"; event: RoutineEvent }
   /** Once, at this moment (ISO 8601). */
-  | { type: "once"; at: string; timezone?: string };
+  | { type: "once"; at: string; timezone?: string }
+  /** New mail in a mailbox the routine's agent can read; `folder` default the inbox. */
+  | { type: "email"; accountId: string; folder?: string; filter?: MailFilter };
 
 export interface RoutineDeps {
   db: Database;
@@ -127,6 +152,8 @@ export interface RoutineDeps {
   artifacts?: ArtifactDeps;
   /** Reads schedule phrases (`schedulesOf`: the org's cheap model, `kind=summary`). */
   context?: ContextDeps;
+  /** Mail adapters: email routines on Gmail/Outlook create and delete Composio triggers. */
+  mail?: MailAdapters | null;
 }
 
 type RoutineRow = typeof routines.$inferSelect;
@@ -152,7 +179,16 @@ export function routineSlots(r: Pick<RoutineRow, "rule" | "cron" | "timezone">, 
   return out;
 }
 
-function triggerOf(r: RoutineRow): RoutineTrigger {
+function triggerOf(r: RoutineRow, watch?: MailWatchRow): RoutineTrigger {
+  if (r.triggerType === "event" && r.event === "email.received" && watch) {
+    return {
+      type: "email",
+      accountId: watch.accountId,
+      folder: watch.folder,
+      filter: watch.filter,
+      status: watch.status as "active" | "needs_reconnect" | "error",
+    };
+  }
   if (r.triggerType === "event") return { type: "event", event: (r.event ?? "issue.created") as RoutineEvent };
   if (r.triggerType === "once") {
     return {
@@ -341,6 +377,10 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
   const latest = new Map<string, RunRow>();
   for (const [id, list] of recent) if (list[0]) latest.set(id, list[0]);
   const details = await runDetails(db, recentRows);
+  const watches = await watchesOf(
+    db,
+    rows.filter((r) => r.event === "email.received").map((r) => r.id),
+  );
   return rows.map((r) => {
     const last = latest.get(r.id);
     const agentRun = last?.agentRunId ? details.agentRunsById.get(last.agentRunId) : undefined;
@@ -353,7 +393,7 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
       agentId: r.agentId,
       prompt: r.prompt,
       target: targetOf(r),
-      trigger: triggerOf(r),
+      trigger: triggerOf(r, watches.get(r.id)),
       active: r.active,
       nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
       running,
@@ -469,7 +509,14 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
     const description = describeWhen(at, timezone);
     return { ...none, triggerType: "once", timezone, description, nextRunAt: at as Date | null };
   }
-  if (!ROUTINE_EVENTS.includes(trigger.event)) throw new ValidationError("Unknown event", "routine.unknown_event");
+  if (trigger.type === "email") {
+    if (!trigger.accountId) throw new ValidationError("Pick a mailbox", "routine.mail_account_not_found");
+    normalizeMailFilter(trigger.filter);
+    return { ...none, triggerType: "event", event: "email.received" as string | null, nextRunAt: null as Date | null };
+  }
+  // Mail events need a mailbox and a folder: only through an `email` trigger.
+  if (!ROUTINE_EVENTS.includes(trigger.event) || trigger.event === "email.received")
+    throw new ValidationError("Unknown event", "routine.unknown_event");
   return { ...none, triggerType: "event", event: trigger.event as string | null, nextRunAt: null as Date | null };
 }
 
@@ -501,6 +548,12 @@ async function checkTarget(db: Database, orgId: string, agentId: string, target:
     );
 }
 
+const emailWatch = (t: Extract<RoutineTriggerInput, { type: "email" }>) => ({
+  accountId: t.accountId,
+  folder: t.folder?.trim() || "INBOX",
+  filter: t.filter ?? {},
+});
+
 export async function createRoutine(
   deps: RoutineDeps,
   actorId: string,
@@ -517,6 +570,7 @@ export async function createRoutine(
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
   await checkTarget(db, orgId, agent.id, input.target);
   const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
+  if (input.trigger.type === "email") await checkWatchable(db, orgId, agent.id, input.trigger.accountId);
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Routine";
   const [row] = await db
     .insert(routines)
@@ -531,6 +585,7 @@ export async function createRoutine(
     })
     .returning();
   if (!row) throw new Error("routine insert returned nothing");
+  if (input.trigger.type === "email") await syncMailWatch(deps, row, emailWatch(input.trigger));
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -644,6 +699,17 @@ export async function updateRoutine(
     if (patch.target !== undefined) set.target = target as unknown as Record<string, unknown>;
   }
   if (patch.trigger !== undefined) Object.assign(set, await resolveTrigger(deps, actorId, orgId, patch.trigger));
+  // A mail routine's agent must be able to read the mailbox it watches.
+  const watched = await watchesOf(db, [current.id]);
+  const mailTrigger =
+    patch.trigger?.type === "email"
+      ? emailWatch(patch.trigger)
+      : patch.trigger === undefined && watched.get(current.id)
+        ? (({ accountId, folder, filter }) => ({ accountId, folder, filter }))(watched.get(current.id) as MailWatchRow)
+        : null;
+  if (mailTrigger && (patch.trigger?.type === "email" || set.agentId)) {
+    await checkWatchable(db, orgId, agentId, mailTrigger.accountId);
+  }
   const active = patch.active ?? current.active;
   if (patch.active !== undefined) set.active = active;
   // Next slot: from the (new) trigger, only while active; paused routines have none.
@@ -668,6 +734,10 @@ export async function updateRoutine(
     .where(and(eq(routines.id, current.id), eq(routines.orgId, orgId)))
     .returning();
   if (!row) throw new NotFoundError("Routine not found");
+  if (mailTrigger || watched.has(current.id)) {
+    if (mailTrigger && patch.active === true && !current.active) await resetMailWatchState(db, row.id);
+    await syncMailWatch(deps, row, mailTrigger);
+  }
   const before: Record<string, unknown> = {};
   const after: Record<string, unknown> = {};
   for (const key of changed) {
@@ -693,6 +763,8 @@ export async function deleteRoutine(deps: RoutineDeps, actorId: string, orgId: s
     .update(routines)
     .set({ active: false, nextRunAt: null, deletedAt: new Date(), updatedAt: new Date() })
     .where(eq(routines.id, current.id));
+  // A mail routine's watch (and its Composio trigger) goes with it.
+  await syncMailWatch(deps, current, null);
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -731,6 +803,11 @@ export async function duplicateRoutine(
     })
     .returning();
   if (!row) throw new Error("routine insert returned nothing");
+  // A mail routine's copy watches the same mailbox (paused: no Composio trigger until it's turned on).
+  const watch = (await watchesOf(db, [current.id])).get(current.id);
+  if (watch) {
+    await syncMailWatch(deps, row, { accountId: watch.accountId, folder: watch.folder, filter: watch.filter });
+  }
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -758,11 +835,17 @@ export async function setRoutineActive(
     .set({ active, nextRunAt, updatedAt: new Date() })
     .where(eq(routines.id, id))
     .returning();
+  const watch = row ? (await watchesOf(deps.db, [row.id])).get(row.id) : undefined;
+  if (row && watch) {
+    if (active && !current.active) await resetMailWatchState(deps.db, row.id);
+    await syncMailWatch(deps, row, { accountId: watch.accountId, folder: watch.folder, filter: watch.filter });
+  }
   const [view] = await views(deps.db, row ? [row] : []);
   return view as RoutineView;
 }
 
-async function queueRun(
+/** Queues one run of a routine (`routine.run` job); null when that slot already ran. */
+export async function queueRoutineRun(
   deps: { db: Database },
   routine: RoutineRow,
   at: Date,
@@ -789,7 +872,7 @@ async function queueRun(
 export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
   const routine = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, routine.agentId);
-  await queueRun(deps, routine, new Date(), "manual");
+  await queueRoutineRun(deps, routine, new Date(), "manual");
   const [view] = await views(deps.db, [routine]);
   return view as RoutineView;
 }
@@ -877,7 +960,7 @@ export async function fireRoutineEvent(
       ),
     );
   let fired = 0;
-  for (const r of rows) if (await queueRun(deps, r, new Date(), "event", { type: event, ...payload })) fired++;
+  for (const r of rows) if (await queueRoutineRun(deps, r, new Date(), "event", { type: event, ...payload })) fired++;
   return fired;
 }
 
