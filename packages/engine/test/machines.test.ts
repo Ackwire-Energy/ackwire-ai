@@ -301,6 +301,29 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     expect(row).toMatchObject({ online: false, connectedReplica: null });
   });
 
+  test("a tool switched on the machine holds now (exec on the row) and wakes what waited for it", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const woke: string[] = [];
+    hub.setMissionHooks({ online: async (id) => void woke.push(id) });
+    const paired = await pair();
+    const runner = fakeRunner(hub, { execAllowed: false });
+    await runner.hello(paired.token);
+    await Bun.sleep(5);
+    woke.length = 0;
+    expect((await hub.status(paired.machineId))?.execAllowed).toBe(false);
+    await runner.frame({
+      type: "access.changed",
+      access: { folders: [], tools: { claude: true, codex: false, commands: true } },
+    });
+    await Bun.sleep(5);
+    expect(await hub.status(paired.machineId)).toMatchObject({
+      execAllowed: true,
+      access: { tools: { claude: true, commands: true } },
+    });
+    expect(woke).toEqual([paired.machineId]);
+  });
+
   test("a brain turn that goes quiet fails; its own events and bridge calls keep a long one alive", async () => {
     f = await setup({ machines: true });
     const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-i", brainIdleMs: 60 });

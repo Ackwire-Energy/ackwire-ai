@@ -97,7 +97,10 @@ export function claudeCodeAvailability(status: MachineStatus | null): BrainEvent
   if (status.paused) {
     return err("machine_paused", pausedMessage(status.name, status.paused.until, status.paused.timezone), true);
   }
-  if (!status.execAllowed) return err("exec_disabled", `Commands are turned off on ${status.name}.`, true);
+  // A machine that reports its tools (protocol 10, the desktop app) runs Claude Code when that tool is on,
+  // whatever "commands" says (the runner checks the same); an older runner follows its `exec` switch.
+  const off = toolOff(status, "claude");
+  if (off) return err(off.code, off.message, true);
   if (status.protocol < BRAIN_PROTOCOL) {
     return err(
       "runner_outdated",
@@ -111,6 +114,27 @@ export function claudeCodeAvailability(status: MachineStatus | null): BrainEvent
     return err("not_logged_in", `Claude Code on ${status.name} is not logged in (run claude auth login there).`, true);
   }
   return null;
+}
+
+/**
+ * Whether the machine refuses this coding CLI: its tool switched off (protocol
+ * 10, `access.tools`), or commands off on a runner that doesn't report tools.
+ */
+export function toolOff(
+  status: Pick<MachineStatus, "name" | "execAllowed" | "access">,
+  tool: "claude" | "codex",
+): { code: string; message: string } | null {
+  const tools = status.access?.tools;
+  const name = tool === "claude" ? "Claude Code" : "Codex";
+  if (tools) {
+    return tools[tool] === true
+      ? null
+      : {
+          code: "tool_off",
+          message: `${name} is turned off on ${status.name} (its owner can turn it on in the agentes app).`,
+        };
+  }
+  return status.execAllowed ? null : { code: "exec_disabled", message: `Commands are turned off on ${status.name}.` };
 }
 
 /** A failed `brain.turn` request as the turn's error. */

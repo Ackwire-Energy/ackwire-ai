@@ -3,6 +3,7 @@ import type { ChannelEvent, Message } from "../src/index";
 import {
   applyChannelEvent,
   emptyStreams,
+  expectReply,
   parseServerFrame,
   RealtimeConnection,
   realtimeUrl,
@@ -10,6 +11,7 @@ import {
   runsInChannel,
   type Timers,
 } from "../src/index";
+import { barEntries } from "../src/lib/activity";
 import { fakeSockets } from "./fake-socket";
 
 function manualTimers() {
@@ -157,6 +159,44 @@ describe("live agent runs (streaming)", () => {
     s = applyChannelEvent(s, { type: "agent.run", ...base, status: "failed", error: "budget_exceeded" });
     expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "failed", error: "budget_exceeded" });
     expect(runningAgents(s).size).toBe(0);
+  });
+});
+
+describe("a run parked waiting for its computer (never 'working' forever)", () => {
+  test("a flat DM's 'pensando…' rows go when the agent's run stops; a waiting run is not in the working bar", () => {
+    // Two quick messages to Ada in a DM: provisional rows on each message.
+    let s = expectReply(emptyStreams, { channelId: "dm", threadId: "m1", agentId: "ada" });
+    s = expectReply(s, { channelId: "dm", threadId: "m2", agentId: "ada" });
+    s = expectReply(s, { channelId: "other", threadId: "m3", agentId: "ada" });
+    expect(runsInChannel(s, "dm")).toHaveLength(2);
+    // The server looked again and the run parks (flat DM: no thread).
+    s = applyChannelEvent(s, {
+      type: "agent.run",
+      channelId: "dm",
+      threadId: null,
+      runId: "r1",
+      agentId: "ada",
+      status: "waiting_input",
+    } as unknown as ChannelEvent);
+    const names = (id: string) => id;
+    expect(
+      barEntries(
+        runsInChannel(s, "dm").filter((r) => !r.provisional),
+        [],
+        names,
+        names,
+      ),
+    ).toEqual([]);
+    s = applyChannelEvent(s, {
+      type: "agent.idle",
+      channelId: "dm",
+      threadId: null,
+      runId: "r1",
+      agentId: "ada",
+    } as unknown as ChannelEvent);
+    expect(runsInChannel(s, "dm")).toEqual([]);
+    // Another channel's row is not this run's.
+    expect(runsInChannel(s, "other")).toHaveLength(1);
   });
 });
 

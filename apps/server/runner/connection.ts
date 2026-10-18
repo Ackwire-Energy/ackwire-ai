@@ -112,6 +112,9 @@ export interface ConnectionOptions {
   observer?: RequestObserver;
 }
 
+/** A watchdog firing this much later than asked means the process was suspended (sleep), not a silent server. */
+const SUSPENDED_AFTER_MS = 30_000;
+
 interface SessionEnd {
   welcomed: boolean;
   outcome?: ConnectionOutcome;
@@ -246,8 +249,15 @@ export class RunnerConnection {
       };
       const arm = () => {
         if (watchdog) clearTimeout(watchdog);
+        const armedAt = Date.now();
         watchdog = setTimeout(() => {
-          log("no ping from the server; reconnecting");
+          // Fired much later than asked: this process was suspended (the Mac slept), not the server gone quiet.
+          const late = Date.now() - armedAt - 2 * heartbeatMs;
+          log(
+            late > SUSPENDED_AFTER_MS
+              ? `no ping from the server: this computer was asleep for about ${Math.round(late / 1000)} s; reconnecting`
+              : "no ping from the server; reconnecting",
+          );
           end();
         }, 2 * heartbeatMs);
       };

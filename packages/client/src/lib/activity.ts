@@ -251,6 +251,9 @@ export interface EntryConsult {
  * Who shows in the bar, in order: agents asking another agent (`consults`),
  * agents about to answer (not yet writing), then people typing.
  */
+/** Live statuses the working bar shows (the ones "Parar" can stop; a provisional row is about to be one). */
+const BAR_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "running"]);
+
 export function barEntries(
   runs: LiveRun[],
   typingUserIds: string[],
@@ -274,7 +277,8 @@ export function barEntries(
     });
   }
   for (const r of runs) {
-    if (isWriting(r) || r.status === "waiting_approval" || seen.has(r.agentId)) continue;
+    // Only work in progress: a run waiting (an approval, an answer, its computer) or ended isn't "working".
+    if (isWriting(r) || !BAR_STATUSES.has(r.status) || seen.has(r.agentId)) continue;
     seen.add(r.agentId);
     out.push({
       id: r.agentId,

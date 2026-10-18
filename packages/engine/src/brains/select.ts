@@ -5,7 +5,7 @@ import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
 import { missionTurnFor } from "../missions-engine";
 import type { AgentRun } from "../runs";
-import { brainSessionId, claudeCodeAvailability } from "./claude-code";
+import { brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
 import type { BrainKind, BrainSession } from "./types";
 
@@ -94,7 +94,8 @@ export function computerBrainUnavailable(
       ...pausedUntil,
     };
   }
-  if (!status.execAllowed) return { code: "exec_disabled", message: `Commands are turned off on ${status.name}.` };
+  const off = toolOff(status, "codex");
+  if (off) return off;
   if (status.protocol < BRAIN_PROTOCOL) {
     return { code: "runner_outdated", message: `The runner on ${status.name} is too old for Codex agents; update it.` };
   }
@@ -115,6 +116,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "machine_offline",
   "machine_paused",
   "exec_disabled",
+  "tool_off",
   "runner_outdated",
   "cli_missing",
   "not_logged_in",

@@ -41,6 +41,8 @@ export interface ComputerBrainLink {
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
     name?: string;
+    /** What the machine allows (protocol 10): with it, Codex needs its own tool on, not commands. */
+    access?: { tools: { claude: boolean; codex: boolean; commands: boolean } } | null;
   } | null>;
   /** Sends `brain.turn` and calls `onEvent` per `brain.event`; resolves on `brain.done`. */
   turn(
@@ -115,13 +117,20 @@ export class CodexBrain implements Brain {
       yield { type: "error", code: "machine_paused", message, retryable: true };
       return;
     }
-    if (!status.execAllowed) {
-      yield {
-        type: "error",
-        code: "exec_disabled",
-        message: "Commands are turned off on the computer (its runner was started with --no-exec).",
-        retryable: true,
-      };
+    if (status.access ? status.access.tools.codex !== true : !status.execAllowed) {
+      yield status.access
+        ? {
+            type: "error",
+            code: "tool_off",
+            message: "Codex is turned off on the computer (its owner can turn it on in the agentes app).",
+            retryable: true,
+          }
+        : {
+            type: "error",
+            code: "exec_disabled",
+            message: "Commands are turned off on the computer (its runner was started with --no-exec).",
+            retryable: true,
+          };
       return;
     }
     if (status.protocol !== undefined && status.protocol < BRAIN_PROTOCOL) {

@@ -259,6 +259,24 @@ function settleProvisional(state: StreamsState, agentId: string, threadId: strin
   return { ...state, runs };
 }
 
+/**
+ * A run of this agent stopped (idle, finished): its "pensando…" goes too. A
+ * flat reply (DMs: no thread) answers the latest messages, whatever thread we
+ * guessed, so every provisional row of the agent in that channel goes.
+ */
+function settleAfterRun(
+  state: StreamsState,
+  event: { agentId: string; channelId: string; threadId: string | null },
+): StreamsState {
+  if (event.threadId) return settleProvisional(state, event.agentId, event.threadId);
+  const runs = Object.fromEntries(
+    Object.entries(state.runs).filter(
+      ([, r]) => !(r.provisional && r.agentId === event.agentId && r.channelId === event.channelId),
+    ),
+  );
+  return Object.keys(runs).length === Object.keys(state.runs).length ? state : { ...state, runs };
+}
+
 function upsert(
   state: StreamsState,
   event: { runId: string; agentId: string; channelId: string; threadId: string },
@@ -475,13 +493,13 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       return upsert(s, event, { status: "running" });
     }
     case "agent.idle": {
-      const settled = settleProvisional(state, event.agentId, event.threadId);
+      const settled = settleAfterRun(state, event);
       // A failure is reported by run.finished; keep a failed row visible.
       if (settled.runs[event.runId]?.status === "failed") return settled;
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
     }
     case "run.finished": {
-      const settled = settleProvisional(state, event.agentId, event.threadId);
+      const settled = settleAfterRun(state, event);
       if (event.status === "failed") return upsert(settled, event, { status: "failed", error: event.error });
       // done: the message replaces the row; waiting_approval: the approval card does.
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;

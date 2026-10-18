@@ -118,6 +118,25 @@ test("availability: no computer, offline, old runner, not logged in, Codex missi
   ).toBe("not_logged_in");
   expect(computerBrainUnavailable("codex", "m1", statusOf("m1"))?.code).toBe("codex_missing");
   expect(computerBrainUnavailable("claude_code", "m1", statusOf("m1"))).toBeNull();
+  // The desktop app (protocol 10) reports its tools: Claude Code needs its own switch, not commands.
+  const access = (tools: { claude: boolean; codex: boolean; commands: boolean }) => ({ folders: [], tools });
+  expect(
+    computerBrainUnavailable(
+      "claude_code",
+      "m1",
+      statusOf("m1", { execAllowed: false, access: access({ claude: true, codex: false, commands: false }) }),
+    ),
+  ).toBeNull();
+  expect(
+    computerBrainUnavailable(
+      "claude_code",
+      "m1",
+      statusOf("m1", { execAllowed: true, access: access({ claude: false, codex: false, commands: true }) }),
+    )?.code,
+  ).toBe("tool_off");
+  expect(computerBrainUnavailable("claude_code", "m1", statusOf("m1", { execAllowed: false }))?.code).toBe(
+    "exec_disabled",
+  );
   notePlanLimit("m1", "claude_code", new Date(Date.now() + 3600_000).toISOString());
   expect(computerBrainUnavailable("claude_code", "m1", statusOf("m1"))?.code).toBe("plan_limit");
   expect(
@@ -455,6 +474,57 @@ test("the computer drops mid-turn and stays away: after the grace the agent says
   expect(seen[1]?.trigger).toContain("cut off because the computer disconnected");
   thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
   expect(thread.at(-1)?.body).toBe("Voltei.");
+});
+
+test("a message to a run parked for its computer: looked at again now; resumes with it, or parks again quietly", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let online = false;
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Oi! Aqui." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online }) },
+  });
+  const events: { type: string; status?: string }[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(e as { type: string; status?: string }));
+  const question = await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+  const reply = (body: string) =>
+    postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body,
+      threadId: question.id,
+    });
+
+  // Still away: one more look, no second note, and the run says it stopped (the "working" row goes).
+  events.length = 0;
+  await reply("oi?");
+  await drainOutbox(f.db, handlers);
+  let runs = await f.db.select().from(schema.agentRuns);
+  expect(runs).toHaveLength(1);
+  expect(runs[0]?.status).toBe("waiting_input");
+  expect(runs[0]?.waitingMachineId).toBe(machineId);
+  expect(events.some((e) => e.type === "run.finished" && e.status === "waiting_input")).toBe(true);
+  expect(events.some((e) => e.type === "agent.idle")).toBe(true);
+  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.filter((m) => m.meta.bodyCode === "brain_unavailable")).toHaveLength(1);
+  expect(seen.length).toBe(0);
+
+  // Actually there (a "not available" that was wrong, no reconnect coming): the next message resumes it.
+  online = true;
+  await reply("oi!!");
+  await drainOutbox(f.db, handlers);
+  runs = await f.db.select().from(schema.agentRuns);
+  expect(runs).toHaveLength(1);
+  expect(runs[0]?.status).toBe("done");
+  expect(seen.length).toBe(1);
+  expect(seen[0]?.trigger).toContain("@dev oi");
+  expect(seen[0]?.trigger).toContain("oi?");
+  expect(seen[0]?.trigger).toContain("oi!!");
+  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.at(-1)?.body).toBe("Oi! Aqui.");
 });
 
 test("the mission engine: one run per agent and notice; a resume answers the call waiting on that id", async () => {

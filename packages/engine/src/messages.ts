@@ -24,6 +24,7 @@ import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./
 import { isStopRequest, type Judge } from "./judge";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
+import { enqueue } from "./outbox";
 import { afterReplyAnswered } from "./questions";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 
@@ -595,6 +596,18 @@ export async function postPersonMessage(
         ...(stop ? { stop: true } : {}),
       });
       if (stop) await cancelRun(deps, userId, orgId, s.id).catch(() => undefined);
+      // Parked waiting for its computer: look again now. Back (or never really away): the run resumes
+      // and reads this message with the rest; still away: it parks again quietly (one answer later).
+      else if (active?.status === "waiting_input" && active.waitingMachineId) {
+        const wait = (active.transcript as { waitingForBrain?: { waitId?: string } } | null)?.waitingForBrain?.waitId;
+        await enqueue(deps.db, {
+          orgId,
+          kind: "agent_run.execute",
+          payload: { runId: s.id, ...(wait ? { wait } : {}) },
+          dedupeKey: `agent_run.execute:${s.id}:steer:${message.id}`,
+          maxAttempts: 4,
+        }).catch(() => undefined);
+      }
     }
   }
   if (runs.length > 0) {

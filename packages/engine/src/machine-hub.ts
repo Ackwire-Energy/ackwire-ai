@@ -862,9 +862,20 @@ export function createMachineHub(deps: MachineHubDeps) {
           deps.log?.warn("runner.state failed", { machineId: conn.machineId, error: String(error) }),
         );
       } else if (frame.type === "access.changed") {
-        await storeMachineAccess({ db, pubsub }, conn.machineId, frame.access).catch((error) =>
-          deps.log?.warn("access.changed failed", { machineId: conn.machineId, error: String(error) }),
+        const machineId = conn.machineId;
+        await storeMachineAccess({ db, pubsub }, machineId, frame.access).catch((error) =>
+          deps.log?.warn("access.changed failed", { machineId, error: String(error) }),
         );
+        // A tool turned on (Claude Code, Codex, commands): what waited for this computer goes on.
+        if (hooks.online) {
+          const online = hooks.online;
+          queueMicrotask(
+            () =>
+              void online(machineId).catch((error) =>
+                deps.log?.warn("resume after access change failed", { machineId, error: String(error) }),
+              ),
+          );
+        }
       } else if (frame.type === "access.decided") {
         await applyAccessDecided({ db, pubsub }, conn.machineId, frame).catch((error) =>
           deps.log?.warn("access.decided failed", { requestId: frame.requestId, error: String(error) }),

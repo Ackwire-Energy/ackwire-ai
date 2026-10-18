@@ -54,7 +54,8 @@ export function agentFolders(access: RunnerAccess | null | undefined, agentId: s
 export async function storeMachineAccess(deps: AccessDeps, machineId: string, access: RunnerAccess) {
   const [row] = await deps.db
     .update(machines)
-    .set({ access, updatedAt: new Date() })
+    // `exec` is the commands switch (as in `hello`): a change on the machine holds now, not at the next connect.
+    .set({ access, execAllowed: access.tools.commands === true, updatedAt: new Date() })
     .where(eq(machines.id, machineId))
     .returning({ orgId: machines.orgId });
   // Members refetch; the folders themselves are only in the API, for admins and the pairer.
