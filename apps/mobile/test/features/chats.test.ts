@@ -9,6 +9,7 @@ import {
   missionsWaiting,
   missionWaitingItems,
   openQuestions,
+  rowPlace,
   unreadConversationCount,
   unreadConversations,
   waitingTotal,
@@ -100,6 +101,35 @@ describe("the list", () => {
     expect(filterConversations(rows, "all")).toHaveLength(5);
     expect(filterCounts(rows)).toEqual({ all: 5, unread: 1, threads: 1, dm: 2 });
     expect(unreadConversations(rows)).toBe(1);
+  });
+});
+
+describe("where a thread or mission lives", () => {
+  const mission = { id: "m", agentId: "a-theo", status: "active", planDone: 3, planTotal: 8, waitingYou: 0 } as const;
+  const rows = buildConversations({
+    channels: [],
+    dms: [dm("dm-67aa", "Theo", 0, 50)],
+    threads: [
+      thread({ id: "t1", channelId: "c1", channelName: "vendas", mission, lastActivityAt: at(1) }),
+      thread({ id: "t2", channelId: "dm-67aa", channelName: "dm-67aa4c9adff8625b9433", channelKind: "dm", mission }),
+      thread({ id: "t3", channelId: "dm-zz", channelName: "dm-zz", channelKind: "dm", mission }),
+    ],
+  });
+  const place = (key: string, nameOf?: (who: { type: string; id: string | null }) => string) => {
+    const r = rows.find((x) => x.key === key);
+    return r && (r.kind === "thread" || r.kind === "mission") ? rowPlace(r, nameOf) : "missing";
+  };
+
+  test("a channel by its name", () => {
+    expect(place("t:t1")).toEqual({ kind: "channel", name: "vendas" });
+  });
+  test("a DM by who it is with, never its internal name", () => {
+    expect(place("t:t2")).toEqual({ kind: "with", name: "Theo" });
+  });
+  test("a DM not in the list falls back to the mission's agent, else nothing", () => {
+    expect(place("t:t3", (w) => (w.id === "a-theo" ? "Theo" : ""))).toEqual({ kind: "with", name: "Theo" });
+    expect(place("t:t3")).toBeNull();
+    expect(place("t:t3", () => "")).toBeNull();
   });
 });
 

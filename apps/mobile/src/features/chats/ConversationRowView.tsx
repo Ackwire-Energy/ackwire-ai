@@ -8,7 +8,7 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
-import type { ConversationRow, LastLine } from "./logic";
+import { type ConversationRow, type LastLine, rowPlace } from "./logic";
 
 /** The avatar column (and where the hairline between rows starts). */
 const AVATAR = 52;
@@ -55,14 +55,18 @@ export const ConversationRowView = memo(function ConversationRowView({
   // Whose orbit: the DM's agent, or the mission's.
   const orbitAgent = r.kind === "dm" ? r.with.id : r.kind === "mission" ? r.mission?.agentId : null;
   const orbitColor = agentLook(orbitAgent ? dir.agentById.get(orbitAgent) : undefined).color;
-  const where =
-    r.kind === "thread" || r.kind === "mission" ? (r.channelKind === "dm" ? r.channelName : `#${r.channelName}`) : "";
+  const place = r.kind === "thread" || r.kind === "mission" ? rowPlace(r, dir.nameOf) : null;
+  const where = !place ? "" : place.kind === "with" ? place.name : `#${place.name}`;
 
   let line: ReactNode;
   let label: string;
   if (r.kind === "mission" && r.mission) {
     const progress = t("mobile.chats.missionProgress", { done: r.mission.planDone, total: r.mission.planTotal });
-    const missionIn = t("mobile.chats.missionIn", { where });
+    const missionIn = !place
+      ? t("mobile.chats.mission")
+      : place.kind === "with"
+        ? t("mobile.chats.missionWith", { who: place.name })
+        : t("mobile.chats.missionIn", { where });
     label = `${missionIn} · ${progress}`;
     line = (
       <View style={styles.work}>

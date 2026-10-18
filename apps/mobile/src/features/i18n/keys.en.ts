@@ -89,6 +89,8 @@ export const featureKeysEn: FeatureTranslations = {
     working: "working…",
     missionProgress: "{{done}} of {{total}} items",
     missionIn: "Mission in {{where}}",
+    missionWith: "Mission with {{who}}",
+    mission: "Mission",
     unreadLabel_one: "{{count}} unread",
     unreadLabel_other: "{{count}} unread",
     newChannel: "New channel",

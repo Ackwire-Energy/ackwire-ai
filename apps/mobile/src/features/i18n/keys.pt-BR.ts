@@ -93,6 +93,8 @@ export const featureKeysPtBR = {
     working: "trabalhando…",
     missionProgress: "{{done}} de {{total}} itens",
     missionIn: "Missão em {{where}}",
+    missionWith: "Missão com {{who}}",
+    mission: "Missão",
     unreadLabel_one: "{{count}} não lida",
     unreadLabel_other: "{{count}} não lidas",
     newChannel: "Novo canal",

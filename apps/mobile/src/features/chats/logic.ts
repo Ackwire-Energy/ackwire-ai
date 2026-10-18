@@ -55,6 +55,8 @@ export type ConversationRow =
       title: string;
       channelName: string;
       channelKind: ThreadInfo["channelKind"];
+      /** In a DM: who it is with (the channel's own name is an internal one). */
+      dmWith: DirectMessage["with"] | null;
       closed: boolean;
       working: boolean;
       needsYou: boolean;
@@ -96,6 +98,7 @@ export function buildConversations(input: {
   workingChannels?: ReadonlySet<string>;
 }): ConversationRow[] {
   const rows: ConversationRow[] = [];
+  const dmWith = new Map(input.dms.map((d) => [d.channelId, d.with]));
   for (const t of input.threads) {
     if (!isListedThread(t)) continue;
     const m = t.mission ?? null;
@@ -107,6 +110,7 @@ export function buildConversations(input: {
       title: threadTitle(t),
       channelName: t.channelName,
       channelKind: t.channelKind,
+      dmWith: t.channelKind === "dm" ? (dmWith.get(t.channelId) ?? null) : null,
       closed: t.state === "closed",
       working: t.working,
       needsYou: t.needsYou,
@@ -168,6 +172,32 @@ export function buildConversations(input: {
     if (b.at) return 1;
     return rowName(a).localeCompare(rowName(b));
   });
+}
+
+/** Where a thread or mission lives: "#vendas", or who the DM is with ("Theo"); null when unknown. */
+export type RowPlace = { kind: "channel"; name: string } | { kind: "with"; name: string } | null;
+
+/**
+ * A DM's channel name is internal ("dm-…") and never shown: its other member, else (`nameOf`, from the
+ * directory) the mission's agent; nothing when neither resolves.
+ */
+export function rowPlace(
+  r: Pick<
+    Extract<ConversationRow, { kind: "thread" | "mission" }>,
+    "channelKind" | "channelName" | "dmWith" | "mission"
+  >,
+  nameOf?: (who: { type: string; id: string | null }) => string,
+): RowPlace {
+  if (r.channelKind === "dm") {
+    const name =
+      r.dmWith?.name?.trim() ||
+      (r.dmWith ? nameOf?.(r.dmWith) : "") ||
+      (r.mission ? nameOf?.({ type: "agent", id: r.mission.agentId }) : "") ||
+      "";
+    return name ? { kind: "with", name } : null;
+  }
+  const name = r.channelName?.trim();
+  return name ? { kind: "channel", name } : null;
 }
 
 export const rowName = (r: ConversationRow) =>

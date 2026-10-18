@@ -21,9 +21,9 @@ export interface LargeTitleScreenProps {
   /** Native buttons on the bar's leading side (iOS). */
   leftActions?: HeaderAction[];
   /**
-   * Revealed above the content when the list is pulled down (it sits above the first row, outside the
-   * content, so only the bounce shows it; iOS only, where scroll views bounce). `pullDownHeight` is its
-   * height.
+   * Revealed above the content when the list is pulled down, bottom first, only in the strip the
+   * overscroll opens under the bar (below the refresh spinner's room); iOS only, where scroll views
+   * bounce. `pullDownHeight` is its height.
    */
   pullDown?: ReactNode;
   pullDownHeight?: number;
@@ -60,9 +60,23 @@ export function LargeTitleScreen({
   // from the top of the screen, under the bar.
   const { y, onScroll } = useCoverScroll(IOS ? headerHeight : 0);
   const titleFade = useScrollFade(y, 0, TITLE_GONE);
-  // The pull-down header sits above the first row, and on iOS the clear bar lies over that strip: at rest
-  // it must not show behind the bar. It appears only as the list is pulled past rest (y < 0).
-  const pullReveal = useAnimatedStyle(() => ({ opacity: progress(-y.value, PULL_FROM, PULL_TO) }));
+  // The pull-down header lives only in the strip the overscroll reveals: between the bar's bottom edge
+  // (where the content rests, y = 0) and the content's top, less the room at the top where the refresh
+  // spinner turns. Nothing of it is ever under the clear bar or the status bar, at rest, while pulling or
+  // while bouncing back. The window is clipped and moved by transforms (no layout per frame): it is
+  // `pullDownHeight` tall above the content, slid down by what is not revealed, and the header inside is
+  // slid back up so it stays anchored to the content's top (bottom first: the crew, then the text).
+  const pullWindow = useAnimatedStyle(() => {
+    const shown = Math.min(Math.max(-y.value - PULL_ROOM, 0), pullDownHeight);
+    return {
+      opacity: shown > 0 ? progress(shown, 0, PULL_FADE) : 0,
+      transform: [{ translateY: pullDownHeight - shown }],
+    };
+  });
+  const pullAnchor = useAnimatedStyle(() => {
+    const shown = Math.min(Math.max(-y.value - PULL_ROOM, 0), pullDownHeight);
+    return { transform: [{ translateY: shown - pullDownHeight }] };
+  });
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
   const options = useMemo<NativeStackNavigationOptions>(
@@ -88,10 +102,12 @@ export function LargeTitleScreen({
         >
           {pullDown && IOS ? (
             <Animated.View
-              style={[styles.pullDown, { top: -pullDownHeight, height: pullDownHeight }, pullReveal]}
+              style={[styles.pullDown, { top: -pullDownHeight, height: pullDownHeight }, pullWindow]}
               pointerEvents="box-none"
             >
-              {pullDown}
+              <Animated.View style={[styles.pullDownContent, { height: pullDownHeight }, pullAnchor]}>
+                {pullDown}
+              </Animated.View>
             </Animated.View>
           ) : null}
           <Animated.View style={[styles.head, titleFade]}>
@@ -119,13 +135,18 @@ const TITLE_GONE = 40;
 /** The bar's title fades in over this stretch, as the large title leaves. */
 const BAR_TITLE_FROM = 28;
 const BAR_TITLE_TO = 48;
-/** The pull-down header fades in over this much pull past rest (hidden at rest). */
-const PULL_FROM = 4;
-const PULL_TO = 72;
+/**
+ * The top of the pulled strip stays clear for the refresh spinner (UIRefreshControl is 60pt tall and the
+ * list rests pulled by that much while refreshing), so the header never covers it.
+ */
+const PULL_ROOM = 64;
+/** The pull-down header fades in over its first stretch revealed. */
+const PULL_FADE = 56;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
   subtitle: { marginTop: 2 },
   pullDown: { position: "absolute", left: 0, right: 0, overflow: "hidden" },
+  pullDownContent: { position: "absolute", left: 0, right: 0, top: 0 },
 });
