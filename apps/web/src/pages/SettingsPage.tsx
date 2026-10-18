@@ -40,10 +40,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { SandboxSection } from "@/components/AgentComputer";
+import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ErrorState, LoadingList } from "@/components/Loading";
-import { MachinePage, MachinesSection } from "@/components/Machines";
+import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { SkillsSection } from "@/components/Skills";
@@ -60,7 +60,6 @@ export type SettingsSection =
   | "skills"
   | "keys"
   | "storage"
-  | "sandbox"
   | "computers"
   | "usage";
 
@@ -73,13 +72,15 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; icon: IconName; allowed: 
   { id: "skills", icon: "document", allowed: (r) => can(r, "configure") },
   { id: "keys", icon: "approve", allowed: (r) => can(r, "manage_credentials") },
   { id: "storage", icon: "drive", allowed: (r) => can(r, "configure") },
-  { id: "sandbox", icon: "code", allowed: (r) => can(r, "configure") },
-  // Every member sees the connected computers and can pair one (ADR 0025).
+  // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
   { id: "computers", icon: "computer", allowed: (r) => can(r, "read") },
   { id: "usage", icon: "waiting", allowed: (r) => can(r, "view_usage") },
 ];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
+
+/** Old section ids and where they live now ("sandbox" joined Computadores). */
+export const MOVED_SETTINGS = new Map<string, SettingsSection>([["sandbox", "computers"]]);
 
 /** `?connected=github` (back from OAuth) and `?review=1` (a custom MCP server to classify). */
 export const settingsSearch = (search: Record<string, unknown>): { connected?: string; review?: string } => ({
@@ -149,8 +150,7 @@ export function SettingsPage({
         {current === "skills" && <SkillsSection />}
         {current === "keys" && <KeysSection />}
         {current === "storage" && <StorageSection />}
-        {current === "sandbox" && <SandboxSection />}
-        {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <MachinesSection />)}
+        {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
       </div>
     </div>

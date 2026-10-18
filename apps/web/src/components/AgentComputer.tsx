@@ -1,4 +1,11 @@
-import type { Agent, AgentComputer, ComputerTarget, SandboxNetwork, SandboxSettings } from "@agenteschat/client";
+import type {
+  Agent,
+  AgentComputer,
+  ComputerTarget,
+  Machine,
+  SandboxNetwork,
+  SandboxSettings,
+} from "@agenteschat/client";
 import {
   useAgents,
   useComputer,
@@ -6,6 +13,7 @@ import {
   useMachines,
   useSandboxSettings,
   useSaveSandboxSettings,
+  useSetComputerTarget,
 } from "@agenteschat/client";
 import {
   busyDisplay,
@@ -19,13 +27,15 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { folderName, foldersOfAgent } from "@agenteschat/client/lib/machines";
+import { computerKind, computerState, folderName, foldersOfAgent } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Card,
   Checkbox,
   Chip,
+  ComputerIcon,
+  ComputerPortrait,
   Dialog,
   DialogFooter,
   Field,
@@ -281,7 +291,6 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
   return (
     <span className="stack-4" style={{ gap: 4 }}>
       <span className="row" style={{ gap: 8, alignItems: "center" }}>
-        <Icon name="computer" size={16} />
         <span className="computer-machine__name">{target.name}</span>
         <MachineChip online={target.online} />
       </span>
@@ -354,7 +363,10 @@ function ComputerTargetSelect({
         ...o,
         leading: (
           <span className="newag__ib">
-            <Icon name={o.value === CLOUD ? "cloud" : "computer"} size={16} />
+            <ComputerIcon
+              kind={o.value === CLOUD ? "cloud" : computerKind(list.find((m) => m.id === o.value)?.os)}
+              size={16}
+            />
           </span>
         ),
       }))}
@@ -368,6 +380,28 @@ function ComputerTargetSelect({
           </span>
         </span>
       )}
+    />
+  );
+}
+
+/**
+ * The computer the agent uses, as its portrait (IconesComputador.html): the
+ * cloud computer (lit while running or starting) or the connected machine,
+ * its kind and pause from the computers list.
+ */
+function TargetPortrait({ target, display }: { target: ComputerTarget; display: ComputerDisplay | null | undefined }) {
+  const { org } = useOrg();
+  const machines = useMachines(org.id);
+  if (target.kind === "cloud") {
+    const on = display === "running" || display === "starting" || display === "stopping";
+    return <ComputerPortrait className="agp-pc__logo" kind="cloud" state={on ? "online" : "offline"} />;
+  }
+  const m = machines.data?.find((x) => x.id === target.machineId);
+  return (
+    <ComputerPortrait
+      className="agp-pc__logo"
+      kind={computerKind(m?.os)}
+      state={m ? computerState(m) : target.online ? "online" : "offline"}
     />
   );
 }
@@ -402,9 +436,7 @@ export function AgentComputerPanel({
   return (
     <div className="agp-pc">
       <div className="agp-pc__now">
-        <span className="agp-pc__logo" aria-hidden="true">
-          <Icon name={target.kind === "machine" ? "computer" : "cloud"} />
-        </span>
+        <TargetPortrait target={target} display={life.display} />
         <span className="agp-pc__text">
           {target.kind === "machine" ? (
             <MachineTargetView target={target} />
@@ -497,39 +529,6 @@ function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineI
   );
 }
 
-function ComputerListRow({ agent }: { agent: Agent }) {
-  const { t } = useTranslation();
-  const life = useComputerLifecycle(agent);
-  const { pc } = life;
-  const target = targetOf(pc.data);
-  if (target.kind === "machine") {
-    return (
-      <div className="ac-list__row computer-row">
-        <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />
-        <span className="list-col" style={{ flex: "1 1 220px" }}>
-          <span style={{ fontWeight: 600 }}>{agent.name}</span>
-          <span className="small muted">{t("computer.onMachine", { machine: target.name })}</span>
-        </span>
-        <MachineChip online={target.online} />
-      </div>
-    );
-  }
-  return (
-    <div className="ac-list__row computer-row">
-      <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />
-      <span className="list-col" style={{ flex: "1 1 220px" }}>
-        <span style={{ fontWeight: 600 }}>{agent.name}</span>
-        {pc.isLoading && <LoadingLine width={200} />}
-        {pc.data && (life.busy || life.ready ? <ComputerProgress life={life} /> : <ComputerFacts pc={pc.data} />)}
-        {pc.isError && <span className="small muted">{t("common.loadFailed")}</span>}
-        <ComputerError life={life} />
-      </span>
-      {life.display && <ComputerChip status={life.display} />}
-      {pc.data && <ComputerMenu agent={agent} life={life} />}
-    </div>
-  );
-}
-
 type Draft = Pick<
   SandboxSettings,
   "enabled" | "allowDomains" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval"
@@ -547,15 +546,18 @@ const draftOf = (s: SandboxSettings): Draft => ({
   requireApproval: s.requireApproval,
 });
 
-/** Configurações → Sandbox (admins): on/off, the internet allowlist, limits, approval; and every agent's PC. */
-export function SandboxSection() {
+/**
+ * Configurações → Computadores, "Computador na nuvem" (admins, telas/Computadores.html):
+ * on/off, the internet allowlist, limits and approval. They apply only to the
+ * cloud computer; the person's own computers follow what is allowed on them.
+ */
+export function CloudComputerCard() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const admin = can(org.role, "configure");
   const settings = useSandboxSettings(org.id, admin);
   const save = useSaveSandboxSettings(org.id);
-  const agents = useAgents(org.id);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [domain, setDomain] = useState("");
   const [domainError, setDomainError] = useState<string | null>(null);
@@ -563,12 +565,21 @@ export function SandboxSection() {
     if (settings.data) setDraft(draftOf(settings.data));
   }, [settings.data]);
   if (!admin) return null;
+  const head = (
+    <div className="computers-card__head">
+      <ComputerPortrait kind="cloud" state={settings.data && !settings.data.enabled ? "offline" : "online"} />
+      <span className="computers-card__title">
+        <h2 id="sec-cloud" className="ac-card__title">
+          {t("computers.cloud.cardTitle")}
+        </h2>
+        <span className="small muted">{t("computers.cloud.cardText")}</span>
+      </span>
+    </div>
+  );
   if (settings.isError) {
     return (
-      <Card aria-labelledby="sec-sandbox">
-        <h2 id="sec-sandbox" className="ac-card__title">
-          {t("sandbox.title")}
-        </h2>
+      <Card aria-labelledby="sec-cloud" id="nuvem">
+        {head}
         <p className="small muted">{t("sandbox.unavailable")}</p>
       </Card>
     );
@@ -576,10 +587,8 @@ export function SandboxSection() {
   const s = settings.data;
   if (!s || !draft) {
     return settings.isLoading ? (
-      <Card aria-labelledby="sec-sandbox">
-        <h2 id="sec-sandbox" className="ac-card__title">
-          {t("sandbox.title")}
-        </h2>
+      <Card aria-labelledby="sec-cloud" id="nuvem">
+        {head}
         <LoadingCards count={3} />
       </Card>
     ) : null;
@@ -598,199 +607,299 @@ export function SandboxSection() {
     return true;
   };
   return (
-    <>
-      <Card aria-labelledby="sec-sandbox">
-        <div className="stack-4" style={{ gap: 2 }}>
-          <h2 id="sec-sandbox" className="ac-card__title">
-            {t("sandbox.title")}
-          </h2>
-          <span className="small muted">{t("sandbox.subtitle")}</span>
-        </div>
-        {!s.available && <p className="small muted">{t("sandbox.notConfigured")}</p>}
-        <form
-          className="stack-4"
-          style={{ gap: 16 }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!dirty || !timeoutOk || !minutesOk || !networkOk) return;
-            const networkChanged =
-              draft.network !== networkOf(s) || draft.allowDomains.join() !== s.allowDomains.join();
-            save.mutate(draft, {
-              onSuccess: (saved) => {
-                toast.show(
-                  networkChanged
-                    ? t(saved.networkApply === "live" ? "sandbox.appliedNow" : "sandbox.appliedNext")
-                    : t("sandbox.saved"),
-                );
-              },
-            });
-          }}
-        >
-          <span className="row" style={{ gap: 10, alignItems: "center" }}>
-            <Switch
-              id="sb-enabled"
-              checked={draft.enabled}
-              disabled={!s.available}
-              onCheckedChange={(on) => setDraft({ ...draft, enabled: on })}
-            />
+    <Card aria-labelledby="sec-cloud" id="nuvem">
+      {head}
+      <p className="computers-note small" role="note">
+        <Icon name="info" size={16} />
+        <span>{t("computers.cloud.note")}</span>
+      </p>
+      {!s.available && <p className="small muted">{t("sandbox.notConfigured")}</p>}
+      <form
+        className="stack-4"
+        style={{ gap: 16 }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!dirty || !timeoutOk || !minutesOk || !networkOk) return;
+          const networkChanged = draft.network !== networkOf(s) || draft.allowDomains.join() !== s.allowDomains.join();
+          save.mutate(draft, {
+            onSuccess: (saved) => {
+              toast.show(
+                networkChanged
+                  ? t(saved.networkApply === "live" ? "sandbox.appliedNow" : "sandbox.appliedNext")
+                  : t("sandbox.saved"),
+              );
+            },
+          });
+        }}
+      >
+        <span className="row" style={{ gap: 10, alignItems: "center" }}>
+          <Switch
+            id="sb-enabled"
+            checked={draft.enabled}
+            disabled={!s.available}
+            aria-describedby="sb-enabled-help"
+            onCheckedChange={(on) => setDraft({ ...draft, enabled: on })}
+          />
+          <span className="list-col" style={{ gap: 2 }}>
             <label htmlFor="sb-enabled" style={{ fontWeight: 600 }}>
               {t("sandbox.enabled")}
             </label>
+            <span id="sb-enabled-help" className="small muted">
+              {t("sandbox.enabledHelp")}
+            </span>
           </span>
-          <div className="stack-4" style={{ gap: 8 }}>
-            <span className="ac-field__label">{t("sandbox.internet")}</span>
-            <span className="small muted">{t("sandbox.internetHelp")}</span>
-            <RadioGroup
-              value={draft.network}
-              onValueChange={(v) => setDraft({ ...draft, network: v as SandboxNetwork })}
-              aria-label={t("sandbox.internet")}
-              className="stack-4"
-              style={{ gap: 8 }}
-            >
-              {NETWORKS.map((n) => (
-                <RadioCard
-                  key={n}
-                  value={n}
-                  id={`sb-net-${n}`}
-                  checked={draft.network === n}
-                  title={t(`sandbox.network.${n}`)}
-                  description={t(`sandbox.networkText.${n}`)}
-                />
-              ))}
-            </RadioGroup>
-            {draft.network === "open" && (
-              <p className="sandbox-warning small" role="note">
-                <Icon name="alert" size={16} />
-                {t("sandbox.openWarning")}
-              </p>
-            )}
-          </div>
-          {draft.network === "allowlist" && (
-            <div className="stack-4" style={{ gap: 8 }}>
-              {!networkOk && (
-                <span className="small" style={{ color: "var(--danger)" }}>
-                  {t("sandbox.needDomain")}
-                </span>
-              )}
-              {draft.allowDomains.length > 0 ? (
-                <TokenList label={t("sandbox.internet")}>
-                  {draft.allowDomains.map((d) => (
-                    <li key={d}>
-                      <Token
-                        removeLabel={t("common.removeName", { name: d })}
-                        onRemove={() => setDraft({ ...draft, allowDomains: draft.allowDomains.filter((x) => x !== d) })}
-                      >
-                        <code>{d}</code>
-                      </Token>
-                    </li>
-                  ))}
-                </TokenList>
-              ) : null}
-              <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
-                <Field
-                  label={t("sandbox.addDomain")}
-                  id="sb-domain"
-                  error={domainError ?? undefined}
-                  style={{ flex: "1 1 240px" }}
-                >
-                  <Input
-                    value={domain}
-                    placeholder={t("sandbox.domainPlaceholder")}
-                    onChange={(e) => {
-                      setDomain(e.target.value);
-                      setDomainError(null);
-                    }}
-                  />
-                </Field>
-                <Button
-                  type="button"
-                  style={{ marginTop: 24 }}
-                  onClick={() => {
-                    if (!isDomain(domain)) {
-                      setDomainError(t("sandbox.domainInvalid"));
-                      return;
-                    }
-                    if (add([domain])) setDomain("");
-                  }}
-                >
-                  {t("sandbox.add")}
-                </Button>
-              </div>
-              <div className="row" style={{ gap: 8 }}>
-                {DOMAIN_PRESETS.map((p) => (
-                  <Button key={p.id} type="button" size="sm" icon="plus" onClick={() => add(p.domains)}>
-                    {t(`sandbox.preset.${p.id}`)}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="grid-fields">
-            <Field
-              label={t("sandbox.dailyMinutes")}
-              id="sb-minutes"
-              help={t("sandbox.dailyMinutesHelp")}
-              error={minutesOk ? undefined : t("sandbox.minutesInvalid")}
-            >
-              <Input
-                inputMode="numeric"
-                value={String(draft.dailyMinutes)}
-                onChange={(e) => setDraft({ ...draft, dailyMinutes: Number(e.target.value.replace(/\D/g, "") || 0) })}
+        </span>
+        <div className="stack-4" style={{ gap: 8 }}>
+          <span className="ac-field__label">{t("sandbox.internet")}</span>
+          <span className="small muted">{t("sandbox.internetHelp")}</span>
+          <RadioGroup
+            value={draft.network}
+            onValueChange={(v) => setDraft({ ...draft, network: v as SandboxNetwork })}
+            aria-label={t("sandbox.internet")}
+            className="stack-4"
+            style={{ gap: 8 }}
+          >
+            {NETWORKS.map((n) => (
+              <RadioCard
+                key={n}
+                value={n}
+                id={`sb-net-${n}`}
+                checked={draft.network === n}
+                title={t(`sandbox.network.${n}`)}
+                description={t(`sandbox.networkText.${n}`)}
               />
-            </Field>
-            <Field
-              label={t("sandbox.timeout")}
-              id="sb-timeout"
-              help={t("sandbox.timeoutHelp", { max: s.maxTimeoutSeconds })}
-              error={timeoutOk ? undefined : t("sandbox.timeoutInvalid", { max: s.maxTimeoutSeconds })}
-            >
-              <Input
-                inputMode="numeric"
-                value={String(draft.execTimeoutSeconds)}
-                onChange={(e) =>
-                  setDraft({ ...draft, execTimeoutSeconds: Number(e.target.value.replace(/\D/g, "") || 0) })
-                }
-              />
-            </Field>
-          </div>
-          <span className="row" style={{ gap: 8, alignItems: "center" }}>
-            <Checkbox
-              id="sb-approval"
-              checked={draft.requireApproval}
-              onCheckedChange={(on) => setDraft({ ...draft, requireApproval: on })}
-            />
-            <label htmlFor="sb-approval">{t("sandbox.requireApproval")}</label>
-          </span>
-          <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
-            {dirty && <span className="small muted">{t("edit.unsaved")}</span>}
-            <Button type="button" disabled={!dirty} onClick={() => setDraft(draftOf(s))}>
-              {t("edit.discard")}
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!dirty || !timeoutOk || !minutesOk || !networkOk || save.isPending}
-              loading={save.isPending}
-            >
-              {t("common.save")}
-            </Button>
-          </div>
-        </form>
-      </Card>
-      <Card aria-labelledby="sec-pcs">
-        <h2 id="sec-pcs" className="ac-card__title">
-          {t("computer.listTitle")}
-        </h2>
-        {(agents.data ?? []).length === 0 ? (
-          <p className="small muted">{t("computer.listEmpty")}</p>
-        ) : (
-          <List aria-label={t("computer.listTitle")}>
-            {(agents.data ?? []).map((a) => (
-              <ComputerListRow key={a.id} agent={a} />
             ))}
-          </List>
+          </RadioGroup>
+          {draft.network === "open" && (
+            <p className="sandbox-warning small" role="note">
+              <Icon name="alert" size={16} />
+              {t("sandbox.openWarning")}
+            </p>
+          )}
+        </div>
+        {draft.network === "allowlist" && (
+          <div className="stack-4" style={{ gap: 8 }}>
+            {!networkOk && (
+              <span className="small" style={{ color: "var(--danger)" }}>
+                {t("sandbox.needDomain")}
+              </span>
+            )}
+            {draft.allowDomains.length > 0 ? (
+              <TokenList label={t("sandbox.internet")}>
+                {draft.allowDomains.map((d) => (
+                  <li key={d}>
+                    <Token
+                      removeLabel={t("common.removeName", { name: d })}
+                      onRemove={() => setDraft({ ...draft, allowDomains: draft.allowDomains.filter((x) => x !== d) })}
+                    >
+                      <code>{d}</code>
+                    </Token>
+                  </li>
+                ))}
+              </TokenList>
+            ) : null}
+            <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
+              <Field
+                label={t("sandbox.addDomain")}
+                id="sb-domain"
+                error={domainError ?? undefined}
+                style={{ flex: "1 1 240px" }}
+              >
+                <Input
+                  value={domain}
+                  placeholder={t("sandbox.domainPlaceholder")}
+                  onChange={(e) => {
+                    setDomain(e.target.value);
+                    setDomainError(null);
+                  }}
+                />
+              </Field>
+              <Button
+                type="button"
+                style={{ marginTop: 24 }}
+                onClick={() => {
+                  if (!isDomain(domain)) {
+                    setDomainError(t("sandbox.domainInvalid"));
+                    return;
+                  }
+                  if (add([domain])) setDomain("");
+                }}
+              >
+                {t("sandbox.add")}
+              </Button>
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              {DOMAIN_PRESETS.map((p) => (
+                <Button key={p.id} type="button" size="sm" icon="plus" onClick={() => add(p.domains)}>
+                  {t(`sandbox.preset.${p.id}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
         )}
-      </Card>
-    </>
+        <div className="grid-fields">
+          <Field
+            label={t("sandbox.dailyMinutes")}
+            id="sb-minutes"
+            help={t("sandbox.dailyMinutesHelp")}
+            error={minutesOk ? undefined : t("sandbox.minutesInvalid")}
+          >
+            <Input
+              inputMode="numeric"
+              value={String(draft.dailyMinutes)}
+              onChange={(e) => setDraft({ ...draft, dailyMinutes: Number(e.target.value.replace(/\D/g, "") || 0) })}
+            />
+          </Field>
+          <Field
+            label={t("sandbox.timeout")}
+            id="sb-timeout"
+            help={t("sandbox.timeoutHelp", { max: s.maxTimeoutSeconds })}
+            error={timeoutOk ? undefined : t("sandbox.timeoutInvalid", { max: s.maxTimeoutSeconds })}
+          >
+            <Input
+              inputMode="numeric"
+              value={String(draft.execTimeoutSeconds)}
+              onChange={(e) =>
+                setDraft({ ...draft, execTimeoutSeconds: Number(e.target.value.replace(/\D/g, "") || 0) })
+              }
+            />
+          </Field>
+        </div>
+        <span className="row" style={{ gap: 8, alignItems: "center" }}>
+          <Checkbox
+            id="sb-approval"
+            checked={draft.requireApproval}
+            onCheckedChange={(on) => setDraft({ ...draft, requireApproval: on })}
+          />
+          <label htmlFor="sb-approval">{t("sandbox.requireApproval")}</label>
+        </span>
+        <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+          {dirty && <span className="small muted">{t("edit.unsaved")}</span>}
+          <Button type="button" disabled={!dirty} onClick={() => setDraft(draftOf(s))}>
+            {t("edit.discard")}
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!dirty || !timeoutOk || !minutesOk || !networkOk || save.isPending}
+            loading={save.isPending}
+          >
+            {t("common.save")}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+/**
+ * "Qual computador cada agente usa" (telas/Computadores.html): every agent and
+ * its computer, changed here at once. The current one comes from the computers
+ * list (each says which agents use it); no computer there means the cloud.
+ * Admins pick any computer; an agent's owner, the ones they connected (the
+ * server checks again). Admins also start, stop and delete a cloud computer.
+ */
+export function AgentComputersCard() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const admin = can(org.role, "configure");
+  const agents = useAgents(org.id);
+  const machines = useMachines(org.id);
+  const list = agents.data ?? [];
+  return (
+    <Card aria-labelledby="sec-agent-computers">
+      <div className="stack-4" style={{ gap: 2 }}>
+        <h2 id="sec-agent-computers" className="ac-card__title">
+          {t("computers.agents.title")}
+        </h2>
+        <span className="small muted">{t("computers.agents.text")}</span>
+      </div>
+      {agents.isLoading || machines.isLoading ? (
+        <LoadingLine width={240} />
+      ) : list.length === 0 ? (
+        <p className="small muted">{t("computers.agents.empty")}</p>
+      ) : (
+        <List aria-label={t("computers.agents.title")}>
+          {list.map((a) => (
+            <AgentComputerRow key={a.id} agent={a} admin={admin} machines={machines.data ?? []} />
+          ))}
+        </List>
+      )}
+    </Card>
+  );
+}
+
+function AgentComputerRow({ agent, admin, machines }: { agent: Agent; admin: boolean; machines: Machine[] }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const toast = useToast();
+  const setTarget = useSetComputerTarget(org.id);
+  const current = machines.find((m) => m.agents.some((a) => a.id === agent.id));
+  const value = current?.id ?? CLOUD;
+  const choices = machines.filter((m) => admin || m.pairedBy?.id === me.user.id || m.id === value);
+  const canPick = (admin || agent.ownerUserId === me.user.id) && choices.length > 0;
+  const kindOf = (id: string) => (id === CLOUD ? "cloud" : computerKind(machines.find((m) => m.id === id)?.os));
+  const nameOf = (id: string) =>
+    id === CLOUD ? t("computer.target.cloud") : (machines.find((m) => m.id === id)?.name ?? id);
+  const options: SelectOption[] = [
+    { value: CLOUD, label: t("computer.target.cloud"), description: t("computers.agents.ready") },
+    ...choices.map((m) => ({
+      value: m.id,
+      label: m.name,
+      description: t(`computers.agents.state.${computerState(m)}`),
+    })),
+  ].map((o) => ({ ...o, leading: <ComputerIcon kind={kindOf(o.value)} size={16} /> }));
+  return (
+    <div className="ac-list__row computers-agent">
+      <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />
+      <span className="list-col computers-agent__main">
+        <span style={{ fontWeight: 600 }}>{agent.name}</span>
+        {admin && value === CLOUD && <CloudStatus agent={agent} />}
+      </span>
+      {canPick ? (
+        <Select
+          size="sm"
+          className="computers-agent__pick"
+          aria-label={t("computers.agents.pick", { name: agent.name })}
+          value={value}
+          options={options}
+          disabled={setTarget.isPending}
+          onValueChange={(v) => {
+            if (v === value) return;
+            setTarget.mutate(
+              { agentId: agent.id, machineId: v === CLOUD ? null : v },
+              {
+                onSuccess: () => toast.show(t("computers.agents.saved", { name: agent.name, computer: nameOf(v) })),
+                onError: (e) => toast.show(errorText(t, e), "error"),
+              },
+            );
+          }}
+          renderValue={(o) => (
+            <span className="computers-agent__value">
+              {o.leading}
+              {o.label}
+            </span>
+          )}
+        />
+      ) : (
+        <span className="computers-agent__value computers-agent__value--ro">
+          <ComputerIcon kind={kindOf(value)} size={16} />
+          {nameOf(value)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** An agent's cloud computer for admins: its state and Ligar / Desligar / Apagar in "…". */
+function CloudStatus({ agent }: { agent: Agent }) {
+  const life = useComputerLifecycle(agent);
+  return (
+    <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      {life.display && <ComputerChip status={life.display} />}
+      {(life.busy || life.ready) && <ComputerProgress life={life} />}
+      <ComputerError life={life} />
+      <ComputerMenu agent={agent} life={life} />
+    </span>
   );
 }

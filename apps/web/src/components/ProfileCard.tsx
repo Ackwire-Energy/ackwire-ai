@@ -4,7 +4,7 @@ import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/c
 import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { scopeSummary } from "@agenteschat/client/lib/scopes";
-import { Avatar, Button, Icon, Meter, Popover } from "@agenteschat/ui";
+import { Avatar, BrainIcon, Button, Meter, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -215,7 +215,7 @@ function AgentCardBody({ agent }: { agent: Agent }) {
         <dd>
           {thinks ? (
             <span className="profile-card__brain">
-              <Icon name={thinks.icon} size={14} />
+              <BrainIcon kind={thinks.kind} size={14} />
               {thinks.text}
             </span>
           ) : (

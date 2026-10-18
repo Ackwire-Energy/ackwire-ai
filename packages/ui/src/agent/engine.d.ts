@@ -120,6 +120,8 @@ export type AccessoryName =
   | "flower"
   | "scarf";
 export const ACCESSORY_PALETTE: Record<string, string>;
+/** Lowercase accessory letters that are a 2-tone checker of two palette letters. */
+export const ACCESSORY_CHECK: Record<string, [string, string]>;
 export const ACCESSORIES: Record<AccessoryName, { ox: number; oy: number; rows: string[] }>;
 export const ACCESSORY_NAMES: ["none", ...AccessoryName[]];
 export const ACCESSORY_REACH: { top: number; left: number; right: number; bottom: number };

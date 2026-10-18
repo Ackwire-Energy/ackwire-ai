@@ -1,11 +1,13 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Main } from "@/components/Main";
-import { isSettingsSection, SettingsPage, settingsSearch } from "@/pages/SettingsPage";
+import { isSettingsSection, MOVED_SETTINGS, SettingsPage, settingsSearch } from "@/pages/SettingsPage";
 
 /** One settings section per URL: `/settings/connectors` (OAuth returns here with `?connected`/`?review=1`). */
 export const Route = createFileRoute("/org/$orgId/settings_/$section")({
   validateSearch: settingsSearch,
   beforeLoad: ({ params }) => {
+    const moved = MOVED_SETTINGS.get(params.section);
+    if (moved) throw redirect({ to: "/org/$orgId/settings/$section", params: { orgId: params.orgId, section: moved } });
     if (!isSettingsSection(params.section)) {
       throw redirect({ to: "/org/$orgId/settings", params: { orgId: params.orgId } });
     }

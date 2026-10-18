@@ -10,6 +10,8 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { daysBetween, formatShortDate, formatTime, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import {
+  computerKind,
+  computerState,
   DESKTOP_TARGET,
   downloadHref,
   folderName,
@@ -24,6 +26,8 @@ import {
   Button,
   Card,
   Chip,
+  ComputerIcon,
+  ComputerPortrait,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -50,6 +54,14 @@ export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ?
 
 /** Refetch the list this often while waiting for a new computer (events usually arrive first). */
 export const PAIR_POLL_MS = 5000;
+
+/** A connected computer's line icon by its id (its kind from the computers list); the generic one until known. */
+export function MachineIcon({ machineId, size = 14 }: { machineId: string | null | undefined; size?: 14 | 16 }) {
+  const { org } = useOrg();
+  const machines = useMachines(org.id, Boolean(machineId));
+  const m = machineId ? machines.data?.find((x) => x.id === machineId) : undefined;
+  return m ? <ComputerIcon kind={computerKind(m.os)} size={size} /> : <Icon name="computer" size={size} />;
+}
 
 /** Online / Offline, with an icon (never a colored dot). */
 export function MachineChip({ online }: { online: boolean }) {
@@ -120,6 +132,22 @@ export function CommandBlock({ command }: { command: string }) {
   );
 }
 
+/** "Baixar o app para Mac" from the latest build, small; nothing while there is none (the connect card says so). */
+export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
+  const { t } = useTranslation();
+  const latest = useDesktopLatest(DESKTOP_TARGET.target, DESKTOP_TARGET.arch);
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  if (!latest.data) return null;
+  return (
+    <Button asChild size="sm" variant={primary ? "primary" : "default"}>
+      <a href={downloadHref(latest.data.url, origin)} download>
+        <Icon name="download" />
+        {t("machines.download.mac")}
+      </a>
+    </Button>
+  );
+}
+
 /**
  * How to connect a computer (ADR 0036 §2, §10): "Baixar o app para Mac" from
  * the latest release (version, size, SHA-256), the first-run steps of an
@@ -144,6 +172,7 @@ export function ConnectComputer() {
       ) : release ? (
         <div className="machine-connect__release">
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
+            <ComputerPortrait kind="mac" state="online" />
             <Button asChild variant="primary">
               <a href={downloadHref(release.url, origin)} download>
                 <Icon name="download" />
@@ -271,9 +300,7 @@ function MachineRow({
   ].filter(Boolean);
   return (
     <div className="ac-list__row machine-row">
-      <span className="machine-row__icon machine-page__icon">
-        <Icon name="computer" />
-      </span>
+      <ComputerPortrait className="machine-row__icon" kind={computerKind(m.os)} state={computerState(m)} />
       <span className="list-col machine-row__main">
         <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Link
@@ -420,7 +447,10 @@ function RemoveDialog({
   );
 }
 
-/** Configurações → Computadores: the connected computers (each opens its page) and how to connect one. */
+/**
+ * Configurações → Computadores, "Seus computadores" (telas/Computadores.html):
+ * the connected computers (each opens its page) and how to connect one.
+ */
 export function MachinesSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -432,23 +462,30 @@ export function MachinesSection() {
   return (
     <>
       <Card aria-labelledby="sec-machines">
-        <div className="stack-4" style={{ gap: 2 }}>
-          <h2 id="sec-machines" className="ac-card__title">
-            {t("machines.title")}
-          </h2>
-          <span className="small muted">{t("machines.subtitle")}</span>
+        <div className="computers-card__head">
+          <span className="computers-card__title">
+            <h2 id="sec-machines" className="ac-card__title">
+              {t("computers.mine.listTitle")}
+            </h2>
+            <span className="small muted">{t("computers.mine.listText")}</span>
+          </span>
+          <DownloadMacButton />
         </div>
         {machines.isLoading && <LoadingList count={2} trailing />}
         {machines.isError && !machines.data && (
           <ErrorState error={machines.error} onRetry={() => void machines.refetch()} />
         )}
         {machines.isSuccess && list.length === 0 && (
-          <EmptyState icon="computer" title={t("machines.emptyTitle")}>
-            {t("machines.emptyText")}
-          </EmptyState>
+          <div className="computers-empty">
+            <ComputerPortrait kind="mac" state="offline" size={96} />
+            <span className="computers-empty__text">
+              <b>{t("computers.mine.emptyTitle")}</b>
+              <span className="small muted">{t("computers.mine.emptyText")}</span>
+            </span>
+          </div>
         )}
         {list.length > 0 && (
-          <List aria-label={t("machines.title")}>
+          <List aria-label={t("computers.mine.listTitle")}>
             {list.map((m) => (
               <MachineRow key={m.id} machine={m} onRename={() => setRenaming(m)} onRemove={() => setRemoving(m)} />
             ))}
@@ -756,9 +793,12 @@ export function MachinePage({ machineId }: { machineId: string }) {
       {back}
       <Card aria-labelledby="sec-machine">
         <div className="row machine-page__head">
-          <span className="machine-row__icon machine-page__icon">
-            <Icon name="computer" />
-          </span>
+          <ComputerPortrait
+            className="machine-page__icon"
+            kind={computerKind(m.os)}
+            state={computerState(m)}
+            size={96}
+          />
           <span className="list-col machine-page__title">
             <h2 id="sec-machine" className="ac-card__title">
               {m.name}

@@ -2,6 +2,7 @@ import type { Machine, Role } from "@agenteschat/client";
 import { keys, useMachines, useModels, useSandboxSettings } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { computerKind } from "@agenteschat/client/lib/machines";
 import {
   addInvites,
   type InviteDraft,
@@ -23,6 +24,7 @@ import {
   Avatar,
   Button,
   Card,
+  ComputerPortrait,
   Field,
   Icon,
   type IconName,
@@ -879,6 +881,7 @@ function KeySection({
 /** A choice card with an icon (computer step). */
 function ChoiceCard({
   icon,
+  art,
   title,
   desc,
   pressed,
@@ -886,7 +889,9 @@ function ChoiceCard({
   disabled,
   onClick,
 }: {
-  icon: IconName;
+  icon?: IconName;
+  /** A picture instead of the icon (the computer step's portraits). */
+  art?: ReactNode;
   title: string;
   desc: string;
   pressed: boolean;
@@ -897,9 +902,15 @@ function ChoiceCard({
   const body = (
     <>
       {tag && <span className="onb__tag">{tag}</span>}
-      <span className="onb__ic" aria-hidden="true">
-        <Icon name={icon} />
-      </span>
+      {art ? (
+        <span className="onb__art">{art}</span>
+      ) : (
+        icon && (
+          <span className="onb__ic" aria-hidden="true">
+            <Icon name={icon} />
+          </span>
+        )
+      )}
       <span className="ac-option__title">{title}</span>
       <span className="ac-option__desc">{desc}</span>
     </>
@@ -962,7 +973,7 @@ function ComputerStep({
       {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
       <div className="onb__choices" role="group" aria-label={t("onboarding.computer.title")}>
         <ChoiceCard
-          icon="cloud"
+          art={<ComputerPortrait kind="cloud" state={cloudAvailable ? "online" : "offline"} />}
           title={t("onboarding.computer.cloud")}
           desc={cloudAvailable ? t("onboarding.computer.cloudDesc") : t("onboarding.computer.cloudUnavailable")}
           tag={cloudAvailable ? t("onboarding.computer.recommended") : undefined}
@@ -971,7 +982,7 @@ function ComputerStep({
           onClick={() => onChoose("cloud")}
         />
         <ChoiceCard
-          icon="computer"
+          art={<ComputerPortrait kind={machine ? computerKind(machine.os) : "mac"} state="online" />}
           title={t("onboarding.computer.mine")}
           desc={t("onboarding.computer.mineDesc")}
           pressed={computer === "machine"}

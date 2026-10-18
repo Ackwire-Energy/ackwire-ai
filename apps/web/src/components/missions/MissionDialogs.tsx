@@ -38,6 +38,7 @@ import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -221,7 +222,7 @@ export function NewMissionDialog({
             <div className="mi-field">
               <span className="mi-field__label">{t("missions.new.computer")}</span>
               <span className="mi-pill" style={{ height: 40, borderRadius: 12 }}>
-                <Icon name="computer" size={14} />
+                <MachineIcon machineId={machine?.id} />
                 {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
                 {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
               </span>
@@ -312,7 +313,7 @@ export function NewMissionDialog({
         </div>
         {machine && !machine.online && (
           <div className="mi-notes">
-            <Icon name="computer" size={14} />
+            <MachineIcon machineId={machine.id} />
             <span>{t("missions.new.offline", { name: machine.name })}</span>
           </div>
         )}

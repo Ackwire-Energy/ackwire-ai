@@ -58,7 +58,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
-import { CommandBlock } from "@/components/Machines";
+import { CommandBlock, MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -229,7 +229,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       <div className="mi-plan__metas">
         <div className="mi-plan__meta">
           <span className="mi-plan__label mi-plan__label--wide">
-            <Icon name="computer" size={14} />
+            <MachineIcon machineId={m?.machine?.id} />
             {t("missions.plan.on", {
               computer,
               state: m?.machine && !m.machine.online ? t("missions.offline") : t("missions.online"),

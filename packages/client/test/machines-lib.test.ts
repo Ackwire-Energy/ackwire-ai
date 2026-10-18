@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   allowFolderCommand,
+  computerKind,
+  computerState,
   downloadHref,
   folderName,
   foldersOfAgent,
@@ -80,5 +82,20 @@ describe("connected computers helpers (ADR 0036)", () => {
     );
     expect(downloadHref("https://cdn.example/a.dmg", "https://agentes.chat")).toBe("https://cdn.example/a.dmg");
     expect(locationText({ city: "Curitiba", region: null, country: "Brasil" })).toBe("Curitiba, Brasil");
+  });
+
+  test("portraits: the kind from the machine's os, the state with pause over online", () => {
+    expect(computerKind("darwin")).toBe("mac");
+    expect(computerKind("windows")).toBe("windows");
+    expect(computerKind("linux")).toBe("linux");
+    expect(computerKind("other")).toBe("linux");
+    expect(computerKind(null)).toBe("linux");
+    expect(computerKind("darwin", true)).toBe("cloud");
+    expect(computerState({ online: true, paused: null })).toBe("online");
+    expect(computerState({ online: false, paused: null })).toBe("offline");
+    expect(computerState({ online: true, paused: { until: null } })).toBe("paused");
+    expect(computerState({ online: true, paused: { until: "2026-01-01T00:00:00Z" } }, Date.parse("2026-02-01"))).toBe(
+      "online",
+    );
   });
 });

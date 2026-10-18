@@ -239,17 +239,68 @@ describe("Configurações → Computadores", () => {
     };
   };
 
-  test("next to Sandbox in the nav; empty state explains it", async () => {
+  test("one section for both kinds (Sandbox joined it); empty state explains it", async () => {
     await go();
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     const links = within(nav)
       .getAllByRole("link")
       .map((l) => l.textContent);
-    expect(links.indexOf("Computadores")).toBe(links.indexOf("Sandbox") + 1);
-    expect(screen().getByText("Nenhum computador conectado")).toBeTruthy();
-    expect(document.body.textContent).toContain("Conecte um Mac, um servidor ou uma VM.");
+    expect(links).toContain("Computadores");
+    expect(links).not.toContain("Sandbox");
+    const kinds = screen().getByRole("region", { name: "Onde os agentes trabalham" });
+    expect(kinds.textContent).toContain("Na nuvem");
+    expect(kinds.textContent).toContain("No seu computador");
+    expect(kinds.textContent).toContain("Nenhum conectado");
+    // Every agent is on the cloud until a computer of yours takes one.
+    expect(kinds.textContent).toContain("2agentes usam");
+    expect(kinds.querySelectorAll("canvas.ac-computer")).toHaveLength(2);
+    expect(screen().getByRole("region", { name: "Computador na nuvem" })).toBeTruthy();
+    expect(screen().getByText("Nenhum computador seu ainda")).toBeTruthy();
+    expect(document.body.textContent).toContain("Instale o app agentes no seu Mac e entre com a sua conta.");
     // Never internal names in the UI.
-    expect(document.querySelector(".settings__body")?.textContent).not.toMatch(/runner|MCP/);
+    expect(document.querySelector(".settings__body")?.textContent).not.toMatch(/runner|MCP|sandbox/i);
+  });
+
+  test("the old Sandbox address opens Computadores", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/settings/sandbox`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers`);
+  });
+
+  test("which computer each agent uses: picked here and saved at once; the counts follow", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const m = fakeMachinesOf.get(api)?.pair({ name: "Escritório", os: "darwin" }) as Machine;
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
+    const trigger = within(card).getByRole("combobox", { name: "Computador de Ada" });
+    expect(trigger.textContent).toContain("Nuvem");
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    await act(async () => fireEvent.click(screen().getByRole("option", { name: /^Escritório/ })));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args).toEqual([ORG_ID, ADA_ID, m.id]);
+    expect(document.body.textContent).toContain("Ada agora usa Escritório.");
+    expect(within(card).getByRole("combobox", { name: "Computador de Ada" }).textContent).toContain("Escritório");
+    const kinds = screen().getByRole("region", { name: "Onde os agentes trabalham" });
+    expect(kinds.textContent).toContain("1agente usa");
+    // The row's portrait is the Mac's.
+    expect(document.querySelector(".machine-row canvas.ac-computer")?.getAttribute("data-kind")).toBe("mac");
+  });
+
+  test("members see each agent's computer but don't pick for agents they don't own", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({ name: "Escritório" });
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
+    expect(within(card).queryByRole("combobox")).toBeNull();
+    expect(card.textContent).toContain("Nuvem");
+    // The cloud computer's settings stay with the admins.
+    expect(screen().queryByRole("region", { name: "Computador na nuvem" })).toBeNull();
   });
 
   test("download: the Mac app from the latest build (version, size, SHA-256), first-run steps, other ways", async () => {
@@ -278,11 +329,13 @@ describe("Configurações → Computadores", () => {
     expect(card.textContent).toContain("xattr -dr com.apple.quarantine /Applications/agentes.app");
     // The old flow is gone: no code made on the site, no install command with a code.
     expect(screen().queryByRole("button", { name: "Gerar comando" })).toBeNull();
-    expect(card.querySelector(".machine-command__code")).toBeNull();
+    const commands = () => [...card.querySelectorAll(".machine-command__code")].map((el) => el.textContent ?? "");
+    // Only the first-run unlock is shown before "Outras formas" opens.
+    expect(commands()).toEqual(["xattr -dr com.apple.quarantine /Applications/agentes.app"]);
     const other = within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" });
     expect(other.getAttribute("aria-expanded")).toBe("false");
     await click(other);
-    const command = card.querySelector(".machine-command__code")?.textContent ?? "";
+    const command = commands().at(-1) ?? "";
     expect(command).toBe("curl -fsSL http://localhost:3000/api/machines/install.sh | sh");
     expect(command).not.toContain("--code");
     expect(card.textContent).toContain("Ele mostra um código e um link");

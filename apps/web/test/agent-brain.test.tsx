@@ -27,21 +27,31 @@ const group = (section: HTMLElement) => within(section).getByRole("radiogroup", 
 const radio = (section: HTMLElement, name: RegExp) => within(group(section)).getByRole("radio", { name });
 
 describe("Quem pensa (agent settings)", () => {
-  test("three rows with their marks; the API is the default, with its model and key under it", async () => {
+  test("three cards with their portraits; the API is the default, with its model and key under them", async () => {
     const { section } = await open();
     expect(section.textContent).toContain("Quem pensa");
     const rows = within(group(section)).getAllByRole("radio");
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
       "Modelo (API)",
-      "Claude Code no MacBook",
-      "Codex no MacBookEm teste",
+      "Claude Code",
+      "CodexEm teste",
     ]);
     expect(rows[0]?.getAttribute("aria-checked")).toBe("true");
-    expect(rows.map((r) => r.querySelector(".ac-icon") !== null)).toEqual([true, true, true]);
+    // Each card leads with its engine's portrait (the agent alone for the API) and says where it runs.
+    expect(rows.map((r) => r.querySelector("canvas.ac-brain")?.getAttribute("data-kind"))).toEqual([
+      "agent",
+      "claude_code",
+      "codex",
+    ]);
+    expect(rows.map((r) => r.querySelector(".ac-optrow__foot")?.textContent)).toEqual([
+      "Pela API",
+      "MacBook",
+      "MacBook",
+    ]);
     expect(rows[0]?.textContent).toContain("Um modelo de IA pela API, com uma chave do workspace.");
     expect(within(section).queryByRole("switch")).toBeNull();
     expect(within(section).queryByRole("combobox", { name: "Modelo" })).toBeNull();
-    // "Modelo (API)" carries the model cards and the key, under its row.
+    // "Modelo (API)" carries the model cards and the key, under the cards.
     const more = section.querySelector(".ac-optrow__more") as HTMLElement;
     expect(within(more).getByRole("group", { name: "Modelo" })).toBeTruthy();
     expect(within(more).getByRole("combobox", { name: "Chave" })).toBeTruthy();
@@ -56,7 +66,7 @@ describe("Quem pensa (agent settings)", () => {
 
   test("Claude Code asks first: the personal-plan warning; Cancelar keeps the API", async () => {
     const { section } = await open();
-    await click(radio(section, /^Claude Code no MacBook/));
+    await click(radio(section, /^Claude Code/));
     const dialog = screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" });
     expect(dialog.textContent).toContain(
       "A assinatura do Claude é pessoal. Usar o seu plano para o agente responder a outras pessoas pode contrariar os termos da Anthropic. O risco é seu.",
@@ -69,13 +79,13 @@ describe("Quem pensa (agent settings)", () => {
 
   test("confirmed: the model select and the fallback switch; Salvar sends the choice with the warning accepted", async () => {
     const { section, state } = await open();
-    await click(radio(section, /^Claude Code no MacBook/));
+    await click(radio(section, /^Claude Code/));
     await click(
       within(screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" })).getByRole("button", {
         name: "Entendi, usar mesmo assim",
       }),
     );
-    expect(radio(section, /^Claude Code no MacBook/).getAttribute("aria-checked")).toBe("true");
+    expect(radio(section, /^Claude Code/).getAttribute("aria-checked")).toBe("true");
     expect(within(section).getByRole("combobox", { name: "Modelo" }).textContent).toContain("Sonnet");
     // The API's model and key go with the API row.
     expect(within(section).queryByRole("combobox", { name: "Chave" })).toBeNull();
@@ -105,9 +115,9 @@ describe("Quem pensa (agent settings)", () => {
     const api = createFakeApi(state);
     api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "codex", model: null, effectiveModel: "gpt-6-sol" });
     const { section } = await open(state, api);
-    expect(radio(section, /^Codex no MacBook/).getAttribute("aria-checked")).toBe("true");
+    expect(radio(section, /^Codex/).getAttribute("aria-checked")).toBe("true");
     expect(within(section).getByRole("combobox", { name: "Modelo" }).textContent).toContain("GPT-6 Sol");
-    await click(radio(section, /^Claude Code no MacBook/));
+    await click(radio(section, /^Claude Code/));
     expect(screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" }).textContent).toContain(
       "termos da Anthropic",
     );
@@ -115,13 +125,13 @@ describe("Quem pensa (agent settings)", () => {
     // Back to the API needs no warning.
     await click(radio(section, /^Modelo \(API\)/));
     expect(screen().queryByRole("dialog", { name: "Usar o seu plano para o agente?" })).toBeNull();
-    await click(radio(section, /^Codex no MacBook/));
+    await click(radio(section, /^Codex/));
     expect(screen().queryByRole("dialog", { name: "Usar o seu plano para o agente?" })).toBeNull();
   });
 
   test("the save never sends acceptPlanTerms without the warning confirmed; choosing again asks again", async () => {
     const { section, state } = await open();
-    await click(radio(section, /^Claude Code no MacBook/));
+    await click(radio(section, /^Claude Code/));
     await click(
       within(screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" })).getByRole("button", {
         name: "Entendi, usar mesmo assim",
@@ -129,7 +139,7 @@ describe("Quem pensa (agent settings)", () => {
     );
     // Back to the API and to Claude Code again: the warning again (nothing confirmed for the new pick yet).
     await click(radio(section, /^Modelo \(API\)/));
-    await click(radio(section, /^Claude Code no MacBook/));
+    await click(radio(section, /^Claude Code/));
     const again = screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" });
     await click(within(again).getByRole("button", { name: "Cancelar" }));
     expect(radio(section, /^Modelo \(API\)/).getAttribute("aria-checked")).toBe("true");
@@ -138,7 +148,7 @@ describe("Quem pensa (agent settings)", () => {
 
   test("the warning for Codex names OpenAI", async () => {
     const { section } = await open();
-    await click(radio(section, /^Codex no MacBook/));
+    await click(radio(section, /^Codex/));
     expect(screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" }).textContent).toContain(
       "A assinatura do ChatGPT é pessoal. Usar o seu plano para o agente responder a outras pessoas pode contrariar os termos da OpenAI. O risco é seu.",
     );
@@ -153,9 +163,11 @@ describe("Quem pensa (agent settings)", () => {
       options: base.options.map((o) => (o.kind === "codex" ? { ...o, available: false, reason: "not_installed" } : o)),
     });
     const { section } = await open(state, api);
-    const codex = radio(section, /^Codex no MacBook/);
+    const codex = radio(section, /^Codex/);
     expect(codex.hasAttribute("disabled")).toBe(true);
     expect(codex.textContent).toContain("Não está instalado no MacBook.");
+    expect(codex.querySelector("canvas.ac-brain")?.getAttribute("data-state")).toBe("off");
+    expect(codex.querySelector(".ac-optrow__foot")?.textContent).toBe("Indisponível");
   });
 
   test("the owner chooses too; a member sees who chooses", async () => {

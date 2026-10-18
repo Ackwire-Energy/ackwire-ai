@@ -32,6 +32,7 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { brainModelLabel } from "@/components/AgentBrain";
+import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
@@ -349,7 +350,7 @@ function SettingsBody({
             <li className="ac-setlist__row ac-setlist__row--pad">
               <span className="ac-setlist__text">
                 <span className="ac-setlist__title">
-                  <Icon name="computer" size={16} />
+                  <MachineIcon machineId={m.machine?.id} size={16} />
                   {m.machine?.name ?? t("missions.settings.executor.noComputer")}
                 </span>
               </span>

@@ -11,6 +11,7 @@ import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
+import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -282,7 +283,7 @@ export function MachineChip({ machine }: { machine: Mission["machine"] }) {
   const { t } = useTranslation();
   return (
     <span className="mi-pill">
-      <Icon name="computer" size={14} />
+      <MachineIcon machineId={machine?.id} />
       {machine ? machine.name : t("missions.noComputer")}
       {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
     </span>

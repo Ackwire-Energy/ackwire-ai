@@ -11,10 +11,10 @@ import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
 import { type Home, isIncompatible, orgName, pairedHomes } from "../control/store";
-import { isOnline, trayStateOf } from "../control/tray";
+import { isOnline, macStateOf, trayStateOf } from "../control/tray";
 import { SITE_URL } from "../control/version";
 import { agentOf, useOnShown, useUpdateCheck, writePref } from "../hooks";
-import { AgentFace, Banner, BrandFace, Count, MenuRow, OrgTile } from "../ui/bits";
+import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
 
@@ -175,7 +175,7 @@ export function Popover() {
     <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
       <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
         <header className="dk-ph">
-          <BrandFace size="sm" state={pause ? "waiting" : jobs.length ? "thinking" : "idle"} />
+          <MacPortrait state={macStateOf(homes)} />
           <span className="dk-ph__text">
             <b>{machine}</b>
             <small>

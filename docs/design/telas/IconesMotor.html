@@ -17,11 +17,13 @@
   Our own drawings, never the vendors' marks (no starburst, no knot, no Codex logo): each engine is told
   apart by its tool, its temperature (warm / cool / the agent's own color) and what the screen shows.
 
+  APPROVED: direction C "Objeto + agente" (2026-10-17). The portraits are drawn by the one engine,
+  packages/ui/src/brain/portrait.js (drawBrain), imported here as is; in the product the tiny agent wears
+  the agent's own look (color, eyes, accessory). Direction A (Retrato) was dropped from this page.
   Directions (#dir=):
-    a  Retrato         pixel portraits on the 48×48 grid, same family as IconesComputador.html
-    b  Contorno        line icons on a neutral tile (the 16 px drawing, scaled)
     c  Objeto + agente a smaller pixel console with the agent's tiny pixel self beside it, using it;
-                       Agente is the agent alone. In the product the tiny agent wears the agent's own color.
+                       Agente is the agent alone, thinking.
+    b  Contorno        line icons on a neutral tile (the 16 px drawing, scaled)
   Below 48 px every direction uses the same 16 px line icons (pixels don't read that small).
 
   States (#state=): idle (Parado) · working (Trabalhando: the pen writes / the code types / the agent
@@ -29,7 +31,8 @@
   Theme: &theme=light|dark. Example: IconesMotor.html#dir=c&state=working&theme=dark
   Context shown: grid 144/96/48 + 16, the agent page "Motor" selector, the mission "Quem programa" picker,
   chips and the API fallback note, the desktop app's Ferramentas tab, inline text. Phone width: no horizontal scroll.
-  Agents come only from packages/ui/src/agent/engine.js (serve the repo root over http).
+  Agents come only from packages/ui/src/agent/engine.js, portraits from packages/ui/src/brain/portrait.js
+  (serve the repo root over http).
 */
 :root{
   --bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
@@ -187,193 +190,11 @@ h1{font-family:var(--display);font-weight:300;font-size:40px;letter-spacing:-.03
 <div class="pbar"><span class="lbl">Protótipo</span><span class="grow"></span><div class="seg" id="dirs"></div><div class="seg" id="states"></div><div class="seg" id="theme"></div></div>
 <main class="wrap" id="root"></main>
 <script type="module">
-import { drawAgent, idlePose, eyeShapes, inBody, toneAt, bodyTones, bodyPath } from "../../../packages/ui/src/agent/engine.js";
+import { drawAgent, idlePose, eyeShapes, bodyPath } from "../../../packages/ui/src/agent/engine.js";
+import { drawBrain, BRAIN_GRID as N } from "../../../packages/ui/src/brain/portrait.js";
 
-/* ================= Pixel drawing (48×48 grid) ================= */
-const N = 48;
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-const ALU = ["#fbfbf9", "#eeeeea", "#dcdcd7", "#c4c4be", "#a3a39d", "#7d7d77"];
-/* Claude Code: warm paper frame, a warm dark screen, clay ink. */
-const WARM = ["#fdfaf5", "#f5ede2", "#e8dccb", "#d2c1a9", "#ae977d", "#806b56"];
-const WSCR = ["#1d1815", "#251f1a", "#30271f"];
-const CLAY = { hi: "#f2a982", mid: "#d4744a", lo: "#9c4b2a", ink: "#3d2215" };
-/* Codex: cool slate frame, a cold screen, mint and ice code. */
-const COOL = ["#f7f9fb", "#eaeef2", "#d6dde4", "#b9c3cd", "#8f9ba8", "#67737f"];
-const COOL_BACK = ["#eef2f5", "#e0e6eb", "#cbd3db", "#b1bbc6", "#8f9ba8", "#67737f"];
-const CSCR = ["#0e1317", "#131a1f", "#19232a"];
-const MINT = "#6fd6bf", ICE = "#9cc0d8", SLATE = "#5f7b90";
-const SKYL = ["#c6e1ff", "#8cc3ff"];
-
-function painter(ctx) {
-  const set = (x, y, c) => { if (c && x >= 0 && y >= 0 && x < N && y < N) { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); } };
-  const ramp = (x0, y0, w, h, tones, f) => {
-    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
-      const v = Math.max(0, Math.min(1, f((x - x0) / Math.max(1, w - 1), (y - y0) / Math.max(1, h - 1))));
-      const k = v * (tones.length - 1), lo = Math.floor(k);
-      set(x, y, tones[Math.min(tones.length - 1, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))]);
-    }
-  };
-  const box = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c); };
-  const clear = (...pts) => pts.forEach(([x, y]) => ctx.clearRect(x, y, 1, 1));
-  const bits = (x, y, rows, colors) => rows.forEach((r, j) => [...r].forEach((ch, i) => { if (colors[ch]) set(x + i, y + j, colors[ch]); }));
-  return { set, ramp, box, clear, bits };
-}
-function shadow(p, cx, y, w, dark) {
-  const c = dark ? "rgba(0,0,0,.55)" : "rgba(23,23,22,.16)";
-  for (let x = cx - w; x <= cx + w; x++) for (let j = 0; j < 2; j++) {
-    const edge = 1 - Math.abs(x - cx) / w;
-    if (edge > BAYER[(x & 3) + ((y + j) & 3) * 4] * (j ? 1.6 : 1)) p.set(x, y + j, c);
-  }
-}
-/* A window: dithered frame, rounded corners, three title dots; returns the screen box. */
-function windowFrame(p, x, y, w, h, tones) {
-  p.ramp(x, y, w, h, tones, (u, v) => 0.04 + 0.28 * v + 0.08 * u);
-  for (let i = x + 1; i < x + w - 1; i++) { p.set(i, y, tones[3]); p.set(i, y + h - 1, tones[4]); }
-  for (let j = y + 1; j < y + h - 1; j++) { p.set(x, j, tones[3]); p.set(x + w - 1, j, tones[4]); }
-  p.clear([x, y], [x + w - 1, y], [x, y + h - 1], [x + w - 1, y + h - 1]);
-  for (const k of [0, 1, 2]) p.set(x + 3 + k * 2, y + 2, tones[3]);
-  return { sx: x + 2, sy: y + 5, sw: w - 4, sh: h - 7 };
-}
-const screenFill = (p, s, tones, state) => p.ramp(s.sx, s.sy, s.sw, s.sh, tones, (u, v) => (state === "off" ? 0.04 : 0.1 + 0.8 * u * v));
-
-/* Claude Code's screen: a prompt, some output, and a line written by hand (it grows while working). */
-function ccScreen(p, s, state, t, pen) {
-  screenFill(p, s, WSCR, state);
-  if (state === "off") return null;
-  const x = s.sx + 2, y = s.sy + 2;
-  p.set(x, y, CLAY.mid); p.set(x + 1, y + 1, CLAY.mid); p.set(x, y + 2, CLAY.mid);
-  p.box(x + 3, y + 1, Math.min(9, s.sw - 9), 1, "rgba(245,237,226,.72)");
-  p.box(x, y + 5, Math.min(15, s.sw - 6), 1, "rgba(174,151,125,.55)");
-  p.box(x, y + 7, Math.min(11, s.sw - 6), 1, "rgba(174,151,125,.55)");
-  if (state === "idle" && t % 1.6 < 0.9) p.box(x + 4 + Math.min(9, s.sw - 9), y, 2, 3, CLAY.mid);
-  const base = s.sy + s.sh - 5, full = s.sw - (pen ? 10 : 7);
-  const len = state === "working" ? 3 + Math.floor((t * 7) % (full - 2)) : full - 4;
-  let tip = [x, base];
-  for (let i = 0; i <= len; i++) { const yy = base + Math.round(Math.sin(i * 0.75) * 1.3); p.set(x + i, yy, CLAY.hi); tip = [x + i, yy]; }
-  if (!pen && state === "working" && t % 0.5 < 0.3) p.box(tip[0] + 2, base - 1, 1, 3, CLAY.mid);
-  return tip;
-}
-/* A fountain-pen nib (our drawing), tip at column 4 of the last row. */
-const NIB = ["...HHH...", "..HgGGH..", "..HgGGH..", "..HgGGH..", "..HgGGH..", ".MMMMMMM.", "MllLLLLLM", "MlLLKLLLM", "MlLLKLLLM", ".MlLKLLM.", ".MlLKLLM.", "..MLKLM..", "..MLKLM..", "...MKM...", "....M...."];
-const nib = (p, tx, ty) => p.bits(tx - 4, ty - 14, NIB, { H: "#1d1d1b", G: "#3a3a37", g: "#5a5a55", M: CLAY.lo, L: CLAY.mid, l: CLAY.hi, K: CLAY.ink });
-
-/* Codex's screen: braces, indented code that types in while working, a cursor. */
-const BRACE_L = ["..XX", ".X..", ".X..", ".X..", ".X..", "X...", ".X..", ".X..", ".X..", ".X..", "..XX"];
-const BRACE_R = BRACE_L.map((r) => [...r].reverse().join(""));
-function cxScreen(p, s, state, t) {
-  screenFill(p, s, CSCR, state);
-  if (state === "off") return;
-  const top = s.sy + Math.floor((s.sh - 11) / 2);
-  p.bits(s.sx + 2, top, BRACE_L, { X: MINT }); p.bits(s.sx + s.sw - 6, top, BRACE_R, { X: MINT });
-  const lines = [[0, 9, ICE], [2, 11, SLATE], [2, 7, MINT], [4, 8, SLATE], [0, 5, ICE]];
-  const x0 = s.sx + 8, maxw = s.sw - 16, typed = (t * 3.2) % (lines.length + 2);
-  let end = null;
-  lines.forEach(([ind, len, c], i) => {
-    let L = Math.min(len, maxw - ind);
-    if (state === "working") { const k = typed - i; if (k <= 0) return; if (k < 1) L = Math.max(1, Math.round(L * k)); }
-    const y = top + 1 + i * 2;
-    p.box(x0 + ind, y, L, 1, c); end = [x0 + ind + L + 1, y];
-  });
-  if (end && (state === "working" || t % 1.6 < 0.9)) p.box(end[0], end[1] - 1, 1, 2, MINT);
-}
-
-/* Our pixel agent, from the engine's body, dither and eyes (n odd keeps the eyes symmetric). */
-function pixAgent(p, x0, y0, n, color, look) {
-  const tones = bodyTones(color);
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    if (inBody((x + 0.5) / n, (y + 0.5) / n)) p.set(x0 + x, y0 + y, tones[toneAt(x, y, n, look.pose.turn)]);
-  }
-  for (const e of eyeShapes(look.style, look.pose)) {
-    const ew = Math.max(1, Math.round(e.w * n)), eh = Math.max(1, Math.round(e.h * n));
-    p.box(x0 + Math.round((e.x + e.w / 2) * n - ew / 2), y0 + Math.round((e.y + e.h / 2) * n - eh / 2), ew, eh, "#ffffff");
-  }
-}
-/* Idle: blinks, glances a little. Working: looks around (up toward the thought, to the sides). Off: sleepy. */
-function lookFor(state, t, seed = 0, toward = null) {
-  if (state === "off") return { style: "sleepy", pose: { turn: [0, 0.2] } };
-  const ip = idlePose(t, seed, { active: state === "working", expressions: [] });
-  const k = state === "working" ? 0.11 : 0.05;
-  let look = [ip.turn[0] * k, ip.turn[1] * k * 0.7];
-  let turn = ip.turn.map((v) => v * (state === "working" ? 0.6 : 0.3));
-  if (toward) { // keeps its eyes on the tool, glancing back now and then
-    const glance = state === "working" && (t + seed) % 4 > 3.2;
-    look = glance ? [0.02, -0.02] : [toward[0] * 0.09, toward[1] * 0.05 + (state === "working" ? 0.02 * Math.sin(t * 6) : 0)];
-    turn = glance ? [0.1, 0] : toward.map((v) => v * 0.55);
-  }
-  return { style: "round", pose: { look, turn, blink: ip.blink } };
-}
-function halo(p, cx, cy, r, dark) {
-  for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
-    const d = Math.hypot(x - cx, y - cy); if (d > r) continue;
-    const k = 1 - d / r;
-    if (k * 0.7 > BAYER[(x & 3) + (y & 3) * 4]) p.set(x, y, dark ? (k > 0.6 ? "rgba(47,128,224,.26)" : "rgba(47,128,224,.13)") : (k > 0.6 ? SKYL[1] : SKYL[0]));
-  }
-}
-/* A thought bubble with three dots; while working one dot after the other lights up. */
-function bubble(p, x, y, state, t) {
-  if (state === "off") return;
-  const w = 14, h = 8;
-  p.box(x, y, w, h, "#ffffff");
-  for (let i = x + 1; i < x + w - 1; i++) { p.set(i, y, ALU[3]); p.set(i, y + h - 1, ALU[4]); }
-  for (let j = y + 1; j < y + h - 1; j++) { p.set(x, j, ALU[3]); p.set(x + w - 1, j, ALU[4]); }
-  p.clear([x, y], [x + w - 1, y], [x, y + h - 1], [x + w - 1, y + h - 1]);
-  p.box(x, y + h + 1, 2, 2, "#ffffff"); p.set(x, y + h + 1, ALU[3]);
-  p.set(x - 1, y + h + 4, ALU[4]);
-  const on = Math.floor(t * 3) % 3;
-  [3, 6, 9].forEach((dx, i) => p.box(x + dx, y + 3, 2, 2, state === "working" && i === on ? "#04203f" : ALU[state === "working" ? 3 : 4]));
-}
-
-const DRAW = {
-  a: {
-    claude(p, state, dark, t) {
-      shadow(p, 24, 39, 20, dark);
-      const s = windowFrame(p, 4, 7, 37, 31, WARM);
-      const tip = ccScreen(p, s, state, t, true);
-      const [tx, ty] = tip ?? [27, s.sy + s.sh - 5];
-      nib(p, tx, ty - (state === "working" && t % 0.4 < 0.2 ? 1 : 0));
-    },
-    codex(p, state, dark, t) {
-      shadow(p, 24, 40, 20, dark);
-      windowFrame(p, 9, 4, 35, 29, COOL_BACK);
-      const s = windowFrame(p, 4, 9, 36, 30, COOL);
-      cxScreen(p, s, state, t);
-    },
-    agent(p, state, dark, t, color) {
-      if (state !== "off") halo(p, 21, 25, 19, dark);
-      shadow(p, 24, 42, 19, dark);
-      p.ramp(5, 36, 38, 3, ALU, (u, v) => 0.08 + 0.45 * v + 0.15 * Math.abs(u - 0.5));
-      p.box(5, 39, 38, 1, ALU[4]); p.clear([5, 36], [42, 36]);
-      p.box(8, 40, 2, 2, ALU[4]); p.box(38, 40, 2, 2, ALU[4]);
-      const bob = state === "working" && Math.sin(t * 5) > 0.5 ? -1 : 0;
-      pixAgent(p, 10, 15 + bob, 21, color, lookFor(state, t, 1));
-      bubble(p, 33, 1, state, t);
-    },
-  },
-  c: {
-    claude(p, state, dark, t, color) {
-      shadow(p, 23, 40, 21, dark);
-      const s = windowFrame(p, 2, 7, 33, 31, WARM);
-      ccScreen(p, s, state, t, false);
-      const bob = state === "working" && Math.sin(t * 5) > 0.5 ? -1 : 0;
-      pixAgent(p, 33, 27 + bob, 13, color, lookFor(state, t, 2, [-1, -0.3]));
-    },
-    codex(p, state, dark, t, color) {
-      shadow(p, 23, 40, 21, dark);
-      windowFrame(p, 6, 3, 31, 28, COOL_BACK);
-      const s = windowFrame(p, 2, 8, 32, 30, COOL);
-      cxScreen(p, s, state, t);
-      const bob = state === "working" && Math.sin(t * 5 + 1) > 0.5 ? -1 : 0;
-      pixAgent(p, 33, 27 + bob, 13, color, lookFor(state, t, 3, [-1, -0.3]));
-    },
-    agent(p, state, dark, t, color) {
-      if (state !== "off") halo(p, 22, 25, 20, dark);
-      shadow(p, 23, 39, 14, dark);
-      const bob = state === "working" && Math.sin(t * 5) > 0.5 ? -1 : 0;
-      pixAgent(p, 12, 16 + bob, 21, color, lookFor(state, t, 1));
-      bubble(p, 33, 2, state, t);
-    },
-  },
-};
+/* The prototype's engine names → the engine's kinds. */
+const KIND = { claude: "claude_code", codex: "codex", agent: "agent" };
 
 /* ================= Line icons (24 grid) ================= */
 const f = (n) => +n.toFixed(2);
@@ -394,10 +215,10 @@ const I = {
 
 /* ================= State ================= */
 const q = new URLSearchParams(location.hash.slice(1));
-let dir = ["a", "b", "c"].includes(q.get("dir")) ? q.get("dir") : "a";
+let dir = ["b", "c"].includes(q.get("dir")) ? q.get("dir") : "c";
 let state = ["idle", "working", "off"].includes(q.get("state")) ? q.get("state") : "idle";
 let pick = "claude";
-const DIRS = [["a", "A · Retrato"], ["b", "B · Contorno"], ["c", "C · Objeto + agente"]];
+const DIRS = [["c", "C · Objeto + agente (aprovada)"], ["b", "B · Contorno"]];
 const STATES = [["idle", "Parado"], ["working", "Trabalhando"], ["off", "Indisponível"]];
 const ENG = {
   claude: { name: "Claude Code", a: "Console quente; uma pena escreve à mão na tela", b: "Janela com o prompt e uma linha escrita à mão, em argila", c: "O agente usa um console quente, que escreve à mão" },
@@ -418,7 +239,7 @@ function hydrate() {
     cv.className = "pt" + (el.dataset.st === "off" ? " off" : ""); cv.width = cv.height = N;
     cv.style.width = cv.style.height = el.dataset.px + "px";
     cv.setAttribute("role", "img"); cv.setAttribute("aria-label", ENG[el.dataset.pt].name);
-    live.push({ kind: "pt", cv, eng: el.dataset.pt, st: el.dataset.st, dir });
+    live.push({ kind: "pt", cv, eng: el.dataset.pt, st: el.dataset.st });
     el.replaceWith(cv);
   }
   for (const el of document.querySelectorAll("[data-av]")) {
@@ -436,7 +257,7 @@ function frame(now) {
     if (!a.cv.isConnected) { live.splice(i, 1); continue; }
     const ctx = a.cv.getContext("2d");
     ctx.clearRect(0, 0, a.cv.width, a.cv.height);
-    if (a.kind === "pt") DRAW[a.dir][a.eng](painter(ctx), a.st, dark, t, "sky");
+    if (a.kind === "pt") drawBrain(ctx, KIND[a.eng], a.st, { dark, t });
     else drawAgent(ctx, 0, 0, a.s * DPR, { color: "sky", cells: 14, pose: idlePose(t, a.seed, { every: 9, expressions: ["happy"] }) });
   }
   setTimeout(() => requestAnimationFrame(frame), 90);

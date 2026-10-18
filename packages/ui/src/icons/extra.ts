@@ -5,6 +5,49 @@ import type { IconShape } from "./types";
  * file in docs/design/icons yet. Same grid (20px), stroke (1.6) and rules.
  * Move them to docs/design/icons when the design files are added.
  */
+/*
+ * IconesMotor.html: the engines an agent thinks and works with, small (the
+ * 16 px form of their portraits), redrawn from the 24px grid. Our own glyphs,
+ * no logos. The accent classes take each engine's color (components.css).
+ */
+/** Claude Code: a console with a prompt and a line written by hand, in clay. */
+const BRAIN_CLAUDE_CODE: IconShape[] = [
+  ["rect", { x: "2.5", y: "3.75", width: "15", height: "12.5", rx: "2.5" }],
+  ["path", { d: "m5.83 7.17 2.17 1.75-2.17 1.75" }],
+  [
+    "path",
+    {
+      className: "ac-brain-cc",
+      pathLength: "1",
+      d: "M6 13.5c.75-.92 1.5-.92 2.25 0s1.5.92 2.25 0 1.5-.92 2.25 0 1.17-.83 1.67-.33",
+    },
+  ],
+];
+/** Codex: a terminal with a title bar and the code between braces. */
+const BRAIN_CODEX: IconShape[] = [
+  ["rect", { x: "2.5", y: "3.75", width: "15", height: "12.5", rx: "2.5" }],
+  ["path", { d: "M2.5 7.17h15" }],
+  [
+    "path",
+    {
+      className: "ac-brain-cx",
+      d: "M8.5 9c-.83 0-1.17.33-1.17 1.08v.33c0 .5-.25.75-.75.75.5 0 .75.25.75.75v.33c0 .75.33 1.08 1.17 1.08M11.5 9c.83 0 1.17.33 1.17 1.08v.33c0 .5.25.75.75.75-.5 0-.75.25-.75.75v.33c0 .75-.33 1.08-1.17 1.08",
+    },
+  ],
+];
+/** Agente: our agent's outline (the engine's body, bodyPath) with its eyes, in the agents' color. */
+const BRAIN_AGENT: IconShape[] = [
+  [
+    "path",
+    {
+      className: "ac-brain-body",
+      d: "M7.2 3.75H12.8A3.867 3.867 0 0 1 16.667 7.617V13.217A3.867 3.867 0 0 1 12.8 17.083H4.053A.72 .72 0 0 1 3.333 16.363V7.617A3.867 3.867 0 0 1 7.2 3.75Z",
+    },
+  ],
+  ["rect", { className: "ac-brain-eye", x: "7.4", y: "8.15", width: "1.86", height: "3.6", rx: ".93" }],
+  ["rect", { className: "ac-brain-eye", x: "10.74", y: "8.15", width: "1.86", height: "3.6", rx: ".93" }],
+];
+
 export const extraIcons = {
   /** Sidebar.dc.html: Issues (closed shape keeps the cut corner). */
   issues: [
@@ -200,6 +243,35 @@ export const extraIcons = {
   ],
   /** The cloud computer. */
   cloud: [["path", { d: "M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z" }]],
+  /**
+   * IconesComputador.html: each computer's line icon (the small form of its
+   * portrait, `ComputerIcon`), redrawn from the 24px grid. A laptop with the notch.
+   */
+  computerMac: [
+    ["rect", { x: "3.33", y: "3.75", width: "13.33", height: "9.17", rx: "1.67" }],
+    ["path", { d: "M8.67 3.75h2.67v.58a.75 .75 0 0 1-.75 .75h-1.17a.75 .75 0 0 1-.75-.75Z" }],
+    ["path", { d: "M2.08 15.17h15.83l-.75 .92a1.33 1.33 0 0 1-1 .5H3.83a1.33 1.33 0 0 1-1-.5Z" }],
+  ],
+  /** IconesComputador.html: a monitor on a stand with four tiles. */
+  computerWindows: [
+    ["rect", { x: "2.5", y: "3.17", width: "15", height: "10.58", rx: "1.67" }],
+    ["path", { d: "M7.5 16.83h5M10 13.75v3.08" }],
+    ["rect", { x: "6.83", y: "6", width: "2.75", height: "2.17", rx: ".33" }],
+    ["rect", { x: "10.42", y: "6", width: "2.75", height: "2.17", rx: ".33" }],
+    ["rect", { x: "6.83", y: "8.83", width: "2.75", height: "2.17", rx: ".33" }],
+    ["rect", { x: "10.42", y: "8.83", width: "2.75", height: "2.17", rx: ".33" }],
+  ],
+  /** IconesComputador.html: a terminal window (Linux's face). */
+  computerLinux: [
+    ["rect", { x: "2.5", y: "3.75", width: "15", height: "12.5", rx: "2.08" }],
+    ["path", { d: "M2.5 7.17h15" }],
+    ["path", { d: "m6 10 2.17 1.75-2.17 1.75M10 13.58h3.83" }],
+  ],
+  /** IconesComputador.html: the cloud computer, a cloud with a screen set in it. */
+  computerCloud: [
+    ["path", { d: "M5.83 15.42h8.75a3.33 3.33 0 0 0 .5-6.62A4.58 4.58 0 0 0 6.25 8 3.75 3.75 0 0 0 5.83 15.42Z" }],
+    ["rect", { x: "7.92", y: "9.67", width: "5", height: "3.33", rx: ".67" }],
+  ],
   /** "Reagir" and the composer's emoji button (our face, never an emoji glyph). */
   smile: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
@@ -252,18 +324,12 @@ export const extraIcons = {
     ["rect", { x: "3.5", y: "3.5", width: "13", height: "13", rx: "3.5" }],
     ["path", { d: "M7.5 7.5h.01M12.5 12.5h.01M12.5 7.5h.01M7.5 12.5h.01" }],
   ],
-  /** Missions: Claude Code works on the computer (a terminal prompt with a small spark). Our own glyph, no logo. */
-  executorClaude: [
-    ["rect", { x: "2.5", y: "5", width: "12.5", height: "11", rx: "2.5" }],
-    ["path", { d: "m5.5 9 2 1.6-2 1.6M9.5 13h2.5" }],
-    ["path", { d: "M16.5 1.8c.3 1.3.7 1.7 2 2-1.3.3-1.7.7-2 2-.3-1.3-.7-1.7-2-2 1.3-.3 1.7-.7 2-2z" }],
-  ],
-  /** Missions: Codex works on the computer (a terminal prompt with a small cube). Our own glyph, no logo. */
-  executorCodex: [
-    ["rect", { x: "2.5", y: "5", width: "12.5", height: "11", rx: "2.5" }],
-    ["path", { d: "m5.5 9 2 1.6-2 1.6M9.5 13h2.5" }],
-    ["path", { d: "M16.5 1.5 18.6 2.7v2.4l-2.1 1.2-2.1-1.2V2.7zM14.4 2.7l2.1 1.2 2.1-1.2M16.5 3.9v2.4" }],
-  ],
+  /** IconesMotor.html: the engines' line icons (`BrainIcon`); missions keep the executor names. */
+  executorClaude: BRAIN_CLAUDE_CODE,
+  executorCodex: BRAIN_CODEX,
+  brainClaudeCode: BRAIN_CLAUDE_CODE,
+  brainCodex: BRAIN_CODEX,
+  brainAgent: BRAIN_AGENT,
   /** NovoAgente.html: sensitive actions always ask for approval. */
   shield: [["path", { d: "M10 3 4 5.5v4.5c0 3.6 2.6 6.4 6 7 3.4-.6 6-3.4 6-7V5.5z" }]],
   /** NovoAgente.html: "Conectar outro app". */

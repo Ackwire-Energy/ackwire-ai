@@ -285,7 +285,7 @@ body[data-window="popover"] {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 8px 10px;
+  padding: 4px 8px 6px 4px;
 }
 .dk-ph__text {
   flex: 1;
@@ -661,7 +661,12 @@ body[data-window="popover"] {
   padding-bottom: 80px;
 }
 .dk-hello__mark {
-  margin-bottom: 22px;
+  margin-bottom: 18px;
+  margin-left: -8px;
+}
+/* The "Pronto" step: this Mac's portrait above the title. */
+.dk-done__mark {
+  margin: -6px 0 10px -6px;
 }
 .dk-hello__acts {
   display: flex;
@@ -843,8 +848,8 @@ body[data-window="popover"] {
 .dk-pnav__who {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 8px 14px;
+  gap: 8px;
+  padding: 4px 8px 10px 2px;
 }
 .dk-pnav__whotext {
   display: flex;

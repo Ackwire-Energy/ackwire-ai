@@ -315,6 +315,7 @@ export function SettingsTab({
                   onChange={can("brain") ? (v) => set("brain", v) : undefined}
                   g={g}
                   apiFields={apiFields}
+                  look={look}
                 />
                 <WasLine changeKey="brain" />
               </>

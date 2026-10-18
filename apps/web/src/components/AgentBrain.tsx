@@ -1,11 +1,15 @@
 import type { Agent, AgentBrain, BrainKind, BrainOption } from "@agenteschat/client";
+import { type EngineKind, engineOfBrain, engineStateOfOption } from "@agenteschat/client/lib/brain";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  type AgentAppearance,
+  BrainIcon,
+  BrainPortrait,
   Button,
+  Chip,
   Dialog,
   DialogFooter,
   Field,
-  Icon,
   type IconName,
   OptionList,
   Select,
@@ -18,35 +22,30 @@ import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type BrainChoice, needsPlanWarning } from "@/lib/agent-edit";
 
+/** Each brain's line icon (telas/IconesMotor.html): the agent itself for the API. */
 const BRAIN_ICON: Record<BrainKind, IconName> = {
-  model: "bolt",
-  claude_code: "executorClaude",
-  codex: "executorCodex",
+  model: "brainAgent",
+  claude_code: "brainClaudeCode",
+  codex: "brainCodex",
 };
-
-/** "Claude Code no mac" (or "… no computador" without one). */
-export function brainName(t: TFunction, kind: BrainKind, computer: string | null | undefined) {
-  if (kind === "model") return t("brain.model");
-  return computer ? t(`brain.${kind}`, { computer }) : t(`brain.${kind}NoComputer`);
-}
 
 /**
  * What thinks for an agent, wherever its model is shown (DM header, profile,
  * cards): "Claude Code · Sonnet no mac", "Codex · GPT-6 Sol", or the API
- * model's label, with the matching mark.
+ * model's label, with the matching mark (`icon` for chips, `kind` for `BrainIcon`).
  */
 export function agentBrainLine(
   t: TFunction,
   agent: Pick<Agent, "brain">,
   apiModelLabel: string,
-): { text: string; icon: IconName } {
+): { text: string; icon: IconName; kind: EngineKind } {
   const b = agent.brain;
-  if (!b || b.kind === "model") return { text: apiModelLabel, icon: BRAIN_ICON.model };
+  if (!b || b.kind === "model") return { text: apiModelLabel, icon: BRAIN_ICON.model, kind: "agent" };
   const model = b.model ?? "";
   const text = b.computer
     ? t(`brain.line.${b.kind}`, { model, computer: b.computer })
     : t(`brain.line.${b.kind}NoComputer`, { model });
-  return { text, icon: BRAIN_ICON[b.kind] };
+  return { text, icon: BRAIN_ICON[b.kind], kind: engineOfBrain(b.kind) };
 }
 
 /** The model's label for a brain ("Opus"), or the value as typed. */
@@ -66,8 +65,9 @@ export function brainSummary(t: TFunction, choice: BrainChoice, options: BrainOp
 
 /**
  * "Quem pensa" in the agent's Configurações (ADR 0032): the model (API), or
- * Claude Code / Codex on its computer, as rows with their mark. Under the
- * chosen row, its settings: the API's model and key (`apiFields`), or a
+ * Claude Code / Codex on its computer, as three cards with their portraits
+ * (telas/IconesMotor.html, the agent's small self in its own look). Under the
+ * cards, the chosen one's settings: the API's model and key (`apiFields`), or a
  * computer brain's model and the fallback to the API. Choosing a plan brain anew
  * asks for the warning to be confirmed first (the plan is personal); the
  * audience is never blocked.
@@ -79,6 +79,7 @@ export function AgentBrainChoice({
   onChange,
   g,
   apiFields,
+  look,
 }: {
   view: AgentBrain;
   value: BrainChoice;
@@ -89,6 +90,8 @@ export function AgentBrainChoice({
   g: ReturnType<typeof agentGrammar>;
   /** Under "Modelo (API)" when chosen: its model and key. */
   apiFields?: ReactNode;
+  /** The agent's look (the draft's), for its small self in the portraits. */
+  look?: AgentAppearance;
 }) {
   const { t } = useTranslation();
   const [asking, setAsking] = useState<"claude_code" | "codex" | null>(null);
@@ -161,22 +164,36 @@ export function AgentBrainChoice({
     <>
       <OptionList
         aria-label={t("brain.title")}
+        layout="cards"
         value={value.brain}
         disabled={!editable}
         onValueChange={choose}
-        options={view.options.map((o) => ({
-          value: o.kind,
-          title: (
-            <>
-              <Icon name={BRAIN_ICON[o.kind]} size={14} />
-              {brainName(t, o.kind, computer)}
-            </>
-          ),
-          tag: o.experimental ? t("brain.testing") : undefined,
-          description: o.available || o.kind === value.brain ? t(`brain.${o.kind}Text`) : reason(o),
-          disabled: !o.available && o.kind !== value.brain,
-          children: o.kind === value.brain ? settings(o) : undefined,
-        }))}
+        options={view.options.map((o) => {
+          const state = engineStateOfOption(o, view.computer);
+          const engine = engineOfBrain(o.kind);
+          return {
+            value: o.kind,
+            leading: <BrainPortrait kind={engine} state={state} agent={look} />,
+            title: o.kind === "model" ? t("brain.model") : t(`brain.card.${o.kind}`),
+            tag: o.experimental ? t("brain.testing") : undefined,
+            description: o.available || o.kind === value.brain ? t(`brain.${o.kind}Text`) : reason(o),
+            foot: (
+              <Chip icon={BRAIN_ICON[o.kind]} lead={<BrainIcon kind={engine} state={state} size={14} />}>
+                {o.kind === "model"
+                  ? t("brain.foot.api")
+                  : !o.available
+                    ? t("brain.foot.unavailable")
+                    : !computer
+                      ? t("brain.foot.noComputer")
+                      : view.computer?.online === false
+                        ? t("brain.foot.offline", { computer })
+                        : computer}
+              </Chip>
+            ),
+            disabled: !o.available && o.kind !== value.brain,
+            children: o.kind === value.brain ? settings(o) : undefined,
+          };
+        })}
       />
 
       <PlanTermsDialog

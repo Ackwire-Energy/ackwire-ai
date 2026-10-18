@@ -335,6 +335,87 @@ textarea.ac-input {
 }
 
 /* Avatar: people are circles, agents are rounded squares with one cut corner */
+/* Computer portrait (IconesComputador.html): pixels scaled by whole numbers, no tile. */
+.ac-computer {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
+}
+/* Engine portrait (IconesMotor.html, direction C): pixels scaled by whole numbers, no tile; off fades to gray. */
+.ac-brain {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
+}
+.ac-brain--off {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+/* Engine line icons (BrainIcon, executor marks): each engine's accent; working writes / looks around. */
+.ac-icon .ac-brain-cc {
+  stroke: #c0603a;
+}
+.ac-icon .ac-brain-cx {
+  stroke: #1d7a82;
+}
+/* The agent's outline in the agents' sky (fixed, like the pixel agents), not the --agent accent token. */
+.ac-icon .ac-brain-body {
+  stroke: #0063d1;
+}
+.ac-icon .ac-brain-eye {
+  fill: #0063d1;
+  stroke: none;
+}
+[data-theme="dark"] .ac-icon .ac-brain-cc {
+  stroke: #e8916b;
+}
+[data-theme="dark"] .ac-icon .ac-brain-cx {
+  stroke: #5cc3bd;
+}
+[data-theme="dark"] .ac-icon .ac-brain-body {
+  stroke: #5aa8ff;
+}
+[data-theme="dark"] .ac-icon .ac-brain-eye {
+  fill: #5aa8ff;
+}
+.ac-brain-icon--off {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-brain-icon--working .ac-brain-cc {
+    stroke-dasharray: 1;
+    animation: ac-brain-write 1.8s linear infinite;
+  }
+  .ac-brain-icon--working .ac-brain-eye {
+    animation: ac-brain-look 3s ease-in-out infinite;
+  }
+}
+@keyframes ac-brain-write {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ac-brain-look {
+  0%,
+  18%,
+  88%,
+  100% {
+    transform: translate(0, 0);
+  }
+  28%,
+  48% {
+    transform: translate(-0.9px, -0.25px);
+  }
+  58%,
+  78% {
+    transform: translate(0.9px, -0.4px);
+  }
+}
+
 .ac-avatar {
   display: inline-grid;
   place-items: center;
@@ -5038,6 +5119,46 @@ a.ac-list__row:focus-visible {
 }
 .ac-optlist--locked .ac-optrow[data-state="checked"]:hover {
   box-shadow: inset 0 0 0 2px var(--ink);
+}
+/* Cards (layout="cards"; telas/IconesMotor.html "Motor"): side by side, illustration on top, radio in the corner. */
+.ac-optlist__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 10px;
+}
+.ac-optlist--cards .ac-optrow {
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  padding: 14px;
+}
+.ac-optlist--cards .ac-optrow__text {
+  flex: none;
+  width: 100%;
+}
+.ac-optlist--cards .ac-optrow__dot--corner {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.ac-optlist--cards .ac-optrow[data-disabled]:not([data-state="checked"]) .ac-optrow__dot--corner {
+  display: none;
+}
+.ac-optrow__foot {
+  display: flex;
+  margin-top: auto;
+  max-width: 100%;
+}
+.ac-optrow__more--cards {
+  padding: 6px 0 0;
+}
+/* Cards keep every illustration in full color (each one is the option's face). */
+.ac-optlist--cards .ac-optrow--lead[data-state="unchecked"] .ac-optrow__lead {
+  opacity: 1;
+  filter: none;
 }
 .ac-autonomy {
   display: block;

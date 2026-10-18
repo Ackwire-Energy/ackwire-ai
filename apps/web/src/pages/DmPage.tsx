@@ -3,7 +3,7 @@ import { keys, useModels } from "@agenteschat/client";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Avatar, Button, Icon } from "@agenteschat/ui";
+import { Avatar, BrainIcon, Button } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -73,7 +73,7 @@ export function DmPage({ target }: { target: DmTarget }) {
               <>
                 {" · "}
                 <span className="channel__brain">
-                  <Icon name={brainLine.icon} size={14} />
+                  <BrainIcon kind={brainLine.kind} size={14} />
                   {brainLine.text}
                 </span>
               </>

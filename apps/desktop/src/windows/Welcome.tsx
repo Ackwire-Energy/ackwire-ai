@@ -14,7 +14,7 @@ import { ControlError } from "../control/client";
 import { type Home, orgName, pairedHomes } from "../control/store";
 import { SITE_URL } from "../control/version";
 import { useOnShown } from "../hooks";
-import { BrandFace, CodeDigits } from "../ui/bits";
+import { BrandFace, CodeDigits, MacPortrait } from "../ui/bits";
 import { useToast } from "../ui/Toast";
 import { baseName, listNames, shortPath } from "../ui/time";
 
@@ -205,7 +205,7 @@ export function Welcome() {
     body = (
       <div className="dk-hello">
         <span className="dk-hello__mark">
-          <BrandFace size="lg" />
+          <MacPortrait state="online" size={144} />
         </span>
         <h1>{t("desktop.welcome.helloTitle")}</h1>
         <p className="dk-lead">{t("desktop.welcome.helloLead")}</p>
@@ -404,6 +404,9 @@ export function Welcome() {
     body = (
       <>
         {steps}
+        <span className="dk-done__mark">
+          <MacPortrait state="online" size={96} />
+        </span>
         <h1>{mode === "org" ? t("desktop.welcome.orgDone", { count }) : t("desktop.welcome.doneTitle")}</h1>
         <p className="dk-lead">{t("desktop.welcome.doneLead")}</p>
         <div className="dk-mini" aria-hidden="true">

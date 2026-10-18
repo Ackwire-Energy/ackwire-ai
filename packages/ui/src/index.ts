@@ -37,6 +37,13 @@ export {
   setGaze,
 } from "./agent/live";
 export {
+  BRAIN_GRID,
+  BRAIN_KINDS,
+  BRAIN_STATES,
+  type BrainAgentLook,
+  drawBrain,
+} from "./brain/portrait.js";
+export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
   AGENT_EYES,
@@ -59,6 +66,14 @@ export {
   AvatarStack,
   initialsOf,
 } from "./components/Avatar";
+export {
+  BRAIN_ICONS,
+  BrainIcon,
+  BrainPortrait,
+  type BrainPortraitKind,
+  type BrainPortraitProps,
+  type BrainPortraitState,
+} from "./components/Brain";
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
 export {
   Checkbox,
@@ -83,6 +98,13 @@ export {
   linkQuery,
   mentionQuery,
 } from "./components/Composer";
+export {
+  ComputerIcon,
+  type ComputerKind,
+  ComputerPortrait,
+  type ComputerPortraitProps,
+  type ComputerState,
+} from "./components/Computer";
 export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";
 export {
   DetailsDialog,
@@ -215,6 +237,7 @@ export {
   toolLevelTones,
 } from "./components/ToolPixels";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
+export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
 export {
   EMOJI_CATEGORIES,

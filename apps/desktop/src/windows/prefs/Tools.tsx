@@ -1,6 +1,6 @@
 import type { RunnerExecutorInfo, RunnerTools } from "@agenteschat/adapters/machine-protocol";
 import type { ControlStatus } from "@agenteschat/adapters/runner-control";
-import { Chip, Icon, type IconName, Switch } from "@agenteschat/ui";
+import { BrainPortrait, type BrainPortraitState, Chip, Icon, type IconName, Switch } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { useSnapshot, useStore } from "../../app";
 import { pairedHomes } from "../../control/store";
@@ -43,6 +43,10 @@ export function Tools() {
       </Chip>
     );
 
+  /** Found and logged in: the engine at rest; not found or logged out: off (IconesMotor.html, Ferramentas). */
+  const engineState = (info: RunnerExecutorInfo | undefined): BrainPortraitState =>
+    info && info.loggedIn !== false ? "idle" : "off";
+
   const logo = (icon: IconName) => (
     <span className="dk-logo">
       <Icon name={icon} size={16} />
@@ -54,8 +58,7 @@ export function Tools() {
       <PrefHead title={t("desktop.prefs.tools.title")} lead={t("desktop.prefs.tools.lead")} />
       <PrefCard>
         <PrefRow
-          top
-          lead={logo("executorClaude")}
+          lead={<BrainPortrait kind="claude_code" state={engineState(executors.claude)} />}
           htmlFor="tool-claude"
           title={
             <>
@@ -73,8 +76,7 @@ export function Tools() {
           }
         />
         <PrefRow
-          top
-          lead={logo("executorCodex")}
+          lead={<BrainPortrait kind="codex" state={engineState(executors.codex)} />}
           htmlFor="tool-codex"
           title={
             <>

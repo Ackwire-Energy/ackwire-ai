@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { type Home, orgName, pairedHomes } from "../../control/store";
+import { macStateOf } from "../../control/tray";
 import { SITE_URL } from "../../control/version";
 import { usePref } from "../../hooks";
-import { AgentFace, ConnectionChip, OrgTile } from "../../ui/bits";
+import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
 import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
@@ -75,6 +76,7 @@ export function General() {
       <CardTitle>{t("desktop.prefs.general.thisMac")}</CardTitle>
       <PrefCard>
         <PrefRow
+          lead={<MacPortrait state={macStateOf(homes)} />}
           title={t("desktop.prefs.general.name")}
           desc={t("desktop.prefs.general.nameDesc")}
           htmlFor="machine-name"

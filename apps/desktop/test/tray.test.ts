@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ControlJob, ControlStatus } from "@agenteschat/adapters/runner-control";
 import { combinedPause, extendPause, pauseUntil } from "../src/control/pause";
-import { type TrayInput, trayStateOf } from "../src/control/tray";
+import { macStateOf, type TrayInput, trayStateOf } from "../src/control/tray";
 
 const status = (over: Partial<ControlStatus> = {}): ControlStatus => ({
   paired: true,
@@ -74,5 +74,14 @@ describe("pause", () => {
         { paused: true, until: null },
       ]),
     ).toEqual({ paused: true, until: null });
+  });
+});
+
+describe("macStateOf", () => {
+  test("paused wins, then online, else offline", () => {
+    expect(macStateOf([home(), home({ paused: { paused: true, until: null } })])).toBe("paused");
+    expect(macStateOf([home({ connection: "offline" }), home()])).toBe("online");
+    expect(macStateOf([home({}, [], false)])).toBe("offline");
+    expect(macStateOf([])).toBe("offline");
   });
 });

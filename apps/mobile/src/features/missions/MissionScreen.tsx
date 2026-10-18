@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ComputerIcon, ComputerPortrait, useComputerKind } from "@/computer/ComputerPortrait";
 import { Button, Card, Chip, Count, fonts, Icon, IconButton, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
@@ -51,6 +52,7 @@ function Mission({ id }: { id: string }) {
   const tasks = useThreadTasks(orgId, m?.threadId);
   const reviews = useMissionReviews(orgId, id);
   const decisions = useMissionDecisions(orgId, id);
+  const computer = useComputerKind(orgId, m?.machine?.id);
 
   if (!m) {
     return (
@@ -131,7 +133,7 @@ function Mission({ id }: { id: string }) {
             <View style={styles.chips}>
               {m.machine ? (
                 <Chip
-                  icon="laptop"
+                  leading={<ComputerIcon kind={computer} size={13} color={c.muted} />}
                   label={t(m.machine.online ? "mobile.mission.computerOn" : "mobile.mission.computerOff", {
                     name: m.machine.name,
                   })}
@@ -178,7 +180,7 @@ function Mission({ id }: { id: string }) {
                   key={s.id}
                   style={[styles.sess, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
                 >
-                  <Tile icon="laptop" />
+                  <ComputerPortrait kind={computer} state={m.machine?.online === false ? "offline" : "online"} />
                   <View style={styles.grow}>
                     <Text variant="body" style={styles.bold} numberOfLines={2}>
                       {s.title}

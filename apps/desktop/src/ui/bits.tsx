@@ -1,5 +1,15 @@
 import type { ControlAgent, ControlStatus } from "@agenteschat/adapters/runner-control";
-import { type AgentState, Avatar, Chip, CountChip, Icon, type IconName, normalizeAppearance } from "@agenteschat/ui";
+import {
+  type AgentState,
+  Avatar,
+  Chip,
+  ComputerPortrait,
+  type ComputerState,
+  CountChip,
+  Icon,
+  type IconName,
+  normalizeAppearance,
+} from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -55,6 +65,11 @@ export function AgentFace({
 /** The app's own mark (the sky agent). */
 export function BrandFace({ size = "sm", state }: { size?: "xs" | "sm" | "md" | "lg" | "xl"; state?: AgentState }) {
   return <Avatar kind="agent" name="agentes" size={size} appearance={{ color: "sky" }} state={state} />;
+}
+
+/** This Mac's portrait (telas/IconesComputador.html): the screen lit, dimmed (paused) or dark (offline). */
+export function MacPortrait({ state, size = 48 }: { state: ComputerState; size?: 48 | 96 | 144 }) {
+  return <ComputerPortrait kind="mac" state={state} size={size} />;
 }
 
 /** The device code, `K7Q·4ZP`, in Doto. */

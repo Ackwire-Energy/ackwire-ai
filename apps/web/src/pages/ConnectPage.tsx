@@ -2,9 +2,9 @@ import type { Machine } from "@agenteschat/client";
 import { ApiError, useConfirmDevice, useDenyDevice, useMachineDevice, useMe } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { formatUserCode, locationText } from "@agenteschat/client/lib/machines";
+import { computerKind, formatUserCode, locationText } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Alert, Button, Card, EmptyState, Field, Icon, Input, Select } from "@agenteschat/ui";
+import { Alert, Button, Card, ComputerPortrait, EmptyState, Field, Input, Select } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -189,9 +189,7 @@ export function ConnectPage({ code }: { code: string }) {
             {formatUserCode(code)}
           </p>
           <div className="connect-page__computer">
-            <span className="machine-row__icon">
-              <Icon name="computer" />
-            </span>
+            <ComputerPortrait className="machine-row__icon" kind={computerKind(request.os)} state="online" />
             <span className="list-col" style={{ minWidth: 0 }}>
               <span className="machine-row__name">{request.name}</span>
               <span className="small muted">

@@ -477,7 +477,8 @@ export const ACCESSORY_PALETTE = {
   M: "#5b6270",
   L: "#3fae6a",
 };
-const CHECK = { c: ["K", "k"], h: ["Y", "y"], s: ["R", "r"], m: ["N", "n"] };
+export const ACCESSORY_CHECK = { c: ["K", "k"], h: ["Y", "y"], s: ["R", "r"], m: ["N", "n"] };
+const CHECK = ACCESSORY_CHECK;
 
 /**
  * Each accessory as rows of palette letters on the body's 16×16 grid: (ox, oy)

@@ -7,8 +7,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "../app";
 import { pairedHomes } from "../control/store";
+import { macStateOf } from "../control/tray";
 import { readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
-import { BrandFace } from "../ui/bits";
+import { MacPortrait } from "../ui/bits";
 import { Activity } from "./prefs/Activity";
 import { Advanced } from "./prefs/Advanced";
 import { Folders } from "./prefs/Folders";
@@ -52,7 +53,7 @@ export function Prefs() {
     <div className="dk-prefs">
       <nav className="dk-pnav" aria-label={t("desktop.prefs.nav.label")}>
         <div className="dk-pnav__who">
-          <BrandFace size="sm" />
+          <MacPortrait state={macStateOf(homes)} />
           <span className="dk-pnav__whotext">
             <b>{machine}</b>
             <small>{t("desktop.orgCount", { count: homes.length })}</small>

@@ -30,35 +30,36 @@ const openMenu = async (trigger: HTMLElement) => {
   return screen().getByRole("menu");
 };
 
-describe("Configurações → Sandbox", () => {
+describe("Configurações → Computadores: the cloud computer", () => {
   const go = async (state = seedState()) => {
-    await renderApp(`/org/${ORG_ID}/settings/sandbox`, { api: createFakeApi(state) });
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api: createFakeApi(state) });
     await settle(8);
     return state;
   };
 
   test("on/off, the internet allowlist with presets, limits and approval; saved explicitly", async () => {
     const state = await go();
-    const card = within(screen().getByRole("region", { name: "PC dos agentes" }));
+    const region = screen().getByRole("region", { name: "Computador na nuvem" });
+    const card = within(region);
     expect(card.getByRole("radio", { name: /Sem internet/ }).getAttribute("aria-checked")).toBe("true");
-    expect(screen().getByRole("region", { name: "PC dos agentes" }).textContent).toContain(
-      "Por padrão, os PCs não acessam a internet.",
-    );
-    // The domain list only for "Só domínios liberados".
-    expect(card.queryByLabelText("Adicionar domínio")).toBeNull();
-    await click(card.getByRole("radio", { name: /Só domínios liberados/ }));
-    expect(card.getByText("Libere pelo menos um domínio, ou escolha sem internet ou internet liberada.")).toBeTruthy();
-    await type(card.getByLabelText("Adicionar domínio"), "não é domínio");
+    expect(region.textContent).toContain("O que o computador na nuvem acessa lá fora.");
+    // Only for the cloud computer: the person's own computers follow the app.
+    expect(card.getByRole("note").textContent).toContain("quem decide o que os agentes podem fazer é o app agentes");
+    // The domain list only for "Só os sites liberados".
+    expect(card.queryByLabelText("Adicionar site")).toBeNull();
+    await click(card.getByRole("radio", { name: /Só os sites liberados/ }));
+    expect(card.getByText("Libere pelo menos um site, ou escolha sem internet ou qualquer site.")).toBeTruthy();
+    await type(card.getByLabelText("Adicionar site"), "não é domínio");
     await click(card.getByRole("button", { name: "Adicionar" }));
     expect(card.getByText("Use um domínio como api.exemplo.com ou *.exemplo.com.")).toBeTruthy();
-    await type(card.getByLabelText("Adicionar domínio"), "*.github.com");
+    await type(card.getByLabelText("Adicionar site"), "*.github.com");
     await click(card.getByRole("button", { name: "Adicionar" }));
     await click(card.getByRole("button", { name: "Pacotes Python" }));
     expect(card.getByRole("button", { name: "Remover pypi.org" })).toBeTruthy();
-    await type(card.getByLabelText("Tempo máximo por comando (segundos)"), "5000");
+    await type(card.getByLabelText("Tempo máximo de cada comando (segundos)"), "5000");
     expect(card.getByText("Use de 5 a 900 segundos.")).toBeTruthy();
     expect(card.getByRole("button", { name: "Salvar" }).hasAttribute("disabled")).toBe(true);
-    await type(card.getByLabelText("Tempo máximo por comando (segundos)"), "300");
+    await type(card.getByLabelText("Tempo máximo de cada comando (segundos)"), "300");
     await click(card.getByLabelText("Pedir aprovação antes de rodar código"));
     await click(card.getByRole("button", { name: "Salvar" }));
     await settle(4);
@@ -70,10 +71,10 @@ describe("Configurações → Sandbox", () => {
     });
   });
 
-  test("every agent's PC with status, and Ligar / Desligar / Apagar in '…'", async () => {
+  test("every agent's cloud computer with status, and Ligar / Desligar / Apagar in '…'", async () => {
     const state = await go();
-    const list = screen().getByRole("region", { name: "PCs dos agentes" });
-    const rows = Array.from(list.querySelectorAll(".computer-row")).map((r) => r.textContent ?? "");
+    const list = screen().getByRole("region", { name: "Qual computador cada agente usa" });
+    const rows = Array.from(list.querySelectorAll(".computers-agent")).map((r) => r.textContent ?? "");
     expect(rows[0]).toContain("Ada");
     expect(rows[0]).toContain("Ligado");
     expect(rows[1]).toContain("Ainda não criado");
@@ -99,19 +100,19 @@ describe("Configurações → Sandbox", () => {
 });
 
 describe("internet mode", () => {
-  test("Internet liberada warns; saving says the running PCs got it", async () => {
+  test("Qualquer site warns; saving says the running cloud computers got it", async () => {
     const state = seedState();
-    await renderApp(`/org/${ORG_ID}/settings/sandbox`, { api: createFakeApi(state) });
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api: createFakeApi(state) });
     await settle(8);
-    const card = within(screen().getByRole("region", { name: "PC dos agentes" }));
-    await click(card.getByRole("radio", { name: /Internet liberada/ }));
-    expect(card.getByRole("note").textContent).toBe(
+    const card = within(screen().getByRole("region", { name: "Computador na nuvem" }));
+    await click(card.getByRole("radio", { name: /Qualquer site/ }));
+    expect(card.getAllByRole("note").map((n) => n.textContent)).toContain(
       "O agente acessa qualquer site. Chaves e segredos continuam fora da máquina.",
     );
     await click(card.getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "sandbox.saveSettings")?.args[1]).toMatchObject({ network: "open" });
-    expect(document.body.textContent).toContain("Os PCs ligados já usam a nova regra de internet.");
+    expect(document.body.textContent).toContain("Os computadores na nuvem ligados já usam a nova regra de internet.");
   });
 });
 

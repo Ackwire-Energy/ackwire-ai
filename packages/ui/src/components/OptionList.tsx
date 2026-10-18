@@ -13,6 +13,8 @@ export interface OptionListItem<V extends string> {
   leading?: ReactNode;
   /** Shown but not choosable now (say why in `description`). */
   disabled?: boolean;
+  /** Cards only: at the bottom of the card (a chip with where it runs). */
+  foot?: ReactNode;
   /** Its settings, under the row while it is the one chosen, aligned with the row's text. */
   children?: ReactNode;
 }
@@ -25,6 +27,12 @@ export interface OptionListProps<V extends string> {
   "aria-labelledby"?: string;
   /** Shown but not changeable (the choice is kept, the others fade). */
   disabled?: boolean;
+  /**
+   * `rows` (default): full-width rows. `cards`: side by side, the illustration
+   * on top (telas/IconesMotor.html: the agent's "Motor"); the chosen card's
+   * settings go under all of them. One column on narrow screens.
+   */
+  layout?: "rows" | "cards";
   className?: string;
 }
 
@@ -40,44 +48,60 @@ export function OptionList<V extends string>({
   onValueChange,
   options,
   disabled,
+  layout = "rows",
   className,
   ...rest
 }: OptionListProps<V>) {
+  const cards = layout === "cards";
+  const item = (o: OptionListItem<V>) => (
+    <RRadioGroup.Item
+      key={o.value}
+      value={o.value}
+      disabled={o.disabled}
+      className={cx("ac-optrow", o.leading ? "ac-optrow--lead" : undefined)}
+    >
+      {o.leading ? (
+        <span className="ac-optrow__lead">{o.leading}</span>
+      ) : (
+        <span className="ac-optrow__dot" aria-hidden="true" />
+      )}
+      {cards && o.leading && <span className="ac-optrow__dot ac-optrow__dot--corner" aria-hidden="true" />}
+      <span className="ac-optrow__text">
+        <span className="ac-optrow__title">
+          {o.title}
+          {o.tag && <span className="ac-optrow__tag">{o.tag}</span>}
+        </span>
+        {o.description && <span className="ac-optrow__desc">{o.description}</span>}
+      </span>
+      {cards && o.foot && <span className="ac-optrow__foot">{o.foot}</span>}
+    </RRadioGroup.Item>
+  );
+  const chosen = options.find((o) => o.value === value);
   return (
     <RRadioGroup.Root
-      className={cx("ac-optlist", disabled && "ac-optlist--locked", className)}
+      className={cx("ac-optlist", cards && "ac-optlist--cards", disabled && "ac-optlist--locked", className)}
       value={value}
       onValueChange={(v) => onValueChange(v as V)}
       disabled={disabled}
-      orientation="vertical"
+      orientation={cards ? undefined : "vertical"}
       loop
       {...rest}
     >
-      {options.map((o) => (
-        <Fragment key={o.value}>
-          <RRadioGroup.Item
-            value={o.value}
-            disabled={o.disabled}
-            className={cx("ac-optrow", o.leading ? "ac-optrow--lead" : undefined)}
-          >
-            {o.leading ? (
-              <span className="ac-optrow__lead">{o.leading}</span>
-            ) : (
-              <span className="ac-optrow__dot" aria-hidden="true" />
+      {cards ? (
+        <>
+          <div className="ac-optlist__cards">{options.map(item)}</div>
+          {chosen?.children && <div className="ac-optrow__more ac-optrow__more--cards">{chosen.children}</div>}
+        </>
+      ) : (
+        options.map((o) => (
+          <Fragment key={o.value}>
+            {item(o)}
+            {o.value === value && o.children && (
+              <div className={cx("ac-optrow__more", o.leading ? "ac-optrow__more--lead" : undefined)}>{o.children}</div>
             )}
-            <span className="ac-optrow__text">
-              <span className="ac-optrow__title">
-                {o.title}
-                {o.tag && <span className="ac-optrow__tag">{o.tag}</span>}
-              </span>
-              {o.description && <span className="ac-optrow__desc">{o.description}</span>}
-            </span>
-          </RRadioGroup.Item>
-          {o.value === value && o.children && (
-            <div className={cx("ac-optrow__more", o.leading ? "ac-optrow__more--lead" : undefined)}>{o.children}</div>
-          )}
-        </Fragment>
-      ))}
+          </Fragment>
+        ))
+      )}
     </RRadioGroup.Root>
   );
 }
