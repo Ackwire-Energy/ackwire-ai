@@ -35,7 +35,7 @@ import {
   BudgetField,
   KeySelect,
   keyOptions,
-  LookPicker,
+  LookField,
   ModelCards,
   ModelCardView,
   NO_OWNER,
@@ -271,8 +271,8 @@ export function SettingsTab({
               <span className="small muted">{t("agent.identityHelp", { handle: agent.handle })}</span>
             </div>
             {can("look") ? (
-              <div className="newag__look agp-look">
-                <LookPicker look={look} onPick={(patch) => set("look", { ...look, ...patch })} />
+              <div className="agp-field">
+                <LookField look={look} name={agent.name} onChange={(next) => set("look", next)} />
                 <WasLine changeKey="look" />
               </div>
             ) : (

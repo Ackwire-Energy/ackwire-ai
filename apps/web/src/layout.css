@@ -9738,3 +9738,89 @@ a.machine-row__name:hover {
     transition: none;
   }
 }
+
+/* ── The agent's look: one row on the page, the choices in a dialog with a big preview ── */
+.look-field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.look-field__avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+.look-field__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.look-dialog__grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.look-dialog__stage {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 14px;
+  border-radius: var(--radius-lg, 16px);
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+  isolation: isolate;
+  text-align: center;
+}
+.look-dialog__sky {
+  position: absolute;
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: 180px;
+  margin: 0;
+  z-index: -1;
+}
+.look-dialog__agent {
+  display: grid;
+  place-items: center;
+  height: 168px;
+}
+.look-dialog__name {
+  font-weight: 650;
+  font-size: 15px;
+  margin-top: 4px;
+}
+.look-dialog__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.look-dialog__choices {
+  min-height: 228px;
+}
+.look-dialog__choices .newag__swatches {
+  gap: 10px;
+}
+.look-dialog__choices .newag__swatch {
+  width: 44px;
+  height: 44px;
+}
+@media (max-width: 640px) {
+  .look-dialog__grid {
+    grid-template-columns: 1fr;
+  }
+  .look-dialog__stage {
+    position: static;
+  }
+  .look-dialog__agent {
+    height: 120px;
+  }
+}

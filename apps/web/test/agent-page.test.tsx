@@ -137,7 +137,10 @@ describe("agent page: who edits what", () => {
     const { state } = await go("?tab=settings", asOwner());
     expect(screen().queryByLabelText("Nome")).toBeNull();
     expect(document.body.textContent).toContain("Você é responsável da Ada");
-    await click(within(screen().getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
+    await click(screen().getByRole("button", { name: "Mudar aparência" }));
+    const look = screen().getByRole("dialog");
+    await click(within(within(look).getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
+    await click(within(look).getByRole("button", { name: "Usar esta aparência" }));
     expect(saveBar()?.textContent).toContain("1 alteração");
     await openTab(/^Instruções/);
     expect(screen().queryByRole("textbox", { name: "Instruções" })).toBeNull();

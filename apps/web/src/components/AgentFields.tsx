@@ -8,13 +8,21 @@ import {
   type AgentAppearance,
   Avatar,
   agentGradient,
+  Button,
+  Dialog,
+  DialogFooter,
+  type Expression,
   Field,
   Icon,
+  prefersReducedMotion,
+  randomAppearance,
+  Segmented,
   Select,
   type SelectOption,
+  SkyGlow,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { QUICK_BUDGETS, readBudget } from "@/lib/new-agent";
@@ -78,8 +86,10 @@ type LookPatch = Partial<Required<AgentAppearance>>;
 /** A model's cost without money (members and owners): cheapest, mid, most expensive. */
 const TIER_KEY = { 1: "agentPage.tier.1", 2: "agentPage.tier.2", 3: "agentPage.tier.3" } as const;
 
+type LookPickProps = { look: Required<AgentAppearance>; onPick: (patch: LookPatch) => void };
+
 /** Color swatches, eyes and an accessory, each a live symbol. `onPick` gets what changed. */
-export function LookPicker({ look, onPick }: { look: Required<AgentAppearance>; onPick: (patch: LookPatch) => void }) {
+export function LookPicker({ look, onPick }: LookPickProps) {
   const { t } = useTranslation();
   return (
     <>
@@ -87,71 +97,231 @@ export function LookPicker({ look, onPick }: { look: Required<AgentAppearance>; 
         <span className="newag__label">
           {t("look.color")} <span className="newag__opt-label">{t(`look.colors.${look.color}`)}</span>
         </span>
-        {/* biome-ignore lint/a11y/useSemanticElements: pressable swatches, not a native fieldset */}
-        <div className="newag__swatches" role="group" aria-label={t("look.color")}>
-          {AGENT_COLORS.map((c) => {
-            const [top, bottom] = agentGradient(c);
-            return (
-              <button
-                key={c}
-                type="button"
-                className="newag__swatch"
-                aria-label={t(`look.colors.${c}`)}
-                aria-pressed={look.color === c}
-                style={{ "--a": top, "--b": bottom } as CSSProperties}
-                onClick={() => onPick({ color: c })}
-              />
-            );
-          })}
-        </div>
+        <ColorChoices look={look} onPick={onPick} />
       </div>
       <div className="newag__look-row">
         <span className="newag__label">{t("look.eyes")}</span>
-        {/* biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset */}
-        <div className="newag__opts" role="group" aria-label={t("look.eyes")}>
-          {AGENT_EYES.map((e) => (
-            <button
-              key={e}
-              type="button"
-              className="newag__opt"
-              aria-pressed={look.eyes === e}
-              onClick={() => onPick({ eyes: e })}
-            >
-              <span className="newag__stage">
-                <AgentAvatar name={t(`look.eyesNames.${e}`)} appearance={{ ...look, eyes: e, accessory: "none" }} />
-              </span>
-              {t(`look.eyesNames.${e}`)}
-            </button>
-          ))}
-        </div>
+        <EyesChoices look={look} onPick={onPick} />
       </div>
       <div className="newag__look-row">
         <span className="newag__label">
           {t("look.accessory")} <span className="newag__opt-label">{t("newAgent.optional")}</span>
         </span>
-        {/* biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset */}
-        <div className="newag__opts newag__opts--acc" role="group" aria-label={t("look.accessory")}>
-          {AGENT_ACCESSORIES.map((a) => (
-            <button
-              key={a}
-              type="button"
-              className="newag__opt"
-              aria-pressed={look.accessory === a}
-              onClick={() => onPick({ accessory: a })}
-            >
-              <span className="newag__stage">
-                {a === "none" ? (
-                  <Icon name="block" />
-                ) : (
-                  <AgentAvatar size="sm" name={t(`look.accessories.${a}`)} appearance={{ ...look, accessory: a }} />
-                )}
-              </span>
-              {t(`look.accessories.${a}`)}
-            </button>
-          ))}
-        </div>
+        <AccessoryChoices look={look} onPick={onPick} />
       </div>
     </>
+  );
+}
+
+function ColorChoices({ look, onPick }: LookPickProps) {
+  const { t } = useTranslation();
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: pressable swatches, not a native fieldset
+    <div className="newag__swatches" role="group" aria-label={t("look.color")}>
+      {AGENT_COLORS.map((c) => {
+        const [top, bottom] = agentGradient(c);
+        return (
+          <button
+            key={c}
+            type="button"
+            className="newag__swatch"
+            aria-label={t(`look.colors.${c}`)}
+            title={t(`look.colors.${c}`)}
+            aria-pressed={look.color === c}
+            style={{ "--a": top, "--b": bottom } as CSSProperties}
+            onClick={() => onPick({ color: c })}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function EyesChoices({ look, onPick }: LookPickProps) {
+  const { t } = useTranslation();
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset
+    <div className="newag__opts" role="group" aria-label={t("look.eyes")}>
+      {AGENT_EYES.map((e) => (
+        <button
+          key={e}
+          type="button"
+          className="newag__opt"
+          aria-pressed={look.eyes === e}
+          onClick={() => onPick({ eyes: e })}
+        >
+          <span className="newag__stage">
+            <AgentAvatar name={t(`look.eyesNames.${e}`)} appearance={{ ...look, eyes: e, accessory: "none" }} />
+          </span>
+          {t(`look.eyesNames.${e}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AccessoryChoices({ look, onPick }: LookPickProps) {
+  const { t } = useTranslation();
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset
+    <div className="newag__opts newag__opts--acc" role="group" aria-label={t("look.accessory")}>
+      {AGENT_ACCESSORIES.map((a) => (
+        <button
+          key={a}
+          type="button"
+          className="newag__opt"
+          aria-pressed={look.accessory === a}
+          onClick={() => onPick({ accessory: a })}
+        >
+          <span className="newag__stage">
+            {a === "none" ? (
+              <Icon name="block" />
+            ) : (
+              <AgentAvatar size="sm" name={t(`look.accessories.${a}`)} appearance={{ ...look, accessory: a }} />
+            )}
+          </span>
+          {t(`look.accessories.${a}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+type LookPart = "color" | "eyes" | "accessory";
+
+/** "Âmbar · Redondo · Gorro": the look in words (no accessory, no third part). */
+export function lookSummary(t: TFunction, look: Required<AgentAppearance>) {
+  return [
+    t(`look.colors.${look.color}`),
+    t(`look.eyesNames.${look.eyes}`),
+    ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
+  ].join(" · ");
+}
+
+/**
+ * The look as one row (the live agent, the look in words, "Mudar aparência"); the choices live in a
+ * dialog with a big preview, so the settings page stays short.
+ */
+export function LookField({
+  look,
+  name,
+  onChange,
+}: {
+  look: Required<AgentAppearance>;
+  name: string;
+  onChange: (look: Required<AgentAppearance>) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="look-field">
+      <span className="look-field__avatar">
+        <AgentAvatar size="lg" name={name} appearance={look} />
+      </span>
+      <span className="look-field__text">
+        <span className="newag__label">{t("agentPage.fields.look")}</span>
+        <span className="small muted">{lookSummary(t, look)}</span>
+      </span>
+      <Button size="sm" icon="agent" onClick={() => setOpen(true)}>
+        {t("look.change")}
+      </Button>
+      {open && <LookDialog look={look} name={name} onClose={() => setOpen(false)} onSave={onChange} />}
+    </div>
+  );
+}
+
+/** Pick color, eyes and accessory with a big live preview that reacts; "Usar" applies, Cancelar drops it. */
+export function LookDialog({
+  look,
+  name,
+  onClose,
+  onSave,
+}: {
+  look: Required<AgentAppearance>;
+  name: string;
+  onClose: () => void;
+  onSave: (look: Required<AgentAppearance>) => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(look);
+  const [part, setPart] = useState<LookPart>("color");
+  const [face, setFace] = useState<Expression | undefined>(undefined);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const react = (expression: Expression, ms: number) => {
+    if (prefersReducedMotion()) return;
+    setFace(expression);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setFace(undefined), ms);
+  };
+  const pick = (patch: LookPatch) => {
+    setDraft((d) => ({ ...d, ...patch }));
+    if (patch.color) react("happy", 1100);
+    else if (patch.eyes) react("wink", 700);
+    else if (patch.accessory && patch.accessory !== "none") react("happy", 900);
+  };
+  const changed = draft.color !== look.color || draft.eyes !== look.eyes || draft.accessory !== look.accessory;
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={t("look.dialogTitle", { name })}
+      closeLabel={t("common.close")}
+      width={760}
+      className="look-dialog"
+    >
+      <div className="look-dialog__grid">
+        <div className="look-dialog__stage">
+          <SkyGlow color={draft.color} surface="--surface-raised" className="look-dialog__sky" />
+          <span className="look-dialog__agent">
+            <AgentAvatar size="xl" name={name} appearance={draft} expression={face} />
+          </span>
+          <b className="look-dialog__name">{name}</b>
+          <span className="small muted">{lookSummary(t, draft)}</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="shuffle"
+            onClick={() => {
+              setDraft((d) => ({ ...d, ...randomAppearance(d) }) as Required<AgentAppearance>);
+              react("dizzy", 1000);
+            }}
+          >
+            {t("newAgent.shuffle")}
+          </Button>
+        </div>
+        <div className="look-dialog__panel">
+          <Segmented
+            label={t("look.parts")}
+            value={part}
+            onValueChange={setPart}
+            options={[
+              { value: "color", label: t("look.color") },
+              { value: "eyes", label: t("look.eyes") },
+              { value: "accessory", label: t("look.accessory") },
+            ]}
+          />
+          <div className="look-dialog__choices newag__look">
+            {part === "color" && <ColorChoices look={draft} onPick={pick} />}
+            {part === "eyes" && <EyesChoices look={draft} onPick={pick} />}
+            {part === "accessory" && <AccessoryChoices look={draft} onPick={pick} />}
+          </div>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
+        <Button
+          variant="primary"
+          disabled={!changed}
+          onClick={() => {
+            onSave(draft);
+            onClose();
+          }}
+        >
+          {t("look.use")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 

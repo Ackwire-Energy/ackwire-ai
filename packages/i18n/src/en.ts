@@ -3815,6 +3815,10 @@ export const en: Translations = {
     removed: "Logo removed.",
   },
   look: {
+    change: "Change look",
+    dialogTitle: "{{name}}'s look",
+    parts: "Look parts",
+    use: "Use this look",
     color: "Color",
     eyes: "Eyes",
     accessory: "Accessory",

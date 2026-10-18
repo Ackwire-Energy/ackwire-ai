@@ -3823,6 +3823,10 @@ export const ptBR = {
     removed: "Logo removido.",
   },
   look: {
+    change: "Mudar aparência",
+    dialogTitle: "Aparência de {{name}}",
+    parts: "Partes da aparência",
+    use: "Usar esta aparência",
     color: "Cor",
     eyes: "Olhos",
     accessory: "Acessório",
