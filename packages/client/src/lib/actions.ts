@@ -44,3 +44,79 @@ export const actionTextKey = (a: Pick<AgentAction, "kind">) => `agentActions.${a
 
 /** The i18n key of an undo/redo error code (`action.changed_since` → `agentActions.errors.changed_since`). */
 export const actionErrorKey = (code: string) => `agentActions.errors.${code.replace(/^action\./, "")}`;
+
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
+
+function joinList(items: string[], and: string) {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")}${and}${items[items.length - 1]}`;
+}
+
+/**
+ * The values (and i18next `context`) for `t(actionTextKey(a), …)`: issue
+ * number and title, the changed fields in words, the assignee ("você" when it
+ * is the viewer), the routine's name… The sentence marks the target with
+ * `<b>…</b>` (render it as the link to the issue, page, routine…).
+ */
+export function actionTextValues(
+  a: Pick<AgentAction, "kind" | "target" | "params">,
+  t: Translate,
+  viewerUserId?: string,
+): Record<string, string> {
+  const p = a.params;
+  const fields = Array.isArray(p.fields) ? p.fields : [];
+  const fieldWords = (group: "issueFields" | "routineFields") =>
+    fields.length
+      ? joinList(
+          fields.map((f) => t(`agentActions.${group}.${f}`, { defaultValue: f })),
+          t("agentActions.and"),
+        )
+      : t("agentActions.someFields");
+  const title = str(p.title) || a.target.title || "";
+  switch (a.kind) {
+    case "issue.created":
+    case "issue.updated":
+    case "issue.assigned": {
+      const v: Record<string, string> = { number: str(p.number) || str(a.target.number), title };
+      if (a.kind === "issue.updated") {
+        v.fields = fieldWords("issueFields");
+        if (fields.length === 1 && fields[0] === "status" && p.status) {
+          v.context = "status";
+          v.status = t(`issues.status.${str(p.status)}`, { defaultValue: str(p.status) }).toLowerCase();
+        } else if (fields.length === 1 && fields[0] === "priority" && p.priority) {
+          v.context = "priority";
+          v.priority = t(`issues.priority.${str(p.priority)}`, { defaultValue: str(p.priority) }).toLowerCase();
+        }
+      }
+      const assigned = a.kind === "issue.assigned" || fields.includes("assignee");
+      if (assigned) {
+        if (p.assigneeIsSelf === true && a.kind === "issue.assigned") v.context = "self";
+        const isViewer = viewerUserId && p.assigneeType === "user" && p.assigneeId === viewerUserId;
+        v.assignee = isViewer ? t("agentActions.you") : str(p.assigneeName) || t("agentActions.someone");
+      }
+      return v;
+    }
+    case "memory.saved":
+    case "memory.updated":
+    case "memory.forgotten":
+      return { text: str(p.text) };
+    case "routine.created":
+      return { name: str(p.name) || title, schedule: str(p.schedule) };
+    case "routine.updated": {
+      const v: Record<string, string> = { name: str(p.name) || title, fields: fieldWords("routineFields") };
+      if (fields.length === 1 && fields[0] === "active") v.context = p.active ? "resumed" : "paused";
+      return v;
+    }
+    case "channel.agent_added":
+      return { agentName: str(p.agentName), channel: str(p.channel) || a.target.title || "" };
+    case "wiki.page_created":
+    case "wiki.page_edited":
+      return { title };
+    case "thread.renamed":
+      return { from: str(p.from), to: str(p.to) || title };
+    case "thread.closed":
+      return { title };
+  }
+}

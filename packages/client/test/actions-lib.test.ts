@@ -4,6 +4,7 @@ import {
   actionErrorKey,
   actionPhase,
   actionTextKey,
+  actionTextValues,
   actionTimeLeft,
   canUndoAction,
   formatTimeLeft,
@@ -52,5 +53,58 @@ describe("receipts", () => {
     expect(undoableNow(list, now).map((a) => a.id)).toEqual(["a1"]);
     expect(actionTextKey(action())).toBe("agentActions.issue.created");
     expect(actionErrorKey("action.changed_since")).toBe("agentActions.errors.changed_since");
+  });
+});
+
+describe("receipt sentence values", () => {
+  const t = (key: string, o?: Record<string, unknown>) =>
+    key === "agentActions.and"
+      ? " e "
+      : key.startsWith("agentActions.")
+        ? (key.split(".").pop() ?? key)
+        : String(o?.defaultValue ?? key);
+
+  test("issue: number and title; one field picks a context", () => {
+    expect(actionTextValues(action(), t)).toEqual({ number: "23", title: "Prompt" });
+    const status = action({
+      kind: "issue.updated",
+      params: { number: 23, title: "P", fields: ["status"], status: "done" },
+    });
+    expect(actionTextValues(status, t)).toMatchObject({ context: "status", status: "done" });
+    const two = action({ kind: "issue.updated", params: { number: 23, title: "P", fields: ["title", "labels"] } });
+    expect(actionTextValues(two, t).fields).toBe("title e labels");
+    expect(actionTextValues(two, t).context).toBeUndefined();
+  });
+
+  test("assigned: to the agent itself, or to the viewer", () => {
+    const self = action({ kind: "issue.assigned", params: { number: 2, title: "T", assigneeIsSelf: true } });
+    expect(actionTextValues(self, t).context).toBe("self");
+    const viewer = action({
+      kind: "issue.assigned",
+      params: { number: 2, title: "T", assigneeType: "user", assigneeId: "u9", assigneeName: "Bia" },
+    });
+    expect(actionTextValues(viewer, t, "u9").assignee).toBe("you");
+    expect(actionTextValues(viewer, t, "u1").assignee).toBe("Bia");
+  });
+
+  test("routine paused, channel, thread", () => {
+    const paused = action({
+      kind: "routine.updated",
+      target: { type: "routine", id: "r" },
+      params: { name: "Daily", fields: ["active"], active: false },
+    });
+    expect(actionTextValues(paused, t)).toMatchObject({ name: "Daily", context: "paused" });
+    const added = action({
+      kind: "channel.agent_added",
+      target: { type: "channel", id: "c", title: "tech" },
+      params: { agentName: "Theo" },
+    });
+    expect(actionTextValues(added, t)).toEqual({ agentName: "Theo", channel: "tech" });
+    const renamed = action({
+      kind: "thread.renamed",
+      target: { type: "thread", id: "t" },
+      params: { from: "a", to: "b" },
+    });
+    expect(actionTextValues(renamed, t).to).toBe("b");
   });
 });
