@@ -58,13 +58,11 @@ describe("the agent's look", () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api: createFakeApi(state) });
     await settle(8);
-    // The choices live in a dialog with a big preview; Cor, Olhos and Acessório are tabs there.
+    // The choices live in a dialog with a big preview; Cor, Olhos and Acessório all in view there.
     await click(screen().getByRole("button", { name: "Mudar aparência" }));
     const look = screen().getByRole("dialog");
     await click(within(within(look).getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
-    await click(within(look).getByRole("radio", { name: "Olhos" }));
     await click(within(within(look).getByRole("group", { name: "Olhos" })).getByRole("button", { name: /Felizes/ }));
-    await click(within(look).getByRole("radio", { name: "Acessório" }));
     await click(within(within(look).getByRole("group", { name: "Acessório" })).getByRole("button", { name: /Coroa/ }));
     await click(within(look).getByRole("button", { name: "Usar esta aparência" }));
     // The agent on the cover is the draft.

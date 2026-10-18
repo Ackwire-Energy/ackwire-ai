@@ -16,7 +16,6 @@ import {
   Icon,
   prefersReducedMotion,
   randomAppearance,
-  Segmented,
   Select,
   type SelectOption,
   SkyGlow,
@@ -187,8 +186,6 @@ function AccessoryChoices({ look, onPick }: LookPickProps) {
   );
 }
 
-type LookPart = "color" | "eyes" | "accessory";
-
 /** "Âmbar · Redondo · Gorro": the look in words (no accessory, no third part). */
 export function lookSummary(t: TFunction, look: Required<AgentAppearance>) {
   return [
@@ -244,7 +241,6 @@ export function LookDialog({
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(look);
-  const [part, setPart] = useState<LookPart>("color");
   const [face, setFace] = useState<Expression | undefined>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -267,46 +263,32 @@ export function LookDialog({
       onOpenChange={(o) => !o && onClose()}
       title={t("look.dialogTitle", { name })}
       closeLabel={t("common.close")}
-      width={760}
+      width={560}
       className="look-dialog"
     >
-      <div className="look-dialog__grid">
-        <div className="look-dialog__stage">
-          <SkyGlow color={draft.color} surface="--surface-raised" className="look-dialog__sky" />
-          <span className="look-dialog__agent">
-            <AgentAvatar size="xl" name={name} appearance={draft} expression={face} />
-          </span>
-          <b className="look-dialog__name">{name}</b>
+      {/* One column: the agent big on its sky, then every choice in view (no tabs), each one live. */}
+      <div className="look-dialog__hero">
+        <SkyGlow color={draft.color} surface="--surface-raised" className="look-dialog__sky" />
+        <AgentAvatar size="xl" name={name} appearance={draft} expression={face} />
+      </div>
+      <div className="look-dialog__who">
+        <span className="look-dialog__id">
+          <b>{name}</b>
           <span className="small muted">{lookSummary(t, draft)}</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="shuffle"
-            onClick={() => {
-              setDraft((d) => ({ ...d, ...randomAppearance(d) }) as Required<AgentAppearance>);
-              react("dizzy", 1000);
-            }}
-          >
-            {t("newAgent.shuffle")}
-          </Button>
-        </div>
-        <div className="look-dialog__panel">
-          <Segmented
-            label={t("look.parts")}
-            value={part}
-            onValueChange={setPart}
-            options={[
-              { value: "color", label: t("look.color") },
-              { value: "eyes", label: t("look.eyes") },
-              { value: "accessory", label: t("look.accessory") },
-            ]}
-          />
-          <div className="look-dialog__choices newag__look">
-            {part === "color" && <ColorChoices look={draft} onPick={pick} />}
-            {part === "eyes" && <EyesChoices look={draft} onPick={pick} />}
-            {part === "accessory" && <AccessoryChoices look={draft} onPick={pick} />}
-          </div>
-        </div>
+        </span>
+        <Button
+          size="sm"
+          icon="shuffle"
+          onClick={() => {
+            setDraft((d) => ({ ...d, ...randomAppearance(d) }) as Required<AgentAppearance>);
+            react("dizzy", 1000);
+          }}
+        >
+          {t("newAgent.shuffle")}
+        </Button>
+      </div>
+      <div className="look-dialog__rows newag__look">
+        <LookPicker look={draft} onPick={pick} />
       </div>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
