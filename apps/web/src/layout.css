@@ -6303,7 +6303,23 @@ button.live-call__head:hover {
 
 /* Settings → Computadores. */
 .machine-row {
-  align-items: flex-start;
+  align-items: center;
+  gap: 14px;
+}
+.machine-row__main {
+  flex: 1 1 260px;
+  min-width: 0;
+  gap: 4px;
+}
+.machine-row__agents {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .machine-row__agents {
+    display: none;
+  }
 }
 .machine-row__icon {
   display: inline-flex;
@@ -6409,9 +6425,31 @@ a.machine-row__name:hover {
   align-self: flex-start;
 }
 .machine-page__head {
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
   flex-wrap: nowrap;
+}
+.machine-page__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px 14px 14px 5px;
+}
+.machine-page__title {
+  flex: 1 1 260px;
+  min-width: 0;
+  gap: 6px;
+}
+/* The facts line up under the name, past the icon (48px + the 14px gap). */
+.machine-page__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 62px;
+}
+@media (max-width: 640px) {
+  .machine-page__facts {
+    padding-left: 0;
+  }
 }
 .machine-page__agent {
   align-items: center;

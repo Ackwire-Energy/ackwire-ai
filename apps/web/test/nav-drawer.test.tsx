@@ -92,9 +92,9 @@ describe("the sidebar on a phone (drawer)", () => {
     onPhone();
     const { router } = await go(`c/${GENERAL_ID}`);
     await click(menuButton());
-    await click(within(nav()).getByRole("link", { name: "Membros" }));
+    await click(within(nav()).getByRole("link", { name: "Drive" }));
     await settle(6);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/members`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
     expect(nav().getAttribute("data-open")).toBe("false");
     // Not a chat page: the shell's bar carries the menu, the workspace and search.
     const bar = document.querySelector(".shell__bar") as HTMLElement;
@@ -104,10 +104,10 @@ describe("the sidebar on a phone (drawer)", () => {
 
   test("a link to the page already open closes it too", async () => {
     onPhone();
-    await go("members");
+    await go("drive");
     await click(menuButton());
     expect(nav().getAttribute("data-open")).toBe("true");
-    await click(within(nav()).getByRole("link", { name: "Membros" }));
+    await click(within(nav()).getByRole("link", { name: "Drive" }));
     await settle();
     expect(nav().getAttribute("data-open")).toBe("false");
   });

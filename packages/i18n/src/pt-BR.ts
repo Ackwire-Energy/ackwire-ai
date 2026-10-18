@@ -5135,6 +5135,7 @@ export const ptBR = {
     seenNow: "conectado agora",
     seen: "visto {{when}}",
     neverSeen: "ainda não conectou",
+    versionShort: "versão {{version}}",
     details: "{{os}} · {{arch}} · versão {{version}} · {{seen}}",
     open: "Abrir {{name}}",
     pairedBy: "Conectado por {{name}}",

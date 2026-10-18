@@ -263,13 +263,19 @@ function MachineRow({
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const facts = [
+    t(`machines.os.${osOf(m.os)}`),
+    m.runnerVersion ? t("machines.versionShort", { version: m.runnerVersion }) : null,
+    seenText(t, i18n.language, m),
+    m.pairedBy ? t("machines.pairedBy", { name: m.pairedBy.name }) : null,
+  ].filter(Boolean);
   return (
     <div className="ac-list__row machine-row">
-      <span className="machine-row__icon">
+      <span className="machine-row__icon machine-page__icon">
         <Icon name="computer" />
       </span>
-      <span className="list-col" style={{ flex: "1 1 260px", minWidth: 0 }}>
-        <span className="row" style={{ gap: 8, alignItems: "center" }}>
+      <span className="list-col machine-row__main">
+        <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Link
             to="/org/$orgId/settings/computers/$machineId"
             params={{ orgId: org.id, machineId: m.id }}
@@ -282,29 +288,26 @@ function MachineRow({
           <PausedChip paused={m.paused} />
           {!m.execAllowed && <Chip icon="block">{t("machines.execOff")}</Chip>}
         </span>
-        <span className="small muted">
-          {t("machines.details", {
-            os: t(`machines.os.${osOf(m.os)}`),
-            arch: m.arch,
-            version: m.runnerVersion,
-            seen: seenText(t, i18n.language, m),
-          })}
-        </span>
-        <span className="small muted">
-          {m.pairedBy ? `${t("machines.pairedBy", { name: m.pairedBy.name })} · ` : ""}
-          {m.agents.length > 0
-            ? t("machines.usedBy", {
-                names: joinNames(
-                  m.agents.map((a) => a.name),
-                  t("newAgent.and"),
-                ),
-              })
-            : t("machines.noAgents")}
-        </span>
-        {m.workspace && (
-          <span className="small muted machine-row__workspace">
-            {t("machines.workspace")} <code>{m.workspace}</code>
+        <span className="small muted">{facts.join(" · ")}</span>
+      </span>
+      <span className="machine-row__agents">
+        {m.agents.length > 0 ? (
+          <span
+            className="row"
+            style={{ gap: 4 }}
+            title={t("machines.usedBy", {
+              names: joinNames(
+                m.agents.map((a) => a.name),
+                t("newAgent.and"),
+              ),
+            })}
+          >
+            {m.agents.slice(0, 4).map((a) => (
+              <AgentAvatar key={a.id} agentId={a.id} size="sm" name={a.name} />
+            ))}
           </span>
+        ) : (
+          <span className="small muted">{t("machines.noAgents")}</span>
         )}
       </span>
       {m.canManage && <MachineMenu machine={m} onRename={onRename} onRemove={onRemove} />}
@@ -753,14 +756,14 @@ export function MachinePage({ machineId }: { machineId: string }) {
       {back}
       <Card aria-labelledby="sec-machine">
         <div className="row machine-page__head">
-          <span className="machine-row__icon">
+          <span className="machine-row__icon machine-page__icon">
             <Icon name="computer" />
           </span>
-          <span className="list-col" style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <span className="list-col machine-page__title">
             <h2 id="sec-machine" className="ac-card__title">
               {m.name}
             </h2>
-            <span className="row" style={{ gap: 6, alignItems: "center" }}>
+            <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <MachineChip online={m.online} />
               <PausedChip paused={m.paused} />
               {m.pairedBy && <Chip icon="person">{t("machines.pairedBy", { name: m.pairedBy.name })}</Chip>}
@@ -768,20 +771,22 @@ export function MachinePage({ machineId }: { machineId: string }) {
           </span>
           {m.canManage && <MachineMenu machine={m} onRename={() => setRenaming(m)} onRemove={() => setRemoving(m)} />}
         </div>
-        <span className="small muted">
-          {t("machines.details", {
-            os: t(`machines.os.${osOf(m.os)}`),
-            arch: m.arch,
-            version: m.runnerVersion,
-            seen: seenText(t, i18n.language, m),
-          })}
-        </span>
-        {paused && <span className="small muted">{t("machines.pausedHint")}</span>}
-        {m.workspace && (
-          <span className="small muted machine-row__workspace">
-            {t("machines.workspace")} <code>{m.workspace}</code>
+        <div className="machine-page__facts">
+          <span className="small muted">
+            {t("machines.details", {
+              os: t(`machines.os.${osOf(m.os)}`),
+              arch: m.arch,
+              version: m.runnerVersion,
+              seen: seenText(t, i18n.language, m),
+            })}
           </span>
-        )}
+          {paused && <span className="small muted">{t("machines.pausedHint")}</span>}
+          {m.workspace && (
+            <span className="small muted machine-row__workspace">
+              {t("machines.workspace")} <code>{m.workspace}</code>
+            </span>
+          )}
+        </div>
         {m.agents.length > 0 && (
           <div className="stack-4" style={{ gap: 6 }}>
             <span className="newag__label">{t("machines.page.agents")}</span>

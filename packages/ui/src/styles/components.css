@@ -4606,6 +4606,14 @@ a.ac-list__row:focus-visible {
   border: 0;
   padding-top: 8px;
 }
+/* The surface the sky glow fades into: the page, or the card it sits in (no visible box). */
+.ac-empty {
+  --empty-surface: var(--bg);
+}
+.ac-card .ac-empty,
+.ac-dialog .ac-empty {
+  --empty-surface: var(--surface-raised);
+}
 .ac-empty__sky {
   width: min(320px, 100%);
   height: 140px;

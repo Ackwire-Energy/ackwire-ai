@@ -69,7 +69,7 @@ export interface EmptyStateProps {
 export function EmptyState({ icon, title, children, actions, className, sky }: EmptyStateProps) {
   return (
     <div className={cx("ac-empty", sky && "ac-empty--sky", className)}>
-      {sky && <SkyGlow className="ac-empty__sky" />}
+      {sky && <SkyGlow className="ac-empty__sky" surface="--empty-surface" />}
       {icon && !sky && (
         <span className="ac-empty__icon">
           <Icon name={icon} />

@@ -306,9 +306,9 @@ describe("Configurações → Computadores", () => {
     const row = document.querySelector(".machine-row") as HTMLElement;
     expect(row.textContent).toContain("Escritório");
     expect(row.textContent).toContain("Online");
-    expect(row.textContent).toContain("Linux · x64 · versão 0.1.0 · conectado agora");
-    expect(row.textContent).toContain("Conectado por Walter");
-    expect(row.textContent).toContain("/home/runner/agentes");
+    expect(row.textContent).toContain("Linux · versão 0.1.0 · conectado agora · Conectado por Walter");
+    // The folder is on the computer's page, not in the list.
+    expect(row.textContent).not.toContain("/home/runner/agentes");
 
     // Goes offline: the chip follows the event, no refetch needed.
     await act(async () => socket.push(orgEvent({ type: "machine.status", machineId: m.id, online: false })));
@@ -343,7 +343,7 @@ describe("Configurações → Computadores", () => {
     const row = document.querySelector(".machine-row") as HTMLElement;
     expect(row.textContent).toContain("Comandos desligados");
     expect(row.textContent).toContain("ainda não conectou");
-    expect(row.textContent).toContain("Usado por Ada");
+    expect(row.querySelector(".machine-row__agents [title='Usado por Ada']")).not.toBeNull();
 
     let menu = await openMenu(within(row).getByRole("button", { name: "Ações de Notebook" }));
     await click(within(menu).getByRole("menuitem", { name: "Renomear" }));

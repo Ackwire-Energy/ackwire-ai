@@ -306,10 +306,6 @@ export function Sidebar() {
             <Icon name="drive" />
             <span className="sidebar__item-label">{t("shell.drive")}</span>
           </Link>
-          <Link to="/org/$orgId/members" params={{ orgId }} className="sidebar__item" title={t("shell.members")}>
-            <Icon name="members" />
-            <span className="sidebar__item-label">{t("shell.members")}</span>
-          </Link>
         </div>
 
         <div className="sidebar__group">

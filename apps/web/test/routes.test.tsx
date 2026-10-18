@@ -36,8 +36,8 @@ describe("route guards", () => {
   });
 
   test("/login when already signed in goes to the redirect target", async () => {
-    const { router } = await renderApp(`/login?redirect=/org/${ORG_ID}/members`, { api: createFakeApi() });
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/members`);
+    const { router } = await renderApp(`/login?redirect=/org/${ORG_ID}/drive`, { api: createFakeApi() });
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
   });
 
   test("open redirects are dropped", async () => {
@@ -48,7 +48,7 @@ describe("route guards", () => {
   });
 
   test("an organization you're not in shows a designed state, not a crash", async () => {
-    await renderApp("/org/someone-else/members", { api: createFakeApi() });
+    await renderApp("/org/someone-else/drive", { api: createFakeApi() });
     expect(screen().getByRole("heading", { name: "Você não faz parte desta organização" })).toBeTruthy();
   });
 

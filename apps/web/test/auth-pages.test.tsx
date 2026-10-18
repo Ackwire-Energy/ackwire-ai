@@ -34,7 +34,7 @@ describe("Entrar", () => {
     const state = seedState({ me: null });
     const signedIn = seedState().me;
     const { auth } = createFakeAuth({ onSignIn: () => (state.me = signedIn) });
-    const { router } = await renderApp(`/login?redirect=/org/${ORG_ID}/members`, { api: createFakeApi(state), auth });
+    const { router } = await renderApp(`/login?redirect=/org/${ORG_ID}/drive`, { api: createFakeApi(state), auth });
     // auth-config of the fake: GitHub only, sign-up open.
     expect(screen().queryByRole("button", { name: "Continuar com Google" })).toBeNull();
     expect(screen().getByRole("button", { name: "Continuar com GitHub" })).toBeTruthy();
@@ -43,7 +43,7 @@ describe("Entrar", () => {
     await type("Senha", "correct horse");
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Entrar" })));
     await settle(6);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/members`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
   });
 });
 

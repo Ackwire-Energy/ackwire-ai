@@ -5126,6 +5126,7 @@ export const en: Translations = {
     seenNow: "connected now",
     seen: "seen {{when}}",
     neverSeen: "hasn't connected yet",
+    versionShort: "version {{version}}",
     details: "{{os}} · {{arch}} · version {{version}} · {{seen}}",
     open: "Open {{name}}",
     pairedBy: "Connected by {{name}}",
