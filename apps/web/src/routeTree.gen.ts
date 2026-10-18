@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConectarRouteImport } from './routes/conectar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as SignupRouteImport } from './routes/signup'
@@ -34,6 +35,7 @@ import { Route as OrgOrgIdThreadsIndexRouteImport } from './routes/org.$orgId.th
 import { Route as OrgOrgIdIssuesIndexRouteImport } from './routes/org.$orgId.issues.index'
 import { Route as OrgOrgIdIssuesNumberRouteImport } from './routes/org.$orgId.issues.$number'
 import { Route as OrgOrgIdSettingsSectionRouteImport } from './routes/org.$orgId.settings_.$section'
+import { Route as OrgOrgIdSettingsComputersMachineIdRouteImport } from './routes/org.$orgId.settings_.computers.$machineId'
 import { Route as OrgOrgIdForumTopicIdRouteImport } from './routes/org.$orgId.forum_.$topicId'
 import { Route as OrgOrgIdWikiSlugRouteImport } from './routes/org.$orgId.wiki_.$slug'
 import { Route as OrgOrgIdThreadsThreadIdRouteImport } from './routes/org.$orgId.threads.$threadId'
@@ -45,6 +47,11 @@ import { Route as OrgOrgIdDmPersonUserIdRouteImport } from './routes/org.$orgId.
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConectarRoute = ConectarRouteImport.update({
+  id: '/conectar',
+  path: '/conectar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -182,6 +189,12 @@ const OrgOrgIdThreadsThreadIdRoute = OrgOrgIdThreadsThreadIdRouteImport.update({
   path: '/threads/$threadId',
   getParentRoute: () => OrgOrgIdRoute,
 } as any)
+const OrgOrgIdSettingsComputersMachineIdRoute =
+  OrgOrgIdSettingsComputersMachineIdRouteImport.update({
+    id: '/settings_/computers/$machineId',
+    path: '/settings/computers/$machineId',
+    getParentRoute: () => OrgOrgIdRoute,
+  } as any)
 const OrgOrgIdAgentsAgentIdIndexRoute =
   OrgOrgIdAgentsAgentIdIndexRouteImport.update({
     id: '/agents/$agentId/',
@@ -207,6 +220,7 @@ const OrgOrgIdDmPersonUserIdRoute = OrgOrgIdDmPersonUserIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
@@ -237,10 +251,12 @@ export interface FileRoutesByFullPath {
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
   '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
   '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
+  '/org/$orgId/settings/computers/$machineId': typeof OrgOrgIdSettingsComputersMachineIdRoute
   '/org/$orgId/agents/$agentId/': typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
@@ -270,11 +286,13 @@ export interface FileRoutesByTo {
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
   '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
   '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
+  '/org/$orgId/settings/computers/$machineId': typeof OrgOrgIdSettingsComputersMachineIdRoute
   '/org/$orgId/agents/$agentId': typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
@@ -305,12 +323,14 @@ export interface FileRoutesById {
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
   '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
   '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
+  '/org/$orgId/settings_/computers/$machineId': typeof OrgOrgIdSettingsComputersMachineIdRoute
   '/org/$orgId/agents/$agentId/': typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/conectar'
     | '/login'
     | '/onboarding'
     | '/signup'
@@ -341,10 +361,12 @@ export interface FileRouteTypes {
     | '/org/$orgId/agents/$agentId/memory'
     | '/org/$orgId/dm/agent/$agentId'
     | '/org/$orgId/dm/person/$userId'
+    | '/org/$orgId/settings/computers/$machineId'
     | '/org/$orgId/agents/$agentId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/conectar'
     | '/login'
     | '/onboarding'
     | '/signup'
@@ -374,10 +396,12 @@ export interface FileRouteTypes {
     | '/org/$orgId/agents/$agentId/memory'
     | '/org/$orgId/dm/agent/$agentId'
     | '/org/$orgId/dm/person/$userId'
+    | '/org/$orgId/settings/computers/$machineId'
     | '/org/$orgId/agents/$agentId'
   id:
     | '__root__'
     | '/'
+    | '/conectar'
     | '/login'
     | '/onboarding'
     | '/signup'
@@ -408,11 +432,13 @@ export interface FileRouteTypes {
     | '/org/$orgId/agents/$agentId/memory'
     | '/org/$orgId/dm/agent/$agentId'
     | '/org/$orgId/dm/person/$userId'
+    | '/org/$orgId/settings_/computers/$machineId'
     | '/org/$orgId/agents/$agentId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConectarRoute: typeof ConectarRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   SignupRoute: typeof SignupRoute
@@ -428,6 +454,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conectar': {
+      id: '/conectar'
+      path: '/conectar'
+      fullPath: '/conectar'
+      preLoaderRoute: typeof ConectarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -647,6 +680,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgOrgIdDmPersonUserIdRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
+    '/org/$orgId/settings_/computers/$machineId': {
+      id: '/org/$orgId/settings_/computers/$machineId'
+      path: '/settings/computers/$machineId'
+      fullPath: '/org/$orgId/settings/computers/$machineId'
+      preLoaderRoute: typeof OrgOrgIdSettingsComputersMachineIdRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
   }
 }
 
@@ -675,6 +715,7 @@ interface OrgOrgIdRouteChildren {
   OrgOrgIdAgentsAgentIdMemoryRoute: typeof OrgOrgIdAgentsAgentIdMemoryRoute
   OrgOrgIdDmAgentAgentIdRoute: typeof OrgOrgIdDmAgentAgentIdRoute
   OrgOrgIdDmPersonUserIdRoute: typeof OrgOrgIdDmPersonUserIdRoute
+  OrgOrgIdSettingsComputersMachineIdRoute: typeof OrgOrgIdSettingsComputersMachineIdRoute
   OrgOrgIdAgentsAgentIdIndexRoute: typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 
@@ -703,6 +744,7 @@ const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
   OrgOrgIdAgentsAgentIdMemoryRoute: OrgOrgIdAgentsAgentIdMemoryRoute,
   OrgOrgIdDmAgentAgentIdRoute: OrgOrgIdDmAgentAgentIdRoute,
   OrgOrgIdDmPersonUserIdRoute: OrgOrgIdDmPersonUserIdRoute,
+  OrgOrgIdSettingsComputersMachineIdRoute: OrgOrgIdSettingsComputersMachineIdRoute,
   OrgOrgIdAgentsAgentIdIndexRoute: OrgOrgIdAgentsAgentIdIndexRoute,
 }
 
@@ -712,6 +754,7 @@ const OrgOrgIdRouteWithChildren = OrgOrgIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConectarRoute: ConectarRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   SignupRoute: SignupRoute,

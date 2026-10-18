@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
+import { folderName } from "@agenteschat/client/lib/machines";
 import {
   executorName,
   formatSpan,
@@ -57,6 +58,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
+import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -987,14 +989,25 @@ const NOTICE_ICON: Record<string, IconName> = {
   machine_task_failed: "alert",
   machine_task_canceled: "stop",
   machine_task_interrupted: "pause",
+  machine_access_requested: "waiting",
+  machine_access_granted: "check",
+  machine_access_denied: "close",
+  machine_access_expired: "dash",
 };
 
 /** The computer went offline, came back, a task ended: one quiet line. */
 export function TaskNoticeLine({ message }: { message: Message }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
   const notice = taskNoticeOf(message.meta);
   if (!notice) return null;
-  const p = notice.params;
+  // A folder request (ADR 0036 §8): the server sends `path` and `computer`; the agent is the note's author.
+  const author =
+    message.author.type === "agent" && message.author.id ? (dir.agentById.get(message.author.id)?.name ?? "") : "";
+  const p = notice.code.startsWith("machine_access_")
+    ? { agent: author, folder: notice.params.path ? folderName(notice.params.path) : "", ...notice.params }
+    : notice.params;
   const seconds = Number(p.seconds ?? 0);
   // Commands it was refused: one line, the list in a dialog.
   const task = machineTaskOf(message.meta);
@@ -1013,6 +1026,12 @@ export function TaskNoticeLine({ message }: { message: Message }) {
       </span>
       {blocked.length > 0 && task?.missionId && (
         <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
+      )}
+      {notice.code === "machine_access_requested" && p.command && (
+        <span className="mi-evt__command">
+          <span className="small muted">{t("missions.notice.access_command")}</span>
+          <CommandBlock command={p.command} />
+        </span>
       )}
     </div>
   );

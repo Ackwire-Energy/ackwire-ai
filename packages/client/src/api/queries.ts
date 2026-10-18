@@ -44,6 +44,7 @@ import type {
   IssueInput,
   IssuePatch,
   Machine,
+  MachineAccessReduce,
   Message,
   MessageMemory,
   NotificationCount,
@@ -1393,11 +1394,66 @@ export const useMachines = (orgId: string, enabled = true, pollMs: number | fals
   });
 };
 
-export function useCreatePairing(orgId: string) {
+/** `/conectar?code=`: the computer that made this code (ADR 0036 §5). */
+export const useMachineDevice = (userCode: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.machineDevice(userCode),
+    queryFn: () => api.machines.device(userCode),
+    enabled: enabled && userCode.length > 0,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    meta: { quiet: true },
+  });
+};
+
+/** "Conectar": the computer joins `orgId`; the list refreshes. */
+export function useConfirmDevice() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { orgId: string; userCode: string; name?: string }) =>
+      api.machines.confirmDevice(input.orgId, input.userCode, input.name ? { name: input.name } : {}),
+    meta: { silent: true },
+    onSuccess: (_m, input) => void qc.invalidateQueries({ queryKey: keys.machines(input.orgId) }),
+  });
+}
+
+/** "Não fui eu". */
+export function useDenyDevice() {
   const api = useApi();
   return useMutation({
-    mutationFn: (name: string) => api.machines.createPairing(orgId, { name }),
+    mutationFn: (userCode: string) => api.machines.denyDevice(userCode),
     meta: { silent: true },
+  });
+}
+
+/** The newest desktop app build (`null`: none published, or the server can't read releases). */
+export const useDesktopLatest = (target: string, arch: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.desktopLatest(target, arch),
+    queryFn: () => api.machines.desktopLatest(target, arch),
+    enabled,
+    retry: false,
+    staleTime: 5 * 60_000,
+    meta: { quiet: true },
+  });
+};
+
+/** Removes a folder (for everyone or one agent) or turns a tool off; the machine follows. */
+export function useReduceMachineAccess(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ machineId, ...input }: MachineAccessReduce & { machineId: string }) =>
+      api.machines.reduceAccess(orgId, machineId, input),
+    meta: { silent: true },
+    onSuccess: (access, { machineId }) => {
+      qc.setQueryData<Machine[]>(keys.machines(orgId), (list) =>
+        list?.map((m) => (m.id === machineId ? { ...m, access } : m)),
+      );
+    },
   });
 }
 

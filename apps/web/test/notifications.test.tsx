@@ -297,3 +297,23 @@ describe("Notificações", () => {
     expect((screen().getByRole("button", { name: "Marcar tudo como lido" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("a new computer connected (ADR 0036, admins)", () => {
+  test("who connected which computer; Abrir goes to the computer's page", async () => {
+    const connected = notification({
+      id: "n-machine",
+      kind: "machine_connected",
+      actors: [{ type: "user", id: "u-joao" }],
+      source: { machineId: "m-9", label: "MacBook do João" },
+      latest: {},
+      updatedAt: ago(3),
+    });
+    const { router } = await go(seedState({ notifications: [connected] }));
+    const row = document.querySelector('[data-n="n-machine"]') as HTMLElement;
+    expect(row.textContent).toContain("João conectou o computador MacBook do João");
+    expect(row.textContent).toContain("Computador");
+    await click(within(row).getByRole("button", { name: "Abrir" }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+  });
+});

@@ -1661,3 +1661,12 @@ a.mi-pr:hover {
     animation: none;
   }
 }
+
+/* An agent's folder request on a computer without the app: the exact command, full width under the line. */
+.mi-evt__command {
+  display: flex;
+  flex: 1 0 100%;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 22px;
+}

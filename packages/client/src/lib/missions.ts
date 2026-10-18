@@ -350,10 +350,14 @@ export function missionCommandOf(meta: Message["meta"]): MissionCommandMeta | nu
   };
 }
 
-/** The server's notices about a computer and its tasks (offline, back, a task that ended): event lines. */
+/**
+ * The server's notices about a computer and its tasks (offline, back, a task that ended) and, ADR 0036 §8,
+ * an agent's folder request on it (`machine_access_requested|granted|denied|expired`, params
+ * `agent`, `folder`, `computer`, optional `command`): event lines.
+ */
 export function taskNoticeOf(meta: Message["meta"]): { code: string; params: Record<string, string> } | null {
   const code = str(meta?.bodyCode);
-  if (!/^machine_(offline|task_[a-z]+)$/.test(code)) return null;
+  if (!/^machine_(offline|task_[a-z]+|access_(requested|granted|denied|expired))$/.test(code)) return null;
   const params = obj(meta?.bodyParams) ?? {};
   return { code, params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v ?? "")])) };
 }
