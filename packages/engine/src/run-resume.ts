@@ -82,7 +82,7 @@ export async function resumeRunsWaitingForMachine(db: Executor, machineId: strin
     await enqueue(db, {
       orgId: r.orgId,
       kind: "agent_run.execute",
-      payload: { runId: r.id },
+      payload: { runId: r.id, ...(r.waitId ? { wait: r.waitId } : {}) },
       // The wait's own id (older waits: when the run started waiting, which no reconnect changes).
       dedupeKey: `agent_run.execute:${r.id}:brain_back:${r.waitId ?? r.updatedAt.getTime()}`,
       maxAttempts: 4,

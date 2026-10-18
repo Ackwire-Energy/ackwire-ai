@@ -316,7 +316,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "agent_run.execute": async (job, ctx) => {
       // Counted per run (statements per stage go into the run profile).
-      await queryTrace.run({ count: 0 }, () => executeRun(deps, String(job.payload.runId), ctx));
+      const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
+      await queryTrace.run({ count: 0 }, () =>
+        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait } : ctx),
+      );
     },
     "search.index": async (job) => {
       if (!deps.search) return;

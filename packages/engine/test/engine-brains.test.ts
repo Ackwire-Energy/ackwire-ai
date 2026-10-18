@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   type Brain,
@@ -315,6 +315,146 @@ test("with no model credential, an offline computer: the agent says so once and 
   expect(seen.length).toBe(1);
   thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
   expect(thread.at(-1)?.body).toBe("Voltei e respondo.");
+});
+
+test("the computer drops mid-turn after a tool ran: the run stops working, resumes there when it is back, nothing runs twice", async () => {
+  let checks = 0;
+  const env: ToolSource = {
+    name: "env",
+    tools: async () => [
+      {
+        name: "check_env",
+        description: "Check the environment",
+        scope: "",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        execute: async () => {
+          checks++;
+          return { content: "go 1.23" };
+        },
+      },
+    ],
+  };
+  f = await setup({ toolSources: [env], reply: () => ({ chunks: ["Respondi pela API."] }) });
+  const machineId = await computerAgent(f);
+  let online = true;
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      online = false;
+      const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+      const result = await executeToolForRun(f.jobDeps, id, { id: "c-1", name: "check_env", input: {} });
+      yield { type: "text_delta", text: "Verificando..." };
+      yield { type: "tool_call", id: "c-1", name: "check_env", input: {}, executed: result };
+      // The runner was killed (the desktop app reinstalled): the hub fails the request as offline.
+      yield { type: "error", code: "machine_offline", message: "The computer MacBook is offline.", retryable: true };
+      return;
+    }
+    yield { type: "done", text: "Tem Go 1.23." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online }) },
+  });
+  const events: string[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(String(e.type)));
+  const question = await post(f, "@dev tem Go aí?");
+  await drainOutbox(f.db, handlers);
+
+  // Not working anymore: waiting for that computer, quietly (no note yet), nothing redone by the API.
+  let [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  expect(run?.waitingMachineId).toBe(machineId);
+  expect(seen.length).toBe(1);
+  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.length).toBe(1);
+  // The "working" indicator cleared.
+  expect(events).toContain("agent.idle");
+
+  // Back: the turn goes to the same computer again, told what already ran.
+  online = true;
+  expect(await resumeRunsWaitingForMachine(f.db, machineId)).toEqual([run?.id ?? ""]);
+  await drainOutbox(f.db, handlers);
+  [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect(seen.length).toBe(2);
+  expect(seen[1]?.trigger).toContain("cut off because the computer disconnected");
+  expect(seen[1]?.trigger).toContain("do not repeat: check_env");
+  expect(seen[1]?.trigger).toContain("tem Go aí?");
+  expect(seen[1]?.session?.machineId).toBe(machineId);
+  expect(checks).toBe(1);
+  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.at(-1)?.body).toBe("Tem Go 1.23.");
+  const usage = await f.db
+    .select()
+    .from(schema.usageRecords)
+    .where(eq(schema.usageRecords.runId, run?.id ?? ""));
+  expect(usage.some((u) => u.provider === "anthropic")).toBe(false);
+
+  // The grace job of that wait finds nothing to do (the run is not run twice).
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 10 * 60_000) });
+  expect(seen.length).toBe(2);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+});
+
+test("the computer drops mid-turn and is already back: the turn is sent again right away", async () => {
+  f = await setup();
+  await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain((n) =>
+    n === 0
+      ? [{ type: "error", code: "machine_offline", message: "The computer MacBook is offline.", retryable: true }]
+      : [{ type: "done", text: "Pronto." }],
+  );
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const question = await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect(seen.length).toBe(2);
+  // No fallback to the API and no "unavailable" note.
+  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.map((m) => m.body)).toEqual(["@dev oi", "Pronto."]);
+});
+
+test("the computer drops mid-turn and stays away: after the grace the agent says so once, and answers when it is back", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let online = true;
+  const { brain, seen } = scriptedComputerBrain((n) => {
+    if (n > 0) return [{ type: "done", text: "Voltei." }];
+    online = false;
+    return [{ type: "error", code: "machine_offline", message: "The computer MacBook is offline.", retryable: true }];
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online }) },
+  });
+  const question = await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 3 * 60_000) });
+  let [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  expect(run?.waitingMachineId).toBe(machineId);
+  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.at(-1)?.meta).toMatchObject({ brainUnavailable: { brain: "claude_code", code: "machine_offline" } });
+  expect(seen.length).toBe(1);
+
+  online = true;
+  await resumeRunsWaitingForMachine(f.db, machineId);
+  await drainOutbox(f.db, handlers);
+  [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect(seen.length).toBe(2);
+  expect(seen[1]?.trigger).toContain("cut off because the computer disconnected");
+  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.at(-1)?.body).toBe("Voltei.");
 });
 
 test("the mission engine: one run per agent and notice; a resume answers the call waiting on that id", async () => {

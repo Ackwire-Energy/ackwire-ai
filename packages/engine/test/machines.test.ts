@@ -78,6 +78,8 @@ function fakeRunner(
     ) => { exitCode: number; stdout: string; stderr: string } | "hang";
     push?: (req: Extract<Request, { op: "push" }>, bytes: Uint8Array, name: string) => Promise<void>;
     execAllowed?: boolean;
+    /** A socket whose close never reaches the hub (a runner killed behind a proxy: half-open). */
+    dead?: boolean;
   } = {},
 ) {
   const sent: ServerFrame[] = [];
@@ -164,7 +166,7 @@ function fakeRunner(
     },
     close(code?: number, reason?: string) {
       closed = { code, reason };
-      void hub.close(conn);
+      if (!options.dead) void hub.close(conn);
     },
   };
   const conn = hub.open(socket);
@@ -181,8 +183,165 @@ function fakeRunner(
         JSON.stringify({ type: "hello", token, ...RUNNER, exec: options.execAllowed !== false, ...extra }),
       ),
     disconnect: () => hub.close(conn),
+    /** Sends a frame as this runner. */
+    frame: (frame: Record<string, unknown>) => reply(frame),
   };
 }
+
+/** A `brain.turn` request (the fake runner never answers it by itself). */
+const brainTurn = (runId = crypto.randomUUID()) => ({
+  op: "brain.turn" as const,
+  runId,
+  kind: "claude_code" as const,
+  session: { id: crypto.randomUUID(), resume: true },
+  cwd: "",
+  system: "",
+  prompt: "oi",
+  mcp: { token: `agr_${"x".repeat(32)}` },
+});
+
+/** Settles to "pending" when the promise is still open after `ms`. */
+const within = <T>(p: Promise<T>, ms = 200) =>
+  Promise.race([
+    p.then(
+      () => "resolved" as const,
+      (e: unknown) => e,
+    ),
+    Bun.sleep(ms).then(() => "pending" as const),
+  ]);
+
+describe("a runner that dies mid-request (brain turns never stay working)", () => {
+  test("a new socket for the same machine fails the old one's requests at once, even if its close never comes", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const old = fakeRunner(hub, { dead: true });
+    await old.hello(paired.token);
+    const turn = hub.call(paired.machineId, brainTurn());
+    await Bun.sleep(5);
+    expect(old.sent.some((s) => s.type === "request" && s.op === "brain.turn")).toBe(true);
+
+    // The desktop app was reinstalled: the runner was killed mid-turn and a new one says hello.
+    const fresh = fakeRunner(hub);
+    await fresh.hello(paired.token);
+    expect(await within(turn)).toBeInstanceOf(MachineOfflineError);
+    expect(old.closed()).toMatchObject({ code: 4409 });
+    expect((await hub.status(paired.machineId))?.online).toBe(true);
+  });
+
+  test("the caller on another replica learns it too: same replica replaced, or the runner back on another replica", async () => {
+    f = await setup({ machines: true });
+    const hubA = f.machineHub as MachineHub;
+    const hubB = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-b", rpcPollMs: 10 });
+    hubs.push(hubB);
+    const paired = await pair();
+
+    // Socket on A, turn asked from B (machine_rpc); the runner comes back on A.
+    const first = fakeRunner(hubA, { dead: true });
+    await first.hello(paired.token);
+    const viaRpc = hubB.call(paired.machineId, brainTurn());
+    await Bun.sleep(40);
+    expect(first.sent.some((s) => s.type === "request" && s.op === "brain.turn")).toBe(true);
+    const second = fakeRunner(hubA, { dead: true });
+    await second.hello(paired.token);
+    expect(await within(viaRpc, 300)).toBeInstanceOf(MachineOfflineError);
+
+    // Socket on A, turn asked from B; the runner comes back on B: A drops its stale socket.
+    const turn2 = hubB.call(paired.machineId, brainTurn());
+    await Bun.sleep(40);
+    expect(second.sent.some((s) => s.type === "request" && s.op === "brain.turn")).toBe(true);
+    const third = fakeRunner(hubB);
+    await third.hello(paired.token);
+    expect(await within(turn2, 300)).toBeInstanceOf(MachineOfflineError);
+    expect(second.closed()).toMatchObject({ code: 4409 });
+    expect(hubA.isLocal(paired.machineId)).toBe(false);
+    expect(hubB.isLocal(paired.machineId)).toBe(true);
+  });
+
+  test("a replica that holds the socket and dies: the caller stops waiting once the row says so", async () => {
+    f = await setup({ machines: true });
+    const hubB = createMachineHub({
+      db: f.db,
+      pubsub: f.pubsub,
+      replicaId: "replica-b",
+      rpcPollMs: 10,
+      rpcLivenessMs: 20,
+    });
+    hubs.push(hubB);
+    const paired = await pair();
+    // A replica that never serves its machine_rpc rows (it is gone), still on the row.
+    await f.db
+      .update(schema.machines)
+      .set({ online: true, connectedReplica: "gone", lastSeenAt: new Date(), protocol: MACHINE_PROTOCOL_VERSION })
+      .where(eq(schema.machines.id, paired.machineId));
+    const turn = hubB.call(paired.machineId, brainTurn());
+    await Bun.sleep(40);
+    expect(await within(turn, 20)).toBe("pending");
+    // The runner reconnected to another replica.
+    await f.db
+      .update(schema.machines)
+      .set({ connectedReplica: "replica-c" })
+      .where(eq(schema.machines.id, paired.machineId));
+    expect(await within(turn, 300)).toBeInstanceOf(MachineOfflineError);
+    const [rpc] = await f.db.select().from(schema.machineRpc);
+    expect(rpc?.status).toBe("failed");
+  });
+
+  test("no pong: the socket's requests fail and the machine goes offline even if its close never comes", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-p", heartbeatMs: 20 });
+    hubs.push(hub);
+    const paired = await pair();
+    const runner = fakeRunner(hub, { dead: true });
+    await runner.hello(paired.token);
+    const turn = hub.call(paired.machineId, brainTurn());
+    expect(await within(turn, 400)).toBeInstanceOf(MachineOfflineError);
+    expect(runner.closed()).toMatchObject({ code: 4408 });
+    const [row] = await f.db.select().from(schema.machines);
+    expect(row).toMatchObject({ online: false, connectedReplica: null });
+  });
+
+  test("a brain turn that goes quiet fails; its own events and bridge calls keep a long one alive", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-i", brainIdleMs: 60 });
+    hubs.push(hub);
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+
+    const quiet = hub.call(paired.machineId, brainTurn());
+    const error = await within(quiet, 400);
+    expect(error).toBeInstanceOf(MachineRequestError);
+    expect((error as MachineRequestError).code).toBe("timeout");
+    expect(runner.sent.some((s) => s.type === "cancel")).toBe(true);
+
+    const runId = crypto.randomUUID();
+    const alive = hub.call(paired.machineId, brainTurn(runId));
+    await Bun.sleep(5);
+    const req = [...runner.sent].reverse().find((s) => s.type === "request" && s.op === "brain.turn") as Request;
+    for (let i = 0; i < 4; i++) {
+      await Bun.sleep(30);
+      await runner.frame({ type: "brain.event", runId, event: { type: "text_delta", text: "." } });
+      await Bun.sleep(30);
+      // A permission prompt waiting for a person polls the bridge with the turn's token.
+      await runner.frame({
+        type: "mcp.call",
+        callId: `c${i}`,
+        taskId: "t",
+        tool: "x",
+        args: {},
+        token: req.op === "brain.turn" ? req.mcp.token : "",
+      });
+    }
+    await runner.frame({
+      type: "result",
+      id: req.id,
+      ok: true,
+      data: { runId, final: { type: "done", text: "ok" } },
+    });
+    expect(await alive).toMatchObject({ final: { type: "done" } });
+  });
+});
 
 // Connecting a computer (the device-code flow) is covered in desktop.test.ts.
 describe("pairing", () => {

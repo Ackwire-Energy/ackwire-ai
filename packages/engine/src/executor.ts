@@ -120,6 +120,8 @@ export interface EngineDeps {
   brains?: Partial<Record<BrainKind, BrainFactory>>;
   /** Computers' status (machine hub): a computer brain's availability is checked before its turn. */
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
+  /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
+  computerDropGraceMs?: number;
 }
 
 /**
@@ -164,6 +166,12 @@ export interface Transcript {
   waitingForBrain?: { kind: BrainKind; machineId: string; code: string; waitId?: string };
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
+  /**
+   * The computer dropped in the middle of a computer brain's turn: the turn is sent again to the same
+   * computer once it is back (its session resumes), told which tools already ran so none is repeated.
+   * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off.
+   */
+  interruptedTurn?: { prompt: string; executed: string[]; drops: number };
   /** The GitHub repository this run last worked in (`owner/name`), for "Trabalhando em" and Atividade. */
   repo?: string;
   /** A GitHub repository the run was refused (not in the agent's list): Atividade offers to add it. */
@@ -206,6 +214,26 @@ export class BrainFailure extends Error {
   }
 }
 
+/** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
+export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
+/** A run resumes on its computer after this many drops at most; then it ends like any failed turn. */
+export const MAX_COMPUTER_DROPS = 3;
+
+/** What a computer brain is asked again after its computer dropped mid-turn. */
+export function interruptedTurnPrompt(
+  t: NonNullable<Transcript["interruptedTurn"]>,
+  extra: string | null = null,
+): string {
+  const done = t.executed.length > 0 ? ` Already done in it, do not repeat: ${t.executed.join(", ")}.` : "";
+  return [
+    `Your previous turn was cut off because the computer disconnected.${done} Pick up where you left off and finish it. What you were asked:`,
+    t.prompt,
+    extra,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
   if (error instanceof BrainFailure) return error.retryable ? null : error.code;
@@ -245,7 +273,12 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
  * On the final attempt, or for permanent problems (budget, credential), the
  * run fails.
  */
-export async function executeRun(deps: EngineDeps, runId: string, options: { finalAttempt: boolean }) {
+export async function executeRun(
+  deps: EngineDeps,
+  runId: string,
+  /** `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale. */
+  options: { finalAttempt: boolean; wait?: string },
+) {
   const prof = createProfiler();
   // A person can cancel it: the signal aborts the model stream, tools and running code.
   const abort = registerRunAbort(runId);
@@ -269,11 +302,23 @@ export async function executeRun(deps: EngineDeps, runId: string, options: { fin
 async function executeRunInner(
   deps: EngineDeps,
   runId: string,
-  options: { finalAttempt: boolean },
+  options: { finalAttempt: boolean; wait?: string },
   prof: ReturnType<typeof createProfiler>,
   signal: AbortSignal,
 ) {
   const { db } = deps;
+  // A job for one wait for the computer (back, grace, plan reset): only while the run still waits on it.
+  // Another job may have resumed it already; running it again would run the run twice.
+  if (options.wait) {
+    const [row] = await db
+      .select({
+        status: agentRuns.status,
+        waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, runId));
+    if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+  }
   // Claim first (the common case is a queued run): one statement.
   let run: AgentRun;
   let fresh = false;
@@ -765,7 +810,9 @@ async function executeRunInner(
     triggerText = (await getMessage(db, run.orgId, run.triggerMessageId))?.body ?? "";
   }
   /** What a computer brain reads next when it isn't the trigger: results after a pause, new messages. */
-  let nextPrompt: string | null = resumeText;
+  let nextPrompt: string | null = transcript.interruptedTurn
+    ? interruptedTurnPrompt(transcript.interruptedTurn, resumeText)
+    : resumeText;
   let computerTurns = 0;
 
   /** The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the computer. */
@@ -777,7 +824,14 @@ async function executeRunInner(
     const from = plan.kind;
     if (from === "model") return "no";
     const t = transcript as Transcript;
-    if (agent.brainFallback !== false && (await deps.gateway.hasModelCredential(agent).catch(() => false))) {
+    // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
+    // brain would redo them), so the run waits for it.
+    const onlyThisComputer = (t.interruptedTurn?.executed.length ?? 0) > 0;
+    if (
+      !onlyThisComputer &&
+      agent.brainFallback !== false &&
+      (await deps.gateway.hasModelCredential(agent).catch(() => false))
+    ) {
       t.fallback = { from, code: u.code, message: u.message };
       plan = { kind: "model", ...(plan.missionId ? { missionId: plan.missionId } : {}) };
       brain = createBrain(deps, agent, run, "model", turnToken, () => transcript as Transcript);
@@ -821,7 +875,7 @@ async function executeRunInner(
       await enqueue(db, {
         orgId: run.orgId,
         kind: "agent_run.execute",
-        payload: { runId: run.id },
+        payload: { runId: run.id, wait: t.waitingForBrain.waitId },
         dedupeKey: `agent_run.execute:${run.id}:plan_reset:${at}`,
         runAt: new Date(at + 30_000),
         maxAttempts: 4,
@@ -902,6 +956,46 @@ async function executeRunInner(
     await publishChannelEvent(deps.pubsub, event("done"));
     await finished("done");
     await redispatchPending();
+  };
+
+  /**
+   * The computer dropped in the middle of the turn (its runner restarted, the network went): the run
+   * waits for that computer, saying nothing for a short while, and the turn is sent again when it is
+   * back (`resumeRunsWaitingForMachine`, or right away when it already is). Still away after the grace:
+   * the next attempt finds it unavailable and says so ("I'll answer when it's back").
+   */
+  const waitForDroppedComputer = async (from: BrainKind, machineId: string, prompt: string, executed: string[]) => {
+    await deferred;
+    const t = transcript as Transcript;
+    const prev = t.interruptedTurn;
+    t.interruptedTurn = {
+      prompt: prev?.prompt ?? prompt,
+      executed: [...new Set([...(prev?.executed ?? []), ...executed])],
+      drops: (prev?.drops ?? 0) + 1,
+    };
+    const waitId = Bun.randomUUIDv7();
+    t.waitingForBrain = { kind: from, machineId, code: "machine_dropped", waitId };
+    await addRunStep(db, run, "error", { reason: "brain_dropped", code: "machine_offline", executed });
+    const moved = await transitionRun(db, run.id, "running", "waiting_input", {
+      transcript: t as unknown as Record<string, unknown>,
+      waitingMachineId: machineId,
+    });
+    if (!moved) throw new PermanentJobError("run changed state while executing");
+    const job = (key: string, runAt?: Date) =>
+      enqueue(db, {
+        orgId: run.orgId,
+        kind: "agent_run.execute",
+        payload: { runId: run.id, wait: waitId },
+        dedupeKey: `agent_run.execute:${run.id}:${key}:${waitId}`,
+        maxAttempts: 4,
+        ...(runAt ? { runAt } : {}),
+      });
+    await job("drop_grace", new Date(Date.now() + (deps.computerDropGraceMs ?? COMPUTER_DROP_GRACE_MS)));
+    // Already back (a new runner's hello is what ended the turn): now. Same key as the "back" signal's job.
+    const back = await deps.machines?.status(machineId).catch(() => null);
+    if (back?.online) await job("brain_back");
+    await publishChannelEvent(deps.pubsub, event("waiting_input"));
+    await finished("waiting_input");
   };
 
   if (plan.unavailable) {
@@ -995,6 +1089,8 @@ async function executeRunInner(
         if (turnPlan.kind !== "model") {
           computerTurns++;
           nextPrompt = null;
+          // A turn cut off by its computer is finished now.
+          delete transcript.interruptedTurn;
           // Later turns of this run continue the same session.
           if (plan.session) plan = { ...plan, session: { ...plan.session, resume: true } };
         }
@@ -1026,6 +1122,16 @@ async function executeRunInner(
         // they would run them again. Post what the brain said and what it did instead, and end the run there.
         if (turnPlan.kind !== "model") {
           const executed = await executedSince(db, run.id, turnStepSeq, executedNow);
+          // The computer dropped mid-turn: the turn resumes there when it is back (its session keeps what it did).
+          const machineId = turnPlan.session?.machineId;
+          if (
+            machineId &&
+            error instanceof BrainFailure &&
+            error.code === "machine_offline" &&
+            (transcript.interruptedTurn?.drops ?? 0) < MAX_COMPUTER_DROPS
+          ) {
+            return waitForDroppedComputer(turnPlan.kind, machineId, prompt, executed);
+          }
           if (executed.length > 0) {
             const failure =
               error instanceof BrainFailure

@@ -20,7 +20,7 @@ import {
   TASKS_PROTOCOL,
   type Unsubscribe,
 } from "@agenteschat/adapters";
-import { and, type Database, eq, lt, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { applyAccessDecided, storeMachineAccess } from "./machine-access";
 import {
@@ -141,6 +141,10 @@ export interface MachineCaller {
 
 interface Pending {
   onOutput?: MachineCallOptions["onOutput"];
+  /** A `brain.turn`: its run and bridge token, so its frames (events, tool calls) prove it is alive. */
+  brain?: { runId: string; token: string };
+  /** Restarts the request's inactivity timer (brain turns). */
+  touch?(): void;
   settle(frame: Extract<RunnerFrame, { type: "result" }>): void;
   fail(error: Error): void;
 }
@@ -175,8 +179,23 @@ export interface MachineHubDeps {
   rpcPollMs?: number;
   /** A machine offline this long has its running tasks interrupted (default 60 s). */
   taskOfflineGraceMs?: number;
+  /** A brain turn with no frame of its own (event, tool call) for this long fails (default `BRAIN_IDLE_TIMEOUT_MS`). */
+  brainIdleMs?: number;
+  /** A cross-replica caller checks this often that the replica it asked still holds the socket (default 5 s). */
+  rpcLivenessMs?: number;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
+
+/**
+ * A brain turn that sends nothing of its own for this long has stopped (a hung
+ * CLI behind a live socket): it fails instead of keeping the run "working".
+ * Every `brain.event`, and every bridge call with the turn's token (a
+ * permission prompt polls every few seconds while it waits for a person),
+ * restarts it; a long legit turn keeps talking. A dropped socket is caught much
+ * sooner: its pending requests fail when it closes, is replaced or stops
+ * answering pings.
+ */
+export const BRAIN_IDLE_TIMEOUT_MS = 15 * 60_000;
 
 /** Default time a request may take: a command's own timeout plus slack; an upload 5.5 minutes; the rest 2 minutes. */
 export function requestTimeoutMs(request: MachineRequest) {
@@ -239,6 +258,8 @@ export function createMachineHub(deps: MachineHubDeps) {
   const helloTimeoutMs = deps.helloTimeoutMs ?? HELLO_TIMEOUT_MS;
   const rpcPollMs = deps.rpcPollMs ?? 500;
   const taskOfflineGraceMs = deps.taskOfflineGraceMs ?? TASK_OFFLINE_GRACE_MS;
+  const brainIdleMs = deps.brainIdleMs ?? BRAIN_IDLE_TIMEOUT_MS;
+  const rpcLivenessMs = deps.rpcLivenessMs ?? 5000;
   /** Sockets on this replica, by machine id. */
   const local = new Map<string, MachineConnection>();
   /** Cross-replica requests this replica is running, to cancel them. */
@@ -337,6 +358,9 @@ export function createMachineHub(deps: MachineHubDeps) {
     local.set(machine.id, conn);
     if (old && old !== conn) {
       refuse(old, "replaced", "Another runner connected for this computer.", MACHINE_CLOSE.replaced);
+      // Its requests end now, not when (if ever) the dead socket's close arrives: a runner that restarted
+      // mid-request lost them all (its requests die with its session).
+      await closeConn(old);
     }
     const now = new Date();
     await db
@@ -361,6 +385,15 @@ export function createMachineHub(deps: MachineHubDeps) {
         updatedAt: now,
       })
       .where(eq(machines.id, machine.id));
+    // An older socket for this machine on another replica (the runner came back elsewhere) is dropped there.
+    await pubsub
+      .publish(MACHINE_CONTROL_TOPIC, {
+        type: "machine.connected",
+        machineId: machine.id,
+        replicaId,
+        connectionId: conn.connectionId,
+      })
+      .catch(() => undefined);
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
     send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
@@ -371,6 +404,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         try {
           conn.socket.close(MACHINE_CLOSE.timeout, "no pong");
         } catch {}
+        // A half-open socket may never report its close: its requests fail and the machine goes offline now.
+        void closeConn(conn);
         return;
       }
       send(conn, { type: "ping", at: Date.now() });
@@ -508,10 +543,29 @@ export function createMachineHub(deps: MachineHubDeps) {
       if (signal?.aborted) return reject(new MachineRequestError("canceled", "canceled"));
       const id = crypto.randomUUID();
       const timeoutMs = options.timeoutMs ?? requestTimeoutMs(request);
+      const turn = request.op === "brain.turn" ? (request as Extract<MachineRequest, { op: "brain.turn" }>) : null;
+      const brain = turn ? { runId: turn.runId, token: turn.mcp.token } : undefined;
+      let idle: ReturnType<typeof setTimeout> | undefined;
       const cleanup = () => {
         clearTimeout(timer);
+        clearTimeout(idle);
         signal?.removeEventListener("abort", onAbort);
         conn.pending.delete(id);
+      };
+      /** A brain turn that went quiet: canceled on the machine, failed here. */
+      const touch = () => {
+        if (!brain) return;
+        clearTimeout(idle);
+        idle = setTimeout(() => {
+          cleanup();
+          send(conn, { type: "cancel", id });
+          reject(
+            new MachineRequestError(
+              "timeout",
+              `no news from the computer ${conn.name} for ${Math.round(brainIdleMs / 60_000)} min`,
+            ),
+          );
+        }, brainIdleMs);
       };
       const timer = setTimeout(() => {
         cleanup();
@@ -532,8 +586,10 @@ export function createMachineHub(deps: MachineHubDeps) {
         }
       }
       signal?.addEventListener("abort", onAbort, { once: true });
+      touch();
       conn.pending.set(id, {
         onOutput: options.onOutput,
+        ...(brain ? { brain, touch } : {}),
         settle(frame) {
           cleanup();
           if (frame.ok) resolve(frame.data as MachineReplies[Op]);
@@ -546,6 +602,11 @@ export function createMachineHub(deps: MachineHubDeps) {
       });
       send(conn, { type: "request", id, ...request } as ServerFrame);
     });
+  }
+
+  /** A brain turn's own frame arrived: it is alive (restarts its inactivity timer). */
+  function touchBrain(conn: MachineConnection, match: (b: NonNullable<Pending["brain"]>) => boolean) {
+    for (const p of conn.pending.values()) if (p.brain && match(p.brain)) p.touch?.();
   }
 
   async function cleanupRpc() {
@@ -577,6 +638,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     };
     options.signal?.addEventListener("abort", onAbort, { once: true });
     const deadline = Date.now() + (options.timeoutMs ?? requestTimeoutMs(request)) + 10_000;
+    let checkedAt = Date.now();
     try {
       await pubsub.publish(machineRpcTopic(machine.connectedReplica), { type: "machine.rpc", rpcId: rpc.id });
       for (;;) {
@@ -590,6 +652,28 @@ export function createMachineHub(deps: MachineHubDeps) {
           const error = reply && !reply.ok ? reply.error : { code: "internal", message: "no reply" };
           if (error.code === "offline") throw new MachineOfflineError(machine.name);
           throw new MachineRequestError(error.code as MachineErrorCode, error.message);
+        }
+        // The replica asked no longer holds the socket (the runner came back elsewhere, or that replica
+        // died): its answer will never come, so the request ends now as offline.
+        if (Date.now() - checkedAt >= rpcLivenessMs) {
+          checkedAt = Date.now();
+          const now = await getMachineById(db, machine.id).catch(() => undefined);
+          if (
+            now !== undefined &&
+            (!now || now.deletedAt || !machineOnline(now) || now.connectedReplica !== machine.connectedReplica)
+          ) {
+            const [gone] = await db
+              .update(machineRpc)
+              .set({ status: "failed", repliedAt: new Date() })
+              .where(and(eq(machineRpc.id, rpc.id), inArray(machineRpc.status, ["pending", "running"])))
+              .returning({ id: machineRpc.id });
+            // No row: the answer landed meanwhile (read on the next pass).
+            if (gone) {
+              onAbort();
+              throw new MachineOfflineError(machine.name);
+            }
+            continue;
+          }
         }
         if (Date.now() >= deadline) {
           await db
@@ -680,6 +764,17 @@ export function createMachineHub(deps: MachineHubDeps) {
       } else if (event.type === "machine.rpc.cancel") running.get(rpcId)?.abort();
     }),
     pubsub.subscribe(MACHINE_CONTROL_TOPIC, (event) => {
+      if (event.type === "machine.connected" && typeof event.machineId === "string") {
+        if (event.replicaId === replicaId) return;
+        const conn = local.get(event.machineId);
+        if (!conn || conn.connectionId === event.connectionId) return;
+        // The runner came back on another replica: this socket is a stale one (outside the publisher's call stack).
+        queueMicrotask(() => {
+          refuse(conn, "replaced", "Another runner connected for this computer.", MACHINE_CLOSE.replaced);
+          void closeConn(conn);
+        });
+        return;
+      }
       if (event.type === "machine.agents" && typeof event.orgId === "string") {
         // The org's agents changed: its machines here list them again (outside the publisher's call stack).
         for (const conn of local.values()) {
@@ -742,10 +837,13 @@ export function createMachineHub(deps: MachineHubDeps) {
       else if (frame.type === "task.event") {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
       } else if (frame.type === "mcp.call") {
+        if (frame.token) touchBrain(conn, (b) => b.token === frame.token);
         mcpCall(conn, frame);
       } else if (frame.type === "mcp.list") {
+        touchBrain(conn, (b) => b.token === frame.token);
         mcpList(conn, frame);
       } else if (frame.type === "brain.event" || frame.type === "brain.done") {
+        touchBrain(conn, (b) => b.runId === frame.runId);
         // Brain turns (protocol 8, ADR 0032): to whichever replica runs the turn; it checks the machine.
         await pubsub
           .publish(brainTopic(frame.runId), {
