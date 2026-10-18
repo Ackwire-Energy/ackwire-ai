@@ -7826,6 +7826,17 @@ a.machine-row__name:hover {
 .newag__money-field {
   width: 170px;
 }
+/* The label is for screen readers only: take its (empty) row out of the layout so the input lines up
+   with the amount buttons. */
+.newag__money-field > .ac-field__label,
+.newag__money-field > .ac-field__label-row {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .newag__money-field .ac-input-affix input {
   font-size: 17px;
   font-weight: 600;
