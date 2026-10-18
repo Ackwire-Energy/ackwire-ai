@@ -1,12 +1,7 @@
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
-import {
-  createMachinePairing,
-  grantScopes,
-  type MachineHub,
-  redeemMachinePairing,
-  setAgentComputerTarget,
-} from "../src";
+import { grantScopes, type MachineHub, setAgentComputerTarget } from "../src";
 import type { Fixture } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 /** Helpers for mission tests: a fake runner on the hub, and a paired computer for the fixture's agent. */
 export const RUNNER = {
@@ -107,8 +102,7 @@ export function missionRunner(hub: MachineHub, hello: Record<string, unknown> = 
 
 export async function pairedMachine(f: Fixture) {
   const deps = { db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.chat" };
-  const { code } = await createMachinePairing(deps, f.owner.id, f.org.id, { name: "MacBook" });
-  const paired = await redeemMachinePairing(deps, { code, ...RUNNER, exec: true });
+  const paired = await pairMachine(deps, f.owner.id, f.org.id, { name: "MacBook", ...RUNNER, exec: true });
   await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
   await setAgentComputerTarget(deps, f.owner.id, f.org.id, f.agent.id, paired.machineId);
   return paired;

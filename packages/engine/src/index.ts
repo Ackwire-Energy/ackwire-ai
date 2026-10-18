@@ -69,6 +69,8 @@ export * from "./issue-tools";
 export * from "./issues";
 export * from "./jobs";
 export * from "./judge";
+export * from "./machine-access";
+export * from "./machine-device";
 export * from "./machine-hub";
 export * from "./machine-provider";
 export * from "./machine-tasks";

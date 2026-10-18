@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t.close());
@@ -58,14 +58,7 @@ test("mission settings API: read, take back a rule, resume tasks, the agent's de
   const { orgId, channelId, agentId } = await seedOrg(owner);
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
-  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
-  const paired = (await (
-    await t.app.request("/api/machines/pair", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
-      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
-    })
-  ).json()) as { machineId: string; token: string };
+  const paired = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "MacBook" });
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
   await fakeRunner().hello(paired.token);
   const mission = (await (

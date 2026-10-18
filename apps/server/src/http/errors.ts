@@ -2,6 +2,9 @@ import {
   BudgetExceededError,
   ConflictError,
   ForbiddenError,
+  MachineOfflineError,
+  MachinePausedError,
+  MachineRequestError,
   MissingCredentialError,
   NotFoundError,
   ValidationError,
@@ -63,5 +66,13 @@ export function domainErrorResponse(error: unknown, c: Context) {
     return apiError(c, 402, "budget_exceeded", error.message, { agentId: error.agentId });
   }
   if (error instanceof MissingCredentialError) return apiError(c, 400, "missing_credential", error.message);
+  // A connected computer (ADR 0025, ADR 0036) that can't take the request now.
+  if (error instanceof MachineOfflineError) {
+    return apiError(c, 409, "machine.offline", error.message, { name: error.machineName });
+  }
+  if (error instanceof MachinePausedError) {
+    return apiError(c, 409, "machine.paused", error.message, { name: error.machineName, until: error.until });
+  }
+  if (error instanceof MachineRequestError) return apiError(c, 502, `machine.${error.code}`, error.message);
   return null;
 }

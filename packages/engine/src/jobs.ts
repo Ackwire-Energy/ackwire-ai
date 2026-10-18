@@ -13,6 +13,7 @@ import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
 import { mentionHandoffs } from "./judge";
+import { wakeForAccessDecision } from "./machine-access";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
@@ -394,6 +395,12 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A mission's plan finished or its work stopped: is everything done (then it waits to be concluded)?
     "mission.check_done": async (job) => {
       await checkMissionDone(missions, String(job.payload.missionId), Number(job.payload.attempt ?? 0) || 0);
+    },
+    // The person at a connected computer answered an agent's folder request (ADR 0036 §8): the agent wakes.
+    "machine.access_decided": async (job) => {
+      await wakeForAccessDecision({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.requestId), {
+        maxHops: deps.maxHops,
+      });
     },
     // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
     "machine.tasks_offline": async (job) => {

@@ -26,6 +26,7 @@ export const PUSH_KINDS: ReadonlySet<string> = new Set([
   "dm",
   "mission_stopped",
   "routine_failed",
+  "machine_connected",
 ]);
 
 /** Expo keeps receipts for a day and has most ready within 15 minutes: ask then. */

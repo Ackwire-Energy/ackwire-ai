@@ -505,6 +505,21 @@ export const envVars = {
     description: "Price of one GiB of disk per hour, for sandbox usage.",
     section: "Sandbox",
   },
+  DESKTOP_RELEASES_TOKEN: {
+    schema: z.string().optional(),
+    description:
+      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`). Unset: those endpoints answer 404.",
+    section: "Sandbox",
+    secret: true,
+  },
+  DESKTOP_RELEASES_REPO: {
+    schema: z
+      .string()
+      .regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/repo")
+      .default("wescld/agents.chat"),
+    description: "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app.",
+    section: "Sandbox",
+  },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),
     description: "Minimum log level written to stdout.",

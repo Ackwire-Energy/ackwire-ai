@@ -135,6 +135,10 @@ export async function buildRunContext(
       : rawRange;
   // A mission's thread: a compact brief instead of making the agent dig (only there; one lookup above decided).
   const briefing = threadInfo?.missionId ? missionBrief(db, threadInfo.missionId).catch(() => null) : null;
+  // Its connected computer's folders (ADR 0036 §8): the absolute paths it may use there, when the machine reports them.
+  const machineAccess = agent.machineId
+    ? machineAccessOf(db, run.orgId, agent.id, agent.machineId).catch(() => null)
+    : null;
   const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
 
@@ -452,6 +456,7 @@ export async function buildRunContext(
         ]
       : []),
     ...(briefing ? await briefing.then((text) => (text ? [{ text }] : [])) : []),
+    ...(machineAccess ? await machineAccess.then((a) => (a ? [{ text: machineAccessText(a) }] : [])) : []),
     ...(trigger.meta.routine
       ? [
           {
@@ -541,8 +546,66 @@ export function attachedLine(m: Pick<Message, "authorUserId" | "meta">): string 
   return list.length > 0 ? `\n(attached files: ${list.join(", ")})` : "";
 }
 
+/** What the agent's computer allows it (protocol 10); null when it doesn't say (an older runner) or is gone. */
+async function machineAccessOf(db: Database, orgId: string, agentId: string, machineId: string) {
+  const [m] = await db
+    .select({ name: schema.machines.name, access: schema.machines.access })
+    .from(schema.machines)
+    .where(and(eq(schema.machines.orgId, orgId), eq(schema.machines.id, machineId), isNull(schema.machines.deletedAt)));
+  if (!m?.access) return null;
+  return {
+    name: m.name,
+    folders: m.access.folders.filter((f) => f.agents.includes(agentId)).map((f) => f.path),
+    tools: m.access.tools,
+  };
+}
+
+/** The block about the agent's connected computer: the folders the machine allows it and the tools that are off. */
+export function machineAccessText(a: {
+  name: string;
+  folders: string[];
+  tools: { claude: boolean; codex: boolean; commands: boolean };
+}) {
+  const off = [
+    a.tools.commands ? "" : "shell commands",
+    a.tools.claude ? "" : "Claude Code",
+    a.tools.codex ? "" : "Codex",
+  ].filter(Boolean);
+  return [
+    `# Your folders on the computer "${a.name}"`,
+    a.folders.length > 0
+      ? `Besides your own folder there, its owner allowed you these folders; use their absolute paths:\n${a.folders
+          .slice(0, 30)
+          .map((f) => `- ${f}`)
+          .join("\n")}`
+      : "Only your own folder there; no other folders are allowed for you.",
+    off.length > 0 ? `Turned off on that computer: ${off.join(", ")}.` : "",
+    "Anything else is refused. For another folder, ask its owner with request_folder_access (they decide on that computer); never ask people to change settings by hand.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** The text the model reads for a folder request's outcome (`meta.machineAccess`); null for other messages. */
+export function accessNotice(m: Pick<Message, "body" | "meta">, current = false): string | null {
+  const a = m.meta?.machineAccess as { decision?: unknown; path?: unknown } | undefined;
+  if (!a || typeof a !== "object") return null;
+  const parts = [`[Folder access]: ${m.body}`];
+  // Still pending: news for the people, nothing for the agent to act on yet.
+  if (current && a.decision !== "pending") {
+    parts.push(
+      a.decision === "granted"
+        ? `You asked for this folder earlier in this conversation. Use ${typeof a.path === "string" ? a.path : "it"} now (absolute paths) and go on with the work you needed it for; tell the people briefly.`
+        : "You asked for this folder earlier in this conversation. Go on without it if you can, or tell the people briefly what you can't do without it; don't ask again unless they say so.",
+    );
+  }
+  return parts.join("\n");
+}
+
 /** The text the model reads for a task-end notice (`meta.machineTask`), with its result; null for other messages. */
 export function taskNotice(m: Pick<Message, "body" | "meta">, current = false): string | null {
+  const access = accessNotice(m, current);
+  if (access) return access;
   // Agent mode (ADR 0029): what the mission tells its agent (an answer, a request, a message from people).
   const inbox = m.meta?.missionInbox as { from?: unknown; text?: unknown } | undefined;
   if (inbox && typeof inbox === "object") {

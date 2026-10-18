@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
 import { completeMission, getMissionRow, startSessionTask } from "@agenteschat/engine";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t.close());
@@ -69,14 +69,7 @@ test("missions API: session and same origin; create, read, start (owner only), l
     owner(`/api/app/organizations/${orgId}${path}`, init);
 
   // A computer for the agent, its runner connected.
-  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
-  const paired = (await (
-    await t.app.request("/api/machines/pair", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
-      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
-    })
-  ).json()) as { machineId: string; token: string };
+  const paired = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "MacBook" });
   expect(
     (await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } })).status,
   ).toBe(200);
@@ -212,14 +205,7 @@ test("missions API: who programs: eligible agents list it, POST takes it, the ow
   const { orgId, channelId, agentId } = await seedOrg(owner);
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
-  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
-  const paired = (await (
-    await t.app.request("/api/machines/pair", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
-      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
-    })
-  ).json()) as { machineId: string; token: string };
+  const paired = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "MacBook" });
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
   // The runner found Claude Code on the machine.
   const runner = fakeRunner({ executors: { claude: { version: "2.1.300 (Claude Code)" } } });
@@ -267,14 +253,7 @@ test("missions API: deliveries — list, check per person, Pedir ajustes (active
   const { orgId, channelId, agentId } = await seedOrg(owner);
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
-  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
-  const paired = (await (
-    await t.app.request("/api/machines/pair", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
-      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
-    })
-  ).json()) as { machineId: string; token: string };
+  const paired = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "MacBook" });
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
   const runner = fakeRunner();
   await runner.hello(paired.token);

@@ -578,3 +578,30 @@ export async function routineReplyText(deps: NotificationDeps, orgId: string, ru
     .where(and(eq(messages.orgId, orgId), eq(messages.id, run.reply)));
   return m?.body ?? null;
 }
+
+// ── Connected computers ───────────────────────────────────────────────────────
+
+/**
+ * A computer was connected to the organization (ADR 0036 §5): every admin
+ * hears, except who connected it, so a computer nobody expected (a phished
+ * code) is seen and can be removed at once.
+ */
+export async function notifyMachineConnected(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string; hostname: string },
+  actorId: string,
+) {
+  const admins = await deps.db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, machine.orgId), inArray(organizationMembers.role, ["owner", "admin"])));
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: admins.map((a) => a.userId),
+    kind: "machine_connected",
+    groupKey: `machine_connected:${machine.id}`,
+    actor: person(actorId),
+    source: { machineId: machine.id, label: machine.name },
+    latest: { title: machine.name, ...(machine.hostname ? { text: notificationSnippet(machine.hostname) } : {}) },
+  });
+}

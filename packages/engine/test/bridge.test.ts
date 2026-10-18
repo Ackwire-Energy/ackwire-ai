@@ -2,20 +2,19 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { MCP_TOOLS_MAX, MISSION_MCP_TOOLS, type ServerFrame } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
-  createMachinePairing,
   createMission,
   createMissionRunToolSource,
   grantScopes,
   issueRunToolToken,
   type MachineHub,
   postPersonMessage,
-  redeemMachinePairing,
   revokeRunToolTokens,
   startSessionTask,
   type ToolSource,
   verifyRunToolToken,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 import { missionRunner, pairedMachine, RUNNER, type TaskStartRequest } from "./mission-helpers";
 import { fakeGithub } from "./tool-fixtures";
 
@@ -104,8 +103,7 @@ async function runningRun(threadRootId?: string) {
 
 async function otherMachine() {
   const deps = { db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.chat" };
-  const { code } = await createMachinePairing(deps, f.owner.id, f.org.id, { name: "Other" });
-  return redeemMachinePairing(deps, { code, ...RUNNER, exec: true });
+  return pairMachine(deps, f.owner.id, f.org.id, { name: "Other", ...RUNNER, exec: true });
 }
 
 describe("runner MCP bridge (ADR 0032)", () => {

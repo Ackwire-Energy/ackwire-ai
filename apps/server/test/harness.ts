@@ -70,6 +70,8 @@ export async function createTestServer(
     schedules?: FakeScheduleAnswers;
     /** Fake Apple token revocation (account deletion). */
     appleRevoke?: AppleTokenRevoker;
+    /** Fake GitHub for the desktop app's releases. */
+    desktopFetch?: typeof fetch;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -138,6 +140,7 @@ export async function createTestServer(
         sandbox: engine.sandbox,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: options.appleRevoke,
+        desktopFetch: options.desktopFetch,
       },
     },
     log,
@@ -223,6 +226,36 @@ export async function signUp(b: Browser, email: string, options: { inviteToken?:
   });
   if (res.status !== 200) throw new Error(`sign-up failed: ${res.status} ${await res.text()}`);
   return res;
+}
+
+/**
+ * Connects a computer over HTTP the way the runner and the site do (ADR 0036
+ * §5): the computer asks for a code, a member confirms it through `orgApi`
+ * (their `/api/app/organizations/{orgId}` calls), the computer polls for
+ * its token.
+ */
+export async function pairComputer(
+  t: TestServer,
+  orgApi: (path: string, init?: Parameters<Browser>[1]) => Promise<Response>,
+  computer: Record<string, unknown>,
+  options: { name?: string; ip?: string } = {},
+) {
+  const runner = (path: string, body: unknown) =>
+    t.app.request(path, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": options.ip ?? "203.0.113.9" },
+      body: JSON.stringify(body),
+    });
+  const started = await runner("/api/machines/device", { name: options.name ?? "MacBook", ...computer });
+  if (started.status !== 200) throw new Error(`device start failed: ${started.status} ${await started.text()}`);
+  const { deviceCode, userCode } = (await started.json()) as { deviceCode: string; userCode: string };
+  const confirmed = await orgApi(`/machines/device/${userCode}/confirm`, {
+    json: options.name ? { name: options.name } : {},
+  });
+  if (confirmed.status !== 201) throw new Error(`confirm failed: ${confirmed.status} ${await confirmed.text()}`);
+  const token = await runner("/api/machines/device/token", { deviceCode });
+  if (token.status !== 200) throw new Error(`token failed: ${token.status} ${await token.text()}`);
+  return (await token.json()) as { machineId: string; token: string; name: string; org: { id: string; name: string } };
 }
 
 /** Owner with an organization, a credential and an agent `@dev` in #general. */

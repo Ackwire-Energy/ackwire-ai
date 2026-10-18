@@ -1,4 +1,16 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -8,6 +20,16 @@ export interface MachineExecutors {
   claude?: { version: string; loggedIn?: boolean; authMethod?: string; plan?: string };
   codex?: { version: string };
   detectedAt?: string;
+}
+
+/**
+ * What the machine allows beyond the agents' own folders (ADR 0036 §8,
+ * protocol 10), as its runner last reported it (`hello.access`,
+ * `access.changed`). The same shape as `RunnerAccess` in the machine protocol.
+ */
+export interface MachineAccess {
+  folders: { path: string; agents: string[] }[];
+  tools: { claude: boolean; codex: boolean; commands: boolean };
 }
 
 /**
@@ -44,6 +66,15 @@ export const machines = pgTable(
      * older runner that doesn't report them.
      */
     executors: jsonb().$type<MachineExecutors>().notNull().default({}),
+    /**
+     * The owner paused this computer (ADR 0036 §6, protocol 9): no new work
+     * goes to it. `paused_until` null with `paused`: until they resume. A
+     * past `paused_until` means it is no longer paused.
+     */
+    paused: boolean().notNull().default(false),
+    pausedUntil: timestamp({ withTimezone: true }),
+    /** Folders and tools the machine allows (protocol 10); null: its runner doesn't report them. */
+    access: jsonb().$type<MachineAccess>(),
     /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
     resumeTasks: boolean().notNull().default(true),
     /** Last known; trust it only with a recent `last_seen_at` (a replica may have died). */
@@ -58,25 +89,51 @@ export const machines = pgTable(
   (t) => [unique().on(t.orgId, t.id), index().on(t.orgId)],
 );
 
-/** One-time pairing codes (10 minutes, single use), stored as SHA-256 of the normalized code. */
-export const machinePairings = pgTable(
-  "machine_pairings",
+/**
+ * Connecting a computer (ADR 0036 §5, a device-code flow): the computer asks
+ * for a code (`POST /api/machines/device`), a signed-in person confirms it on
+ * the site for one of their organizations, and the computer polls until it
+ * gets its token, once. `device_code` is stored as SHA-256 only; `user_code`
+ * is only compared by people. `org_id` is set on confirm (null while pending).
+ */
+export const machineDeviceCodes = pgTable(
+  "machine_device_codes",
   {
     id: uuid()
       .primaryKey()
       .$defaultFn(() => Bun.randomUUIDv7()),
-    orgId: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    codeHash: text().notNull().unique(),
-    name: text().notNull(),
-    createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
-    expiresAt: timestamp({ withTimezone: true }).notNull(),
-    usedAt: timestamp({ withTimezone: true }),
+    /** The organization chosen on confirm; null until then. */
+    orgId: uuid().references(() => organizations.id, { onDelete: "cascade" }),
+    deviceCodeHash: text().notNull().unique(),
+    /** 6 characters, normalized (no separator). Unique among pending codes. */
+    userCode: text().notNull(),
+    /** `pending`, `confirmed`, `denied` or `redeemed` (expiry comes from `expires_at`). */
+    status: text().notNull().default("pending"),
+    /** What the computer said about itself. */
+    name: text().notNull().default(""),
+    os: text().notNull().default("other"),
+    arch: text().notNull().default(""),
+    hostname: text().notNull().default(""),
+    runnerVersion: text().notNull().default(""),
+    /** Optional extras a runner may send (copied to the machine row). */
+    protocol: integer(),
+    workspace: text(),
+    execAllowed: boolean(),
+    /** Where the request came from (rate limits, the confirm page). */
+    requesterIp: text().notNull().default(""),
+    approxLocation: text(),
+    confirmedByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    /** The machine made on confirm; its token is issued when the computer polls. */
     machineId: uuid(),
+    lastPolledAt: timestamp({ withTimezone: true }),
+    decidedAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index().on(t.orgId, t.createdAt)],
+  (t) => [
+    uniqueIndex("machine_device_codes_pending_user_code").on(t.userCode).where(sql`${t.status} = 'pending'`),
+    index().on(t.requesterIp, t.createdAt),
+  ],
 );
 
 /**

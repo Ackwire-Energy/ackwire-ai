@@ -2,6 +2,7 @@ import { BRAIN_PROTOCOL } from "@agenteschat/adapters";
 import { and, type Executor, eq, schema } from "@agenteschat/db";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
+import { pausedMessage } from "../machines";
 import { missionTurnFor } from "../missions-engine";
 import type { AgentRun } from "../runs";
 import { brainSessionId, claudeCodeAvailability } from "./claude-code";
@@ -56,7 +57,7 @@ export interface BrainUnavailability {
 
 /**
  * Why a computer brain can't take the turn now (null: it can): no computer,
- * offline, commands off, a runner older than protocol 8, the CLI missing or
+ * offline, paused by its owner, commands off, a runner older than protocol 8, the CLI missing or
  * not logged in (`hello.executors`), or over the plan limit.
  */
 export function computerBrainUnavailable(
@@ -76,12 +77,22 @@ export function computerBrainUnavailable(
       resetsAt: new Date(limited).toISOString(),
     };
   }
+  // Paused by its owner (ADR 0036 §6): like offline, until the pause ends (a known end: try again then).
+  const pausedUntil = status?.online && status.paused?.until ? { resetsAt: status.paused.until } : {};
   if (kind === "claude_code") {
     const e = claudeCodeAvailability(status);
-    return e && e.type === "error" ? { code: e.code, message: e.message } : null;
+    if (e?.type !== "error") return null;
+    return { code: e.code, message: e.message, ...(e.code === "machine_paused" ? pausedUntil : {}) };
   }
   if (!status?.online) {
     return { code: "machine_offline", message: `Codex${status ? ` on ${status.name}` : ""} is offline.` };
+  }
+  if (status.paused) {
+    return {
+      code: "machine_paused",
+      message: pausedMessage(status.name, status.paused.until, status.paused.timezone),
+      ...pausedUntil,
+    };
   }
   if (!status.execAllowed) return { code: "exec_disabled", message: `Commands are turned off on ${status.name}.` };
   if (status.protocol < BRAIN_PROTOCOL) {
@@ -102,6 +113,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "no_session",
   "no_computer",
   "machine_offline",
+  "machine_paused",
   "exec_disabled",
   "runner_outdated",
   "cli_missing",

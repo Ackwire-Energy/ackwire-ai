@@ -34,6 +34,7 @@ const Notification = z
       questionId: z.string().optional(),
       missionId: z.string().optional(),
       routineId: z.string().optional(),
+      machineId: z.string().optional(),
       label: z.string().optional(),
     }),
     latest: z.object({

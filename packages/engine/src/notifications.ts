@@ -54,6 +54,7 @@ export const NOTIFICATION_KINDS = [
   "routine_finished",
   "routine_failed",
   "reaction",
+  "machine_connected",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -77,6 +78,8 @@ export interface NotificationSource {
   questionId?: string;
   missionId?: string;
   routineId?: string;
+  /** A computer connected to the organization (ADR 0036). */
+  machineId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
   label?: string;
 }

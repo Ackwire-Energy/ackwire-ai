@@ -8,7 +8,6 @@ import {
   chooseDecision,
   closeMission,
   createAgent,
-  createMachinePairing,
   createMission,
   createMissionRunToolSource,
   decideCommand,
@@ -35,7 +34,6 @@ import {
   opineDecision,
   pauseMission,
   postPersonMessage,
-  redeemMachinePairing,
   requestFilesSync,
   requestToJoin,
   retryBlockedCommand,
@@ -51,6 +49,7 @@ import {
   syncMissionFiles,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -158,8 +157,7 @@ function missionRunner(hub: MachineHub) {
 }
 
 async function pairedMachine() {
-  const { code } = await createMachinePairing(deps(), f.owner.id, f.org.id, { name: "MacBook" });
-  const paired = await redeemMachinePairing(deps(), { code, ...RUNNER, exec: true });
+  const paired = await pairMachine(deps(), f.owner.id, f.org.id, { name: "MacBook", ...RUNNER, exec: true });
   await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
   await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
   return paired;
@@ -590,8 +588,7 @@ describe("missions (ADR 0029)", () => {
       error: { code: "mission.not_allowed" },
     });
     // Another computer of the org presenting the mission's task id.
-    const { code } = await createMachinePairing(deps(), f.owner.id, f.org.id, { name: "Other" });
-    const other = await redeemMachinePairing(deps(), { code, ...RUNNER, exec: true });
+    const other = await pairMachine(deps(), f.owner.id, f.org.id, { name: "Other", ...RUNNER, exec: true });
     const intruder = missionRunner(f.machineHub as MachineHub);
     await intruder.hello(other.token);
     expect(await intruder.mcp(plan.taskId, "report", { summary: "hi" })).toMatchObject({

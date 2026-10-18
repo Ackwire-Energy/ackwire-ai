@@ -13,7 +13,6 @@ import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
   createMachineHub,
-  createMachinePairing,
   declineSecret,
   deleteMachine,
   deliverSecret,
@@ -28,19 +27,17 @@ import {
   MachineOfflineError,
   MachineRequestError,
   NotFoundError,
-  PAIRING_TTL_MS,
   postPersonMessage,
   receiveMachineUpload,
-  redeemMachinePairing,
   removeAgentSecret,
   renameMachine,
   type SecretRequestView,
   setAgentComputerTarget,
   startAgentComputer,
   type ToolContext,
-  ValidationError,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 const hubs: MachineHub[] = [];
@@ -52,7 +49,6 @@ afterEach(async () => {
   await current?.close();
 });
 
-const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const deps = () => ({ db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.chat" });
 const RUNNER = {
   hostname: "box",
@@ -63,9 +59,8 @@ const RUNNER = {
   workspace: "/home/u/agentes",
 };
 
-async function pair(actorId = f.owner.id, name = "Build box", exec = true) {
-  const { code } = await createMachinePairing(deps(), actorId, f.org.id, { name });
-  return redeemMachinePairing(deps(), { code, ...RUNNER, exec });
+function pair(actorId = f.owner.id, name = "Build box", exec = true) {
+  return pairMachine(deps(), actorId, f.org.id, { name, ...RUNNER, exec });
 }
 
 type Request = Extract<ServerFrame, { type: "request" }>;
@@ -189,61 +184,8 @@ function fakeRunner(
   };
 }
 
+// Connecting a computer (the device-code flow) is covered in desktop.test.ts.
 describe("pairing", () => {
-  test("a one-time code (no 0/O/1/I), stored hashed; redeemed once for a hashed token", async () => {
-    f = await setup();
-    const p = await createMachinePairing(deps(), f.owner.id, f.org.id, { name: "  Build box  " });
-    expect(p.code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
-    expect(p.installCommand).toBe(
-      `curl -fsSL https://agentes.chat/api/machines/install.sh | sh -s -- --code ${p.code}`,
-    );
-    expect(new Date(p.expiresAt).getTime() - Date.now()).toBeGreaterThan(PAIRING_TTL_MS - 5000);
-    const [row] = await f.db.select().from(schema.machinePairings);
-    expect(row?.codeHash).toBe(sha(p.code.replace("-", "")));
-    expect(JSON.stringify(row)).not.toContain(p.code.replace("-", ""));
-
-    // Typed loosely: lower case, no dash.
-    const paired = await redeemMachinePairing(deps(), {
-      code: p.code.toLowerCase().replace("-", ""),
-      ...RUNNER,
-      exec: true,
-    });
-    expect(paired.name).toBe("Build box");
-    expect(paired.token).toMatch(/^agm_[A-Za-z0-9_-]{43}$/);
-    const [machine] = await f.db.select().from(schema.machines);
-    expect(machine).toMatchObject({
-      id: paired.machineId,
-      tokenHash: sha(paired.token),
-      online: false,
-      hostname: "box",
-    });
-    expect(JSON.stringify(machine)).not.toContain(paired.token);
-    const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "machine.paired"));
-    expect(audit).toHaveLength(1);
-
-    // Single use.
-    await expect(redeemMachinePairing(deps(), { code: p.code, ...RUNNER, exec: true })).rejects.toMatchObject({
-      code: "machine.pairing_invalid",
-    });
-    await expect(redeemMachinePairing(deps(), { code: "AAAA-BBBB", ...RUNNER, exec: true })).rejects.toThrow(
-      ValidationError,
-    );
-  });
-
-  test("expired codes and outdated runners are refused; outsiders can't pair", async () => {
-    f = await setup();
-    const p = await createMachinePairing(deps(), f.owner.id, f.org.id, { name: "Old" });
-    const later = () => new Date(Date.now() + PAIRING_TTL_MS + 1000);
-    await expect(
-      redeemMachinePairing({ ...deps(), now: later }, { code: p.code, ...RUNNER, exec: true }),
-    ).rejects.toMatchObject({ code: "machine.pairing_invalid" });
-    await expect(
-      redeemMachinePairing(deps(), { code: p.code, ...RUNNER, protocol: 0, exec: true }),
-    ).rejects.toMatchObject({ code: "machine.outdated" });
-    await expect(createMachinePairing(deps(), "user_nobody", f.org.id, { name: "x" })).rejects.toThrow(ForbiddenError);
-    await expect(createMachinePairing(deps(), f.owner.id, f.org.id, { name: "  " })).rejects.toThrow(ValidationError);
-  });
-
   test("authenticateMachine: valid token only; deleting the machine revokes it", async () => {
     f = await setup();
     const paired = await pair();
@@ -563,10 +505,10 @@ describe("tools on a connected machine", () => {
     expect(runner.sent.find((s) => s.type === "request" && s.op === "push")).toMatchObject({
       url: `http://localhost:3000/api/machines/uploads/${row?.id}`,
     });
-    // Every request says which agent it's for: the runner keeps each agent in its own folder.
+    // Every request says which agent it's for (the runner keeps each agent in its own folder) and its name (protocol 9).
     const requests = runner.sent.filter((s) => s.type === "request");
     expect(requests.length).toBeGreaterThan(3);
-    for (const r of requests) expect(r.agent).toEqual({ id: f.agent.id, handle: "dev" });
+    for (const r of requests) expect(r.agent).toEqual({ id: f.agent.id, handle: "dev", name: "Dev" });
 
     const status = await call(ctx, "computer_status", {});
     expect(status.content).toContain('connected computer "Build box" (Linux), online');

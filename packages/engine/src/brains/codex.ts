@@ -7,6 +7,7 @@ import {
   parseBrainEvent,
 } from "@agenteschat/adapters";
 import type { MachineCaller } from "../machine-hub";
+import { MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
 import { computerPrompt } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
@@ -37,6 +38,9 @@ export interface ComputerBrainLink {
     /** The runner's protocol (absent: not checked). */
     protocol?: number;
     executors: { codex?: { version: string }; claude?: { version: string } };
+    /** The owner paused the computer (protocol 9; absent: not checked). */
+    paused?: { until: string | null; timezone: string | null } | null;
+    name?: string;
   } | null>;
   /** Sends `brain.turn` and calls `onEvent` per `brain.event`; resolves on `brain.done`. */
   turn(
@@ -104,6 +108,11 @@ export class CodexBrain implements Brain {
     const status = await this.deps.link.status(session.machineId);
     if (!status?.online) {
       yield { type: "error", code: "machine_offline", message: "The computer is offline.", retryable: true };
+      return;
+    }
+    if (status.paused) {
+      const message = pausedMessage(status.name ?? "", status.paused.until, status.paused.timezone);
+      yield { type: "error", code: "machine_paused", message, retryable: true };
       return;
     }
     if (!status.execAllowed) {
@@ -186,6 +195,8 @@ export class CodexBrain implements Brain {
     if (ended) return;
     if (io.signal.aborted) {
       yield { type: "error", code: "canceled", message: "The turn was canceled." };
+    } else if (state.failure instanceof MachinePausedError) {
+      yield { type: "error", code: "machine_paused", message: state.failure.message, retryable: true };
     } else if (state.failure !== undefined) {
       const message = state.failure instanceof Error ? state.failure.message : String(state.failure);
       yield { type: "error", code: "runner_failed", message, retryable: true };

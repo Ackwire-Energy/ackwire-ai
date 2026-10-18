@@ -51,6 +51,7 @@ interface Strings {
   missionStoppedTitle: string;
   routineFailedTitle: string;
   routineFailedBody: string;
+  machineConnectedTitle: string;
   waitingTitle: string;
   openBody: string;
 }
@@ -70,6 +71,7 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "Uma missão parou",
     routineFailedTitle: "Uma rotina não terminou",
     routineFailedBody: "Toque para ver o que aconteceu.",
+    machineConnectedTitle: "Um computador novo entrou na organização",
     waitingTitle: "Tem algo esperando você",
     openBody: "Toque para abrir.",
   },
@@ -87,6 +89,7 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "A mission stopped",
     routineFailedTitle: "A routine didn't finish",
     routineFailedBody: "Tap to see what happened.",
+    machineConnectedTitle: "A new computer joined the organization",
     waitingTitle: "Something is waiting for you",
     openBody: "Tap to open.",
   },
@@ -124,6 +127,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       return out(s.missionStoppedTitle, what || s.openBody);
     case "routine_failed":
       return out(s.routineFailedTitle, what || s.routineFailedBody);
+    case "machine_connected":
+      // Its name and who connected it: if nobody here expected it, it can be removed at once.
+      return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);
   }
