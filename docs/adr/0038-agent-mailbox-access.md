@@ -1,6 +1,6 @@
 # 0038. Agents use people's mailboxes: Composio for Gmail/Outlook, our IMAP/SMTP connector for the rest
 
-- Status: Proposed
+- Status: Accepted (built on `feature/agent-email`; not yet tried against real Composio or IMAP servers)
 - Date: 2026-10-18
 - Planning: none yet (D53 lists the security prerequisites)
 - Extends: ADR 0015 (Tool Gateway and approvals), ADR 0016 (connectors), ADR 0007 (credentials)
@@ -109,4 +109,15 @@ KMS is not a prerequisite for email. Gmail and Outlook through Composio store no
 - **IMAP app passwords can't be scoped at the provider.** Our scopes protect against the agent (prompt injection from mail), not against someone who steals the credential from us. The screen suggests a dedicated mailbox. The KMS from ADR 0007 makes stealing the credential harder for every credential, this one included.
 - **Prompt injection through inbound mail is reduced, not removed.** The defences are untrusted wrapping, approval on send, recipient lists, and runs started by inbound mail never approving their own sends. The agent screen warns about "reads outside mail + sends without asking".
 - **Tests** use a fake Composio source and a fake IMAP/SMTP server (no network), following ADR 0003.
-- **Self-host:** Composio is a Cloud module. The IMAP/SMTP connector works in core. This is noted for the open-source list in the planning doc when it is decided.
+- **Self-host:** Composio is an adapter turned on by `COMPOSIO_API_KEY` (any install can bring its own project). The IMAP/SMTP connector works in core (`MAIL_IMAP_ENABLED`).
+
+## As built
+
+- Contract: `packages/adapters/src/mail.ts`; Composio `composio.ts` (REST v3.1); IMAP/SMTP `imap.ts` (`imapflow`, `nodemailer`, `mailparser`) and `mail-presets.ts`; fakes `mail-fake.ts`. Engine: `packages/engine/src/mail/*`. Tables: migration 0071. Routes: `apps/server/src/routes/app/mail.ts`, `POST /api/webhooks/composio`. Wiring: `mailAdapters` in `apps/server/src/start.ts`.
+- Per-call checks: `ToolDefinition.checkCall` and `tools/checks.ts`; the GitHub repository check is the first connector-wide one.
+- Tools per mailbox: `mail_<slug>_<verb>` (search, read, folders, attachment into the Drive as an untrusted file, draft, send, reply, forward, move, mark, archive, trash).
+- Mail grants are changed only by the mail API: replacing an agent's scopes keeps them, and "all tools" never includes `mail:` scopes.
+- A run started by inbound mail, and later runs in that thread, always ask before sending, even when the policy allows sending without asking.
+- IMAP host names are resolved and refused when they point to private, loopback or metadata addresses. They are checked once before connecting, not pinned against DNS rebinding.
+- Presets: iCloud, Yahoo, Zoho (and Zoho custom domains), Fastmail, Locaweb, Hostinger, GoDaddy, Titan and IONOS. KingHost and UOL Host are left out because no official settings page was found; those mailboxes use "Outro servidor".
+- Outlook has no brand icon (Simple Icons removed it at Microsoft's request); the card shows a letter tile.

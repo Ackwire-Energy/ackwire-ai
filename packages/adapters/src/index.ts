@@ -1,6 +1,7 @@
 import type { BlobStore } from "./blob";
 import type { EmailSender } from "./email";
 import type { KeyWrapper, PlatformCredentials } from "./keys";
+import type { MailAdapters } from "./mail";
 import type { Presence } from "./presence";
 import type { PubSub } from "./pubsub";
 import type { PushSender } from "./push";
@@ -11,9 +12,14 @@ import type { SearchIndexResolver } from "./search";
 export * from "./blob";
 export * from "./blob-postgres";
 export * from "./command-policy";
+export * from "./composio";
 export * from "./email";
+export * from "./imap";
 export * from "./keys";
 export * from "./machine-protocol";
+export * from "./mail";
+export * from "./mail-fake";
+export * from "./mail-presets";
 export * from "./presence";
 export * from "./pubsub";
 export * from "./push";
@@ -49,4 +55,6 @@ export interface Adapters {
   sandbox?: SandboxProvider | null;
   /** Push to the phone app (`push.send` outbox job, ADR 0035); null/absent = no push. */
   push?: PushSender | null;
+  /** People's mailboxes for agents (ADR 0038); absent = no email connectors. */
+  mail?: MailAdapters;
 }

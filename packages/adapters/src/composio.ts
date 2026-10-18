@@ -1,0 +1,1037 @@
+/**
+ * Gmail and Outlook through Composio (ADR 0038), over its REST API v3.1
+ * (`https://backend.composio.dev/api/v3.1`, `x-api-key` header).
+ *
+ * - `createComposioClient`: auth configs (Composio-managed, found or created
+ *   once per toolkit), Connect Links, connected accounts, "new message"
+ *   triggers, signed webhooks, and tool execution for our connector.
+ * - `createComposioMailConnector`: a `MailProvider` per account that runs
+ *   only explicit Gmail/Outlook tools (never Composio's meta-tools).
+ *
+ * Permissions, approvals and per-call checks live in the engine; this file
+ * only reaches the mailbox. The API key never appears in errors.
+ */
+import { createHmac, timingSafeEqual } from "node:crypto";
+import {
+  decodeBase64,
+  decodeBase64Text,
+  decodeEntities,
+  graphRecipient,
+  htmlToText,
+  parseAddressList,
+  snippetOf,
+  toIsoDate,
+  toPlainText,
+} from "./composio-mail";
+import {
+  type ComposioClient,
+  ComposioSignatureError,
+  type ComposioToolkit,
+  type ComposioWebhookEvent,
+  type MailAccountRef,
+  type MailAttachment,
+  MailAuthError,
+  type MailConnector,
+  MailError,
+  type MailFolder,
+  type MailFolderRole,
+  type MailMessage,
+  type MailProvider,
+  type MailQuery,
+  type MailSummary,
+  type OutgoingMail,
+} from "./mail";
+
+/** Composio trigger types for a new message. */
+export const COMPOSIO_MAIL_TRIGGERS: Record<ComposioToolkit, string> = {
+  gmail: "GMAIL_NEW_GMAIL_MESSAGE",
+  outlook: "OUTLOOK_MESSAGE_TRIGGER",
+};
+
+/** How old (or how far ahead) a webhook timestamp may be, in seconds. */
+const WEBHOOK_TOLERANCE_SECONDS = 300;
+
+/** The client plus what only our connector uses (tool execution, file downloads). */
+export interface ComposioRestClient extends ComposioClient {
+  /** Runs one tool for a connected account; returns the tool's `data`. Throws `MailAuthError`/`MailError`. */
+  executeTool(slug: string, connectedAccountId: string, args: Record<string, unknown>): Promise<unknown>;
+  /** Downloads a file a tool returned as a URL (attachments). */
+  fetchFile(url: string): Promise<Uint8Array>;
+}
+
+export interface ComposioClientOptions {
+  apiKey: string;
+  /** Signing secret of the project's webhook subscription; without it every webhook is refused. */
+  webhookSecret?: string;
+  /** Auth configs to use; absent = find or create a Composio-managed one per toolkit. */
+  gmailAuthConfigId?: string;
+  outlookAuthConfigId?: string;
+  baseUrl?: string;
+  fetch?: typeof fetch;
+  /** Clock for webhook timestamps (tests). */
+  now?: () => number;
+}
+
+type Obj = Record<string, unknown>;
+
+const obj = (value: unknown): Obj =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Obj) : {};
+const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+const str = (value: unknown): string | undefined =>
+  typeof value === "string" && value !== "" ? value : typeof value === "number" ? String(value) : undefined;
+/** Tool results sometimes nest the provider response under `response_data`. */
+const unwrap = (data: unknown): Obj => {
+  const outer = obj(data);
+  const inner = outer.response_data;
+  return inner && typeof inner === "object" && !Array.isArray(inner) ? (inner as Obj) : outer;
+};
+const clampLimit = (limit: number | undefined) => Math.min(50, Math.max(1, Math.floor(limit ?? 20)));
+
+/** A connection that needs reconnecting (expired, revoked, deleted, refused by the provider). */
+const AUTH_BROKEN =
+  /\b401\b|invalid_grant|unauthori[sz]ed|unauthenticated|invalid[_ ]credentials|token (has been |is )?(expired|revoked)|auth(entication)? refresh required|re-?auth|connected ?account[^.]*?(not active|inactive|expired|disabled|deleted|not found|revoked|failed)|no (active )?connected account/i;
+const RETRYABLE =
+  /\b(429|500|502|503|504)\b|rate.?limit|quota|too many requests|timed? ?out|timeout|temporar|unavailable|backend ?error|try again/i;
+
+function cut(message: string): string {
+  const flat = message.replace(/\s+/g, " ").trim();
+  return flat.length > 300 ? `${flat.slice(0, 299)}…` : flat;
+}
+
+/** A failed tool run (`successful: false`) as our error types. */
+function toolError(slug: string, message: string): Error {
+  const text = `Composio ${slug} failed: ${cut(message)}`;
+  if (AUTH_BROKEN.test(message)) return new MailAuthError(text);
+  return new MailError(text, RETRYABLE.test(message));
+}
+
+/** Gmail search terms: drops characters Gmail can't take inside a term. */
+function gmailTerm(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s"(){}]+/g, "");
+}
+
+/** Gmail has no escape for quotes inside a phrase: they become spaces. */
+function gmailPhrase(value: string): string {
+  return value.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * A routine's filter as a Gmail search (pushed to the trigger so unrelated
+ * mail is never a billed event): `from:(a@x.com OR @b.com) subject:"x" "text"`.
+ * Null when the filter is empty.
+ */
+export function gmailQueryFromFilter(filter: { from?: string[]; subject?: string; text?: string }): string | null {
+  const parts: string[] = [];
+  const from = (filter.from ?? []).map(gmailTerm).filter(Boolean);
+  if (from.length === 1) parts.push(`from:${from[0]}`);
+  else if (from.length > 1) parts.push(`from:(${from.join(" OR ")})`);
+  const subject = gmailPhrase(filter.subject ?? "");
+  if (subject) parts.push(`subject:"${subject}"`);
+  const text = gmailPhrase(filter.text ?? "");
+  if (text) parts.push(`"${text}"`);
+  return parts.length ? parts.join(" ") : null;
+}
+
+/** A `MailQuery` as a Gmail search (folder goes in `label_ids`). Dates use epoch seconds, so they are exact. */
+export function gmailSearchQuery(query: MailQuery): string {
+  const parts: string[] = [];
+  const from = gmailTerm(query.from ?? "");
+  if (from) parts.push(`from:${from}`);
+  const to = gmailTerm(query.to ?? "");
+  if (to) parts.push(`to:${to}`);
+  const subject = gmailPhrase(query.subject ?? "");
+  if (subject) parts.push(`subject:"${subject}"`);
+  const text = gmailPhrase(query.text ?? "");
+  if (text) parts.push(`"${text}"`);
+  const since = query.since ? Date.parse(query.since) : Number.NaN;
+  if (Number.isFinite(since)) parts.push(`after:${Math.floor(since / 1000) - 1}`);
+  const before = query.before ? Date.parse(query.before) : Number.NaN;
+  if (Number.isFinite(before)) parts.push(`before:${Math.floor(before / 1000)}`);
+  if (query.unreadOnly) parts.push("is:unread");
+  return parts.join(" ");
+}
+
+export function createComposioClient(options: ComposioClientOptions): ComposioRestClient {
+  const http = options.fetch ?? fetch;
+  const base = (options.baseUrl ?? "https://backend.composio.dev/api/v3.1").replace(/\/$/, "");
+  const now = options.now ?? Date.now;
+  const authConfigs = new Map<ComposioToolkit, Promise<string>>();
+  if (options.gmailAuthConfigId) authConfigs.set("gmail", Promise.resolve(options.gmailAuthConfigId));
+  if (options.outlookAuthConfigId) authConfigs.set("outlook", Promise.resolve(options.outlookAuthConfigId));
+
+  async function request(
+    method: string,
+    path: string,
+    body?: unknown,
+    opts: { allowNotFound?: boolean } = {},
+  ): Promise<Obj | null> {
+    let res: Response;
+    try {
+      res = await http(`${base}${path}`, {
+        method,
+        headers: {
+          "x-api-key": options.apiKey,
+          accept: "application/json",
+          ...(body !== undefined ? { "content-type": "application/json" } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      });
+    } catch (error) {
+      throw new MailError(`could not reach Composio: ${error instanceof Error ? error.message : String(error)}`, true);
+    }
+    if (opts.allowNotFound && res.status === 404) return null;
+    const text = await res.text().catch(() => "");
+    let json: unknown = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      json = {};
+    }
+    if (res.ok) return obj(json);
+    const error = obj(obj(json).error);
+    const message = str(error.message) ?? str(obj(json).message) ?? res.statusText ?? "";
+    const slug = str(error.slug);
+    const text2 = `Composio ${method} ${path.split("?")[0]} failed (${res.status}${slug ? ` ${slug}` : ""}): ${cut(message)}`;
+    if (res.status === 429 || res.status >= 500) throw new MailError(text2, true);
+    // 401/403 here is our project key, not the person's connection.
+    if (res.status === 401 || res.status === 403) throw new MailError(text2, false);
+    if (AUTH_BROKEN.test(`${message} ${slug ?? ""}`)) throw new MailAuthError(text2);
+    throw new MailError(text2, false);
+  }
+
+  async function findOrCreateAuthConfig(toolkit: ComposioToolkit): Promise<string> {
+    const list = await request("GET", `/auth_configs?toolkit_slug=${toolkit}&is_composio_managed=true&limit=50`);
+    const found = arr(list?.items)
+      .map(obj)
+      .find(
+        (item) =>
+          str(obj(item.toolkit).slug)?.toLowerCase() === toolkit &&
+          item.is_composio_managed !== false &&
+          item.status !== "DISABLED" &&
+          str(item.id),
+      );
+    if (found) return str(found.id) as string;
+    const created = await request("POST", "/auth_configs", {
+      toolkit: { slug: toolkit },
+      auth_config: { type: "use_composio_managed_auth" },
+    });
+    const id = str(obj(created?.auth_config).id);
+    if (!id) throw new MailError(`Composio did not return an auth config for ${toolkit}`, false);
+    return id;
+  }
+
+  function authConfigId(toolkit: ComposioToolkit): Promise<string> {
+    let pending = authConfigs.get(toolkit);
+    if (!pending) {
+      pending = findOrCreateAuthConfig(toolkit);
+      authConfigs.set(toolkit, pending);
+      pending.catch(() => authConfigs.delete(toolkit));
+    }
+    return pending;
+  }
+
+  async function executeTool(slug: string, connectedAccountId: string, args: Record<string, unknown>) {
+    const result = await request("POST", `/tools/execute/${encodeURIComponent(slug)}`, {
+      connected_account_id: connectedAccountId,
+      arguments: Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)),
+    });
+    if (!result || result.successful === false) {
+      throw toolError(slug, str(result?.error) ?? "unknown error");
+    }
+    return result.data ?? {};
+  }
+
+  async function mailboxAddress(toolkit: string, connectedAccountId: string): Promise<string | null> {
+    if (toolkit === "gmail") {
+      const profile = unwrap(await executeTool("GMAIL_GET_PROFILE", connectedAccountId, { user_id: "me" }));
+      return str(profile.emailAddress)?.toLowerCase() ?? str(profile.email_address)?.toLowerCase() ?? null;
+    }
+    if (toolkit === "outlook") {
+      const profile = unwrap(await executeTool("OUTLOOK_GET_PROFILE", connectedAccountId, { user_id: "me" }));
+      const address = str(profile.mail) ?? str(profile.userPrincipalName) ?? str(profile.user_principal_name);
+      return address?.includes("@") ? address.toLowerCase() : null;
+    }
+    return null;
+  }
+
+  function signatureMatches(secret: string, signed: string, header: string): boolean {
+    const keys: (string | Uint8Array)[] = [secret];
+    // Standard Webhooks secrets (`whsec_<base64>`) sign with the decoded key.
+    if (secret.startsWith("whsec_")) keys.push(decodeBase64(secret.slice(6)));
+    const expected = keys.map((key) => createHmac("sha256", key).update(signed).digest());
+    return header
+      .split(" ")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .some((part) => {
+        const comma = part.indexOf(",");
+        const version = comma === -1 ? "v1" : part.slice(0, comma);
+        if (version !== "v1") return false;
+        const received = Buffer.from(comma === -1 ? part : part.slice(comma + 1), "base64");
+        return expected.some((digest) => digest.length === received.length && timingSafeEqual(digest, received));
+      });
+  }
+
+  return {
+    executeTool,
+
+    async fetchFile(url) {
+      if (!/^https:\/\//i.test(url)) throw new MailError("Composio returned a file URL that is not https", false);
+      let res: Response;
+      try {
+        res = await http(url);
+      } catch (error) {
+        throw new MailError(
+          `could not download the file: ${error instanceof Error ? error.message : String(error)}`,
+          true,
+        );
+      }
+      if (!res.ok) throw new MailError(`could not download the file (${res.status})`, res.status >= 500);
+      return new Uint8Array(await res.arrayBuffer());
+    },
+
+    async createConnectLink(input) {
+      const result = await request("POST", "/connected_accounts/link", {
+        auth_config_id: await authConfigId(input.toolkit),
+        user_id: input.userId,
+        callback_url: input.callbackUrl,
+      });
+      const connectedAccountId = str(result?.connected_account_id);
+      const redirectUrl = str(result?.redirect_url);
+      if (!connectedAccountId || !redirectUrl) throw new MailError("Composio did not return a connect link", false);
+      return { connectedAccountId, redirectUrl };
+    },
+
+    async getConnectedAccount(id) {
+      const account = await request("GET", `/connected_accounts/${encodeURIComponent(id)}`, undefined, {
+        allowNotFound: true,
+      });
+      if (!account) return { status: "failed", address: null };
+      const raw = (str(account.status) ?? "").toUpperCase();
+      if (raw === "INITIALIZING" || raw === "INITIATED") return { status: "pending", address: null };
+      if (raw === "EXPIRED") return { status: "expired", address: null };
+      if (raw !== "ACTIVE" || account.is_disabled === true) return { status: "failed", address: null };
+      try {
+        const address = await mailboxAddress((str(obj(account.toolkit).slug) ?? "").toLowerCase(), id);
+        return { status: "active", address };
+      } catch (error) {
+        if (error instanceof MailAuthError) return { status: "expired", address: null };
+        throw error;
+      }
+    },
+
+    async deleteConnectedAccount(id) {
+      // Also revokes the grant at Google/Microsoft: the person disconnected it.
+      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}?revoke_on_delete=true`, undefined, {
+        allowNotFound: true,
+      });
+    },
+
+    async createMailTrigger(input) {
+      let triggerConfig: Obj = {};
+      if (input.toolkit === "gmail") {
+        const query = input.query?.trim();
+        triggerConfig = query
+          ? { query: /\b(in|label):/i.test(query) ? query : `in:inbox ${query}` }
+          : { labelIds: "INBOX" };
+      }
+      const result = await request("POST", `/trigger_instances/${COMPOSIO_MAIL_TRIGGERS[input.toolkit]}/upsert`, {
+        connected_account_id: input.connectedAccountId,
+        trigger_config: triggerConfig,
+      });
+      const triggerId = str(result?.trigger_id);
+      if (!triggerId) throw new MailError("Composio did not return a trigger id", false);
+      return { triggerId };
+    },
+
+    async deleteTrigger(triggerId) {
+      await request("DELETE", `/trigger_instances/manage/${encodeURIComponent(triggerId)}`, undefined, {
+        allowNotFound: true,
+      });
+    },
+
+    verifyWebhook(headers, rawBody) {
+      const secret = options.webhookSecret;
+      const id = headers.get("webhook-id");
+      const timestamp = headers.get("webhook-timestamp");
+      const signature = headers.get("webhook-signature");
+      if (!secret || !id || !timestamp || !signature) throw new ComposioSignatureError();
+      const seconds = Number(timestamp);
+      if (!Number.isFinite(seconds) || Math.abs(now() / 1000 - seconds) > WEBHOOK_TOLERANCE_SECONDS) {
+        throw new ComposioSignatureError();
+      }
+      if (!signatureMatches(secret, `${id}.${timestamp}.${rawBody}`, signature)) throw new ComposioSignatureError();
+      let payload: unknown;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        return { type: "other" };
+      }
+      return parseComposioEvent(payload);
+    },
+  };
+}
+
+/** Maps a verified V3 webhook payload to our event. */
+export function parseComposioEvent(payload: unknown): ComposioWebhookEvent {
+  const event = obj(payload);
+  const data = obj(event.data);
+  const metadata = obj(event.metadata);
+  switch (event.type) {
+    case "composio.trigger.message": {
+      const triggerId = str(metadata.trigger_id);
+      const connectedAccountId = str(metadata.connected_account_id);
+      const slug = str(metadata.trigger_slug)?.toUpperCase();
+      if (!triggerId || !connectedAccountId) return { type: "other" };
+      let message: MailSummary | null = null;
+      if (slug === COMPOSIO_MAIL_TRIGGERS.gmail) message = summaryOf(gmailMessage(data));
+      else if (slug === COMPOSIO_MAIL_TRIGGERS.outlook) {
+        const fields = obj(data.outlook_message ?? data.message);
+        message = outlookSummary({ ...fields, id: str(data.id) ?? fields.id });
+      }
+      if (!message?.id) return { type: "other" };
+      return { type: "mail.received", triggerId, connectedAccountId, message };
+    }
+    case "composio.connected_account.expired": {
+      const connectedAccountId = str(data.id);
+      return connectedAccountId ? { type: "account.expired", connectedAccountId } : { type: "other" };
+    }
+    case "composio.trigger.disabled": {
+      const triggerId = str(data.id);
+      return triggerId ? { type: "trigger.disabled", triggerId } : { type: "other" };
+    }
+    default:
+      return { type: "other" };
+  }
+}
+
+function summaryOf(message: MailMessage): MailSummary {
+  const { text: _text, replyTo: _replyTo, messageIdHeader: _m, references: _r, attachments: _a, ...summary } = message;
+  return summary;
+}
+
+// --- Gmail ---------------------------------------------------------------
+
+const GMAIL_ROLES: Record<string, { name: string; role: MailFolderRole }> = {
+  INBOX: { name: "Inbox", role: "inbox" },
+  SENT: { name: "Sent", role: "sent" },
+  DRAFT: { name: "Drafts", role: "drafts" },
+  TRASH: { name: "Trash", role: "trash" },
+  SPAM: { name: "Spam", role: "spam" },
+};
+/** Not a Gmail label: "All Mail" (no label filter). Archived mail lives here. */
+const GMAIL_ALL = "ALL";
+
+interface GmailPart {
+  mimeType?: string;
+  filename?: string;
+  headers?: { name?: string; value?: string }[];
+  body?: { data?: string; attachmentId?: string; size?: number };
+  parts?: GmailPart[];
+}
+
+function gmailHeaders(payload: GmailPart | undefined): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const header of payload?.headers ?? []) {
+    const name = header.name?.toLowerCase();
+    if (name && typeof header.value === "string" && !(name in headers)) headers[name] = header.value;
+  }
+  return headers;
+}
+
+function gmailParts(payload: GmailPart | undefined): GmailPart[] {
+  const out: GmailPart[] = [];
+  const walk = (part: GmailPart | undefined) => {
+    if (!part) return;
+    out.push(part);
+    for (const child of part.parts ?? []) walk(child);
+  };
+  walk(payload);
+  return out;
+}
+
+function gmailBody(payload: GmailPart | undefined): string | null {
+  const parts = gmailParts(payload).filter((part) => !part.filename && part.body?.data);
+  const plain = parts.find((part) => part.mimeType?.toLowerCase() === "text/plain");
+  if (plain?.body?.data) return decodeBase64Text(plain.body.data).replace(/\r\n/g, "\n").trim();
+  const html = parts.find((part) => part.mimeType?.toLowerCase() === "text/html");
+  if (html?.body?.data) return htmlToText(decodeBase64Text(html.body.data));
+  return null;
+}
+
+/** Attachment ids are `<position>:<Gmail attachment id>`: Gmail's ids change between fetches, the position doesn't. */
+function gmailAttachments(raw: Obj, payload: GmailPart | undefined): MailAttachment[] {
+  const fromParts = gmailParts(payload).filter((part) => part.filename && part.body?.attachmentId);
+  if (fromParts.length) {
+    return fromParts.map((part, index) => ({
+      id: `${index}:${part.body?.attachmentId}`,
+      filename: part.filename ?? "attachment",
+      contentType: part.mimeType ?? "application/octet-stream",
+      size: Number(part.body?.size ?? 0),
+    }));
+  }
+  return arr(raw.attachmentList ?? raw.attachment_list)
+    .map(obj)
+    .filter((item) => str(item.attachmentId ?? item.attachment_id))
+    .map((item, index) => ({
+      id: `${index}:${str(item.attachmentId ?? item.attachment_id)}`,
+      filename: str(item.filename ?? item.name) ?? "attachment",
+      contentType: str(item.mimeType ?? item.mime_type ?? item.mimetype) ?? "application/octet-stream",
+      size: Number(item.size ?? 0) || 0,
+    }));
+}
+
+/** A Gmail message (tool result or trigger payload, camelCase or snake_case) as our message. */
+export function gmailMessage(raw: Obj): MailMessage {
+  const payload = (raw.payload && typeof raw.payload === "object" ? raw.payload : undefined) as GmailPart | undefined;
+  const headers = gmailHeaders(payload);
+  const labels = arr(raw.labelIds ?? raw.label_ids).filter((label): label is string => typeof label === "string");
+  const preview = obj(raw.preview);
+  const fallbackText = str(raw.messageText ?? raw.message_text);
+  const text = gmailBody(payload) ?? (fallbackText ? toPlainText(fallbackText) : "");
+  const snippetSource = str(raw.snippet) ?? str(preview.body) ?? text;
+  const attachments = gmailAttachments(raw, payload);
+  const folder = labels.find((label) => label in GMAIL_ROLES);
+  return {
+    id: str(raw.messageId ?? raw.id ?? raw.message_id) ?? "",
+    threadId: str(raw.threadId ?? raw.thread_id),
+    ...(folder ? { folder } : {}),
+    from: parseAddressList(headers.from ?? raw.sender ?? raw.from)[0] ?? null,
+    to: parseAddressList(headers.to ?? raw.to),
+    cc: parseAddressList(headers.cc ?? raw.cc),
+    subject: decodeEntities(headers.subject ?? str(raw.subject) ?? str(preview.subject) ?? ""),
+    date:
+      toIsoDate(raw.internalDate ?? raw.internal_date) ??
+      toIsoDate(raw.messageTimestamp ?? raw.message_timestamp) ??
+      toIsoDate(headers.date) ??
+      new Date(0).toISOString(),
+    snippet: snippetOf(toPlainText(snippetSource)),
+    unread: labels.includes("UNREAD"),
+    flagged: labels.includes("STARRED"),
+    hasAttachments: attachments.length > 0 || payload?.mimeType?.toLowerCase() === "multipart/mixed",
+    text,
+    replyTo: parseAddressList(headers["reply-to"]),
+    messageIdHeader: headers["message-id"],
+    references: (headers.references ?? "").split(/\s+/).filter(Boolean),
+    attachments,
+  };
+}
+
+function gmailRecipients(mail: OutgoingMail): Obj {
+  return {
+    ...(mail.to.length ? { recipient_email: mail.to[0] } : {}),
+    ...(mail.to.length > 1 ? { extra_recipients: mail.to.slice(1) } : {}),
+    ...(mail.cc.length ? { cc: mail.cc } : {}),
+    ...(mail.bcc.length ? { bcc: mail.bcc } : {}),
+  };
+}
+
+/** The forwarded message's text quoted below ours (where the tool can't forward natively). */
+function forwardedText(text: string, original: MailMessage): string {
+  const who = (address: { name?: string; address: string } | null) =>
+    address ? (address.name ? `${address.name} <${address.address}>` : address.address) : "";
+  return [
+    text,
+    "",
+    "---------- Forwarded message ---------",
+    `From: ${who(original.from)}`,
+    `Date: ${original.date}`,
+    `Subject: ${original.subject}`,
+    `To: ${original.to.map(who).join(", ")}`,
+    ...(original.cc.length ? [`Cc: ${original.cc.map(who).join(", ")}`] : []),
+    "",
+    original.text,
+  ].join("\n");
+}
+
+function sentId(data: unknown): string | null {
+  const result = unwrap(data);
+  return str(result.id) ?? str(result.messageId) ?? str(result.message_id) ?? null;
+}
+
+function gmailProvider(client: ComposioRestClient, accountId: string): MailProvider {
+  const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, accountId, { user_id: "me", ...args });
+  const read = async (id: string, format: "full" | "metadata" = "full") =>
+    gmailMessage(unwrap(await exec("GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", { message_id: id, format })));
+  const modify = (id: string, add: string[], remove: string[]) =>
+    exec("GMAIL_ADD_LABEL_TO_EMAIL", {
+      message_id: id,
+      ...(add.length ? { add_label_ids: add } : {}),
+      ...(remove.length ? { remove_label_ids: remove } : {}),
+    });
+  const trash = async (id: string) => {
+    await exec("GMAIL_MOVE_TO_TRASH", { message_id: id });
+  };
+  const threadOf = async (id: string) => {
+    const threadId = (await read(id, "metadata")).threadId;
+    if (!threadId) throw new MailError(`Gmail message ${id} has no thread`, false);
+    return threadId;
+  };
+
+  return {
+    async listFolders() {
+      const data = unwrap(await exec("GMAIL_LIST_LABELS"));
+      const folders: MailFolder[] = [];
+      for (const label of arr(data.labels).map(obj)) {
+        const id = str(label.id);
+        if (!id) continue;
+        const system = GMAIL_ROLES[id];
+        if (system) folders.push({ id, ...system });
+        else if (label.type !== "system") folders.push({ id, name: str(label.name) ?? id });
+      }
+      folders.push({ id: GMAIL_ALL, name: "All Mail", role: "all" });
+      return folders;
+    },
+
+    async search(query) {
+      const limit = clampLimit(query.limit);
+      const folder = query.folder ?? "INBOX";
+      const q = gmailSearchQuery(query);
+      const data = unwrap(
+        await exec("GMAIL_FETCH_EMAILS", {
+          ...(q ? { query: q } : {}),
+          ...(folder !== GMAIL_ALL ? { label_ids: [folder] } : {}),
+          include_spam_trash: folder === "SPAM" || folder === "TRASH",
+          max_results: limit,
+          include_payload: true,
+          verbose: false,
+        }),
+      );
+      return arr(data.messages)
+        .map((message) => summaryOf(gmailMessage(obj(message))))
+        .filter((message) => message.id)
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, limit);
+    },
+
+    read: (id) => read(id),
+
+    async attachment(messageId, attachmentId) {
+      const colon = attachmentId.indexOf(":");
+      const gmailId = colon === -1 ? attachmentId : attachmentId.slice(colon + 1);
+      const position = colon === -1 ? -1 : Number(attachmentId.slice(0, colon));
+      const message = await read(messageId);
+      const meta =
+        message.attachments.find((item) => item.id === attachmentId) ??
+        (position >= 0 ? message.attachments[position] : undefined) ??
+        message.attachments.find((item) => item.id.endsWith(`:${gmailId}`));
+      const freshId = meta ? meta.id.slice(meta.id.indexOf(":") + 1) : gmailId;
+      const filename = meta?.filename ?? "attachment";
+      const data = await exec("GMAIL_GET_ATTACHMENT", {
+        message_id: messageId,
+        attachment_id: freshId,
+        file_name: filename,
+      });
+      const file = await extractFile(client, data);
+      return {
+        filename,
+        contentType: meta?.contentType ?? file.contentType ?? "application/octet-stream",
+        data: file.data,
+      };
+    },
+
+    async createDraft(mail) {
+      let body = mail.text;
+      let thread: Obj = {};
+      if (mail.forwardOf) body = forwardedText(mail.text, await read(mail.forwardOf));
+      else if (mail.inReplyTo) thread = { thread_id: await threadOf(mail.inReplyTo) };
+      const data = unwrap(
+        await exec("GMAIL_CREATE_EMAIL_DRAFT", {
+          ...gmailRecipients(mail),
+          // In a thread, an empty subject keeps the draft in it (a subject starts a new thread).
+          subject: thread.thread_id ? "" : mail.subject,
+          body,
+          is_html: false,
+          include_signature: false,
+          ...thread,
+        }),
+      );
+      const id = str(data.id) ?? str(data.draft_id) ?? str(data.draftId) ?? str(obj(data.draft).id);
+      if (!id) throw new MailError("Gmail did not return a draft id", false);
+      return { id };
+    },
+
+    async send(mail) {
+      if (mail.forwardOf) {
+        // Gmail forwards natively: original body and attachments kept.
+        return {
+          id: sentId(
+            await exec("GMAIL_FORWARD_MESSAGE", {
+              message_id: mail.forwardOf,
+              recipients: mail.to,
+              ...(mail.cc.length ? { cc: mail.cc } : {}),
+              ...(mail.bcc.length ? { bcc: mail.bcc } : {}),
+              additional_text: mail.text,
+              include_signature: false,
+            }),
+          ),
+        };
+      }
+      if (mail.inReplyTo) {
+        return {
+          id: sentId(
+            await exec("GMAIL_REPLY_TO_THREAD", {
+              thread_id: await threadOf(mail.inReplyTo),
+              ...gmailRecipients(mail),
+              message_body: mail.text,
+              is_html: false,
+              include_signature: false,
+            }),
+          ),
+        };
+      }
+      return {
+        id: sentId(
+          await exec("GMAIL_SEND_EMAIL", {
+            ...gmailRecipients(mail),
+            subject: mail.subject,
+            body: mail.text,
+            is_html: false,
+            include_signature: false,
+            ...(mail.from ? { from_email: mail.from } : {}),
+          }),
+        ),
+      };
+    },
+
+    async move(id, folder) {
+      if (folder === "TRASH") return trash(id);
+      if (folder === GMAIL_ALL) {
+        await modify(id, [], ["INBOX"]);
+        return;
+      }
+      if (folder === "INBOX") await modify(id, ["INBOX"], ["SPAM", "TRASH"]);
+      else await modify(id, [folder], ["INBOX"]);
+    },
+
+    async setFlags(id, flags) {
+      const add: string[] = [];
+      const remove: string[] = [];
+      if (flags.read !== undefined) (flags.read ? remove : add).push("UNREAD");
+      if (flags.flagged !== undefined) (flags.flagged ? add : remove).push("STARRED");
+      if (add.length || remove.length) await modify(id, add, remove);
+    },
+
+    async archive(id) {
+      await modify(id, [], ["INBOX"]);
+    },
+
+    trash,
+
+    async close() {},
+  };
+}
+
+// --- Outlook -------------------------------------------------------------
+
+const OUTLOOK_SELECT = [
+  "id",
+  "conversationId",
+  "parentFolderId",
+  "from",
+  "sender",
+  "toRecipients",
+  "ccRecipients",
+  "subject",
+  "receivedDateTime",
+  "sentDateTime",
+  "bodyPreview",
+  "isRead",
+  "flag",
+  "hasAttachments",
+];
+
+/** Roles from Outlook folder names (English and Portuguese; Graph v1.0 doesn't return well-known names). */
+const OUTLOOK_ROLES: [RegExp, MailFolderRole][] = [
+  [/^(inbox|caixa de entrada)$/i, "inbox"],
+  [/^(sent items|sent|itens enviados|enviados|enviadas)$/i, "sent"],
+  [/^(drafts|rascunhos)$/i, "drafts"],
+  [/^(deleted items|trash|itens exclu[ií]dos|lixeira)$/i, "trash"],
+  [/^(junk email|junk e-mail|junk|spam|lixo eletr[oô]nico)$/i, "spam"],
+  [/^(archive|arquivo morto|arquivo)$/i, "archive"],
+];
+
+function pick(raw: Obj, ...keys: string[]): unknown {
+  for (const key of keys) if (raw[key] !== undefined && raw[key] !== null) return raw[key];
+  return undefined;
+}
+
+/** An Outlook (Graph) message, camelCase or snake_case, as our summary. */
+export function outlookSummary(raw: Obj): MailSummary {
+  const flag = obj(raw.flag);
+  const preview = str(pick(raw, "bodyPreview", "body_preview")) ?? "";
+  return {
+    id: str(raw.id) ?? "",
+    threadId: str(pick(raw, "conversationId", "conversation_id")),
+    folder: str(pick(raw, "parentFolderId", "parent_folder_id")),
+    from:
+      graphRecipient(pick(raw, "from", "sender")) ??
+      parseAddressList(pick(raw, "from_address", "sender_address"))[0] ??
+      null,
+    to: parseAddressList(pick(raw, "toRecipients", "to_recipients")),
+    cc: parseAddressList(pick(raw, "ccRecipients", "cc_recipients")),
+    subject: str(raw.subject) ?? "",
+    date:
+      toIsoDate(pick(raw, "receivedDateTime", "received_date_time", "sentDateTime", "sent_date_time")) ??
+      new Date(0).toISOString(),
+    snippet: snippetOf(toPlainText(preview)),
+    unread: pick(raw, "isRead", "is_read") === false,
+    flagged: (str(pick(flag, "flagStatus", "flag_status")) ?? "").toLowerCase() === "flagged",
+    hasAttachments: pick(raw, "hasAttachments", "has_attachments") === true,
+  };
+}
+
+function outlookText(body: unknown): string {
+  const record = obj(body);
+  const content = str(record.content) ?? "";
+  return (str(record.contentType) ?? str(record.content_type) ?? "").toLowerCase() === "html"
+    ? htmlToText(content)
+    : toPlainText(content);
+}
+
+const odataString = (value: string) => `'${value.replace(/'/g, "''")}'`;
+const kqlPhrase = (value: string) => value.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim();
+const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+
+function outlookProvider(client: ComposioRestClient, accountId: string): MailProvider {
+  const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, accountId, { user_id: "me", ...args });
+
+  async function listAttachments(messageId: string): Promise<MailAttachment[]> {
+    const data = unwrap(await exec("OUTLOOK_LIST_OUTLOOK_ATTACHMENTS", { message_id: messageId }));
+    return arr(data.value ?? data.attachments)
+      .map(obj)
+      .filter((item) => {
+        const type = str(item["@odata.type"]);
+        return (!type || type.endsWith("fileAttachment")) && item.isInline !== true && str(item.id);
+      })
+      .map((item) => ({
+        id: str(item.id) as string,
+        filename: str(item.name) ?? "attachment",
+        contentType: str(item.contentType) ?? "application/octet-stream",
+        size: Number(item.size ?? 0) || 0,
+      }));
+  }
+
+  /** Drafts a reply or forward with Graph (threading kept), then sets exactly our recipients and subject. */
+  async function draftFrom(mail: OutgoingMail): Promise<string> {
+    const created = unwrap(
+      mail.inReplyTo
+        ? await exec("OUTLOOK_CREATE_DRAFT_REPLY", { message_id: mail.inReplyTo, comment: mail.text })
+        : await exec("OUTLOOK_CREATE_ME_FORWARD_DRAFT", { message_id: mail.forwardOf, comment: mail.text }),
+    );
+    const id = str(created.id);
+    if (!id) throw new MailError("Outlook did not return a draft id", false);
+    await exec("OUTLOOK_UPDATE_EMAIL", {
+      message_id: id,
+      subject: mail.subject,
+      to_recipients: mail.to,
+      cc_recipients: mail.cc,
+      bcc_recipients: mail.bcc,
+    });
+    return id;
+  }
+
+  async function plainDraft(mail: OutgoingMail): Promise<string> {
+    const created = unwrap(
+      await exec("OUTLOOK_CREATE_DRAFT", {
+        subject: mail.subject,
+        body: mail.text,
+        is_html: false,
+        to_recipients: mail.to,
+        ...(mail.cc.length ? { cc_recipients: mail.cc } : {}),
+        ...(mail.bcc.length ? { bcc_recipients: mail.bcc } : {}),
+      }),
+    );
+    const id = str(created.id);
+    if (!id) throw new MailError("Outlook did not return a draft id", false);
+    return id;
+  }
+
+  return {
+    async listFolders() {
+      const data = unwrap(await exec("OUTLOOK_LIST_MAIL_FOLDERS", { top: 100 }));
+      return arr(data.value ?? data.folders)
+        .map(obj)
+        .filter((folder) => str(folder.id) && folder.isHidden !== true)
+        .map((folder) => {
+          const name = str(folder.displayName) ?? str(folder.display_name) ?? (str(folder.id) as string);
+          const role = OUTLOOK_ROLES.find(([pattern]) => pattern.test(name.trim()))?.[1];
+          return { id: str(folder.id) as string, name, ...(role ? { role } : {}) };
+        });
+    },
+
+    async search(query) {
+      const limit = clampLimit(query.limit);
+      const from = query.from?.trim().toLowerCase() ?? "";
+      const useSearch = Boolean(query.text?.trim() || query.to?.trim() || (from && !from.includes("@", 1)));
+      const args: Obj = {
+        folder: query.folder ?? "inbox",
+        select: OUTLOOK_SELECT,
+        top: query.unreadOnly && useSearch ? 50 : limit,
+      };
+      if (useSearch) {
+        // $search can't be combined with $filter: dates and unread are checked here.
+        const terms: string[] = [];
+        if (from) terms.push(`from:${kqlPhrase(from.replace(/^@/, ""))}`);
+        if (query.to?.trim()) terms.push(`to:${kqlPhrase(query.to.trim().toLowerCase().replace(/^@/, ""))}`);
+        if (query.subject?.trim()) terms.push(`subject:"${kqlPhrase(query.subject)}"`);
+        if (query.text?.trim()) terms.push(`"${kqlPhrase(query.text)}"`);
+        if (query.since) terms.push(`received>=${day(query.since)}`);
+        if (query.before) terms.push(`received<=${day(query.before)}`);
+        args.search = terms.join(" AND ");
+      } else {
+        const filter: string[] = [];
+        if (query.since) filter.push(`receivedDateTime ge ${new Date(query.since).toISOString()}`);
+        if (query.before) filter.push(`receivedDateTime lt ${new Date(query.before).toISOString()}`);
+        if (query.unreadOnly) filter.push("isRead eq false");
+        if (from) filter.push(`from/emailAddress/address eq ${odataString(from)}`);
+        if (query.subject?.trim()) filter.push(`contains(subject,${odataString(query.subject.trim())})`);
+        if (filter.length) args.filter = filter.join(" and ");
+      }
+      const data = unwrap(await exec("OUTLOOK_LIST_MESSAGES", args));
+      const since = query.since ? Date.parse(query.since) : Number.NaN;
+      const before = query.before ? Date.parse(query.before) : Number.NaN;
+      return arr(data.value ?? data.messages)
+        .map((message) => outlookSummary(obj(message)))
+        .filter((message) => {
+          if (!message.id) return false;
+          if (!useSearch) return true;
+          const at = Date.parse(message.date);
+          if (query.unreadOnly && !message.unread) return false;
+          if (Number.isFinite(since) && at < since) return false;
+          if (Number.isFinite(before) && at >= before) return false;
+          return true;
+        })
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, limit);
+    },
+
+    async read(id) {
+      const raw = unwrap(
+        await exec("OUTLOOK_GET_MESSAGE", {
+          message_id: id,
+          select: [...OUTLOOK_SELECT, "body", "replyTo", "internetMessageId", "internetMessageHeaders"],
+        }),
+      );
+      const summary = outlookSummary(raw);
+      const headers = arr(raw.internetMessageHeaders).map(obj);
+      const header = (name: string) =>
+        str(headers.find((item) => str(item.name)?.toLowerCase() === name)?.value) ?? undefined;
+      const text = outlookText(raw.body);
+      return {
+        ...summary,
+        snippet: summary.snippet || snippetOf(text),
+        text,
+        replyTo: parseAddressList(raw.replyTo),
+        messageIdHeader: str(raw.internetMessageId) ?? header("message-id"),
+        references: (header("references") ?? "").split(/\s+/).filter(Boolean),
+        attachments: summary.hasAttachments ? await listAttachments(id) : [],
+      };
+    },
+
+    async attachment(messageId, attachmentId) {
+      const meta = (await listAttachments(messageId)).find((item) => item.id === attachmentId);
+      const filename = meta?.filename ?? "attachment";
+      const file = await extractFile(
+        client,
+        await exec("OUTLOOK_DOWNLOAD_OUTLOOK_ATTACHMENT", {
+          message_id: messageId,
+          attachment_id: attachmentId,
+          file_name: filename,
+        }),
+      );
+      return {
+        filename,
+        contentType: meta?.contentType ?? file.contentType ?? "application/octet-stream",
+        data: file.data,
+      };
+    },
+
+    async createDraft(mail) {
+      return { id: mail.inReplyTo || mail.forwardOf ? await draftFrom(mail) : await plainDraft(mail) };
+    },
+
+    async send(mail) {
+      if (!mail.inReplyTo && !mail.forwardOf && mail.to.length) {
+        await exec("OUTLOOK_SEND_EMAIL", {
+          to: mail.to.join(","),
+          subject: mail.subject,
+          body: mail.text,
+          is_html: false,
+          ...(mail.cc.length ? { cc_emails: mail.cc } : {}),
+          ...(mail.bcc.length ? { bcc_emails: mail.bcc } : {}),
+          ...(mail.from ? { from_address: mail.from } : {}),
+          save_to_sent_items: true,
+        });
+        return { id: null };
+      }
+      const draftId = mail.inReplyTo || mail.forwardOf ? await draftFrom(mail) : await plainDraft(mail);
+      await exec("OUTLOOK_SEND_DRAFT", { message_id: draftId });
+      return { id: null };
+    },
+
+    async move(id, folder) {
+      await exec("OUTLOOK_MOVE_MESSAGE", { message_id: id, destination_id: folder });
+    },
+
+    async setFlags(id, flags) {
+      if (flags.read === undefined && flags.flagged === undefined) return;
+      await exec("OUTLOOK_UPDATE_EMAIL", {
+        message_id: id,
+        ...(flags.read !== undefined ? { is_read: flags.read } : {}),
+        ...(flags.flagged !== undefined ? { flag: { flagStatus: flags.flagged ? "flagged" : "notFlagged" } } : {}),
+      });
+    },
+
+    async archive(id) {
+      await exec("OUTLOOK_MOVE_MESSAGE", { message_id: id, destination_id: "archive" });
+    },
+
+    async trash(id) {
+      await exec("OUTLOOK_MOVE_MESSAGE", { message_id: id, destination_id: "deleteditems" });
+    },
+
+    async close() {},
+  };
+}
+
+/** A file from a tool result: inline base64 (`data`, `contentBytes`…) or a download URL (`s3url`…). */
+async function extractFile(
+  client: ComposioRestClient,
+  data: unknown,
+): Promise<{ data: Uint8Array; contentType?: string }> {
+  const outer = unwrap(data);
+  const candidates = [obj(outer.file), outer];
+  for (const candidate of candidates) {
+    const contentType = str(
+      candidate.mimetype ?? candidate.mimeType ?? candidate.contentType ?? candidate.content_type,
+    );
+    const inline = str(candidate.contentBytes ?? candidate.content_bytes ?? candidate.base64 ?? candidate.data);
+    if (inline && !/^https?:\/\//i.test(inline)) return { data: decodeBase64(inline), contentType };
+    const url = str(
+      candidate.s3url ?? candidate.s3_url ?? candidate.url ?? candidate.download_url ?? candidate.downloadUrl,
+    );
+    if (url) return { data: await client.fetchFile(url), contentType };
+  }
+  if (typeof outer.file === "string" && /^https:\/\//i.test(outer.file)) {
+    return { data: await client.fetchFile(outer.file) };
+  }
+  throw new MailError("Composio returned no attachment content", false);
+}
+
+/** Gmail and Outlook mailboxes through Composio tools (`account.externalAccountId` is the connected account). */
+export function createComposioMailConnector(client: ComposioRestClient): MailConnector {
+  return {
+    async open(account: MailAccountRef) {
+      if (account.via !== "composio" || !account.externalAccountId) {
+        throw new MailError(`mail account ${account.id} is not connected through Composio`, false);
+      }
+      if (account.provider === "gmail") return gmailProvider(client, account.externalAccountId);
+      if (account.provider === "outlook") return outlookProvider(client, account.externalAccountId);
+      throw new MailError(`Composio does not serve ${account.provider} mailboxes`, false);
+    },
+  };
+}

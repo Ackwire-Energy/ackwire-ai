@@ -2,8 +2,8 @@ import { and, eq, schema, sql } from "@agenteschat/db";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
-import { checkGithubCall } from "../git/repos";
 import { addRunStep } from "../runs";
+import { checkToolCall } from "./checks";
 import { canonicalJson, validateJson } from "./json-schema";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
@@ -12,9 +12,6 @@ const { approvals, agents } = schema;
 
 /** Merge, deploy and rollback always need a person, whatever a connector says. */
 export const ALWAYS_SENSITIVE = /(^|[^a-z])(merge|deploy|rollback|revert_deploy|promote)([^a-z]|$)/i;
-
-/** A GitHub tool (catalog MCP or our git tools): checked against the agent's repositories. */
-const isGithubTool = (tool: Pick<ToolDefinition, "scope">) => tool.scope.startsWith("github:");
 
 export const isSensitive = (tool: Pick<ToolDefinition, "name" | "scope" | "sensitive">) =>
   tool.sensitive === true || ALWAYS_SENSITIVE.test(tool.name) || ALWAYS_SENSITIVE.test(tool.scope);
@@ -127,13 +124,11 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) return finish({ content: `Invalid input: ${problems.join("; ")}`, isError: true });
-      // GitHub: only the agent's repositories, before running or asking anyone.
-      const github = isGithubTool(tool) ? await checkGithubCall(ctx.db, ctx.orgId, ctx.agentId, call.input) : null;
-      if (github && !github.ok) {
-        return finish({ content: github.message, isError: true, data: github.repo ? { deniedRepo: github.repo } : {} });
-      }
+      // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
+      const check = await checkToolCall(tool, call.input, ctx);
+      if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} });
       const withRepo = (output: ToolOutput): ToolOutput =>
-        github?.repo ? { ...output, data: { ...output.data, repo: github.repo } } : output;
+        check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 
       if (isSensitive(tool)) {
         const owner = await ownerOf(ctx);
@@ -202,14 +197,20 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         params: approval.params,
       });
       const tool = (await allTools(ctx)).get(approval.tool);
+      // Why the approved action can't run any more; null = it may.
+      const refusal = async (): Promise<string | null> => {
+        if (expected !== approval.actionHash) return "Approval does not match the action";
+        if (!tool || tool.scope !== approval.scope || (tool.connectionId ?? null) !== approval.connectionId)
+          return `The tool ${approval.tool} is no longer available`;
+        if (!isAllowed(toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool)))
+          return `Not allowed: this agent lost the scope ${tool.scope}`;
+        // Rules about the arguments again: a repository or recipient may have been removed while waiting.
+        const check = await checkToolCall(tool, approval.params, ctx);
+        return check.ok ? null : check.message;
+      };
       let output: ToolOutput;
-      if (expected !== approval.actionHash) output = { content: "Approval does not match the action", isError: true };
-      else if (!tool || tool.scope !== approval.scope || (tool.connectionId ?? null) !== approval.connectionId)
-        output = { content: `The tool ${approval.tool} is no longer available`, isError: true };
-      else if (!isAllowed(toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool)))
-        output = { content: `Not allowed: this agent lost the scope ${tool.scope}`, isError: true };
-      else if (isGithubTool(tool) && !(await checkGithubCall(ctx.db, ctx.orgId, ctx.agentId, approval.params)).ok)
-        output = { content: "Not allowed: this repository was removed from the agent's repositories", isError: true };
+      const refused = await refusal();
+      if (refused || !tool) output = { content: refused ?? "Not allowed", isError: true };
       else {
         // Claim the execution first: a retried job never runs the action twice.
         const claimed = await ctx.db

@@ -22,6 +22,7 @@ import {
   createJobHandlers,
   createLlmJudge,
   createMachineHub,
+  createMailToolSource,
   createMissionHooks,
   createMissionRunToolSource,
   createMissionToolSource,
@@ -36,6 +37,7 @@ import {
   type GitProxyDeps,
   hubBrainLink,
   type Judge,
+  type MailDeps,
   type McpConnect,
   missionAllowRules,
   missionBranchPrefix,
@@ -205,11 +207,19 @@ export function buildEngine(o: EngineOptions) {
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({ db, blobs: artifacts.blobs }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
-      createScheduleToolSource({ pubsub: adapters.pubsub, context }),
+      createScheduleToolSource({ pubsub: adapters.pubsub, context, mail: adapters.mail }),
       createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
+      // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
+      createMailToolSource({
+        keyWrappers,
+        mail: adapters.mail,
+        publicUrl: config.PUBLIC_URL,
+        resolveHost: o.resolveHost,
+        artifacts,
+      }),
       createMissionToolSource(missionDeps),
       // Computer-brain runs only (calls through the runner bridge): before the sandbox tools, so these
       // win a name clash (`start_task`) there.
@@ -315,7 +325,15 @@ export function buildEngine(o: EngineOptions) {
         : {}),
     },
   });
-  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox, gitProxy, machineHub };
+  // Mail accounts, inbound mail and polling (routes and workers).
+  const mail: MailDeps = {
+    db,
+    keyWrappers,
+    mail: adapters.mail,
+    publicUrl: config.PUBLIC_URL,
+    resolveHost: o.resolveHost,
+  };
+  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox, gitProxy, machineHub, mail };
 }
 
 export type Engine = ReturnType<typeof buildEngine>;

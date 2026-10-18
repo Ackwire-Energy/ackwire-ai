@@ -39,6 +39,14 @@ import {
 
 const tags = ["Routines"];
 const Event = z.enum(ROUTINE_EVENTS);
+/** New mail in a mailbox folder (ADR 0038): `from` takes addresses or `@domains`. */
+const MailFilterSchema = z
+  .object({
+    from: z.array(z.string().max(320)).max(50).optional(),
+    subject: z.string().max(200).optional(),
+    text: z.string().max(200).optional(),
+  })
+  .openapi("MailFilter");
 const Reminder = z
   .object({
     id: z.uuid().openapi({ description: "A one-off routine: also listed in Routines." }),
@@ -153,6 +161,16 @@ const Routine = z
         timezone: z.string(),
         description: z.string().openapi({ description: '"tomorrow, Oct 16, at 09:00 (Brasília time)".' }),
       }),
+      z.object({
+        type: z.literal("email"),
+        accountId: z.uuid(),
+        folder: z.string(),
+        filter: MailFilterSchema,
+        status: z
+          .enum(["active", "needs_reconnect", "error"])
+          .optional()
+          .openapi({ description: "`needs_reconnect`: the mailbox must be reconnected before it wakes the routine." }),
+      }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
     nextRunAt: z.string().nullable(),
@@ -178,6 +196,14 @@ const TriggerInput = z.union([
     at: z.iso.datetime({ offset: true }),
     timezone: z.string().max(64).optional(),
   }),
+  z
+    .object({
+      type: z.literal("email"),
+      accountId: z.uuid(),
+      folder: z.string().min(1).max(300).optional(),
+      filter: MailFilterSchema.optional(),
+    })
+    .openapi({ description: "New mail in a mailbox the agent can read; `folder` default the inbox." }),
 ]);
 
 const RoutineParams = OrgParams.extend({ routineId: z.uuid() });
@@ -192,6 +218,7 @@ export function routineRoutes(deps: AppDeps) {
     pubsub: adapters.pubsub,
     context: deps.extras?.context,
     artifacts: deps.extras?.artifacts,
+    mail: adapters.mail,
   };
 
   app.openapi(

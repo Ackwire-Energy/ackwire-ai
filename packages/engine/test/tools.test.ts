@@ -184,6 +184,43 @@ describe("Tool Gateway", () => {
     );
     expect(gh.executed).toEqual([]);
   });
+
+  test("a tool's checkCall refuses with its data kept, or merges its data into the result", async () => {
+    f = await setup();
+    const gh = fakeGithub();
+    const checked = gh.tools.map((t) =>
+      t.name === "github_get_pr"
+        ? {
+            ...t,
+            checkCall: async (input: Record<string, unknown>) =>
+              input.repo === "acme/secret"
+                ? { ok: false as const, message: "Not allowed: acme/secret", data: { denied: "acme/secret" } }
+                : { ok: true as const, data: { checkedRepo: input.repo } },
+          }
+        : t,
+    );
+    const tools = createToolGateway({ sources: [{ name: "checked", tools: async () => checked }] });
+    const ctx = await ctxOf(f);
+    await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+    expect(
+      await tools.invoke(ctx, { toolUseId: "tu_1", name: "github_get_pr", input: { repo: "acme/secret", pr: 1 } }),
+    ).toEqual({
+      type: "result",
+      output: { content: "Not allowed: acme/secret", isError: true, data: { denied: "acme/secret" } },
+    });
+    expect(gh.executed).toEqual([]);
+    expect(
+      await tools.invoke(ctx, { toolUseId: "tu_2", name: "github_get_pr", input: { repo: "acme/app", pr: 2 } }),
+    ).toMatchObject({
+      output: { content: "github_get_pr ok: acme/app#2", data: { ok: true, checkedRepo: "acme/app" } },
+    });
+    // Merged with the connector-wide GitHub check's data (`repo`).
+    const results = (await f.db.select().from(schema.agentRunSteps)).filter((s) => s.kind === "tool_result");
+    expect(results.map((s) => (s.data as { data?: unknown }).data)).toEqual([
+      { denied: "acme/secret" },
+      { ok: true, repo: "acme/app", checkedRepo: "acme/app" },
+    ]);
+  });
 });
 
 describe("approval flow (end to end)", () => {

@@ -82,10 +82,16 @@ export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_
 /** Old section ids and where they live now ("sandbox" joined Computadores). */
 export const MOVED_SETTINGS = new Map<string, SettingsSection>([["sandbox", "computers"]]);
 
-/** `?connected=github` (back from OAuth) and `?review=1` (a custom MCP server to classify). */
-export const settingsSearch = (search: Record<string, unknown>): { connected?: string; review?: string } => ({
+/**
+ * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to
+ * classify) and `?mail=connected|failed` (back from Gmail/Outlook).
+ */
+export const settingsSearch = (
+  search: Record<string, unknown>,
+): { connected?: string; review?: string; mail?: string } => ({
   connected: typeof search.connected === "string" ? search.connected : undefined,
   review: search.review === undefined ? undefined : String(search.review),
+  mail: typeof search.mail === "string" ? search.mail : undefined,
 });
 
 /**
@@ -96,11 +102,14 @@ export function SettingsPage({
   section = "general",
   connected,
   review,
+  mail,
   machineId,
 }: {
   section?: SettingsSection;
   connected?: string;
   review?: boolean;
+  /** Back from Gmail/Outlook: `connected` or `failed`. */
+  mail?: string;
   /** Computadores → one computer (`/settings/computers/{id}`). */
   machineId?: string;
 }) {
@@ -146,7 +155,7 @@ export function SettingsPage({
         )}
         {current === "members" && <MembersPage embedded />}
         {current === "access" && <AccessMatrixSection />}
-        {current === "connectors" && <ConnectorsSection connected={connected} review={review} />}
+        {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}
         {current === "keys" && <KeysSection />}
         {current === "storage" && <StorageSection />}

@@ -106,4 +106,10 @@ export const keys = {
   pins: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "pins"] as const,
   working: (orgId: string) => ["org", orgId, "working"] as const,
   reminders: (orgId: string) => ["org", orgId, "reminders"] as const,
+  /** Every mailbox read (prefix). */
+  mail: (orgId: string) => ["org", orgId, "mail"] as const,
+  mailProviders: (orgId: string) => ["org", orgId, "mail", "providers"] as const,
+  mailAccounts: (orgId: string) => ["org", orgId, "mail", "accounts"] as const,
+  mailFolders: (orgId: string, accountId: string) => ["org", orgId, "mail", "folders", accountId] as const,
+  agentMail: (orgId: string, agentId: string) => ["org", orgId, "mail", "agent", agentId] as const,
 };

@@ -64,8 +64,24 @@ export interface ToolDefinition {
   missionId?: string;
   /** Human summary of a call, for approval cards. */
   describe?(input: Record<string, unknown>): { title: string; detail?: string };
+  /**
+   * Rules about this call's arguments (which folders, recipients, daily cap…),
+   * run by the gateway after the scope check and schema validation, before
+   * running or asking anyone, and again before an approved action runs.
+   * Connector-wide rules (GitHub repositories) live in `tools/checks.ts`.
+   */
+  checkCall?(input: Record<string, unknown>, ctx: ToolContext): Promise<CallCheck>;
   execute(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput>;
 }
+
+/**
+ * Result of a per-call check. An allowed call's `data` is merged into the
+ * tool result's data; a refusal's `message` is what the model sees and its
+ * `data` is kept in the run step (e.g. `deniedRepo` for "Liberar").
+ */
+export type CallCheck =
+  | { ok: true; data?: Record<string, unknown> }
+  | { ok: false; message: string; data?: Record<string, unknown> };
 
 /** Supplies tools for a run. The gateway filters them by the agent's scopes. */
 export interface ToolSource {

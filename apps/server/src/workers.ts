@@ -12,9 +12,12 @@ import {
   fireDueRoutines,
   type JobHandlers,
   listenForRunCancels,
+  type MailDeps,
+  pollImapWatches,
   processOutbox,
   purgeDeletedArtifacts,
   queueApprovalDigests,
+  reconcileComposioAccounts,
   recoverStaleRuns,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
@@ -30,6 +33,8 @@ export interface WorkerDeps {
   artifacts?: ArtifactDeps;
   /** Approval reminder emails. */
   approvalDigest?: { publicUrl: string; afterHours: number };
+  /** People's mailboxes (ADR 0038): IMAP polling for routines and Composio account checks. */
+  mail?: { deps: MailDeps; pollSeconds: number };
   log: Logger;
   workerId?: string;
 }
@@ -52,6 +57,10 @@ export const WORKER_INTERVALS_MS = {
   recovery: 60_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
+  /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
+  mailPoll: 30_000,
+  /** Composio accounts' state (expired → "Reconnect"). */
+  mailReconcile: 15 * 60_000,
 };
 
 /**
@@ -159,6 +168,22 @@ export function startWorkers(deps: WorkerDeps) {
     const fired = await fireDueRoutines({ db, pubsub: deps.pubsub });
     if (fired > 0) log.info("routines fired", { fired });
   });
+
+  const mail = deps.mail;
+  if (mail?.deps.mail?.imap) {
+    every("mailPoll", Math.min(WORKER_INTERVALS_MS.mailPoll, mail.pollSeconds * 1000), async () => {
+      const r = await pollImapWatches(mail.deps, { intervalMs: mail.pollSeconds * 1000, concurrency: 5 });
+      if (r.fired > 0) {
+        log.info("mail routines fired", r);
+        void ticks.get("outbox")?.();
+      } else if (r.failed > 0) log.warn("mail polls failed", r);
+    });
+  }
+  if (mail?.deps.mail?.composio) {
+    every("mailReconcile", WORKER_INTERVALS_MS.mailReconcile, async () => {
+      await reconcileComposioAccounts(mail.deps);
+    });
+  }
 
   const digest = deps.approvalDigest;
   if (digest) {

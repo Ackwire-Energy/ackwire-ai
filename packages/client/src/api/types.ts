@@ -1341,7 +1341,27 @@ export type RoutineTrigger =
     }
   | { type: "event"; event: RoutineEvent }
   /** A one-off (reminders, "amanhã às 9h"): fires once at `at`, then the routine is inactive. */
-  | { type: "once"; at: string; timezone: string; description: string };
+  | { type: "once"; at: string; timezone: string; description: string }
+  | RoutineEmailTrigger;
+
+/** "Quando chegar um email" (ADR 0038): new mail in a folder of a connected mailbox, optionally filtered. */
+export interface RoutineEmailTrigger {
+  type: "email";
+  accountId: string;
+  folder: string;
+  filter: RoutineEmailFilter;
+  /** The mailbox needs reconnecting (or the watch failed): the routine shows "Precisa reconectar". */
+  status?: "active" | "needs_reconnect" | "error";
+}
+
+export interface RoutineEmailFilter {
+  /** Addresses or `@domain`s. */
+  from?: string[];
+  /** Subject contains. */
+  subject?: string;
+  /** Body contains. */
+  text?: string;
+}
 
 /** Where a routine created here delivers; `forum` opens a topic with these agents each time. */
 export type RoutineTargetInput =
@@ -1401,7 +1421,8 @@ export interface RoutineInput {
     | { type: "schedule"; phrase: string; timezone?: string }
     | { type: "schedule"; rule: ApiRule }
     | { type: "event"; event: RoutineEvent }
-    | { type: "once"; at: string; timezone?: string };
+    | { type: "once"; at: string; timezone?: string }
+    | Omit<RoutineEmailTrigger, "status">;
 }
 
 /** `PATCH …/routines/{id}`: only what changed. */
@@ -3051,4 +3072,100 @@ export interface ReminderInput {
   at: string;
   text?: string | null;
   timezone?: string | null;
+}
+
+// ── Mailboxes (ADR 0038) ────────────────────────────────────────────────────
+
+/** A preset for our IMAP/SMTP connector (iCloud, Locaweb, Hostinger, Zoho…). */
+export interface MailPreset {
+  id: string;
+  label: string;
+  imapHost: string;
+  imapPort: number;
+  smtpHost: string;
+  smtpPort: number;
+  /** What to log in with: the whole address, or only the part before the @. */
+  username: "address" | "local";
+  /** Where the person creates an app password; null = none to link. */
+  appPasswordUrl: string | null;
+}
+
+/** `GET …/mail/providers`: which ways in this server offers. */
+export interface MailProviders {
+  /** Gmail and Outlook (through Composio). */
+  composio: boolean;
+  /** iCloud and any other mailbox (IMAP/SMTP). */
+  imap: boolean;
+  presets: MailPreset[];
+}
+
+export type MailLevel = "read" | "read_write";
+
+/** A mailbox the organization connected (never its password). */
+export interface MailAccount {
+  id: string;
+  provider: "gmail" | "outlook" | "imap";
+  via: "composio" | "imap";
+  address: string;
+  label: string;
+  status: "pending" | "active" | "needs_reconnect";
+  lastError: string | null;
+  /** The IMAP preset (`icloud`, `locaweb`…); null for Gmail/Outlook or a custom server. */
+  preset: string | null;
+  createdAt: string;
+  /** Agents with access, and how much. */
+  agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
+}
+
+/** Why an IMAP mailbox didn't connect (`422 { error }`). */
+export type MailConnectError = "auth" | "imap_unreachable" | "smtp_unreachable" | "tls" | "blocked_host" | "unknown";
+
+export interface MailImapInput {
+  preset: string;
+  address: string;
+  password: string;
+  label?: string;
+  username?: string;
+  imapHost?: string;
+  imapPort?: number;
+  smtpHost?: string;
+  smtpPort?: number;
+}
+
+export interface MailFolder {
+  id: string;
+  name: string;
+  /** `inbox`, `sent`, `drafts`, `trash`, `archive`, `junk`… */
+  role?: string;
+}
+
+/** An agent's rules for one mailbox. */
+export interface MailPolicy {
+  /** Folders it may read; empty = all. */
+  folders: string[];
+  /** Only mail from these addresses or `@domain`s; empty = anyone. */
+  senders: string[];
+  /** Only mail from the last N days; null = no limit. */
+  windowDays: number | null;
+  /** Only send to these addresses or `@domain`s; empty = anyone (always asking). */
+  allowedRecipients: string[];
+  dailySendCap: number;
+  /** Sends without asking (only with `allowedRecipients`). */
+  sendWithoutAsking: boolean;
+  /** Send as this alias; null = the mailbox's address. */
+  fromAddress: string | null;
+}
+
+/** An agent's access to one mailbox. */
+export interface AgentMailbox {
+  accountId: string;
+  level: "none" | MailLevel;
+  canDelete: boolean;
+  policy: MailPolicy;
+}
+
+export interface AgentMailboxInput {
+  level: "none" | MailLevel;
+  canDelete: boolean;
+  policy: MailPolicy;
 }

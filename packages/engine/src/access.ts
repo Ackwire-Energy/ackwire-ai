@@ -16,6 +16,7 @@ import {
   CONNECTOR_ALL,
   grantKey,
   impliedByWrite,
+  notMailGrant,
   type ScopeGrant,
   toolAccess,
   toolAllowScope,
@@ -411,7 +412,10 @@ export async function setAgentAccess(
   for (const ref of input.tools?.deny ?? []) rows.push(toolRow(ref, true));
   const unique = new Map(rows.map((r) => [grantKey(r.connectionId, r.scope), r]));
   await db.transaction(async (tx) => {
-    await tx.delete(agentScopes).where(and(eq(agentScopes.orgId, orgId), eq(agentScopes.agentId, agentId)));
+    // Mailbox grants are managed by the mail API (ADR 0038): kept as they are.
+    await tx
+      .delete(agentScopes)
+      .where(and(eq(agentScopes.orgId, orgId), eq(agentScopes.agentId, agentId), notMailGrant(orgId)));
     if (unique.size > 0) {
       await tx.insert(agentScopes).values(
         [...unique.values()].map((g) => ({

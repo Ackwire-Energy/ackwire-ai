@@ -2,8 +2,13 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   type Adapters,
+  createComposioClient,
+  createComposioMailConnector,
   createDaytonaSandboxProvider,
   createExpoPushSender,
+  createImapConnectionTester,
+  createImapMailConnector,
+  createImapPoller,
   createLogEmailSender,
   createMemoryPresence,
   createMemoryRateLimiter,
@@ -13,11 +18,19 @@ import {
   createPostgresSearchResolver,
   createS3BlobStore,
   envPlatformCredentials,
+  MAIL_PRESETS,
+  type MailAdapters,
   postgresJsNotifier,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, type Database, ensureMessagePartitions, MigrationMismatchError } from "@agenteschat/db";
-import { createLocalKeyWrapper, drainLocalRuns, enableCaches } from "@agenteschat/engine";
+import {
+  createLocalKeyWrapper,
+  drainLocalRuns,
+  enableCaches,
+  isBlockedAddress,
+  resolveHostDns,
+} from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
@@ -103,9 +116,11 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
       : null,
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
+    mail: mailAdapters(config),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
+  log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
   const base = { config, db: database.db, edition, version };
   const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
     anthropic: createAnthropicProvider(),
@@ -131,6 +146,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     context: engine.context,
     artifacts: engine.artifacts,
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
+    mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     log,
   });
 
@@ -217,4 +233,33 @@ function platformBlobStore(config: Config, db: Database) {
     secretAccessKey: S3_SECRET_ACCESS_KEY,
     pathStyle: false,
   });
+}
+
+/** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. */
+function mailAdapters(config: Config): MailAdapters {
+  const composio = config.COMPOSIO_API_KEY
+    ? createComposioClient({
+        apiKey: config.COMPOSIO_API_KEY,
+        webhookSecret: config.COMPOSIO_WEBHOOK_SECRET,
+        gmailAuthConfigId: config.COMPOSIO_GMAIL_AUTH_CONFIG_ID,
+        outlookAuthConfigId: config.COMPOSIO_OUTLOOK_AUTH_CONFIG_ID,
+      })
+    : null;
+  // A mail server named by a person never resolves to our network (private, loopback, metadata).
+  const checkHost = async (host: string) => {
+    const addresses = await resolveHostDns(host);
+    if (addresses.length === 0 || addresses.some(isBlockedAddress)) throw new Error("blocked host");
+  };
+  const imapOptions = { checkHost };
+  return {
+    composio: composio ? { client: composio, connector: createComposioMailConnector(composio) } : null,
+    imap: config.MAIL_IMAP_ENABLED
+      ? {
+          connector: createImapMailConnector(imapOptions),
+          poller: createImapPoller(imapOptions),
+          tester: createImapConnectionTester(imapOptions),
+          presets: MAIL_PRESETS,
+        }
+      : null,
+  };
 }

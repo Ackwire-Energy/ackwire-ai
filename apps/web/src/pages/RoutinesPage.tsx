@@ -11,6 +11,7 @@ import {
   useCalendar,
   useChannels,
   useDms,
+  useMailAccounts,
   useRoutineAction,
   useRoutineRuns,
   useRoutines,
@@ -59,6 +60,7 @@ import { type CSSProperties, useDeferredValue, useEffect, useMemo, useState } fr
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
+import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -88,6 +90,12 @@ const nextLabel = (locale: string, iso: string) =>
     .format(new Date(iso))
     .replace(/\./g, "")
     .replace(/ de /g, " ");
+
+/** Started by something happening (an event or an email), not by the clock. */
+const isEventDriven = (r: Routine) => r.trigger.type === "event" || r.trigger.type === "email";
+/** An email routine whose mailbox needs reconnecting (or whose watch fails). */
+const mailTrouble = (r: Routine) =>
+  r.trigger.type === "email" && r.trigger.status && r.trigger.status !== "active" ? r.trigger.status : null;
 
 /** A one-off that already fired (or was cancelled): shown muted, under "Concluídos". */
 export const isDoneOnce = (r: Routine) => r.trigger.type === "once" && !r.active;
@@ -156,10 +164,12 @@ function useLook() {
 /** "Quando" in words, in the routine's zone (the zone shows only when it isn't mine). */
 function useWhen() {
   const { t, i18n } = useTranslation();
-  const { me } = useOrg();
+  const { me, org } = useOrg();
   const actors = useActors();
+  const mailboxes = useMailAccounts(org.id);
   const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "UTC";
   return (r: Routine) => {
+    if (r.trigger.type === "email") return emailWhen(t, r, mailboxes.data);
     const zone = r.trigger.type === "event" ? "" : r.trigger.timezone || "UTC";
     const zoneNote = zone && zone !== myZone ? ` (${timezoneName(zone, i18n.language)})` : "";
     if (r.trigger.type === "schedule")
@@ -203,13 +213,13 @@ export function RoutinesPage() {
     all: current.length,
     active: current.filter((r) => r.active).length,
     paused: current.filter(isPaused).length,
-    event: current.filter((r) => r.trigger.type === "event").length,
+    event: current.filter(isEventDriven).length,
   };
   const byStatus = (r: Routine) =>
     status === "all" ||
     (status === "active" && r.active) ||
     (status === "paused" && isPaused(r)) ||
-    (status === "event" && r.trigger.type === "event");
+    (status === "event" && isEventDriven(r));
   const live = current.filter((r) => byStatus(r) && !isPaused(r));
   const paused = current.filter((r) => byStatus(r) && isPaused(r));
   const open = list.find((r) => r.id === openId) ?? null;
@@ -429,8 +439,10 @@ function useNextText() {
         ? t("routines.firedAt", { when: whenAt(t, i18n.language, r.lastRun.at) })
         : t("routines.canceled");
     if (!r.active) return t("routines.paused");
-    if (r.trigger.type === "event") {
+    if (isEventDriven(r)) {
       const week = (r.recentRuns ?? []).filter((x) => now.getTime() - new Date(x.at).getTime() < 7 * 86_400_000).length;
+      if (r.trigger.type === "email")
+        return week > 0 ? t("mail.routine.thisWeek", { count: week }) : t("mail.routine.waiting");
       return week > 0 ? t("routines.eventThisWeek", { count: week }) : t("routines.waitingEvent");
     }
     if (!r.nextRunAt) return "";
@@ -516,6 +528,11 @@ function RoutineRow({
               {t("routines.reminder")}
             </Chip>
           )}
+          {mailTrouble(r) && (
+            <Chip icon="alert" tone="waiting" className="routine-row__chip">
+              {t(mailTrouble(r) === "error" ? "mail.routine.error" : "mail.routine.needsReconnect")}
+            </Chip>
+          )}
         </span>
       </div>
       <div className="routine-row__when">
@@ -524,11 +541,13 @@ function RoutineRow({
             name={
               r.trigger.type === "event"
                 ? "bolt"
-                : r.trigger.type === "once"
-                  ? reminder
-                    ? "bell"
-                    : "calendar"
-                  : "repeat"
+                : r.trigger.type === "email"
+                  ? "mail"
+                  : r.trigger.type === "once"
+                    ? reminder
+                      ? "bell"
+                      : "calendar"
+                    : "repeat"
             }
             size={16}
           />
@@ -660,7 +679,7 @@ function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: D
   const slots = useCalendar(org.id, range.from, range.to);
   const from = new Date(now.getTime() - HORIZON_BACK);
   const to = new Date(now.getTime() + HORIZON_AHEAD);
-  const lanes = routines.filter((r) => r.active && !isDoneOnce(r) && r.trigger.type !== "event");
+  const lanes = routines.filter((r) => r.active && !isDoneOnce(r) && !isEventDriven(r));
   if (lanes.length === 0) return null;
   const futureOf = (r: Routine) => {
     const at = (slots.data?.routines ?? [])
@@ -878,7 +897,14 @@ function RoutineDetails({
       </DetailsSection>
       <DetailsSection title={t("routines.panel.when")}>
         <p className="routine-details__sentence">{when(r)}</p>
-        {r.trigger.type === "event" ? (
+        {mailTrouble(r) && (
+          <Chip icon="alert" tone="waiting">
+            {t(mailTrouble(r) === "error" ? "mail.routine.error" : "mail.routine.needsReconnect")}
+          </Chip>
+        )}
+        {r.trigger.type === "email" ? (
+          <p className="small muted">{t("mail.routine.every")}</p>
+        ) : r.trigger.type === "event" ? (
           <p className="small muted">{t("routines.panel.eventEvery")}</p>
         ) : (
           nexts.length > 0 &&
@@ -1002,7 +1028,14 @@ function ruleOf(r: Routine | undefined, zone: string): RecurrenceRule {
     count: null,
   };
 }
-const zoneOf = (r: Routine | undefined) => (r && r.trigger.type !== "event" ? r.trigger.timezone || "UTC" : "");
+const zoneOf = (r: Routine | undefined) =>
+  r && r.trigger.type !== "event" && r.trigger.type !== "email" ? r.trigger.timezone || "UTC" : "";
+
+/** The email trigger a routine has (new, or another kind: none picked yet, the inbox). */
+const emailDraftOf = (r: Routine | undefined): EmailTriggerDraft =>
+  r?.trigger.type === "email"
+    ? { accountId: r.trigger.accountId, folder: r.trigger.folder, filter: r.trigger.filter ?? {} }
+    : { accountId: "", folder: "", filter: {} };
 const isUtc = (z: string) => z === "UTC" || z === "Etc/UTC";
 
 /**
@@ -1023,7 +1056,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   const initialForum = routine?.target.type === "forum" ? routine.target : null;
   const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "America/Sao_Paulo";
   const savedZone = zoneOf(routine);
-  const wasUtc = editing && routine?.trigger.type !== "event" && isUtc(savedZone);
+  const wasUtc = editing && routine !== undefined && !isEventDriven(routine) && isUtc(savedZone);
   const [agentId, setAgentId] = useState(routine?.agentId ?? "");
   const [target, setTarget] = useState(targetChoice(routine?.target));
   // "Um tópico no fórum": which agents discuss, and how many rounds.
@@ -1035,7 +1068,14 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   );
   const [prompt, setPrompt] = useState(routine?.prompt ?? "");
   const [name, setName] = useState(routine?.name ?? "");
-  const [kind, setKind] = useState<"schedule" | "event">(routine?.trigger.type === "event" ? "event" : "schedule");
+  const [kind, setKind] = useState<"schedule" | "event" | "email">(
+    routine?.trigger.type === "event" ? "event" : routine?.trigger.type === "email" ? "email" : "schedule",
+  );
+  // "Quando chegar um email": the mailbox, folder and filters.
+  const [email, setEmail] = useState<EmailTriggerDraft>(() => emailDraftOf(routine));
+  const mailboxes = useMailAccounts(org.id);
+  // "Quando chegar um email" shows where the organization has mailboxes (or the routine already uses one).
+  const hasMail = kind === "email" || (mailboxes.data?.length ?? 0) > 0;
   // What the person typed, in any language: the server reads it (never the browser) and fills the picker.
   const [phrase, setPhrase] = useState(phraseOf(routine));
   const [event, setEvent] = useState<RoutineEvent>(
@@ -1094,7 +1134,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     : upcomingLabels(i18n.language, rule);
   const phraseFailed = phraseTyped && typed.length > 0 && parsed.data?.ok === false;
   const shownZone = zone;
-  const scheduleOk = kind === "event" || once || !phraseFailed;
+  const scheduleOk = kind === "event" || (kind === "email" ? Boolean(email.accountId) : once || !phraseFailed);
   const targetValue = (): RoutineTargetInput =>
     target === TARGET_FORUM
       ? { type: "forum", agentIds: forumAgents.length > 0 ? forumAgents : [agentId], rounds: Number(forumRounds) }
@@ -1103,16 +1143,24 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
         : target === TARGET_ARTIFACT
           ? { type: "artifact" }
           : { type: "channel", channelId: target };
+  const emailTrigger = () => ({
+    type: "email" as const,
+    accountId: email.accountId,
+    folder: email.folder || INBOX,
+    filter: cleanFilter(email.filter),
+  });
   const trigger = (): RoutineInput["trigger"] =>
-    kind === "event"
-      ? { type: "event", event }
-      : once
-        ? {
-            type: "once",
-            at: zonedInstant(rule.start, rule.times[0] ?? "09:00", rule.timezone).toISOString(),
-            timezone: rule.timezone,
-          }
-        : { type: "schedule", rule: toApiRule(rule) };
+    kind === "email"
+      ? emailTrigger()
+      : kind === "event"
+        ? { type: "event", event }
+        : once
+          ? {
+              type: "once",
+              at: zonedInstant(rule.start, rule.times[0] ?? "09:00", rule.timezone).toISOString(),
+              timezone: rule.timezone,
+            }
+          : { type: "schedule", rule: toApiRule(rule) };
   /** What changed against the routine (`PATCH` sends only this). */
   const changes = (r: Routine): RoutinePatch => {
     const patch: RoutinePatch = {};
@@ -1127,12 +1175,21 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
         Number(forumRounds) !== (r.target.rounds ?? 3));
     if (target !== TARGET_KEEP && (target !== targetChoice(r.target) || forumChanged)) patch.target = targetValue();
     const triggerChanged =
-      kind === "event"
-        ? r.trigger.type !== "event" || r.trigger.event !== event
-        : once
-          ? r.trigger.type !== "once" ||
-            JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
-          : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
+      kind === "email"
+        ? r.trigger.type !== "email" ||
+          JSON.stringify(emailTrigger()) !==
+            JSON.stringify({
+              type: "email",
+              accountId: r.trigger.accountId,
+              folder: r.trigger.folder,
+              filter: cleanFilter(r.trigger.filter ?? {}),
+            })
+        : kind === "event"
+          ? r.trigger.type !== "event" || r.trigger.event !== event
+          : once
+            ? r.trigger.type !== "once" ||
+              JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
+            : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
     if (triggerChanged) patch.trigger = trigger();
     if (active !== r.active) patch.active = active;
     return patch;
@@ -1316,13 +1373,17 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
           </Field>
           <RadioGroup
             value={kind}
-            onValueChange={(v) => setKind(v as "schedule" | "event")}
+            onValueChange={(v) => setKind(v as "schedule" | "event" | "email")}
             aria-label={t("routines.form.when")}
-            className="grid-fields"
+            className={cx("grid-fields", hasMail && "grid-fields--3")}
           >
             <RadioCard value="schedule" id="nr-k-time" checked={kind === "schedule"} title={t("routines.form.time")} />
             <RadioCard value="event" id="nr-k-event" checked={kind === "event"} title={t("routines.form.onEvent")} />
+            {hasMail && (
+              <RadioCard value="email" id="nr-k-email" checked={kind === "email"} title={t("mail.routine.onEmail")} />
+            )}
           </RadioGroup>
+          {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
           {kind === "schedule" && (
             <div className="routine-when">
               <div className="routine-when__head">
@@ -1383,7 +1444,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               </button>
             </p>
           )}
-          {kind === "schedule" ? null : (
+          {kind !== "event" ? null : (
             <Field
               label={t("routines.form.event")}
               id="nr-event"
