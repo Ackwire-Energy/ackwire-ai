@@ -32,8 +32,10 @@ Output: PASS/FAIL per case with each check, totals per criterion and cost; the f
 | `addressees` | a message mentioning several agents is classified (who acts, who is only referenced) by the cheap model |
 | `connectors` | fake connectors granted with all their scopes: `github`, `sentry`, `himetrica`, `railway` |
 | `issues`, `seedIssues` | the built-in issue tools, and issues already there |
+| `workspace` | `add_agent_to_channel` and `update_thread` (internal changes with undo) |
+| `missions` | a `propose_mission` with the real description and findings schema (no computer: the proposal is only recorded) |
 | `memory` | the agent's memory items (found with `search_context`) |
 | `fixtures` | per tool name, canned results: the first entry whose `when` words all appear in the call's input (no `when` = default) |
-| `expect` | deterministic: `investigate`, `mustCall` (`"a\|b"` = any), `mustNotExecute`, `approval`, `evidence` (any of), `noReply`, `ask` (`never`/`required`), `mustNotCall`, `notTriggered` (other agents' handles the trigger must not start); judge: `behavior` (what a good answer does), `rubric` (extra criteria), `skipJudge` |
+| `expect` | deterministic: `investigate`, `mustCall` (`"a\|b"` = any), `mustNotExecute`, `approval`, `evidence` (any of), `noReply`, `ask` (`never`/`required`), `mustNotCall`, `notTriggered` (other agents' handles the trigger must not start), `receipts` (act with undo: receipt kinds the reply must carry, e.g. `issue.created`), `missionFindings` (`propose_mission` with read/data findings and at most one decision); judge: `behavior` (what a good answer does), `rubric` (extra criteria), `skipJudge` |
 
 Checkers are unit-tested in `test/behavior-checks.test.ts`; `test/behavior-eval.test.ts` runs the harness with the fake provider (no network).

@@ -4,6 +4,7 @@ import type {
   ActiveRun,
   Agent,
   AgentAccess,
+  AgentAction,
   AgentBrain,
   AgentChannel,
   AgentComputer,
@@ -100,6 +101,7 @@ import type {
   ThreadInfo,
   ThreadPage,
   TrashedArtifact,
+  UndoAllResult,
   UsageReport,
   WikiGraph,
   WikiImportResult,
@@ -145,6 +147,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
   };
 
   return {
+    actions: {
+      undo: (orgId, actionId) => request<AgentAction>(`${org(orgId)}/actions/${enc(actionId)}/undo`, { json: {} }),
+      redo: (orgId, actionId) => request<AgentAction>(`${org(orgId)}/actions/${enc(actionId)}/redo`, { json: {} }),
+      undoMessage: (orgId, messageId) =>
+        request<UndoAllResult>(`${org(orgId)}/messages/${enc(messageId)}/actions/undo`, { json: {} }),
+    },
     pins: {
       list: async (orgId, channelId) =>
         (await request<{ pins: MessagePin[] }>(`${org(orgId)}/channels/${enc(channelId)}/pins`)).pins,

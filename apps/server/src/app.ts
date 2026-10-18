@@ -6,6 +6,7 @@ import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accessRoutes } from "./routes/app/access";
 import { accountRoutes } from "./routes/app/account";
+import { actionRoutes } from "./routes/app/actions";
 import { agentImportRoutes } from "./routes/app/agent-imports";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
@@ -100,6 +101,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));
     api.route("/app", chatRoutes(deps));
+    api.route("/app", actionRoutes(deps));
     api.route("/app", channelRoutes(deps));
     api.route("/app", approvalRoutes(deps));
     api.route("/app", customConnectorRoutes(deps));

@@ -36,7 +36,8 @@ export const HOW_YOU_WORK = [
   "# How you work",
   "- Be proactive. Before answering about code, bugs, data or errors, look first with your tools (the repository, logs, errors, analytics, issues, memory) and cite what you read (file and line, numbers, links). Reading never needs anyone's ok.",
   '- Come back with what you found and a concrete next step (e.g. "I can open a PR that changes X in file Y"). A plan made without looking is not an answer.',
-  "- Ask only for decisions that are really the person's (product choices, priorities) or before actions that change things for others. Never ask permission to look, and never ask for information your tools can find.",
+  "- Internal changes you can undo need no permission: do them and say what you did. That is creating or updating issues (status, priority, assignee, labels, due date), assigning work, saving or changing memories you were asked to keep, creating or changing routines, adding an agent to a channel, writing the wiki when asked, renaming or closing a thread. The person sees each change under your reply with an Undo button.",
+  "- Ask only for decisions that are really the person's (product choices, priorities) or before actions that are external or can't be undone: merge, deploy, rollback, anything sent outside the organization (email, messages, payments), deleting what can't be restored. Never ask permission to look, and never ask for information your tools can find.",
   "- Never claim you lack access to something a tool just returned.",
   "- Work in one go: chain tool calls in the same turn until you can give a real answer.",
 ].join("\n");
@@ -387,7 +388,7 @@ export async function buildRunContext(
             ? "- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome."
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
-            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Never ask for something your tools can find, don't ask about simple requests you can just do, and never ask more than you need."
+            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Never ask for something your tools can find, don't ask about simple requests you can just do (an issue to open, a priority to set, work to assign: do it, they can undo), and never ask more than you need."
             : "",
           options.react
             ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply: no text at all, not even the emoji again. Never react and also reply with redundant text; if something still needs saying, just reply.'
@@ -658,6 +659,12 @@ export function taskNotice(m: Pick<Message, "body" | "meta">, current = false): 
   return parts.join("\n");
 }
 
+/** `meta.actionNotes` (undo/redo of the agent's changes) as one bracketed line each; "" when none. */
+function undoNotes(meta: Record<string, unknown> | undefined): string {
+  const notes = Array.isArray(meta?.actionNotes) ? meta.actionNotes.filter((n) => typeof n === "string") : [];
+  return notes.map((n) => `[Undo]: ${n}. Don't redo it unless asked.`).join("\n");
+}
+
 /**
  * Turns channel history into alternating user/assistant turns. The agent's
  * own messages are `assistant`; everything else is `user`, prefixed with the
@@ -696,10 +703,13 @@ export function toTurns(
         : who;
     // Quote reply and files: from the meta written at post time (no query here).
     const body = `${quotedLine(m.meta)}${m.body}${attachedLine(m)}`;
-    const text = own ? body : `[${label}]: ${body}`;
+    const notes = undoNotes(m.meta);
+    const text = own ? body : `[${label}]: ${body}${notes ? `\n${notes}` : ""}`;
     const last = turns.at(-1);
     if (last && last.role === role) last.parts.push({ id: m.id, text });
     else turns.push({ role, parts: [{ id: m.id, text }] });
+    // Someone undid (or redid) what this reply did: news for the agent, on the people's side.
+    if (own && notes) turns.push({ role: "user", parts: [{ id: `${m.id}:notes`, text: notes }] });
   }
   while (turns[0]?.role === "assistant") turns.shift();
   while (turns.at(-1)?.role === "assistant") turns.pop();

@@ -1,4 +1,6 @@
 import { and, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { type ActionRecord, type AgentActionParams, actWithUndo } from "./agent-actions";
+import { issueDiff, issueSnapshot } from "./agent-undo";
 import {
   commentIssue,
   createIssue,
@@ -104,6 +106,41 @@ async function assigneeOf(deps: IssueDeps, ctx: ToolContext, ref: string): Promi
   );
 }
 
+/** The receipt of an issue change: `issue.assigned` when only the assignee changed, else `issue.updated`. */
+async function issueChange(
+  deps: IssueDeps,
+  ctx: ToolContext,
+  before: Record<string, unknown>,
+  i: IssueView,
+): Promise<ActionRecord | null> {
+  const diff = issueDiff(before, issueSnapshot(i));
+  if (diff.fields.length === 0) return null;
+  const assignee = i.assignee;
+  const name = assignee ? (await assigneeNames(deps, ctx, [i])).get(assignee.id)?.replace(" (you)", "") : undefined;
+  const params: AgentActionParams = { number: i.number, title: i.title, fields: diff.fields };
+  if (diff.fields.includes("status")) params.status = i.status;
+  if (diff.fields.includes("priority")) params.priority = i.priority;
+  if (diff.fields.includes("dueDate")) params.dueDate = i.dueDate;
+  if (diff.fields.includes("labels")) params.labels = i.labels;
+  if (diff.fields.includes("assignee")) {
+    params.assigneeType = assignee?.type ?? null;
+    params.assigneeId = assignee?.id ?? null;
+    params.assigneeName = name ?? null;
+    params.assigneeIsSelf = assignee?.type === "agent" && assignee.id === ctx.agentId;
+  }
+  return {
+    // Assigning may move it to "in progress" on its own (the agent took it): still an assignment.
+    kind:
+      diff.fields.includes("assignee") && diff.fields.every((f) => f === "assignee" || f === "status")
+        ? "issue.assigned"
+        : "issue.updated",
+    target: { type: "issue", id: i.id, number: i.number, title: i.title },
+    params,
+    before: diff.before,
+    after: diff.after,
+  };
+}
+
 const assigneeField = {
   type: "string",
   minLength: 1,
@@ -154,7 +191,8 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     },
     {
       name: "create_issue",
-      description: "Create an issue with a title, a description and acceptance criteria (a checklist).",
+      description:
+        "Create an issue with a title, a description and acceptance criteria (a checklist). No permission needed: when work should be tracked, create it; the person sees it with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -171,14 +209,25 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       },
       async execute(input, ctx) {
         try {
-          const i = await createIssue(deps, actorOf(ctx), ctx.orgId, {
-            title: str(input.title),
-            description: str(input.description),
-            criteria: Array.isArray(input.criteria) ? input.criteria.map(String) : [],
-            priority: (input.priority as IssuePriority | undefined) ?? undefined,
-            labels: Array.isArray(input.labels) ? input.labels.map(String) : undefined,
-            ...(str(input.assignee) ? { assignee: await assigneeOf(deps, ctx, str(input.assignee)) } : {}),
-          });
+          const assignee = str(input.assignee) ? await assigneeOf(deps, ctx, str(input.assignee)) : undefined;
+          const i = await actWithUndo(
+            ctx,
+            (db) =>
+              createIssue({ ...deps, db }, actorOf(ctx), ctx.orgId, {
+                title: str(input.title),
+                description: str(input.description),
+                criteria: Array.isArray(input.criteria) ? input.criteria.map(String) : [],
+                priority: (input.priority as IssuePriority | undefined) ?? undefined,
+                labels: Array.isArray(input.labels) ? input.labels.map(String) : undefined,
+                ...(assignee !== undefined ? { assignee } : {}),
+              }),
+            (created) => ({
+              kind: "issue.created",
+              target: { type: "issue", id: created.id, number: created.number, title: created.title },
+              params: { number: created.number, title: created.title },
+              after: issueSnapshot(created),
+            }),
+          );
           return { content: `Created ${await lineOf(deps, ctx, i)}`, data: { issue: { id: i.id, number: i.number } } };
         } catch (error) {
           return failed(error);
@@ -188,7 +237,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: "update_issue",
       description:
-        "Change an issue's status, priority, title, description or assignee, check acceptance criteria you met, or link a pull request to it. Linking a PR moves the issue to review on its own.",
+        "Change an issue's status, priority, title, description, assignee, labels or due date, check acceptance criteria you met, or link a pull request to it. Linking a PR moves the issue to review on its own. No permission needed: the person sees the change with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -199,6 +248,17 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           title: { type: "string", maxLength: 300 },
           description: { type: "string", maxLength: 20000 },
           assignee: assigneeField,
+          labels: {
+            type: "array",
+            items: { type: "string", maxLength: 40 },
+            maxItems: 10,
+            description: "Replaces the labels",
+          },
+          due_date: {
+            type: "string",
+            maxLength: 10,
+            description: 'Due date as YYYY-MM-DD; "" removes it',
+          },
           pull_request_url: { type: "string", maxLength: 500 },
           pull_request_number: { type: "integer", minimum: 1 },
           done_criteria: {
@@ -213,25 +273,39 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       },
       async execute(input, ctx) {
         try {
-          const current = await find(deps, ctx, str(input.issue));
           const url = str(input.pull_request_url);
           const number = typeof input.pull_request_number === "number" ? input.pull_request_number : undefined;
           const fromUrl = Number(/\/pull\/(\d+)/.exec(url)?.[1] ?? Number.NaN);
           const prNumber = number ?? (Number.isFinite(fromUrl) ? fromUrl : undefined);
-          const i = await updateIssue(deps, actorOf(ctx), ctx.orgId, current.id, {
-            status: (input.status as IssueStatus | undefined) ?? undefined,
-            priority: (input.priority as IssuePriority | undefined) ?? undefined,
-            title: str(input.title) || undefined,
-            description: typeof input.description === "string" ? input.description : undefined,
-            ...(str(input.assignee) ? { assignee: await assigneeOf(deps, ctx, str(input.assignee)) } : {}),
-            ...(url && prNumber ? { addPullRequest: { number: prNumber, url } } : {}),
-          });
-          const done = Array.isArray(input.done_criteria) ? input.done_criteria.map(Number) : [];
-          let latest = i;
-          for (const n of [...new Set(done)]) {
-            const c = latest.criteria[n - 1];
-            if (c && !c.done) latest = await setCriterion(deps, actorOf(ctx), ctx.orgId, i.id, c.id, true);
-          }
+          const assignee = str(input.assignee) ? await assigneeOf(deps, ctx, str(input.assignee)) : undefined;
+          const due = typeof input.due_date === "string" ? input.due_date.trim() : undefined;
+          let before: Record<string, unknown> = {};
+          const latest = await actWithUndo(
+            ctx,
+            async (db) => {
+              const d = { ...deps, db };
+              const current = await find(d, ctx, str(input.issue));
+              before = issueSnapshot(current);
+              const i = await updateIssue(d, actorOf(ctx), ctx.orgId, current.id, {
+                status: (input.status as IssueStatus | undefined) ?? undefined,
+                priority: (input.priority as IssuePriority | undefined) ?? undefined,
+                title: str(input.title) || undefined,
+                description: typeof input.description === "string" ? input.description : undefined,
+                ...(assignee !== undefined ? { assignee } : {}),
+                ...(Array.isArray(input.labels) ? { labels: input.labels.map(String) } : {}),
+                ...(due !== undefined ? { dueDate: due || null } : {}),
+                ...(url && prNumber ? { addPullRequest: { number: prNumber, url } } : {}),
+              });
+              const done = Array.isArray(input.done_criteria) ? input.done_criteria.map(Number) : [];
+              let last = i;
+              for (const n of [...new Set(done)]) {
+                const c = last.criteria[n - 1];
+                if (c && !c.done) last = await setCriterion(d, actorOf(ctx), ctx.orgId, i.id, c.id, true);
+              }
+              return last;
+            },
+            (i, db) => issueChange({ ...deps, db }, ctx, before, i),
+          );
           return { content: `Updated ${await lineOf(deps, ctx, latest)}` };
         } catch (error) {
           return failed(error);

@@ -1,5 +1,7 @@
 export * from "./access";
+export * from "./agent-actions";
 export * from "./agent-import";
+export * from "./agent-undo";
 export * from "./agents";
 export * from "./appearance";
 export * from "./approvals";
@@ -138,4 +140,5 @@ export * from "./wiki";
 export * from "./wiki-links";
 export * from "./wiki-tools";
 export * from "./working";
+export * from "./workspace-tools";
 export * from "./zip";

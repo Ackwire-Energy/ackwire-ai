@@ -1,4 +1,6 @@
 import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { recordAgentActions } from "./agent-actions";
+import { routineRow, routineSnapshot } from "./agent-undo";
 import { canTalkTo } from "./audience";
 import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
@@ -250,7 +252,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a recurring routine ("toda segunda às 9h", "dias úteis às 18h", "every Monday at 9am"): at each time you get `prompt` as a request from the person, and your answer goes where the routine lives. By default that is this conversation; set `channel` (its name, with or without #) when the person wants the results posted in a channel ("manda no #general", "post it in #general"), so nothing comes here. Only admins or your owner can create routines.',
+        'Create a recurring routine ("toda segunda às 9h", "dias úteis às 18h", "every Monday at 9am"): at each time you get `prompt` as a request from the person, and your answer goes where the routine lives. By default that is this conversation; set `channel` (its name, with or without #) when the person wants the results posted in a channel ("manda no #general", "post it in #general"), so nothing comes here. Only admins or your owner can create routines. No permission needed beyond that: the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -301,6 +303,18 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                 : `${t.description} (${zoneName})`
               : "";
           const where = await whereOf(ctx, routine);
+          // Recorded right after (reading the schedule may call a model: no transaction held around it).
+          const row = await routineRow(ctx.db, ctx.orgId, routine.id);
+          if (row) {
+            await recordAgentActions(ctx.db, ctx, [
+              {
+                kind: "routine.created",
+                target: { type: "routine", id: routine.id, title: routine.name },
+                params: { name: routine.name, schedule: when, active: routine.active },
+                after: routineSnapshot(row),
+              },
+            ]);
+          }
           return {
             content: `Created routine ${routine.id} "${routine.name}": ${when}; next: ${next}; answers in ${where}. Confirm it to the person.`,
             data: { routine: { id: routine.id } },
@@ -422,6 +436,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           }
           if (!found) return { content: `You have no routine ${id}. Use list_routines.`, isError: true };
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
+          const beforeRow = await routineRow(ctx.db, ctx.orgId, id);
           const routine = await updateRoutine(routineDeps(ctx), requester, ctx.orgId, id, {
             ...(channel ? { target: channel.target } : {}),
             ...(str(input.prompt) ? { prompt: str(input.prompt) } : {}),
@@ -432,6 +447,37 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const when = routine.trigger.type === "schedule" ? routine.trigger.description : "";
           const zone = routine.trigger.type === "schedule" ? routine.trigger.timezone : "UTC";
           const next = routine.nextRunAt ? describeWhen(new Date(routine.nextRunAt), zone) : "none";
+          const afterRow = await routineRow(ctx.db, ctx.orgId, id);
+          if (beforeRow && afterRow) {
+            const was = routineSnapshot(beforeRow);
+            const now = routineSnapshot(afterRow);
+            const fields = Object.keys(now).filter((k) => JSON.stringify(was[k]) !== JSON.stringify(now[k]));
+            if (fields.length > 0) {
+              await recordAgentActions(ctx.db, ctx, [
+                {
+                  kind: "routine.updated",
+                  target: { type: "routine", id: routine.id, title: routine.name },
+                  params: {
+                    name: routine.name,
+                    // The app's words: name, prompt, schedule, where (target), paused/resumed (active).
+                    fields: [
+                      ...new Set(
+                        fields.map((f) =>
+                          ["triggerType", "phrase", "cron", "timezone", "description", "event", "rule"].includes(f)
+                            ? "schedule"
+                            : f,
+                        ),
+                      ),
+                    ],
+                    active: routine.active,
+                    ...(when ? { schedule: when } : {}),
+                  },
+                  before: Object.fromEntries(fields.map((k) => [k, was[k]])),
+                  after: Object.fromEntries(fields.map((k) => [k, now[k]])),
+                },
+              ]);
+            }
+          }
           return {
             content: `Updated routine ${routine.id} "${routine.name}" (${routine.active ? "active" : "paused"}): ${when}; next: ${next}; answers in ${await whereOf(ctx, routine)}. Tell the person what changed.`,
             data: { routine: { id: routine.id } },

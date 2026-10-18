@@ -1,6 +1,6 @@
 # 0037. Agents investigate before answering
 
-- Status: Accepted (round 1 built)
+- Status: Accepted (rounds 1 and 2 built)
 - Date: 2026-10-18
 - Planning: D52
 - Extends: ADR 0015 (approvals), ADR 0032 (agent engine), ADR 0034 (agents talk to each other)
@@ -34,9 +34,28 @@ Prompt changes are checked against a behavior eval built from the real failures 
 
 Scoring is deterministic checks (a reading tool before the answer, no asking permission to look, no "I haven't looked", no false "no access", required tools called, evidence cited, sensitive tools held for approval and never run, `NO_REPLY` only when expected) plus a cheap judge model with a rubric per case (looked first, grounded, concrete next step, asks only the person's decisions, case-specific points). The report (per case and per criterion, cost) goes to `packages/engine/eval/out/`. The checkers are unit-tested and the harness runs with the fake provider in `bun test` (no network).
 
+## Round 2: act with undo, missions that arrive investigated
+
+Prototype: `docs/design/telas/FazerDesfazer.html` (views `undo` and `mission`), web and app.
+
+**Act with undo.** Internal, reversible changes need no permission: the agent does them and its reply carries one receipt per change with "Desfazer" for `UNDO_WINDOW_MS` (5 minutes; every undo or redo opens the window again), then the receipt stays as history.
+
+- Covered (only through agent tools, never people's own edits): issue created, issue fields changed (status, priority, assignee, labels, due date, title, description, criteria), issue assigned, memory saved / changed / forgotten, routine created (same creation rules as before: active) or changed, agent added to a channel (`add_agent_to_channel`, new), wiki page created or edited (agents still write the wiki only when a person asks), thread renamed or closed (`update_thread`, new). The two new tools act with the rights of the person who asked.
+- Not covered, still approvals: merge, deploy, rollback, anything that leaves the organization (email, messages outside, payments) and deletes that can't be restored.
+- `agent_actions` (migration 0070): org, run, agent, channel, the reply (`message_id`, set when the run posts: `linkRunActions` in the executor's `post`), the person the agent worked for (the trigger's author), kind, target (type, id and a label: number, title, slug), params for the sentence, `before`/`after` (what inverting needs and what detects someone else's change), `state` (undo/redo bookkeeping), `undoable_until`, `undone_at`/`undone_by_user_id`, `redone_at`. No foreign key to the run (receipts outlive pruned runs).
+- Recorded in the tool layer (`actWithUndo`, `agent-actions.ts`), in the change's transaction for issues, wiki, channel members and threads. Memory saves and routines are recorded right after the change: they may call a model (memory judge, schedule reader), and a transaction is never held around a network call.
+- Undo and redo (`agent-undo.ts`) go through the domain functions as the person undoing (activity, events, notifications as for any edit): a created issue is canceled (issues have no delete), fields go back to their previous values, a memory goes back to its previous version or is archived, a routine is soft-deleted or its fields restored, the agent leaves the channel, a wiki page is soft-deleted or gets a new version with the previous text, a thread gets its title back or reopens. Redo applies the change again. Refused with 409 when the target changed since (`action.changed_since`: compared field by field with `after`; for creations, activity by anyone else since; changes made by undo/redo of the same agent's receipts don't count), after the window (`action.expired`), or twice (`action.already_undone` / `action.not_undone`). A claim on the row comes first, so two clicks never invert twice.
+- Who may undo: the person the agent worked for, admins, the agent's owner (403 `action.not_allowed`).
+- API: `POST /api/app/organizations/{orgId}/actions/{id}/undo`, `…/redo`, `POST …/messages/{messageId}/actions/undo` (Desfazer tudo: newest first, each failure listed). Message lists carry `actions` on agent messages; `message.actions` (the message's whole list) goes to the channel when receipts are linked and on every undo/redo.
+- The agent learns: an undo or redo appends a line to the reply's `meta.actionNotes` ("Ana undid: created issue #23"), which its next turns read on the people's side of the history (`[Undo]: … Don't redo it unless asked.`).
+- Prompt: "How you work" says internal changes need no permission (do them, they show with Undo) and lists what still asks; the `ask_user` rule and tool descriptions say the same; "What you can do" lists the tools done right away. Memory saves, changes and forgets are receipts now; `meta.memoryUpdates` stays only for instruction proposals.
+
+**Missions arrive investigated.** `propose_mission` now requires `findings` (`{kind: read | data | decision, text, refs?}`, at most one `decision`: the one question that is the person's) and takes the `plan` (item titles). The agent investigates with its read tools before proposing; with a plan the mission arrives planned (plan version 1, no plan-mode session) and the card shows findings, the open question and the plan. Start still unlocks writing (branch, code, PR, writes outside reading); the findings go into the Start prompt and the mission brief, since a mission from a flat DM lives in a new thread without the investigation. Missions a person starts (`/mission`) keep the read-only planning session, which records its findings with `record_findings`. `missions.findings` (migration 0070); the mission view has `findings` and `openQuestion`.
+
+**Eval.** Four cases: organizing work creates the issue directly (a receipt, no question); a mission proposal carries findings that cite the code; "apaga o canal" still needs a person; an issue created on its own while the merge waits for approval. New checks: `receipts` (kinds on the reply) and `missionFindings`; the harness adds the workspace tools and a `propose_mission` with the real description and schema.
+
 ## Later rounds
 
-- **Act with undo:** for reversible actions that only touch the agent's own work (a branch, a draft PR, an issue it opened), act first and offer undo instead of asking.
 - Measure it in production too: count `ask_user` calls and replies with no tool call before them on questions about code or errors (the behavior eval covers it before shipping).
 - The repositories block in `git/repos.ts`: pick the repository from context (recent work, the issue, the only connected repository) before asking.
 

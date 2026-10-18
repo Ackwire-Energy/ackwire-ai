@@ -23,6 +23,7 @@ import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
 import { keys } from "./keys";
 import type {
+  AgentAction,
   AgentComputer,
   AgentInput,
   ApiRule,
@@ -803,6 +804,64 @@ export function cacheMessageMemories(
     if (!list.some((m) => m && m.id === messageId)) return data;
     return list.map((m) => (m.id === messageId ? { ...m, memories } : m));
   });
+}
+
+/**
+ * `message.actions` (and undo/redo results): an agent message's receipts, in
+ * every cached list of that channel (timeline and threads). Replaces the list.
+ */
+export function cacheMessageActions(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  actions: AgentAction[],
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, actions } : m));
+  });
+}
+
+/** One receipt changed: put it in its message's cached list (keeps the others). */
+function cacheOneAction(qc: ReturnType<typeof useQueryClient>, orgId: string, channelId: string, action: AgentAction) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === action.messageId)) return data;
+    return list.map((m) =>
+      m.id === action.messageId
+        ? { ...m, actions: (m.actions ?? []).map((a) => (a.id === action.id ? action : a)) }
+        : m,
+    );
+  });
+}
+
+/**
+ * Desfazer / Refazer / Desfazer tudo on an agent's receipts. The cached
+ * message updates from the answer (the `message.actions` event follows for
+ * everyone). Errors are `ApiError` with `code` (`action.changed_since`…).
+ */
+export function useAgentActions(orgId: string, channelId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const one = (result: AgentAction) => cacheOneAction(qc, orgId, channelId, result);
+  return {
+    undo: useMutation({
+      mutationFn: (actionId: string) => part(api, "actions").undo(orgId, actionId),
+      onSuccess: one,
+    }),
+    redo: useMutation({
+      mutationFn: (actionId: string) => part(api, "actions").redo(orgId, actionId),
+      onSuccess: one,
+    }),
+    undoAll: useMutation({
+      mutationFn: (messageId: string) => part(api, "actions").undoMessage(orgId, messageId),
+      onSuccess: (result, messageId) => cacheMessageActions(qc, orgId, channelId, messageId, result.actions),
+    }),
+  };
 }
 
 export function useCorrectMessage(orgId: string) {
@@ -2019,7 +2078,7 @@ export function useNotificationReply(orgId: string) {
 // ── Phone app: read state, pins, following, working now, reminders ─────────────
 
 /** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
-function part<K extends "pins" | "threadFollows" | "working" | "reminders">(
+function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions">(
   api: ApiClient,
   name: K,
 ): NonNullable<ApiClient[K]> {

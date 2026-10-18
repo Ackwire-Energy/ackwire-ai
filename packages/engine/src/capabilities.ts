@@ -1,3 +1,4 @@
+import { UNDOABLE_TOOLS } from "./agent-actions";
 import { isSensitive } from "./tools/gateway";
 import type { ToolDefinition } from "./tools/types";
 
@@ -82,6 +83,12 @@ export function describeCapabilities(
     if (names.has("share_artifact")) {
       lines.push(
         "- A request for a file you already made (here, in a DM or in another channel): find it with `list_artifacts` and bring it with `share_artifact` instead of creating it again.",
+      );
+    }
+    const undoable = tools.filter((t) => UNDOABLE_TOOLS.has(t.name) && !isSensitive(t)).map((t) => `\`${t.name}\``);
+    if (undoable.length > 0) {
+      lines.push(
+        `Done right away, no approval (the person sees each change under your reply with Undo for a few minutes): ${undoable.join(", ")}.`,
       );
     }
     const approval = tools.filter((t) => isSensitive(t)).map((t) => `\`${t.name}\``);

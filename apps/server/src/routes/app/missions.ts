@@ -92,6 +92,22 @@ const Mission = z
     executor: z.string(),
     title: z.string(),
     goal: z.string(),
+    findings: z
+      .array(
+        z.object({
+          kind: z.enum(["read", "data", "decision"]),
+          text: z.string(),
+          refs: z.array(z.string()).optional(),
+        }),
+      )
+      .openapi({
+        description:
+          "What the agent found before proposing it (read only): `read` = code or files it read, `data` = numbers from analytics, logs, errors, `decision` = the one open question for the person. `refs`: files with lines, links, ids. Empty when a person started it and the planning hasn't recorded any yet.",
+      }),
+    openQuestion: z
+      .string()
+      .nullable()
+      .openapi({ description: "The `decision` finding's text: the one question left for the person (null: none)." }),
     status: Status,
     repoDir: z.string(),
     resumeTasks: z.boolean(),

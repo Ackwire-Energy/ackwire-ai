@@ -84,6 +84,13 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
           waiting.length ? ` Waiting for people: ${waiting.join("; ")}.` : ""
         }`
       : "Plan: not written yet.",
+    ...(mission.findings.length
+      ? [
+          `Found before the proposal:\n${mission.findings
+            .map((f) => `- [${f.kind}] ${f.text}${f.refs?.length ? ` (${f.refs.join(", ")})` : ""}`)
+            .join("\n")}`,
+        ]
+      : []),
     running.length
       ? `Running on ${computer}: ${running
           .map((t) => `"${t.title}"${t.branch ? ` (${t.branch})` : ""}${t.lastLine ? `: ${t.lastLine}` : ""}`)

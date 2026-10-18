@@ -17,6 +17,7 @@ import {
   postPersonMessage,
   requireChannelAccess,
   revertMemoryChange,
+  undoAgentAction,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -246,7 +247,7 @@ describe("memory changes on request", () => {
       return call ? { chunks: [], toolUses: [call] } : { chunks: ["ok"] };
     };
 
-  test("DM 'Ada, esquece X' → forget → memory.updated with undo → archived → undo restores", async () => {
+  test("DM 'Ada, esquece X' → forget → a receipt with undo on the reply → archived → undo restores", async () => {
     let itemId = "";
     f = await setup({
       contextTools: true,
@@ -268,23 +269,21 @@ describe("memory changes on request", () => {
     });
     await drainOutbox(f.db, f.handlers);
 
-    const update = events.find((e) => e.type === "memory.updated") as unknown as {
-      update: { action: string; itemId: string; requestedByUserId: string; undo: { path: string } };
-    };
-    expect(update.update).toMatchObject({ action: "forgot", itemId, requestedByUserId: f.owner.id });
-    expect(update.update.undo.path).toBe(`/api/app/organizations/${f.org.id}/memories/${itemId}/revert`);
     const [archived] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, itemId));
     expect(archived?.status).toBe("archived");
-    // The confirmation is in the chat, with the structured update for the card.
+    // The confirmation is in the chat, with the change as a receipt (act with undo, ADR 0037).
     // DMs are flat: the reply is in the main timeline, right after the request.
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, dm.id);
     expect(timeline.map((m) => m.id)).toContain(ask.id);
     const reply = timeline.at(-1);
     expect(reply?.threadId).toBeNull();
     expect(reply?.body).toBe("Pronto.");
-    expect(reply?.meta.memoryUpdates).toEqual([expect.objectContaining({ action: "forgot", itemId })]);
+    expect(reply?.actions?.map((a) => [a.kind, a.target.id, a.requestedByUserId])).toEqual([
+      ["memory.forgotten", itemId, f.owner.id],
+    ]);
+    expect(events.some((e) => e.type === "message.actions" && e.messageId === reply?.id)).toBe(true);
 
-    await revertMemoryChange(f.db, f.owner.id, f.org.id, itemId);
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, reply?.actions?.[0]?.id ?? "");
     const [restored] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, itemId));
     expect(restored?.status).toBe("active");
   });

@@ -55,6 +55,8 @@ const mission = (over: Partial<Mission> = {}): Mission => ({
   executor: "claude",
   title: "App mobile",
   goal: "Build the app.",
+  findings: [],
+  openQuestion: null,
   status: "active",
   repoDir: "",
   resumeTasks: true,

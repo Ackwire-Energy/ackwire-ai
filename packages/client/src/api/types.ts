@@ -216,6 +216,8 @@ export interface Message {
   memories?: MessageMemory[];
   /** In lists: true when pinned in its channel (absent: not pinned); live via `message.pinned` / `message.unpinned`. */
   pinned?: boolean;
+  /** Agents' messages: what the agent changed with it, as receipts with Undo; live via `message.actions`. */
+  actions?: AgentAction[];
   /** Client only: an optimistic message waiting for the server, or one that failed to send. */
   local?: "pending" | "failed";
   createdAt: string;
@@ -268,6 +270,8 @@ export type ChannelEvent =
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
+  /** An agent message's receipts changed (linked to it, undone or redone): its whole list now (replace). */
+  | { type: "message.actions"; channelId: string; threadId: string | null; messageId: string; actions: AgentAction[] }
   /** A message was pinned here (`pins.list` has them all, newest first). */
   | {
       type: "message.pinned";
@@ -875,6 +879,81 @@ export interface ReplyRef {
   author: { type: AuthorType; id: string | null };
   authorName: string;
   excerpt: string;
+}
+
+/**
+ * Act with undo (ADR 0037 round 2): what an agent changed with its reply,
+ * shown as a receipt under the message. Say it with `agentActions.{kind}`
+ * (pt-BR and en) and `params`.
+ */
+export type AgentActionKind =
+  | "issue.created"
+  | "issue.updated"
+  | "issue.assigned"
+  | "memory.saved"
+  | "memory.updated"
+  | "memory.forgotten"
+  | "routine.created"
+  | "routine.updated"
+  | "channel.agent_added"
+  | "wiki.page_created"
+  | "wiki.page_edited"
+  | "thread.renamed"
+  | "thread.closed";
+
+/** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
+export interface AgentActionTarget {
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread";
+  id: string;
+  /** Issues. */
+  number?: number;
+  /** Issue, routine, wiki page or thread title; channel name (without `#`). */
+  title?: string;
+  /** Wiki pages. */
+  slug?: string;
+}
+
+/**
+ * Values for the sentence, by kind:
+ * - `issue.created`: `number`, `title`
+ * - `issue.updated`: `number`, `title`, `fields` (any of title, description, status, priority,
+ *   assignee, labels, dueDate, criteria) and the new `status`, `priority`, `dueDate`, `labels`,
+ *   `assigneeType`/`assigneeId`/`assigneeName`/`assigneeIsSelf` for the fields that changed
+ * - `issue.assigned`: `number`, `title`, `assigneeType`, `assigneeId`, `assigneeName`, `assigneeIsSelf`
+ * - `memory.saved`: `text` (and `previousText` when it replaced one); `memory.updated`: `text`, `previousText`;
+ *   `memory.forgotten`: `text`
+ * - `routine.created`: `name`, `schedule` (the server's words), `active`; `routine.updated`: `name`,
+ *   `fields` (name, prompt, target, schedule, active), `active`, `schedule`
+ * - `channel.agent_added`: `agentId`, `agentName`, `agentHandle`, `channel`
+ * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
+ * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
+ */
+export type AgentActionParams = Record<string, string | number | boolean | null | string[]>;
+
+export interface AgentAction {
+  id: string;
+  kind: AgentActionKind;
+  agentId: string;
+  messageId: string | null;
+  /** The person the agent worked for: they, admins and the agent's owner may undo (see `lib/actions`). */
+  requestedByUserId: string | null;
+  target: AgentActionTarget;
+  params: AgentActionParams;
+  createdAt: string;
+  /** Desfazer (or Refazer, once undone) works until then; every undo or redo moves it 5 minutes ahead. */
+  undoableUntil: string;
+  /** Set while undone ("Desfeito por …", Refazer). */
+  undoneAt: string | null;
+  undoneByUserId: string | null;
+  redoneAt: string | null;
+}
+
+/** `POST …/messages/{messageId}/actions/undo` (Desfazer tudo). */
+export interface UndoAllResult {
+  /** The message's receipts now. */
+  actions: AgentAction[];
+  /** Changes that could not be undone, with the error code (`action.changed_since`, …). */
+  failed: { id: string; code: string; message: string }[];
 }
 
 /** Something an agent saved to its memory from a person's message (the memory mark). */
@@ -2286,6 +2365,18 @@ export interface PlanItem {
 /** Who programs a mission: Claude Code, Codex (experimental) or the agent itself with its own tools. */
 export type MissionExecutor = "claude" | "codex" | "agent";
 
+/**
+ * What the agent found before proposing a mission (ADR 0037 round 2), shown on the plan card:
+ * `read` = code or files it read (icon: search), `data` = numbers from analytics, logs or errors
+ * (icon: chart), `decision` = the one open question left for the person (icon: help; at most one).
+ * `refs`: files with lines (`ReviewPrompt.swift:41`), links or ids it cites.
+ */
+export interface MissionFinding {
+  kind: "read" | "data" | "decision";
+  text: string;
+  refs?: string[];
+}
+
 export interface Mission {
   id: string;
   /** The home thread (root message id). */
@@ -2297,6 +2388,10 @@ export interface Mission {
   executor: string;
   title: string;
   goal: string;
+  /** What the agent found before proposing it (read only); empty when a person started it and planning found nothing yet. */
+  findings: MissionFinding[];
+  /** The `decision` finding's text: the one question left for the person (null: none). */
+  openQuestion: string | null;
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;

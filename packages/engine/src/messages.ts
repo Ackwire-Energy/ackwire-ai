@@ -14,6 +14,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { type AgentActionView, actionsFor } from "./agent-actions";
 import { getAgentCached } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
@@ -62,6 +63,11 @@ export interface MessageView {
   memories?: MessageMemory[];
   /** In message lists: `true` when pinned in its channel (absent: not pinned); live via `message.pinned`/`message.unpinned`. */
   pinned?: boolean;
+  /**
+   * Agents' messages in lists: the changes the agent made with it, as
+   * receipts with Undo (ADR 0037 round 2); live via `message.actions`.
+   */
+  actions?: AgentActionView[];
   createdAt: string;
 }
 
@@ -1040,7 +1046,8 @@ async function pinnedOf(db: Database, orgId: string, list: Message[]): Promise<S
 export const withMessageDetails = (db: Database, orgId: string, list: Message[]) => withReceipts(db, orgId, list);
 
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
-  const [receipts, usage, reactions, memories, pinned] = await Promise.all([
+  const agentMessageIds = list.flatMap((m) => (m.authorType === "agent" ? [m.id] : []));
+  const [receipts, usage, reactions, memories, pinned, actions] = await Promise.all([
     receiptsFor(
       db,
       orgId,
@@ -1054,6 +1061,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
     ),
     memoriesFor(db, orgId, list),
     pinnedOf(db, orgId, list),
+    actionsFor(db, orgId, agentMessageIds),
   ]);
   const views = list.map((m) => {
     const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
@@ -1065,6 +1073,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...(reacted ? { reactions: reacted } : {}),
       ...(memories.has(m.id) ? { memories: memories.get(m.id) } : {}),
       ...(pinned.has(m.id) ? { pinned: true } : {}),
+      ...(actions.has(m.id) ? { actions: actions.get(m.id) } : {}),
     };
   });
   return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));

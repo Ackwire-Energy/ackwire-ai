@@ -139,6 +139,10 @@ export interface Expectations {
   mustNotCall?: string[];
   /** Handles of other agents the trigger must not start (mentioned only as a reference). */
   notTriggered?: string[];
+  /** Act with undo (ADR 0037 round 2): receipt kinds the reply must carry (`issue.created`…). */
+  receipts?: string[];
+  /** `propose_mission` must arrive investigated: read/data findings, at most one decision. */
+  missionFindings?: boolean;
 }
 
 export interface RunObservation {
@@ -152,6 +156,18 @@ export interface RunObservation {
   approvals: string[];
   /** Handles of the other agents of the case that the trigger started. */
   triggered?: string[];
+  /** Receipt kinds linked to the run's messages (`agent_actions`). */
+  receipts?: string[];
+}
+
+/** A `propose_mission` input that arrives investigated: at least one read/data finding, at most one decision. */
+export function missionFindingsOk(input: Record<string, unknown>): { pass: boolean; detail: string } {
+  const findings = Array.isArray(input.findings) ? (input.findings as { kind?: unknown; text?: unknown }[]) : [];
+  const evidence = findings.filter((x) => (x.kind === "read" || x.kind === "data") && String(x.text ?? "").trim());
+  const decisions = findings.filter((x) => x.kind === "decision").length;
+  if (evidence.length === 0) return { pass: false, detail: "no read/data findings" };
+  if (decisions > 1) return { pass: false, detail: `${decisions} decisions (at most one)` };
+  return { pass: true, detail: `${evidence.length} finding(s), ${decisions} decision` };
 }
 
 /** All deterministic checks a case asks for. */
@@ -235,6 +251,21 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
       pass: started.length === 0,
       detail: started.length ? `also started ${started.join(", ")}` : "ok",
     });
+  }
+  if (expect.receipts?.length) {
+    const missing = expect.receipts.filter((k) => !(run.receipts ?? []).includes(k));
+    out.push({
+      id: "acted_with_undo",
+      pass: missing.length === 0,
+      detail: missing.length ? `no receipt for ${missing.join(", ")}` : `receipts: ${(run.receipts ?? []).join(", ")}`,
+    });
+  }
+  if (expect.missionFindings) {
+    const proposals = run.calls.filter((c) => c.name === "propose_mission" && c.executed && !c.isError);
+    const r = proposals.length
+      ? missionFindingsOk(proposals.at(-1)?.input ?? {})
+      : { pass: false, detail: "no mission proposed" };
+    out.push({ id: "mission_investigated", ...r });
   }
   if (expect.ask) {
     const asked = run.calls.some((c) => c.name === "ask_user");

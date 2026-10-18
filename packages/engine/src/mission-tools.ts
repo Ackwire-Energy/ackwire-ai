@@ -21,6 +21,7 @@ import {
   noMentions,
   postMissionMessage,
   proposeMission,
+  recordFindings,
   recordMissionEvent,
   requestReview,
   updatePlan,
@@ -35,6 +36,38 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
   ...((error as { code?: unknown }).code ? { data: { code: (error as { code: string }).code } } : {}),
 });
+
+/** One finding of the investigation before a mission (ADR 0037 round 2). */
+/** What `propose_mission` tells the model (also used by the behavior eval's fake). */
+export const proposeMissionDescription = (computer: string) =>
+  `Propose a mission when a request is long work on the computer "${computer}" (several deliverables, days, product decisions). Investigate FIRST with your read tools (code, logs, errors, analytics, issues, memory): reading needs no ok. Then propose with \`findings\` (what you found, citing files with lines, numbers, ids), at most one \`decision\` finding (the one question that is the person's; decide the rest yourself) and the \`plan\` (short item titles). The people get a card with the findings, the plan and a button to start; starting unlocks writing (branch, code, PR, anything outside reading). For one task, use start_task instead.`;
+
+export const MISSION_FINDINGS_SCHEMA = {
+  type: "array",
+  minItems: 1,
+  maxItems: MISSION_LIMITS.findings,
+  items: {
+    type: "object",
+    properties: {
+      kind: {
+        enum: ["read", "data", "decision"],
+        description:
+          "read: code or files you read; data: numbers from analytics, logs, errors; decision: the one open question that is the person's",
+      },
+      text: { type: "string", minLength: 1, maxLength: MISSION_LIMITS.findingText },
+      refs: {
+        type: "array",
+        maxItems: MISSION_LIMITS.findingRefs,
+        items: { type: "string", minLength: 1, maxLength: MISSION_LIMITS.findingRef },
+        description: "Files with lines (src/a.ts:41), links, ids you cite",
+      },
+    },
+    required: ["kind", "text"],
+    additionalProperties: false,
+  },
+  description:
+    "What you found investigating with your read tools, citing files and lines, numbers, ids. At most one `decision`.",
+};
 
 /** The same JSON Schemas the executor's MCP tools have (one contract for both). */
 const mcpSchema = (name: string) =>
@@ -55,7 +88,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
 
   const proposeTool = (computer: string, executors: MissionExecutor[]): ToolDefinition => ({
     name: "propose_mission",
-    description: `Propose a mission when a request is long work on the computer "${computer}" (several deliverables, days, product decisions). It is planned first (read only) in its thread; the people get a plan card to start it. Nothing changes until the person who asked starts it. For one task, use start_task instead.`,
+    description: proposeMissionDescription(computer),
     scope: SANDBOX_SCOPE,
     inputSchema: {
       type: "object",
@@ -78,8 +111,16 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
             .map((e) => (e === "agent" ? "agent (you, with your own tools)" : e))
             .join(", ")}. Only when the person asked for one.`,
         },
+        findings: MISSION_FINDINGS_SCHEMA,
+        plan: {
+          type: "array",
+          minItems: 1,
+          maxItems: MISSION_LIMITS.proposedPlan,
+          items: { type: "string", minLength: 1, maxLength: MISSION_LIMITS.itemTitle },
+          description: "The plan's items in order (short titles), from what you found",
+        },
       },
-      required: ["title", "goal"],
+      required: ["title", "goal", "findings"],
       additionalProperties: false,
     },
     describe: (input) => ({
@@ -114,7 +155,10 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           goal: str(input.goal),
           repoDir: str(input.folder) || null,
           executor: (str(input.executor) || null) as MissionExecutor | null,
+          findings: input.findings,
+          plan: Array.isArray(input.plan) ? input.plan.map(String) : null,
         });
+        const planned = Array.isArray(input.plan) && input.plan.length > 0;
         // Its home is a new thread (a flat DM): the reply here gets a link card to it.
         const elsewhere = home !== ctx.threadRootId;
         const shown = elsewhere
@@ -122,6 +166,21 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           : "The app shows the plan card in this thread, with the button to start.";
         const reply =
           "Reply briefly (one or two lines) in the person's language; don't name buttons or other parts of the app.";
+        if (planned) {
+          return {
+            content: `Mission ${mission.id} proposed on ${computer}, already investigated and planned: ${
+              elsewhere
+                ? "a link card to its thread goes under your reply, and the card there"
+                : "the card in this thread"
+            } shows your findings, the open decision and the plan, with the button to start. Nothing is written until the person who asked starts it. ${reply} Then end your turn.`,
+            data: {
+              missionId: mission.id,
+              threadId: home,
+              executor: mission.executor,
+              ...(elsewhere ? { missionLink: { missionId: mission.id, threadId: home } } : {}),
+            },
+          };
+        }
         return {
           content:
             // The plan notice joins this run when the mission lives in this thread; a new thread gets its own run.
@@ -205,6 +264,22 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
         return {
           content: `Plan saved (version ${out.version}: ${out.items.length} items; +${c.added.length} −${c.removed.length} ~${c.changed.length}).`,
         };
+      },
+    }),
+    bound(run, {
+      name: "record_findings",
+      description:
+        "Save what you found investigating this mission (read only), replacing what was saved: cite files with lines, numbers, ids; at most one `decision` (the one question that is the person's). People see it on the mission's card. Write it in the language the people use in the thread.",
+      inputSchema: {
+        type: "object",
+        properties: { findings: MISSION_FINDINGS_SCHEMA },
+        required: ["findings"],
+        additionalProperties: false,
+      },
+      whileProposed: true,
+      async run(input, ctx, mission) {
+        const findings = await recordFindings(missionDeps(ctx), mission, input.findings);
+        return { content: `Findings saved (${findings.length}).` };
       },
     }),
     bound(run, {

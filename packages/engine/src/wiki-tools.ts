@@ -1,4 +1,5 @@
 import { and, eq, schema } from "@agenteschat/db";
+import { actWithUndo } from "./agent-actions";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
   appendToWikiPage,
@@ -36,6 +37,18 @@ async function requester(ctx: ToolContext): Promise<string | null> {
   if (forum?.kickoff) return null;
   return m.userId;
 }
+
+/** The receipt of a wiki edit (none when the text came out the same). */
+const wikiEdit = (p: { id: string; title: string; slug: string; version: number }, before: number) =>
+  p.version === before
+    ? null
+    : {
+        kind: "wiki.page_edited" as const,
+        target: { type: "wiki_page" as const, id: p.id, title: p.title, slug: p.slug },
+        params: { title: p.title, slug: p.slug },
+        before: { version: before },
+        after: { version: p.version },
+      };
 
 const reader = (ctx: ToolContext): WikiActor => ({ type: "agent", agentId: ctx.agentId, requestedByUserId: null });
 
@@ -140,13 +153,23 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
         const actor = await writer(ctx);
         if (!actor) return { content: WIKI_WRITE_REFUSAL, isError: true };
         try {
-          const p = await createWikiPage(wiki(ctx), actor, ctx.orgId, {
-            title: str(input.title),
-            body: str(input.body),
-            folder: str(input.folder) || undefined,
-            tags: Array.isArray(input.tags) ? (input.tags as string[]) : undefined,
-            note: str(input.note) || undefined,
-          });
+          const p = await actWithUndo(
+            ctx,
+            (db) =>
+              createWikiPage({ ...wiki(ctx), db }, actor, ctx.orgId, {
+                title: str(input.title),
+                body: str(input.body),
+                folder: str(input.folder) || undefined,
+                tags: Array.isArray(input.tags) ? (input.tags as string[]) : undefined,
+                note: str(input.note) || undefined,
+              }),
+            (page) => ({
+              kind: "wiki.page_created",
+              target: { type: "wiki_page", id: page.id, title: page.title, slug: page.slug },
+              params: { title: page.title, slug: page.slug },
+              after: { version: page.version },
+            }),
+          );
           return {
             content: `Created [[${p.title}]] (slug ${p.slug}, version 1). Link it in your reply as [[${p.title}]].`,
             data: { wikiPageId: p.id, slug: p.slug },
@@ -180,27 +203,33 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
         try {
           const mode = str(input.mode);
           const page = str(input.page);
-          let p: Awaited<ReturnType<typeof updateWikiPage>>;
-          if (mode === "replace") {
-            if (typeof input.base_version !== "number") {
-              return { content: "Read the page first and pass its version as base_version.", isError: true };
-            }
-            p = await updateWikiPage(wiki(ctx), actor, ctx.orgId, page, {
-              baseVersion: input.base_version,
-              body: str(input.content),
-              note: str(input.note) || undefined,
-            });
-          } else {
-            if (mode === "replace_section" && !str(input.section)) {
-              return { content: "replace_section needs `section`.", isError: true };
-            }
-            p = await appendToWikiPage(wiki(ctx), actor, ctx.orgId, page, {
-              text: str(input.content),
-              section: str(input.section) || null,
-              mode: mode === "replace_section" ? "replace_section" : "append",
-              note: str(input.note) || undefined,
-            });
+          if (mode === "replace" && typeof input.base_version !== "number") {
+            return { content: "Read the page first and pass its version as base_version.", isError: true };
           }
+          if (mode === "replace_section" && !str(input.section)) {
+            return { content: "replace_section needs `section`.", isError: true };
+          }
+          let before = 0;
+          const p = await actWithUndo(
+            ctx,
+            async (db) => {
+              const deps = { ...wiki(ctx), db };
+              before = (await getWikiPage(db, reader(ctx), ctx.orgId, page)).version;
+              return mode === "replace"
+                ? updateWikiPage(deps, actor, ctx.orgId, page, {
+                    baseVersion: input.base_version as number,
+                    body: str(input.content),
+                    note: str(input.note) || undefined,
+                  })
+                : appendToWikiPage(deps, actor, ctx.orgId, page, {
+                    text: str(input.content),
+                    section: str(input.section) || null,
+                    mode: mode === "replace_section" ? "replace_section" : "append",
+                    note: str(input.note) || undefined,
+                  });
+            },
+            (saved) => wikiEdit(saved, before),
+          );
           return {
             content: `Saved [[${p.title}]] as version ${p.version}.`,
             data: { wikiPageId: p.id, slug: p.slug, version: p.version },
@@ -230,10 +259,18 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
         if (!actor) return { content: WIKI_WRITE_REFUSAL, isError: true };
         try {
           const targets = (input.to as string[]).map((t) => t.replace(/[[\]]/g, "").trim()).filter(Boolean);
-          const p = await appendToWikiPage(wiki(ctx), actor, ctx.orgId, str(input.page), {
-            text: targets.map((t) => `- [[${t}]]`).join("\n"),
-            section: str(input.section) || "See also",
-          });
+          let before = 0;
+          const p = await actWithUndo(
+            ctx,
+            async (db) => {
+              before = (await getWikiPage(db, reader(ctx), ctx.orgId, str(input.page))).version;
+              return appendToWikiPage({ ...wiki(ctx), db }, actor, ctx.orgId, str(input.page), {
+                text: targets.map((t) => `- [[${t}]]`).join("\n"),
+                section: str(input.section) || "See also",
+              });
+            },
+            (saved) => wikiEdit(saved, before),
+          );
           return { content: `Linked [[${p.title}]] to ${targets.map((t) => `[[${t}]]`).join(", ")}.` };
         } catch (error) {
           return failed(error);

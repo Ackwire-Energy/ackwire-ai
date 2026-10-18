@@ -10,6 +10,7 @@ import {
   investigatedBeforeReply,
   isReadTool,
   missingCalls,
+  missionFindingsOk,
 } from "../eval/behavior-checks";
 
 describe("phrase detectors", () => {
@@ -204,5 +205,35 @@ describe("deterministicChecks", () => {
       { ...base, calls: [], reply: "Ajustei.", noReply: false, triggered: [] },
     );
     expect(good.every((k) => k.pass)).toBe(true);
+  });
+});
+
+describe("act with undo and investigated missions", () => {
+  const base = { turns: [], calls: [] as EvalToolCall[], reply: "Abri a #1.", noReply: false, approvals: [] };
+
+  test("receipts: the reply must carry the expected kinds", () => {
+    const ok = deterministicChecks({ receipts: ["issue.created"] }, { ...base, receipts: ["issue.created"] });
+    expect(ok.find((c) => c.id === "acted_with_undo")?.pass).toBe(true);
+    const missing = deterministicChecks({ receipts: ["issue.created"] }, { ...base, receipts: [] });
+    expect(missing.find((c) => c.id === "acted_with_undo")).toMatchObject({ pass: false });
+  });
+
+  test("mission findings: read or data evidence, at most one decision", () => {
+    expect(missionFindingsOk({ findings: [{ kind: "read", text: "a.ts:4" }] }).pass).toBe(true);
+    expect(missionFindingsOk({ findings: [{ kind: "decision", text: "qual?" }] }).pass).toBe(false);
+    expect(
+      missionFindingsOk({
+        findings: [
+          { kind: "data", text: "9 de 11" },
+          { kind: "decision", text: "a?" },
+          { kind: "decision", text: "b?" },
+        ],
+      }).pass,
+    ).toBe(false);
+    const none = deterministicChecks({ missionFindings: true }, base);
+    expect(none.find((c) => c.id === "mission_investigated")).toMatchObject({
+      pass: false,
+      detail: "no mission proposed",
+    });
   });
 });

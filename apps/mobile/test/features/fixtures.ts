@@ -102,6 +102,8 @@ export function mission(over: Partial<Mission> & { id: string }): Mission {
     executor: "claude",
     title: "App no celular",
     goal: "Construir o app",
+    findings: [],
+    openQuestion: null,
     status: "active",
     repoDir: "",
     resumeTasks: true,

@@ -156,6 +156,52 @@ const MessageUsage = z
   .object({ model: z.string(), inputTokens: z.number(), outputTokens: z.number() })
   .openapi("MessageUsage", { description: "Agent messages: model and tokens of the run that wrote it (no money)." });
 
+export const AgentAction = z
+  .object({
+    id: z.uuid(),
+    kind: z
+      .enum([
+        "issue.created",
+        "issue.updated",
+        "issue.assigned",
+        "memory.saved",
+        "memory.updated",
+        "memory.forgotten",
+        "routine.created",
+        "routine.updated",
+        "channel.agent_added",
+        "wiki.page_created",
+        "wiki.page_edited",
+        "thread.renamed",
+        "thread.closed",
+      ])
+      .openapi({ description: "What the agent did; the app says it with `agentActions.{kind}` and `params`." }),
+    agentId: z.uuid(),
+    messageId: z.uuid().nullable(),
+    requestedByUserId: z
+      .string()
+      .nullable()
+      .openapi({ description: "The person the agent worked for: they, admins and the agent's owner may undo." }),
+    target: z.object({
+      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread"]),
+      id: z.string(),
+      number: z.number().optional().openapi({ description: "Issues." }),
+      title: z.string().optional().openapi({ description: "Issue, routine, page or thread title; channel name." }),
+      slug: z.string().optional().openapi({ description: "Wiki pages." }),
+    }),
+    params: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]))
+      .openapi({ description: "Values for the sentence (number, title, fields, status, text, agentName…)." }),
+    createdAt: z.string(),
+    undoableUntil: z
+      .string()
+      .openapi({ description: "Desfazer (or Refazer once undone) works until then; each undo/redo moves it." }),
+    undoneAt: z.string().nullable().openapi({ description: "Set while undone." }),
+    undoneByUserId: z.string().nullable(),
+    redoneAt: z.string().nullable(),
+  })
+  .openapi("AgentAction", { description: "A change an agent made, shown as a receipt with Undo (ADR 0037)." });
+
 const MessageBase = z.object({
   id: z.uuid(),
   channelId: z.uuid(),
@@ -223,6 +269,10 @@ const MessageBase = z.object({
   pinned: z.boolean().optional().openapi({
     description:
       "In lists: true when pinned in its channel (absent: not pinned); live via `message.pinned`/`message.unpinned`.",
+  }),
+  actions: z.array(AgentAction).optional().openapi({
+    description:
+      "Agents' messages in lists: the changes made with this reply, as receipts with Undo; live via `message.actions`.",
   }),
   createdAt: z.string(),
 });

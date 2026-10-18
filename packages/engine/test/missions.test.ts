@@ -264,7 +264,16 @@ describe("missions (ADR 0029)", () => {
         n === 1
           ? {
               chunks: ["Planning it."],
-              toolUses: [{ name: "propose_mission", input: { title: "Photos", goal: "Make a contact sheet" } }],
+              toolUses: [
+                {
+                  name: "propose_mission",
+                  input: {
+                    title: "Photos",
+                    goal: "Make a contact sheet",
+                    findings: [{ kind: "read", text: "Read the repo" }],
+                  },
+                },
+              ],
             }
           : { chunks: ["Proposed the mission; the plan is coming."] },
     });
@@ -302,7 +311,16 @@ describe("missions (ADR 0029)", () => {
         n === 1
           ? {
               chunks: ["Planning it."],
-              toolUses: [{ name: "propose_mission", input: { title: "Mobile app", goal: "Build our mobile app" } }],
+              toolUses: [
+                {
+                  name: "propose_mission",
+                  input: {
+                    title: "Mobile app",
+                    goal: "Build our mobile app",
+                    findings: [{ kind: "read", text: "Read the repo" }],
+                  },
+                },
+              ],
             }
           : { chunks: ["Planning; the plan card shows when it is ready."] },
     });
@@ -338,7 +356,9 @@ describe("missions (ADR 0029)", () => {
     expect(started.status).toBe("active");
     // "Proceed" is a notice that starts (or joins) the main session's run; nothing goes to the computer by itself.
     const after = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, ask.id));
-    const notice = after.find((m) => (m.meta.missionInbox as { text?: string } | undefined)?.text === START_PROMPT);
+    const notice = after.find((m) =>
+      (m.meta.missionInbox as { text?: string } | undefined)?.text?.startsWith(START_PROMPT),
+    );
     expect(notice).toBeTruthy();
     const runs = await f.db.select().from(schema.agentRuns);
     expect(

@@ -54,6 +54,19 @@ export interface MissionPlanItem {
   note?: string;
 }
 
+/**
+ * What the agent found before proposing a mission (ADR 0037 round 2): it
+ * investigates with read tools first, so the plan card arrives with evidence.
+ * `read`: code or files it read; `data`: numbers from analytics, logs, errors;
+ * `decision`: the one open question that is the person's (at most one).
+ * `refs`: files with lines, links, ids it cites.
+ */
+export interface MissionFinding {
+  kind: "read" | "data" | "decision";
+  text: string;
+  refs?: string[];
+}
+
 /** Something to tell a session when it can hear it (its task ended, the mission resumed, the machine came back). */
 export interface MissionInboxEntry {
   sessionId: string;
@@ -85,6 +98,8 @@ export const missions = pgTable(
     executor: text().notNull().default("claude"),
     title: text().notNull(),
     goal: text().notNull(),
+    /** What the agent found before proposing it (read only); empty when a person started it. */
+    findings: jsonb().$type<MissionFinding[]>().notNull().default([]),
     status: missionStatusEnum().notNull().default("proposed"),
     /** The executor's main session (a UUID): planned the mission, hears people, splits work. */
     mainSessionId: text().notNull(),

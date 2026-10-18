@@ -3,6 +3,7 @@ import type {
   ActiveRun,
   Agent,
   AgentAccess,
+  AgentAction,
   AgentBrain,
   AgentBrainInput,
   AgentChannel,
@@ -137,6 +138,7 @@ import type {
   ThreadPatch,
   ToolDecision,
   TrashedArtifact,
+  UndoAllResult,
   UsageReport,
   WikiGraph,
   WikiImportInput,
@@ -792,6 +794,19 @@ export interface ApiClient {
     /** Pinning again keeps the first pin. `pins.limit` past 100. */
     pin(orgId: string, channelId: string, messageId: string): Promise<MessagePin>;
     unpin(orgId: string, channelId: string, messageId: string): Promise<void>;
+  };
+  /**
+   * Act with undo (ADR 0037 round 2): receipts under an agent's reply. 409 codes:
+   * `action.changed_since`, `action.expired`, `action.already_undone`, `action.not_undone`;
+   * 403 `action.not_allowed`. The channel also hears `message.actions`.
+   */
+  actions?: {
+    /** Desfazer. */
+    undo(orgId: string, actionId: string): Promise<AgentAction>;
+    /** Refazer (after an undo, while `undoableUntil` has not passed). */
+    redo(orgId: string, actionId: string): Promise<AgentAction>;
+    /** Desfazer tudo: every receipt of the message still undoable, newest first. */
+    undoMessage(orgId: string, messageId: string): Promise<UndoAllResult>;
   };
   /** Follow or mute a thread (replies notify and count as unread only while you follow). */
   threadFollows?: {

@@ -37,6 +37,7 @@ import {
   createRoutine,
   createScheduleToolSource,
   createToolGateway,
+  createWorkspaceToolSource,
   drainOutbox,
   grantScopes,
   insertContextItem,
@@ -47,7 +48,7 @@ import {
   type ToolSource,
 } from "../src";
 import type { CheckResult, EvalToolCall, EvalTurn, Expectations } from "./behavior-checks";
-import { type Canned, CONNECTORS, fakeConnectorSource } from "./behavior-fakes";
+import { type Canned, CONNECTORS, fakeConnectorSource, fakeMissionSource } from "./behavior-fakes";
 
 // ── Cases ────────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,10 @@ export interface BehaviorCase {
   connectors?: (keyof typeof CONNECTORS)[];
   /** Built-in issue tools (list_issues, create_issue…) on the real issues table. */
   issues?: boolean;
+  /** Workspace tools (add_agent_to_channel, update_thread): internal changes with undo. */
+  workspace?: boolean;
+  /** A `propose_mission` with the real description and findings schema (no computer; recorded only). */
+  missions?: boolean;
   /** Issues already in the workspace. */
   seedIssues?: { title: string; description?: string; labels?: string[] }[];
   /** The agent's memory (context items it can find with search_context). */
@@ -147,6 +152,8 @@ export interface CaseRun {
   costNanoUsd: number;
   /** Handles of the other agents the trigger started. */
   triggered: string[];
+  /** Receipt kinds on the run's messages (act with undo). */
+  receipts?: string[];
   error?: string;
 }
 
@@ -265,6 +272,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       createReactToolSource({ pubsub }),
       createContextToolSource(context),
       ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
+      ...(c.workspace ? [createWorkspaceToolSource({ pubsub })] : []),
+      ...(c.missions ? [fakeMissionSource().source] : []),
       ...fakes.map((f) => f.source),
     ];
     const tools = createToolGateway({ sources });
@@ -484,6 +493,15 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       .select({ cost: sql<number>`coalesce(sum(${schema.usageRecords.costNanoUsd}), 0)::bigint` })
       .from(schema.usageRecords)
       .where(eq(schema.usageRecords.orgId, org.id));
+    // Act with undo: the receipts the run's messages carry.
+    const receipts = runIds.length
+      ? (
+          await db
+            .select({ kind: schema.agentActions.kind })
+            .from(schema.agentActions)
+            .where(and(inArray(schema.agentActions.runId, runIds), sql`${schema.agentActions.messageId} is not null`))
+        ).map((r) => r.kind)
+      : [];
     const turns = recorder.turns.map(({ text, toolCalls }) => ({ text, toolCalls }));
     const last = turns.at(-1);
     return {
@@ -496,6 +514,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
       costNanoUsd: Number(usage?.cost ?? 0),
       triggered,
+      receipts,
     };
   } finally {
     await close();

@@ -359,6 +359,53 @@ export const approvals = pgTable(
 );
 
 /**
+ * Act with undo (ADR 0037 round 2): an internal, reversible change an agent
+ * made with a tool (an issue, a memory, a routine, a channel member, a wiki
+ * page, a thread). Written with the change; linked to the run's reply
+ * (`message_id`) so the message shows it as a receipt with "Desfazer".
+ * `before`/`after`: what is needed to invert and to detect someone else's
+ * change since. `undone_at` set = currently undone (redo clears it);
+ * `undoable_until` moves forward on every undo or redo.
+ */
+export const agentActions = pgTable(
+  "agent_actions",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    /** The run that made the change (no foreign key: receipts outlive pruned runs). */
+    runId: uuid(),
+    agentId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    /** The run's reply (set when it is posted). */
+    messageId: uuid(),
+    /** The person the agent worked for (the trigger message's author); null for routines and agents. */
+    requestedByUserId: text(),
+    kind: text().notNull(),
+    targetType: text().notNull(),
+    targetId: text().notNull(),
+    /** Label of the target for the receipt (`number`, `title`, `name`…) and the summary's params. */
+    target: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    params: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    before: jsonb().$type<Record<string, unknown>>(),
+    after: jsonb().$type<Record<string, unknown>>(),
+    /** Bookkeeping of undo/redo (e.g. the wiki version an undo wrote). */
+    state: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    undoableUntil: timestamp({ withTimezone: true }).notNull(),
+    undoneAt: timestamp({ withTimezone: true }),
+    undoneByUserId: text(),
+    redoneAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index().on(t.orgId, t.messageId),
+    index().on(t.runId),
+  ],
+);
+
+/**
  * What an agent may do: one row per granted scope (D7, docs/adr/0015).
  * `connection_id` null = a built-in tool scope (e.g. `context:read`);
  * otherwise a scope of one org connector connection (e.g. `github:pr.merge`).

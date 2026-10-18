@@ -1,4 +1,5 @@
 import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, schema } from "@agenteschat/db";
+import { recordAgentActions } from "../agent-actions";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { announceMessageMemories } from "../message-memories";
@@ -204,13 +205,22 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               content: `Not saved as current: it contradicts memory ${res.item.id} ("${res.item.content.slice(0, 200)}"), which has stronger evidence (an observed outcome). It was kept as history. Tell the person what you have on record and ask them to confirm which is right; if they confirm, use update_memory on ${res.item.id}.`,
             };
           }
-          return memoryResult(ctx, `Saved (${res.action}) as ${res.item.id}.`, {
-            action: "remembered",
-            itemId: res.item.id,
-            text: res.item.content,
-            previousText: res.previous?.content ?? null,
-            requestedByUserId: requester,
-          });
+          // A new item (or a new version of one): a receipt with Undo. The same thing again (merged) changes nothing to undo.
+          if (res.action === "created" || res.action === "superseded") {
+            await recordAgentActions(ctx.db, ctx, [
+              {
+                kind: "memory.saved",
+                target: { type: "memory", id: res.item.id },
+                params: {
+                  text: res.item.content.slice(0, 500),
+                  ...(res.previous ? { previousText: res.previous.content.slice(0, 500) } : {}),
+                },
+                before: res.previous ? { itemId: res.previous.id } : null,
+                after: { itemId: res.item.id },
+              },
+            ]);
+          }
+          return { content: `Saved (${res.action}) as ${res.item.id}.` };
         } catch (error) {
           return { content: error instanceof Error ? error.message : "Could not save", isError: true };
         }
@@ -234,8 +244,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         if (typeof item === "string") return { content: item, isError: true };
         try {
           await checkPermissionText(judgeOf(deps), ctx.orgId, str(input.content));
-          const next = await ctx.db.transaction((tx) =>
-            supersede(tx, item, {
+          const next = await ctx.db.transaction(async (tx) => {
+            const row = await supersede(tx, item, {
               orgId: ctx.orgId,
               kind: item.kind,
               scopeType: item.scopeType as "agent",
@@ -252,17 +262,21 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               pinned: item.pinned,
               createdByKind: "person",
               createdById: requester,
-            }),
-          );
+            });
+            await recordAgentActions(tx, ctx, [
+              {
+                kind: "memory.updated",
+                target: { type: "memory", id: row.id },
+                params: { text: row.content.slice(0, 500), previousText: item.content.slice(0, 500) },
+                before: { itemId: item.id },
+                after: { itemId: row.id },
+              },
+            ]);
+            return row;
+          });
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: next.id }).catch(() => {});
           await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, next).catch(() => {});
-          return memoryResult(ctx, `Updated (${next.id}).`, {
-            action: "updated",
-            itemId: next.id,
-            text: next.content,
-            previousText: item.content,
-            requestedByUserId: requester,
-          });
+          return { content: `Updated (${next.id}).` };
         } catch (error) {
           return { content: error instanceof Error ? error.message : "Could not update", isError: true };
         }
@@ -284,18 +298,24 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         if (!requester) return notRequested;
         const item = await changeableItem(ctx, str(input.item_id), requester);
         if (typeof item === "string") return { content: item, isError: true };
-        await ctx.db
-          .update(contextItems)
-          .set({ status: "archived", updatedAt: new Date() })
-          .where(eq(contextItems.id, item.id));
+        await ctx.db.transaction(async (tx) => {
+          await tx
+            .update(contextItems)
+            .set({ status: "archived", updatedAt: new Date() })
+            .where(eq(contextItems.id, item.id));
+          await recordAgentActions(tx, ctx, [
+            {
+              kind: "memory.forgotten",
+              target: { type: "memory", id: item.id },
+              params: { text: item.content.slice(0, 500) },
+              before: { itemId: item.id },
+              after: { itemId: item.id },
+            },
+          ]);
+        });
         await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: item.id }).catch(() => {});
         await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, item).catch(() => {});
-        return memoryResult(ctx, "Forgotten.", {
-          action: "forgot",
-          itemId: item.id,
-          text: item.content,
-          requestedByUserId: requester,
-        });
+        return { content: "Forgotten." };
       },
     },
     {
@@ -383,7 +403,11 @@ async function changeableItem(ctx: ToolContext, id: string, requester: string): 
   return item;
 }
 
-/** A memory tool's result: the model's text plus the structured update the chat renders (with undo). */
+/**
+ * A proposal's result: the model's text plus the card the chat renders.
+ * Saved, changed and forgotten memories are receipts with Undo instead
+ * (`agent_actions`, ADR 0037 round 2).
+ */
 function memoryResult(ctx: ToolContext, content: string, update: MemoryUpdate) {
   return {
     content,

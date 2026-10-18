@@ -3,6 +3,7 @@
  * like the real catalog/MCP ones (`github_search_code`, `sentry_search_issues`…),
  * returning canned results from the case. Nothing leaves the process.
  */
+import { MISSION_FINDINGS_SCHEMA, proposeMissionDescription } from "../src/mission-tools";
 import type { JsonSchema } from "../src/tools/json-schema";
 import type { ToolDefinition, ToolSource } from "../src/tools/types";
 
@@ -258,4 +259,37 @@ export function fakeConnectorSource(id: ConnectorId, fixtures: Record<string, Ca
   );
   const source: ToolSource = { name: `fake-${id}`, tools: async () => tools };
   return { source, executed };
+}
+
+/**
+ * `propose_mission` as the agent sees it (the real description and findings
+ * schema; ADR 0037 round 2), without a computer: the proposal is recorded,
+ * nothing else happens. `proposals` lists the inputs.
+ */
+export function fakeMissionSource(computer = "MacBook da Marina") {
+  const proposals: Record<string, unknown>[] = [];
+  const tool: ToolDefinition = {
+    name: "propose_mission",
+    description: proposeMissionDescription(computer),
+    scope: "",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", minLength: 1, maxLength: 120 },
+        goal: { type: "string", minLength: 1, maxLength: 4000 },
+        findings: MISSION_FINDINGS_SCHEMA as JsonSchema,
+        plan: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", minLength: 1, maxLength: 200 } },
+      },
+      required: ["title", "goal", "findings"],
+      additionalProperties: false,
+    },
+    async execute(input) {
+      proposals.push(input);
+      return {
+        content: `Mission proposed on ${computer}, already investigated and planned: the card in this thread shows your findings, the open decision and the plan, with the button to start. Nothing is written until the person who asked starts it. Reply briefly (one or two lines) in the person's language; don't name buttons or other parts of the app. Then end your turn.`,
+      };
+    },
+  };
+  const source: ToolSource = { name: "fake-missions", tools: async () => [tool] };
+  return { source, proposals };
 }

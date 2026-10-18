@@ -9,6 +9,7 @@ import {
   textOf,
 } from "@agenteschat/providers";
 import { pendingConnectors } from "./access";
+import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
 import { recordPlanUsage } from "./brains/claude-code";
@@ -383,10 +384,15 @@ async function executeRunInner(
   /** Who thinks for this run (set before the first turn). */
   let brainPlan: BrainPlan | null = null;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
+  /** Messages that got receipts (`message.actions` goes out once they are published). */
+  const withReceipts: string[] = [];
   const finished = async (
     status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
     error?: string,
   ) => {
+    for (const id of withReceipts.splice(0)) {
+      await publishMessageActions({ db, pubsub: deps.pubsub }, run.orgId, id).catch(() => {});
+    }
     // The turn's bridge tokens die with it (a resumed turn gets a new one).
     if (brainPlan && brainPlan.kind !== "model") await revokeRunToolTokens(db, { runId: run.id }).catch(() => {});
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
@@ -521,12 +527,16 @@ async function executeRunInner(
       ? { id: routineCall.id, name: routineCall.name }
       : null;
   routineOfRun = viaRoutine;
-  const post = (tx: Executor, threadId: string | null, body: string, meta?: Record<string, unknown>) =>
-    postAgentMessage(tx, run, threadId, body, {
+  const post = async (tx: Executor, threadId: string | null, body: string, meta?: Record<string, unknown>) => {
+    const m = await postAgentMessage(tx, run, threadId, body, {
       ...meta,
       ...(viaRoutine ? { viaRoutine } : {}),
       ...(joined ? { joined: true } : {}),
     });
+    // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
+    if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
+    return m;
+  };
 
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx

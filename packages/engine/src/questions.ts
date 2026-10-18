@@ -55,7 +55,7 @@ export function createAskUserToolSource(): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_USER_TOOL,
     description:
-      "Ask the person a short clarifying question and wait for the answer. Use it when the request is ambiguous, key information is missing, or before a sensitive or irreversible action. Don't use it for simple requests you can just do. Offer 2 to 4 short choices when the answer is one of a few options.",
+      "Ask the person a short clarifying question and wait for the answer. Use it when the request is still ambiguous after you looked with your tools, for a decision that is really theirs, or before a sensitive or irreversible action. Don't use it for what you can just do: internal changes (issues, priorities, assignments, memories, routines) need no ok, the person can undo them. Offer 2 to 4 short choices when the answer is one of a few options.",
     scope: "",
     inputSchema: {
       type: "object",

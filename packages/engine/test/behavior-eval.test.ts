@@ -24,6 +24,9 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "list_routines",
     "update_routine",
     "create_routine",
+    "propose_mission",
+    "add_agent_to_channel",
+    "update_thread",
   ]);
   const ids = new Set<string>();
   for (const c of all) {
@@ -140,4 +143,61 @@ test("a consultation case: the agent answers another agent's question as the per
   ]);
   expect(run.triggered).toEqual([]);
   expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
+});
+
+test("act with undo: the issue is a receipt on the reply while the merge waits for approval", async () => {
+  const provider = script([
+    {
+      chunks: [],
+      toolUses: [
+        { name: "create_issue", input: { title: "Preço do plano anual", assignee: "me" } },
+        { name: "github_merge_pull_request", input: { owner: "lumen", repo: "api", pullNumber: 70 } },
+      ],
+    },
+  ]);
+  const c = byId("dev-organize-and-merge");
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
+  expect(run.system).toContain("Done right away, no approval");
+  expect(run.receipts).toEqual(["issue.created"]);
+  expect(run.approvals).toEqual(["github_merge_pull_request"]);
+  const checks = deterministicChecks(c.expect, run);
+  for (const id of ["acted_with_undo", "requested_approval", "no_sensitive_action", "no_needless_question"]) {
+    expect(checks.find((k) => k.id === id)?.pass, id).toBe(true);
+  }
+});
+
+test("a mission proposal carries what the agent read; one without findings is refused by the schema", async () => {
+  const proposal = {
+    title: "Pedido de avaliação no momento certo",
+    goal: "Tirar o pedido de avaliação do subscription_completed e mostrar após a primeira meditação concluída.",
+    findings: [
+      {
+        kind: "read",
+        text: "O pedido dispara em review-prompt.ts:40, no subscription_completed.",
+        refs: ["src/review/review-prompt.ts:40"],
+      },
+      { kind: "decision", text: "Conta como concluída a meditação até o fim ou a partir de 80%?" },
+    ],
+    plan: ["Tirar o gatilho do subscription_completed", "Disparar após a primeira meditação", "Teste e PR"],
+  };
+  const provider = script([
+    { chunks: [], toolUses: [{ name: "github_search_code", input: { query: "subscription_completed" } }] },
+    { chunks: [], toolUses: [{ name: "propose_mission", input: { title: "x", goal: "y", findings: [] } }] },
+    { chunks: [], toolUses: [{ name: "propose_mission", input: proposal }] },
+    {
+      chunks: [
+        "Propus a missão: o pedido dispara em review-prompt.ts:40. Falta só decidir o que conta como concluída.",
+      ],
+    },
+  ]);
+  const c = byId("dev-mission-arrives-investigated");
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 6 });
+  expect(run.calls.map((k) => [k.name, k.executed])).toEqual([
+    ["github_search_code", true],
+    ["propose_mission", false],
+    ["propose_mission", true],
+  ]);
+  const checks = deterministicChecks(c.expect, run);
+  expect(checks.find((k) => k.id === "mission_investigated")).toMatchObject({ pass: true });
+  expect(checks.find((k) => k.id === "cites_evidence")?.pass).toBe(true);
 });

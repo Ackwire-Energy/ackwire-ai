@@ -210,6 +210,8 @@ export function createFakeMissions(
         executor: input.executor ?? "claude",
         title: input.title ?? input.goal.slice(0, 60),
         goal: input.goal,
+        findings: [],
+        openQuestion: null,
         status: "proposed",
         repoDir: input.folder ?? "",
         resumeTasks: true,

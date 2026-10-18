@@ -1,4 +1,5 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
+import type { AgentActionView } from "./agent-actions";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
 import type { CalendarEventView } from "./calendar";
@@ -277,6 +278,18 @@ export type ChannelEvent =
   | { type: "message.unpinned"; channelId: string; messageId: string }
   /** An agent saved something to memory from this person's message: its current memory marks. */
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
+  /**
+   * Act with undo (ADR 0037 round 2): the receipts of an agent's message
+   * changed (they were linked to it, or someone undid or redid one). `actions`
+   * is the message's whole list now (replace, don't merge).
+   */
+  | {
+      type: "message.actions";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      actions: AgentActionView[];
+    }
   /**
    * A background task on a connected computer started, reported progress
    * (last line, files, elapsed), ended, was interrupted or resumed (ADR 0029).

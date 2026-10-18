@@ -104,7 +104,17 @@ const agentScript = (req: { messages: { content: unknown }[]; system: unknown })
   if (last.includes("build the app")) {
     return {
       chunks: ["Proposing."],
-      toolUses: [{ name: "propose_mission", input: { title: "Mobile app", goal: "Build the app", executor: "agent" } }],
+      toolUses: [
+        {
+          name: "propose_mission",
+          input: {
+            title: "Mobile app",
+            goal: "Build the app",
+            executor: "agent",
+            findings: [{ kind: "read", text: "Read the repo" }],
+          },
+        },
+      ],
     };
   }
   return { chunks: ["ok"] };
@@ -554,5 +564,156 @@ describe("missions with executor agent (ADR 0029)", () => {
       ),
     );
     expect(triggers.every((m) => m?.authorAgentId !== ops.id)).toBe(true);
+  });
+});
+
+describe("missions arrive investigated (ADR 0037 round 2)", () => {
+  const FINDINGS = [
+    { kind: "read", text: "The prompt fires right after the subscription", refs: ["ReviewPrompt.swift:41"] },
+    { kind: "data", text: "9 of 11 negative reviews came right after subscribing" },
+    { kind: "decision", text: "After how many completed trips?" },
+  ];
+
+  test("findings and plan come with the proposal: no plan mode, the view and card show them, Start carries them", async () => {
+    f = await setup({
+      machines: true,
+      missionTools: true,
+      reply: (req) => {
+        const last = lastText(req);
+        if (last.includes("The person approved the plan")) return { chunks: ["On it."] };
+        if (last.includes("already investigated")) return { chunks: ["Mission proposed."] };
+        return {
+          chunks: ["Looked at it."],
+          toolUses: [
+            {
+              name: "propose_mission",
+              input: {
+                title: "Review prompt",
+                goal: "Ask for a review at the right moment",
+                executor: "agent",
+                findings: FINDINGS,
+                plan: ["Remove the trigger", "Fire after the first trip", "Test and PR"],
+              },
+            },
+          ],
+        };
+      },
+    });
+    const paired = await pairedMachine(f);
+    const runner = missionRunner(f.machineHub as MachineHub, { executors: {} });
+    await runner.hello(paired.token);
+    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev why does the review prompt show right after subscribing?",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const mission = await missionRow();
+    expect(mission).toMatchObject({ status: "proposed", planVersion: 1, planTotal: 3 });
+    expect(mission.findings).toHaveLength(3);
+    const lines = await threadMessages(ask.id);
+    // Arrives planned: no plan-mode notice to the main session.
+    expect(lines.some((m) => JSON.stringify(m.meta.missionInbox ?? "").includes("PLAN MODE"))).toBe(false);
+    const card = lines.find((m) => m.meta.missionPlan);
+    expect((card?.meta.missionPlan as { findings?: unknown[] } | undefined)?.findings).toHaveLength(3);
+    const view = await getMission(md(), f.owner.id, f.org.id, mission.id);
+    expect(view.findings[0]).toEqual(FINDINGS[0] as (typeof view.findings)[number]);
+    expect(view.openQuestion).toBe("After how many completed trips?");
+    expect(view.plan.items.map((i) => i.title)).toEqual([
+      "Remove the trigger",
+      "Fire after the first trip",
+      "Test and PR",
+    ]);
+
+    // Writing waits for Start; Start tells the main session what was found.
+    await startMission(md(), f.owner.id, f.org.id, mission.id);
+    const after = await threadMessages(ask.id);
+    const start = after
+      .map((m) => (m.meta.missionInbox as { text?: string } | undefined)?.text ?? "")
+      .find((t) => t.startsWith("The person approved the plan"));
+    expect(start).toContain("ReviewPrompt.swift:41");
+    expect(start).toContain("Build on what was found");
+  });
+
+  test("findings are required and hold at most one decision", async () => {
+    f = await setup({
+      machines: true,
+      missionTools: true,
+      reply: (_req, n) => {
+        if (n === 1)
+          return {
+            chunks: ["Proposing."],
+            toolUses: [{ name: "propose_mission", input: { title: "App", goal: "Build", executor: "agent" } }],
+          };
+        if (n === 2)
+          return {
+            chunks: ["Again."],
+            toolUses: [
+              {
+                name: "propose_mission",
+                input: {
+                  title: "App",
+                  goal: "Build",
+                  executor: "agent",
+                  findings: [
+                    { kind: "decision", text: "Which store?" },
+                    { kind: "decision", text: "Which color?" },
+                  ],
+                },
+              },
+            ],
+          };
+        return { chunks: ["ok"] };
+      },
+    });
+    const paired = await pairedMachine(f);
+    const runner = missionRunner(f.machineHub as MachineHub, { executors: {} });
+    await runner.hello(paired.token);
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev build the app",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(await f.db.select().from(schema.missions)).toHaveLength(0);
+    const seen = f.provider.calls.map((c) => JSON.stringify(c.request.messages)).join("\n");
+    expect(seen).toContain("Invalid input");
+    expect(seen).toContain("at most one decision");
+  });
+
+  test("a person's /mission is planned by the main session, which records findings while proposed", async () => {
+    f = await setup({
+      machines: true,
+      missionTools: true,
+      reply: (req) => {
+        const last = lastText(req);
+        if (last.includes("Plan saved")) return { chunks: [""] };
+        if (last.includes("PLAN MODE")) {
+          return {
+            chunks: ["Investigating."],
+            toolUses: [
+              {
+                name: "record_findings",
+                input: { findings: [{ kind: "read", text: "No tests yet", refs: ["package.json:12"] }] },
+              },
+              { name: "update_plan", input: { items: [{ id: "tests", title: "Add tests", status: "todo" }] } },
+            ],
+          };
+        }
+        return { chunks: ["ok"] };
+      },
+    });
+    const paired = await pairedMachine(f);
+    const runner = missionRunner(f.machineHub as MachineHub, { executors: {} });
+    await runner.hello(paired.token);
+    const created = await createMission(md(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      goal: "Add tests",
+      executor: "agent",
+    });
+    expect(created.findings).toEqual([]);
+    await drainOutbox(f.db, f.handlers);
+    const view = await getMission(md(), f.owner.id, f.org.id, created.id);
+    expect(view.findings).toEqual([{ kind: "read", text: "No tests yet", refs: ["package.json:12"] }]);
+    expect(view.openQuestion).toBeNull();
+    expect(view.status).toBe("proposed");
+    expect(view.plan.total).toBe(1);
   });
 });
