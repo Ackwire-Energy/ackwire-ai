@@ -192,6 +192,22 @@ describe("list toolbars", () => {
     expect(rule(".ac-filter--active")).toContain("background: var(--ink)");
     expect(css).toMatch(/\.ac-toolbar__search \{\s*flex: 1 1 100%;/);
   });
+
+  test("one height: the search, the toggles and the chips all read --tool-h, so a row lines up", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) =>
+      new RegExp(`(^|\\n)${selector.replace(/[.[\]()"=]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
+    for (const sel of [".ac-searchfield", ".ac-filtertoggle", ".ac-filter"]) {
+      expect(rule(sel)).toContain("height: var(--tool-h, 36px)");
+    }
+    expect(rule(".ac-toolbar")).toContain("--tool-h: 36px");
+    expect(rule(".ac-toolbar--sm")).toContain("--tool-h: 32px");
+    expect(rule(".ac-searchfield--sm")).toContain("--tool-h: 32px");
+    // Touch grows the whole row together, never one control alone.
+    expect(css).toMatch(
+      /@media \(pointer: coarse\) \{\s*\.ac-toolbar,\s*\.ac-searchfield,\s*\.ac-filtertoggle,\s*\.ac-filter \{\s*--tool-h: 40px;/,
+    );
+  });
 });
 
 describe("the living agent symbol", () => {

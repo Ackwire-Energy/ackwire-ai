@@ -517,6 +517,10 @@
   gap: 6px;
   font-size: 14px;
 }
+/* "see in the calendar" under the due date field. */
+.issue-due__link {
+  align-self: flex-start;
+}
 .issue-link {
   display: inline-flex;
   align-items: center;

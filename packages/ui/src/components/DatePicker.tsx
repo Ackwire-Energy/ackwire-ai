@@ -37,9 +37,13 @@ export interface DatePickerProps {
   value: string | null;
   onChange: (value: string) => void;
   locale: string;
-  /** Accessible names: "Mês anterior", "Próximo mês", "Escolher data". */
-  labels: { previousMonth: string; nextMonth: string; choose: string };
+  /** Accessible names: "Mês anterior", "Próximo mês", "Escolher data"; `clear` names the clear action ("Tirar o prazo"). */
+  labels: { previousMonth: string; nextMonth: string; choose: string; clear?: string };
   placeholder?: string;
+  /** 40px (default) or 34px, the same heights as Select's `md` and `sm`. */
+  size?: "md" | "sm";
+  /** With a date set, the grid ends with a clear action (`labels.clear`) that calls this. */
+  onClear?: () => void;
   min?: string;
   max?: string;
   id?: string;
@@ -60,6 +64,8 @@ export function DatePicker({
   locale,
   labels,
   placeholder,
+  size = "md",
+  onClear,
   min,
   max,
   id,
@@ -141,7 +147,7 @@ export function DatePicker({
       <RPopover.Trigger asChild>
         <button
           type="button"
-          className={cx("ac-select__trigger ac-date__trigger", className)}
+          className={cx("ac-select__trigger ac-date__trigger", size === "sm" && "ac-date__trigger--sm", className)}
           id={wiring.id}
           disabled={disabled}
           aria-label={rest["aria-label"]}
@@ -222,6 +228,21 @@ export function DatePicker({
               ))}
             </tbody>
           </table>
+          {onClear && selected && labels.clear && (
+            <div className="ac-date__foot">
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="close"
+                onClick={() => {
+                  onClear();
+                  setOpen(false);
+                }}
+              >
+                {labels.clear}
+              </Button>
+            </div>
+          )}
         </RPopover.Content>
       </RPopover.Portal>
     </RPopover.Root>

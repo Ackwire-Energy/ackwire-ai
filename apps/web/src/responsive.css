@@ -248,8 +248,7 @@
   .sidebar__item,
   .sidebar__jump,
   .settings__link,
-  .pill,
-  .ac-filtertoggle {
+  .pill {
     height: auto;
     min-height: 40px;
   }

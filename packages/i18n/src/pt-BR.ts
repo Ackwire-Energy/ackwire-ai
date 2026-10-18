@@ -1953,6 +1953,7 @@ export const ptBR = {
     due: "Prazo",
     noDue: "Sem prazo",
     seeCalendar: "ver no calendário",
+    removeDue: "Tirar o prazo",
     links: "Ligados",
     prBy: "PR #{{number}} · aberto por {{name}}",
     artifactBy: "{{title}} ({{name}})",

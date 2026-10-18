@@ -1,6 +1,6 @@
 import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@agenteschat/client";
 import { keys, useChannels, useIssue, useIssueAction, useIssueActivity, useWikiTree } from "@agenteschat/client";
-import { dueLabel, relativeTime, whenAt } from "@agenteschat/client/lib/format";
+import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Alert,
@@ -11,6 +11,7 @@ import {
   type ComposerFormatLabels,
   CriteriaPixels,
   cx,
+  DatePicker,
   DetailsDialog,
   DetailsSection,
   Field,
@@ -612,20 +613,27 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
           options={PRIORITIES.map((p) => ({ value: p, label: t(`issues.priority.${p}`) }))}
         />
       </Field>
-      <div className="issue-aside__item">
-        <span className="ac-field__label">{t("issues.due")}</span>
-        {i.dueDate ? (
-          <span className="row" style={{ gap: 6 }}>
-            <Icon name="calendar" size={16} />
-            {dueLabel(t, i18n.language, i.dueDate)} ·{" "}
-            <Link to="/org/$orgId/calendar" params={{ orgId: org.id }} className="ac-link">
-              {t("issues.seeCalendar")}
-            </Link>
-          </span>
-        ) : (
-          <span className="small muted">{t("issues.noDue")}</span>
+      <Field label={t("issues.due")} id={`is-due-${i.id}`}>
+        <DatePicker
+          size="sm"
+          value={i.dueDate}
+          onChange={(v) => action.mutate({ type: "update", id: i.id, patch: { dueDate: v } })}
+          onClear={() => action.mutate({ type: "update", id: i.id, patch: { dueDate: null } })}
+          placeholder={t("issues.noDue")}
+          locale={i18n.language}
+          labels={{
+            previousMonth: t("common.previousMonth"),
+            nextMonth: t("common.nextMonth"),
+            choose: t("common.chooseDate"),
+            clear: t("issues.removeDue"),
+          }}
+        />
+        {i.dueDate && (
+          <Link to="/org/$orgId/calendar" params={{ orgId: org.id }} className="ac-link small issue-due__link">
+            {t("issues.seeCalendar")}
+          </Link>
         )}
-      </div>
+      </Field>
     </>
   );
   if (bare) return fields;

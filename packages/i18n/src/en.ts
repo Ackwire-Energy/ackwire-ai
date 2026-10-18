@@ -1940,6 +1940,7 @@ export const en: Translations = {
     due: "Due date",
     noDue: "No due date",
     seeCalendar: "see in the calendar",
+    removeDue: "Remove the due date",
     links: "Linked",
     prBy: "PR #{{number}} · opened by {{name}}",
     artifactBy: "{{title}} ({{name}})",
