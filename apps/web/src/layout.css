@@ -609,11 +609,16 @@ p {
 }
 /* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
 .channel__brain,
+/* The engine line: the icon sits with the first line when the text wraps. */
 .profile-card__brain {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  vertical-align: bottom;
+  align-items: flex-start;
+  gap: 6px;
+  vertical-align: top;
+}
+.profile-card__brain > .ac-icon {
+  flex: none;
+  margin-top: 2px;
 }
 .channel__messages {
   flex: 1;
@@ -6321,16 +6326,9 @@ button.live-call__head:hover {
     display: none;
   }
 }
+/* The computer's portrait (IconesComputador.html) sits on the surface, no tile. */
 .machine-row__icon {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  color: var(--ink-muted);
 }
 .machine-row__name {
   font-weight: 600;
@@ -6426,25 +6424,23 @@ a.machine-row__name:hover {
 }
 .machine-page__head {
   align-items: center;
-  gap: 14px;
+  gap: 18px;
   flex-wrap: nowrap;
 }
 .machine-page__icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px 14px 14px 5px;
+  flex: none;
 }
 .machine-page__title {
   flex: 1 1 260px;
   min-width: 0;
   gap: 6px;
 }
-/* The facts line up under the name, past the icon (48px + the 14px gap). */
+/* The facts line up under the name, past the portrait (96px + the 18px gap). */
 .machine-page__facts {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-left: 62px;
+  padding-left: 114px;
 }
 @media (max-width: 640px) {
   .machine-page__facts {
@@ -6813,6 +6809,11 @@ a.machine-row__name:hover {
   border-radius: 12px 12px 12px 4px;
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+/* The computer step's portraits (IconesComputador.html), on the card. */
+.onb__art {
+  display: block;
+  margin-bottom: 4px;
 }
 .onb__status {
   display: flex;
@@ -9288,16 +9289,9 @@ a.machine-row__name:hover {
   align-items: center;
   gap: 12px;
 }
+/* The computer's portrait (IconesComputador.html), on the surface. */
 .agp-pc__logo {
-  display: grid;
   flex: none;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 11px 11px 11px 4px;
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line2);
-  color: var(--ink2);
 }
 .agp-pc__text {
   flex: 1 1 220px;
