@@ -410,6 +410,42 @@ export const envVars = {
       "Sender of transactional emails, e.g. `agentes <ola@agentes.chat>` (the domain must be verified in MillionSend).",
     section: "Email",
   },
+  COMPOSIO_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "Composio project API key (Gmail and Outlook for agents, ADR 0038). Without it, Gmail and Outlook don't appear among the email connectors; IMAP mailboxes still work.",
+    section: "Email for agents",
+    secret: true,
+  },
+  COMPOSIO_WEBHOOK_SECRET: {
+    schema: z.string().optional(),
+    description:
+      "Signing secret of the Composio webhook subscription (Standard Webhooks). Point the subscription at `{PUBLIC_URL}/api/webhooks/composio`. Without it, routines can't wake on new Gmail/Outlook mail.",
+    section: "Email for agents",
+    secret: true,
+  },
+  COMPOSIO_GMAIL_AUTH_CONFIG_ID: {
+    schema: z.string().optional(),
+    description:
+      "Composio auth config for Gmail (`ac_…`). Optional: without it, one using Composio's managed Google app is created on first use. Set it to use our own Google OAuth app (white label).",
+    section: "Email for agents",
+  },
+  COMPOSIO_OUTLOOK_AUTH_CONFIG_ID: {
+    schema: z.string().optional(),
+    description:
+      "Composio auth config for Outlook (`ac_…`). Optional: without it, one using Composio's managed Microsoft app is created on first use.",
+    section: "Email for agents",
+  },
+  MAIL_IMAP_ENABLED: {
+    schema: z.stringbool().default(true),
+    description: "IMAP/SMTP mailboxes for agents (iCloud, hosting providers, any server). `false` hides them.",
+    section: "Email for agents",
+  },
+  MAIL_POLL_SECONDS: {
+    schema: z.coerce.number().int().min(60).max(3600).default(300),
+    description: "How often IMAP folders watched by routines are checked for new mail.",
+    section: "Email for agents",
+  },
   EMAIL_REPLY_TO: {
     schema: z.string().optional(),
     description: "Optional Reply-To address for transactional emails.",

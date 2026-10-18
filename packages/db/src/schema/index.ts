@@ -5,6 +5,7 @@ export * from "./connectors";
 export * from "./context";
 export * from "./forum";
 export * from "./machines";
+export * from "./mail";
 export * from "./missions";
 export * from "./notifications";
 export * from "./push";
