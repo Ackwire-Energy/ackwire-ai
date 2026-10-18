@@ -228,9 +228,9 @@
   box-shadow: var(--focus-ring);
 }
 .issue-card.is-on {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    var(--e2);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  transform: var(--chosen-lift);
 }
 .issue-card__top {
   display: flex;

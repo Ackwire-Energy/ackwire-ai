@@ -1406,9 +1406,9 @@ p {
 }
 .drive-card--open,
 .drive-card--selected {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    var(--e2);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  transform: var(--chosen-lift);
 }
 .drive-card__body {
   padding: 10px 6px 4px;
@@ -4982,10 +4982,11 @@ button.live-call__head:hover {
     var(--e2);
 }
 .cal-chip[aria-pressed="true"] {
+  background: var(--chosen-bg);
   box-shadow:
     inset 3px 0 0 var(--cal-accent),
-    var(--e1),
-    0 0 0 1.5px var(--ink);
+    var(--chosen-shadow);
+  transform: var(--chosen-lift);
 }
 .cal-chip:focus-visible {
   outline: none;
@@ -5489,7 +5490,8 @@ button.live-call__head:hover {
   color: var(--ink);
 }
 .cal-mini__day[aria-pressed="true"] {
-  box-shadow: inset 0 0 0 1.5px var(--ink);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
 }
 .cal-mini__day[data-today] {
   background: var(--ink);
@@ -7444,9 +7446,9 @@ a.machine-row__name:hover {
 }
 .newag__role[aria-pressed="true"],
 .newag__model[aria-pressed="true"] {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    var(--e2);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  transform: var(--chosen-lift);
 }
 .newag__role:focus-visible,
 .newag__model:focus-visible,
@@ -7516,7 +7518,8 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
 .newag__role--blank[aria-pressed="true"] {
-  box-shadow: 0 0 0 2px var(--ink);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
 }
 .newag__role--blank .newag__role-name b {
   font-size: 22px;
@@ -7621,11 +7624,10 @@ a.machine-row__name:hover {
   transform: translateY(-1px);
 }
 .newag__opt[aria-pressed="true"] {
-  background: var(--raised);
+  background: var(--chosen-bg);
   color: var(--ink);
-  box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--e1);
+  box-shadow: var(--chosen-shadow);
+  transform: var(--chosen-lift);
 }
 .newag__stage {
   flex: 1;
@@ -7865,9 +7867,9 @@ a.machine-row__name:hover {
 }
 .newag__tog[aria-pressed="true"] {
   color: var(--ink);
-  box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--top);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  transform: var(--chosen-lift);
 }
 /* Review */
 .newag__review {

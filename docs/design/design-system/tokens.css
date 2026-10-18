@@ -14,6 +14,15 @@
   --e3: 0 2px 4px rgba(23, 23, 22, 0.04), 0 24px 56px -16px rgba(23, 23, 22, 0.3), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --scrim: rgba(10, 10, 10, 0.32);
+  /* Chosen (telas/Selecao.html "H"), never a thick ring. Light: it sinks into the page in place, like a key
+     held down. Dark: it rises (brighter face, deeper shadow) and, in a single-choice group, the others step
+     back to a flat hairline (components.css). */
+  --chosen-bg: var(--sunken);
+  --chosen-shadow:
+    inset 0 2px 5px rgba(23, 23, 22, 0.16), inset 0 1px 1.5px rgba(23, 23, 22, 0.12), inset 0 0 0 1px var(--line),
+    0 1px 0 rgba(255, 255, 255, 0.7);
+  --chosen-lift: none;
+  --unchosen-shadow: inset 0 0 0 1px var(--line);
 }
 [data-theme="dark"] {
   --bg: #0f0f0e; --raised: #1c1c1b; --raised-2: #242423; --sunken: #0a0a09;
@@ -29,6 +38,10 @@
   --e3: 0 28px 64px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --scrim: rgba(0, 0, 0, 0.5);
+  --chosen-bg: color-mix(in srgb, #fff 7%, var(--raised));
+  --chosen-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1), 0 14px 28px -8px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --chosen-lift: translateY(-2px);
 }
 :root, [data-theme] {
   /* Names from v1, kept so every component keeps working (they follow the theme). */

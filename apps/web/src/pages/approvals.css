@@ -184,9 +184,9 @@
   box-shadow: var(--focus-ring);
 }
 .ap-card.is-selected {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    var(--e2);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  transform: var(--chosen-lift);
 }
 .ap-card__face {
   grid-row: 1 / span 2;
