@@ -65,7 +65,7 @@ export function createJevRouterStrategy(options: {
         needs_agent: {
           type: "noul",
           instructions:
-            "Should any AI agent reply to `latest_message`? People in a team chat often talk among themselves; an agent should reply only when the message asks for help, asks a question the agents can answer, greets the room, or continues a conversation with an agent.",
+            "Should any AI agent reply to `latest_message`? People in a team chat often talk among themselves; an agent should reply only when the message asks for help, asks a question the agents can answer, greets the room, speaks to the agents as a group, or continues a conversation with an agent.",
           criteria: {
             true: "The message is for an agent or needs an agent's answer.",
             false: "People talking to each other; no agent should interrupt.",
@@ -84,10 +84,10 @@ export function createJevRouterStrategy(options: {
               can: c.can ?? null,
             },
             question:
-              "Should `agent` reply to `latest_message`? Yes when the message addresses this agent, fits its role and what it `can` do, or follows up on a conversation this agent was just part of (see `agent_just_talking`). No when it can't actually help with this.",
+              'Should `agent` reply to `latest_message`? Yes when the message addresses this agent, fits its role and what it `can` do, or follows up on a conversation this agent was just part of (see `agent_just_talking`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer (its name, its computer, its status): then every agent should reply. No when it can\'t actually help with this.',
           },
           criteria: {
-            true: "This agent is the one who should answer.",
+            true: "This agent should answer (alone, or along with the others when the message is for all of them).",
             false: "This agent should stay quiet.",
           },
         };
