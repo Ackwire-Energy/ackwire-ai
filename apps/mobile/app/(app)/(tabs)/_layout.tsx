@@ -6,15 +6,17 @@ import { haptics, useTheme } from "@/ui";
 import { type TabGlyph, tabGlyphKey } from "@/ui/tabGlyphs";
 import { tabGlyphFamily } from "@/ui/tabIcons";
 
-const TABS: { name: string; glyph: TabGlyph; label: string }[] = [
+const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search" }[] = [
   { name: "(chats)", glyph: "chats", label: "mobile.tabs.chats" },
   { name: "threads", glyph: "threads", label: "mobile.tabs.threads" },
   { name: "agents", glyph: "agents", label: "mobile.tabs.agents" },
   { name: "activity", glyph: "activity", label: "mobile.tabs.activity" },
+  // The search role: on iOS 26 the round button apart at the bar's end (like Music); a plain tab on Android.
+  { name: "search", glyph: "search", label: "mobile.tabs.search", role: "search" },
 ];
 
 /**
- * Conversas (the home), Threads (threads and missions), Agentes, Atividade in the system tab bar
+ * Conversas (the home), Threads (threads and missions), Agentes, Atividade and Buscar in the system tab bar
  * (UITabBarController on iOS, Liquid Glass on iOS 26; Material bottom navigation on Android). Our own glyphs on both platforms (outline, filled when
  * selected), drawn as template images the bar tints. Badges for unread conversations (Conversas: channels
  * and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a stack with a native header.
@@ -49,6 +51,7 @@ export default function TabsLayout() {
           <NativeTabs.Trigger
             key={tab.name}
             name={tab.name}
+            {...(tab.role ? { role: tab.role } : {})}
             accessibilityLabel={badge ? t("mobile.tabs.withCount", { label, count }) : label}
             contentStyle={{ backgroundColor: colors.bg }}
           >

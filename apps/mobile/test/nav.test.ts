@@ -71,8 +71,8 @@ describe("cover parallax", () => {
 });
 
 describe("tab glyphs", () => {
-  test("four tabs: Conversas, Threads, Agentes, Atividade", () => {
-    expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity"]);
+  test("five tabs: Conversas, Threads, Agentes, Atividade and Buscar", () => {
+    expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity", "search"]);
   });
 
   test("every glyph in both states is a 24×24 SVG with finite numbers", () => {
@@ -90,7 +90,7 @@ describe("tab glyphs", () => {
   });
 
   test("outline when unselected, filled when selected", () => {
-    for (const glyph of TAB_GLYPHS) {
+    for (const glyph of TAB_GLYPHS.filter((g) => g !== "search")) {
       const outline = tabGlyphSvg(glyph, false, "#000");
       const filled = tabGlyphSvg(glyph, true, "#000");
       expect(outline).not.toBe(filled);
@@ -113,6 +113,15 @@ describe("tab glyphs", () => {
     expect(outline.match(/fill="none"/g)?.length).toBe(3);
     expect(filled.match(/fill="#000"/g)?.length).toBe(2);
     expect(filled.match(/fill="none"/g)?.length).toBe(1);
+  });
+
+  test("Buscar: the magnifier, never filled, bolder when selected", () => {
+    const outline = tabGlyphSvg("search", false, "#000");
+    const bold = tabGlyphSvg("search", true, "#000");
+    expect(outline).toContain("<circle ");
+    expect(bold).not.toContain('fill="#000"');
+    expect(outline).toContain('stroke-width="1.7"');
+    expect(bold).toContain('stroke-width="2.3"');
   });
 
   test("glyph keys round-trip and reject unknown names", () => {

@@ -16,13 +16,12 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://agentes.chat";
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
 
 /**
- * Paths the app no longer has (the old Início, Conversas and Busca routes), sent to Conversas (`/`) so a stale
- * link, notification or restored URL never lands on "not found". expo-router applies these to deep links and
- * to in-app navigation alike.
+ * Paths the app no longer has (the old Início and Conversas routes), sent to Conversas (`/`) so a stale link,
+ * notification or restored URL never lands on "not found". expo-router applies these to deep links and to
+ * in-app navigation alike. (`/search` is the search tab again.)
  */
 export const LEGACY_REDIRECTS = [
   { source: "/chats", destination: "/" },
-  { source: "/search", destination: "/" },
   { source: "/home", destination: "/" },
 ];
 

@@ -2,13 +2,13 @@ import { router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Count, PixelOrbit, Text } from "@/ui";
+import { Count, Icon, PixelOrbit, Text } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
-import { type ConversationRow, type LastLine, rowPlace } from "./logic";
+import { type ConversationRow, type LastLine, threadRowLines } from "./logic";
 
 /** The avatar column (and where the hairline between rows starts). */
 const AVATAR = 52;
@@ -16,9 +16,11 @@ const INSET = 14 + AVATAR + 12;
 
 /**
  * One conversation in the list (MobileConversas.html): the agent's living body (moving while it works),
- * a person's face, or the tile of a channel, thread or mission; the name and the time; the last line
- * ("Nome: …", two lines), or "trabalhando…" with the pixel orbit when an agent is on it, or the
- * mission's progress; the unread count in Doto. `live`: the agent moves (the first rows only).
+ * a person's face, or the tile of a channel; the name and the time; the last line ("Nome: …", two lines),
+ * or "trabalhando…" with the pixel orbit when an agent is on it; the unread count in Doto. Threads and
+ * missions (MobileRefinos.html `trowApp`) add a faint line with what and where ("Missão · #canal"): a
+ * mission shows its agent, its state and items ("Esperando você · 4 de 9 itens") and what waits on you in
+ * it; a thread shows the face and the line of its last reply. `live`: the agent moves (the first rows only).
  */
 export const ConversationRowView = memo(function ConversationRowView({
   row: r,
@@ -48,55 +50,62 @@ export const ConversationRowView = memo(function ConversationRowView({
       ) : (
         <Face who={{ type: r.with.type, id: r.with.id }} size={AVATAR} live={false} />
       )
+    ) : r.kind === "mission" && r.mission ? (
+      <AgentFace agentId={r.mission.agentId} size={AVATAR - 2} mode={working ? "run" : "idle"} live={live} />
+    ) : r.kind === "thread" || r.kind === "mission" ? (
+      <Face who={r.face} size={r.face.type === "agent" ? AVATAR - 2 : AVATAR} live={live} />
     ) : (
-      <Tile icon={r.kind === "channel" ? "hash" : r.kind === "mission" ? "target" : "reply"} size={AVATAR} />
+      <Tile icon="hash" size={AVATAR} />
     );
   const name = r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title;
   // Whose orbit: the DM's agent, or the mission's.
   const orbitAgent = r.kind === "dm" ? r.with.id : r.kind === "mission" ? r.mission?.agentId : null;
   const orbitColor = agentLook(orbitAgent ? dir.agentById.get(orbitAgent) : undefined).color;
-  const place = r.kind === "thread" || r.kind === "mission" ? rowPlace(r, dir.nameOf) : null;
-  const where = !place ? "" : place.kind === "with" ? place.name : `#${place.name}`;
+  const lines = r.kind === "thread" || r.kind === "mission" ? threadRowLines(r, dir.nameOf) : null;
+  // The faint line of a thread or mission: what it is and where ("Missão · #canal").
+  const placeLine = lines
+    ? [t(lines.kind === "mission" ? "mobile.chats.mission" : "mobile.chats.thread"), lines.where]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+  const badge = lines ? lines.badge : r.unread;
 
   let line: ReactNode;
   let label: string;
-  if (r.kind === "mission" && r.mission) {
-    const progress = t("mobile.chats.missionProgress", { done: r.mission.planDone, total: r.mission.planTotal });
-    const missionIn = !place
-      ? t("mobile.chats.mission")
-      : place.kind === "with"
-        ? t("mobile.chats.missionWith", { who: place.name })
-        : t("mobile.chats.missionIn", { where });
-    label = `${missionIn} · ${progress}`;
+  if (lines?.state && lines.progress) {
+    const progress = t("mobile.chats.missionProgress", lines.progress);
+    const state = t(`mobile.chats.missionState.${lines.state}`);
+    const lead = lines.state === "working" || lines.state === "waiting";
+    label = `${state} · ${progress}`;
     line = (
       <View style={styles.work}>
-        {working ? <PixelOrbit color={orbitColor} size={13} /> : null}
+        {lines.state === "working" ? <PixelOrbit color={orbitColor} size={13} /> : null}
+        {lines.state === "waiting" ? <Icon name="shield" size={14} color={c.ink2} /> : null}
         <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-          <Text variant="small" tone="ink2" style={styles.em}>
-            {missionIn}
+          <Text variant="small" tone={lead ? "ink2" : "muted"} style={lead ? styles.em : undefined}>
+            {state}
           </Text>
           {` · ${progress}`}
         </Text>
       </View>
     );
-  } else if (working) {
+  } else if (working && r.kind !== "mission") {
     label = t("mobile.chats.working");
     line = (
       <View style={styles.work}>
         <PixelOrbit color={orbitColor} size={13} />
         <Text variant="small" tone="ink2" numberOfLines={1} style={[styles.em, styles.shrink]}>
-          {where ? `${where} · ${label}` : label}
+          {label}
         </Text>
       </View>
     );
   } else {
     const last = lastText(r.last);
     const text = r.kind === "channel" ? last.text || r.topic : last.text;
-    const lead =
-      r.kind === "thread" ? [r.closed ? t("mobile.chats.closed") : null, where].filter(Boolean).join(" · ") : last.who;
+    const lead = last.who;
     label = lead ? `${lead}: ${text}` : text;
     line = (
-      <Text variant="small" tone="muted" numberOfLines={2} style={styles.last}>
+      <Text variant="small" tone="muted" numberOfLines={lines ? 1 : 2} style={styles.last}>
         {lead ? (
           <Text variant="small" tone="ink2">
             {`${lead}: `}
@@ -106,14 +115,19 @@ export const ConversationRowView = memo(function ConversationRowView({
       </Text>
     );
   }
+  if (r.kind === "thread" && r.closed) label = `${t("mobile.chats.closed")}, ${label}`;
 
   const open = () =>
     router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
   const a11y = [
     name,
+    placeLine,
     label,
     r.at ? when.short(r.at) : null,
     r.unread > 0 ? t("mobile.chats.unreadLabel", { count: r.unread }) : null,
+    lines?.kind === "mission" && badge > 0
+      ? t("mobile.tabs.withCount", { label: t("mobile.home.waiting"), count: badge })
+      : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -139,9 +153,14 @@ export const ConversationRowView = memo(function ConversationRowView({
             </Text>
           ) : null}
         </View>
+        {placeLine ? (
+          <Text variant="caption" tone="faint" numberOfLines={1}>
+            {r.kind === "thread" && r.closed ? `${placeLine} · ${t("mobile.chats.closed")}` : placeLine}
+          </Text>
+        ) : null}
         <View style={styles.l2}>
           <View style={styles.grow}>{line}</View>
-          {r.unread > 0 ? <Count value={r.unread} max={99} inverted /> : null}
+          {badge > 0 ? <Count value={badge} max={99} inverted /> : null}
         </View>
       </View>
     </Pressable>

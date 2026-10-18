@@ -5,21 +5,34 @@ import {
   homeSections,
   isListedThread,
   isListKind,
+  missionState,
   missionsWaiting,
   missionWaitingItems,
   openQuestions,
   parseCollapsed,
   rowPlace,
   rowsOfKind,
+  THREAD_SECTIONS,
+  threadRowLines,
   threadRows,
+  threadSections,
   toggleCollapsed,
   unreadConversationCount,
   unreadConversations,
   unreadThreadCount,
-  waitingPreview,
   waitingTotal,
 } from "../../src/features/chats/logic";
-import { at, thread } from "./fixtures";
+import {
+  stackLayers,
+  waitingChipKey,
+  waitingCount,
+  waitingInThreads,
+  waitingItems,
+  waitingMinutes,
+  waitingStack,
+  waitingVerbKey,
+} from "../../src/features/chats/waiting";
+import { approval, at, mission as missionOf, notification, thread } from "./fixtures";
 
 const channel = (id: string, name: string, isMember = true, over: Partial<Channel> = {}): Channel => ({
   id,
@@ -314,29 +327,164 @@ describe("the home by kind", () => {
   });
 });
 
-describe("the Esperando você shortcut's line", () => {
-  test("a request first, then a mission, then a question; nothing when nothing waits", () => {
-    const approval = { agentId: "theo", title: "Publicar a página" };
-    const missionItem = { agentId: "dev", title: "Migrar o banco" };
-    const question = {
-      actors: [{ type: "agent" as const, id: "nina" }],
-      latest: { text: "Qual mês?", title: null },
-    } as unknown as Parameters<typeof waitingPreview>[0]["questions"][number];
-    expect(waitingPreview({ approvals: [approval], missions: [missionItem], questions: [question] })).toEqual({
-      kind: "approval",
-      agentId: "theo",
-      title: "Publicar a página",
+describe("the Esperando você strip", () => {
+  const now = Date.parse("2026-10-17T15:00:00.000Z");
+  const req = approval({
+    id: "ap1",
+    agentId: "theo",
+    title: "Enviar a campanha",
+    threadId: "t-camp",
+    createdAt: new Date(now - 14 * 60_000).toISOString(),
+    expiresAt: new Date(now + 46 * 60_000).toISOString(),
+  });
+  const mis = missionOf({
+    id: "m1",
+    agentId: "dev",
+    title: "Migrar o banco",
+    channelId: "c9",
+    threadId: "t-mis",
+    pending: { decisions: 1, provisional: 0, reviews: 2, suggestions: 0, joinRequests: 0, commands: 0 },
+  });
+  const question = notification({
+    id: "n1",
+    kind: "agent_question",
+    waiting: true,
+    actors: [{ type: "agent", id: "nina" }],
+    latest: { text: "Qual mês?" },
+    source: { channelId: "c3", threadId: "t-q" },
+  });
+  const items = waitingItems({ approvals: [req], missions: [mis], questions: [question] });
+
+  test("a request first, then a mission, then a question, each opening its own place", () => {
+    expect(items.map((i) => [i.kind, i.agentId, i.title, i.href])).toEqual([
+      ["approval", "theo", "Enviar a campanha", "/approval/ap1"],
+      ["mission", "dev", "Migrar o banco", "/chat/c9?thread=t-mis"],
+      ["question", "nina", "Qual mês?", "/chat/c3?thread=t-q"],
+    ]);
+  });
+
+  test("the count adds each item waiting in a mission, like the old shortcut", () => {
+    expect(waitingCount(items)).toBe(5);
+    expect(waitingCount(items)).toBe(waitingTotal({ approvals: 1, missions: [mis], questions: 1 }));
+  });
+
+  test("the verb and the chip follow the kind", () => {
+    expect(items.map((i) => waitingVerbKey(i.kind))).toEqual([
+      "mobile.chats.wait.verb.approval",
+      "mobile.chats.wait.verb.mission",
+      "mobile.chats.wait.verb.question",
+    ]);
+    expect(waitingChipKey("question")).toBe("mobile.chats.wait.chip.question");
+  });
+
+  test("'expira em' only for a request, in minutes", () => {
+    expect(items.map((i) => waitingMinutes(i, now))).toEqual([46, null, null]);
+  });
+
+  test("the copies behind show only while more waits; 'e mais N' and the next agents' faces", () => {
+    const all = waitingStack(items);
+    expect(all.first?.key).toBe("a:ap1");
+    expect([all.count, all.rest, all.stacked]).toEqual([5, 4, true]);
+    expect(all.faces).toEqual(["dev", "nina"]);
+    const one = waitingStack(items.slice(0, 1));
+    expect([one.count, one.rest, one.stacked, one.faces]).toEqual([1, 0, false, []]);
+    const none = waitingStack([]);
+    expect([none.first, none.count, none.stacked]).toEqual([null, 0, false]);
+  });
+
+  test("the Threads tab keeps what waits in a mission or one of its threads", () => {
+    expect(waitingInThreads(items, new Set(["t-q"])).map((i) => i.key)).toEqual(["m:m1", "q:n1"]);
+    expect(waitingInThreads(items, new Set(["t-camp", "t-q"])).map((i) => i.key)).toEqual(["a:ap1", "m:m1", "q:n1"]);
+  });
+
+  test("the stack's colors are ink mixed with the background, darker in front", () => {
+    const [p1, p2] = stackLayers("#000000", "#ffffff");
+    expect([p1.translateY, p1.scaleX, p2.translateY, p2.scaleX]).toEqual([7, 0.95, 14, 0.89]);
+    expect(p1.color).toBe("#616161");
+    expect(p2.color).toBe("#adadad");
+  });
+});
+
+describe("the Threads tab", () => {
+  const ms = (id: string, over: Partial<NonNullable<Parameters<typeof thread>[0]["mission"]>>, working = false) =>
+    thread({
+      id,
+      title: `Missão ${id}`,
+      working,
+      mission: { id: `m-${id}`, agentId: "theo", status: "active", planDone: 2, planTotal: 5, waitingYou: 0, ...over },
     });
-    expect(waitingPreview({ approvals: [], missions: [missionItem], questions: [question] })).toEqual({
+  const rows = buildConversations({
+    channels: [],
+    dms: [],
+    threads: [
+      ms("run", {}, true),
+      ms("wait", { planDone: 4, planTotal: 9, waitingYou: 2 }),
+      ms("paused", { status: "paused", planDone: 3, planTotal: 8 }),
+      ms("done", { status: "done", planDone: 10, planTotal: 10 }),
+      ms("closing", { status: "awaiting_close", planDone: 6, planTotal: 6 }),
+      thread({
+        id: "th",
+        title: "Fechamento",
+        lastMessage: { author: { type: "agent", id: "nina" }, excerpt: "Pronto", createdAt: at(1) },
+      }),
+    ],
+  });
+  const byId = (id: string) => {
+    const r = rows.find((x) => x.key === `t:${id}`);
+    if (!r || (r.kind !== "thread" && r.kind !== "mission")) throw new Error(id);
+    return r;
+  };
+
+  test("a mission's state: working, waiting on you, paused, done", () => {
+    expect(["run", "wait", "paused", "done", "closing"].map((id) => missionState(byId(id)))).toEqual([
+      "working",
+      "waiting",
+      "paused",
+      "done",
+      "done",
+    ]);
+    expect(missionState(byId("th"))).toBeNull();
+    // needsYou alone also means waiting on you; canceled is its own.
+    expect(missionState({ ...byId("paused"), needsYou: true })).toBe("waiting");
+    const done = byId("done");
+    if (!done.mission) throw new Error("mission");
+    expect(missionState({ ...done, mission: { ...done.mission, status: "canceled" } })).toBe("canceled");
+  });
+
+  test("a mission row: where, the items and what waits on you as its badge", () => {
+    expect(threadRowLines(byId("wait"))).toEqual({
       kind: "mission",
-      agentId: "dev",
-      title: "Migrar o banco",
+      where: "#produto",
+      state: "waiting",
+      progress: { done: 4, total: 9 },
+      badge: 2,
     });
-    expect(waitingPreview({ approvals: [], missions: [], questions: [question] })).toEqual({
-      kind: "question",
-      agentId: "nina",
-      title: "Qual mês?",
-    });
-    expect(waitingPreview({ approvals: [], missions: [], questions: [] })).toBeNull();
+  });
+
+  test("a thread row: where, no state, its unread as the badge, the last reply's author as the face", () => {
+    const r = byId("th");
+    expect(threadRowLines(r)).toEqual({ kind: "thread", where: "#produto", state: null, progress: null, badge: 0 });
+    expect(threadRowLines({ ...r, unread: 3 }).badge).toBe(3);
+    expect(r.face).toEqual({ type: "agent", id: "nina" });
+    expect(byId("run").face).toEqual({ type: "person", id: "u1" });
+  });
+
+  test("in a DM, a mission says who it is with", () => {
+    const r = { ...byId("run"), channelKind: "dm" as const, dmWith: null };
+    expect(threadRowLines(r, (w) => (w.id === "theo" ? "Theo" : "")).where).toBe("Theo");
+  });
+
+  test("sections: Missões, then Threads; empty ones left out", () => {
+    expect(threadSections(rows).map((s) => [s.key, s.rows.length])).toEqual([
+      ["missions", 5],
+      ["threads", 1],
+    ]);
+    expect(threadSections(rows.filter((r) => r.kind !== "mission")).map((s) => s.key)).toEqual(["threads"]);
+    expect(threadSections([])).toEqual([]);
+  });
+
+  test("its collapsed sections are remembered on their own keys", () => {
+    expect(parseCollapsed('["threads","agents"]', THREAD_SECTIONS)).toEqual(["threads"]);
+    expect(toggleCollapsed(["threads"], "missions", THREAD_SECTIONS)).toEqual(["missions", "threads"]);
   });
 });

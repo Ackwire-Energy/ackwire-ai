@@ -26,6 +26,7 @@ export const featureKeysEn: FeatureTranslations = {
     threads: "Threads",
     agents: "Agents",
     activity: "Activity",
+    search: "Search",
     withCount: "{{label}}, {{count}}",
   },
   home: {
@@ -95,10 +96,32 @@ export const featureKeysEn: FeatureTranslations = {
       channels: "See all channels",
       people: "See all people",
     },
-    waitPreview: {
-      approval: "{{name}} asks for approval",
-      mission: "{{name}}: {{title}}",
-      question: "{{name}} asked",
+    wait: {
+      verb: {
+        approval: "needs your ok",
+        question: "has a question",
+        mission: "wants your review",
+      },
+      line: "{{name}} {{verb}}",
+      chip: {
+        approval: "Approve",
+        question: "Question",
+        mission: "Mission",
+      },
+      review: "Review",
+      more_one: "and {{count}} more waiting on you",
+      more_other: "and {{count}} more waiting on you",
+      open: "See what waits on you",
+    },
+    thread: "Thread",
+    missionState: {
+      working: "working…",
+      waiting: "Waiting on you",
+      paused: "Paused",
+      done: "Done",
+      canceled: "Canceled",
+      active: "In progress",
+      proposed: "Proposed",
     },
     empty: "No chats yet.",
     closed: "Closed",
@@ -428,6 +451,10 @@ export const featureKeysEn: FeatureTranslations = {
   },
   threads: {
     title: "Threads and missions",
+    section: {
+      missions: "Missions",
+      threads: "Threads",
+    },
     empty: "No threads or missions yet",
     emptyHint: "Hold a message to reply in a thread or turn it into a mission.",
   },
@@ -522,6 +549,7 @@ export const featureKeysEn: FeatureTranslations = {
   find: {
     title: "Search",
     short: "Search",
+    recent: "Recent",
     placeholder: "Search chats, agents, messages",
     actions: "Actions",
     agents: "Agents",

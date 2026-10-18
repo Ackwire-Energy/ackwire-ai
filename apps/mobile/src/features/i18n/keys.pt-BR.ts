@@ -30,6 +30,7 @@ export const featureKeysPtBR = {
     threads: "Threads",
     agents: "Agentes",
     activity: "Atividade",
+    search: "Buscar",
     withCount: "{{label}}, {{count}}",
   },
   home: {
@@ -99,10 +100,32 @@ export const featureKeysPtBR = {
       channels: "Ver todos os canais",
       people: "Ver todas as pessoas",
     },
-    waitPreview: {
-      approval: "{{name}} pede aprovação",
-      mission: "{{name}}: {{title}}",
-      question: "{{name}} perguntou",
+    wait: {
+      verb: {
+        approval: "precisa do seu ok",
+        question: "tem uma pergunta",
+        mission: "pede sua revisão",
+      },
+      line: "{{name}} {{verb}}",
+      chip: {
+        approval: "Aprovar",
+        question: "Pergunta",
+        mission: "Missão",
+      },
+      review: "Revisar",
+      more_one: "e mais {{count}} esperando você",
+      more_other: "e mais {{count}} esperando você",
+      open: "Ver o que espera você",
+    },
+    thread: "Thread",
+    missionState: {
+      working: "trabalhando…",
+      waiting: "Esperando você",
+      paused: "Pausada",
+      done: "Concluída",
+      canceled: "Cancelada",
+      active: "Em andamento",
+      proposed: "Proposta",
     },
     empty: "Nenhuma conversa ainda.",
     closed: "Fechada",
@@ -432,6 +455,10 @@ export const featureKeysPtBR = {
   },
   threads: {
     title: "Threads e missões",
+    section: {
+      missions: "Missões",
+      threads: "Threads",
+    },
     empty: "Nenhuma thread ou missão ainda",
     emptyHint: "Segure uma mensagem para responder em thread ou transformar em missão.",
   },
@@ -526,6 +553,7 @@ export const featureKeysPtBR = {
   find: {
     title: "Buscar",
     short: "Buscar",
+    recent: "Recentes",
     placeholder: "Buscar conversas, agentes, mensagens",
     actions: "Ações",
     agents: "Agentes",

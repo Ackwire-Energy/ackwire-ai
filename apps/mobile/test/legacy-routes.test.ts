@@ -7,7 +7,7 @@ const APP = join(import.meta.dir, "..", "app");
 
 describe("legacy routes", () => {
   test("the removed paths go to Conversas", () => {
-    expect(LEGACY_REDIRECTS.map((r) => r.source).sort()).toEqual(["/chats", "/home", "/search"]);
+    expect(LEGACY_REDIRECTS.map((r) => r.source).sort()).toEqual(["/chats", "/home"]);
     for (const r of LEGACY_REDIRECTS) expect(r.destination).toBe("/");
   });
 

@@ -22,7 +22,7 @@ import {
 const ACTION_ICON = { newConversation: "compose", newTask: "target", newAgent: "agent" } as const;
 
 /**
- * Busca, under the native search bar of Conversas (the phone's ⌘K): the actions with no words, then the
+ * Busca, under the field of the search tab (the phone's ⌘K): the actions with no words, then the
  * results grouped (Conversas, Mensagens, Arquivos) with a chip per group and its count.
  */
 export function SearchResults({ q }: { q: string }) {

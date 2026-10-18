@@ -29,6 +29,8 @@ export interface LargeTitleScreenProps {
   refreshControl?: ReactElement<RefreshControlProps>;
   /** Room under the content (default 24; the system already keeps content clear of the tab bar). */
   bottomInset?: number;
+  /** The person starts scrolling the list (Conversas closes its open "Esperando você" card). */
+  onScrollBeginDrag?: () => void;
 }
 
 /**
@@ -49,6 +51,7 @@ export function LargeTitleScreen({
   children,
   refreshControl,
   bottomInset = 24,
+  onScrollBeginDrag,
 }: LargeTitleScreenProps) {
   const { colors } = useTheme();
   const focused = useIsFocused();
@@ -79,6 +82,7 @@ export function LargeTitleScreen({
       <LivePause paused={!focused}>
         <Animated.ScrollView
           onScroll={onScroll}
+          onScrollBeginDrag={onScrollBeginDrag}
           scrollEventThrottle={16}
           refreshControl={refreshControl}
           contentInsetAdjustmentBehavior="never"

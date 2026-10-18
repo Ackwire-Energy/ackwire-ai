@@ -42,6 +42,8 @@ export const STORED = {
   pushOff: "push-off",
   /** Conversas' sections the person collapsed (JSON list). */
   homeCollapsed: "home-collapsed",
+  /** The Threads tab's sections the person collapsed (JSON list). */
+  threadsCollapsed: "threads-collapsed",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

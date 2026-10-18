@@ -1,6 +1,5 @@
 import type {
   AppNotification,
-  Approval,
   Channel,
   DirectMessage,
   Mission,
@@ -58,6 +57,8 @@ export type ConversationRow =
       closed: boolean;
       working: boolean;
       needsYou: boolean;
+      /** Whose face the row shows: the last reply's author, else who started it. */
+      face: ThreadActor;
       last: LastLine | null;
       at: string | null;
       unread: number;
@@ -112,6 +113,7 @@ export function buildConversations(input: {
       closed: t.state === "closed",
       working: t.working,
       needsYou: t.needsYou,
+      face: t.lastMessage?.author ?? t.rootAuthor,
       last: t.lastMessage ? { author: t.lastMessage.author, text: previewOf(t.lastMessage.excerpt) } : null,
       at: t.lastActivityAt,
       unread: 0,
@@ -263,21 +265,78 @@ export const threadRows = (rows: ConversationRow[]) => rowsOfKind(rows, "threads
  */
 export const unreadThreadCount = (rows: ConversationRow[]) => threadRows(rows).filter((r) => r.unread > 0).length;
 
-/** The sections the person collapsed, as remembered (anything unreadable: none). */
-export function parseCollapsed(raw: string | null): HomeSection[] {
+/** The sections the person collapsed, as remembered (anything unreadable: none), out of `keys`. */
+export function parseCollapsed<K extends string>(
+  raw: string | null,
+  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+): K[] {
   if (!raw) return [];
   try {
     const v: unknown = JSON.parse(raw);
-    return Array.isArray(v) ? HOME_SECTIONS.filter((k) => v.includes(k)) : [];
+    return Array.isArray(v) ? keys.filter((k) => v.includes(k)) : [];
   } catch {
     return [];
   }
 }
 
 /** Collapses or opens a section (in the sections' order). */
-export function toggleCollapsed(list: readonly HomeSection[], key: HomeSection): HomeSection[] {
+export function toggleCollapsed<K extends string>(
+  list: readonly K[],
+  key: K,
+  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+): K[] {
   const on = list.includes(key);
-  return HOME_SECTIONS.filter((k) => (k === key ? !on : list.includes(k)));
+  return keys.filter((k) => (k === key ? !on : list.includes(k)));
+}
+
+// ── The Threads tab (MobileRefinos.html, Threads C) ─────────────────────────
+
+/** The Threads tab's collapsible sections, in order. */
+export const THREAD_SECTIONS = ["missions", "threads"] as const;
+export type ThreadSection = (typeof THREAD_SECTIONS)[number];
+
+type ThreadRow = Extract<ConversationRow, { kind: "thread" | "mission" }>;
+
+/** Missões, then Threads, each by latest activity; empty ones left out. */
+export function threadSections(rows: ConversationRow[]): { key: ThreadSection; rows: ThreadRow[] }[] {
+  const all = threadRows(rows).filter((r): r is ThreadRow => r.kind === "thread" || r.kind === "mission");
+  return [
+    { key: "missions" as const, rows: all.filter((r) => r.kind === "mission") },
+    { key: "threads" as const, rows: all.filter((r) => r.kind === "thread") },
+  ].filter((s) => s.rows.length > 0);
+}
+
+/** Where a mission stands, for its second line ("trabalhando…", "Esperando você", "Pausada", "Concluída"). */
+export type MissionState = "working" | "waiting" | "paused" | "done" | "canceled" | "active" | "proposed";
+
+export function missionState(r: Pick<ThreadRow, "working" | "needsYou" | "mission">): MissionState | null {
+  const m = r.mission;
+  if (!m) return null;
+  if (m.status === "canceled") return "canceled";
+  if (m.status === "done") return "done";
+  if (m.status === "active" && r.working) return "working";
+  if (m.waitingYou > 0 || r.needsYou) return "waiting";
+  if (m.status === "paused") return "paused";
+  if (m.status === "awaiting_close") return "done";
+  return m.status === "proposed" ? "proposed" : "active";
+}
+
+/**
+ * A Threads row's lines (`trowApp`): the faint line with what it is and where ("Missão · #canal", "Missão ·
+ * Theo" in a DM, "Thread · #canal"); a mission's state and progress, or a thread's last reply; the badge (a
+ * mission: what waits on you in it; a thread: unread).
+ */
+export function threadRowLines(r: ThreadRow, nameOf?: (who: { type: string; id: string | null }) => string) {
+  const place = rowPlace(r, nameOf);
+  const where = !place ? null : place.kind === "with" ? place.name : `#${place.name}`;
+  const state = r.kind === "mission" ? missionState(r) : null;
+  return {
+    kind: r.kind === "mission" ? ("mission" as const) : ("thread" as const),
+    where,
+    state,
+    progress: r.mission ? { done: r.mission.planDone, total: r.mission.planTotal } : null,
+    badge: r.kind === "mission" ? (r.mission?.waitingYou ?? 0) : r.unread,
+  };
 }
 
 // ── Esperando você (top of Conversas) ───────────────────────────────────────
@@ -301,32 +360,4 @@ export function waitingTotal(input: {
   questions: number;
 }): number {
   return input.approvals + input.missions.reduce((n, m) => n + missionWaitingItems(m), 0) + input.questions;
-}
-
-/** The first thing waiting on you, for the shortcut's line ("Theo pede aprovação"). */
-export type WaitingPreview =
-  | { kind: "approval"; agentId: string; title: string }
-  | { kind: "mission"; agentId: string; title: string }
-  | { kind: "question"; agentId: string | null; title: string };
-
-/** In the rail's old order: requests (the one closest to expiring first), missions, questions. */
-export function waitingPreview(input: {
-  approvals: Pick<Approval, "agentId" | "title">[];
-  missions: Pick<Mission, "agentId" | "title">[];
-  questions: Pick<AppNotification, "actors" | "latest">[];
-}): WaitingPreview | null {
-  const a = input.approvals[0];
-  if (a) return { kind: "approval", agentId: a.agentId, title: a.title };
-  const m = input.missions[0];
-  if (m) return { kind: "mission", agentId: m.agentId, title: m.title };
-  const q = input.questions[0];
-  if (q) {
-    const actor = q.actors[0];
-    return {
-      kind: "question",
-      agentId: actor?.type === "agent" ? actor.id : null,
-      title: q.latest.text ?? q.latest.title ?? "",
-    };
-  }
-  return null;
 }

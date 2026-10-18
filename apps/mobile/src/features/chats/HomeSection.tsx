@@ -5,18 +5,27 @@ import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated"
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { Count, Icon, LIST_INSET, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
-import { type HomeSection, parseCollapsed, toggleCollapsed } from "./logic";
+import { HOME_SECTIONS, type HomeSection, parseCollapsed, toggleCollapsed } from "./logic";
 
-/** The sections the person collapsed on Conversas, remembered across launches. */
-export function useCollapsedSections() {
-  const [collapsed, setCollapsed] = useState<HomeSection[]>(() => parseCollapsed(readValueSync(STORED.homeCollapsed)));
-  const toggle = useCallback((key: HomeSection) => {
-    setCollapsed((list) => {
-      const next = toggleCollapsed(list, key);
-      void writeValue(STORED.homeCollapsed, next.length > 0 ? JSON.stringify(next) : null);
-      return next;
-    });
-  }, []);
+/**
+ * The sections the person collapsed, remembered across launches: Conversas' by default, or another list's
+ * (`store`, `keys`: the Threads tab's Missões and Threads).
+ */
+export function useCollapsedSections<K extends string = HomeSection>(
+  store: string = STORED.homeCollapsed,
+  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+) {
+  const [collapsed, setCollapsed] = useState<K[]>(() => parseCollapsed(readValueSync(store), keys));
+  const toggle = useCallback(
+    (key: K) => {
+      setCollapsed((list) => {
+        const next = toggleCollapsed(list, key, keys);
+        void writeValue(store, next.length > 0 ? JSON.stringify(next) : null);
+        return next;
+      });
+    },
+    [store, keys],
+  );
   return { collapsed, toggle };
 }
 

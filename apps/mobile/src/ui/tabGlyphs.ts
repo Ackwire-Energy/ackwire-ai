@@ -2,15 +2,16 @@ import { bodyPath, EYE_STYLES, EYE_X } from "@agenteschat/ui/agent/engine";
 import { ICONS } from "./icons.data";
 
 /**
- * The tab bar's own glyphs (Conversas, Threads, Agentes, Atividade) as SVG documents, in two states:
+ * The tab bar's own glyphs (Conversas, Threads, Agentes, Atividade, Buscar) as SVG documents, in two states:
  * outline (unselected) and filled (selected). They are template images: one opaque color, and the
  * native tab bar tints them by state. 24×24 viewBox, stroke 1.7 with round caps, the line icons'
  * geometry; Threads is a message with a reply branching off it; Agentes is our agent (the engine's body with
- * the cut bottom-left corner and two pill eyes).
+ * the cut bottom-left corner and two pill eyes); Buscar is the line icons' magnifier, bolder when selected
+ * (a filled lens reads as a dot, so it never fills, like the system's search tab).
  * Pure: `tabIcons.ts` rasterizes them with Skia.
  */
 
-export const TAB_GLYPHS = ["chats", "threads", "agents", "activity"] as const;
+export const TAB_GLYPHS = ["chats", "threads", "agents", "activity", "search"] as const;
 export type TabGlyph = (typeof TAB_GLYPHS)[number];
 
 /** A glyph and its state, as one name (the icon "family" of the tab bar takes a single name). */
@@ -96,6 +97,14 @@ function agentGlyph(selected: boolean, color: string): string {
   return `<path d="${bodyPath(at, at, side)}${agentEyes(at, side, 2.1)}" fill="${color}" fill-rule="evenodd"/>`;
 }
 
+/** Buscar: the magnifier of the line icons (`search`), with a heavier stroke when selected. */
+function searchGlyph(selected: boolean, color: string): string {
+  const width = selected ? SEARCH_SELECTED_STROKE : STROKE;
+  const attrs = `fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"`;
+  return `<circle cx="11" cy="11" r="6.5" ${attrs}/><path d="m16 16 4 4" ${attrs}/>`;
+}
+const SEARCH_SELECTED_STROKE = 2.3;
+
 /** The SVG document of a tab glyph in a state, drawn in `color` (any opaque color: it is a template). */
 export function tabGlyphSvg(glyph: TabGlyph, selected: boolean, color = "#000000"): string {
   let body: string;
@@ -111,6 +120,9 @@ export function tabGlyphSvg(glyph: TabGlyph, selected: boolean, color = "#000000
       break;
     case "agents":
       body = agentGlyph(selected, color);
+      break;
+    case "search":
+      body = searchGlyph(selected, color);
       break;
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${body}</svg>`;
