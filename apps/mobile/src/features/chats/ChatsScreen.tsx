@@ -1,10 +1,10 @@
 import { keys, useMissionList, useNotifications } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshControl, StyleSheet, View } from "react-native";
-import { LargeTitleScreen, SearchField, Text } from "@/ui";
+import { BackHandler, Keyboard, RefreshControl, StyleSheet, type TextInputInstance, View } from "react-native";
+import { LargeTitleScreen, SearchField, searchShowsResults, Text } from "@/ui";
 import { workByAgent } from "../agents/logic";
 import { SearchResults } from "../search/SearchResults";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
@@ -54,6 +54,7 @@ export function ChatsScreen() {
   const { collapsed, toggle } = useCollapsedSections();
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
+  const field = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (!focused) return;
@@ -69,7 +70,23 @@ export function ChatsScreen() {
     .filter((id) => dir.agentById.has(id));
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waitingMissions.refetch(), inbox.refetch()]));
   const sections = homeSections(list.rows);
-  const showResults = searching || Boolean(q.trim());
+  const showResults = searchShowsResults({ focused: searching, value: q });
+  const cancelSearch = () => {
+    setQ("");
+    setSearching(false);
+    field.current?.blur();
+    Keyboard.dismiss();
+  };
+
+  // Android's back leaves search first (like Cancelar), not the app.
+  useEffect(() => {
+    if (!showResults || !focused) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      cancelSearch();
+      return true;
+    });
+    return () => sub.remove();
+  });
   const empty = !list.loading && list.rows.length === 0;
 
   const previewText = (p: WaitingPreview | null) => {
@@ -96,17 +113,18 @@ export function ChatsScreen() {
       title={t("mobile.chats.title")}
       {...header}
       header={showResults || empty ? undefined : (reach) => <Greeting working={working} reach={reach} />}
-      refreshControl={
-        showResults ? undefined : <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
-      }
+      // Kept while searching: dropping it rebuilds the scroll view (Android) and the field lost focus unseen.
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <View style={styles.search}>
         <SearchField
+          ref={field}
           value={q}
           onChangeText={setQ}
           placeholder={t("mobile.find.short")}
           onFocus={() => setSearching(true)}
           onBlur={() => setSearching(false)}
+          onCancel={cancelSearch}
           autoCapitalize="none"
         />
       </View>

@@ -50,6 +50,7 @@ export { SectionHeader, type SectionHeaderProps } from "./SectionHeader";
 export { Segmented, type SegmentedProps } from "./Segmented";
 export { Sheet, type SheetProps } from "./Sheet";
 export { SheetScreen, type SheetScreenProps } from "./SheetScreen";
+export { searchCancelVisible, searchShowsResults } from "./searchMode";
 export { systemText, Text, type TextProps, type TextTone, type TextVariant } from "./Text";
 export { ToastHost, type ToastInput, useToast } from "./Toast";
 export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";
