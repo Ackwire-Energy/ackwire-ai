@@ -185,6 +185,39 @@ describe("bottom anchoring", () => {
     expect(log.scrollTop).toBe(2000);
     expect(screen().queryByRole("button", { name: /Novas mensagens/ })).toBeNull();
   });
+
+  test("a small scroll up lets go at once: new messages don't pull it back down", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    expect(log.scrollTop).toBe(2000);
+    // Still inside the "near bottom" band, but moving up.
+    log.scrollTop = 1960;
+    await act(async () => {
+      fireEvent.wheel(log, { deltaY: -40 });
+      fireEvent.scroll(log);
+    });
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-near",
+      message: {
+        id: "m-near",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: "mais uma",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await settle();
+    expect(log.scrollTop).toBe(1960);
+    expect(screen().getByRole("button", { name: /Novas mensagens/ })).not.toBeNull();
+  });
 });
 
 describe("receipts: a check with a popover", () => {

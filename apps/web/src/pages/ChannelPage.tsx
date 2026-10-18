@@ -648,6 +648,11 @@ function ChannelView({
   const markGesture = () => {
     lastGesture.current = Date.now();
   };
+  // Scrolling up always lets go at once: no waiting to leave the "near bottom" band or for a glide to end.
+  const letGo = () => {
+    stick.current = false;
+    autoScrollUntil.current = 0;
+  };
   // Pinned to the bottom: anything that grows later (images, cards, the skeleton turning into
   // messages, fonts) keeps the latest message in view until the person scrolls.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the list only exists for members; re-attach when it appears
@@ -1213,17 +1218,27 @@ function ChannelView({
                 aria-label={t("channel.messages")}
                 aria-live="polite"
                 aria-relevant="additions"
-                onWheel={markGesture}
+                onWheel={(e) => {
+                  markGesture();
+                  if (e.deltaY < 0) letGo();
+                }}
                 onTouchMove={markGesture}
                 onPointerDown={markGesture}
                 onKeyDown={markGesture}
                 onScroll={(e) => {
+                  const previousTop = lastScrollTop.current;
                   lastScrollTop.current = e.currentTarget.scrollTop;
                   // Only the person scrolling unpins (or loads older pages); layout changes never do.
                   const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
                   if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
+                  if (byPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
+                    letGo();
+                    return;
+                  }
                   const near = nearBottom(e.currentTarget);
                   if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
+                  // Pinned again only when the person comes back down, not by layout.
+                  if (near && !stick.current && !byPerson) return;
                   stick.current = near;
                   if (near) setUnseen(false);
                 }}
