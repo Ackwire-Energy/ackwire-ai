@@ -107,7 +107,8 @@ export function Welcome() {
     setCode(null);
     try {
       // Reuse a home left unpaired by an earlier attempt; else a new one.
-      const spare = store.getSnapshot().homes.find((h) => h.status && !h.status.paired);
+      // A home whose runner never answered counts too: retrying must not leave empty homes behind.
+      const spare = store.getSnapshot().homes.find((h) => !h.status?.paired);
       const id = spare?.homeId ?? (await store.addHome());
       homeRef.current = id;
       setHomeId(id);
@@ -244,7 +245,13 @@ export function Welcome() {
       <>
         {steps}
         <h1>{mode === "org" ? t("desktop.welcome.orgTitle") : t("desktop.welcome.codeTitle")}</h1>
-        <p className="dk-lead">{mode === "org" ? t("desktop.welcome.orgLead") : t("desktop.welcome.codeLead")}</p>
+        <p className="dk-lead">
+          {!code
+            ? t("desktop.welcome.codeLeadPreparing")
+            : mode === "org"
+              ? t("desktop.welcome.orgLead")
+              : t("desktop.welcome.codeLead")}
+        </p>
         <div className="dk-codebox">
           {code ? <CodeDigits code={code.userCode} /> : <span className="dk-code dk-code--empty">···&nbsp;···</span>}
         </div>
