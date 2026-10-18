@@ -733,6 +733,23 @@ export async function postPersonMessage(
 
 /** Above this "the person asks this agent to act now" probability, a mentioned agent gets a run. */
 export const ADDRESSEE_THRESHOLD = 0.5;
+/** Below the threshold, the top score must reach this to count as a lead (Jev's yes is often 0.2–0.4). */
+export const ADDRESSEE_LEAD_MIN = 0.15;
+
+/**
+ * Who acts, from each mentioned agent's score. Above the threshold: those. Otherwise a
+ * calibrated judge (Jev) still separates them: the leader acts with whoever scores at least
+ * half of it ("@atlas, ask @ada to…" scores 0.3 vs 0.06: only Atlas). No lead (all near zero,
+ * or close to each other below the lead minimum): everyone mentioned acts, as before.
+ */
+export function pickAddressees(scores: { agentId: string; score: number }[]) {
+  const above = scores.filter((s) => s.score >= ADDRESSEE_THRESHOLD).map((s) => s.agentId);
+  if (above.length) return above;
+  const top = Math.max(0, ...scores.map((s) => s.score));
+  if (top < ADDRESSEE_LEAD_MIN) return scores.map((s) => s.agentId);
+  return scores.filter((s) => s.score >= top / 2).map((s) => s.agentId);
+}
+
 /** The classification waits at most this long before the post goes on as before (everyone mentioned acts). */
 export const ADDRESSEE_TIMEOUT_MS = 2500;
 
@@ -792,10 +809,7 @@ export async function classifyAddressees(
       }),
     ]);
     const scores = targets.map((t) => ({ agentId: t.id, score: judged.get(t.id) ?? 0 }));
-    const addressees = scores.filter((s) => s.score >= ADDRESSEE_THRESHOLD).map((s) => s.agentId);
-    // Nobody clearly addressed: the judge didn't help, so everyone mentioned acts (as before).
-    if (addressees.length === 0)
-      return { strategy: `addressees-${judge.name}`, scores, addressees: everyone, referenced: [] };
+    const addressees = pickAddressees(scores);
     return {
       strategy: `addressees-${judge.name}`,
       scores,

@@ -33,6 +33,7 @@ test("capabilities come from the granted tools, grouped, with what needs approva
   expect(text).toContain("- GitHub: `github_merge_pr`");
   expect(text).toContain("Download PDF");
   expect(text).toContain("Need a person's approval (you ask, someone approves in the chat): `github_merge_pr`.");
+  expect(text).toContain("write there what you found and why");
   expect(text).toContain("suggest who can");
   const none = describeCapabilities([]);
   expect(none).toContain("You only write messages in this chat");

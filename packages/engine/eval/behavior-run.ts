@@ -28,6 +28,7 @@ import {
   createFakeScheduleReader,
   createIssue,
   createIssueToolSource,
+  createJevJudge,
   createJobHandlers,
   createLlmJudge,
   createLocalKeyWrapper,
@@ -46,6 +47,7 @@ import {
   openDm,
   postPersonMessage,
   type ToolSource,
+  withJudgeFallback,
 } from "../src";
 import type { CheckResult, EvalToolCall, EvalTurn, Expectations } from "./behavior-checks";
 import { type Canned, CONNECTORS, fakeConnectorSource, fakeMissionSource } from "./behavior-fakes";
@@ -154,16 +156,29 @@ export interface CaseRun {
   triggered: string[];
   /** Receipt kinds on the run's messages (act with undo). */
   receipts?: string[];
+  /** What the person sees besides the reply: the cards the run posted (a mission proposal's findings and plan). */
+  cards?: string;
+  /** The tools the agent had (names). */
+  tools?: string[];
+  /** The cheap model's structured answers during the run (addressees), for the report. */
+  classifier?: string[];
   error?: string;
 }
 
 /** Records the model's turns of a run (what it wrote and called), passing everything through. */
 function recording(provider: ModelProvider) {
   const turns: (EvalTurn & { request: ModelRequest })[] = [];
+  /** Structured answers (the addressee classifier), for the report. */
+  const structured: string[] = [];
   const wrapped: ModelProvider = {
     id: provider.id,
     async stream(request, options) {
       const result = await provider.stream(request, options);
+      // Structured calls (the addressee classifier) are not the agent's turns.
+      if (request.outputSchema) {
+        structured.push(`${JSON.stringify(request.messages).slice(0, 1500)} → ${result.text}`);
+        return result;
+      }
       turns.push({
         request,
         text: result.text,
@@ -175,7 +190,7 @@ function recording(provider: ModelProvider) {
     },
     ...(provider.countTokens ? { countTokens: provider.countTokens.bind(provider) } : {}),
   };
-  return { provider: wrapped, turns };
+  return { provider: wrapped, turns, structured };
 }
 
 async function addPerson(db: Awaited<ReturnType<typeof createTestDatabase>>["db"], name: string) {
@@ -192,6 +207,8 @@ export interface RunOptions {
   maxToolTurns: number;
   /** Overrides every case's agent model. */
   agentModel?: string;
+  /** TypeSafe key: the addressee classification uses Jev like production (the cheap model only without it). */
+  jevKey?: string;
 }
 
 /** Runs one case through the engine on a fresh in-memory database. */
@@ -418,8 +435,12 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       );
       if (asked?.isError) throw new Error(`${c.id}: ask_agent refused: ${asked.content}`);
     } else {
+      // Same judge as production (apps/server/src/engine.ts): Jev, the cheap model as fallback.
+      const llmJudge = createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" });
       const judge = c.addressees
-        ? createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" })
+        ? options.jevKey
+          ? withJudgeFallback(createJevJudge({ apiKey: options.jevKey, gateway, timeoutMs: 5000 }), llmJudge)
+          : llmJudge
         : undefined;
       await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
         body: conv.trigger.body,
@@ -503,6 +524,10 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         ).map((r) => r.kind)
       : [];
     const turns = recorder.turns.map(({ text, toolCalls }) => ({ text, toolCalls }));
+    const cards = calls
+      .filter((t) => t.name === "propose_mission" && t.executed && !t.isError)
+      .map((t) => missionCard(t.input))
+      .join("\n\n");
     const last = turns.at(-1);
     return {
       turns,
@@ -515,10 +540,25 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       costNanoUsd: Number(usage?.cost ?? 0),
       triggered,
       receipts,
+      ...(cards ? { cards } : {}),
+      tools: (recorder.turns[0]?.request.tools ?? []).map((t) => t.name),
+      ...(recorder.structured.length ? { classifier: [...recorder.structured] } : {}),
     };
   } finally {
     await close();
   }
+}
+
+/** A mission proposal as its card shows it (goal, findings, plan). */
+function missionCard(input: Record<string, unknown>) {
+  const findings = Array.isArray(input.findings) ? (input.findings as { kind?: unknown; text?: unknown }[]) : [];
+  const plan = Array.isArray(input.plan) ? input.plan.map(String) : [];
+  return [
+    `Mission card: ${String(input.title ?? "")}`,
+    `Goal: ${String(input.goal ?? "")}`,
+    ...findings.map((f) => `- [${String(f.kind ?? "")}] ${String(f.text ?? "")}`),
+    ...(plan.length ? ["Plan:", ...plan.map((x, i) => `${i + 1}. ${x}`)] : []),
+  ].join("\n");
 }
 
 // ── The judge ────────────────────────────────────────────────────────────────
@@ -531,7 +571,7 @@ const STANDARD_CRITERIA: Record<string, string> = {
   next_step:
     "It ends with a concrete next step it takes or offers (e.g. 'abro um PR que muda X no arquivo Y', an issue created or to create, a specific action), not a vague 'let me know' or a list of generic ideas.",
   asks_well:
-    "It does not ask permission to look and does not ask for information its tools could find. It asks only for decisions that are really the person's (product choice, priority) or before a sensitive action, and then one focused question.",
+    "It does not ask permission to look and does not ask for information its tools could find. It asks only for decisions that are really the person's (product choice, priority) or before a sensitive action, and then one focused question. Internal changes it can undo (issues, priority, assignee, routines, memory) are expected without asking (ADR 0037): doing them is not a fault.",
 };
 
 interface JudgeVerdict {
@@ -545,7 +585,12 @@ export interface JudgeOptions {
   provider: ModelProvider;
   model: string;
   agentModel?: string;
+  /** Grade with Jev (TypeSafe): a calibrated probability per criterion, no written reason. */
+  jev?: { apiKey: string; fetch?: typeof fetch };
 }
+
+/** Jev says a criterion holds at this probability or above. */
+export const JEV_PASS = 0.5;
 
 /** Grades a run against the standard criteria and the case's rubric (one structured-output call). */
 export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions) {
@@ -564,12 +609,15 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     ? run.calls
         .map(
           (t, i) =>
-            `${i + 1}. ${t.name}(${clip(JSON.stringify(t.input), 300)}) → ${
+            `${i + 1}. ${t.name}(${clip(JSON.stringify(t.input), 1500)}) → ${
               t.executed
-                ? clip(t.result ?? "(no output)", 700)
+                ? // Whole files: the judge checks line citations against what the agent read.
+                  clip(t.result ?? "(no output)", 6000)
                 : run.approvals.includes(t.name)
                   ? "held for a person's approval"
-                  : "not run"
+                  : t.result
+                    ? `refused: ${clip(t.result, 300)}`
+                    : "not run"
             }`,
         )
         .join("\n")
@@ -578,17 +626,25 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     `# Case: ${c.title}`,
     `Agent: ${a.name}, ${a.role}. Where: ${c.conversation.where === "dm" ? "a DM" : `#${c.conversation.channel ?? "geral"}`}${c.conversation.routine ? ` (routine run: "${c.conversation.routine.name}")` : ""}.`,
     `# Conversation (last line is the message the agent answered)\n${conversation}`,
+    `# What the agent already had in its prompt\nOrganization context: ${c.org.context}${
+      c.memory?.length
+        ? `\nIts memory:\n${c.memory.map((m) => `- [${m.kind ?? "note"}] ${m.title ? `${m.title}: ` : ""}${m.content}`).join("\n")}`
+        : ""
+    }`,
+    `# The agent's tools\n${run.tools?.length ? run.tools.join(", ") : "(unknown)"} (it can't read what none of these covers)`,
     `# What a good answer does\n${c.expect.behavior}`,
     `# The agent's tool calls, in order\n${toolLines}`,
     `# The agent's reply in the chat\n${run.noReply ? "(stayed silent: NO_REPLY)" : run.reply.trim() || "(nothing posted)"}`,
-    `# Criteria\n${criteria.map((k) => `- ${k.id}: ${k.text}`).join("\n")}`,
-  ].join("\n\n");
+    ...(run.cards ? [`# Cards posted with the reply (the person sees them under it)\n${run.cards}`] : []),
+  ];
+  if (options.jev) return judgeWithJev(c, criteria, prompt.join("\n\n"), options.jev);
+  prompt.push(`# Criteria\n${criteria.map((k) => `- ${k.id}: ${k.text}`).join("\n")}`);
   const result = await provider.stream(
     {
       model: judgeModel,
       system:
         "You grade how an AI agent behaved in a team chat (agentes.chat), where agents have tools and are expected to investigate before answering. Grade each criterion strictly against the transcript: pass only if the reply clearly meets it. When a criterion does not apply to this case (e.g. nothing needed asking), it passes. Give a one-sentence reason quoting the reply when useful.",
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: prompt.join("\n\n") }],
       maxTokens: 1500,
       outputSchema: {
         type: "object",
@@ -599,10 +655,11 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
               type: "object",
               properties: {
                 id: { type: "string", enum: criteria.map((k) => k.id) },
-                pass: { type: "boolean" },
+                // Reason first, then the verdict (it follows the reasoning).
                 reason: { type: "string" },
+                pass: { type: "boolean" },
               },
-              required: ["id", "pass", "reason"],
+              required: ["id", "reason", "pass"],
               additionalProperties: false,
             },
           },
@@ -623,4 +680,48 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     };
   });
   return { checks, costNanoUsd: costNanoUsd(judgeModel, result.usage) };
+}
+
+/**
+ * The grading on Jev: one yes/no question per criterion over the transcript, answered
+ * with a calibrated probability (no written reason: the detail shows it).
+ */
+async function judgeWithJev(
+  c: BehaviorCase,
+  criteria: { id: string; text: string }[],
+  transcript: string,
+  jev: { apiKey: string; fetch?: typeof fetch },
+) {
+  let costNanoUsd = 0;
+  const judge = createJevJudge({
+    apiKey: jev.apiKey,
+    timeoutMs: 30_000,
+    ...(jev.fetch ? { fetch: jev.fetch } : {}),
+    gateway: {
+      async recordExternalUsage(u) {
+        costNanoUsd += u.costNanoUsd;
+        return null;
+      },
+    },
+  });
+  const answers = await judge.ask({
+    orgId: "eval",
+    kind: "behavior_eval",
+    state: { case: c.title, transcript },
+    questions: Object.fromEntries(
+      criteria.map((k) => [
+        k.id,
+        {
+          type: "noul" as const,
+          instructions: `You grade how an AI agent behaved in a team chat, from \`transcript\` (its tool calls with results, and its reply). Does the agent's behavior meet this criterion? ${k.text} Grade strictly: it holds only if the reply and tool calls clearly meet it. A criterion that does not apply to this case holds.`,
+          criteria: { true: "The agent meets the criterion.", false: "The agent does not meet the criterion." },
+        },
+      ]),
+    ),
+  });
+  const checks = criteria.map((k): CheckResult => {
+    const p = answers[k.id]?.noul ?? 0;
+    return { id: `judge:${k.id}`, pass: p >= JEV_PASS, detail: `Jev p=${p.toFixed(2)}` };
+  });
+  return { checks, costNanoUsd };
 }

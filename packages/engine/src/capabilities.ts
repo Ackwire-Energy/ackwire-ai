@@ -77,7 +77,7 @@ export function describeCapabilities(
     }
     if (names.has("schedule_reminder")) {
       lines.push(
-        "- You can schedule reminders and routines: `schedule_reminder` (once, in the time zone of whoever asked) and `create_routine` (recurring; with `channel` it posts straight to that channel, not to this conversation). To change a routine that already exists (instructions, time, where it answers), use `list_routines` and `update_routine`; never say it can't be changed. Confirm the time with the words the tool returns; if the time is ambiguous, ask first with `ask_user`.",
+        "- You can schedule reminders and routines: `schedule_reminder` (once, in the time zone of whoever asked) and `create_routine` (recurring; with `channel` it posts straight to that channel, not to this conversation). To change a routine that already exists (instructions, time, where it answers), use `list_routines` and `update_routine`, also when the person describes the change as how you handle something a routine does ('quando entrar um erro…'); never say it can't be changed. Confirm the time with the words the tool returns; if the time is ambiguous, ask first with `ask_user`.",
       );
     }
     if (names.has("share_artifact")) {
@@ -93,7 +93,9 @@ export function describeCapabilities(
     }
     const approval = tools.filter((t) => isSensitive(t)).map((t) => `\`${t.name}\``);
     if (approval.length > 0) {
-      lines.push(`Need a person's approval (you ask, someone approves in the chat): ${approval.join(", ")}.`);
+      lines.push(
+        `Need a person's approval (you ask, someone approves in the chat): ${approval.join(", ")}. Calling one posts the request with only the text of that turn: write there what you found and why.`,
+      );
     }
   }
   if (pending.length > 0) {

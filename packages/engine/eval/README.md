@@ -13,11 +13,15 @@ bun run eval:behavior --only dev-read-full-file,pm-feedback-theo
 bun run eval:behavior --model claude-opus-5-5          # every agent on this model (or EVAL_AGENT_MODEL)
 bun run eval:behavior --judge-model claude-sonnet-5-5  # default claude-haiku-5-5 (or EVAL_JUDGE_MODEL)
 bun run eval:behavior --no-judge --max-turns 8         # deterministic checks only; tool-loop cap (default 12)
+bun run eval:behavior --judge llm                      # grade with the LLM judge instead of Jev (default jev; `both` compares)
+bun run eval:behavior --concurrency 3                  # cases at a time (default 5, or EVAL_CONCURRENCY)
 ```
+
+Judges: with `TYPESAFE_API_KEY` the addressee classification uses Jev like production, and the grading too (a probability per criterion, pass at 0.5, no written reason; `--judge both` also asks the LLM and prints where they differ). Without the key both use the LLM (the output says so). Each case has its own in-memory database and fakes, so cases run in parallel; model calls refused for load (429, overloaded) are retried with backoff.
 
 Each case runs on a fresh in-memory database through the real engine (`behavior-run.ts`): the agent's prompt is built by `context.ts` and `capabilities.ts`, tools go through the Tool Gateway (scopes, approvals), the tool loop is `executeRun`. Only connector tools are fake (`behavior-fakes.ts`: GitHub, Sentry, Himetrica, Railway, named and scoped like the real ones). Memory, issues, `ask_user` and `react` are the real built-ins.
 
-Output: PASS/FAIL per case with each check, totals per criterion and cost; the full report (tool calls with inputs and results, replies, the first system prompt) goes to `eval/out/behavior-*.json` (ignored by git). Exit code 1 when any case fails.
+Output: PASS/FAIL per case with each check (printed as each case ends), totals per criterion, wall time and cost (grading cost apart); the full report (tool calls with inputs and results, replies, the first system prompt) goes to `eval/out/behavior-*.json` (ignored by git). Exit code 1 when any case fails.
 
 ### A case (`behavior-cases.json`; private real cases in `behavior-cases.local.json`, ignored by git)
 

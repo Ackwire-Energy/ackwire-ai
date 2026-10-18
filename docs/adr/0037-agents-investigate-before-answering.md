@@ -54,6 +54,32 @@ Prototype: `docs/design/telas/FazerDesfazer.html` (views `undo` and `mission`), 
 
 **Eval.** Four cases: organizing work creates the issue directly (a receipt, no question); a mission proposal carries findings that cite the code; "apaga o canal" still needs a person; an issue created on its own while the merge waits for approval. New checks: `receipts` (kinds on the reply) and `missionFindings`; the harness adds the workspace tools and a `propose_mission` with the real description and schema.
 
+## Eval results (2026-10-18, round 3)
+
+First run of all 19 cases against the real model (agents on `claude-sonnet-5-5`): **9/19**. Each failure was sorted into harness bug or real behavior.
+
+Harness bugs (fixed in `eval/`, no check weakened):
+- Fakes returned "Not Found" or "No results" for files and commits the same case's search had just shown (the agents then rightly said they couldn't open them), and two fixtures had `...` gaps, so "read the whole file" was impossible. Fixtures are now whole, consistent files (review prompt, store review, events, player, Kotlin locale switcher, webhooks, outbox, the `/sync` diff); code search honors `repo:`.
+- The addressee classifier's call was recorded as the agent's first turn (the report showed the classifier's prompt as the agent's system prompt). Structured calls are kept apart now.
+- The judge didn't see what the agent had in its prompt (memory, org context) nor which tools it had, cut tool results at 700 characters (so line citations looked invented), didn't see refused calls' errors, nor the mission card under the reply; it also decided pass/fail before writing its reason. All fixed; `asks_well` now says internal changes with Undo are expected (round 2).
+- Checkers: "no access" counted any denial once any tool succeeded (a phone to reproduce on, the run history no tool returns, a file the tool answered Not Found); now only denials of what a tool returned count. "se você quiser que os pedidos de análise…" read "análise" (a noun) as asking to look. A question mid-paragraph didn't count as asking. "não li o arquivo" from a PM with no code tool counted as not looking.
+- Evidence counts the mission card too (the tool tells the agent to reply in one or two lines; the findings are in the card).
+
+Real behavior, fixed in the prompt ("How you work", "How to reply", tool descriptions):
+- Chose among fixes with `ask_user` instead of recommending one; its findings were lost because a question (or an approval request) posts only the text of that same turn, and the model rarely writes text next to tool calls.
+- Asked whether to keep reading ("Posso seguir com isso?"), ended with "ainda não verifiquei X".
+- "Falta alguém assumir" instead of assigning the unowned issue.
+- Changed its own routine through `propose_instruction_change` (needs an admin) instead of `update_routine`.
+- Long replies after a simple internal change; apologies before the answer to "why couldn't you…?".
+- Asked "can I request the rollback?" with `ask_user` (the findings never posted). Telling it to call the sensitive tool instead made it worse (an empty "Approval request" card, the routine case regressed), so the rule is now: recommend an unrequested sensitive action in the reply; for a product choice, lay out the trade-off and ask the one question.
+- `create_issue` didn't take a due date (agents tried every time): it does now.
+
+Production finding: with Jev (as in production) the addressee classifier scores "@atlas, quando entrar erro pede para a @ada…" at 0.3 / 0.06; nobody reached 0.5, so everyone acted, the original failure. `pickAddressees` (messages.ts) now lets a clear leader act below the threshold (score ≥ 0.15 and others below half of it); no lead still means everyone acts.
+
+Judges: the addressee classification uses Jev like production (the cheap model only without `TYPESAFE_API_KEY`), and so does the grading (`--judge jev|llm|both`, default jev): one yes/no question per criterion, pass at p ≥ 0.5, no written reason. On the same 19 runs Jev and the Haiku judge agreed on 88/90 criteria; Jev grading costs about US$ 0.000002 per full run against about US$ 0.011 for Haiku. Cases run 5 at a time (`--concurrency`, each with its own database), with retries on rate limits: a full run takes about 67 s instead of about 5 minutes.
+
+Result: **16–17/19** in the final runs (the last parallel run 16/19, the one before 17/19 rescored with the fixed question detector), from 9/19, with no regression among the 9 that passed. What still fails varies between runs: Jev near its threshold on one criterion (p 0.45–0.48), and a "couldn't see the worker code" the access check reads as a denial. Known gap: a sensitive call the person asked for still posts an empty-looking approval card when the model writes no text with it; fixing it needs the executor to let the model write the request's message before suspending.
+
 ## Later rounds
 
 - Measure it in production too: count `ask_user` calls and replies with no tool call before them on questions about code or errors (the behavior eval covers it before shipping).

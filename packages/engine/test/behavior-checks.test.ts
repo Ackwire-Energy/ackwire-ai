@@ -36,6 +36,7 @@ describe("phrase detectors", () => {
       "Você prefere otimizar caixa antecipado ou conversão?",
       "Se você aprovar o rollback, volto para a 2.14.1.",
       "I opened a draft PR that removes the trigger; want me to mark it ready for review?",
+      "Se você quiser que os pedidos de análise caiam em outro canal, peço para o Atlas mudar.",
     ])
       expect(asksPermissionToLook(text), text).toBeNull();
   });
@@ -45,6 +46,19 @@ describe("phrase detectors", () => {
     expect(admitsNotLooking("Não li o arquivo inteiro ainda.")).not.toBeNull();
     expect(admitsNotLooking("I haven't looked at the code yet.")).not.toBeNull();
     expect(admitsNotLooking("Olhei o código: a linha 42 chama requestReview().")).toBeNull();
+    // Only against an agent that had a tool to read it.
+    const run = {
+      turns: [],
+      calls: [],
+      approvals: [],
+      reply: "Não li o arquivo: não tenho o repositório.",
+      noReply: false,
+    };
+    const admits = (tools?: string[]) =>
+      deterministicChecks({}, { ...run, tools }).find((k) => k.id === "no_admits_not_looking")?.pass;
+    expect(admits(["list_issues", "update_issue"])).toBe(true);
+    expect(admits(["list_issues", "github_get_file_contents"])).toBe(false);
+    expect(admits()).toBe(false);
   });
 
   test("claiming no access", () => {
@@ -154,6 +168,14 @@ describe("deterministicChecks", () => {
     expect(checks.filter((k) => !k.pass)).toEqual([]);
   });
 
+  test("asking the decision: a question mid-paragraph counts", () => {
+    const base = { turns: [], calls: [], approvals: [], noReply: false };
+    const ask = (reply: string) =>
+      deterministicChecks({ ask: "required" }, { ...base, reply }).find((k) => k.id === "asks_the_decision")?.pass;
+    expect(ask("O objetivo é caixa ou crescer? Se for caixa, o teste faz sentido.")).toBe(true);
+    expect(ask("Abri a issue #1 com o teste.")).toBe(false);
+  });
+
   test("routines: silence only when expected; false access claims; approvals", () => {
     const base = { turns: [], calls: [], approvals: [] };
     expect(deterministicChecks({ noReply: true }, { ...base, reply: "", noReply: true }).every((k) => k.pass)).toBe(
@@ -172,6 +194,29 @@ describe("deterministicChecks", () => {
       },
     );
     expect(denial.find((k) => k.id === "no_false_access_claim")?.pass).toBe(false);
+
+    // Only denials of what a tool returned count: "o arquivo" after a file read is false,
+    // a phone or the run history (no tool returns them) is an honest limit.
+    const file = { name: "github_get_file_contents", input: {}, executed: true, result: "src/a.ts\n1 x" };
+    const claim = (reply: string, calls: EvalToolCall[]) =>
+      deterministicChecks({}, { ...base, calls, reply, noReply: false }).find((k) => k.id === "no_false_access_claim")
+        ?.pass;
+    expect(claim("Não consegui abrir o arquivo inteiro.", [file])).toBe(false);
+    const routines = { name: "list_routines", input: {}, executed: true, result: '@atlas "Monitorar erros"' };
+    expect(claim("Não consigo ler as rotinas do Atlas.", [routines])).toBe(false);
+    expect(claim("Não reproduzi em device porque não tenho acesso a um aparelho.", [file])).toBe(true);
+    expect(claim("Não consigo ver o histórico de execuções por aqui.", [routines])).toBe(true);
+    const empty = { name: "github_search_code", input: {}, executed: true, result: "No results." };
+    expect(claim("Não consegui abrir o código: a busca voltou vazia.", [empty])).toBe(true);
+    // A file the tool answered "Not Found" for, while another result names it.
+    const missing = {
+      name: "github_get_file_contents",
+      input: { path: "src/routes/store.ts" },
+      executed: true,
+      isError: true,
+    };
+    const named = { name: "github_search_code", input: {}, executed: true, result: "src/routes/store.ts:18 receive" };
+    expect(claim("Não consegui abrir `src/routes/store.ts` (Not Found).", [named, missing])).toBe(true);
 
     const merge = { name: "github_merge_pull_request", input: { pullNumber: 70 } };
     const held = deterministicChecks(
@@ -230,6 +275,12 @@ describe("act with undo and investigated missions", () => {
         ],
       }).pass,
     ).toBe(false);
+    // The card is what the person sees: evidence cited there counts.
+    const carded = deterministicChecks(
+      { evidence: ["review-prompt.ts"] },
+      { ...base, cards: "- [read] src/review/review-prompt.ts:40 fires on subscription_completed" },
+    );
+    expect(carded.find((c) => c.id === "cites_evidence")?.pass).toBe(true);
     const none = deterministicChecks({ missionFindings: true }, base);
     expect(none.find((c) => c.id === "mission_investigated")).toMatchObject({
       pass: false,

@@ -321,7 +321,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "propose_instruction_change",
       description:
-        "When a person asks you to change how you work (your instructions) or something the whole organization should know (org context): create a proposal. You can't edit them yourself; the agent's owner or an admin accepts it.",
+        "When a person asks you to change how you work (your instructions) or something the whole organization should know (org context): create a proposal. You can't edit them yourself; the agent's owner or an admin accepts it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is `update_routine`.",
       scope: "memory:write",
       inputSchema: {
         type: "object",

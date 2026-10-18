@@ -41,9 +41,9 @@ const norm = (text: string) => text.toLowerCase().normalize("NFD").replace(/[̀-
 const LOOK = String.raw`(olh|verific|investig|analis|procur|busc|pesquis|confer|checa|ler\b|leio|le o|abr(o|ir) o|dar uma olhada|dou uma olhada|look|check|investigat|dig|search|read|inspect|review the code|take a look)`;
 
 const PERMISSION_TO_LOOK = [
-  // "se você aprovar/quiser, eu olho o código"
+  // "se você aprovar/quiser, eu olho o código" (a verb: "pedidos de análise" is a noun)
   new RegExp(
-    String.raw`se (voce|vc|tu) (aprovar|autorizar|quiser|concordar|preferir|topar|liberar)[^.?!\n]{0,90}${LOOK}`,
+    String.raw`se (voce|vc|tu) (aprovar|autorizar|quiser|concordar|preferir|topar|liberar)[^.?!\n]{0,90}(?<!\b(de|da|do|uma|a) )${LOOK}`,
   ),
   // "quer que eu olhe/verifique...?", "posso investigar?"
   new RegExp(`(quer|querem|gostaria|prefere) que eu ([a-z]+ ){0,2}${LOOK}`),
@@ -89,8 +89,91 @@ export const asksPermissionToLook = (text: string) => firstMatch(PERMISSION_TO_L
 /** The reply admits it answered without looking ("ainda não olhei o código", "I haven't looked"). */
 export const admitsNotLooking = (text: string) => firstMatch(ADMITS_NOT_LOOKING, text);
 
+/** What an admission is about, and the tool names that could have read it. */
+const READS: [RegExp, RegExp][] = [
+  [/codigo|arquivo|repositorio|code|file|repo/, /file|code|repo|commit|pull_request/],
+  [/logs?\b/, /logs/],
+  [/erros?\b|errors?\b/, /sentry|logs|error/],
+  [/dados|eventos|data|events/, /event|analytics|himetrica|query/],
+];
+
+/**
+ * An admission only counts against an agent that could have looked: a PM without a
+ * code tool saying "não li o arquivo" is honest. Unknown tools: it always counts.
+ */
+export function couldHaveRead(admission: string, tools?: string[]) {
+  if (!tools?.length) return true;
+  const kind = READS.find(([about]) => about.test(admission));
+  if (!kind) return true;
+  return tools.some((t) => kind[1].test(t));
+}
+
 /** The reply says it lacks access ("não tenho acesso", "não consegui abrir", "I can't access"). */
 export const deniesAccess = (text: string) => firstMatch(DENIES_ACCESS, text);
+
+const STOPWORDS = new Set(
+  "para pelo pela pelos pelas aqui isso isto esse essa este esta esses essas mais como onde porque quando entao ainda nesse nessa desse dessa deste desta from with that this what there here your their into about inteiro inteira todo toda".split(
+    " ",
+  ),
+);
+/** Physical things no tool hands over: lacking them is never a false claim. */
+const PHYSICAL = /^(device|devices|aparelho|aparelhos|celular|dispositivo|dispositivos|telefone|phone|computador)$/;
+/** Portuguese objects and the words tool names and results use for them. */
+const SYNONYMS: Record<string, string[]> = {
+  arquivo: ["file"],
+  arquivos: ["file"],
+  codigo: ["code", "file"],
+  repositorio: ["repo"],
+  rotina: ["routine"],
+  rotinas: ["routine"],
+  erro: ["error", "issue"],
+  erros: ["error", "issue"],
+  eventos: ["event"],
+  commits: ["commit"],
+};
+/** Results that returned nothing: an empty search is not data. */
+const EMPTY_RESULT = /^\s*(no results|no issues|nothing|not found|none)\b/i;
+
+/**
+ * Denials of access whose object (the few words after "não consigo ver…") shows up in
+ * what a tool returned (its name or result): "não consigo ler as rotinas do Atlas" after
+ * `list_routines` returned Atlas's routines. A limit no tool covers ("não tenho acesso a um
+ * aparelho", "não vejo o histórico de execuções") is not a false claim.
+ */
+export function falseAccessClaims(text: string, calls: EvalToolCall[]) {
+  const returned = norm(
+    calls
+      .filter(
+        (c) =>
+          c.executed && !c.isError && c.name !== "ask_user" && c.name !== "react" && !EMPTY_RESULT.test(c.result ?? ""),
+      )
+      .map((c) => `${c.name.replace(/_/g, " ")} ${c.result ?? ""}`)
+      .join(" "),
+  );
+  if (!returned) return [];
+  // What a tool failed on ("Not Found" for that file): saying so is honest.
+  const failed = norm(
+    calls
+      .filter((c) => c.isError)
+      .map((c) => JSON.stringify(c.input))
+      .join(" "),
+  );
+  const t = norm(text);
+  const out: string[] = [];
+  for (const p of DENIES_ACCESS) {
+    for (const m of t.matchAll(new RegExp(p.source, "g"))) {
+      const after = t.slice((m.index ?? 0) + m[0].length).split(/[.,;:!?()\n]/)[0] ?? "";
+      const words = after
+        .split(/[^a-z0-9_-]+/)
+        .slice(0, 6)
+        .filter((w) => w.length >= 4 && !STOPWORDS.has(w));
+      if (words.some((w) => PHYSICAL.test(w) || failed.includes(w))) continue;
+      const hit = words.find((w) => [w, ...(SYNONYMS[w] ?? [])].some((x) => returned.includes(x)));
+      if (hit) out.push(`${m[0]}${after.slice(0, 40)}`);
+    }
+  }
+  return out;
+}
 
 /** At least one reading tool ran in a turn before the last one (the answer). */
 export function investigatedBeforeReply(turns: EvalTurn[]): { pass: boolean; tools: string[] } {
@@ -158,6 +241,10 @@ export interface RunObservation {
   triggered?: string[];
   /** Receipt kinds linked to the run's messages (`agent_actions`). */
   receipts?: string[];
+  /** Cards posted with the reply (a mission proposal: goal, findings, plan). */
+  cards?: string;
+  /** Names of the tools the agent had (when known). */
+  tools?: string[];
 }
 
 /** A `propose_mission` input that arrives investigated: at least one read/data finding, at most one decision. */
@@ -188,14 +275,18 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
     pass: !permission,
     detail: permission ? `asked to look: "${permission}"` : "ok",
   });
-  const notLooked = admitsNotLooking(text);
-  out.push({ id: "no_admits_not_looking", pass: !notLooked, detail: notLooked ? `"${notLooked}"` : "ok" });
-  const denied = deniesAccess(text);
-  const falseDenial = denied && anyToolSucceeded(run.calls);
+  const admitted = admitsNotLooking(text);
+  const notLooked = admitted && couldHaveRead(admitted, run.tools) ? admitted : null;
+  out.push({
+    id: "no_admits_not_looking",
+    pass: !notLooked,
+    detail: notLooked ? `"${notLooked}"` : admitted ? `"${admitted}", but it has no tool for it` : "ok",
+  });
+  const falseDenials = falseAccessClaims(text, run.calls);
   out.push({
     id: "no_false_access_claim",
-    pass: !falseDenial,
-    detail: falseDenial ? `claims no access ("${denied}") although a tool returned data` : "ok",
+    pass: falseDenials.length === 0,
+    detail: falseDenials.length ? `claims no access ("${falseDenials[0]}") although a tool returned it` : "ok",
   });
   if (expect.mustCall?.length) {
     const missing = missingCalls(run.calls, expect.mustCall);
@@ -222,7 +313,8 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
     });
   }
   if (expect.evidence?.length) {
-    const found = citedEvidence(text, expect.evidence);
+    // What the person sees: the reply and the cards posted with it (a mission's findings).
+    const found = citedEvidence(`${text}\n${run.cards ?? ""}`, expect.evidence);
     out.push({
       id: "cites_evidence",
       pass: found.length > 0,
@@ -269,7 +361,8 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
   }
   if (expect.ask) {
     const asked = run.calls.some((c) => c.name === "ask_user");
-    const questioned = asked || /\?\s*$/m.test(text);
+    // A question anywhere in the reply ("…ou crescer? Se for caixa…"), not only at a line's end.
+    const questioned = asked || /\?(\s|$)/.test(text);
     out.push(
       expect.ask === "never"
         ? { id: "no_needless_question", pass: !asked, detail: asked ? "used ask_user" : "ok" }

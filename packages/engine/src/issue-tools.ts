@@ -192,7 +192,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: "create_issue",
       description:
-        "Create an issue with a title, a description and acceptance criteria (a checklist). No permission needed: when work should be tracked, create it; the person sees it with Undo.",
+        "Create an issue with a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -203,6 +203,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           priority: { enum: PRIORITIES },
           labels: { type: "array", items: { type: "string", maxLength: 40 }, maxItems: 10 },
           assignee: assigneeField,
+          due_date: { type: "string", maxLength: 10, description: "Due date as YYYY-MM-DD" },
         },
         required: ["title"],
         additionalProperties: false,
@@ -220,6 +221,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 priority: (input.priority as IssuePriority | undefined) ?? undefined,
                 labels: Array.isArray(input.labels) ? input.labels.map(String) : undefined,
                 ...(assignee !== undefined ? { assignee } : {}),
+                ...(str(input.due_date) ? { dueDate: str(input.due_date) } : {}),
               }),
             (created) => ({
               kind: "issue.created",

@@ -238,6 +238,23 @@ export function cannedFor(entries: Canned[] | undefined, input: Record<string, u
   return hit ?? fallback ?? { result: "No results." };
 }
 
+/**
+ * Code search honors a `repo:owner/name` qualifier like the real one: result lines
+ * ("owner/name path:line  code") of other repositories are dropped and the count redone.
+ */
+export function onlyRepo(result: string, input: Record<string, unknown>) {
+  const repo = String(input.query ?? "")
+    .match(/\brepo:(\S+)/)?.[1]
+    ?.toLowerCase();
+  if (!repo) return result;
+  const lines = result.split("\n");
+  const hits = lines.filter((l) => /^[\w.-]+\/[\w.-]+ /.test(l));
+  if (hits.length === 0) return result;
+  const kept = hits.filter((l) => l.toLowerCase().startsWith(`${repo} `));
+  if (kept.length === 0) return "No results.";
+  return [`${kept.length} result${kept.length === 1 ? "" : "s"}`, ...kept].join("\n");
+}
+
 /** A tool source for one fake connector, answering from the case's fixtures; `executed` lists what ran. */
 export function fakeConnectorSource(id: ConnectorId, fixtures: Record<string, Canned[]>) {
   const executed: { name: string; input: Record<string, unknown> }[] = [];
@@ -253,7 +270,8 @@ export function fakeConnectorSource(id: ConnectorId, fixtures: Record<string, Ca
       async execute(input) {
         executed.push({ name: t.name, input });
         const canned = cannedFor(fixtures[t.name], input, t.empty);
-        return { content: canned.result, isError: canned.isError === true };
+        const content = t.name.endsWith("_search_code") ? onlyRepo(canned.result, input) : canned.result;
+        return { content, isError: canned.isError === true };
       },
     }),
   );

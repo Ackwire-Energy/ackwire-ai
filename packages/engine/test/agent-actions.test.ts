@@ -89,7 +89,13 @@ describe("act with undo: issues", () => {
     f = await setup();
     const ctx = await runContext(f);
     const call = await toolsOf([createIssueToolSource(deps(f))], ctx);
-    await call("create_issue", { title: "Prompt de avaliação após a assinatura", assignee: "me" });
+    const created = await call("create_issue", {
+      title: "Prompt de avaliação após a assinatura",
+      assignee: "me",
+      due_date: "2026-10-23",
+    });
+    expect(created.content).toContain("Created #1");
+    expect((await call("list_issues", { issue: "#1" })).content).toContain("due 2026-10-23");
     const [recorded] = await rows(f);
     expect(recorded).toMatchObject({ kind: "issue.created", messageId: null, requestedByUserId: f.owner.id });
 

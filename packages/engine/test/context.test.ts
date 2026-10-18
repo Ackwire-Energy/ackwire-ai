@@ -73,6 +73,14 @@ test("system prompt carries org context, agent instructions and channel; history
   expect(withTools).toContain("Reading never needs anyone's ok.");
   expect(withTools).toContain("Never ask permission to look");
   expect(withTools).toContain("ambiguous after you have looked with your tools");
+  // Lessons from the behavior eval (ADR 0037): whole files, no stopping halfway, recommend the fix,
+  // take unowned work, only what tools returned, findings in the turn that asks or requests approval.
+  expect(withTools).toContain("Read whole files, not just search snippets");
+  expect(withTools).toContain("Choosing the fix is your job");
+  expect(withTools).toContain("don't just say someone must take it");
+  expect(withTools).toContain("when a search finds nothing, say so");
+  expect(withTools).toContain("ask the one question that decides it");
+  expect(withTools).toContain("it posts only the text of that same turn");
   expect(withTools).not.toContain("Use your tools when they help");
   expect(ctx.messages).toEqual([
     {

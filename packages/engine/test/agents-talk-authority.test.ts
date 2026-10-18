@@ -13,6 +13,7 @@ import {
   insertMessage,
   type Judge,
   listMessages,
+  pickAddressees,
   postPersonMessage,
   receiptsFor,
   type ToolContext,
@@ -101,6 +102,21 @@ describe("addressee vs referenced (several agents mentioned)", () => {
     // Audited like a routing decision, with each score.
     const [decision] = await f.db.select().from(schema.routingDecisions);
     expect(decision).toMatchObject({ messageId: msg.id, strategy: "addressees-fake", selectedAgentIds: [f.agent.id] });
+  });
+
+  test("who acts from the scores: above the threshold, else a clear lead (Jev), else everyone", () => {
+    const s = (atlas: number, ada: number) =>
+      pickAddressees([
+        { agentId: "atlas", score: atlas },
+        { agentId: "ada", score: ada },
+      ]);
+    expect(s(0.9, 0.05)).toEqual(["atlas"]);
+    expect(s(0.78, 0.75)).toEqual(["atlas", "ada"]);
+    // Jev on "@atlas quando entrar erro pede para a @ada analisar": a lead below 0.5.
+    expect(s(0.35, 0.07)).toEqual(["atlas"]);
+    expect(s(0.3, 0.2)).toEqual(["atlas", "ada"]);
+    expect(s(0.05, 0.02)).toEqual(["atlas", "ada"]);
+    expect(s(0, 0)).toEqual(["atlas", "ada"]);
   });
 
   test("fail-open: no judge, an error, a timeout or nobody clearly addressed: every mentioned agent acts", async () => {
