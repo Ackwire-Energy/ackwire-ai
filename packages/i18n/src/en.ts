@@ -1846,7 +1846,6 @@ export const en: Translations = {
     undo: "Undo",
     criteriaLabel: "{{done}} of {{total}} acceptance criteria",
     checkedBy: "Checked by {{name}}",
-    statusHint: "Moves on its own: In progress when an agent starts, In review when it links a PR.",
     auto: "automatic",
     autoHint: "The status changed on its own, from the agent's work.",
     now: {

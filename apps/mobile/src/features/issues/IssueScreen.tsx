@@ -576,7 +576,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       key: "status",
       icon: "circle",
       label: t("mobile.issues.actions.status"),
-      hint: `${t(`issues.status.${i.status}`)} · ${t("issues.statusHint")}`,
+      hint: t(`issues.status.${i.status}`),
       onPress: () => pick(statusItems()),
     },
     {

@@ -598,7 +598,7 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
   const action = useIssueAction(org.id);
   const fields = (
     <>
-      <Field label={t("issues.statusLabel")} id={`is-status-${i.id}`} help={t("issues.statusHint")}>
+      <Field label={t("issues.statusLabel")} id={`is-status-${i.id}`}>
         <Select
           size="sm"
           value={i.status}

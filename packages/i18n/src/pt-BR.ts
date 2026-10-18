@@ -1859,7 +1859,6 @@ export const ptBR = {
     undo: "Desfazer",
     criteriaLabel: "{{done}} de {{total}} critérios de aceite",
     checkedBy: "Marcado por {{name}}",
-    statusHint: "Anda sozinho: Em andamento quando um agente começa, Em revisão quando ele liga um PR.",
     auto: "automático",
     autoHint: "O status mudou sozinho, pelo trabalho do agente.",
     now: {
