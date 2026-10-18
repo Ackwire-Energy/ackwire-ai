@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ícones de computador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Doto:ROND,wght@100,600&display=swap">
+<script>{const q=new URLSearchParams(location.hash.slice(1));document.documentElement.dataset.theme=q.get("theme")||"light";}</script>
+<style>
+/*
+  Prototype (v2): a portrait of each connected computer, the way macOS's Finder draws network
+  machines, in our light theme and our pixel/dither language. Our own drawings, never the vendors'
+  marks: each system is told apart by its device and what its screen shows.
+    mac      an aluminum laptop with the screen notch; the screen shows our sky with a pixel agent
+    windows  a light monitor on a stand; a window and a taskbar over the sky
+    linux    a server tower: drive bays, vents, a green light (most Linux machines are servers)
+    cloud    the cloud computer we start for the agents: a pixel cloud with a screen set in it, floating
+  The screen goes dark when the computer is offline and dims when it's paused (#state=online|paused|offline).
+  Portraits at 48 px and up (list rows, the computer page, the empty state); below that the line
+  icons of the first version (A) stay, since pixels don't read at 16 px.
+  Drawn on a 48×48 grid, scaled by whole numbers so every pixel stays crisp.
+*/
+:root{
+  --bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#76766f;--plate:rgba(127,127,127,.1);
+  --ok:#1f7a45;--ok-soft:#e3f2e8;--warn:#9a5b00;--warn-soft:#fbeed5;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --sans:"Onest",system-ui,sans-serif;--display:"Funnel Display",var(--sans);color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;--plate:rgba(127,127,127,.14);
+  --ok:#5fc48a;--ok-soft:#14281c;--warn:#e0a84a;--warn-soft:#33260e;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--top:inset 0 1px 0 rgba(255,255,255,.06);color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,p{margin:0}
+canvas.pt{display:block;image-rendering:pixelated;flex:none}
+.pbar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-size:12.5px;color:var(--muted)}
+.pbar .lbl{font-size:11.5px;font-weight:600;color:var(--faint);letter-spacing:.04em;text-transform:uppercase}
+.pbar .grow{flex:1}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06);gap:2px;flex-wrap:wrap}
+.seg button{all:unset;cursor:pointer;height:26px;padding:0 10px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top)}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 16px 80px;display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--display);font-weight:300;font-size:40px;letter-spacing:-.03em;line-height:1.05}
+.lead{color:var(--muted);max-width:66ch;margin-top:8px}
+.card{background:var(--raised);border-radius:20px;box-shadow:var(--e1),var(--top);padding:18px}
+.cap{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;margin-bottom:12px}
+.stage{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.os{display:flex;flex-direction:column;align-items:center;gap:10px;padding:22px 10px 18px;border-radius:18px;background:linear-gradient(180deg,var(--plate),transparent)}
+.os .sizes{display:flex;align-items:flex-end;gap:16px}
+.os b{font-weight:600}
+.os small{color:var(--muted);font-size:12px;text-align:center}
+.list{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:14px;padding:12px 4px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0;padding-top:2px}
+.row .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.row .n{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:600}
+.row .d{color:var(--muted);font-size:12.5px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--sunken);color:var(--muted)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip svg,.ic svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.chip svg{width:12px;height:12px;stroke-width:2.2}
+.head{display:flex;align-items:center;gap:18px}
+.head h2{font-family:var(--display);font-weight:300;font-size:32px;letter-spacing:-.02em;line-height:1.05}
+.head .d{color:var(--muted);font-size:13px;margin-top:6px}
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:12px 0 4px}
+.empty b{font-weight:600}
+.empty span{color:var(--muted);font-size:13px;max-width:44ch}
+.inline{display:flex;flex-wrap:wrap;gap:18px;align-items:center;color:var(--muted);font-size:13px}
+.inline span{display:inline-flex;align-items:center;gap:6px}
+.ic{display:inline-grid;place-items:center;color:var(--ink2)}
+.ic svg{width:16px;height:16px;stroke-width:1.7}
+@media (max-width:720px){.stage{grid-template-columns:1fr}h1{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="pbar"><span class="lbl">Protótipo</span><span class="grow"></span><div class="seg" id="states"></div><div class="seg" id="theme"></div></div>
+<main class="wrap" id="root"></main>
+<script>
+/* ================= Pixel portraits (48×48 grid) ================= */
+const N = 48;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const ALU = ["#fbfbf9", "#eeeeea", "#dcdcd7", "#c4c4be", "#a3a39d", "#7d7d77"];
+const GRAPHITE = ["#3a3a37", "#262624", "#161615"];
+const SKY = ["#0a2f5e", "#0b4590", "#0063d1", "#2f80e0", "#5ea0ee", "#8cc3ff", "#c6e1ff"];
+const NIGHT = ["#141413", "#1b1b1a", "#222220"];
+
+function painter(ctx) {
+  const set = (x, y, c) => { if (c && x >= 0 && y >= 0 && x < N && y < N) { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); } };
+  /* A dithered ramp across a box: `f(x, y)` from 0 to 1 picks between the tones (ordered dither). */
+  const ramp = (x0, y0, w, h, tones, f) => {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+      const v = Math.max(0, Math.min(1, f((x - x0) / Math.max(1, w - 1), (y - y0) / Math.max(1, h - 1))));
+      const k = v * (tones.length - 1), lo = Math.floor(k);
+      set(x, y, tones[Math.min(tones.length - 1, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))]);
+    }
+  };
+  const box = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c); };
+  const clear = (...pts) => pts.forEach(([x, y]) => ctx.clearRect(x, y, 1, 1));
+  return { set, ramp, box, clear };
+}
+/* A soft floor shadow: sparse dither that fades out to the sides. */
+function shadow(p, cx, y, w, dark) {
+  const c = dark ? "rgba(0,0,0,.55)" : "rgba(23,23,22,.16)";
+  for (let x = cx - w; x <= cx + w; x++) for (let j = 0; j < 2; j++) {
+    const edge = 1 - Math.abs(x - cx) / w;
+    if (edge > BAYER[(x & 3) + ((y + j) & 3) * 4] * (j ? 1.6 : 1)) p.set(x, y + j, c);
+  }
+}
+/* What a screen shows: our sky (deep at the top, the horizon glowing at the bottom), dark when off. */
+function screen(p, x, y, w, h, state, t = 0) {
+  if (state === "offline") { p.ramp(x, y, w, h, NIGHT, (u, v) => 0.2 + 0.6 * u * v); return; }
+  p.ramp(x, y, w, h, SKY, (u, v) => 0.1 + 0.85 * v * v + 0.06 * Math.sin(u * 6 + t));
+  if (state === "paused") for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if ((i + j) % 2) p.set(i, j, "rgba(20,20,19,.55)");
+}
+/* The brand's pixel agent: a 5×4 deep body with white eyes (they close while paused). */
+function agent(p, x, y, state, t = 0) {
+  const body = "#04203f", bob = state === "online" && Math.sin(t * 2) > 0.3 ? -1 : 0;
+  p.box(x, y + bob, 5, 4, body); p.set(x + 4, y + 3 + bob, null);
+  const closed = state !== "online" || t % 4 > 3.85;
+  if (closed) { p.set(x + 1, y + 2 + bob, "#fff"); p.set(x + 3, y + 2 + bob, "#fff"); }
+  else { p.set(x + 1, y + 1 + bob, "#fff"); p.set(x + 1, y + 2 + bob, "#fff"); p.set(x + 3, y + 1 + bob, "#fff"); p.set(x + 3, y + 2 + bob, "#fff"); }
+}
+
+const DRAW = {
+  mac(p, state, dark, t) {
+    shadow(p, 24, 37, 21, dark);
+    // Lid: a graphite bezel with rounded corners, the screen inside.
+    p.box(7, 6, 34, 26, GRAPHITE[2]); p.clear([7, 6], [40, 6]);
+    screen(p, 9, 8, 30, 22, state, t);
+    if (state !== "offline") { p.box(9, 8, 30, 1, "rgba(255,255,255,.55)"); agent(p, 22, 18, state, t); }
+    p.box(22, 8, 4, 2, GRAPHITE[2]); // the notch
+    // Hinge and base: brushed aluminum, the thumb scoop in the front, rounded ends.
+    p.box(7, 32, 34, 1, ALU[5]);
+    p.ramp(3, 33, 42, 3, ALU, (u, v) => 0.15 + 0.55 * v + 0.15 * Math.abs(u - 0.5));
+    p.box(20, 33, 8, 1, ALU[3]);
+    p.clear([3, 35], [44, 35]);
+    p.box(5, 36, 38, 1, ALU[5]);
+  },
+  windows(p, state, dark, t) {
+    shadow(p, 24, 42, 14, dark);
+    // A light monitor: rounded frame with a thin edge, a deeper chin with a power light.
+    p.ramp(4, 5, 40, 28, ALU, (u, v) => 0.05 + 0.25 * v);
+    for (let x = 5; x < 43; x++) { p.set(x, 5, ALU[3]); p.set(x, 32, ALU[4]); }
+    for (let y = 6; y < 32; y++) { p.set(4, y, ALU[3]); p.set(43, y, ALU[4]); }
+    p.clear([4, 5], [43, 5], [4, 32], [43, 32]);
+    screen(p, 6, 7, 36, 22, state, t);
+    if (state !== "offline") {
+      // A window over the sky, and the taskbar with its start mark.
+      p.box(11, 10, 17, 11, "#ffffff"); p.box(11, 10, 17, 2, "#dfe3e8");
+      p.set(25, 10, ALU[4]); p.set(26, 10, ALU[4]);
+      for (const r of [14, 16, 18]) p.box(13, r, r === 18 ? 8 : 12, 1, "#c9ced6");
+      p.box(6, 26, 36, 3, "rgba(236,240,245,.92)");
+      p.box(8, 27, 2, 1, GRAPHITE[0]); p.box(11, 27, 2, 1, GRAPHITE[0]);
+      p.box(15, 27, 3, 1, ALU[4]); p.box(19, 27, 3, 1, ALU[4]);
+      agent(p, 32, 16, state, t);
+    }
+    p.set(39, 30, state === "offline" ? ALU[4] : state === "paused" ? "#e0a84a" : "#5fc48a");
+    // Neck and foot.
+    p.ramp(21, 33, 6, 6, ALU, (u) => 0.25 + 0.4 * u);
+    p.ramp(13, 39, 22, 3, ALU, (u, v) => 0.1 + 0.45 * v + 0.15 * Math.abs(u - 0.5));
+    p.clear([13, 41], [34, 41]);
+  },
+  linux(p, state, dark, t) {
+    shadow(p, 24, 43, 13, dark);
+    // A server tower: light body shaded from the left, a darker side edge.
+    p.ramp(13, 3, 22, 40, ALU, (u, v) => 0.05 + 0.35 * u + 0.1 * v);
+    for (let y = 4; y < 42; y++) { p.set(13, y, ALU[3]); p.set(34, y, ALU[5]); }
+    for (let x = 14; x < 34; x++) { p.set(x, 3, ALU[3]); p.set(x, 42, ALU[5]); }
+    p.clear([13, 3], [34, 3], [13, 42], [34, 42]);
+    // Two drive bays with slots and a light each.
+    for (const y of [7, 11]) {
+      p.box(16, y, 16, 3, ALU[2]); p.box(16, y, 16, 1, ALU[1]); p.box(18, y + 1, 9, 1, ALU[4]);
+      const on = state === "online" && ((t * 3 + y) % 2 > 0.7);
+      p.set(30, y + 1, state === "offline" ? ALU[4] : on ? "#5fc48a" : "#2f7a4f");
+    }
+    // A small status screen: a prompt on black (the terminal, Linux's face).
+    p.box(16, 17, 16, 7, state === "offline" ? NIGHT[1] : "#141413");
+    if (state !== "offline") {
+      p.set(18, 19, "#5fc48a"); p.set(19, 20, "#5fc48a"); p.set(18, 21, "#5fc48a");
+      if (state === "online" ? t % 1 > 0.5 : true) p.box(21, 21, 3, 1, "#5fc48a");
+      p.box(21, 19, 7, 1, "rgba(95,196,138,.45)");
+    }
+    // Vents.
+    for (let y = 27; y < 36; y += 2) for (let x = 16; x < 32; x += 2) p.set(x, y, ALU[4]);
+    // Power button and light.
+    p.box(22, 38, 3, 2, ALU[3]); p.set(23, 38, ALU[5]);
+    p.set(27, 39, state === "offline" ? ALU[4] : state === "paused" ? "#e0a84a" : "#5fc48a");
+  },
+};
+
+/* The cloud: a union of circles over a flat bottom, shaded light at the top, outlined, floating. */
+function cloud(p, state, dark, t) {
+  const bob = state === "online" ? Math.round(Math.sin(t * 1.4)) : 0;
+  shadow(p, 24, 42, state === "online" && bob < 0 ? 11 : 13, dark);
+  const blobs = [[13, 28, 6.5], [21, 21, 8], [30, 18, 9], [38, 26, 6.5], [25, 25, 8]];
+  const inside = (x, y) => (y <= 35 && y >= 9 && x >= 7 && x <= 42 && (y >= 27 ? y <= 34 && x >= 9 && x <= 40 : false)) ||
+    blobs.some(([cx, cy, r]) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r);
+  for (let y = 6; y < 38; y++) for (let x = 4; x < 46; x++) {
+    if (!inside(x, y)) continue;
+    const edge = !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
+    if (edge) { p.set(x, y + bob, y > 30 ? ALU[5] : ALU[4]); continue; }
+    const v = (y - 9) / 26, k = Math.min(1, 0.02 + 0.55 * v * v) * (ALU.length - 2);
+    const lo = Math.floor(k);
+    p.set(x, y + bob, ALU[Math.min(ALU.length - 2, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))]);
+  }
+  // A screen set in the cloud: graphite bezel, our sky, the agent.
+  p.box(17, 19 + bob, 15, 10, GRAPHITE[2]);
+  p.clear([17, 19 + bob], [31, 19 + bob], [17, 28 + bob], [31, 28 + bob]);
+  screen(p, 18, 20 + bob, 13, 8, state, t);
+  if (state !== "offline") agent(p, 22, 22 + bob, state, t);
+  // The status light, low on the right.
+  p.set(36, 31 + bob, state === "offline" ? ALU[4] : state === "paused" ? "#e0a84a" : "#5fc48a");
+}
+DRAW.cloud = cloud;
+
+const live = [];
+function portrait(os, scale, state) {
+  const cv = document.createElement("canvas");
+  cv.className = "pt"; cv.width = cv.height = N;
+  cv.style.width = cv.style.height = N * scale + "px";
+  live.push({ cv, os, state });
+  return cv;
+}
+function frame(now) {
+  const t = now / 1000, dark = document.documentElement.dataset.theme === "dark";
+  for (let i = live.length - 1; i >= 0; i--) {
+    const a = live[i];
+    if (!a.cv.isConnected) { live.splice(i, 1); continue; }
+    const ctx = a.cv.getContext("2d");
+    ctx.clearRect(0, 0, N, N);
+    DRAW[a.os](painter(ctx), a.state, dark, t);
+  }
+  setTimeout(() => requestAnimationFrame(frame), 90);
+}
+
+/* ================= Page ================= */
+const LINE = {
+  mac: '<rect x="4" y="4.5" width="16" height="11" rx="2"/><path d="M10.4 4.5h3.2v.7a.9.9 0 0 1-.9.9h-1.4a.9.9 0 0 1-.9-.9Z"/><path d="M2.5 18.2h19l-.9 1.1a1.6 1.6 0 0 1-1.2.6H4.6a1.6 1.6 0 0 1-1.2-.6Z"/>',
+  windows: '<rect x="3" y="3.8" width="18" height="12.7" rx="2"/><path d="M9 20.2h6M12 16.5v3.7"/><rect x="8.2" y="7.2" width="3.3" height="2.6" rx=".4"/><rect x="12.5" y="7.2" width="3.3" height="2.6" rx=".4"/><rect x="8.2" y="10.6" width="3.3" height="2.6" rx=".4"/><rect x="12.5" y="10.6" width="3.3" height="2.6" rx=".4"/>',
+  linux: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 8.6h18"/><path d="m7.2 12 2.6 2.1-2.6 2.1M12 16.3h4.6"/>',
+  cloud: '<path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.5 9.6 4.5 4.5 0 0 0 7 18.5Z"/><rect x="9.5" y="11.6" width="6" height="4" rx=".8"/>',
+};
+const OS = [
+  { id: "mac", name: "macOS", device: "Notebook de alumínio com o recorte da tela", label: "MacBook do Walter", who: "Walter" },
+  { id: "windows", name: "Windows", device: "Monitor claro: uma janela e a barra de tarefas", label: "PC do escritório", who: "Marina" },
+  { id: "linux", name: "Linux", device: "Servidor em torre: o terminal é a cara do Linux", label: "servidor-build", who: "Walter" },
+  { id: "cloud", name: "Nuvem", device: "O computador na nuvem que ligamos para os agentes", label: "Computador na nuvem", cloud: true },
+];
+const q = new URLSearchParams(location.hash.slice(1));
+let state = ["online", "paused", "offline"].includes(q.get("state")) ? q.get("state") : "online";
+const STATES = [["online", "Online"], ["paused", "Pausado"], ["offline", "Offline"]];
+const check = '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+const pause = '<svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg>';
+const dash = '<svg viewBox="0 0 24 24"><path d="M7 12h10"/></svg>';
+const chipFor = (s) => (s === "online" ? `<span class="chip ok">${check}Online</span>` : s === "paused" ? `<span class="chip warn">${pause}Pausado</span>` : `<span class="chip">${dash}Offline</span>`);
+const slot = (os, scale, s = state) => `<span data-pt="${os}" data-scale="${scale}" data-state="${s}"></span>`;
+
+function render() {
+  const th = document.documentElement.dataset.theme;
+  document.getElementById("states").innerHTML = STATES.map(([v, l]) => `<button data-st="${v}" aria-pressed="${v === state}">${l}</button>`).join("");
+  document.getElementById("theme").innerHTML = [["light", "Claro"], ["dark", "Escuro"]].map(([v, l]) => `<button data-theme="${v}" aria-pressed="${v === th}">${l}</button>`).join("");
+  document.getElementById("root").innerHTML = `
+    <header><h1>Um retrato por computador</h1>
+      <p class="lead">Como o Finder desenha os computadores da rede, no nosso tema claro e em pixel. Cada sistema se reconhece pelo aparelho e pelo que a tela mostra: o nosso céu, com um agente. A tela apaga quando o computador está offline e escurece quando está pausado.</p></header>
+    <section class="card"><div class="cap">Os quatro, em 144, 96 e 48 px</div>
+      <div class="stage">${OS.map((o) => `<div class="os"><div class="sizes">${slot(o.id, 3)}${slot(o.id, 2)}${slot(o.id, 1)}</div><b>${o.name}</b><small>${o.device}</small></div>`).join("")}</div>
+    </section>
+    <section class="card"><div class="cap">Na lista de computadores (48 px)</div>
+      <div class="list">${OS.map((o, i) => {
+        const s = i === 1 ? (state === "online" ? "offline" : state) : state;
+        const d = o.cloud
+          ? `Ligado quando um agente precisa · ${s === "offline" ? "desligado há 20 min" : "ligado agora"}`
+          : `${o.name} · versão 0.9.0 · ${s === "offline" ? "visto há 2 h" : "conectado agora"} · Conectado por ${o.who}`;
+        return `<div class="row">${slot(o.id, 1, s)}<div class="t"><div class="n">${o.label} ${chipFor(s)}</div><div class="d">${d}</div></div></div>`;
+      }).join("")}</div>
+    </section>
+    <section class="card"><div class="cap">Cabeçalho da página do computador (96 px)</div>
+      <div class="head">${slot("mac", 2)}<div><h2>MacBook do Walter</h2><div class="d">macOS · arm64 · versão 0.9.0</div><div style="margin-top:8px">${chipFor(state)}</div></div></div>
+    </section>
+    <section class="card"><div class="cap">Estado vazio: nenhum computador ainda (144 px)</div>
+      <div class="empty">${slot("mac", 3, "online")}<b>Conecte um computador</b><span>Os agentes passam a trabalhar nas pastas que você liberar nele.</span></div>
+    </section>
+    <section class="card"><div class="cap">Pequeno, junto do texto: o ícone de contorno continua (16 px)</div>
+      <div class="inline">${OS.map((o) => `<span><span class="ic"><svg viewBox="0 0 24 24">${LINE[o.id]}</svg></span>${o.name}</span>`).join("")}</div>
+    </section>`;
+  for (const el of document.querySelectorAll("[data-pt]")) el.replaceWith(portrait(el.dataset.pt, Number(el.dataset.scale), el.dataset.state));
+  history.replaceState(null, "", "#" + new URLSearchParams({ state, theme: th }).toString());
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.st) { state = b.dataset.st; render(); }
+  if (b.dataset.theme) { document.documentElement.dataset.theme = b.dataset.theme; render(); }
+});
+render();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
