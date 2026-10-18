@@ -15,7 +15,13 @@ const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 const key = (el: Element | Window, k: string, extra: KeyboardEventInit = {}) =>
   act(async () => fireEvent.keyDown(el, { key: k, ...extra }));
-const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+/** Minutes ago, squeezed into today (same order) when the suite runs soon after midnight. */
+const ago = (m: number) => {
+  const now = Date.now();
+  const sinceMidnight = (now - new Date().setHours(0, 0, 0, 0)) / 60_000 - 1;
+  const k = sinceMidnight < 120 ? Math.max(0, sinceMidnight) / 120 : 1;
+  return new Date(now - m * k * 60_000).toISOString();
+};
 const yesterdayNoon = () => {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12).toISOString();
