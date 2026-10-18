@@ -317,6 +317,13 @@ export const en: Translations = {
     skip: "Skip for now",
   },
   shell: {
+    inviteHint: "By email or link",
+    profileHint: "Name, photo and @",
+    thisMonth: "This month",
+    budgetOf: "{{name}} budget",
+    yourWorkspaces: "Your workspaces",
+    youAreHere: "You are here",
+    newWorkspace: "New workspace",
     wiki: "Wiki",
     settings: "Settings",
     workspaceMenu: "Workspace menu",

@@ -384,6 +384,30 @@ export function SidebarHorizon({ working, total }: { working: number; total: num
   );
 }
 
+/** Under the workspace's full-screen menu (MenuOverlay): a calm horizon in soft tones, no sprites. */
+export function MenuHorizon() {
+  const opts: SkyOptions = {
+    pixel: 4,
+    surface: "--bg",
+    palette: (bg) => softTones("sky", bg),
+    body: spriteTone("sky"),
+    near: 0,
+    ceil: 0.3,
+    light: 0.04,
+    sprites: 0,
+    base: (u, v, tt) => {
+      const s = Math.max(0, (v - 0.1) / 0.9);
+      const e = s * s * (3 - 2 * s);
+      return 0.32 * e + 0.04 * S(u * 5 + tt * 0.6) * e;
+    },
+    blobs: (tt) => [
+      [0.3 + 0.2 * S(tt * 0.2), 0.95, 0.05, 0.04],
+      [0.75 + 0.15 * C(tt * 0.17), 0.9, 0.04, 0.04],
+    ],
+  };
+  return <PixelSky options={opts} />;
+}
+
 /* ---------- Onboarding ---------- */
 
 /**

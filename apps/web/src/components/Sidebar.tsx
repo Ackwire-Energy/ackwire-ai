@@ -4,11 +4,13 @@ import {
   keys,
   runningAgents,
   useChannels,
+  useConnections,
   useDms,
   useMissionList,
   useNotificationCount,
   useOverview,
   usePrefetchMessages,
+  useSkills,
 } from "@agenteschat/client";
 import { audienceChip } from "@agenteschat/client/lib/audience";
 import { formatPercent } from "@agenteschat/client/lib/format";
@@ -28,11 +30,13 @@ import {
   Field,
   Icon,
   Kbd,
-  Menu,
-  MenuItem,
-  MenuRadioGroup,
-  MenuSeparator,
+  MenuOverlay,
+  MenuOverlayGroup,
+  MenuOverlayItem,
+  MenuOverlayRow,
+  MenuOverlaySeparator,
   modKey,
+  Segmented,
   Skeleton,
   SkeletonGroup,
 } from "@agenteschat/ui";
@@ -58,7 +62,7 @@ import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
-import { AgentGlow, AgentTrail, colorOf, SidebarHorizon, SidebarOrgSky } from "./Sky";
+import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, SidebarOrgSky } from "./Sky";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
 function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boolean; label: string }) {
@@ -489,7 +493,12 @@ function UnreadCount({ count }: { count: number }) {
   );
 }
 
-/** The account button; under the name, the workspace's budget use this month (a percentage, never money). */
+/**
+ * The account button; under the name, the workspace's budget use this month
+ * (a percentage, never money). It opens the account's full-screen menu
+ * (telas/MenuOverlay.html): profile, time zone, theme, language, the budget
+ * and signing out.
+ */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -498,8 +507,17 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const others = me.organizations.filter((o) => o.id !== org.id);
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
+  const mine = dir.memberById.get(me.user.id);
+  const photo = mine?.image ?? me.user.image;
+  const zone = mine?.timezone || browserTimezone() || "UTC";
+  // Closes the menu first, then does what was picked (a dialog opens over the app, not over the menu).
+  const pick = (run: () => void) => () => {
+    setOpen(false);
+    run();
+  };
 
   const signOut = async () => {
     await auth.signOut();
@@ -509,137 +527,250 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
 
   return (
     <>
-      <Menu
-        side="top"
-        label={t("shell.account")}
-        trigger={
-          <button
-            type="button"
-            className="sidebar__user"
-            aria-label={
-              budgetUsed === null
-                ? `${t("shell.account")}: ${me.user.name}`
-                : `${t("shell.account")}: ${me.user.name}. ${t("shell.budgetUsed", { percent: formatPercent(i18n.language, budgetUsed) })}`
-            }
-            title={me.user.name}
-          >
-            <Avatar name={me.user.name} size="sm" imageUrl={dir.memberById.get(me.user.id)?.image ?? me.user.image} />
-            <span className="sidebar__user-text">
-              <span className="sidebar__user-name">{me.user.name}</span>
-              {budgetUsed !== null && <BudgetBar percent={budgetUsed} />}
-            </span>
-          </button>
+      <button
+        ref={trigger}
+        type="button"
+        className="sidebar__user"
+        aria-haspopup="dialog"
+        aria-label={
+          budgetUsed === null
+            ? `${t("shell.account")}: ${me.user.name}`
+            : `${t("shell.account")}: ${me.user.name}. ${t("shell.budgetUsed", { percent: formatPercent(i18n.language, budgetUsed) })}`
         }
+        title={me.user.name}
+        onClick={() => setOpen(true)}
       >
-        <MenuItem icon="person" onSelect={() => setProfile("handle")}>
-          {t("shell.profile")}
-        </MenuItem>
-        <MenuItem icon="waiting" onSelect={() => setProfile("timezone")}>
-          {t("shell.timezone")}
-        </MenuItem>
-        <MenuSeparator />
-        <MenuRadioGroup
-          label={t("shell.theme")}
-          value={theme.preference}
-          onValueChange={(v) => theme.setPreference(v as ThemePreference)}
-          options={[
-            { value: "system", label: t("shell.themeSystem") },
-            { value: "light", label: t("shell.themeLight") },
-            { value: "dark", label: t("shell.themeDark") },
-          ]}
-        />
-        <MenuSeparator />
-        <MenuRadioGroup
-          label={t("shell.languageCurrent", {
-            name: locales.find((l) => l.code === i18n.language)?.label ?? i18n.language,
-          })}
-          value={i18n.language}
-          onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
-          options={locales.map((l) => ({ value: l.code, label: l.label }))}
-        />
-        <MenuSeparator />
-        {others.map((o) => (
-          <MenuItem
-            key={o.id}
-            icon="channel"
-            onSelect={() => void navigate({ to: "/org/$orgId", params: { orgId: o.id } })}
+        <Avatar name={me.user.name} size="sm" imageUrl={photo} />
+        <span className="sidebar__user-text">
+          <span className="sidebar__user-name">{me.user.name}</span>
+          {budgetUsed !== null && <BudgetBar percent={budgetUsed} />}
+        </span>
+      </button>
+      <MenuOverlay
+        open={open}
+        onOpenChange={setOpen}
+        anchor={trigger}
+        closeLabel={t("common.close")}
+        mark={<Avatar name={me.user.name} size="xl" imageUrl={photo} />}
+        title={me.user.name}
+        meta={[mine?.handle ? `@${mine.handle}` : null, me.user.email].filter(Boolean).join(" · ")}
+      >
+        <MenuOverlayGroup label={t("shell.account")}>
+          <MenuOverlayItem
+            icon="person"
+            shortcut="1"
+            description={t("shell.profileHint")}
+            onSelect={pick(() => setProfile("handle"))}
           >
-            {o.name}
-          </MenuItem>
-        ))}
-        <MenuItem icon="plus" onSelect={() => void navigate({ to: "/onboarding" })}>
-          {t("shell.newOrg")}
-        </MenuItem>
-        {import.meta.env.DEV && (
-          <MenuItem icon="agent" onSelect={() => void navigate({ to: "/dev/gallery" })}>
-            {t("shell.gallery")}
-          </MenuItem>
-        )}
-        <MenuSeparator />
-        <MenuItem onSelect={() => void signOut()}>{t("auth.signOut")}</MenuItem>
-      </Menu>
+            {t("shell.profile")}
+          </MenuOverlayItem>
+          <MenuOverlayItem
+            icon="clock"
+            shortcut="2"
+            hint={zone.split("/").at(-1)?.replaceAll("_", " ")}
+            onSelect={pick(() => setProfile("timezone"))}
+          >
+            {t("shell.timezone")}
+          </MenuOverlayItem>
+          <MenuOverlayRow icon="bulb" label={t("shell.theme")}>
+            <Segmented
+              size="sm"
+              label={t("shell.theme")}
+              value={theme.preference}
+              onValueChange={(v) => theme.setPreference(v as ThemePreference)}
+              options={[
+                { value: "system", label: t("shell.themeSystem") },
+                { value: "light", label: t("shell.themeLight") },
+                { value: "dark", label: t("shell.themeDark") },
+              ]}
+            />
+          </MenuOverlayRow>
+          <MenuOverlayRow icon="globe" label={t("shell.language")}>
+            <Segmented
+              size="sm"
+              label={t("shell.language")}
+              value={i18n.language}
+              onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
+              options={locales.map((l) => ({ value: l.code, label: l.label }))}
+            />
+          </MenuOverlayRow>
+          {budgetUsed !== null &&
+            (can(org.role, "view_usage") ? (
+              <MenuOverlayItem
+                icon="wallet"
+                shortcut="3"
+                description={t("shell.thisMonth")}
+                hint={<BudgetBar percent={budgetUsed} />}
+                onSelect={pick(
+                  () =>
+                    void navigate({
+                      to: "/org/$orgId/settings/$section",
+                      params: { orgId: org.id, section: "usage" },
+                    }),
+                )}
+              >
+                {t("shell.budgetOf", { name: org.name })}
+              </MenuOverlayItem>
+            ) : (
+              <MenuOverlayRow icon="wallet" label={t("shell.budgetOf", { name: org.name })}>
+                <BudgetBar percent={budgetUsed} />
+              </MenuOverlayRow>
+            ))}
+          {import.meta.env.DEV && (
+            <MenuOverlayItem icon="grid" onSelect={pick(() => void navigate({ to: "/dev/gallery" }))}>
+              {t("shell.gallery")}
+            </MenuOverlayItem>
+          )}
+          <MenuOverlaySeparator />
+          <MenuOverlayItem icon="arrowRight" danger onSelect={pick(() => void signOut())}>
+            {t("auth.signOut")}
+          </MenuOverlayItem>
+        </MenuOverlayGroup>
+      </MenuOverlay>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
     </>
   );
 }
 
 /**
- * The workspace header ("Acme · 2 membros · 3 agentes") opens this menu:
- * settings sections and members, as far as the role allows.
+ * The workspace header ("Acme · 2 membros · 3 agentes") opens the workspace's
+ * full-screen menu (telas/MenuOverlay.html): invite, members, connectors,
+ * agents' access, skills and settings as far as the role allows, then the
+ * other workspaces to switch to.
  */
 function WorkspaceMenu({ summary }: { summary: string | null }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className="sidebar__org-button"
+        aria-haspopup="dialog"
+        aria-label={t("shell.workspaceMenuOf", { name: org.name })}
+        onClick={() => setOpen(true)}
+      >
+        <OrgMark logo={org.logo} className="sidebar__org-mark" />
+        <span className="sidebar__org-text">
+          <span className="sidebar__org-name">{org.name}</span>
+          {summary && <span className="sidebar__org-meta">{summary}</span>}
+        </span>
+        <Icon name="chevronDown" size={16} />
+      </button>
+      <MenuOverlay
+        open={open}
+        onOpenChange={setOpen}
+        anchor={trigger}
+        closeLabel={t("common.close")}
+        backdrop={<MenuHorizon />}
+        mark={<OrgMark logo={org.logo} size={64} />}
+        title={org.name}
+        meta={
+          <>
+            {summary}
+            {dir.agents.length > 0 && (
+              <span className="sidebar__menu-crew">
+                {dir.agents.slice(0, 4).map((a) => (
+                  <AgentAvatar key={a.id} agent={a} name={a.name} size="xs" />
+                ))}
+              </span>
+            )}
+          </>
+        }
+      >
+        <WorkspaceMenuOptions onDone={() => setOpen(false)} />
+      </MenuOverlay>
+    </>
+  );
+}
+
+/** The workspace menu's options (mounted only while open: the counts load then). */
+function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
   const navigate = useNavigate();
-  const go = (section?: SettingsSection) =>
+  const overview = useOverview(org.id);
+  const admin = can(org.role, "configure");
+  const connections = useConnections(org.id);
+  const skills = useSkills(org.id, admin);
+  const go = (section?: SettingsSection) => () => {
+    onDone();
     void (section
       ? navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
       : navigate({ to: "/org/$orgId/settings", params: { orgId: org.id } }));
-  const admin = can(org.role, "configure");
+  };
+  let key = 0;
+  const next = () => String(++key);
   return (
-    <Menu
-      label={t("shell.workspaceMenu")}
-      trigger={
-        <button
-          type="button"
-          className="sidebar__org-button"
-          aria-label={t("shell.workspaceMenuOf", { name: org.name })}
+    <>
+      <MenuOverlayGroup label={t("shell.workspaceMenuOf", { name: org.name })}>
+        {can(org.role, "manage_members") && (
+          <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={go("members")}>
+            {t("shell.invite")}
+          </MenuOverlayItem>
+        )}
+        <MenuOverlayItem icon="members" shortcut={next()} count={overview.data?.people} onSelect={go("members")}>
+          {t("shell.members")}
+        </MenuOverlayItem>
+        <MenuOverlayItem
+          icon="plug"
+          shortcut={next()}
+          count={connections.data?.length || undefined}
+          onSelect={go("connectors")}
         >
-          <OrgMark logo={org.logo} className="sidebar__org-mark" />
-          <span className="sidebar__org-text">
-            <span className="sidebar__org-name">{org.name}</span>
-            {summary && <span className="sidebar__org-meta">{summary}</span>}
-          </span>
-          <Icon name="chevronDown" size={16} />
-        </button>
-      }
-    >
-      <MenuItem icon="settings" onSelect={() => go()}>
-        {t("shell.workspaceSettings")}
-      </MenuItem>
-      <MenuItem icon="link" onSelect={() => go("connectors")}>
-        {t("settings.section.connectors")}
-      </MenuItem>
-      {admin && (
-        <MenuItem icon="document" onSelect={() => go("skills")}>
-          {t("settings.section.skills")}
-        </MenuItem>
-      )}
-      {admin && (
-        <MenuItem icon="agent" onSelect={() => go("access")}>
-          {t("settings.section.access")}
-        </MenuItem>
-      )}
-      <MenuSeparator />
-      <MenuItem icon="members" onSelect={() => go("members")}>
-        {t("shell.members")}
-      </MenuItem>
-      {can(org.role, "manage_members") && (
-        <MenuItem icon="plus" onSelect={() => go("members")}>
-          {t("shell.invite")}
-        </MenuItem>
-      )}
-    </Menu>
+          {t("settings.section.connectors")}
+        </MenuOverlayItem>
+        {admin && (
+          <MenuOverlayItem icon="agent" shortcut={next()} onSelect={go("access")}>
+            {t("settings.section.access")}
+          </MenuOverlayItem>
+        )}
+        {admin && (
+          <MenuOverlayItem
+            icon="book"
+            shortcut={next()}
+            count={skills.data?.length || undefined}
+            onSelect={go("skills")}
+          >
+            {t("settings.section.skills")}
+          </MenuOverlayItem>
+        )}
+        <MenuOverlayItem icon="settings" shortcut={next()} onSelect={go()}>
+          {t("shell.workspaceSettings")}
+        </MenuOverlayItem>
+      </MenuOverlayGroup>
+      <MenuOverlayGroup heading={t("shell.yourWorkspaces")}>
+        {me.organizations.map((o) => (
+          <MenuOverlayItem
+            key={o.id}
+            leading={<OrgMark logo={o.logo} size={32} />}
+            description={t(`roles.${o.role}`)}
+            current={o.id === org.id}
+            hint={o.id === org.id ? t("shell.youAreHere") : undefined}
+            onSelect={() => {
+              onDone();
+              if (o.id !== org.id) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
+            }}
+          >
+            {o.name}
+          </MenuOverlayItem>
+        ))}
+        <MenuOverlaySeparator />
+        <MenuOverlayItem
+          icon="plus"
+          onSelect={() => {
+            onDone();
+            void navigate({ to: "/onboarding" });
+          }}
+        >
+          {t("shell.newWorkspace")}
+        </MenuOverlayItem>
+      </MenuOverlayGroup>
+    </>
   );
 }
 

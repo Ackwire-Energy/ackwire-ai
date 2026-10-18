@@ -11,17 +11,11 @@ import { renderApp, screen, settle } from "./render";
 afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
-const key = async (el: Element, k: string) => {
-  await act(async () => {
-    fireEvent.keyDown(el, { key: k });
-    fireEvent.keyUp(el, { key: k });
-  });
-  await act(() => new Promise((r) => setTimeout(r, 0)));
-};
+// The workspace and account cards open a full-screen menu (MenuOverlay): a dialog with our menu items.
 const openMenu = async (trigger: HTMLElement) => {
-  trigger.focus();
-  await key(trigger, "Enter");
-  return screen().getByRole("menu");
+  await act(async () => fireEvent.click(trigger));
+  await act(() => new Promise((r) => setTimeout(r, 0)));
+  return screen().getAllByRole("menu")[0] as HTMLElement;
 };
 
 describe("profile photo", () => {
@@ -44,7 +38,7 @@ describe("profile photo", () => {
     await renderApp(`/org/${ORG_ID}/issues`, { api: createFakeApi(state) });
     await settle(6);
     const menu = await openMenu(screen().getByRole("button", { name: /^Conta: / }));
-    await click(within(menu).getByRole("menuitem", { name: "Perfil" }));
+    await click(within(menu).getByRole("menuitem", { name: /^Perfil/ }));
     await settle(2);
     const profile = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
     await click(within(profile).getByRole("button", { name: "Trocar foto" }));

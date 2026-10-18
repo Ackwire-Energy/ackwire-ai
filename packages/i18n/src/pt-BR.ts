@@ -323,6 +323,13 @@ export const ptBR = {
     skip: "Pular por agora",
   },
   shell: {
+    inviteHint: "Por email ou link",
+    profileHint: "Nome, foto e @",
+    thisMonth: "Este mês",
+    budgetOf: "Orçamento de {{name}}",
+    yourWorkspaces: "Seus workspaces",
+    youAreHere: "Você está aqui",
+    newWorkspace: "Novo workspace",
     wiki: "Wiki",
     settings: "Configurações",
     workspaceMenu: "Menu do workspace",

@@ -11,18 +11,14 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-const key = async (el: Element, k: string) => {
-  await act(async () => {
-    fireEvent.keyDown(el, { key: k });
-    fireEvent.keyUp(el, { key: k });
-  });
-  await act(() => new Promise((r) => setTimeout(r, 0)));
-};
+// The workspace and account cards open a full-screen menu (MenuOverlay): a dialog with our menu items.
 const openMenu = async (trigger: HTMLElement) => {
-  trigger.focus();
-  await key(trigger, "Enter");
-  return screen().getByRole("menu");
+  await act(async () => fireEvent.click(trigger));
+  await act(() => new Promise((r) => setTimeout(r, 0)));
+  return screen().getAllByRole("menu")[0] as HTMLElement;
 };
+/** An item's name without its count chip, shortcut or description. */
+const itemName = (el: Element) => el.querySelector(".ac-mo__name")?.firstChild?.textContent ?? "";
 const go = async (path: string, state = seedState()) => {
   const r = await renderApp(`/org/${ORG_ID}/${path}`, { api: createFakeApi(state) });
   await settle(6);
@@ -30,26 +26,37 @@ const go = async (path: string, state = seedState()) => {
 };
 
 describe("finding the settings", () => {
-  test("the workspace header is a menu: settings sections and members", async () => {
+  test("the workspace header opens its full-screen menu: invite, members, settings sections", async () => {
     const { router } = await go("issues");
     const menu = await openMenu(screen().getByRole("button", { name: "Menu do workspace Acme" }));
-    expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((i) => i.textContent),
-    ).toEqual([
-      "Configurações do workspace",
-      "Conectores",
-      "Skills",
-      "Agentes e acesso",
-      "Membros",
+    expect(within(menu).getAllByRole("menuitem").map(itemName)).toEqual([
       "Convidar pessoas",
+      "Membros",
+      "Conectores",
+      "Agentes e acesso",
+      "Skills",
+      "Configurações do workspace",
     ]);
-    await click(within(menu).getByRole("menuitem", { name: "Conectores" }));
+    await click(within(menu).getByRole("menuitem", { name: /^Conectores/ }));
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/connectors`);
     // The section's own title (the connectors card has a "Conectores" heading too).
     expect(document.querySelector(".settings__body > .page__header h2")?.textContent).toBe("Conectores");
+  });
+
+  test("the workspace menu lists my workspaces (this one marked) and a digit opens an option", async () => {
+    const { router } = await go("issues");
+    await openMenu(screen().getByRole("button", { name: "Menu do workspace Acme" }));
+    const dialog = screen().getByRole("dialog", { name: "Acme" });
+    const mine = within(dialog).getByRole("menu", { name: "Seus workspaces" });
+    const current = within(mine)
+      .getAllByRole("menuitem")
+      .find((i) => i.getAttribute("aria-current"));
+    expect(current?.textContent).toContain("Você está aqui");
+    await act(async () => fireEvent.keyDown(dialog, { key: "3" }));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/connectors`);
+    expect(document.documentElement.hasAttribute("data-menu-overlay")).toBe(false);
   });
 
   test("members see only what they can open", async () => {
@@ -57,11 +64,11 @@ describe("finding the settings", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go("issues", state);
     const menu = await openMenu(screen().getByRole("button", { name: "Menu do workspace Acme" }));
-    expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((i) => i.textContent),
-    ).toEqual(["Configurações do workspace", "Conectores", "Membros"]);
+    expect(within(menu).getAllByRole("menuitem").map(itemName)).toEqual([
+      "Membros",
+      "Conectores",
+      "Configurações do workspace",
+    ]);
   });
 
   test("a gear next to the account opens the settings", async () => {
@@ -104,7 +111,7 @@ describe("finding the settings", () => {
   test("Perfil and Fuso in the account menu edit my handle and time zone", async () => {
     const { state } = await go("issues");
     const menu = await openMenu(screen().getByRole("button", { name: /^Conta: / }));
-    await click(within(menu).getByRole("menuitem", { name: "Perfil" }));
+    await click(within(menu).getByRole("menuitem", { name: /^Perfil/ }));
     await settle(2);
     const dialog = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
     await type(within(dialog).getByLabelText("Seu @"), "walt");

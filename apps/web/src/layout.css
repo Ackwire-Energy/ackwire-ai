@@ -243,6 +243,9 @@ p {
 .shell {
   position: relative;
   display: flex;
+  transition:
+    filter 0.5s var(--out),
+    transform 0.55s var(--out);
   height: 100vh;
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
   height: 100dvh;
@@ -10114,4 +10117,22 @@ a.machine-row__name:hover {
 .look-dialog__body {
   gap: 12px;
   padding-bottom: 12px;
+}
+
+/* A full-screen menu is open (MenuOverlay): the app sinks behind it. */
+html[data-menu-overlay] .shell {
+  filter: blur(22px) saturate(1.15);
+  transform: scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell {
+    transition: none;
+  }
+}
+/* The workspace menu's meta line: the first agents, alive, next to "2 membros · 4 agentes". */
+.sidebar__menu-crew {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--space-2);
 }
