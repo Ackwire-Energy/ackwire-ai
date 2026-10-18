@@ -2,7 +2,7 @@ import type { LiveConsult, LiveRun } from "@agenteschat/client";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, StyleSheet, View } from "react-native";
-import { fonts, PixelOrbit, Text } from "@/ui";
+import { PixelOrbit, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -20,7 +20,7 @@ export function StreamingRow({ run }: { run: LiveRun }) {
       </View>
       <View style={styles.body}>
         <View style={styles.who}>
-          <Text variant="small" tone="ink" style={styles.name}>
+          <Text variant="footnote" tone="ink" style={styles.name}>
             {agent?.name ?? ""}
           </Text>
           {agent?.role ? (
@@ -121,11 +121,11 @@ const styles = StyleSheet.create({
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
   who: { flexDirection: "row", alignItems: "baseline", gap: 7 },
-  name: { fontFamily: fonts.bold },
+  name: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
   work: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, paddingLeft: 18, paddingRight: 14 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -5 },
   grow: { flex: 1 },
-  ink: { fontFamily: fonts.semibold },
+  ink: { fontWeight: "600" },
 });

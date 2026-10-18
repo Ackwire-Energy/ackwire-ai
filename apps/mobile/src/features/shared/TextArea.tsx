@@ -1,5 +1,5 @@
 import { StyleSheet, TextInput, type TextInputProps } from "react-native";
-import { fonts } from "@/ui";
+import { systemText } from "@/ui";
 import { useColors } from "./hooks";
 
 /**
@@ -27,8 +27,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 12,
-    fontSize: 16,
-    lineHeight: 22,
-    fontFamily: fonts.sans,
+    ...systemText("body"),
   },
 });

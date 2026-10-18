@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerIcon, ComputerPortrait, useComputerKind } from "@/computer/ComputerPortrait";
-import { Button, Card, Chip, Count, fonts, Icon, IconButton, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
+import { Button, Card, Chip, Count, Icon, IconButton, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
@@ -57,7 +57,7 @@ function Mission({ id }: { id: string }) {
   if (!m) {
     return (
       <View style={[styles.screen, { backgroundColor: c.bg }]}>
-        <PushedHeader title="" />
+        <PushedHeader title="" solid={false} />
         <View style={styles.center}>
           {mission.isError ? (
             <Text tone="muted">{t("mobile.mission.notFound")}</Text>
@@ -84,6 +84,7 @@ function Mission({ id }: { id: string }) {
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       <PushedHeader
         title={m.title}
+        solid={false}
         right={
           thread.data ? (
             <IconButton
@@ -97,7 +98,10 @@ function Mission({ id }: { id: string }) {
           ) : null
         }
       />
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
+      >
         <View style={styles.head}>
           <View style={styles.row}>
             <Icon name="target" size={15} color={c.muted} />
@@ -287,7 +291,7 @@ const styles = StyleSheet.create({
   progCard: { marginHorizontal: 16, marginTop: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { marginTop: 4 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
   prog: { padding: 14, gap: 10 },
@@ -302,5 +306,5 @@ const styles = StyleSheet.create({
   planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   st: { width: 22, alignItems: "center" },
   dec: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  decText: { fontFamily: fonts.medium },
+  decText: { fontWeight: "500" },
 });

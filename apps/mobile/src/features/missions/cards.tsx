@@ -13,7 +13,7 @@ import {
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, fonts, Icon, PixelOrbit, PlanTrack, Text, useToast } from "@/ui";
+import { Button, Count, Icon, PixelOrbit, PlanTrack, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   title: { marginTop: 5, marginBottom: 10 },
   titlePinned: { marginTop: 4, marginBottom: 8 },
   ft: { marginTop: 8, gap: 6 },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   opts: { gap: 6 },
   opt: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 13 },
-  optText: { flex: 1, fontFamily: fonts.medium },
+  optText: { flex: 1, fontWeight: "500" },
   planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
   n: { width: 16, alignItems: "flex-end" },
   more: { paddingLeft: 26, paddingBottom: 8 },

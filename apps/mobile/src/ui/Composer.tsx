@@ -7,7 +7,9 @@ import { primaryLook } from "./Button";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
+import { systemText } from "./Text";
 import { useTheme } from "./theme";
+import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export interface ComposerProps {
   placeholder: string;
@@ -15,15 +17,17 @@ export interface ComposerProps {
   onPlus: () => void;
   /** Pills above the field; tapping one puts its text in the field. */
   suggestions?: { icon: IconName; label: string }[];
+  /** The field's `nativeID` (the chat links it to the keyboard's drag-to-dismiss area). */
+  inputNativeID?: string;
 }
 
 /**
  * The center of the app: a raised field near the thumb, a "+" for attachments and actions, and a send
  * button that grows and lights up when there is text. The screen places it (above the keyboard).
  */
-export function Composer({ placeholder, onSend, onPlus, suggestions }: ComposerProps) {
+export function Composer({ placeholder, onSend, onPlus, suggestions, inputNativeID }: ComposerProps) {
   const theme = useTheme();
-  const { colors, fonts, shadows, motion, reducedMotion } = theme;
+  const { colors, shadows, motion, reducedMotion } = theme;
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
@@ -68,7 +72,12 @@ export function Composer({ placeholder, onSend, onPlus, suggestions }: ComposerP
             >
               <View style={{ flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12 }}>
                 <Icon name={s.icon} size={15} color={colors.muted} />
-                <RNText style={{ fontFamily: fonts.semibold, fontSize: 13.5, color: colors.ink2 }}>{s.label}</RNText>
+                <RNText
+                  maxFontSizeMultiplier={CHROME_MAX_SCALE}
+                  style={[systemText("subhead", weights.semibold), { color: colors.ink2 }]}
+                >
+                  {s.label}
+                </RNText>
               </View>
             </PressScale>
           ))}
@@ -97,6 +106,7 @@ export function Composer({ placeholder, onSend, onPlus, suggestions }: ComposerP
           </View>
         </PressScale>
         <TextInput
+          {...(inputNativeID ? { nativeID: inputNativeID } : {})}
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
@@ -109,9 +119,7 @@ export function Composer({ placeholder, onSend, onPlus, suggestions }: ComposerP
             flex: 1,
             minWidth: 0,
             maxHeight: 110,
-            fontFamily: fonts.sans,
-            fontSize: 16,
-            lineHeight: 22,
+            ...systemText("body"),
             paddingVertical: 8,
             paddingHorizontal: 4,
             color: colors.ink,

@@ -33,8 +33,11 @@ export function DeleteAccountScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      <PushedHeader title={t("mobile.me.deleteAccount")} />
-      <ScrollView contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}>
+      <PushedHeader title={t("mobile.me.deleteAccount")} solid={false} />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
+      >
         <Text variant="display">{t("mobile.delete.title")}</Text>
         <Text variant="body" tone="muted">
           {t("mobile.delete.intro")}

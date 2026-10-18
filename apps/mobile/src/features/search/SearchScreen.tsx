@@ -1,5 +1,4 @@
 import { useChannels, useDms, useSearch } from "@agenteschat/client";
-import { BlurView } from "expo-blur";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,7 +14,7 @@ import { isEmpty, type SearchAction, searchResults } from "./logic";
 
 const ACTION_ICON = { newConversation: "plus", newTask: "target", newAgent: "agent" } as const;
 
-/** Busca, the phone's ⌘K: actions, agents, conversations and messages, over glass. */
+/** Busca, the phone's ⌘K: actions, agents, conversations and messages, in a native modal. */
 export function SearchScreen() {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -51,13 +50,9 @@ export function SearchScreen() {
   const channelName = (id: string) => channels.data?.find((x) => x.id === id)?.name;
 
   return (
-    <View style={styles.screen}>
-      <BlurView
-        intensity={Platform.OS === "ios" ? 60 : 0}
-        tint="default"
-        style={[StyleSheet.absoluteFill, Platform.OS === "android" && { backgroundColor: c.bg }]}
-      />
-      <View style={[styles.box, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.screen, { backgroundColor: c.bg }]}>
+      {/* A native modal: a page sheet on iOS (drag down to close), full screen on Android. */}
+      <View style={[styles.box, { paddingTop: Platform.OS === "ios" ? 16 : insets.top + 8 }]}>
         <View style={styles.grow}>
           <SearchField value={q} onChangeText={setQ} placeholder={t("mobile.find.placeholder")} autoFocus />
         </View>

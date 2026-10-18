@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, fonts, Icon, Text, useToast } from "@/ui";
+import { Button, Count, Icon, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   foot: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   hidden: { opacity: 0 },
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 36,
+    minHeight: 36,
     paddingLeft: 8,
     paddingRight: 12,
     borderRadius: 12,

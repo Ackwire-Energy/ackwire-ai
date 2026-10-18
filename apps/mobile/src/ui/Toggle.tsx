@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { Pressable, Text as RNText, View } from "react-native";
+import { Pressable, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { haptics } from "./haptics";
+import { Text } from "./Text";
 import { useTheme } from "./theme";
 
 export interface ToggleProps {
@@ -13,7 +14,6 @@ export interface ToggleProps {
 
 /** A custom switch (never the native one) in a row with its label. */
 export function Toggle({ value, onChange, label }: ToggleProps) {
-  const { colors, fonts } = useTheme();
   return (
     <Pressable
       onPress={() => {
@@ -25,7 +25,9 @@ export function Toggle({ value, onChange, label }: ToggleProps) {
       accessibilityState={{ checked: value }}
       style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 }}
     >
-      <RNText style={{ flex: 1, fontFamily: fonts.medium, fontSize: 15, color: colors.ink }}>{label}</RNText>
+      <Text variant="body" style={{ flex: 1 }}>
+        {label}
+      </Text>
       <ToggleSwitch value={value} />
     </Pressable>
   );

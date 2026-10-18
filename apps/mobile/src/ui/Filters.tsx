@@ -1,7 +1,9 @@
 import { Pressable, Text as RNText, ScrollView, View } from "react-native";
 import { Count } from "./Count";
 import { haptics } from "./haptics";
+import { systemText } from "./Text";
 import { useTheme } from "./theme";
+import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export interface FilterItem {
   key: string;
@@ -17,7 +19,7 @@ export interface FiltersProps {
 
 /** Horizontal pills over a list; the selected one is ink. */
 export function Filters({ items, value, onChange }: FiltersProps) {
-  const { colors, fonts } = useTheme();
+  const { colors } = useTheme();
   return (
     <ScrollView
       horizontal
@@ -39,7 +41,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
           >
             <View
               style={{
-                height: 34,
+                minHeight: 34,
                 paddingHorizontal: 14,
                 borderRadius: 999,
                 backgroundColor: on ? colors.ink : colors.sunken,
@@ -48,7 +50,12 @@ export function Filters({ items, value, onChange }: FiltersProps) {
                 gap: 6,
               }}
             >
-              <RNText style={{ fontFamily: fonts.semibold, fontSize: 14, color }}>{item.label}</RNText>
+              <RNText
+                maxFontSizeMultiplier={CHROME_MAX_SCALE}
+                style={[systemText("subhead", weights.semibold), { color }]}
+              >
+                {item.label}
+              </RNText>
               {item.count !== undefined ? <Count value={item.count} size={14} color={color} /> : null}
             </View>
           </Pressable>

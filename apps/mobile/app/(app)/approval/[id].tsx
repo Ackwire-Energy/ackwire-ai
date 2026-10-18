@@ -1,10 +1,12 @@
 import { useLocalSearchParams } from "expo-router";
 import { ApprovalSheet } from "@/features/approvals/ApprovalSheet";
-import { useClosingSheet } from "@/features/shared/parts";
+import { goBack } from "@/features/shared/parts";
 
-/** A request to approve, over whatever is on screen (deep link `agenteschat://approval/<id>`). */
+/**
+ * A request to approve, as a native form sheet over whatever is on screen (presentation set in
+ * `_layout`; deep link `agenteschat://approval/<id>`).
+ */
 export default function ApprovalRoute() {
   const { id, mode } = useLocalSearchParams<{ id: string; mode?: string }>();
-  const sheet = useClosingSheet();
-  return <ApprovalSheet id={id} refuse={mode === "refuse"} open={sheet.open} onClose={sheet.close} />;
+  return <ApprovalSheet id={id} refuse={mode === "refuse"} onClose={goBack} />;
 }

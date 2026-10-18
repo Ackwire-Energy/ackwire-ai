@@ -7,7 +7,17 @@ import { signOut } from "@/features/account";
 import { pushPermission, registerForPush, unregisterPush } from "@/lib/push";
 import { readValue, STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
-import { Icon, PersonAvatar, Segmented, Sheet, Text, type ThemePreference, Toggle, useTheme, useToast } from "@/ui";
+import {
+  Icon,
+  PersonAvatar,
+  Segmented,
+  SheetScreen,
+  Text,
+  type ThemePreference,
+  Toggle,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useColors } from "../shared/hooks";
 import { ActionList } from "../shared/parts";
 
@@ -15,7 +25,7 @@ import { ActionList } from "../shared/parts";
  * Você: who you are and where, switching organizations, Aparência, push,
  * Idioma, Sair and Apagar conta. A sheet over whatever was on screen.
  */
-export function MeSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function MeSheet({ onClose }: { onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const me = useMe();
   const org = useOrg();
@@ -46,7 +56,7 @@ export function MeSheet({ open, onClose }: { open: boolean; onClose: () => void 
   const name = me.data?.user.name ?? "";
   const role = org.org ? t(`mobile.me.role.${org.org.role}`) : "";
   return (
-    <Sheet open={open} onClose={onClose}>
+    <SheetScreen>
       <View style={styles.in}>
         <View style={styles.head}>
           <PersonAvatar name={name || "?"} size={44} />
@@ -144,7 +154,7 @@ export function MeSheet({ open, onClose }: { open: boolean; onClose: () => void 
           ]}
         />
       </View>
-    </Sheet>
+    </SheetScreen>
   );
 }
 

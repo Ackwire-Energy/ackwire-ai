@@ -2,7 +2,7 @@ import { useApproval, useChannels, useDecideApproval } from "@agenteschat/client
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Fuse, fonts, HoldButton, Sheet, Text, useToast } from "@/ui";
+import { Button, Card, Chip, Fuse, HoldButton, SheetScreen, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, fuseRemaining, genderOf, minutesLeft } from "../shared/logic";
@@ -20,12 +20,10 @@ const TRAIT_ICON = { production: "server", irreversible: "x", reversible: "back"
 export function ApprovalSheet({
   id,
   refuse: startRefusing = false,
-  open,
   onClose,
 }: {
   id: string;
   refuse?: boolean;
-  open: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -96,9 +94,7 @@ export function ApprovalSheet({
             </Text>
           </View>
         </View>
-        <Text variant="title" style={styles.h2}>
-          {a.title}
-        </Text>
+        <Text variant="title2">{a.title}</Text>
         {refusing ? (
           <>
             <TextArea
@@ -206,9 +202,9 @@ export function ApprovalSheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} solid>
+    <SheetScreen>
       <View style={styles.in}>{body}</View>
-    </Sheet>
+    </SheetScreen>
   );
 }
 
@@ -230,8 +226,7 @@ const styles = StyleSheet.create({
   in: { gap: 12 },
   who: { flexDirection: "row", alignItems: "center", gap: 10 },
   grow: { flex: 1 },
-  bold: { fontFamily: fonts.semibold },
-  h2: { fontSize: 21, lineHeight: 26 },
+  bold: { fontWeight: "600" },
   detail: { marginTop: -2 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   fuse: { flexDirection: "row", alignItems: "center", gap: 10 },

@@ -27,13 +27,26 @@ export { Icon, type IconName, type IconProps } from "./Icon";
 export { IconButton, type IconButtonProps } from "./IconButton";
 export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
+export {
+  coverBarOptions,
+  HeaderSlot,
+  type HeaderSlotStore,
+  TabStack,
+  useFormSheetOptions,
+  useHeaderSlot,
+  useLargeTitleOptions,
+  useNavigationTheme,
+  usePushedOptions,
+  useScrollUnderPushedOptions,
+} from "./navigation";
 export { PressScale, type PressScaleProps } from "./PressScale";
 export { Row, type RowProps } from "./Row";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";
 export { Segmented, type SegmentedProps } from "./Segmented";
 export { Sheet, type SheetProps } from "./Sheet";
-export { Text, type TextProps, type TextTone, type TextVariant } from "./Text";
+export { SheetScreen, type SheetScreenProps } from "./SheetScreen";
+export { systemText, Text, type TextProps, type TextTone, type TextVariant } from "./Text";
 export { ToastHost, type ToastInput, useToast } from "./Toast";
 export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";
 export {
@@ -46,4 +59,6 @@ export {
   ThemeProvider,
   useReducedMotion,
   useTheme,
+  weights,
 } from "./theme";
+export { CHROME_MAX_SCALE, type TypeStyle, typeScale } from "./type-scale";

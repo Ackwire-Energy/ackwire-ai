@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Text as RNText, StyleSheet, View } from "react-native";
-import { fonts, Text, useReducedMotion } from "@/ui";
+import { Text, useReducedMotion } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { type Inline, parseBlocks } from "./logic";
@@ -143,13 +143,13 @@ function Caret() {
 const styles = StyleSheet.create({
   wrap: { gap: 6, marginTop: 1 },
   flex: { flex: 1 },
-  heading: { fontFamily: fonts.bold },
+  heading: { fontWeight: "700" },
   bullet: { flexDirection: "row", gap: 8, paddingLeft: 2 },
   mark: { minWidth: 14 },
   quote: { borderLeftWidth: 3, paddingLeft: 10 },
   code: { borderRadius: 10, padding: 10 },
-  mono: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
-  bold: { fontFamily: fonts.bold },
+  mono: { fontFamily: MONO, fontSize: 14, lineHeight: 20 },
+  bold: { fontWeight: "700" },
   italic: { fontStyle: "italic" },
-  inlineCode: { fontFamily: MONO, fontSize: 13 },
+  inlineCode: { fontFamily: MONO, fontSize: 15 },
 });

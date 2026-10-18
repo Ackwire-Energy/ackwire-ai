@@ -1,10 +1,23 @@
 import * as Clipboard from "expo-clipboard";
-import { router, useIsFocused } from "expo-router";
-import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Card, fonts, haptics, Icon, IconButton, type IconName, LivePause, Text, ToggleSwitch, useTheme } from "@/ui";
+import { type NativeStackNavigationOptions, router, Stack, useIsFocused } from "expo-router";
+import { type ReactNode, useMemo } from "react";
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import {
+  Card,
+  coverBarOptions,
+  fonts,
+  HeaderSlot,
+  type HeaderSlotStore,
+  haptics,
+  Icon,
+  type IconName,
+  LivePause,
+  Text,
+  ToggleSwitch,
+  useHeaderSlot,
+  useScrollUnderPushedOptions,
+  useTheme,
+} from "@/ui";
 import { useColors } from "./hooks";
 
 /**
@@ -84,7 +97,14 @@ export function ActionList({ items }: { items: ActionItem[] }) {
   );
 }
 
-/** The bar of a pushed screen: back on the left, a title in the middle, an action on the right. */
+/**
+ * The bar of a pushed screen, as the native header (react-native-screens): the system back chevron with
+ * the edge swipe, a title (with a subtitle under it when given), an action on the right. Renders nothing
+ * itself; it sets the screen's header options, so screens keep calling it where the bar used to be.
+ * The bar is opaque by default (`solid`, content lays out below it); `solid={false}` makes content scroll
+ * under it (glass on iOS 26, blur before; the screen's scroll view needs
+ * `contentInsetAdjustmentBehavior="automatic"`); `plate` puts a clear bar over a full-bleed cover.
+ */
 export function PushedHeader({
   title,
   subtitle,
@@ -95,41 +115,53 @@ export function PushedHeader({
   title?: ReactNode;
   subtitle?: string;
   right?: ReactNode;
-  /** Over a sky cover: the buttons sit on glass plates. */
+  /** Over a sky cover: a clear bar, the back button over the art. */
   plate?: boolean;
   solid?: boolean;
 }) {
-  const insets = useSafeAreaInsets();
-  const c = useColors();
-  const { t } = useTranslation();
+  const scrollUnder = useScrollUnderPushedOptions();
+  const text = typeof title === "string" ? title : "";
+  const titleNode = useHeaderSlot(typeof title === "string" ? null : title);
+  const rightNode = useHeaderSlot(right);
+  const custom = Boolean(subtitle) || (title != null && typeof title !== "string");
+  const hasRight = Boolean(right);
+  // Stable options: `setOptions` runs when the title, subtitle or the presence of actions change, not on
+  // every render of the screen (a conversation re-renders while agents stream).
+  const options = useMemo<NativeStackNavigationOptions>(
+    () => ({
+      ...(plate ? coverBarOptions : solid ? {} : scrollUnder),
+      title: text,
+      headerTitle: custom ? () => <HeaderTitle text={text} node={titleNode} subtitle={subtitle} /> : text,
+      headerRight: hasRight
+        ? () => (
+            <View style={styles.headerRight}>
+              <HeaderSlot slot={rightNode} />
+            </View>
+          )
+        : undefined,
+    }),
+    [plate, solid, scrollUnder, text, custom, subtitle, titleNode, hasRight, rightNode],
+  );
+  return <Stack.Screen options={options} />;
+}
+
+/** A title with a subtitle under it, in the native bar (centered on iOS, leading on Android). */
+function HeaderTitle({ text, node, subtitle }: { text: string; node: HeaderSlotStore; subtitle?: string | undefined }) {
+  const { width } = useWindowDimensions();
   return (
-    <View
-      style={[
-        styles.header,
-        { paddingTop: insets.top + 4 },
-        solid && {
-          backgroundColor: c.glass ?? c.bg,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: c.line,
-        },
-      ]}
-    >
-      <IconButton icon="back" label={t("mobile.common.back")} onPress={goBack} plate={plate} />
-      <View style={styles.headerTitle}>
-        {typeof title === "string" ? (
-          <Text variant="body" numberOfLines={1} style={styles.titleText}>
-            {title}
-          </Text>
-        ) : (
-          title
-        )}
-        {subtitle ? (
-          <Text variant="caption" tone="faint" numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.headerRight}>{right}</View>
+    <View style={[styles.headerTitle, { maxWidth: width - 150 }]}>
+      {text ? (
+        <Text variant="body" numberOfLines={1} style={styles.titleText}>
+          {text}
+        </Text>
+      ) : (
+        <HeaderSlot slot={node} />
+      )}
+      {subtitle ? (
+        <Text variant="caption" tone="faint" numberOfLines={1}>
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -162,10 +194,9 @@ const styles = StyleSheet.create({
   action: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
   actionText: { flex: 1, minWidth: 0 },
   mono: { fontFamily: MONO, fontSize: 13 },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingBottom: 6, gap: 4, zIndex: 10 },
-  headerTitle: { flex: 1, alignItems: "center", minWidth: 0 },
-  titleText: { fontFamily: fonts.semibold },
-  headerRight: { minWidth: 40, alignItems: "flex-end" },
+  headerTitle: { alignItems: Platform.OS === "ios" ? "center" : "flex-start", minWidth: 0 },
+  titleText: { fontWeight: "600" },
+  headerRight: { flexDirection: "row", alignItems: "center" },
 });
 
 /** A raised, neutral surface (the cards inside messages): raised background, the e1 shadow and lit top edge. */
@@ -181,17 +212,4 @@ export function useSurface() {
 export function FocusLive({ children }: { children: ReactNode }) {
   const focused = useIsFocused();
   return <LivePause paused={!focused}>{children}</LivePause>;
-}
-
-/** A route that is only a sheet: closing lets the sheet slide away, then leaves the route. */
-export function useClosingSheet() {
-  const [open, setOpen] = useState(true);
-  const closing = useRef(false);
-  const close = useCallback(() => {
-    if (closing.current) return;
-    closing.current = true;
-    setOpen(false);
-    setTimeout(goBack, 340);
-  }, []);
-  return { open, close };
 }

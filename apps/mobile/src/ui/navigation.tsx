@@ -1,0 +1,204 @@
+import {
+  DarkTheme,
+  DefaultTheme,
+  type NativeStackNavigationOptions,
+  type Theme as NavigationTheme,
+  Stack,
+} from "expo-router";
+import { type ReactNode, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Platform } from "react-native";
+import { needsHeaderBlur } from "@/lib/nav";
+import { useTheme } from "./theme";
+
+/**
+ * Options for the native navigators (react-native-screens through expo-router): the theme the native
+ * headers read, the large-title stacks of the tabs, pushed screens and form sheets. Colors always come
+ * from our theme, so light/dark follows the person's choice.
+ */
+
+const legacyBlur = needsHeaderBlur(Platform.OS, Platform.Version);
+
+/** A piece of the native header that changes with the screen (actions, a custom title). */
+export interface HeaderSlotStore {
+  get(): ReactNode;
+  set(node: ReactNode): void;
+  subscribe(listener: () => void): () => void;
+}
+
+function createSlot(initial: ReactNode): HeaderSlotStore {
+  let node = initial;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => node,
+    set(next) {
+      if (next === node) return;
+      node = next;
+      for (const l of listeners) l();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+/**
+ * Keeps `node` (an element rebuilt on every render of the screen) in a stable store, so the screen's
+ * header options stay the same object and `setOptions` isn't called on every render; `HeaderSlot` shows
+ * the latest node inside the header.
+ */
+export function useHeaderSlot(node: ReactNode): HeaderSlotStore {
+  const [slot] = useState(() => createSlot(node));
+  useLayoutEffect(() => {
+    slot.set(node);
+  });
+  return slot;
+}
+
+/** Renders the latest node of a `useHeaderSlot` store. */
+export function HeaderSlot({ slot }: { slot: HeaderSlotStore }) {
+  const node = useSyncExternalStore(slot.subscribe, slot.get, slot.get);
+  return <>{node}</>;
+}
+
+/** React Navigation's theme from ours (back button tint, header text, userInterfaceStyle of the bars). */
+export function useNavigationTheme(): NavigationTheme {
+  const { colors, scheme } = useTheme();
+  return useMemo(() => {
+    const base = scheme === "dark" ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      dark: scheme === "dark",
+      colors: {
+        ...base.colors,
+        primary: colors.ink,
+        background: colors.bg,
+        card: colors.bg,
+        text: colors.ink,
+        border: colors.line,
+        notification: colors.ink,
+      },
+    };
+  }, [colors, scheme]);
+}
+
+/**
+ * The bar over content that scrolls under it: the system glass on iOS 26 (nothing set, so the system
+ * draws it), a blur on older iOS, an opaque bar on Android (content starts below it).
+ */
+function useScrollUnderBar(): NativeStackNavigationOptions {
+  const { colors, scheme } = useTheme();
+  return useMemo<NativeStackNavigationOptions>(() => {
+    if (Platform.OS === "ios") {
+      return legacyBlur
+        ? {
+            headerTransparent: true,
+            headerBlurEffect: scheme === "dark" ? "systemChromeMaterialDark" : "systemChromeMaterialLight",
+          }
+        : {};
+    }
+    return { headerTransparent: false, headerStyle: { backgroundColor: colors.bg } };
+  }, [colors.bg, scheme]);
+}
+
+/** A tab's stack root: a large title in Funnel Display Light that collapses into the bar on scroll. */
+export function useLargeTitleOptions(): NativeStackNavigationOptions {
+  const { colors, fonts } = useTheme();
+  const bar = useScrollUnderBar();
+  return useMemo<NativeStackNavigationOptions>(
+    () => ({
+      ...bar,
+      headerShown: true,
+      headerLargeTitleEnabled: true,
+      headerLargeTitleShadowVisible: false,
+      headerShadowVisible: false,
+      headerLargeTitleStyle: { fontFamily: fonts.display, color: colors.ink },
+      headerTitleStyle: { color: colors.ink },
+      headerTintColor: colors.ink,
+      contentStyle: { backgroundColor: colors.bg },
+    }),
+    [bar, colors, fonts],
+  );
+}
+
+/**
+ * The stack inside a tab (Conversas, Agentes, Atividade): its root screen gets the native large title.
+ * The title is set here too so the first frame already has it.
+ */
+export function TabStack({ title }: { title: string }) {
+  const options = useLargeTitleOptions();
+  return (
+    <Stack screenOptions={options}>
+      <Stack.Screen name="index" options={{ title }} />
+    </Stack>
+  );
+}
+
+/**
+ * A pushed screen (conversation, mission, agent, delete account): native bar, back chevron only, the
+ * edge swipe back, the platform's push animation. Opaque by default (lists and composers lay out below
+ * it); `PushedHeader` switches a screen to a bar its content scrolls under.
+ */
+export function usePushedOptions(): NativeStackNavigationOptions {
+  const { colors } = useTheme();
+  return useMemo<NativeStackNavigationOptions>(
+    () => ({
+      headerShown: true,
+      title: "",
+      headerBackButtonDisplayMode: "minimal",
+      headerTransparent: false,
+      headerStyle: { backgroundColor: colors.bg },
+      headerShadowVisible: false,
+      headerTitleStyle: { color: colors.ink },
+      headerTintColor: colors.ink,
+      gestureEnabled: true,
+      contentStyle: { backgroundColor: colors.bg },
+    }),
+    [colors],
+  );
+}
+
+/** The bar of a pushed screen whose content scrolls under it (needs `contentInsetAdjustmentBehavior="automatic"`). */
+export function useScrollUnderPushedOptions(): NativeStackNavigationOptions {
+  const bar = useScrollUnderBar();
+  return useMemo<NativeStackNavigationOptions>(
+    () =>
+      // On iOS, clear the opaque defaults of `usePushedOptions` (options merge by spread, so an explicit
+      // `undefined` lets iOS 26 draw its own glass bar).
+      Platform.OS === "ios" ? { headerTransparent: undefined, headerStyle: undefined, ...bar } : bar,
+    [bar],
+  );
+}
+
+/** Over a full-bleed cover (the agent's sky): a clear bar on both platforms, the back button over the art. */
+export const coverBarOptions: NativeStackNavigationOptions = {
+  headerTransparent: true,
+  headerStyle: { backgroundColor: "transparent" },
+};
+
+/**
+ * A native form sheet (Requests, Você): drag to dismiss, detents, the grabber, and on iOS the screen behind
+ * scales back. `detents` are fractions of the screen height, ascending.
+ */
+export function useFormSheetOptions(
+  detents: number[],
+  background: "raised" | "bg" = "bg",
+): NativeStackNavigationOptions {
+  const { colors } = useTheme();
+  const key = detents.join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the detents array
+  return useMemo<NativeStackNavigationOptions>(
+    () => ({
+      headerShown: false,
+      presentation: "formSheet",
+      sheetAllowedDetents: detents,
+      sheetGrabberVisible: true,
+      sheetCornerRadius: 28,
+      sheetExpandsWhenScrolledToEdge: true,
+      contentStyle: { backgroundColor: background === "raised" ? colors.raised : colors.bg },
+    }),
+    [key, background, colors],
+  );
+}

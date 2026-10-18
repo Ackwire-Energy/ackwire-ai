@@ -14,7 +14,9 @@ import Animated, {
 import { BUTTON_SIZES, primaryLook } from "./Button";
 import { haptics } from "./haptics";
 import { Icon } from "./Icon";
+import { systemText } from "./Text";
 import { useTheme } from "./theme";
+import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export interface HoldButtonProps {
   /** Shown at rest, e.g. "Segure para aprovar". */
@@ -79,7 +81,10 @@ export function HoldButton({ label, holdLabel, onConfirm, durationMs = 1100 }: H
 
   return (
     <Animated.View
-      style={[{ height: s.height, borderRadius: s.radius, boxShadow: look.shadow, alignSelf: "stretch" }, pressStyle]}
+      style={[
+        { minHeight: s.height, borderRadius: s.radius, boxShadow: look.shadow, alignSelf: "stretch" },
+        pressStyle,
+      ]}
     >
       <Pressable
         onPressIn={start}
@@ -100,7 +105,11 @@ export function HoldButton({ label, holdLabel, onConfirm, durationMs = 1100 }: H
         </Animated.View>
         <View style={[styles.edge, { backgroundColor: look.highlight }]} />
         <Icon name="check" size={18} color={look.text} />
-        <RNText style={{ fontFamily: theme.fonts.semibold, fontSize: s.font, color: look.text }}>
+        <RNText
+          numberOfLines={1}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
+          style={[systemText(s.text, weights.semibold), { color: look.text }]}
+        >
           {holding ? holdLabel : label}
         </RNText>
       </Pressable>

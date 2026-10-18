@@ -3,7 +3,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
+import { systemText } from "./Text";
 import { type Theme, useTheme } from "./theme";
+import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost";
 
@@ -19,8 +21,8 @@ export interface ButtonProps {
 }
 
 export const BUTTON_SIZES = {
-  md: { height: 48, radius: 15, padding: 20, font: 15, icon: 18 },
-  sm: { height: 36, radius: 12, padding: 14, font: 14, icon: 16 },
+  md: { height: 48, radius: 15, padding: 20, text: "headline", icon: 18 },
+  sm: { height: 36, radius: 12, padding: 14, text: "subhead", icon: 16 },
 } as const;
 
 /** Primary's tonal gradient (ink 82% → ink) and its shadow, as on the web (`.b1`). */
@@ -38,7 +40,7 @@ export function primaryLook(theme: Pick<Theme, "colors">) {
 /** The tactile button: tonal gradient, a lit top edge, a spring press and a light haptic. */
 export function Button({ variant, size = "md", icon, label, onPress, wide = false, disabled = false }: ButtonProps) {
   const theme = useTheme();
-  const { colors, shadows, fonts } = theme;
+  const { colors, shadows } = theme;
   const s = BUTTON_SIZES[size];
   const primary = variant === "primary";
   const look = primaryLook(theme);
@@ -53,7 +55,7 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
       accessibilityState={{ disabled }}
       style={[
         {
-          height: s.height,
+          minHeight: s.height,
           borderRadius: s.radius,
           alignSelf: wide ? "stretch" : "flex-start",
           opacity: disabled ? 0.5 : 1,
@@ -85,7 +87,8 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
         {icon ? <Icon name={icon} size={s.icon} color={textColor} /> : null}
         <RNText
           numberOfLines={1}
-          style={{ fontFamily: fonts.semibold, fontSize: s.font, letterSpacing: -0.075, color: textColor }}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
+          style={[systemText(s.text, weights.semibold), { color: textColor }]}
         >
           {label}
         </RNText>

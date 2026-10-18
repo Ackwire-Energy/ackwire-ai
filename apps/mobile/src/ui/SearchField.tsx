@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Pressable, TextInput, type TextInputProps, View } from "react-native";
 import { Icon } from "./Icon";
+import { systemText } from "./Text";
 import { useTheme } from "./theme";
 
 export interface SearchFieldProps extends Omit<TextInputProps, "style"> {
@@ -10,7 +11,7 @@ export interface SearchFieldProps extends Omit<TextInputProps, "style"> {
 
 /** The search box: sunken, a magnifier, a clear button when there is text. */
 export function SearchField({ value, onChangeText, placeholder, ...rest }: SearchFieldProps) {
-  const { colors, fonts } = useTheme();
+  const { colors } = useTheme();
   const { t } = useTranslation();
   return (
     <View
@@ -18,7 +19,7 @@ export function SearchField({ value, onChangeText, placeholder, ...rest }: Searc
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
-        height: 42,
+        minHeight: 42,
         paddingHorizontal: 12,
         borderRadius: 14,
         backgroundColor: colors.sunken,
@@ -33,7 +34,7 @@ export function SearchField({ value, onChangeText, placeholder, ...rest }: Searc
         placeholderTextColor={colors.faint}
         returnKeyType="search"
         autoCorrect={false}
-        style={{ flex: 1, fontFamily: fonts.sans, fontSize: 15.5, color: colors.ink, paddingVertical: 0 }}
+        style={{ flex: 1, fontSize: systemText("body").fontSize, color: colors.ink, paddingVertical: 8 }}
       />
       {value ? (
         <Pressable

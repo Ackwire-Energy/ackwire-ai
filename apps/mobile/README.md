@@ -62,10 +62,13 @@ token whose audience is the bundle id `chat.agentes.app` (the server's Apple pro
 ## Fonts
 
 `assets/fonts` holds static instances from Google Fonts (all SIL Open Font License, texts in `OFL-*.txt`):
-Onest 400/500/600/700, Funnel Display Light (large titles) and Doto at ROND 100, weight 600 (every count).
+Funnel Display Light (large titles) and Doto at ROND 100, weight 600 (every count). Body and UI text use the
+system font (SF Pro / Roboto) at the platform's sizes and follow the person's text size setting: the scale is
+`src/ui/type-scale.ts` (HIG text styles on iOS, Material 3 on Android), used through `Text` variants and
+`systemText` in `src/ui/Text.tsx`.
 React Native has no variable-font axes, so each is a separate file; the family names are the keys in
 `src/ui/theme.tsx` (`fonts`). To refresh them, request the same instances from
-`https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300&family=Doto:ROND,wght@100,600`
+`https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300&family=Doto:ROND,wght@100,600`
 without a browser user agent (it then serves `.ttf`).
 
 ## Images

@@ -2,13 +2,15 @@ import { Pressable, Text as RNText, View } from "react-native";
 import { Count } from "./Count";
 import type { FiltersProps } from "./Filters";
 import { haptics } from "./haptics";
+import { systemText } from "./Text";
 import { useTheme } from "./theme";
+import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export type SegmentedProps = FiltersProps;
 
 /** A segmented control: a sunken track, the selected segment raised. */
 export function Segmented({ items, value, onChange }: SegmentedProps) {
-  const { colors, fonts, shadows } = useTheme();
+  const { colors, shadows } = useTheme();
   return (
     <View
       style={{
@@ -36,7 +38,7 @@ export function Segmented({ items, value, onChange }: SegmentedProps) {
             <View
               style={[
                 {
-                  height: 30,
+                  minHeight: 30,
                   paddingHorizontal: 12,
                   borderRadius: 9,
                   flexDirection: "row",
@@ -46,7 +48,10 @@ export function Segmented({ items, value, onChange }: SegmentedProps) {
                 on ? { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` } : null,
               ]}
             >
-              <RNText style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? colors.ink : colors.muted }}>
+              <RNText
+                maxFontSizeMultiplier={CHROME_MAX_SCALE}
+                style={[systemText("footnote", weights.semibold), { color: on ? colors.ink : colors.muted }]}
+              >
                 {item.label}
               </RNText>
               {item.count !== undefined ? (

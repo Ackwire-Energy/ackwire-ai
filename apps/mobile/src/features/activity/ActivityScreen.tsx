@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { memo, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import { Card, EmptyState, Filters, fonts, Icon, LargeTitleScreen, Section, Text } from "@/ui";
+import { Card, EmptyState, Filters, Icon, LargeTitleScreen, Section, Text } from "@/ui";
 import { notificationHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   faces: { flexDirection: "row", minWidth: 36, alignItems: "center" },
   overlap: { marginLeft: -8 },
   tx: { flex: 1, minWidth: 0 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   under: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18 },
   side: { flexDirection: "row", alignItems: "center", gap: 6 },
   more: { alignItems: "center", paddingVertical: 16 },

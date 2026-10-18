@@ -4,21 +4,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  AgentAvatar,
-  Button,
-  Card,
-  Chip,
-  fonts,
-  Icon,
-  PixelOrbit,
-  Row,
-  Section,
-  Sky,
-  SpendBar,
-  Text,
-  useToast,
-} from "@/ui";
+import { AgentAvatar, Button, Card, Chip, Icon, PixelOrbit, Row, Section, Sky, SpendBar, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -254,7 +240,7 @@ const styles = StyleSheet.create({
   center: { textAlign: "center" },
   acts: { flexDirection: "row", gap: 8, marginTop: 14 },
   grow: { flex: 1 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   about: { padding: 14 },
   cans: { flexDirection: "row", flexWrap: "wrap", gap: 6, padding: 14 },
   spend: { padding: 14, gap: 10 },

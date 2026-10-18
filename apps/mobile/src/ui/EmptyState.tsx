@@ -1,7 +1,7 @@
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
-import { Text as RNText, View } from "react-native";
+import { View } from "react-native";
 import { Sky } from "@/sky/Sky";
-import { useTheme } from "./theme";
+import { Text } from "./Text";
 
 export interface EmptyStateProps {
   title: string;
@@ -13,7 +13,6 @@ export interface EmptyStateProps {
 
 /** Nothing here yet: one calm line, optionally under a bit of sky. */
 export function EmptyState({ title, subtitle, sky = false, color = "sky" }: EmptyStateProps) {
-  const { colors, fonts } = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 20, paddingVertical: 40 }}>
       {sky ? (
@@ -21,24 +20,13 @@ export function EmptyState({ title, subtitle, sky = false, color = "sky" }: Empt
           <Sky color={color} depth={0.6} style={{ flex: 1 }} />
         </View>
       ) : null}
-      <RNText
-        style={{ fontFamily: fonts.medium, fontSize: 14, lineHeight: 20, color: colors.faint, textAlign: "center" }}
-      >
+      <Text variant="callout" tone="faint" style={{ fontWeight: "500", textAlign: "center" }}>
         {title}
-      </RNText>
+      </Text>
       {subtitle ? (
-        <RNText
-          style={{
-            fontFamily: fonts.sans,
-            fontSize: 13.5,
-            lineHeight: 19,
-            color: colors.faint,
-            textAlign: "center",
-            marginTop: 4,
-          }}
-        >
+        <Text variant="subhead" tone="faint" style={{ textAlign: "center", marginTop: 4 }}>
           {subtitle}
-        </RNText>
+        </Text>
       ) : null}
     </View>
   );

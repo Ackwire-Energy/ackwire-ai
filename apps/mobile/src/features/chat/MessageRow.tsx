@@ -4,7 +4,7 @@ import { splitCanceled } from "@agenteschat/client/lib/work";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Count, fonts, Icon, Text } from "@/ui";
+import { CHROME_MAX_SCALE, Count, Icon, Text } from "@/ui";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/cards";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -77,7 +77,7 @@ export const MessageRow = memo(function MessageRow({
       <View style={styles.body}>
         {grouped ? null : (
           <View style={styles.who}>
-            <Text variant="small" tone="ink" style={styles.name} numberOfLines={1}>
+            <Text variant="footnote" tone="ink" style={styles.name} numberOfLines={1}>
               {name}
             </Text>
             {agent?.role ? (
@@ -177,7 +177,9 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
                   p.mine && { borderWidth: 1.5, borderColor: c.ink2 },
                 ]}
               >
-                <Text style={styles.emoji}>{p.emoji}</Text>
+                <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
+                  {p.emoji}
+                </Text>
                 <Count value={p.people} size={14} />
               </Pressable>,
             ]
@@ -189,7 +191,9 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
             accessibilityLabel={t("mobile.chat.agentReacted", { emoji: p.emoji })}
             style={[styles.react, { backgroundColor: c.sunken }]}
           >
-            <Text style={styles.emoji}>{p.emoji}</Text>
+            <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
+              {p.emoji}
+            </Text>
             <AgentFace agentId={agentId} size={16} live={false} />
           </View>
         )),
@@ -204,11 +208,18 @@ const styles = StyleSheet.create({
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
   who: { flexDirection: "row", alignItems: "baseline", gap: 7 },
-  name: { fontFamily: fonts.bold },
+  name: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
   pin: { alignSelf: "center" },
   pinLine: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
   reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
-  react: { height: 30, paddingHorizontal: 10, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 6 },
+  react: {
+    minHeight: 30,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   emoji: { fontSize: 15 },
 });

@@ -11,6 +11,8 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { AccessibilityInfo, Platform, useColorScheme } from "react-native";
 import { readValue, STORED, writeValue } from "@/lib/storage";
 
+export { weights } from "./type-scale";
+
 /**
  * The theme for React Native, from `@agenteschat/tokens` (tokens.css is the source of truth).
  * Rules (design system): neutral cards, chips with icons (never colored dots), the brand blue only for
@@ -23,12 +25,11 @@ export type ThemePreference = "system" | Scheme;
 export const boxShadow = (layers: readonly ShadowLayer[]) =>
   layers.map((l) => `${l.inset ? "inset " : ""}${l.x}px ${l.y}px ${l.blur}px ${l.spread}px ${l.color}`).join(", ");
 
-/** Font families as loaded by `useAppFonts` (static files: React Native has no variable axes). */
+/**
+ * Brand font families as loaded by `useAppFonts` (static files: React Native has no variable axes).
+ * Body and UI text use the system font (SF Pro / Roboto) through `Text` and `systemText`, with `weights`.
+ */
 export const fonts = {
-  sans: "Onest",
-  medium: "Onest-Medium",
-  semibold: "Onest-SemiBold",
-  bold: "Onest-Bold",
   /** Funnel Display Light: large titles. */
   display: "FunnelDisplay-Light",
   /** Doto, ROND 100 instance (weight 600): every count. */

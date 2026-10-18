@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { ThemeProvider as NavigationThemeProvider, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -7,6 +7,7 @@ import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
 import { NoOrganization } from "@/ui/auth/NoOrganization";
+import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -29,6 +30,7 @@ function Gate() {
   const session = useSession();
   const org = useOrgGate();
   const { colors, scheme } = useTheme();
+  const navigationTheme = useNavigationTheme();
   const signedIn = session.signedIn;
   const hasOrg = signedIn && Boolean(org.state);
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading);
@@ -39,7 +41,8 @@ function Gate() {
 
   // The navigator is always mounted (so links and pushes can navigate); the splash covers it until ready.
   return (
-    <>
+    // The native bars (headers, back button tint, interface style) read React Navigation's theme: ours.
+    <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Protected guard={hasOrg}>
@@ -50,6 +53,6 @@ function Gate() {
         </Stack.Protected>
       </Stack>
       {ready && signedIn && org.none ? <NoOrganization /> : null}
-    </>
+    </NavigationThemeProvider>
   );
 }

@@ -9,7 +9,6 @@ import {
   Button,
   Card,
   EmptyState,
-  fonts,
   Icon,
   IconButton,
   LargeTitleScreen,
@@ -171,8 +170,8 @@ const styles = StyleSheet.create({
   cell: { width: "48.5%" },
   pressed: { transform: [{ scale: 0.97 }] },
   agc: { padding: 14, gap: 2 },
-  name: { fontFamily: fonts.bold, marginTop: 10 },
-  bold: { fontFamily: fonts.semibold },
+  name: { fontWeight: "600", marginTop: 10 },
+  bold: { fontWeight: "600" },
   st: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
   newCard: {
     minHeight: 150,

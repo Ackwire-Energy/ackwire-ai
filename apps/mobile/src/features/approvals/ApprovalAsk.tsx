@@ -2,7 +2,7 @@ import type { Approval } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Chip, Fuse, fonts, Text } from "@/ui";
+import { Button, Chip, Fuse, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow } from "../shared/hooks";
 import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
@@ -70,7 +70,7 @@ export function ApprovalAsk({ approval: a, divider }: { approval: Approval; divi
 const styles = StyleSheet.create({
   ask: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   grow: { flex: 1 },
   title: { marginTop: 7, marginBottom: 10 },
   fuse: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },

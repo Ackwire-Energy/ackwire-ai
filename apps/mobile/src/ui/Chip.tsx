@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { Text as RNText, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
+import { systemText } from "./Text";
 import { useTheme } from "./theme";
+import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 export interface ChipProps {
   /** Chips carry an icon, never a colored dot. */
@@ -13,14 +15,14 @@ export interface ChipProps {
 
 /** A small neutral tag: sunken pill, muted text. */
 export function Chip({ icon, label, leading }: ChipProps) {
-  const { colors, fonts } = useTheme();
+  const { colors } = useTheme();
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
         gap: 5,
-        height: 24,
+        minHeight: 24,
         paddingHorizontal: 9,
         borderRadius: 999,
         backgroundColor: colors.sunken,
@@ -28,7 +30,11 @@ export function Chip({ icon, label, leading }: ChipProps) {
       }}
     >
       {leading ?? (icon ? <Icon name={icon} size={13} color={colors.muted} /> : null)}
-      <RNText numberOfLines={1} style={{ fontFamily: fonts.semibold, fontSize: 12, color: colors.muted }}>
+      <RNText
+        numberOfLines={1}
+        maxFontSizeMultiplier={CHROME_MAX_SCALE}
+        style={[systemText("caption", weights.semibold), { color: colors.muted }]}
+      >
         {label}
       </RNText>
     </View>

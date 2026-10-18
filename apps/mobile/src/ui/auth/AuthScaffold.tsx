@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { KeyboardAvoidingView, Platform, Text as RNText, ScrollView, useWindowDimensions, View } from "react-native";
+import { Text as RNText, ScrollView, useWindowDimensions, View } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { Sky } from "@/sky/Sky";
 import { IconButton } from "../IconButton";
+import { Text } from "../Text";
 import { useTheme } from "../theme";
+import { CHROME_MAX_SCALE } from "../type-scale";
 
 export interface AuthScaffoldProps {
   title: string;
@@ -23,10 +26,8 @@ export function AuthScaffold({ title, subtitle, onBack, children, footer }: Auth
   const { height } = useWindowDimensions();
   const skyHeight = Math.round(Math.min(300, height * 0.32));
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    // The keyboard library's view: with its provider on, Android no longer resizes the window by itself.
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior="padding">
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 16 }}
@@ -54,14 +55,15 @@ export function AuthScaffold({ title, subtitle, onBack, children, footer }: Auth
         <View style={{ paddingHorizontal: 24, paddingTop: 8, flex: 1 }}>
           <RNText
             accessibilityRole="header"
+            maxFontSizeMultiplier={CHROME_MAX_SCALE}
             style={{ fontFamily: fonts.display, fontSize: 32, lineHeight: 35, letterSpacing: -0.64, color: colors.ink }}
           >
             {title}
           </RNText>
           {subtitle ? (
-            <RNText style={{ fontFamily: fonts.sans, fontSize: 15, lineHeight: 21, color: colors.muted, marginTop: 6 }}>
+            <Text variant="callout" tone="muted" style={{ marginTop: 6 }}>
               {subtitle}
-            </RNText>
+            </Text>
           ) : null}
           <View style={{ marginTop: 22, gap: 10 }}>{children}</View>
           <View style={{ flex: 1 }} />

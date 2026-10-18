@@ -23,16 +23,19 @@ import {
   useThreadMission,
   useThreads,
 } from "@agenteschat/client";
-import { FlashList, type FlashListRef } from "@shopify/flash-list";
+import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
+import type { LegendListRef } from "@legendapp/list/react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KeyboardAvoidingView, Pressable, StyleSheet, View } from "react-native";
+import { type LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
+import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
+import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Composer, fonts, IconButton, Text, useToast } from "@/ui";
+import { Button, Composer, Count, Icon, IconButton, PressScale, Text, useTheme, useToast } from "@/ui";
 import { isListedThread, threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
@@ -48,6 +51,15 @@ import { buildRows, type ChatRow, mergeTimeline, parseSlash, pinTarget, threadRo
 import { MessageRow } from "./MessageRow";
 import { PinsSheet } from "./PinsSheet";
 import {
+  appendedKeys,
+  type HeldRun,
+  lastSeenKey,
+  runsToShow,
+  type ScrollRow,
+  STICK_TO_END_THRESHOLD,
+  unreadBelow,
+} from "./scroll";
+import {
   ChannelOptions,
   MessageActions,
   MissionSummaryView,
@@ -58,6 +70,15 @@ import {
 } from "./sheets";
 
 type Row = ChatRow | { kind: "marker"; key: string; text: string } | { kind: "run"; key: string; run: LiveRun };
+
+const rowKey = (r: Row) => r.key;
+const rowType = (r: Row) => r.kind;
+/** A row that just arrived at the bottom rises in (only while it is fresh: not when scrolled back into view). */
+const ENTER = FadeInDown.duration(220);
+const FRESH_MS = 800;
+/** The composer's safe-area padding hides behind the open keyboard; this much stays between them. */
+const KEYBOARD_GAP = 8;
+const COMPOSER_INPUT_ID = "chat-composer";
 
 /** A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). */
 export function ChatScreen({ channelId, threadId }: { channelId: string; threadId?: string | null }) {
@@ -141,6 +162,26 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     [live.consults, isThread, threadId, linkThreads],
   );
 
+  // ── Streaming rows ──
+  // A finished reply keeps its row (last words) until its saved message is listed: no empty frame between them.
+  const heldRef = useRef(new Map<string, HeldRun<LiveRun>>());
+  const shownRef = useRef<LiveRun[]>([]);
+  const [holdTick, setHoldTick] = useState(0);
+  const arrivedRuns = useMemo(() => new Set(list.flatMap((m) => (m.agentRunId ? [m.agentRunId] : []))), [list]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `holdTick` re-checks the held rows when one expires
+  const runRows = useMemo(() => {
+    const next = runsToShow(heldRef.current, shownRef.current, writingRuns(runs), arrivedRuns, Date.now());
+    heldRef.current = next.held;
+    shownRef.current = next.shown;
+    return next;
+  }, [runs, arrivedRuns, holdTick]);
+  useEffect(() => {
+    if (runRows.nextExpiry === null) return;
+    const id = setTimeout(() => setHoldTick((n) => n + 1), Math.max(0, runRows.nextExpiry - Date.now()) + 16);
+    return () => clearTimeout(id);
+  }, [runRows]);
+  const shownRuns = runRows.shown;
+
   // ── Rows ──
   const rows = useMemo<Row[]>(() => {
     if (isThread && threadId) {
@@ -171,15 +212,56 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       return [
         ...head,
         ...buildRows(replies),
-        ...writingRuns(runs).map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
+        ...shownRuns.map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
       ];
     }
     const hidden = (m: Message) => Boolean(m.threadId && (linkThreads.has(m.threadId) || collapsed.has(m.threadId)));
     return [
       ...buildRows(list, hidden),
-      ...writingRuns(runs).map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
+      ...shownRuns.map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
     ];
-  }, [isThread, threadId, list, thread.data, channel?.name, runs, linkThreads, collapsed, t]);
+  }, [isThread, threadId, list, thread.data, channel?.name, shownRuns, linkThreads, collapsed, t]);
+
+  // ── Following the end ──
+  // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
+  // up nothing moves and a button counts what arrived below.
+  const listRef = useRef<LegendListRef>(null);
+  const scrollRows = useMemo<ScrollRow[]>(
+    () =>
+      rows.map((r) => ({
+        key: r.key,
+        kind: r.kind === "message" ? "message" : r.kind === "run" ? "run" : "other",
+        mine: r.kind === "message" && r.message.author.type === "person" && r.message.author.id === meId,
+      })),
+    [rows, meId],
+  );
+  const [atEnd, setAtEnd] = useState(true);
+  const [seenKey, setSeenKey] = useState<string | null>(null);
+  const latestSeen = lastSeenKey(scrollRows);
+  useEffect(() => {
+    if (atEnd) setSeenKey(latestSeen);
+  }, [atEnd, latestSeen]);
+  const unread = atEnd ? 0 : unreadBelow(scrollRows, seenKey);
+  const toEnd = useCallback(() => {
+    requestAnimationFrame(() => void listRef.current?.scrollToEnd({ animated: true }));
+  }, []);
+
+  // Rows that arrive at the bottom while the screen is open rise in; older pages and the first load don't.
+  const prevKeysRef = useRef<string[]>([]);
+  const freshRef = useRef(new Map<string, number>());
+  const rowKeys = useMemo(() => rows.map(rowKey), [rows]);
+  useMemo(() => {
+    const now = Date.now();
+    for (const key of appendedKeys(prevKeysRef.current, rowKeys)) freshRef.current.set(key, now);
+    for (const [key, t0] of freshRef.current) if (now - t0 > FRESH_MS) freshRef.current.delete(key);
+  }, [rowKeys]);
+  useEffect(() => {
+    prevKeysRef.current = rowKeys;
+  }, [rowKeys]);
+  const isFresh = useCallback((key: string) => {
+    const t0 = freshRef.current.get(key);
+    return t0 !== undefined && Date.now() - t0 <= FRESH_MS;
+  }, []);
 
   // ── Read ──
   // Seen up to the latest message: the list's badges (channel and DM) clear at once.
@@ -262,6 +344,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const cmd = parseSlash(text);
     if (!cmd) {
       send(text, threadId);
+      toEnd();
       return;
     }
     switch (cmd.command) {
@@ -319,6 +402,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         ...(threadId ? { threadId } : {}),
       });
       send("", threadId, { artifacts: [{ id: saved.id, version: saved.version, title: saved.title }] });
+      toEnd();
     } catch {
       toast({ title: t("mobile.chat.uploadFailed"), icon: "x" });
     }
@@ -388,7 +472,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   );
 
   // ── Pins ──
-  const listRef = useRef<FlashListRef<Row>>(null);
   const rowsRef = useRef<Row[]>([]);
   const goToPin = (pin: MessagePin) => {
     sheet.close();
@@ -523,22 +606,55 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             </Text>
           );
         case "run":
-          return <StreamingRow run={item.run} />;
+          return (
+            <Animated.View entering={isFresh(item.key) ? ENTER : undefined}>
+              <StreamingRow run={item.run} />
+            </Animated.View>
+          );
         case "message":
           return (
-            <MessageRow
-              message={item.message}
-              grouped={item.grouped}
-              meId={meId}
-              thread={isThread ? undefined : linkThreads.get(item.message.id)}
-              onLongPress={onLongPress}
-              onRetry={onRetry}
-            />
+            // A finished reply replaces its streaming row in place: it doesn't rise in again.
+            <Animated.View entering={isFresh(item.key) && !item.message.agentRunId ? ENTER : undefined}>
+              <MessageRow
+                message={item.message}
+                grouped={item.grouped}
+                meId={meId}
+                thread={isThread ? undefined : linkThreads.get(item.message.id)}
+                onLongPress={onLongPress}
+                onRetry={onRetry}
+              />
+            </Animated.View>
           );
       }
     },
-    [when, meId, isThread, linkThreads, onLongPress, onRetry],
+    [when, meId, isThread, linkThreads, onLongPress, onRetry, isFresh],
   );
+
+  // ── Composer and keyboard ──
+  // The composer floats over the list's bottom and rides the keyboard (KeyboardStickyView); the list's end
+  // inset is the composer's height plus the keyboard, moved on the UI thread frame by frame (also while the
+  // keyboard is dragged down interactively).
+  const composerRef = useRef<ComponentRef<typeof View>>(null);
+  const { contentInsetEndAdjustment, onComposerLayout } = useKeyboardChatComposerInset(listRef, composerRef);
+  const [composerHeight, setComposerHeight] = useState(0);
+  const onComposerBoxLayout = (e: LayoutChangeEvent) => {
+    onComposerLayout(e);
+    setComposerHeight(e.nativeEvent.layout.height);
+  };
+  const bottomPad = Math.max(insets.bottom, 10);
+  const lift = Math.max(0, bottomPad - KEYBOARD_GAP);
+  const showList = !loading && !(rows.length === 0 && runs.length === 0);
+
+  // Whether the person is near the end (what the list follows): the "new messages" button shows otherwise.
+  useEffect(() => {
+    if (!showList) return;
+    const state = listRef.current?.getState();
+    if (!state) return;
+    // A new list opens at the end (initialScrollAtEnd); only changes count from here, so the button never
+    // flashes on open.
+    setAtEnd(true);
+    return state.listen("isWithinMaintainScrollAtEndThreshold", setAtEnd);
+  }, [showList]);
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -548,53 +664,118 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           <MissionCardView mission={pinned} pinned />
         </View>
       ) : null}
-      <KeyboardAvoidingView style={styles.grow} behavior="padding">
+      <KeyboardGestureArea
+        style={styles.grow}
+        interpolator="ios"
+        textInputNativeID={COMPOSER_INPUT_ID}
+        offset={Math.max(0, composerHeight - lift)}
+      >
         {loading ? (
-          <View style={styles.center}>
+          <View style={[styles.center, { paddingBottom: composerHeight }]}>
             <Text tone="faint">{t("mobile.common.loading")}</Text>
           </View>
-        ) : rows.length === 0 && runs.length === 0 ? (
-          <View style={styles.center}>
+        ) : !showList ? (
+          <View style={[styles.center, { paddingBottom: composerHeight }]}>
             <Text tone="faint" style={styles.emptyText}>
               {dmAgentId ? t("mobile.chat.emptyAgent", { name: dm?.with.name ?? "" }) : t("mobile.chat.empty")}
             </Text>
           </View>
         ) : (
-          <FlashList
+          <KeyboardAwareLegendList
             ref={listRef}
+            style={styles.grow}
             data={rows}
-            keyExtractor={(r) => r.key}
-            getItemType={(r) => r.kind}
+            keyExtractor={rowKey}
+            getItemType={rowType}
             renderItem={renderItem}
-            maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
+            estimatedItemSize={72}
+            // Opens at the latest message, short conversations sit at the bottom like any chat.
+            initialScrollAtEnd
+            alignItemsAtEnd
+            // New messages, a reply growing word by word and the working line keep the end in view, but
+            // only while the person is near it.
+            maintainScrollAtEnd
+            maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+            // Older pages above and rows changing size keep what is on screen still.
+            maintainVisibleContentPosition
             onStartReached={loadOlder}
             onStartReachedThreshold={0.5}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
+            keyboardOffset={lift}
+            contentInsetEndAdjustment={contentInsetEndAdjustment}
             contentContainerStyle={styles.listPad}
             ListFooterComponent={<WorkingLine runs={runs} consults={consults} />}
           />
         )}
-        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          {member ? (
-            <Composer
-              placeholder={placeholder}
-              onSend={onSend}
-              onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
-              {...(suggestions.length > 0 ? { suggestions } : {})}
+        <KeyboardStickyView
+          offset={{ opened: lift }}
+          style={[styles.jumpDock, { bottom: composerHeight + 10 }]}
+          pointerEvents="box-none"
+        >
+          {showList && !atEnd ? (
+            <ToLatest
+              unread={unread}
+              onPress={() => {
+                setAtEnd(true);
+                void listRef.current?.scrollToEnd({ animated: true });
+              }}
             />
-          ) : (
-            <Button
-              variant="primary"
-              wide
-              label={t("mobile.chat.join")}
-              disabled={join.isPending}
-              onPress={() => join.mutate()}
-            />
-          )}
-        </View>
-      </KeyboardAvoidingView>
+          ) : null}
+        </KeyboardStickyView>
+        <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
+          <View
+            ref={composerRef}
+            onLayout={onComposerBoxLayout}
+            style={[styles.composer, { paddingBottom: bottomPad, backgroundColor: c.bg }]}
+          >
+            {member ? (
+              <Composer
+                placeholder={placeholder}
+                onSend={onSend}
+                onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
+                inputNativeID={COMPOSER_INPUT_ID}
+                {...(suggestions.length > 0 ? { suggestions } : {})}
+              />
+            ) : (
+              <Button
+                variant="primary"
+                wide
+                label={t("mobile.chat.join")}
+                disabled={join.isPending}
+                onPress={() => join.mutate()}
+              />
+            )}
+          </View>
+        </KeyboardStickyView>
+      </KeyboardGestureArea>
     </View>
+  );
+}
+
+/** Back to the latest messages: a round button over the list, with how many arrived below. */
+function ToLatest({ unread, onPress }: { unread: number; onPress: () => void }) {
+  const { t } = useTranslation();
+  const { colors, shadows } = useTheme();
+  return (
+    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)}>
+      <PressScale
+        to={0.92}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={unread > 0 ? t("mobile.chat.newMessages", { count: unread }) : t("mobile.chat.toLatest")}
+        style={[styles.jump, { backgroundColor: colors.raised, boxShadow: `${shadows.e2}, ${shadows.top}` }]}
+      >
+        <View style={styles.jumpIcon}>
+          <Icon name="chev" size={20} color={colors.ink2} />
+        </View>
+        {unread > 0 ? (
+          <View style={styles.jumpBadge} pointerEvents="none">
+            <Count value={unread} size={11} inverted max={99} />
+          </View>
+        ) : null}
+      </PressScale>
+    </Animated.View>
   );
 }
 
@@ -604,9 +785,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   emptyText: { textAlign: "center" },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
-  day: { alignSelf: "center", textAlign: "center", marginTop: 10, marginBottom: 4, fontFamily: fonts.semibold },
+  day: { alignSelf: "center", textAlign: "center", marginTop: 10, marginBottom: 4, fontWeight: "600" },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },
+  composerDock: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  jumpDock: { position: "absolute", right: 14 },
+  jump: { width: 40, height: 40, borderRadius: 20 },
+  jumpIcon: { flex: 1, alignItems: "center", justifyContent: "center" },
+  jumpBadge: { position: "absolute", top: -6, right: -6 },
   side: { flexDirection: "row", alignItems: "center", gap: 2 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },

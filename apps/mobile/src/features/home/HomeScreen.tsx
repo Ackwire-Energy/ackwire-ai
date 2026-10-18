@@ -13,9 +13,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AgentAvatar, Button, Card, fonts, IconButton, PersonAvatar, PixelOrbit, Row, Section, Sky, Text } from "@/ui";
+import { AgentAvatar, Button, Card, IconButton, PersonAvatar, PixelOrbit, Row, Section, Sky, Text } from "@/ui";
 import { crewOf } from "../agents/logic";
 import { workTitle, workWhere } from "../agents/work";
 import { ApprovalAsk } from "../approvals/ApprovalAsk";
@@ -73,12 +73,16 @@ export function HomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
+      {/* Under the native tabs, iOS insets this first scroll view by itself (status bar on top, tab bar
+          below); Android lays it out above the tab bar, so only the status bar is ours to clear there. */}
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingBottom: 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
-        <View style={[styles.hello, { paddingTop: insets.top + 8 }]}>
-          <Sky color="sky" depth={0.7} style={StyleSheet.absoluteFill} />
+        <View style={[styles.hello, { paddingTop: IOS ? 8 : insets.top + 8 }]}>
+          {/* On iOS the content starts under the status bar: the sky reaches up behind it. */}
+          <Sky color="sky" depth={0.7} style={[StyleSheet.absoluteFill, IOS && { top: -insets.top }]} />
           <View style={styles.top}>
             <Pressable
               onPress={() => router.push("/me")}
@@ -189,6 +193,8 @@ export function HomeScreen() {
   );
 }
 
+const IOS = Platform.OS === "ios";
+
 /** Rows of "Trabalhando agora" whose agent moves. */
 const LIVE_ROWS = 3;
 /** How often "Trabalhando agora" looks again while Início shows. */
@@ -289,7 +295,7 @@ function QuestionAsk({ item: n, divider }: { item: AppNotification; divider: boo
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  hello: { paddingHorizontal: 20, paddingBottom: 18, overflow: "hidden" },
+  hello: { paddingHorizontal: 20, paddingBottom: 18, overflow: Platform.OS === "ios" ? "visible" : "hidden" },
   top: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
@@ -299,7 +305,7 @@ const styles = StyleSheet.create({
   orb: { position: "absolute", right: -4, bottom: -4, padding: 2, borderRadius: 3 },
   ask: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   askTitle: { marginTop: 7, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8 },
 });

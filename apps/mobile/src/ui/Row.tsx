@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Pressable, Text as RNText, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Icon } from "./Icon";
+import { Text } from "./Text";
 import { useTheme } from "./theme";
 
 export interface RowProps {
@@ -17,7 +18,7 @@ export interface RowProps {
 
 /** A list row: leading avatar or tile, title in ink, a muted line, meta on the right. */
 export function Row({ leading, title, subtitle, meta, chevron = false, onPress, divider = false }: RowProps) {
-  const { colors, fonts } = useTheme();
+  const { colors } = useTheme();
   const body = (pressed: boolean) => (
     <View
       style={{
@@ -44,19 +45,13 @@ export function Row({ leading, title, subtitle, meta, chevron = false, onPress, 
       ) : null}
       {leading}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <RNText
-          numberOfLines={1}
-          style={{ fontFamily: fonts.semibold, fontSize: 15, lineHeight: 20, color: colors.ink }}
-        >
+        <Text variant="title" numberOfLines={1}>
           {title}
-        </RNText>
+        </Text>
         {subtitle ? (
-          <RNText
-            numberOfLines={1}
-            style={{ fontFamily: fonts.sans, fontSize: 13.5, lineHeight: 19, color: colors.muted }}
-          >
+          <Text variant="small" numberOfLines={1}>
             {subtitle}
-          </RNText>
+          </Text>
         ) : null}
       </View>
       {meta ? <View style={{ alignItems: "flex-end", gap: 5 }}>{meta}</View> : null}

@@ -1,11 +1,12 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Text as RNText, View } from "react-native";
+import { View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { type AgentLookInput, lookOf } from "@/agent/looks";
 import { Glass } from "./Glass";
 import { Icon, type IconName } from "./Icon";
+import { Text } from "./Text";
 import { useTheme } from "./theme";
 
 export interface ToastInput {
@@ -48,7 +49,7 @@ export function ToastHost({ children }: { children?: ReactNode }) {
 }
 
 function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
-  const { colors, fonts, shadows, motion, reducedMotion } = useTheme();
+  const { colors, shadows, motion, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
   const y = useSharedValue(reducedMotion ? 0 : -200);
   const opacity = useSharedValue(0);
@@ -115,13 +116,13 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
           </View>
         )}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <RNText numberOfLines={1} style={{ fontFamily: fonts.semibold, fontSize: 14.5, color: colors.ink }}>
+          <Text variant="subhead" numberOfLines={1} style={{ fontWeight: "600" }}>
             {item.title}
-          </RNText>
+          </Text>
           {item.subtitle ? (
-            <RNText numberOfLines={2} style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.muted }}>
+            <Text variant="footnote" numberOfLines={2}>
               {item.subtitle}
-            </RNText>
+            </Text>
           ) : null}
         </View>
       </Glass>

@@ -24,7 +24,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, fonts, Icon, Text, useToast } from "@/ui";
+import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -114,7 +114,9 @@ export function MessageActions({
               accessibilityLabel={t("mobile.chat.reactWith", { emoji: e })}
               style={({ pressed }) => [styles.emo, pressed && styles.emoPressed]}
             >
-              <Text style={styles.emoText}>{e}</Text>
+              <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoText}>
+                {e}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -674,7 +676,7 @@ export function MissionSummaryView({ missionId }: { missionId: string }) {
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  bold: { fontFamily: fonts.semibold },
+  bold: { fontWeight: "600" },
   preview: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 18 },
   emorow: {
     flexDirection: "row",

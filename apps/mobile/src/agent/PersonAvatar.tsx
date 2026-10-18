@@ -9,7 +9,7 @@ export interface PersonAvatarProps {
 
 /** A person: a neutral circle with the first letter (agents are the ones with color). */
 export function PersonAvatar({ name, size }: PersonAvatarProps) {
-  const { scheme, fonts } = useTheme();
+  const { scheme } = useTheme();
   const dark = scheme === "dark";
   const initial = (name.trim()[0] ?? "?").toUpperCase();
   return (
@@ -24,7 +24,7 @@ export function PersonAvatar({ name, size }: PersonAvatarProps) {
     >
       <RNText
         allowFontScaling={false}
-        style={{ fontFamily: fonts.semibold, fontSize: size * 0.42, color: dark ? "#efefec" : "#2a2a28" }}
+        style={{ fontWeight: "600", fontSize: size * 0.42, color: dark ? "#efefec" : "#2a2a28" }}
       >
         {initial}
       </RNText>

@@ -1,5 +1,6 @@
 import { Text as RNText, View } from "react-native";
 import { useTheme } from "./theme";
+import { CHROME_MAX_SCALE } from "./type-scale";
 
 export interface CountProps {
   value: number;
@@ -23,7 +24,7 @@ export function Count({ value, size = 14, inverted = false, color, max }: CountP
       <View
         style={{
           minWidth: h,
-          height: h,
+          minHeight: h,
           paddingHorizontal: Math.round(size * 0.42),
           borderRadius: 999,
           backgroundColor: colors.ink,
@@ -33,7 +34,7 @@ export function Count({ value, size = 14, inverted = false, color, max }: CountP
       >
         <RNText
           style={{ fontFamily: fonts.dot, fontSize: size, lineHeight: h - 2, color: color ?? colors.bg }}
-          allowFontScaling={false}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
         >
           {label}
         </RNText>
@@ -42,6 +43,7 @@ export function Count({ value, size = 14, inverted = false, color, max }: CountP
   }
   return (
     <RNText
+      maxFontSizeMultiplier={CHROME_MAX_SCALE}
       style={{ fontFamily: fonts.dot, fontSize: size, lineHeight: Math.round(size * 1.2), color: color ?? colors.ink }}
     >
       {label}
