@@ -1,18 +1,9 @@
 name: CI
 
 # All verification runs here, never on the developer's machine.
-# Cost: docs/Markdown-only changes don't run it, and each test group runs only when its code (or
-# something it depends on) changed; lint, boundaries and typecheck always run (they're quick).
+# Manual only (Actions minutes cost money): run it from the Actions tab or `gh workflow run ci.yml --ref main`.
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-  pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -24,25 +15,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: What changed
+      # A manual run checks everything (the groups below stay so a filter can come back later).
+      - name: What runs
         id: changed
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            shared:
-              - "packages/**"
-              - "package.json"
-              - "bun.lock"
-              - "tsconfig*.json"
-              - ".github/workflows/ci.yml"
-            backend:
-              - "apps/server/**"
-            web:
-              - "apps/web/**"
-            mobile:
-              - "apps/mobile/**"
-            desktop:
-              - "apps/desktop/**"
+        run: |
+          for g in shared backend web mobile desktop; do echo "$g=true" >> "$GITHUB_OUTPUT"; done
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
