@@ -234,6 +234,87 @@ button.mi-pill--need:hover {
   align-items: center;
   gap: 10px;
 }
+/* Proposed already investigated (FazerDesfazer.html, "mission"): the findings, the plan under a label, Ajustar / Começar, the note. */
+.mi-findings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 16px 0;
+  padding: 0;
+  list-style: none;
+}
+.mi-finding {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink2);
+}
+.mi-finding > .ac-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--faint);
+}
+.mi-finding__tx {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* The one decision left: the line that asks something of the person. */
+.mi-finding--decision {
+  margin-top: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--sunken);
+  color: var(--ink);
+  font-weight: 500;
+}
+.mi-finding--decision > .ac-icon {
+  color: var(--ink2);
+}
+.mi-ref {
+  display: inline-block;
+  margin-left: 6px;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+.mi-ref code,
+code.mi-ref {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--sunken);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink2);
+}
+.mi-finding--decision .mi-ref code,
+.mi-finding--decision code.mi-ref {
+  background: var(--raised);
+}
+a.mi-ref:hover code {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.mi-findings__plan {
+  display: block;
+  margin: 14px 16px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.mi-findings__plan + .mi-plan__list {
+  margin-top: 8px;
+}
+.mi-findings__foot {
+  padding-bottom: 8px;
+}
+.mi-findings__note {
+  margin: 0 16px 14px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
 .mi-box {
   width: 14px;
   height: 14px;

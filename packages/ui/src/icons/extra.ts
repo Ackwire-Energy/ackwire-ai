@@ -413,6 +413,8 @@ export const extraIcons = {
   ],
   /** Threads.html: Missões (a flag on a pole); Forum.html: conclude, a turn, where a round starts. */
   flag: [["path", { d: "M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5" }]],
+  /** FazerDesfazer.html: numbers a mission's investigation found (analytics, logs, errors). */
+  chart: [["path", { d: "M3.5 16.5h13M6.5 13.5v-3M10 13.5v-7.5M13.5 13.5v-5" }]],
   /** Forum.html: a stance that proposes. */
   bulb: [["path", { d: "M7.5 15h5M8.3 17.5h3.4M10 2.5a5 5 0 0 0-2.9 9.1v1.7h5.8v-1.7A5 5 0 0 0 10 2.5z" }]],
   /** Forum.html: a stance that disagrees. */

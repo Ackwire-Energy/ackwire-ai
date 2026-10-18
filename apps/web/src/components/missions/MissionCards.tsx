@@ -3,6 +3,7 @@ import type {
   Mission,
   MissionDecision,
   MissionExecutor,
+  MissionFinding,
   MissionLinkMeta,
   MissionPlanMeta,
   MissionReportMeta,
@@ -10,6 +11,7 @@ import type {
 } from "@agenteschat/client";
 import {
   keys,
+  useAgentRepos,
   useMission,
   useMissionAct,
   useMissionControl,
@@ -26,6 +28,8 @@ import { formatTime } from "@agenteschat/client/lib/format";
 import { folderName } from "@agenteschat/client/lib/machines";
 import {
   executorName,
+  findingRefUrl,
+  findingsRepo,
   formatSpan,
   machineTaskOf,
   missionAutoApprovedOf,
@@ -176,16 +180,27 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       },
     );
   const owner = m?.ownerId ? dir.memberById.get(m.ownerId)?.name : undefined;
+  // Proposed already investigated (ADR 0037 round 2): what it read, the numbers, the one decision left.
+  const findings = m?.findings ?? [];
+  const investigated = findings.length > 0;
+  const adjust =
+    m?.canAct && actions?.replyToMission
+      ? () => actions.replyToMission?.(meta.missionId, t("missions.plan.label"))
+      : null;
   return (
-    <div className="mi-card mi-plan">
+    <div className={investigated ? "mi-card mi-plan mi-plan--investigated" : "mi-card mi-plan"}>
       <div className="mi-plan__head">
         <span className="mi-cap">
           <ExecutorMark executor={current} agentId={m?.agentId} agentName={agentName} />
-          {t("missions.plan.cap", { executor })}
+          {investigated ? t("missions.findings.proposed") : t("missions.plan.cap", { executor })}
         </span>
         <h3>{meta.title}</h3>
-        {!sameAsTitle(meta.title, meta.goal) && <p>{firstSentence(meta.goal)}</p>}
+        {!investigated && !sameAsTitle(meta.title, meta.goal) && <p>{firstSentence(meta.goal)}</p>}
       </div>
+      {m && investigated && <MissionFindings mission={m} agentName={agentName} />}
+      {investigated && items.length > 0 && (
+        <p className="mi-plan__label mi-findings__plan">{t("missions.findings.plan", { count: items.length })}</p>
+      )}
       {plan.isPending ? (
         <div className="mi-plan__list" aria-hidden="true">
           <Skeleton width="60%" />
@@ -271,35 +286,117 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
           </div>
         )}
       </div>
-      <div className="mi-plan__foot">
-        {m?.role === "owner" && (
-          <Button
-            variant="primary"
-            size="sm"
-            icon="check"
-            loading={control.isPending}
-            disabled={waitPlan}
-            onClick={start}
-          >
-            {t("missions.plan.start")}
-          </Button>
-        )}
-        {m?.canAct && actions?.replyToMission && (
-          <Button
-            size="sm"
-            icon="edit"
-            onClick={() => actions.replyToMission?.(meta.missionId, t("missions.plan.label"))}
-          >
-            {t("missions.plan.change")}
-          </Button>
-        )}
-        {m?.role === "owner" && waitPlan && <span className="mi-hint">{t("missions.plan.waitPlan")}</span>}
-        {m && m.role !== "owner" && owner && (
-          <span className="mi-hint">{t("missions.plan.ownerStarts", { name: owner })}</span>
-        )}
-      </div>
+      {investigated ? (
+        <>
+          <div className="mi-plan__foot mi-findings__foot">
+            {adjust && (
+              <Button size="sm" icon="edit" onClick={adjust}>
+                {t("missions.findings.adjust")}
+              </Button>
+            )}
+            {m?.role === "owner" && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon="check"
+                loading={control.isPending}
+                disabled={waitPlan}
+                onClick={start}
+              >
+                {t("missions.findings.start")}
+              </Button>
+            )}
+            {m && m.role !== "owner" && owner && (
+              <span className="mi-hint">{t("missions.plan.ownerStarts", { name: owner })}</span>
+            )}
+          </div>
+          <p className="mi-findings__note">{t("missions.findings.note")}</p>
+        </>
+      ) : (
+        <div className="mi-plan__foot">
+          {m?.role === "owner" && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon="check"
+              loading={control.isPending}
+              disabled={waitPlan}
+              onClick={start}
+            >
+              {t("missions.plan.start")}
+            </Button>
+          )}
+          {m?.canAct && actions?.replyToMission && (
+            <Button
+              size="sm"
+              icon="edit"
+              onClick={() => actions.replyToMission?.(meta.missionId, t("missions.plan.label"))}
+            >
+              {t("missions.plan.change")}
+            </Button>
+          )}
+          {m?.role === "owner" && waitPlan && <span className="mi-hint">{t("missions.plan.waitPlan")}</span>}
+          {m && m.role !== "owner" && owner && (
+            <span className="mi-hint">{t("missions.plan.ownerStarts", { name: owner })}</span>
+          )}
+        </div>
+      )}
       {stamp.node}
     </div>
+  );
+}
+
+const FINDING_ICONS: Record<MissionFinding["kind"], IconName> = { read: "search", data: "chart", decision: "question" };
+
+/**
+ * What the agent found before proposing (telas/FazerDesfazer.html,
+ * "mission"): what it read (files and lines), what the numbers say, and
+ * the one decision left, highlighted. Refs are code chips; a file opens in
+ * the repository when the agent's repository is known.
+ */
+export function MissionFindings({ mission, agentName }: { mission: Mission; agentName: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const repos = useAgentRepos(org.id, mission.agentId);
+  const repo = findingsRepo(repos.data, mission.repoDir);
+  const list = [...mission.findings].sort((a, b) => Number(a.kind === "decision") - Number(b.kind === "decision"));
+  if (mission.openQuestion && !list.some((f) => f.kind === "decision"))
+    list.push({ kind: "decision", text: mission.openQuestion });
+  return (
+    <ul className="mi-findings" aria-label={t("missions.findings.label", { name: agentName })}>
+      {list.map((f, i) => (
+        <li
+          // biome-ignore lint/suspicious/noArrayIndexKey: findings have no id and never reorder
+          key={i}
+          className={f.kind === "decision" ? "mi-finding mi-finding--decision" : "mi-finding"}
+          data-kind={f.kind}
+        >
+          <Icon name={FINDING_ICONS[f.kind]} size={16} label={t(`missions.findings.${f.kind}`)} />
+          <span className="mi-finding__tx">
+            {f.kind === "decision" ? t("missions.findings.decisionText", { text: f.text }) : f.text}
+            {f.refs?.map((ref) => {
+              const url = findingRefUrl(ref, repo);
+              return url ? (
+                <a
+                  key={ref}
+                  className="mi-ref"
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={t("missions.findings.openRef", { ref })}
+                >
+                  <code>{ref}</code>
+                </a>
+              ) : (
+                <code key={ref} className="mi-ref">
+                  {ref}
+                </code>
+              );
+            })}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

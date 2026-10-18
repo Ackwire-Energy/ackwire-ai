@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import type { AgentAction } from "../src/api/types";
 import {
   actionErrorKey,
@@ -57,12 +58,12 @@ describe("receipts", () => {
 });
 
 describe("receipt sentence values", () => {
-  const t = (key: string, o?: Record<string, unknown>) =>
+  const t = ((key: string, o?: Record<string, unknown>) =>
     key === "agentActions.and"
       ? " e "
       : key.startsWith("agentActions.")
         ? (key.split(".").pop() ?? key)
-        : String(o?.defaultValue ?? key);
+        : String(o?.defaultValue ?? key)) as unknown as TFunction;
 
   test("issue: number and title; one field picks a context", () => {
     expect(actionTextValues(action(), t)).toEqual({ number: "23", title: "Prompt" });

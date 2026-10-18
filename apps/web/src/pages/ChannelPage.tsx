@@ -119,6 +119,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
+import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -2231,6 +2232,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           </button>
         </p>
       )}
+      {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
       {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
       {proposalId && <InlineProposal proposalId={proposalId} />}
       {agent &&

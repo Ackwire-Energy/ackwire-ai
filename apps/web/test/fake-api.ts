@@ -94,6 +94,8 @@ export interface FakeState {
   defaultAgentBudgetUsd?: number;
   /** My inbox (`notifications.*`); empty unless a test fills it. */
   notifications?: AppNotification[];
+  /** `actions.undo`/`redo`/`undoMessage` fail for these receipt ids with this error (`action.changed_since`…). */
+  actionErrors?: Record<string, ApiError>;
   /** Make `chat.post` fail (optimistic send tests). */
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
@@ -1358,6 +1360,54 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return structuredClone(p);
       },
     },
+    actions: {
+      undo: async (orgId, actionId) => {
+        log("actions.undo", orgId, actionId);
+        const a = findAction(actionId);
+        if (state.actionErrors?.[actionId]) throw state.actionErrors[actionId];
+        if (a.undoneAt) throw new ApiError(409, "action.already_undone", "Already undone");
+        Object.assign(a, {
+          undoneAt: new Date().toISOString(),
+          undoneByUserId: state.me?.user.id ?? null,
+          undoableUntil: new Date(Date.now() + 5 * 60_000).toISOString(),
+        });
+        return structuredClone(a);
+      },
+      redo: async (orgId, actionId) => {
+        log("actions.redo", orgId, actionId);
+        const a = findAction(actionId);
+        if (state.actionErrors?.[actionId]) throw state.actionErrors[actionId];
+        if (!a.undoneAt) throw new ApiError(409, "action.not_undone", "Not undone");
+        Object.assign(a, {
+          undoneAt: null,
+          undoneByUserId: null,
+          redoneAt: new Date().toISOString(),
+          undoableUntil: new Date(Date.now() + 5 * 60_000).toISOString(),
+        });
+        return structuredClone(a);
+      },
+      undoMessage: async (orgId, messageId) => {
+        log("actions.undoMessage", orgId, messageId);
+        const m = state.messages.find((x) => x.id === messageId);
+        if (!m) throw new ApiError(404, "not_found", "Message not found");
+        const failed: { id: string; code: string; message: string }[] = [];
+        const now = Date.now();
+        for (const a of [...(m.actions ?? [])].reverse()) {
+          if (a.undoneAt || Date.parse(a.undoableUntil) <= now) continue;
+          const error = state.actionErrors?.[a.id];
+          if (error) {
+            failed.push({ id: a.id, code: error.code, message: error.message });
+            continue;
+          }
+          Object.assign(a, {
+            undoneAt: new Date().toISOString(),
+            undoneByUserId: state.me?.user.id ?? null,
+            undoableUntil: new Date(now + 5 * 60_000).toISOString(),
+          });
+        }
+        return { actions: structuredClone(m.actions ?? []), failed };
+      },
+    },
     repositories: {
       get: async (_orgId, agentId) => structuredClone(state.agentRepos?.[agentId] ?? []),
       set: async (orgId, agentId, repositories) => {
@@ -1390,6 +1440,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     if (patch.archived !== undefined) m.archived = patch.archived;
     m.updatedAt = new Date().toISOString();
     return Promise.resolve(structuredClone(m));
+  }
+
+  function findAction(actionId: string) {
+    for (const m of state.messages) {
+      const a = m.actions?.find((x) => x.id === actionId);
+      if (a) return a;
+    }
+    throw new ApiError(404, "action.not_found", "Action not found");
   }
 
   function findProposal(id: string) {

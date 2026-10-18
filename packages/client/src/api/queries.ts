@@ -842,7 +842,8 @@ function cacheOneAction(qc: ReturnType<typeof useQueryClient>, orgId: string, ch
 /**
  * Desfazer / Refazer / Desfazer tudo on an agent's receipts. The cached
  * message updates from the answer (the `message.actions` event follows for
- * everyone). Errors are `ApiError` with `code` (`action.changed_since`…).
+ * everyone). Errors are `ApiError` with `code` (`action.changed_since`…):
+ * silent for the global handler, the screen says them (`actionErrorKey`).
  */
 export function useAgentActions(orgId: string, channelId: string) {
   const api = useApi();
@@ -852,14 +853,17 @@ export function useAgentActions(orgId: string, channelId: string) {
     undo: useMutation({
       mutationFn: (actionId: string) => part(api, "actions").undo(orgId, actionId),
       onSuccess: one,
+      meta: { silent: true },
     }),
     redo: useMutation({
       mutationFn: (actionId: string) => part(api, "actions").redo(orgId, actionId),
       onSuccess: one,
+      meta: { silent: true },
     }),
     undoAll: useMutation({
       mutationFn: (messageId: string) => part(api, "actions").undoMessage(orgId, messageId),
       onSuccess: (result, messageId) => cacheMessageActions(qc, orgId, channelId, messageId, result.actions),
+      meta: { silent: true },
     }),
   };
 }

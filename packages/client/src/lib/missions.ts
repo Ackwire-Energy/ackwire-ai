@@ -448,3 +448,37 @@ export function editDiff(diff: string | undefined): { kind: "add" | "del"; text:
     .filter((l) => l.startsWith("- ") || l.startsWith("+ "))
     .map((l) => ({ kind: l.startsWith("+") ? ("add" as const) : ("del" as const), text: l.slice(2) }));
 }
+
+/**
+ * The repository a mission's findings point into: the agent's GitHub entry
+ * named like the mission's folder, else its only repository (never a whole
+ * account). Null when unknown.
+ */
+export function findingsRepo(repos: string[] | undefined, repoDir: string): string | null {
+  const list = (repos ?? []).filter((r) => !r.endsWith("/*") && r.includes("/"));
+  const folder =
+    repoDir
+      .replace(/[\\/]+$/, "")
+      .split(/[\\/]/)
+      .pop()
+      ?.toLowerCase() ?? "";
+  const named = list.find((r) => r.split("/")[1]?.toLowerCase() === folder);
+  return named ?? (list.length === 1 ? (list[0] ?? null) : null);
+}
+
+/**
+ * Where a finding's ref opens (`ReviewPrompt.swift:41`, `src/a.ts:12`, a
+ * link): a link as is; a path with a line in the repository (a bare file
+ * name: GitHub's code search in it). Null when there is nowhere to go.
+ */
+export function findingRefUrl(ref: string, repo: string | null): string | null {
+  if (/^https?:\/\//i.test(ref)) return ref;
+  if (!repo) return null;
+  const m = /^([\w./@-]+\.[\w]+)(?::(\d+))?(?:-\d+)?$/.exec(ref.trim());
+  if (!m?.[1]) return null;
+  const path = m[1].replace(/^\.?\//, "");
+  if (!path.includes("/")) {
+    return `https://github.com/search?q=${encodeURIComponent(`repo:${repo} path:${path}`)}&type=code`;
+  }
+  return `https://github.com/${repo}/blob/HEAD/${path}${m[2] ? `#L${m[2]}` : ""}`;
+}

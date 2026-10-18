@@ -1,0 +1,296 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import type { AgentAction, MissionPlan } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { renderApp, screen, settle } from "./render";
+
+afterEach(() => cleanup());
+
+const BODY = "Olhei o código: o prompt dispara em ReviewPrompt.swift:41.";
+const inMs = (ms: number) => new Date(Date.now() + ms).toISOString();
+
+const action = (over: Partial<AgentAction> = {}): AgentAction => ({
+  id: "act-1",
+  kind: "issue.created",
+  agentId: ADA_ID,
+  messageId: "m-act",
+  requestedByUserId: "u-walter",
+  target: { type: "issue", id: "iss-23", number: 23, title: "Prompt de avaliação após a assinatura" },
+  params: { number: 23, title: "Prompt de avaliação após a assinatura" },
+  createdAt: inMs(-2_000),
+  undoableUntil: inMs(298_000),
+  undoneAt: null,
+  undoneByUserId: null,
+  redoneAt: null,
+  ...over,
+});
+
+const priority = (over: Partial<AgentAction> = {}) =>
+  action({
+    id: "act-2",
+    kind: "issue.updated",
+    params: { number: 23, title: "Prompt", fields: ["priority"], priority: "high" },
+    ...over,
+  });
+const memory = (over: Partial<AgentAction> = {}) =>
+  action({
+    id: "act-3",
+    kind: "memory.saved",
+    target: { type: "memory", id: "mem-9" },
+    params: { text: "o prompt é por evento" },
+    ...over,
+  });
+
+const withActions = (actions: AgentAction[], patch: (s: FakeState) => void = () => {}) => {
+  const state = seedState();
+  state.messages.push({
+    id: "m-act",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "agent", id: ADA_ID },
+    body: BODY,
+    mentionedAgentIds: [],
+    agentRunId: "r-act",
+    createdAt: inMs(-3_000),
+    actions,
+  });
+  patch(state);
+  return state;
+};
+
+const open = async (state: FakeState) => {
+  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+  await settle(8);
+  const socket = r.sockets.last();
+  await act(async () => socket.open());
+  await settle(2);
+  return { ...r, socket, state };
+};
+
+const article = () =>
+  screen()
+    .getAllByRole("article")
+    .find((a) => a.textContent?.includes("Olhei o código")) as HTMLElement;
+const receipts = () => within(article()).getByRole("group", { name: "Mudanças de Ada" });
+const click = async (el: HTMLElement) => {
+  await act(async () => fireEvent.click(el));
+  await settle(4);
+};
+
+describe("receipts under the agent's reply (FazerDesfazer A/B)", () => {
+  test("one change: a quiet row with the sentence, the target links to the issue, Desfazer with the time in Doto", async () => {
+    await open(withActions([action()]));
+    const group = receipts();
+    const row = group.querySelector(".ag-rc") as HTMLElement;
+    expect(row.textContent).toContain("Criei a issue #23 · Prompt de avaliação após a assinatura");
+    const link = within(group).getByRole("link", { name: "#23" });
+    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/23`);
+    const undo = within(group).getByRole("button", { name: /^Desfazer/ });
+    const time = undo.querySelector(".ag-rc__time") as HTMLElement;
+    expect(time.className).toContain("ac-num");
+    expect(time.textContent).toMatch(/^4:5\d$/);
+    // A single receipt has no group header.
+    expect(group.querySelector(".ag-rcg__hd")).toBeNull();
+  });
+
+  test("several: 'N mudanças · agora', Desfazer tudo, one row each with its own Desfazer", async () => {
+    await open(withActions([action(), priority(), memory()]));
+    const group = receipts();
+    expect(group.querySelector(".ag-rcg__hd")?.textContent).toContain("3 mudanças");
+    expect(within(group).getByRole("button", { name: "Desfazer tudo" })).toBeTruthy();
+    expect(within(group).getAllByRole("button", { name: "Desfazer" })).toHaveLength(3);
+    expect(group.textContent).toContain("Prioridade alta na #23");
+    expect(group.textContent).toContain("Guardei na memória: o prompt é por evento");
+    const mem = within(group).getByRole("link", { name: "memória" });
+    expect(mem.getAttribute("href")).toBe(`/org/${ORG_ID}/agents/${ADA_ID}/memory`);
+  });
+
+  test("Desfazer: struck through, 'Desfeito por você' and Refazer; Refazer brings it back", async () => {
+    const { state } = await open(withActions([action()]));
+    await click(within(receipts()).getByRole("button", { name: /^Desfazer/ }));
+    expect(state.calls.find((c) => c.method === "actions.undo")?.args).toEqual([ORG_ID, "act-1"]);
+    const row = receipts().querySelector(".ag-rc") as HTMLElement;
+    expect(row.className).toContain("is-undone");
+    expect(row.textContent).toContain("Desfeito por você");
+    await click(within(receipts()).getByRole("button", { name: "Refazer" }));
+    expect(state.calls.find((c) => c.method === "actions.redo")?.args).toEqual([ORG_ID, "act-1"]);
+    expect((receipts().querySelector(".ag-rc") as HTMLElement).className).not.toContain("is-undone");
+    expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
+  });
+
+  test("Desfazer tudo undoes every one still undoable; a failure is said in a toast", async () => {
+    const { state } = await open(
+      withActions([action(), priority(), memory()], (s) => {
+        s.actionErrors = { "act-2": new ApiError(409, "action.changed_since", "changed") };
+      }),
+    );
+    await click(within(receipts()).getByRole("button", { name: "Desfazer tudo" }));
+    expect(state.calls.find((c) => c.method === "actions.undoMessage")?.args).toEqual([ORG_ID, "m-act"]);
+    const rows = [...receipts().querySelectorAll(".ag-rcg__it")] as HTMLElement[];
+    expect(rows.map((r) => r.className.includes("is-undone"))).toEqual([true, false, true]);
+    expect(document.body.textContent).toContain("1 mudança não pôde ser desfeita.");
+  });
+
+  test("an error rolls the optimistic undo back and says why in the person's language", async () => {
+    await open(
+      withActions([action()], (s) => {
+        s.actionErrors = { "act-1": new ApiError(409, "action.changed_since", "Changed since") };
+      }),
+    );
+    await click(within(receipts()).getByRole("button", { name: /^Desfazer/ }));
+    expect((receipts().querySelector(".ag-rc") as HTMLElement).className).not.toContain("is-undone");
+    expect(document.body.textContent).toContain("Alguém mudou isso depois.");
+    expect(document.body.textContent).not.toContain("Changed since");
+  });
+
+  test("after the window: plain history, no buttons (an undone one stays struck through)", async () => {
+    await open(
+      withActions([
+        action({ undoableUntil: inMs(-1_000) }),
+        memory({ undoableUntil: inMs(-1_000), undoneAt: inMs(-60_000), undoneByUserId: "u-joao" }),
+      ]),
+    );
+    const group = receipts();
+    expect(within(group).queryAllByRole("button")).toHaveLength(0);
+    const rows = [...group.querySelectorAll(".ag-rcg__it")] as HTMLElement[];
+    expect(rows.map((r) => r.dataset.phase)).toEqual(["settled", "settled"]);
+    expect(rows[1]?.textContent).toContain("Desfeito por João");
+  });
+
+  test("the countdown runs out on screen: Desfazer goes away", async () => {
+    await open(withActions([action({ undoableUntil: inMs(1_200) })]));
+    expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
+    await act(() => new Promise((r) => setTimeout(r, 2_100)));
+    await settle(2);
+    expect(within(receipts()).queryByRole("button")).toBeNull();
+    expect((receipts().querySelector(".ag-rc") as HTMLElement).dataset.phase).toBe("settled");
+  });
+
+  test("a member who neither asked nor owns the agent sees the receipts without buttons", async () => {
+    await open(
+      withActions([action({ requestedByUserId: "u-joao" }), priority({ requestedByUserId: "u-joao" })], (s) => {
+        const org = s.me?.organizations[0];
+        if (org) org.role = "member";
+      }),
+    );
+    const group = receipts();
+    expect(group.textContent).toContain("2 mudanças");
+    expect(within(group).queryAllByRole("button")).toHaveLength(0);
+  });
+
+  test("live: message.actions replaces the receipts for everyone", async () => {
+    const { socket } = await open(withActions([action()]));
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: {
+          type: "message.actions",
+          channelId: ENG_ID,
+          threadId: null,
+          messageId: "m-act",
+          actions: [action({ undoneAt: inMs(-500), undoneByUserId: "u-joao" }), memory()],
+        },
+      }),
+    );
+    await settle(3);
+    const group = receipts();
+    expect(group.textContent).toContain("2 mudanças");
+    const first = group.querySelector(".ag-rcg__it") as HTMLElement;
+    expect(first.className).toContain("is-undone");
+    expect(first.textContent).toContain("Desfeito por João");
+    expect(within(first).getByRole("button", { name: "Refazer" })).toBeTruthy();
+  });
+
+  test("no receipts: nothing under the message", async () => {
+    await open(withActions([]));
+    expect(within(article()).queryByRole("group", { name: "Mudanças de Ada" })).toBeNull();
+  });
+});
+
+describe("mission proposed already investigated", () => {
+  test("findings with icons per kind, refs as code chips linked to the repo, the decision highlighted, plan, Ajustar / Começar and the note", async () => {
+    const state = seedState();
+    state.agentRepos = { [ADA_ID]: ["acme/viajolo-ios"] };
+    const api = createFakeApi(state);
+    const mission = await api.missions.create(ORG_ID, {
+      agentId: ADA_ID,
+      goal: "Mostrar o pedido de avaliação no momento certo",
+      title: "Mostrar o pedido de avaliação no momento certo",
+      channelId: ENG_ID,
+      folder: "/Users/ada/code/viajolo-ios",
+    });
+    const get = api.missions.get;
+    api.missions.get = async (o, id) => ({
+      ...(await get(o, id)),
+      findings: [
+        {
+          kind: "read",
+          text: "Li 6 arquivos. O prompt dispara logo depois da assinatura.",
+          refs: ["ReviewPrompt.swift:41", "App/SubscriptionFlow.swift:88"],
+        },
+        { kind: "data", text: "No analytics: 9 de 11 negativos vieram logo depois da assinatura." },
+        { kind: "decision", text: "depois de quantas viagens concluídas?" },
+      ],
+      openQuestion: "depois de quantas viagens concluídas?",
+    });
+    api.missions.plan = async (_o, missionId) =>
+      ({
+        missionId,
+        current: {
+          items: [
+            { id: "p1", title: "Tirar o gatilho de subscription_completed", status: "todo" },
+            { id: "p2", title: "Disparar após a 1ª viagem concluída", status: "todo" },
+            { id: "p3", title: "Teste e PR para revisão", status: "todo" },
+          ],
+        },
+        history: [],
+      }) as unknown as MissionPlan;
+    state.messages.push({
+      id: "m-plan",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-plan",
+      meta: {
+        missionPlan: {
+          missionId: mission.id,
+          title: mission.title,
+          goal: mission.goal,
+          computer: "MacBook",
+          executor: "claude",
+        },
+      },
+      createdAt: new Date().toISOString(),
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const card = document.querySelector(".mi-plan--investigated") as HTMLElement;
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain("Missão proposta · já investigada");
+    const list = within(card).getByRole("list", { name: "O que Ada encontrou" });
+    const items = [...list.querySelectorAll(".mi-finding")] as HTMLElement[];
+    expect(items.map((i) => i.dataset.kind)).toEqual(["read", "data", "decision"]);
+    expect(within(items[0] as HTMLElement).getByRole("img", { name: "Leu" })).toBeTruthy();
+    expect(within(items[1] as HTMLElement).getByRole("img", { name: "Dados" })).toBeTruthy();
+    expect(items[2]?.className).toContain("mi-finding--decision");
+    expect(items[2]?.textContent).toContain("Falta decidir: depois de quantas viagens concluídas?");
+    const refs = [...(items[0] as HTMLElement).querySelectorAll(".mi-ref")] as HTMLAnchorElement[];
+    expect(refs.map((r) => r.textContent)).toEqual(["ReviewPrompt.swift:41", "App/SubscriptionFlow.swift:88"]);
+    expect(refs[1]?.getAttribute("href")).toBe(
+      "https://github.com/acme/viajolo-ios/blob/HEAD/App/SubscriptionFlow.swift#L88",
+    );
+    expect(refs[0]?.getAttribute("href")).toContain("https://github.com/search?q=");
+    expect(card.textContent).toContain("Plano · 3 itens");
+    expect(card.textContent).toContain("Disparar após a 1ª viagem concluída");
+    expect(within(card).getByRole("button", { name: "Começar" })).toBeTruthy();
+    expect(card.textContent).toContain("Começar libera escrever: branch, código e PR. Investigar não precisou de ok.");
+  });
+});

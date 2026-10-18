@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { AgentAction } from "../api/types";
 
 /**
@@ -45,8 +46,6 @@ export const actionTextKey = (a: Pick<AgentAction, "kind">) => `agentActions.${a
 /** The i18n key of an undo/redo error code (`action.changed_since` → `agentActions.errors.changed_since`). */
 export const actionErrorKey = (code: string) => `agentActions.errors.${code.replace(/^action\./, "")}`;
 
-type Translate = (key: string, options?: Record<string, unknown>) => string;
-
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 
 function joinList(items: string[], and: string) {
@@ -62,7 +61,7 @@ function joinList(items: string[], and: string) {
  */
 export function actionTextValues(
   a: Pick<AgentAction, "kind" | "target" | "params">,
-  t: Translate,
+  t: TFunction,
   viewerUserId?: string,
 ): Record<string, string> {
   const p = a.params;
