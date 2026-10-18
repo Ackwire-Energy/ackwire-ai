@@ -14,7 +14,11 @@ const cache = new Map<string, Promise<ImageSourcePropType | null>>();
 function rasterize(svgText: string, size: number): ImageSourcePropType | null {
   const scale = PixelRatio.get();
   const px = Math.max(1, Math.round(size * scale));
-  const svg = Skia.SVG.MakeFromString(svgText);
+  // The glyph SVGs say width/height 24; Skia draws at those, not at the surface size, so a 24px glyph
+  // would sit in a 3x image and show at a third of its size. Draw it at the image's pixel size instead
+  // (the viewBox scales the paths).
+  const sized = svgText.replace(/\swidth="[\d.]+"\s+height="[\d.]+"/, ` width="${px}" height="${px}"`);
+  const svg = Skia.SVG.MakeFromString(sized);
   const surface = Skia.Surface.Make(px, px);
   if (!svg || !surface) return null;
   surface.getCanvas().drawSvg(svg, px, px);
