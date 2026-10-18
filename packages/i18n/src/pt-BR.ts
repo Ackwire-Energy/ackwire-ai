@@ -5168,7 +5168,7 @@ export const ptBR = {
       firstTime: "Na primeira vez",
       step1: "Abra o arquivo baixado e arraste o agentes para Aplicativos.",
       step2:
-        "Abra o agentes. Se o Mac disser que não pode verificar o app, vá em Ajustes do Sistema → Privacidade e Segurança → Abrir mesmo assim.",
+        "Se o Mac disser que o app está danificado ou sugerir a lixeira (ele ainda não tem a assinatura da Apple), rode no Terminal e abra de novo:",
       step3: "Entre com a sua conta. O navegador abre com um código: confira e clique em Conectar.",
       other: "Outras formas: servidor ou Linux",
       otherText:

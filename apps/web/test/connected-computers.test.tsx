@@ -275,7 +275,7 @@ describe("Configurações → Computadores", () => {
     expect(card.querySelector(".machine-connect__hash")?.textContent).toBe(sha);
     expect(within(card).getByRole("button", { name: "Copiar SHA-256" })).toBeTruthy();
     expect(card.textContent).toContain("arraste o agentes para Aplicativos");
-    expect(card.textContent).toContain("Ajustes do Sistema → Privacidade e Segurança → Abrir mesmo assim");
+    expect(card.textContent).toContain("xattr -dr com.apple.quarantine /Applications/agentes.app");
     // The old flow is gone: no code made on the site, no install command with a code.
     expect(screen().queryByRole("button", { name: "Gerar comando" })).toBeNull();
     expect(card.querySelector(".machine-command__code")).toBeNull();

@@ -102,7 +102,7 @@ The machine-side access model from `PastasComputador.html`, built in the runner 
 
 ### 10. Distribution without code signing (for now)
 
-- macOS builds are ad-hoc signed only (required on Apple Silicon), not notarized. First launch of each downloaded build needs System Settings → Privacy & Security → "Abrir mesmo assim"; the download page shows that step.
+- macOS builds are ad-hoc signed only (required on Apple Silicon), not notarized. Recent macOS versions call such a downloaded app "damaged" and offer only the Trash (no "Open Anyway"), so each downloaded build needs `xattr -dr com.apple.quarantine /Applications/agentes.app` once; the download page shows that command.
 - Side effect: macOS may ask again for Documents/Desktop/Downloads access after an update, because the ad-hoc identity changes per build. Folders outside those (`~/agentes`, `~/Projects`) never ask. Revisit when we sign.
 - Windows (later): SmartScreen's "Mais informações → Executar assim mesmo" until we sign.
 - CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, publish a GitHub Release with the SHA-256. Pull requests run the build without publishing. Nothing runs on a developer's machine; testing means installing the CI build. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).

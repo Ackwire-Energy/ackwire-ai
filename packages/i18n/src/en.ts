@@ -5159,7 +5159,7 @@ export const en: Translations = {
       firstTime: "The first time",
       step1: "Open the downloaded file and drag agentes to Applications.",
       step2:
-        "Open agentes. If the Mac says it can't verify the app, go to System Settings → Privacy & Security → Open Anyway.",
+        "If the Mac says the app is damaged or offers the Trash (it doesn't carry Apple's signature yet), run this in Terminal and open it again:",
       step3: "Sign in with your account. The browser opens with a code: check it and click Connect.",
       other: "Other ways: server or Linux",
       otherText:

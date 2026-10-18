@@ -183,7 +183,10 @@ export function ConnectComputer() {
           <span className="newag__label">{t("machines.download.firstTime")}</span>
           <ol className="machine-pair__steps small">
             <li>{t("machines.download.step1")}</li>
-            <li>{t("machines.download.step2")}</li>
+            <li>
+              {t("machines.download.step2")}
+              <CommandBlock command="xattr -dr com.apple.quarantine /Applications/agentes.app" />
+            </li>
             <li>{t("machines.download.step3")}</li>
           </ol>
         </div>
