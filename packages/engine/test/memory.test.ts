@@ -414,6 +414,47 @@ describe("use (retrieval into prompts)", () => {
     });
     expect(inSecret.text).toContain("Foo Corp");
   });
+
+  test("items linked to a hit ride along right after it; links never carry private or archived items", async () => {
+    f = await setup();
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: secret.id, agentId: f.agent.id });
+    const mk = (content: string, subject: string, extra: Partial<Parameters<typeof consolidateItem>[1]> = {}) =>
+      consolidateItem(f.db, {
+        orgId: f.org.id,
+        kind: "fact",
+        scopeType: "channel",
+        scopeId: f.general.id,
+        channelIds: [f.general.id],
+        content,
+        subject,
+        ...extra,
+      }).then((r) => r.item);
+    const hit = await mk("Deploys go out through Railway", "deploy");
+    const linked = await mk("Staging mirrors main every night", "staging");
+    const hidden = await mk("Staging password rotates monthly", "pw", { channelIds: [secret.id], scopeId: secret.id });
+    const archived = await mk("Staging used to live on Heroku", "heroku");
+    await f.db.update(schema.contextItems).set({ status: "archived" }).where(eq(schema.contextItems.id, archived.id));
+    await f.db
+      .update(schema.contextItems)
+      .set({ relatedIds: [linked.id, hidden.id, archived.id] })
+      .where(eq(schema.contextItems.id, hit.id));
+    await drainOutbox(f.db, f.handlers);
+
+    const memory = await retrieveForRun(f.context, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      text: "how do deploys work with Railway?",
+    });
+    const lines = memory.text.split("\n");
+    const at = lines.findIndex((l) => l.includes("Deploys go out through Railway"));
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(lines[at + 1]).toContain("Staging mirrors main every night");
+    expect(memory.text).not.toContain("password");
+    expect(memory.text).not.toContain("Heroku");
+    expect(memory.itemIds).toContain(linked.id);
+  });
 });
 
 describe("context tools through the Tool Gateway", () => {

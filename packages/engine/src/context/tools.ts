@@ -1,4 +1,4 @@
-import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, schema } from "@agenteschat/db";
+import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, type SQL, schema } from "@agenteschat/db";
 import { recordAgentActions } from "../agent-actions";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
@@ -437,11 +437,54 @@ async function injectableChannels(db: Database, orgId: string, agentId: string, 
   return [...new Set([channelId, ...(await agentSearchChannels(db, orgId, agentId, channelId))])];
 }
 
+/** How many top hits bring their linked items along, and how many each brings. */
+const LINKED_FROM = 5;
+const LINKED_PER_HIT = 3;
+
+/**
+ * Search hits with the items the memory judge linked to the best of them
+ * (`related_ids`), each right after the hit that brought it. Linked items
+ * pass the same filter as everything else (`base`), so a link across
+ * channels never carries private context into this one.
+ */
+async function withLinked(db: Database, base: SQL | undefined, hits: ContextItem[]): Promise<ContextItem[]> {
+  const top = hits.slice(0, LINKED_FROM);
+  const have = new Set(hits.map((i) => i.id));
+  const ids = [...new Set(top.flatMap((i) => i.relatedIds))].filter((id) => !have.has(id));
+  if (ids.length === 0) return hits;
+  const linked = new Map(
+    (
+      await db
+        .select()
+        .from(contextItems)
+        .where(and(base, inArray(contextItems.id, ids)))
+    )
+      .filter((i) => i.kind !== "thread_summary")
+      .map((i) => [i.id, i]),
+  );
+  const out: ContextItem[] = [];
+  for (const hit of hits) {
+    out.push(hit);
+    if (!top.includes(hit)) continue;
+    const next = hit.relatedIds
+      .map((id) => linked.get(id))
+      .filter((i): i is ContextItem => Boolean(i))
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, LINKED_PER_HIT);
+    for (const item of next) {
+      out.push(item);
+      linked.delete(item.id);
+    }
+  }
+  return out;
+}
+
 /**
  * What goes into a run's prompt from memory (D9 layers 3–4), within a
  * character budget: pinned items always, then the agent's own lessons and
  * notes, shared lessons, and items retrieved for the trigger message
- * (hybrid search + relevance + recency). Only items whose every source
+ * (hybrid search + relevance + recency), each top hit followed by the
+ * items linked to it (`withLinked`). Only items whose every source
  * channel is the run's channel or a public one are injected, so private
  * context never leaks into another channel. Unverified and untrusted items
  * are labeled. Returns the ids used (logged for relevance).
@@ -510,6 +553,7 @@ export async function retrieveForRun(
       .filter((i) => i.status === "active" && !i.supersededBy && (!i.agentId || i.agentId === input.agentId))
       .filter((i) => i.kind !== "thread_summary")
       .sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99) - (b.relevance - a.relevance));
+    searched = await withLinked(db, base, searched);
   }
   const budget = input.budgetChars ?? 6000;
   const seen = new Set<string>();
