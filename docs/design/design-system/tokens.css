@@ -6,7 +6,7 @@
   --side: #f8f8f6; --pane: #ffffff;
   /* The open book of the memory mark (telas/ReacoesAgente.html). */
   --book-page: #fffdf6; --book-line: #cfc8b6;
-  --glass: rgba(255, 255, 255, 0.72); --glass-solid: #fbfbf9;
+  --glass: rgba(255, 255, 255, 0.88); --glass-solid: #fbfbf9;
   --line: rgba(23, 23, 22, 0.07); --line2: rgba(23, 23, 22, 0.12); --line-strong: #82827d;
   --ink: #151514; --ink2: #2a2a28; --muted: #5c5c58; --faint: #6f6f6a;
   --agent: #0063d1; --agent2: #3d8bff; --agent-soft: #e3eefd; --on-agent: #ffffff;
@@ -31,7 +31,7 @@
   --bg: #0f0f0e; --raised: #1c1c1b; --raised-2: #242423; --sunken: #0a0a09;
   --side: #0a0a09; --pane: #0f0f0e;
   --book-page: #ebe6d8; --book-line: #a59e8c;
-  --glass: rgba(30, 30, 28, 0.66); --glass-solid: #1e1e1c;
+  --glass: rgba(30, 30, 28, 0.86); --glass-solid: #1e1e1c;
   --line: rgba(255, 255, 255, 0.1); --line2: rgba(255, 255, 255, 0.15); --line-strong: #71716c;
   --ink: #efefec; --ink2: #d6d6d2; --muted: #a3a39e; --faint: #8f8f89;
   --agent: #5aa8ff; --agent2: #8cc3ff; --agent-soft: #11253f; --on-agent: #00203f;

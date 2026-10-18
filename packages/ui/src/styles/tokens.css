@@ -13,7 +13,7 @@
   /* The open book of the memory mark (telas/ReacoesAgente.html). */
   --book-page: #fffdf6;
   --book-line: #cfc8b6;
-  --glass: rgba(255, 255, 255, 0.72);
+  --glass: rgba(255, 255, 255, 0.88);
   --glass-solid: #fbfbf9;
   --line: rgba(23, 23, 22, 0.07);
   --line2: rgba(23, 23, 22, 0.12);
@@ -57,7 +57,7 @@
   --pane: #0f0f0e;
   --book-page: #ebe6d8;
   --book-line: #a59e8c;
-  --glass: rgba(30, 30, 28, 0.66);
+  --glass: rgba(30, 30, 28, 0.86);
   --glass-solid: #1e1e1c;
   --line: rgba(255, 255, 255, 0.1);
   --line2: rgba(255, 255, 255, 0.15);
