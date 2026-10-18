@@ -25,11 +25,14 @@ export function progress(y: number, from: number, to: number): number {
 export function coverTransform(
   y: number,
   height: number,
-  factor: number = PARALLAX,
+  factor?: number,
 ): { translateY: number; scale: number } {
   "worklet";
+  // A literal, not PARALLAX: the worklet plugin doesn't capture a module constant used as a default
+  // parameter, and reading it on the UI thread throws (a crash on the first scroll).
+  const f = factor ?? 0.5;
   if (!(height > 0) || !Number.isFinite(y)) return { translateY: 0, scale: 1 };
-  if (y >= 0) return { translateY: Math.min(y, height) * factor, scale: 1 };
+  if (y >= 0) return { translateY: Math.min(y, height) * f, scale: 1 };
   const pull = Math.min(-y, height);
   const scale = (height + pull) / height;
   // Scaling happens around the center: move up by half the growth so the bottom edge stays put.
