@@ -567,13 +567,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           accessibilityLabel={t("mobile.chat.profile")}
           hitSlop={8}
         >
-          <AgentFace agentId={dmAgentId} size={28} />
+          {/* In the header's glass pill the agent stands on its own: a square tile fights the round glass. */}
+          <AgentFace agentId={dmAgentId} size={28} framed={false} />
         </Pressable>
       ) : channel && roster.data ? (
         <View style={styles.faces} accessible accessibilityLabel={subtitle}>
           {roster.data.slice(0, 3).map((r, i) => (
             <View key={`${r.type}:${r.id}`} style={i > 0 ? styles.overlap : undefined}>
-              <Face who={r} size={22} live={false} />
+              <Face who={r} size={22} live={false} framed={false} />
             </View>
           ))}
         </View>
