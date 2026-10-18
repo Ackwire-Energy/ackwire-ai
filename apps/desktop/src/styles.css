@@ -265,7 +265,12 @@ body[data-window="popover"] {
   border-radius: 18px;
   padding: 6px;
   background: var(--glass-solid);
-  box-shadow: var(--e3), var(--top);
+  /* Shorter than --e3: it has to fit the window's transparent margin (POP_PAD in Popover.tsx). */
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 12px 30px -12px rgba(0, 0, 0, 0.32),
+    0 0 0 1px var(--line2),
+    var(--top);
   animation: dk-pop-in 0.25s var(--spring) both;
 }
 .dk-pop::-webkit-scrollbar {

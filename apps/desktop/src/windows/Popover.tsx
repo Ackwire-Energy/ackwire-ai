@@ -19,8 +19,9 @@ import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
 
 const POP_WIDTH = 360;
-/** Transparent margin around the card, so its shadow isn't cut by the window's edge. */
-const POP_PAD = 10;
+/** Transparent margin around the card, so its shadow (`.dk-pop`) isn't cut by the window's edge. */
+const POP_PAD = { x: 22, top: 6, bottom: 34 };
+const POP_PADDING = `${POP_PAD.top}px ${POP_PAD.x}px ${POP_PAD.bottom}px`;
 const POP_MAX_HEIGHT = 680;
 
 export function Popover() {
@@ -69,8 +70,8 @@ export function Popover() {
     const el = card.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const fit = () => {
-      const h = Math.min(POP_MAX_HEIGHT, Math.ceil(el.getBoundingClientRect().height) + POP_PAD * 2);
-      void host.resize(POP_WIDTH + POP_PAD * 2, h).catch(() => {});
+      const h = Math.min(POP_MAX_HEIGHT, Math.ceil(el.getBoundingClientRect().height) + POP_PAD.top + POP_PAD.bottom);
+      void host.resize(POP_WIDTH + POP_PAD.x * 2, h).catch(() => {});
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -150,7 +151,7 @@ export function Popover() {
 
   if (confirmQuit) {
     return (
-      <div className="dk-pop-shell" style={{ padding: POP_PAD }}>
+      <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
         <main className="dk-pop" ref={card} aria-label={t("desktop.tray.quitTitle")}>
           <div className="dk-confirm">
             <h2>{t("desktop.tray.quitTitle")}</h2>
@@ -171,7 +172,7 @@ export function Popover() {
 
   const mod = "⌘";
   return (
-    <div className="dk-pop-shell" style={{ padding: POP_PAD }}>
+    <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
       <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
         <header className="dk-ph">
           <BrandFace size="sm" state={pause ? "waiting" : jobs.length ? "thinking" : "idle"} />
