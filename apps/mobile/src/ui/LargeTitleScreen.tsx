@@ -3,6 +3,7 @@ import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ReactElement, type ReactNode, useMemo } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
 import { progress } from "@/lib/parallax";
 import { CoverBarBackdrop, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
@@ -56,8 +57,10 @@ export function LargeTitleScreen({
   const { colors } = useTheme();
   const focused = useIsFocused();
   const headerHeight = useHeaderHeight();
-  // iOS insets the scroll view by the clear bar (it rests at minus the header height); Android lays it out
-  // from the top of the screen, under the bar.
+  const safe = useSafeAreaInsets();
+  // On iOS the scroll view is inset by the clear bar ourselves (contentInset, resting at minus the header
+  // height): the automatic adjustment didn't apply inside the system tabs, so the list rested under the bar
+  // with the large title hidden, shown only while pulled. Android lays it out from the top, under the bar.
   const { y, onScroll } = useCoverScroll(IOS ? headerHeight : 0);
   const titleFade = useScrollFade(y, 0, TITLE_GONE);
   // The pull-down header lives only in the strip the overscroll reveals: between the bar's bottom edge
@@ -95,7 +98,14 @@ export function LargeTitleScreen({
           onScroll={onScroll}
           scrollEventThrottle={16}
           refreshControl={refreshControl}
-          contentInsetAdjustmentBehavior="automatic"
+          contentInsetAdjustmentBehavior="never"
+          {...(IOS
+            ? {
+                contentInset: { top: headerHeight, bottom: safe.bottom + TAB_BAR },
+                scrollIndicatorInsets: { top: headerHeight, bottom: safe.bottom + TAB_BAR },
+                contentOffset: { x: 0, y: -headerHeight },
+              }
+            : {})}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingTop: IOS ? 0 : headerHeight, paddingBottom: bottomInset }}
@@ -129,6 +139,8 @@ export function LargeTitleScreen({
 }
 
 const IOS = Platform.OS === "ios";
+/** Room for the system tab bar over the list's end (iOS; the bar floats over the content). */
+const TAB_BAR = 56;
 
 /** Scroll (from rest) by which the large title has faded out under the bar. */
 const TITLE_GONE = 40;
