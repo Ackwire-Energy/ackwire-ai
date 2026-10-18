@@ -19,7 +19,8 @@
     "db:generate": "cd packages/db && bunx drizzle-kit generate --name",
     "docs:env": "bun run --filter '@agenteschat/config' docs",
     "smoke": "bun --env-file=.env scripts/smoke.ts",
-    "eval:memory": "bun --env-file=.env packages/engine/eval/memory.ts"
+    "eval:memory": "bun --env-file=.env packages/engine/eval/memory.ts",
+    "eval:behavior": "bun --env-file=.env packages/engine/eval/behavior.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

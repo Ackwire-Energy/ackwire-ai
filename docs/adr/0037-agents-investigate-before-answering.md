@@ -28,10 +28,16 @@ Asked about a bug, agents answered with a plan and "can I take a look?" instead 
 
 Approvals are unchanged: sensitive actions (merge, deploy, rollback) still wait for a person.
 
+## Behavior eval
+
+Prompt changes are checked against a behavior eval built from the real failures above (`packages/engine/eval/behavior.ts`, `bun run eval:behavior`; manual, never in CI, needs `ANTHROPIC_API_KEY`). Each case (`behavior-cases.json`, plus an optional `behavior-cases.local.json` outside git) seeds an in-memory database with an organization, an agent from a role preset, a conversation (channel, thread, DM or routine run), memory and issues, and runs the real path: `postPersonMessage` → outbox → `executeRun` with the context.ts prompt, "What you can do", the Tool Gateway (scopes, approvals) and the tool loop. Only connectors are fake (GitHub, Sentry, analytics, Railway tools named and scoped like the catalog ones, with canned results); the model is real.
+
+Scoring is deterministic checks (a reading tool before the answer, no asking permission to look, no "I haven't looked", no false "no access", required tools called, evidence cited, sensitive tools held for approval and never run, `NO_REPLY` only when expected) plus a cheap judge model with a rubric per case (looked first, grounded, concrete next step, asks only the person's decisions, case-specific points). The report (per case and per criterion, cost) goes to `packages/engine/eval/out/`. The checkers are unit-tested and the harness runs with the fake provider in `bun test` (no network).
+
 ## Later rounds
 
 - **Act with undo:** for reversible actions that only touch the agent's own work (a branch, a draft PR, an issue it opened), act first and offer undo instead of asking.
-- Measure it: count `ask_user` calls and replies with no tool call before them on questions about code or errors.
+- Measure it in production too: count `ask_user` calls and replies with no tool call before them on questions about code or errors (the behavior eval covers it before shipping).
 - The repositories block in `git/repos.ts`: pick the repository from context (recent work, the issue, the only connected repository) before asking.
 
 ## Consequences

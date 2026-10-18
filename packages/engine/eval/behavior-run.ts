@@ -1,0 +1,489 @@
+/**
+ * The behavior eval's machinery (`behavior.ts` is the command line): seeds an
+ * in-memory database with a case, runs the agent through the real engine
+ * path, observes what it did, and asks a judge model to grade it. The model
+ * provider is passed in, so tests drive it with the fake provider (no network).
+ */
+import { createMemoryPubSub, createPostgresSearchResolver, noPlatformCredentials } from "@agenteschat/adapters";
+import { and, asc, eq, inArray, schema, sql } from "@agenteschat/db";
+import { createTestDatabase } from "@agenteschat/db/testing";
+import {
+  type ContentBlock,
+  costNanoUsd,
+  type ModelProvider,
+  type ModelRequest,
+  systemText,
+} from "@agenteschat/providers";
+import { ptBR } from "../../i18n/src/pt-BR";
+import {
+  addChannelMember,
+  type ContextDeps,
+  createAgent,
+  createAskUserToolSource,
+  createChannel,
+  createContextToolSource,
+  createCredential,
+  createFakeJudge,
+  createFakeScheduleReader,
+  createIssue,
+  createIssueToolSource,
+  createJobHandlers,
+  createLocalKeyWrapper,
+  createModelGateway,
+  createOrganization,
+  createReactToolSource,
+  createToolGateway,
+  drainOutbox,
+  grantScopes,
+  insertContextItem,
+  insertMessage,
+  isNoReply,
+  openDm,
+  postPersonMessage,
+  type ToolSource,
+} from "../src";
+import type { CheckResult, EvalToolCall, EvalTurn, Expectations } from "./behavior-checks";
+import { type Canned, CONNECTORS, fakeConnectorSource } from "./behavior-fakes";
+
+// ── Cases ────────────────────────────────────────────────────────────────────
+
+type RoleId = "dev" | "ops" | "qa" | "pm";
+
+interface CaseMessage {
+  /** A person's name, or "agent" for the agent under test. */
+  author: string;
+  body: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface BehaviorCase {
+  id: string;
+  title: string;
+  /** Where it comes from ("real failure 2026-10-17", "synthetic"). */
+  source?: string;
+  agent: {
+    /** Role preset of "Criar agente" (name, role and instructions from pt-BR). */
+    preset?: RoleId;
+    name?: string;
+    handle?: string;
+    role?: string;
+    instructions?: string;
+    model?: string;
+  };
+  org: { name: string; context: string };
+  conversation: {
+    where: "channel" | "dm";
+    channel?: string;
+    topic?: string;
+    /** Channel only: everything after the first prior message (and the trigger) is a reply in its thread. */
+    thread?: boolean;
+    prior?: CaseMessage[];
+    trigger: CaseMessage;
+    /** The trigger is a routine's scheduled message (meta.routine), not a person typing. */
+    routine?: { name: string };
+  };
+  /** Fake connectors granted to the agent (all their scopes). */
+  connectors?: (keyof typeof CONNECTORS)[];
+  /** Built-in issue tools (list_issues, create_issue…) on the real issues table. */
+  issues?: boolean;
+  /** Issues already in the workspace. */
+  seedIssues?: { title: string; description?: string; labels?: string[] }[];
+  /** The agent's memory (context items it can find with search_context). */
+  memory?: { kind?: "note" | "fact" | "decision" | "lesson"; title?: string; content: string }[];
+  /** Canned results per tool: the first entry whose `when` words all appear in the input wins. */
+  fixtures?: Record<string, Canned[]>;
+  expect: Expectations & {
+    /** What a good answer does, for the judge. */
+    behavior: string;
+    /** Extra criteria for the judge, specific to the case. */
+    rubric?: string[];
+    /** Standard judge criteria that don't apply here. */
+    skipJudge?: string[];
+  };
+}
+
+// ── One case ─────────────────────────────────────────────────────────────────
+
+const ROLE_PRESETS = ptBR.newAgent.roles as Record<string, { name: string; agent?: string; instructions: string }>;
+
+export function agentOf(c: BehaviorCase, modelOverride?: string) {
+  const preset = c.agent.preset ? ROLE_PRESETS[c.agent.preset] : undefined;
+  if (c.agent.preset && !preset) throw new Error(`${c.id}: unknown preset ${c.agent.preset}`);
+  const name = c.agent.name ?? preset?.agent ?? "Agente";
+  return {
+    name,
+    handle: (c.agent.handle ?? name).toLowerCase(),
+    role: c.agent.role ?? preset?.name ?? "",
+    instructions: c.agent.instructions ?? preset?.instructions ?? "",
+    model: modelOverride ?? c.agent.model ?? "claude-sonnet-5-5",
+  };
+}
+
+export interface CaseRun {
+  turns: EvalTurn[];
+  calls: EvalToolCall[];
+  reply: string;
+  noReply: boolean;
+  approvals: string[];
+  status: string[];
+  system: string;
+  costNanoUsd: number;
+  error?: string;
+}
+
+/** Records the model's turns of a run (what it wrote and called), passing everything through. */
+function recording(provider: ModelProvider) {
+  const turns: (EvalTurn & { request: ModelRequest })[] = [];
+  const wrapped: ModelProvider = {
+    id: provider.id,
+    async stream(request, options) {
+      const result = await provider.stream(request, options);
+      turns.push({
+        request,
+        text: result.text,
+        toolCalls: result.content
+          .filter((b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use")
+          .map((b) => ({ name: b.name, input: b.input })),
+      });
+      return result;
+    },
+    ...(provider.countTokens ? { countTokens: provider.countTokens.bind(provider) } : {}),
+  };
+  return { provider: wrapped, turns };
+}
+
+async function addPerson(db: Awaited<ReturnType<typeof createTestDatabase>>["db"], name: string) {
+  const id = `user_${name.toLowerCase().replace(/\W+/g, "")}_${crypto.randomUUID().slice(0, 8)}`;
+  await db.insert(schema.users).values({ id, name, email: `${id}@example.com` });
+  return { id, name };
+}
+
+export interface RunOptions {
+  /** The provider key the agent's credential holds (any string with the fake provider). */
+  apiKey: string;
+  /** The real Anthropic provider, or the fake one in tests. */
+  provider: ModelProvider;
+  maxToolTurns: number;
+  /** Overrides every case's agent model. */
+  agentModel?: string;
+}
+
+/** Runs one case through the engine on a fresh in-memory database. */
+export async function runCase(c: BehaviorCase, options: RunOptions): Promise<CaseRun> {
+  const { apiKey, maxToolTurns } = options;
+  const { db, close } = await createTestDatabase();
+  try {
+    const keyWrapper = createLocalKeyWrapper(crypto.randomUUID().repeat(2));
+    const conv = c.conversation;
+    const personNames = [
+      ...new Set([conv.trigger, ...(conv.prior ?? [])].map((m) => m.author).filter((a) => a !== "agent")),
+    ];
+    const ownerName = conv.trigger.author !== "agent" ? conv.trigger.author : (personNames[0] ?? "Marina");
+    const owner = await addPerson(db, ownerName);
+    const { organization: org } = await createOrganization(db, owner.id, c.org);
+    const people = new Map([[ownerName, owner]]);
+    for (const name of personNames.filter((n) => n !== ownerName)) {
+      const p = await addPerson(db, name);
+      await db.insert(schema.organizationMembers).values({ orgId: org.id, userId: p.id, role: "member" });
+      people.set(name, p);
+    }
+    const credential = await createCredential(db, keyWrapper, owner.id, org.id, {
+      provider: "anthropic",
+      label: "eval",
+      apiKey,
+      makeDefault: true,
+    });
+    const a = agentOf(c, options.agentModel);
+    const agent = await createAgent(
+      db,
+      owner.id,
+      org.id,
+      { name: a.name, handle: a.handle, role: a.role, instructions: a.instructions, credentialId: credential.id },
+      { model: a.model },
+    );
+
+    // Tools: the fake connectors, the real built-ins (memory and search, issues, ask_user, react).
+    const fakes: { source: ToolSource; executed: { name: string }[] }[] = (c.connectors ?? []).map((id) =>
+      fakeConnectorSource(id, c.fixtures ?? {}),
+    );
+    await grantScopes(
+      db,
+      org.id,
+      agent.id,
+      [
+        ...(c.connectors ?? []).flatMap((id) => [...new Set(CONNECTORS[id].map((t) => t.scope))]),
+        ...(c.issues ? ["issues:read", "issues:write"] : []),
+      ].map((scope) => ({ connectionId: null, scope })),
+    );
+
+    const recorder = recording(options.provider);
+    const pubsub = createMemoryPubSub();
+    const gateway = createModelGateway({
+      db,
+      keyWrappers: [keyWrapper],
+      providers: { anthropic: recorder.provider },
+      platformCredentials: noPlatformCredentials,
+    });
+    const search = createPostgresSearchResolver(db);
+    const context: ContextDeps = {
+      db,
+      gateway,
+      search,
+      summaryModel: "claude-haiku-5-5",
+      pubsub,
+      // No reflection or summaries during the eval: only the agent's own calls cost.
+      reflect: { everyMessages: 100_000, idleMinutes: 100_000, maxPerThread: 1 },
+      judge: createFakeJudge(),
+      schedules: createFakeScheduleReader({}),
+    };
+    const sources: ToolSource[] = [
+      createAskUserToolSource(),
+      createReactToolSource({ pubsub }),
+      createContextToolSource(context),
+      ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
+      ...fakes.map((f) => f.source),
+    ];
+    const tools = createToolGateway({ sources });
+    const handlers = createJobHandlers({
+      db,
+      gateway,
+      pubsub,
+      maxOutputTokens: 16_000,
+      contextMessages: 30,
+      maxHops: 3,
+      maxToolTurns,
+      deltaFlushMs: 0,
+      tools,
+      context,
+      search,
+    });
+
+    // The conversation.
+    let channelId: string;
+    if (conv.where === "dm") {
+      channelId = (await openDm(db, owner.id, org.id, { agentId: agent.id })).id;
+    } else {
+      const channel = await createChannel(db, owner.id, org.id, { name: conv.channel ?? "geral", topic: conv.topic });
+      channelId = channel.id;
+      await addChannelMember(db, owner.id, org.id, channelId, { agentId: agent.id });
+      for (const [name, p] of people)
+        if (name !== ownerName) await addChannelMember(db, owner.id, org.id, channelId, { userId: p.id });
+    }
+    for (const m of c.memory ?? []) {
+      await insertContextItem(db, {
+        orgId: org.id,
+        kind: m.kind ?? "note",
+        scopeType: "agent",
+        scopeId: agent.id,
+        agentId: agent.id,
+        title: m.title,
+        content: m.content,
+        channelIds: [channelId],
+        createdByKind: "agent",
+        createdById: agent.id,
+      });
+    }
+    for (const issue of c.seedIssues ?? []) {
+      await createIssue({ db, pubsub }, { type: "person", userId: owner.id }, org.id, { ...issue, channelId });
+    }
+    const author = (m: CaseMessage) =>
+      m.author === "agent"
+        ? ({ type: "agent", agentId: agent.id, runId: null, hop: 0 } as const)
+        : ({ type: "person", userId: (people.get(m.author) ?? owner).id } as const);
+    let threadId: string | null = null;
+    for (const m of conv.prior ?? []) {
+      const msg = await insertMessage(db, {
+        orgId: org.id,
+        channelId,
+        threadId,
+        author: author(m),
+        body: m.body,
+        meta: m.meta,
+      });
+      if (conv.thread && conv.where === "channel" && !threadId) threadId = msg.id;
+    }
+    // History only: earlier messages start no runs (their routing jobs go), but they are indexed for search.
+    await db.delete(schema.outbox).where(eq(schema.outbox.kind, "message.posted"));
+    await drainOutbox(db, handlers);
+    recorder.turns.length = 0;
+
+    const triggerAuthor = people.get(conv.trigger.author) ?? owner;
+    const routine = conv.routine
+      ? { routine: { id: crypto.randomUUID(), name: conv.routine.name, runId: crypto.randomUUID() } }
+      : undefined;
+    await postPersonMessage({ db, pubsub }, triggerAuthor.id, org.id, channelId, {
+      body: conv.trigger.body,
+      threadId,
+      meta: routine,
+    });
+    await drainOutbox(db, handlers, { maxBatches: 500 });
+
+    // What happened.
+    const runs = await db
+      .select()
+      .from(schema.agentRuns)
+      .where(and(eq(schema.agentRuns.orgId, org.id), eq(schema.agentRuns.agentId, agent.id)))
+      .orderBy(asc(schema.agentRuns.createdAt));
+    const runIds = runs.map((r) => r.id);
+    const steps = runIds.length
+      ? await db
+          .select()
+          .from(schema.agentRunSteps)
+          .where(inArray(schema.agentRunSteps.runId, runIds))
+          .orderBy(asc(schema.agentRunSteps.createdAt), asc(schema.agentRunSteps.seq))
+      : [];
+    const results = new Map(
+      steps.filter((s) => s.kind === "tool_result").map((s) => [String(s.data.toolUseId), s.data] as const),
+    );
+    const calls: EvalToolCall[] = steps
+      .filter((s) => s.kind === "tool_call")
+      .map((s) => {
+        const r = results.get(String(s.data.toolUseId)) as { isError?: boolean; content?: string } | undefined;
+        const refused = r?.isError && /^(Not allowed|Invalid input|Unknown tool)/.test(r.content ?? "");
+        return {
+          name: String(s.data.name),
+          input: (s.data.input ?? {}) as Record<string, unknown>,
+          executed: Boolean(r) && !refused,
+          isError: r?.isError === true,
+          result: r?.content,
+        };
+      });
+    const approvals = runIds.length
+      ? (
+          await db
+            .select({ tool: schema.approvals.tool })
+            .from(schema.approvals)
+            .where(inArray(schema.approvals.runId, runIds))
+        ).map((r) => r.tool)
+      : [];
+    const posted = runIds.length
+      ? await db
+          .select({ body: schema.messages.body })
+          .from(schema.messages)
+          .where(and(eq(schema.messages.orgId, org.id), inArray(schema.messages.agentRunId, runIds)))
+          .orderBy(asc(schema.messages.createdAt))
+      : [];
+    const [usage] = await db
+      .select({ cost: sql<number>`coalesce(sum(${schema.usageRecords.costNanoUsd}), 0)::bigint` })
+      .from(schema.usageRecords)
+      .where(eq(schema.usageRecords.orgId, org.id));
+    const turns = recorder.turns.map(({ text, toolCalls }) => ({ text, toolCalls }));
+    const last = turns.at(-1);
+    return {
+      turns,
+      calls,
+      reply: posted.map((m) => m.body).join("\n\n"),
+      noReply: Boolean(last && isNoReply(last.text)),
+      approvals,
+      status: runs.map((r) => (r.error ? `${r.status} (${r.error})` : r.status)),
+      system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
+      costNanoUsd: Number(usage?.cost ?? 0),
+    };
+  } finally {
+    await close();
+  }
+}
+
+// ── The judge ────────────────────────────────────────────────────────────────
+
+const STANDARD_CRITERIA: Record<string, string> = {
+  looked_first:
+    "Before answering, the agent looked at the real sources with its tools (code, errors, analytics, issues, memory) instead of answering from assumptions or replying with a plan made without looking.",
+  grounded:
+    "What it says about code, data or errors is backed by what the tools returned (file and line, numbers, ids, links). Nothing is invented or contradicts the tool results, and it never says it lacks access to something a tool returned.",
+  next_step:
+    "It ends with a concrete next step it takes or offers (e.g. 'abro um PR que muda X no arquivo Y', an issue created or to create, a specific action), not a vague 'let me know' or a list of generic ideas.",
+  asks_well:
+    "It does not ask permission to look and does not ask for information its tools could find. It asks only for decisions that are really the person's (product choice, priority) or before a sensitive action, and then one focused question.",
+};
+
+interface JudgeVerdict {
+  criteria: { id: string; pass: boolean; reason: string }[];
+}
+
+export const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+export interface JudgeOptions {
+  apiKey: string;
+  provider: ModelProvider;
+  model: string;
+  agentModel?: string;
+}
+
+/** Grades a run against the standard criteria and the case's rubric (one structured-output call). */
+export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions) {
+  const { apiKey, provider, model: judgeModel } = options;
+  const criteria = Object.entries(STANDARD_CRITERIA)
+    .filter(([id]) => !(c.expect.skipJudge ?? []).includes(id))
+    .filter(([id]) => id !== "looked_first" || c.expect.investigate)
+    .map(([id, text]) => ({ id, text }));
+  for (const [i, text] of (c.expect.rubric ?? []).entries()) criteria.push({ id: `case_${i + 1}`, text });
+  if (criteria.length === 0) return { checks: [] as CheckResult[], costNanoUsd: 0 };
+  const a = agentOf(c, options.agentModel);
+  const conversation = [...(c.conversation.prior ?? []), c.conversation.trigger]
+    .map((m) => `[${m.author === "agent" ? a.name : m.author}]: ${m.body}`)
+    .join("\n");
+  const toolLines = run.calls.length
+    ? run.calls
+        .map(
+          (t, i) =>
+            `${i + 1}. ${t.name}(${clip(JSON.stringify(t.input), 300)}) → ${
+              t.executed
+                ? clip(t.result ?? "(no output)", 700)
+                : run.approvals.includes(t.name)
+                  ? "held for a person's approval"
+                  : "not run"
+            }`,
+        )
+        .join("\n")
+    : "(no tool calls)";
+  const prompt = [
+    `# Case: ${c.title}`,
+    `Agent: ${a.name}, ${a.role}. Where: ${c.conversation.where === "dm" ? "a DM" : `#${c.conversation.channel ?? "geral"}`}${c.conversation.routine ? ` (routine run: "${c.conversation.routine.name}")` : ""}.`,
+    `# Conversation (last line is the message the agent answered)\n${conversation}`,
+    `# What a good answer does\n${c.expect.behavior}`,
+    `# The agent's tool calls, in order\n${toolLines}`,
+    `# The agent's reply in the chat\n${run.noReply ? "(stayed silent: NO_REPLY)" : run.reply.trim() || "(nothing posted)"}`,
+    `# Criteria\n${criteria.map((k) => `- ${k.id}: ${k.text}`).join("\n")}`,
+  ].join("\n\n");
+  const result = await provider.stream(
+    {
+      model: judgeModel,
+      system:
+        "You grade how an AI agent behaved in a team chat (agentes.chat), where agents have tools and are expected to investigate before answering. Grade each criterion strictly against the transcript: pass only if the reply clearly meets it. When a criterion does not apply to this case (e.g. nothing needed asking), it passes. Give a one-sentence reason quoting the reply when useful.",
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 1500,
+      outputSchema: {
+        type: "object",
+        properties: {
+          criteria: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", enum: criteria.map((k) => k.id) },
+                pass: { type: "boolean" },
+                reason: { type: "string" },
+              },
+              required: ["id", "pass", "reason"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["criteria"],
+        additionalProperties: false,
+      },
+    },
+    { apiKey, onDelta: () => {} },
+  );
+  const verdict = JSON.parse(result.text) as JudgeVerdict;
+  const checks = criteria.map((k): CheckResult => {
+    const v = verdict.criteria.find((x) => x.id === k.id);
+    return {
+      id: `judge:${k.id}`,
+      pass: v?.pass === true,
+      detail: v ? v.reason : "the judge gave no verdict",
+    };
+  });
+  return { checks, costNanoUsd: costNanoUsd(judgeModel, result.usage) };
+}
