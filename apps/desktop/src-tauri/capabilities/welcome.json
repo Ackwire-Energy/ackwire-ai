@@ -1,0 +1,19 @@
+{
+  "identifier": "welcome",
+  "description": "First run and adding an organization: sign-in by code, folders, tools, start at login.",
+  "windows": ["welcome"],
+  "permissions": [
+    "core:default",
+    "allow-runners-list",
+    "allow-runner-send",
+    "allow-runner-add",
+    "allow-runner-remove",
+    "allow-open-external",
+    "allow-pick-folder",
+    "allow-show-window",
+    "allow-hide-window",
+    "allow-app-info",
+    "allow-autostart-get",
+    "allow-autostart-set"
+  ]
+}

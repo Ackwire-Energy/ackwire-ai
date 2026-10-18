@@ -1,0 +1,19 @@
+{
+  "identifier": "popover",
+  "description": "The menu bar popover: live state, pause, access requests, tray icon, notifications.",
+  "windows": ["popover"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-size",
+    "allow-runners-list",
+    "allow-runner-send",
+    "allow-open-external",
+    "allow-reveal-folder",
+    "allow-set-tray-state",
+    "allow-show-window",
+    "allow-hide-window",
+    "allow-quit-app",
+    "allow-app-info",
+    "allow-notify"
+  ]
+}
