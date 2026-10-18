@@ -111,6 +111,14 @@ export const ICONS = {
   ],
   photos: [r(3.5, 5, 17, 14, 3), c(9, 10, 1.6), p("m4 17 5-4.5 4 3.5 3-2.5 4 3.5")],
   drive: [p("M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z")],
+  // From FazerDesfazer.html: the receipts of what an agent did (Desfazer, issue, memory).
+  undo: [p("M9 7 4.5 11.5 9 16"), p("M5 11.5h9.5a5 5 0 0 1 0 10H11")],
+  issue: [c(12, 12, 8.5), c(12, 12, 2.2, true)],
+  brain: [
+    p(
+      "M9 5.5a3 3 0 0 0-3 3v.5a3 3 0 0 0-1.5 5.3A3 3 0 0 0 9 18.5h1V5.5ZM15 5.5a3 3 0 0 1 3 3v.5a3 3 0 0 1 1.5 5.3A3 3 0 0 1 15 18.5h-1V5.5Z",
+    ),
+  ],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -1,6 +1,7 @@
 import {
   type Mission,
   type MissionDecision,
+  type MissionFinding,
   type MissionReview,
   useApi,
   useMission,
@@ -12,8 +13,8 @@ import {
 } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Count, Icon, PixelOrbit, PlanTrack, Text, useToast } from "@/ui";
+import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, PixelOrbit, PlanTrack, Text, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -356,19 +357,31 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
     );
   }
   const items = (m.plan.items ?? []).filter((i) => i.status !== "dropped");
+  const findings = m.findings ?? [];
+  const investigated = findings.length > 0;
   return (
-    <View style={[styles.askcard, surface]}>
+    <View style={[investigated ? styles.inv : styles.askcard, surface]}>
       <View style={styles.row}>
         <Icon name="target" size={15} color={c.muted} />
         <Text variant="caption" tone="muted" style={styles.bold}>
-          {items.length > 0
-            ? t("mobile.mission.plan.titleCount", { count: items.length })
-            : t("mobile.mission.plan.title")}
+          {investigated
+            ? t("missions.findings.proposed")
+            : items.length > 0
+              ? t("mobile.mission.plan.titleCount", { count: items.length })
+              : t("mobile.mission.plan.title")}
         </Text>
       </View>
-      <Text variant="body" style={[styles.bold, styles.title]}>
+      <Text variant="body" style={[styles.bold, investigated ? styles.invTitle : styles.title]}>
         {m.title || goal}
       </Text>
+      {investigated ? <Findings findings={findings} /> : null}
+      {investigated && items.length > 0 ? (
+        <View style={[styles.plHead, { borderTopColor: c.line }]}>
+          <Text variant="caption" tone="faint" style={styles.bold}>
+            {t("missions.findings.plan", { count: items.length })}
+          </Text>
+        </View>
+      ) : null}
       {items.slice(0, 4).map((it, i) => (
         <View key={it.id} style={styles.planRow}>
           <View style={styles.n}>
@@ -396,7 +409,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
               variant="secondary"
               size="sm"
               wide
-              label={t("mobile.mission.plan.change")}
+              label={investigated ? t("missions.findings.adjust") : t("mobile.mission.plan.change")}
               onPress={() =>
                 sheet.open(
                   <PromptForm
@@ -450,6 +463,59 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
           </View>
         </View>
       ) : null}
+      {m.canAct && investigated ? (
+        <Text variant="caption" tone="faint" style={styles.note}>
+          {t("missions.findings.note")}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const FINDING_ICON = { read: "search", data: "chart", decision: "help" } as const;
+
+/**
+ * What the agent found before proposing (FazerDesfazer.html, `.inv .fd`): what it read (search), numbers
+ * it saw (chart) and the one decision left for the person (help), highlighted. Refs are mono chips.
+ */
+function Findings({ findings }: { findings: MissionFinding[] }) {
+  const { t } = useTranslation();
+  const { colors, fonts } = useTheme();
+  return (
+    <View style={styles.fd}>
+      {findings.map((f, i) => {
+        const open = f.kind === "decision";
+        return (
+          <View
+            key={`${f.kind}:${String(i)}`}
+            style={[styles.fdRow, open && [styles.fdOpen, { backgroundColor: colors.sunken }]]}
+            accessible
+            accessibilityLabel={`${t(`missions.findings.${f.kind}`)}: ${f.text}`}
+          >
+            <Icon name={FINDING_ICON[f.kind]} size={15} color={open ? colors.ink : colors.faint} />
+            <View style={styles.grow}>
+              <Text variant="small" tone={open ? "ink" : "ink2"} style={open ? styles.bold : undefined}>
+                {f.text}
+              </Text>
+              {f.refs && f.refs.length > 0 ? (
+                <View style={styles.refs}>
+                  {f.refs.slice(0, 6).map((ref) => (
+                    <View key={ref} style={[styles.ref, { backgroundColor: colors.sunken }]}>
+                      <RNText
+                        numberOfLines={1}
+                        maxFontSizeMultiplier={CHROME_MAX_SCALE}
+                        style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.ink2 }}
+                      >
+                        {ref}
+                      </RNText>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -481,4 +547,13 @@ const styles = StyleSheet.create({
   planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
   n: { width: 16, alignItems: "flex-end" },
   more: { paddingLeft: 26, paddingBottom: 8 },
+  inv: { marginTop: 8, padding: 14, borderRadius: 20 },
+  invTitle: { marginTop: 5, marginBottom: 10, fontSize: 17, lineHeight: 22 },
+  fd: { gap: 7, marginBottom: 12 },
+  fdRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
+  fdOpen: { padding: 8, marginHorizontal: -8, borderRadius: 12 },
+  refs: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
+  ref: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, maxWidth: "100%" },
+  plHead: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginBottom: 4 },
+  note: { marginTop: 8, textAlign: "center" },
 });

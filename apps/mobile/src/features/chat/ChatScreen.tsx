@@ -45,7 +45,7 @@ import { isOpenMission } from "../missions/logic";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { PushedHeader, Tile } from "../shared/parts";
+import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
 import { useChatLive } from "./live";
@@ -88,7 +88,9 @@ const COMPOSER_INPUT_ID = "chat-composer";
 export function ChatScreen({ channelId, threadId }: { channelId: string; threadId?: string | null }) {
   return (
     <SheetHostProvider>
-      <Chat channelId={channelId} threadId={threadId ?? null} />
+      <FocusLive>
+        <Chat channelId={channelId} threadId={threadId ?? null} />
+      </FocusLive>
     </SheetHostProvider>
   );
 }

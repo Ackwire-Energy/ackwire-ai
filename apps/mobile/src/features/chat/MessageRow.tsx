@@ -26,6 +26,7 @@ import {
   workStepsOf,
 } from "./logic";
 import { MessageText } from "./MessageText";
+import { Receipts } from "./Receipts";
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
@@ -166,6 +167,7 @@ export const MessageRow = memo(function MessageRow({
         ))}
         {body ? <MessageText body={body} muted={m.local === "pending"} /> : null}
         {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
+        {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}

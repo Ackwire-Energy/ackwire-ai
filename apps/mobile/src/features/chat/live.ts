@@ -7,6 +7,7 @@ import {
   type ConsultsState,
   cacheApproval,
   cacheMessage,
+  cacheMessageActions,
   consultsIn,
   dismissRun,
   dropProvisional,
@@ -154,6 +155,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "message.reactions":
       cacheReactions(qc, orgId, channelId, event.messageId, event.reactions);
+      break;
+    case "message.actions":
+      // An agent's receipts changed (undone, redone, a new one): replace the list.
+      cacheMessageActions(qc, orgId, channelId, event.messageId, event.actions);
       break;
     case "approval.created":
     case "approval.decided":
