@@ -1,4 +1,4 @@
-import type { Agent } from "@agenteschat/client";
+import type { Agent, MailAccount } from "@agenteschat/client";
 import {
   keys,
   useAgents,
@@ -7,10 +7,14 @@ import {
   useCustomServerAction,
   useCustomServers,
   useDisconnect,
+  useMailAccounts,
+  useMailAction,
+  useMailProviders,
 } from "@agenteschat/client";
 import { levelIn } from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, connectedIds, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { choiceOf, newestAccount } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AvatarStack, Button, Card, Chip, Dialog, DialogFooter, List } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,8 +25,17 @@ import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorCatalogDialog, ConnectorIcon } from "@/components/ConnectorCatalog";
 import { GitHubAppPanel } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
+import {
+  MailConnectFlow,
+  MailDisconnectDialog,
+  type MailFlowState,
+  MailReconnectDialog,
+  MailRow,
+  mailChoices,
+} from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -32,9 +45,19 @@ import { useToast } from "@/lib/toast";
  *
  * Back from OAuth: `?connected=github` (or `custom:{id}`) reopens the flow at
  * "O que faz" for that connection; `?review=1` (older returns) opens the
- * newest server waiting for review.
+ * newest server waiting for review. Back from Gmail/Outlook: `?mail=connected`
+ * opens "O que faz" for the newest mailbox; `?mail=failed` says it didn't work.
+ * Mailboxes (ADR 0038) are rows of the same list.
  */
-export function ConnectorsSection({ connected, review }: { connected?: string; review?: boolean }) {
+export function ConnectorsSection({
+  connected,
+  review,
+  mail,
+}: {
+  connected?: string;
+  review?: boolean;
+  mail?: string;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const admin = can(org.role, "configure");
@@ -45,6 +68,36 @@ export function ConnectorsSection({ connected, review }: { connected?: string; r
   const [adding, setAdding] = useState(false);
   const [flow, setFlow] = useState<FlowState | null>(null);
   const [removing, setRemoving] = useState<ConnectedItem | null>(null);
+  const toast = useToast();
+  const mailProviders = useMailProviders(org.id);
+  const mailAccounts = useMailAccounts(org.id);
+  const { connectComposio } = useMailAction(org.id);
+  const accounts = mailAccounts.data ?? [];
+  const [mailFlow, setMailFlow] = useState<MailFlowState | null>(null);
+  const [reconnecting, setReconnecting] = useState<MailAccount | null>(null);
+  const [removingMail, setRemovingMail] = useState<MailAccount | null>(null);
+  const reconnect = (account: MailAccount) => {
+    // Gmail/Outlook sign in again on the provider's page; the rest take a new app password.
+    if (account.via === "composio" && (account.provider === "gmail" || account.provider === "outlook")) {
+      connectComposio.mutate(
+        { provider: account.provider, label: account.label },
+        { onSuccess: (started) => navigateAway(started.redirectUrl) },
+      );
+    } else setReconnecting(account);
+  };
+  // Back from Gmail/Outlook: "O que faz" for the mailbox that came in, or why it didn't.
+  const mailReturned = useRef(false);
+  useEffect(() => {
+    if (mailReturned.current || !mail) return;
+    if (mail === "connected" && !mailAccounts.data && !mailAccounts.isError) return;
+    mailReturned.current = true;
+    const newest = mail === "connected" ? newestAccount(mailAccounts.data ?? []) : null;
+    if (newest && admin) {
+      toast.show(t("mail.returned"));
+      setMailFlow({ step: 1, account: newest });
+    } else if (mail !== "connected") toast.show(t("mail.failed"), "error");
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [mail, mailAccounts.data, mailAccounts.isError, admin, t, toast]);
   const defs = catalog.data?.connectors ?? [];
   const items = connectedItems(connections.data ?? [], servers.data ?? [], defs);
   const agentList = agents.data ?? [];
@@ -84,11 +137,23 @@ export function ConnectorsSection({ connected, review }: { connected?: string; r
         )}
       </div>
       {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
-      {connections.isSuccess && servers.isSuccess && items.length === 0 && (
+      {connections.isSuccess && servers.isSuccess && items.length === 0 && accounts.length === 0 && (
         <p className="small muted">{t("connectors.none")}</p>
       )}
-      {items.length > 0 && (
+      {items.length + accounts.length > 0 && (
         <List aria-label={t("connectors.connectedList")}>
+          {accounts.map((account) => (
+            <MailRow
+              key={`mail-${account.id}`}
+              account={account}
+              agents={agentList}
+              admin={admin}
+              onTools={() => setMailFlow({ step: 1, account })}
+              onWho={() => setMailFlow({ step: 2, account })}
+              onReconnect={() => reconnect(account)}
+              onDisconnect={() => setRemovingMail(account)}
+            />
+          ))}
           {items.map((item) => (
             <ConnectedRow
               key={item.id}
@@ -119,8 +184,19 @@ export function ConnectorsSection({ connected, review }: { connected?: string; r
           setAdding(false);
           setFlow({ step: 0, def: null });
         }}
+        mail={{
+          choices: mailChoices(mailProviders.data),
+          connected: new Set(accounts.map(choiceOf)),
+          onPick: (choice) => {
+            setAdding(false);
+            setMailFlow({ step: 0, choice });
+          },
+        }}
       />
       <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
+      <MailConnectFlow flow={mailFlow} onChange={setMailFlow} onClose={() => setMailFlow(null)} />
+      <MailReconnectDialog account={reconnecting} onClose={() => setReconnecting(null)} />
+      <MailDisconnectDialog account={removingMail} onClose={() => setRemovingMail(null)} />
       <DisconnectDialog
         item={removing}
         using={removing ? using(removing).length : 0}

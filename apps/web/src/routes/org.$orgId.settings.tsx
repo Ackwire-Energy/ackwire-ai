@@ -9,7 +9,7 @@ import { SettingsPage, settingsSearch } from "@/pages/SettingsPage";
 export const Route = createFileRoute("/org/$orgId/settings")({
   validateSearch: settingsSearch,
   beforeLoad: ({ params, search }) => {
-    if (search.connected !== undefined || search.review !== undefined) {
+    if (search.connected !== undefined || search.review !== undefined || search.mail !== undefined) {
       throw redirect({
         to: "/org/$orgId/settings/$section",
         params: { orgId: params.orgId, section: "connectors" },

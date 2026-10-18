@@ -15,6 +15,7 @@ import {
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { CardHead, ChangedTag, useAgentEdit, WasLine } from "./context";
+import { MailAccessCard } from "./MailAccess";
 import { ReadOnlyNote } from "./pieces";
 import { ReposBlock } from "./Repos";
 
@@ -161,6 +162,7 @@ export function AccessTab() {
                   </Link>
                 )}
               </Card>
+              <MailAccessCard />
               <Card as="section" className="agp-card" aria-labelledby="ac-builtin">
                 <CardHead
                   id="ac-builtin"

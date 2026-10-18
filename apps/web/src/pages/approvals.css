@@ -324,6 +324,10 @@
   color: var(--ink);
   font-weight: 600;
   overflow-wrap: anywhere;
+  /* An email body: its lines kept, scrolling when long. */
+  white-space: pre-line;
+  max-height: 200px;
+  overflow-y: auto;
 }
 .ap-why {
   display: flex;
