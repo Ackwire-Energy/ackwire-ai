@@ -459,4 +459,9 @@ export const extraIcons = {
     ],
     ["path", { d: "M8.33 8.5a2.17 2.17 0 0 0 3.08 3.08" }],
   ],
+  /** Email (ADR 0038): an envelope, for "Outro email" and routines started by an email. */
+  mail: [
+    ["rect", { x: "2.75", y: "4.5", width: "14.5", height: "11", rx: "2.25" }],
+    ["path", { d: "m3.5 6 6.5 5 6.5-5" }],
+  ],
 } satisfies Record<string, IconShape[]>;

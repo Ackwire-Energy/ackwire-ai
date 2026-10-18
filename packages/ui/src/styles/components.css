@@ -795,6 +795,10 @@ textarea.ac-input {
   background: var(--surface);
   border-radius: var(--radius-sm);
   overflow-wrap: anywhere;
+  /* Long, multi-line details (an email's recipients, subject and body) keep their lines and scroll. */
+  white-space: pre-line;
+  max-height: 240px;
+  overflow-y: auto;
 }
 .ac-approval__actions {
   display: flex;

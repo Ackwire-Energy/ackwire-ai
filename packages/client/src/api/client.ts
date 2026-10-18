@@ -10,6 +10,8 @@ import type {
   AgentComputer,
   AgentDetail,
   AgentInput,
+  AgentMailbox,
+  AgentMailboxInput,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -65,6 +67,10 @@ import type {
   MachineAccess,
   MachineAccessReduce,
   MachineTask,
+  MailAccount,
+  MailFolder,
+  MailImapInput,
+  MailProviders,
   Me,
   Member,
   Memory,
@@ -816,6 +822,26 @@ export interface ApiClient {
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {
     list(orgId: string): Promise<WorkingRun[]>;
+  };
+  /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio, the rest by IMAP/SMTP. */
+  mail: {
+    /** Which ways in this server offers, and the IMAP presets. */
+    providers(orgId: string): Promise<MailProviders>;
+    accounts(orgId: string): Promise<MailAccount[]>;
+    /** Tests the login and both servers first; a `422` carries `MailConnectError` as its code. */
+    connectImap(orgId: string, input: MailImapInput): Promise<MailAccount>;
+    /** Gmail/Outlook: the page to open; the server sends the person back with `?mail=connected|failed`. */
+    connectComposio(
+      orgId: string,
+      input: { provider: "gmail" | "outlook"; label?: string },
+    ): Promise<{ accountId: string; redirectUrl: string }>;
+    /** A new name, or a new app password (reconnects an IMAP mailbox). */
+    update(orgId: string, accountId: string, input: { label?: string; password?: string }): Promise<MailAccount>;
+    disconnect(orgId: string, accountId: string): Promise<void>;
+    folders(orgId: string, accountId: string): Promise<MailFolder[]>;
+    /** An agent's access and rules per mailbox. */
+    agent(orgId: string, agentId: string): Promise<AgentMailbox[]>;
+    setAgent(orgId: string, agentId: string, accountId: string, input: AgentMailboxInput): Promise<AgentMailbox>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {
