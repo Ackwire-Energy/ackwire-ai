@@ -140,7 +140,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         {body ? (
           <View style={[styles.bubble, { backgroundColor: c.bubble }]}>
-            <MessageText body={body} muted={m.local === "pending"} />
+            <MessageText body={body} muted={m.local === "pending"} selectable={false} />
           </View>
         ) : null}
         {files.length > 0 ? (
@@ -236,7 +236,7 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {body ? <MessageText body={body} muted={m.local === "pending"} /> : null}
+        {body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} /> : null}
         {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}

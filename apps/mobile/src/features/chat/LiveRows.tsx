@@ -33,7 +33,7 @@ export function StreamingRow({ run }: { run: LiveRun }) {
             </Text>
           ) : null}
         </View>
-        <MessageText body={run.text} streaming={run.status !== "canceled"} />
+        <MessageText body={run.text} streaming={run.status !== "canceled"} selectable={false} />
       </View>
     </View>
   );

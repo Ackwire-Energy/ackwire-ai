@@ -114,6 +114,7 @@ export function Composer({
           horizontal
           showsHorizontalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          style={styles.pillsBleed}
           contentContainerStyle={styles.pills}
         >
           {suggestions.map((s) => (
@@ -124,10 +125,10 @@ export function Composer({
               style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
             >
               <View style={styles.pillIn}>
-                <Icon name={s.icon} size={15} color={colors.muted} />
+                <Icon name={s.icon} size={14} color={colors.muted} />
                 <RNText
                   maxFontSizeMultiplier={CHROME_MAX_SCALE}
-                  style={[systemText("subhead", weights.semibold), { color: colors.ink2 }]}
+                  style={[systemText("subhead", weights.medium), styles.pillText, { color: colors.ink2 }]}
                 >
                   {s.label}
                 </RNText>
@@ -238,9 +239,13 @@ const inputText: TextStyle = {
 };
 
 const styles = StyleSheet.create({
-  pills: { gap: 6, paddingHorizontal: 4, paddingBottom: 8 },
+  // The row runs to the screen edges (past the composer's own inset) so a long last chip scrolls instead of
+  // being cut at the padding.
+  pillsBleed: { marginHorizontal: -10 },
+  pills: { gap: 6, paddingHorizontal: 14, paddingBottom: 8 },
   pill: { height: 32, borderRadius: 999 },
   pillIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12 },
+  pillText: { fontSize: 14, lineHeight: 18 },
   row: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   plus: { width: FIELD, height: FIELD, borderRadius: FIELD / 2 },
   plusGlass: { flex: 1, borderRadius: FIELD / 2 },

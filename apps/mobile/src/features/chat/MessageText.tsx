@@ -14,10 +14,16 @@ export const MessageText = memo(function MessageText({
   body,
   streaming = false,
   muted = false,
+  selectable = true,
 }: {
   body: string;
   streaming?: boolean;
   muted?: boolean;
+  /**
+   * false in chat rows: a long press there opens the message sheet (which has "Copiar texto"), and native
+   * selection would float iOS's own "Copiar" bubble over it.
+   */
+  selectable?: boolean;
 }) {
   const c = useColors();
   const blocks = useMemo(() => parseBlocks(body), [body]);
@@ -33,7 +39,7 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={[styles.code, { backgroundColor: c.sunken }]}>
-                <RNText selectable style={[styles.mono, { color: c.ink2 }]}>
+                <RNText selectable={selectable} style={[styles.mono, { color: c.ink2 }]}>
                   {b.text}
                 </RNText>
                 {end}
@@ -73,7 +79,7 @@ export const MessageText = memo(function MessageText({
           default:
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone={tone} style={styles.line} selectable>
+              <Text key={i} variant="body" tone={tone} style={styles.line} selectable={selectable}>
                 <Spans inline={b.inline} />
                 {end}
               </Text>
