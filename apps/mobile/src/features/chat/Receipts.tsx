@@ -176,7 +176,7 @@ function Sentence({
   const { t } = useTranslation();
   const href = targetHref(a.target, channelId);
   const meId = useMeId();
-  const values = actionTextValues(a, (key, options) => t(key, options) as string, meId ?? undefined);
+  const values = actionTextValues(a, t, meId ?? undefined);
   const runs = boldRuns(t(actionTextKey(a), values) as string);
   const open = href
     ? () => {
