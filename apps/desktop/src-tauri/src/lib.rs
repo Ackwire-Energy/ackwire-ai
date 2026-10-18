@@ -42,6 +42,30 @@ fn is_site_url(url: &str) -> bool {
     url == SITE || url.starts_with("https://agentes.chat/") || url.starts_with("https://agentes.chat?")
 }
 
+/// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
+/// (with the open-window dot, clickable); with all of them closed it lives in the menu bar only.
+const APP_WINDOWS: &[&str] = &["welcome", "prefs"];
+
+/// Dock icon on while an app window is visible, off otherwise (macOS).
+pub(crate) fn sync_dock(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let open = APP_WINDOWS.iter().any(|name| {
+            app.get_webview_window(name)
+                .and_then(|w| w.is_visible().ok())
+                .unwrap_or(false)
+        });
+        let policy = if open {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        let _ = app.set_activation_policy(policy);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
     if !WINDOWS.contains(&name) {
         return Err(format!("unknown window: {name}"));
@@ -53,6 +77,9 @@ pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
     }
     let _ = window.unminimize();
     window.show().map_err(|e| e.to_string())?;
+    if APP_WINDOWS.contains(&name) {
+        sync_dock(app);
+    }
     window.set_focus().map_err(|e| e.to_string())?;
     let _ = app.emit("window://shown", name);
     Ok(())
@@ -156,7 +183,9 @@ fn hide_window(app: AppHandle, name: String) -> Result<(), String> {
         return Err(format!("unknown window: {name}"));
     }
     let window = app.get_webview_window(&name).ok_or("window not found")?;
-    window.hide().map_err(|e| e.to_string())
+    window.hide().map_err(|e| e.to_string())?;
+    sync_dock(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -237,6 +266,7 @@ pub fn run() {
                 // Windows are made once and only hidden; quitting goes through "Sair".
                 api.prevent_close();
                 let _ = window.hide();
+                sync_dock(window.app_handle());
             }
             _ => {}
         })
@@ -255,12 +285,19 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building agentes");
 
-    app.run(|app, event| {
-        if let RunEvent::ExitRequested { api, .. } = event {
+    app.run(|app, event| match event {
+        RunEvent::ExitRequested { api, .. } => {
             if !app.state::<Runners>().is_shut_down() {
                 api.prevent_exit();
                 begin_quit(app.clone());
             }
         }
+        // A click on the Dock icon: bring the app's window back (sign-in first, if nothing is signed in).
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen { .. } => {
+            let name = if app.state::<Runners>().any_paired() { "prefs" } else { "welcome" };
+            let _ = present(app, name);
+        }
+        _ => {}
     });
 }
