@@ -6,7 +6,7 @@ import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } f
 import { Card, EmptyState, Filters, Icon, LargeTitleScreen, Section, Text } from "@/ui";
 import { notificationHref } from "../links/logic";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { type ActivityFilter, activitySections, type DayGroup, placeOf, subtitleOf, whoOf } from "./logic";
 
@@ -23,10 +23,11 @@ export function ActivityScreen() {
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const counts = list.data?.pages[0]?.counts;
   const { waiting, days } = activitySections(items, filter);
+  const pull = usePullRefresh(list.refetch);
   return (
     <LargeTitleScreen
       title={t("mobile.activity.title")}
-      refreshControl={<RefreshControl refreshing={list.isRefetching} onRefresh={() => void list.refetch()} />}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <Filters
         items={[

@@ -23,11 +23,13 @@ export { type FilterItem, Filters, type FiltersProps } from "./Filters";
 export { Glass, type GlassProps } from "./Glass";
 export { HoldButton, type HoldButtonProps } from "./HoldButton";
 export { haptics } from "./haptics";
+export { type HeaderAction, type SFSymbolName, useHeaderActionOptions } from "./headerActions";
 export { Icon, type IconName, type IconProps } from "./Icon";
 export { IconButton, type IconButtonProps } from "./IconButton";
 export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
 export {
+  CoverTabStack,
   coverBarOptions,
   HeaderSlot,
   type HeaderSlotStore,

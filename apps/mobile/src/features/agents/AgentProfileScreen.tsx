@@ -2,9 +2,11 @@ import { keys, useAgentAccess, useAgentDetail, useApi, useUsage } from "@agentes
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar, Button, Card, Chip, Icon, PixelOrbit, Row, Section, Sky, SpendBar, Text, useToast } from "@/ui";
+import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -38,6 +40,10 @@ function Profile({ id }: { id: string }) {
   const toast = useToast();
   const sheet = useSheet();
   const insets = useSafeAreaInsets();
+  // The cover's sky lags behind the scroll and stretches on pull; the agent fades as it nears the bar.
+  const { y, onScroll } = useCoverScroll();
+  const underBar = AVATAR_TOP - (insets.top + BAR_HEIGHT);
+  const avatarFade = useScrollFade(y, underBar - 30, underBar + 70);
   const agent = dir.agentById.get(id);
   const detail = useAgentDetail(orgId, id);
   const access = useAgentAccess(orgId, id);
@@ -93,10 +99,18 @@ function Profile({ id }: { id: string }) {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+      >
         <View style={[styles.cover, { paddingTop: insets.top + 56 }]}>
-          <Sky color={look.color} depth={1} style={StyleSheet.absoluteFill} />
-          <AgentAvatar agent={look} size={104} mode={busy ? "run" : "idle"} />
+          <CoverParallax y={y} style={StyleSheet.absoluteFill}>
+            <Sky color={look.color} depth={1} style={StyleSheet.absoluteFill} />
+          </CoverParallax>
+          <Animated.View style={avatarFade}>
+            <AgentAvatar agent={look} size={104} mode={busy ? "run" : "idle"} />
+          </Animated.View>
         </View>
         <View style={styles.prof}>
           <Text variant="display" style={styles.center}>
@@ -224,7 +238,7 @@ function Profile({ id }: { id: string }) {
             </Card>
           </Section>
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
         <PushedHeader plate solid={false} />
       </View>
@@ -232,10 +246,17 @@ function Profile({ id }: { id: string }) {
   );
 }
 
+/** Height of the sky cover. */
+const COVER_HEIGHT = 300;
+/** Where the agent's top sits in the cover (bottom padding 22, avatar 104), and the bar's height. */
+const AVATAR_TOP = COVER_HEIGHT - 22 - 104;
+const BAR_HEIGHT = 44;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   bar: { position: "absolute", top: 0, left: 0, right: 0 },
-  cover: { height: 300, alignItems: "center", justifyContent: "flex-end", paddingBottom: 22, overflow: "hidden" },
+  // Not clipped: on a pull the sky grows up into the gap above the content.
+  cover: { height: COVER_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 22 },
   prof: { paddingHorizontal: 24, gap: 4 },
   center: { textAlign: "center" },
   acts: { flexDirection: "row", gap: 8, marginTop: 14 },

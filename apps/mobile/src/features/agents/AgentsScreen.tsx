@@ -4,19 +4,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import {
-  AgentAvatar,
-  Button,
-  Card,
-  EmptyState,
-  Icon,
-  IconButton,
-  LargeTitleScreen,
-  PixelOrbit,
-  Text,
-  useToast,
-} from "@/ui";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { AgentAvatar, Button, Card, EmptyState, Icon, LargeTitleScreen, PixelOrbit, Text, useToast } from "@/ui";
+import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, Tile } from "../shared/parts";
@@ -44,6 +33,7 @@ function Agents() {
   const agents = [...dir.agents].sort((a, b) => a.name.localeCompare(b.name));
   const working = agents.filter((a) => busy.has(a.id)).length;
   const newAgent = () => sheet.open(<NewAgentForm />);
+  const pull = usePullRefresh(runs.refetch);
   // Busca → "Criar agente" opens this screen with `?new=1`.
   const params = useLocalSearchParams<{ new?: string }>();
   useEffect(() => {
@@ -55,8 +45,8 @@ function Agents() {
     <LargeTitleScreen
       title={t("mobile.agents.title")}
       subtitle={t("mobile.agents.subtitle", { count: agents.length, working })}
-      headerRight={<IconButton icon="plus" label={t("mobile.agents.new")} onPress={newAgent} />}
-      refreshControl={<RefreshControl refreshing={runs.isRefetching} onRefresh={() => void runs.refetch()} />}
+      actions={[{ icon: "plus", sf: "plus", label: t("mobile.agents.new"), onPress: newAgent }]}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {dir.loading ? null : agents.length === 0 ? <EmptyState title={t("mobile.agents.empty")} sky /> : null}
       <View style={styles.grid}>

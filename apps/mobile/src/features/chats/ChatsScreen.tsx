@@ -4,10 +4,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import { Card, EmptyState, Filters, IconButton, LargeTitleScreen, SearchField, Text, useToast } from "@/ui";
+import { Card, EmptyState, Filters, LargeTitleScreen, SearchField, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useDirectory, useOrgId } from "../shared/hooks";
+import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PromptForm, SheetTitle } from "../shared/PromptForm";
 import { ActionList, Tile } from "../shared/parts";
 import { useConversations } from "../shared/queries";
@@ -36,15 +36,16 @@ function Chats() {
     sheet.open(<NewConversation />);
     router.setParams({ new: undefined });
   }, [params.new, sheet]);
+  const pull = usePullRefresh(list.refetch);
   const counts = filterCounts(list.rows);
   const rows = filterConversations(list.rows, filter);
   return (
     <LargeTitleScreen
       title={t("mobile.chats.title")}
-      headerRight={
-        <IconButton icon="plus" label={t("mobile.chats.new")} onPress={() => sheet.open(<NewConversation />)} />
-      }
-      refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={() => void list.refetch()} />}
+      actions={[
+        { icon: "plus", sf: "plus", label: t("mobile.chats.new"), onPress: () => sheet.open(<NewConversation />) },
+      ]}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <Pressable
         onPress={() => router.push("/search")}

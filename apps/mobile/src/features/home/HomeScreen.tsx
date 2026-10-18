@@ -10,12 +10,25 @@ import {
   useWorkingRuns,
 } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useIsFocused } from "expo-router";
-import { useEffect, useState } from "react";
+import { type NativeStackNavigationOptions, router, Stack, useIsFocused } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AgentAvatar, Button, Card, IconButton, PersonAvatar, PixelOrbit, Row, Section, Sky, Text } from "@/ui";
+import { Platform, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
+import {
+  AgentAvatar,
+  Button,
+  Card,
+  PersonAvatar,
+  PixelOrbit,
+  Row,
+  Section,
+  Sky,
+  Text,
+  useHeaderActionOptions,
+} from "@/ui";
+import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { crewOf } from "../agents/logic";
 import { workTitle, workWhere } from "../agents/work";
 import { ApprovalAsk } from "../approvals/ApprovalAsk";
@@ -28,7 +41,8 @@ import { useConversations, useWaitingApprovals, useWorkingNow } from "../shared/
 
 /**
  * Início: the greeting over the light sky and the crew (working ones bigger),
- * what waits on you (requests with their fuse, mission reviews and
+ * under a clear native bar (Você on the left, Busca on the right; the title
+ * shows once the greeting has scrolled away), what waits on you (requests with their fuse, mission reviews and
  * decisions, agents' questions), who is working now, and the latest
  * conversations.
  */
@@ -38,7 +52,12 @@ export function HomeScreen() {
   const me = useMe();
   const dir = useDirectory();
   const c = useColors();
-  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  // iOS insets the scroll view by the bar (it rests at minus the header height); Android lays it out
+  // from the top of the screen, under the clear bar.
+  const { y, onScroll } = useCoverScroll(IOS ? headerHeight : 0);
+  const [heroHeight, setHeroHeight] = useState(0);
+  const greetingFade = useScrollFade(y, 0, GREETING_GONE);
   const approvals = useWaitingApprovals();
   const waitingMissions = useMissionList(orgId, { status: "waiting_you" });
   const questions = useNotifications(orgId, "waiting");
@@ -71,39 +90,64 @@ export function HomeScreen() {
     setRefreshing(false);
   };
 
+  const title = t("mobile.tabs.home");
+  const actionOptions = useHeaderActionOptions({
+    left: (
+      <Pressable
+        onPress={() => router.push("/me")}
+        accessibilityRole="button"
+        accessibilityLabel={t("mobile.me.title")}
+        hitSlop={6}
+      >
+        <PersonAvatar name={me.data?.user.name ?? "?"} size={32} />
+      </Pressable>
+    ),
+    right: [
+      { icon: "search", sf: "magnifyingglass", label: t("mobile.find.title"), onPress: () => router.push("/search") },
+    ],
+  });
+  const options = useMemo<NativeStackNavigationOptions>(
+    () => ({
+      ...actionOptions,
+      title,
+      headerTitle: () => <FadingHeaderTitle y={y} from={TITLE_FROM} to={TITLE_TO} text={title} />,
+    }),
+    [actionOptions, title, y],
+  );
+  // Where the bottom of the sky passes under the bar: the bar turns solid there.
+  const heroUnderBar = IOS ? heroHeight : heroHeight - headerHeight;
+
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      {/* Under the native tabs, iOS insets this first scroll view by itself (status bar on top, tab bar
-          below); Android lays it out above the tab bar, so only the status bar is ours to clear there. */}
-      <ScrollView
+      <Stack.Screen options={options} />
+      {/* The first view of the screen, so the native bar follows its scroll. iOS insets it by itself
+          (bar on top, tab bar below); on Android it starts under the clear bar. */}
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingBottom: 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
-        <View style={[styles.hello, { paddingTop: IOS ? 8 : insets.top + 8 }]}>
-          {/* On iOS the content starts under the status bar: the sky reaches up behind it. */}
-          <Sky color="sky" depth={0.7} style={[StyleSheet.absoluteFill, IOS && { top: -insets.top }]} />
-          <View style={styles.top}>
-            <Pressable
-              onPress={() => router.push("/me")}
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.me.title")}
-              hitSlop={6}
-            >
-              <PersonAvatar name={me.data?.user.name ?? "?"} size={34} />
-            </Pressable>
-            <View style={styles.grow} />
-            <IconButton icon="search" label={t("mobile.find.title")} plate onPress={() => router.push("/search")} />
-          </View>
-          <Text variant="display">
-            {name ? t(`mobile.home.greeting.${greetingKey()}`, { name }) : t(`mobile.home.hello.${greetingKey()}`)}
-          </Text>
-          <Text variant="body" tone="muted" style={styles.sub}>
-            {[
-              waiting > 0 ? t("mobile.home.waitingLine", { count: waiting }) : t("mobile.home.nothingWaiting"),
-              t("mobile.home.workingLine", { count: busy.size }),
-            ].join(" ")}
-          </Text>
+        <View
+          style={[styles.hello, { paddingTop: IOS ? 12 : headerHeight + 12 }]}
+          onLayout={(e) => setHeroHeight(e.nativeEvent.layout.height)}
+        >
+          {/* On iOS the content starts under the bar: the sky reaches up behind it and the status bar. */}
+          <CoverParallax y={y} style={[StyleSheet.absoluteFill, IOS && { top: -headerHeight }]}>
+            <Sky color="sky" depth={0.7} style={StyleSheet.absoluteFill} />
+          </CoverParallax>
+          <Animated.View style={greetingFade}>
+            <Text variant="display" accessibilityRole="header">
+              {name ? t(`mobile.home.greeting.${greetingKey()}`, { name }) : t(`mobile.home.hello.${greetingKey()}`)}
+            </Text>
+            <Text variant="body" tone="muted" style={styles.sub}>
+              {[
+                waiting > 0 ? t("mobile.home.waitingLine", { count: waiting }) : t("mobile.home.nothingWaiting"),
+                t("mobile.home.workingLine", { count: busy.size }),
+              ].join(" ")}
+            </Text>
+          </Animated.View>
           {crew.length > 0 ? (
             <View style={styles.crew}>
               {crew.map(({ agent, busy: on }) => (
@@ -188,12 +232,19 @@ export function HomeScreen() {
             </Card>
           </Section>
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
+      <CoverBarBackdrop y={y} from={heroUnderBar - 40} to={heroUnderBar} height={headerHeight} />
     </View>
   );
 }
 
 const IOS = Platform.OS === "ios";
+
+/** Scroll (from rest) by which the greeting has faded out under the bar. */
+const GREETING_GONE = 44;
+/** The bar's title fades in over this stretch of scroll, as the greeting leaves. */
+const TITLE_FROM = 32;
+const TITLE_TO = 60;
 
 /** Rows of "Trabalhando agora" whose agent moves. */
 const LIVE_ROWS = 3;
@@ -296,8 +347,6 @@ function QuestionAsk({ item: n, divider }: { item: AppNotification; divider: boo
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   hello: { paddingHorizontal: 20, paddingBottom: 18, overflow: Platform.OS === "ios" ? "visible" : "hidden" },
-  top: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 },
-  grow: { flex: 1 },
   shrink: { flexShrink: 1 },
   sub: { marginTop: 6 },
   crew: { flexDirection: "row", alignItems: "flex-end", gap: 14, marginTop: 20, minHeight: 58 },

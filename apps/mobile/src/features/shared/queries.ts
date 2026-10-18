@@ -48,7 +48,6 @@ export function useConversations() {
     rows,
     loading: channels.isLoading || dms.isLoading,
     refetch: () => Promise.all([channels.refetch(), dms.refetch(), threads.refetch()]),
-    refreshing: channels.isRefetching || dms.isRefetching || threads.isRefetching,
   };
 }
 

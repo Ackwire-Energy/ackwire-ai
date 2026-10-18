@@ -1,5 +1,5 @@
 import { type Agent, type Member, type RealtimeConnection, useAgents, useMe, useMembers } from "@agenteschat/client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
@@ -103,4 +103,26 @@ export function useNow(ms = 30_000): number {
     return () => clearInterval(timer);
   }, [ms]);
   return now;
+}
+
+/**
+ * Pull to refresh that spins only for the person's own pull. Driving `RefreshControl` from a query's
+ * `isRefetching` made every background refetch (realtime, polling, focus) start the spinner from code,
+ * and on iOS that moves the scroll view by the spinner's height without counting the native header's
+ * inset: the content slid up under the large title.
+ */
+export function usePullRefresh(refetch: () => Promise<unknown>): { refreshing: boolean; onRefresh: () => void } {
+  const [refreshing, setRefreshing] = useState(false);
+  const latest = useRef(refetch);
+  useEffect(() => {
+    latest.current = refetch;
+  });
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void Promise.resolve()
+      .then(() => latest.current())
+      .catch(() => undefined)
+      .finally(() => setRefreshing(false));
+  }, []);
+  return { refreshing, onRefresh };
 }

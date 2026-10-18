@@ -137,6 +137,33 @@ export function TabStack({ title }: { title: string }) {
 }
 
 /**
+ * The stack of Início: its root has no large title (the greeting over the sky is the large title). The
+ * bar is clear over the sky; the title fades in once the greeting scrolls away, and what the bar becomes
+ * once scrolled is drawn by the screen (`CoverBarBackdrop`) or, on iOS 26, by the system's scroll edge.
+ */
+export function CoverTabStack({ title }: { title: string }) {
+  const { colors } = useTheme();
+  const options = useMemo<NativeStackNavigationOptions>(
+    () => ({
+      headerShown: true,
+      headerTransparent: true,
+      headerStyle: { backgroundColor: "transparent" },
+      headerShadowVisible: false,
+      headerLargeTitleEnabled: false,
+      headerTitleStyle: { color: colors.ink },
+      headerTintColor: colors.ink,
+      contentStyle: { backgroundColor: colors.bg },
+    }),
+    [colors],
+  );
+  return (
+    <Stack screenOptions={options}>
+      <Stack.Screen name="index" options={{ title }} />
+    </Stack>
+  );
+}
+
+/**
  * A pushed screen (conversation, mission, agent, delete account): native bar, back chevron only, the
  * edge swipe back, the platform's push animation. Opaque by default (lists and composers lay out below
  * it); `PushedHeader` switches a screen to a bar its content scrolls under.
