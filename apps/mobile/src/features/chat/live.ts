@@ -9,6 +9,7 @@ import {
   cacheMessage,
   consultsIn,
   dismissRun,
+  dropProvisional,
   emptyStreams,
   expectReply,
   keys,
@@ -20,11 +21,12 @@ import {
   reconcileRuns,
   runsInChannel,
   type StreamsState,
+  staleProvisional,
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { useConnection } from "../shared/hooks";
 
 /**
@@ -46,7 +48,11 @@ type Action =
   | { type: "expect"; channelId: string; threadId: string; agentIds: string[]; at: number }
   | { type: "stopping"; runId: string; byUserId: string }
   | { type: "unstopping"; runId: string }
-  | { type: "dismiss"; runId: string };
+  | { type: "dismiss"; runId: string }
+  | { type: "sweep"; at: number };
+
+/** A "pensando…" the server never confirmed is dropped after this long (the web's `PROVISIONAL_TTL_MS`). */
+export const PROVISIONAL_TTL_MS = 20_000;
 
 function reduce(state: LiveState, action: Action): LiveState {
   switch (action.type) {
@@ -73,6 +79,11 @@ function reduce(state: LiveState, action: Action): LiveState {
       return { ...state, streams: unmarkStopping(state.streams, action.runId) };
     case "dismiss":
       return { ...state, streams: dismissRun(state.streams, action.runId) };
+    case "sweep": {
+      const stale = staleProvisional(state.streams, action.at, PROVISIONAL_TTL_MS);
+      if (stale.length === 0) return state;
+      return { ...state, streams: dropProvisional(state.streams, new Set(stale.map((r) => r.threadId))) };
+    }
   }
 }
 
@@ -187,6 +198,8 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const qc = useQueryClient();
   const api = useApi();
   const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {} });
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // On open and after every reconnect: the server's active runs replace what we guessed.
   useEffect(() => {
@@ -219,6 +232,20 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       applyToCache(qc, orgId, channelId, event);
     });
   }, [connection, enabled, orgId, channelId, qc]);
+
+  // Safety net, as on the web: a "pensando…" the server never confirmed doesn't spin forever; the
+  // conversation resyncs instead (checked every 5 s while there is one).
+  const hasProvisional = Object.values(state.streams.runs).some((r) => r.provisional && r.channelId === channelId);
+  useEffect(() => {
+    if (!hasProvisional) return;
+    const timer = setInterval(() => {
+      const at = Date.now();
+      if (staleProvisional(stateRef.current.streams, at, PROVISIONAL_TTL_MS).length === 0) return;
+      dispatch({ type: "sweep", at });
+      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [hasProvisional, qc, orgId, channelId]);
 
   const expect = useCallback(
     (threadId: string, agentIds: string[]) => {

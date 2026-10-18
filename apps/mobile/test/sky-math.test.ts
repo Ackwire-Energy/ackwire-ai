@@ -16,6 +16,7 @@ import {
   shaderToneIndex,
   skyField,
   statesUniform,
+  sweepField,
   trackField,
   webToneIndex,
 } from "../src/sky/math";
@@ -86,7 +87,7 @@ describe("palettes", () => {
 });
 
 test("every shader declares the uniforms the component passes", () => {
-  for (const kind of ["sky", "fuse", "bar", "track"] as const) {
+  for (const kind of ["sky", "fuse", "bar", "track", "sweep"] as const) {
     const src = shaderSource(kind);
     for (const u of ["size", "px", "t", "last", "fade", "pal"]) expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
     expect(src).toContain("half4 main(float2 pos)");
@@ -95,4 +96,12 @@ test("every shader declares the uniforms the component passes", () => {
   expect(shaderSource("fuse")).toContain("uniform float remaining;");
   expect(shaderSource("bar")).toContain("uniform float value;");
   expect(shaderSource("track")).toContain("uniform float states[48];");
+});
+
+test("the working line's sweep: a band that crosses left to right every 5 s, over a faint wash", () => {
+  // At t = 0 the band's center sits off the left edge (u = -0.3); 2.5 s later it is at u = 0.5.
+  expect(sweepField(0.5, 0, 2.5, 0, 0)).toBeCloseTo(0.58, 5);
+  expect(sweepField(0.5, 0, 0, 0, 0)).toBeLessThan(0.1);
+  expect(sweepField(0.2, 0, 5, 0, 0)).toBeCloseTo(sweepField(0.2, 0, 0, 0, 0), 5);
+  expect(shaderSource("sweep")).toContain("mod(t * 0.32, 1.6) - 0.3");
 });

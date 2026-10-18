@@ -727,7 +727,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             keyboardOffset={lift}
             contentInsetEndAdjustment={contentInsetEndAdjustment}
             contentContainerStyle={styles.listPad}
-            ListFooterComponent={<WorkingLine runs={runs} consults={consults} canStop={canStop} onStop={stopRun} />}
           />
         )}
         <KeyboardStickyView
@@ -751,6 +750,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onLayout={onComposerBoxLayout}
             style={[styles.composer, { paddingBottom: bottomPad, backgroundColor: c.bg }]}
           >
+            {/* Who is working, right above the composer (as on the web); it takes room only while someone is. */}
+            {member ? <WorkingLine runs={runs} consults={consults} canStop={canStop} onStop={stopRun} /> : null}
             {member ? (
               <Composer
                 placeholder={placeholder}

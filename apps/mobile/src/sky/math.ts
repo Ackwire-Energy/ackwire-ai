@@ -1,6 +1,9 @@
 import { AGENT_GRADIENTS, type AgentColorName, mixHex } from "@agenteschat/ui/agent/engine";
 import { BAYER, bayerAt, ditherIndex } from "@agenteschat/ui/sky/math";
 
+/** The web's soft tones (activity bar, cards): the same function, so both draw the same colors. */
+export { softTones } from "@agenteschat/ui/sky/math";
+
 export { BAYER, bayerAt };
 
 /**
@@ -92,6 +95,16 @@ export const trackField =
     if (st === "run") return 0.3 + 0.32 * (0.5 + 0.5 * Math.sin(t * 4 + k));
     return (v < 0.2 || v > 0.8 || local < 0.12 || local > 0.68) && (x + y) % 2 === 0 ? 0.2 : 0;
   };
+
+/**
+ * The working line's background (the web's `ActivitySky`): a soft band in the agent's color sweeping left
+ * to right every 5 s, over a faint wash.
+ */
+export const sweepField: Field = (u, _v, t) => {
+  const c = mod(t * 0.32, 1.6) - 0.3;
+  const d = u - c;
+  return 0.08 + 0.5 * Math.exp(-(d * d) / 0.035);
+};
 
 /** The grid of a drawing `width`×`height` (points) at `pixel` points per cell (Mobile.html `drawDithers`). */
 export const gridOf = (width: number, height: number, pixel: number) => ({

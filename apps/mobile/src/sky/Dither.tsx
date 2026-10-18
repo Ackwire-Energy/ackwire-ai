@@ -2,6 +2,7 @@ import { Canvas, Fill, Shader, Skia, type SkRuntimeEffect, useClock } from "@sho
 import { useState } from "react";
 import { type LayoutChangeEvent, type StyleProp, View, type ViewStyle } from "react-native";
 import { useDerivedValue } from "react-native-reanimated";
+import { useLivePaused } from "@/agent/live";
 import { useReducedMotion } from "@/ui/theme";
 import { paletteUniform } from "./math";
 import { type DitherKind, shaderSource } from "./shaders";
@@ -45,6 +46,8 @@ export interface DitherProps {
  */
 export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, style }: DitherProps) {
   const reduced = useReducedMotion();
+  // Off screen (LivePause): drawn still, so Skia stops redrawing.
+  const paused = useLivePaused();
   const [size, setSize] = useState({ width: 0, height: 0 });
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -52,7 +55,7 @@ export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, s
   };
   const effect = effectOf(kind);
   const { pal, last } = paletteUniform(tones);
-  const moving = animated && !reduced;
+  const moving = animated && !reduced && !paused;
   const clock = useClock();
   const base = { size: [size.width, size.height], px: pixel, last, fade, pal, ...(extra ?? {}) };
   const uniforms = useDerivedValue(() => ({ ...base, t: moving ? clock.value / 1000 : 0 }));

@@ -6,7 +6,7 @@
  * last tone), `pal[8]` (tones, padded), `fade` (from this height, as a share, the drawing fades out to
  * the bottom like the web's mask; 2 = no fade). Arrays are only read with loop indices (SkSL rule).
  */
-export type DitherKind = "sky" | "fuse" | "bar" | "track";
+export type DitherKind = "sky" | "fuse" | "bar" | "track" | "sweep";
 
 const PRELUDE = `
 uniform float2 size;
@@ -107,6 +107,13 @@ float field(float u, float v, float x, float y) {
   if (st > 0.5) return 0.3 + 0.32 * (0.5 + 0.5 * sin(t * 4.0 + k));
   bool edge = v < 0.2 || v > 0.8 || loc < 0.12 || loc > 0.68;
   return (edge && mod(x + y, 2.0) < 0.5) ? 0.2 : 0.0;
+}
+`,
+  sweep: `
+float field(float u, float v, float x, float y) {
+  float c = mod(t * 0.32, 1.6) - 0.3;
+  float d = u - c;
+  return 0.08 + 0.5 * exp(-(d * d) / 0.035);
 }
 `,
 };
