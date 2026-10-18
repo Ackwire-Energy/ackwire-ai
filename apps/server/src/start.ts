@@ -131,6 +131,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     context: engine.context,
     artifacts: engine.artifacts,
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
+    mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     log,
   });
 

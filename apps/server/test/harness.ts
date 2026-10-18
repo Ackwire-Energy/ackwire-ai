@@ -7,6 +7,7 @@ import {
   createMemoryPubSub,
   createMemoryRateLimiter,
   createPostgresSearchResolver,
+  type MailAdapters,
   noPlatformCredentials,
   type S3Fetch,
   type SandboxProvider,
@@ -72,6 +73,8 @@ export async function createTestServer(
     appleRevoke?: AppleTokenRevoker;
     /** Fake GitHub for the desktop app's releases. */
     desktopFetch?: typeof fetch;
+    /** Fake mail adapters (Composio, IMAP); absent = no email connectors. */
+    mail?: MailAdapters;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -97,6 +100,7 @@ export async function createTestServer(
     email,
     platformBlobs,
     push,
+    ...(options.mail ? { mail: options.mail } : {}),
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
