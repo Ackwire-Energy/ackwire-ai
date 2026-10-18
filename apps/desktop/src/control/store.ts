@@ -1,6 +1,7 @@
 /**
  * What every window knows about the runners: one entry per organization home with its status,
- * live jobs, pending folder requests and access, kept current from the control protocol's events.
+ * live jobs, pending folder requests, access and the organization's logo, kept current from the
+ * control protocol's events.
  * A tiny external store (`useSyncExternalStore`), no framework.
  */
 import type { RunnerAccess } from "@agenteschat/adapters/machine-protocol";
@@ -25,6 +26,8 @@ export interface Home {
   jobs: ControlJob[];
   requests: ControlAccessRequest[];
   access: RunnerAccess | null;
+  /** The organization's logo as a `data:` URL (asked again when `status.org.logoEtag` changes); null: the initial. */
+  logo: string | null;
 }
 
 export interface Snapshot {
@@ -59,6 +62,7 @@ const emptyHome = (info: Pick<RunnerInfo, "homeId" | "dir" | "running" | "hello"
   jobs: [],
   requests: [],
   access: null,
+  logo: null,
 });
 
 export class DesktopStore {
@@ -67,6 +71,9 @@ export class DesktopStore {
   private readonly listeners = new Set<() => void>();
   private readonly eventListeners = new Set<StoreEventListener>();
   private stops: (() => void)[] = [];
+  /** Logos already fetched, by `homeId + etag` (a new etag means a new logo). */
+  private readonly logos = new Map<string, string | null>();
+  private readonly askingLogo = new Set<string>();
 
   constructor(
     private readonly host: Host,
@@ -137,6 +144,7 @@ export class DesktopStore {
     try {
       const status = await this.client.request(homeId, { type: "status" });
       this.patch(homeId, { status, access: status.access ?? this.home(homeId)?.access ?? null });
+      void this.syncLogo(homeId, status);
       if (!status.paired) {
         this.patch(homeId, { jobs: [], requests: [] });
         return;
@@ -207,6 +215,7 @@ export class DesktopStore {
     switch (event.kind) {
       case "status":
         this.patch(homeId, { status: event.status, ...(event.status.access ? { access: event.status.access } : {}) });
+        void this.syncLogo(homeId, event.status);
         if (!event.status.paired) this.patch(homeId, { jobs: [], requests: [] });
         break;
       case "job.started":
@@ -240,6 +249,34 @@ export class DesktopStore {
       } catch {
         // Keep the others going.
       }
+    }
+  }
+
+  /** Asks the runner for the logo when its etag is one this store hasn't fetched for the home. */
+  private async syncLogo(homeId: string, status: ControlStatus) {
+    const etag = status.paired ? status.org?.logoEtag : undefined;
+    if (!etag) {
+      if (this.home(homeId)?.logo) this.patch(homeId, { logo: null });
+      return;
+    }
+    const key = `${homeId}\n${etag}`;
+    if (this.logos.has(key)) {
+      const logo = this.logos.get(key) ?? null;
+      if (this.home(homeId)?.logo !== logo) this.patch(homeId, { logo });
+      return;
+    }
+    if (this.askingLogo.has(key)) return;
+    this.askingLogo.add(key);
+    try {
+      const { logo } = await this.client.request(homeId, { type: "org.logo" });
+      const safe = typeof logo === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(logo) ? logo : null;
+      this.logos.set(key, safe);
+      // Still the logo the runner reports (another may have arrived meanwhile).
+      if (this.home(homeId)?.status?.org?.logoEtag === etag) this.patch(homeId, { logo: safe });
+    } catch {
+      // Asked again on the next status with this etag.
+    } finally {
+      this.askingLogo.delete(key);
     }
   }
 

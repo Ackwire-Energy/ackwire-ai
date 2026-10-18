@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -69,4 +69,45 @@ test("workspace logo: admins upload and remove it; members see it; strangers don
   expect((await owner(logoApi, { method: "DELETE" })).status).toBe(204);
   const after = (await (await owner(`/api/app/organizations/${orgId}`)).json()) as { logo: string | null };
   expect(after.logo).toBeNull();
+});
+
+test("the logo for a connected computer: machine token, ETag/304, 404 without one, 401 once removed", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const computer = { hostname: "mac", os: "darwin", arch: "arm64", version: "0.1.0", protocol: 10, exec: false };
+  const { machineId, token } = await pairComputer(t, api, computer);
+  const fetchLogo = (headers: Record<string, string> = {}) =>
+    t.app.request("/api/machines/org-logo", { headers: { authorization: `Bearer ${token}`, ...headers } });
+
+  expect((await t.app.request("/api/machines/org-logo")).status).toBe(401);
+  const forged = await t.app.request("/api/machines/org-logo", { headers: { authorization: "Bearer agm_nope" } });
+  expect(forged.status).toBe(401);
+  expect((await fetchLogo()).status).toBe(404);
+
+  const put = await owner(`/api/app/organizations/${orgId}/logo`, { method: "PUT", json: image });
+  const { logo } = (await put.json()) as { logo: string };
+  const res = await fetchLogo();
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toBe("image/jpeg");
+  expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  expect(res.headers.get("cache-control")).toBe("private, max-age=300");
+  const etag = res.headers.get("etag") ?? "";
+  expect(etag).toBe(`"${logo.split("/").pop()}"`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  expect(bytes[0]).toBe(0xff);
+  expect(bytes[1]).toBe(0xd8);
+
+  const same = await fetchLogo({ "if-none-match": etag });
+  expect(same.status).toBe(304);
+  expect(same.headers.get("etag")).toBe(etag);
+  expect((await fetchLogo({ "if-none-match": '"0000000000000000.jpg"' })).status).toBe(200);
+
+  // Removed logo → 404; removed computer → 401.
+  expect((await owner(`/api/app/organizations/${orgId}/logo`, { method: "DELETE" })).status).toBe(204);
+  expect((await fetchLogo()).status).toBe(404);
+  expect((await api(`/machines/${machineId}`, { method: "DELETE" })).status).toBe(204);
+  expect((await fetchLogo()).status).toBe(401);
 });

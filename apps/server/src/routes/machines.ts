@@ -7,6 +7,7 @@ import {
   denyDeviceCode,
   getDeviceCode,
   listMachines,
+  machineOrgLogo,
   pollDeviceToken,
   receiveMachineUpload,
   reduceMachineAccess,
@@ -337,8 +338,9 @@ const DEVICE_POLL_LIMIT = { limit: 60, windowMs: 60_000 };
 /**
  * What the runner calls, with no session (ADR 0025, ADR 0036): the
  * device-code connection (`POST /api/machines/device`, `…/device/token`;
- * rate limited per address), `PUT /api/machines/uploads/{uploadId}` (its
- * machine token) and `GET /api/machines/install.sh`. No CSRF: no cookie is
+ * rate limited per address), `PUT /api/machines/uploads/{uploadId}` and
+ * `GET /api/machines/org-logo` (its machine token) and
+ * `GET /api/machines/install.sh`. No CSRF: no cookie is
  * read here. The WebSocket `/api/machines/connect` lives in `Bun.serve`
  * (`realtime/machines.ts`).
  */
@@ -463,6 +465,27 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       if (mapped) return mapped;
       throw error;
     }
+  });
+
+  // The organization's logo for the desktop app (the runner fetches it; the
+  // app's web view never sees the token). The file name is a content hash: the ETag.
+  api.get("/machines/org-logo", async (c) => {
+    const auth = c.req.header("authorization") ?? "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const machine = token ? await authenticateMachine(db, token) : null;
+    if (!machine) return apiError(c, 401, "machine.unauthorized", "This computer's token is not valid");
+    const logo = await machineOrgLogo({ db, blobs: adapters.platformBlobs }, machine.orgId);
+    if (!logo) return apiError(c, 404, "org.logo_not_found", "The organization has no logo");
+    const etag = `"${logo.file}"`;
+    const headers = { etag, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" };
+    const match = c.req.header("if-none-match") ?? "";
+    if (match.split(",").some((tag) => tag.trim().replace(/^W\//, "") === etag)) {
+      return new Response(null, { status: 304, headers });
+    }
+    return new Response(logo.body, {
+      status: 200,
+      headers: { ...headers, "content-type": logo.contentType, "content-security-policy": "sandbox" },
+    });
   });
 
   api.get("/machines/install.sh", (c) =>

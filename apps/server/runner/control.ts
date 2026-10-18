@@ -88,6 +88,8 @@ export class ControlServer {
         return d.pairCancel();
       case "unpair":
         return d.unpair();
+      case "org.logo":
+        return d.orgLogo();
       case "diagnostics":
         return { text: d.diagnostics() };
       case "access.get":

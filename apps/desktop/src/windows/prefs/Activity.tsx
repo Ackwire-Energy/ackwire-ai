@@ -103,7 +103,11 @@ export function Activity() {
 
   const options = [
     { value: "all", label: t("desktop.prefs.activity.all") },
-    ...homes.map((h) => ({ value: h.homeId, label: orgName(h), mark: <OrgTile name={orgName(h)} size="sm" /> })),
+    ...homes.map((h) => ({
+      value: h.homeId,
+      label: orgName(h),
+      mark: <OrgTile name={orgName(h)} logo={h.logo} size="sm" />,
+    })),
   ];
   const groups = groupByDay(entries);
 

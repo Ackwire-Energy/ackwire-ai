@@ -252,3 +252,21 @@ export async function orgLogoFile(
   if (!object) throw new NotFoundError("Not found");
   return object;
 }
+
+/**
+ * The organization's logo for a connected computer (`GET /api/machines/org-logo`,
+ * ADR 0036): the caller already authenticated the machine token, and the
+ * machine belongs to `orgId`, so no person is checked. Null without a logo.
+ * `file` (a content hash) doubles as the ETag.
+ */
+export async function machineOrgLogo(deps: { db: Database; blobs: BlobStore }, orgId: string) {
+  const [org] = await deps.db
+    .select({ logo: organizations.logo })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  const m = org?.logo ? LOGO_PATH.exec(org.logo) : null;
+  if (!m?.[2] || decodeURIComponent(m[1] ?? "") !== orgId) return null;
+  const object = await deps.blobs.get(`org-logos/${orgId}/${m[2]}`);
+  if (!object) return null;
+  return { file: m[2], ...object };
+}

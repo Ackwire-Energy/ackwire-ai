@@ -171,6 +171,11 @@ p {
   font-size: 13px;
   border-radius: 9px 9px 9px 3px;
 }
+.dk-org--logo {
+  display: inline-block;
+  object-fit: cover;
+  background: transparent;
+}
 .dk-avs {
   display: inline-flex;
   align-items: center;

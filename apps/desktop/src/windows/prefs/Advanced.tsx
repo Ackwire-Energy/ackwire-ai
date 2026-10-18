@@ -151,7 +151,7 @@ export function Advanced() {
         {homes.map((h) => (
           <PrefRow
             key={h.homeId}
-            lead={<OrgTile name={orgName(h)} size="md" />}
+            lead={<OrgTile name={orgName(h)} logo={h.logo} size="md" />}
             title={orgName(h)}
             desc={
               <>

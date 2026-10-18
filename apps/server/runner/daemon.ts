@@ -63,6 +63,7 @@ import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { redactCommon, tailLines } from "./logfile";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
+import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
 import { agentSecrets } from "./secrets";
@@ -234,6 +235,9 @@ export class RunnerDaemon implements RequestObserver {
   private chain: Promise<void> = Promise.resolve();
   private statusQueued = false;
   private lastExecutors = "";
+  /** The organization's logo cached in `<home>/org-logo.json` (app mode, refreshed on each `welcome`). */
+  private logo: CachedLogo | null = null;
+  private logoSync: Promise<void> | null = null;
   private readonly self: { command: string[]; compiled: boolean };
   private readonly executors: () => NonNullable<RunnerInfo["executors"]>;
   private readonly now: () => number;
@@ -263,6 +267,7 @@ export class RunnerDaemon implements RequestObserver {
     if (this.booted) return;
     this.booted = true;
     this.agents = readAgents(this.opts.home);
+    this.logo = readCachedLogo(this.opts.home);
     let stored: StoredConfig | null = null;
     try {
       stored = readStoredConfig(this.opts.home);
@@ -556,7 +561,10 @@ export class RunnerDaemon implements RequestObserver {
       observer: this,
       onAgents: (raw) => this.setAgents(raw),
       onState: (state) => this.setConnState(state),
-      onWelcome: () => this.flushDecisions(),
+      onWelcome: () => {
+        this.flushDecisions();
+        this.syncLogo(config);
+      },
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
     const session: Session = { config, workspaceReal, tasks, brains, mcp, connection };
@@ -652,6 +660,42 @@ export class RunnerDaemon implements RequestObserver {
     });
   }
 
+  /** App mode: refreshes the cached organization logo; a change reaches the app as `status` (`org.logoEtag`). */
+  private syncLogo(config: RunnerConfig) {
+    if (this.opts.mode !== "app" || this.logoSync) return;
+    const before = this.logo;
+    let stale = false;
+    this.logoSync = syncOrgLogo({
+      home: this.opts.home,
+      server: config.server,
+      token: config.token,
+      cached: before,
+      ...(this.opts.fetch ? { fetch: this.opts.fetch } : {}),
+    })
+      .then((logo) => {
+        if (this.stopped) return;
+        // Unpaired or paired elsewhere meanwhile: not this pairing's logo any more.
+        if (this.config?.token !== config.token) {
+          if (logo !== before) removeCachedLogo(this.opts.home);
+          stale = true;
+          return;
+        }
+        this.logo = logo;
+        if (logo?.etag !== before?.etag) this.queueStatus();
+      })
+      .catch((err: unknown) => this.opts.log(`org logo: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => {
+        this.logoSync = null;
+        // A new pairing connected while this ran: its own logo.
+        if (stale && this.config && this.connState === "online") this.syncLogo(this.config);
+      });
+  }
+
+  /** The organization's logo as a `data:` URL for the app (`org.logo`), or null. */
+  orgLogo(): { logo: string | null } {
+    return { logo: this.config ? logoDataUrl(this.logo) : null };
+  }
+
   private setAgents(raw: unknown) {
     const list = parseAgents(raw);
     if (JSON.stringify(list) === JSON.stringify(this.agents)) return;
@@ -680,7 +724,9 @@ export class RunnerDaemon implements RequestObserver {
     return {
       paired: c !== null,
       ...(s?.server ? { server: s.server } : {}),
-      ...(c?.orgId ? { org: { id: c.orgId, name: c.orgName ?? "" } } : {}),
+      ...(c?.orgId
+        ? { org: { id: c.orgId, name: c.orgName ?? "", ...(this.logo ? { logoEtag: this.logo.etag } : {}) } }
+        : {}),
       ...(c ? { machine: { id: c.machineId, name: c.name } } : {}),
       connection: c ? this.connState : "unpaired",
       ...(c && this.connState === "refused" && this.refused && this.refused.reason !== "outdated"
@@ -867,6 +913,10 @@ export class RunnerDaemon implements RequestObserver {
     this.agents = [];
     try {
       writeAgents(this.opts.home, []);
+    } catch {}
+    this.logo = null;
+    try {
+      removeCachedLogo(this.opts.home);
     } catch {}
     this.refused = null;
     this.write({ ...rest, ...(access ? { access: { folders: [], tools: access.tools } } : {}) });

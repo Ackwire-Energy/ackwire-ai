@@ -31,7 +31,11 @@ export interface ControlStatus {
   paired: boolean;
   /** Our server, e.g. `https://agentes.chat`. */
   server?: string;
-  org?: { id: string; name: string };
+  /**
+   * `logoEtag`: the organization's logo cached on this computer (absent: none);
+   * when it changes the app asks `org.logo` again.
+   */
+  org?: { id: string; name: string; logoEtag?: string };
   machine?: { id: string; name: string };
   /**
    * `unpaired`: no config yet; `connecting`/`online`/`offline`: the socket;
@@ -137,6 +141,8 @@ export type ControlRequest =
   /** Forgets the pairing (the token is deleted; the server side is the site's "Desconectar"). */
   | { type: "unpair" }
   | { type: "diagnostics" }
+  /** The organization's logo, fetched by the runner with its token (the app never sees the token). */
+  | { type: "org.logo" }
   /** Protocol 10. */
   | { type: "access.get" }
   | { type: "folders.add"; path: string; agents: string[] }
@@ -164,6 +170,8 @@ export interface ControlReplies {
   unpair: { unpaired: true };
   /** Redacted: versions, OS, recent log lines with secrets removed. Safe to paste in a support chat. */
   diagnostics: { text: string };
+  /** A `data:image/png|jpeg|webp;base64,…` URL; null without a logo (the app draws the initial). */
+  "org.logo": { logo: string | null };
   "access.get": RunnerAccess;
   "folders.add": RunnerAccess;
   "folders.remove": RunnerAccess;

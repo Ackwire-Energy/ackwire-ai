@@ -1,8 +1,8 @@
 /**
  * An in-browser runner for design work (`bun run dev`, ADR 0036 §10): it speaks the same control
  * protocol as `agentes-runner app` (packages/adapters/src/runner-control.ts) with realistic data
- * (two organizations, agents at work, a folder request), so every screen can be seen without the
- * Tauri shell. Never part of the real app's behaviour: the host picks it only outside Tauri.
+ * (two organizations, one with a logo, agents at work, a folder request), so every screen can be seen
+ * without the Tauri shell. Never part of the real app's behaviour: the host picks it only outside Tauri.
  */
 import type { RunnerAccess, RunnerPause } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -28,6 +28,8 @@ const rid = () => Math.random().toString(36).slice(2, 10);
 export interface FakeOrgSeed {
   org: { id: string; name: string };
   slug: string;
+  /** The organization's logo as `org.logo` returns it; absent: the initial tile. */
+  logo?: string;
   agents: ControlAgent[];
   jobs: ControlJob[];
   access: RunnerAccess;
@@ -143,11 +145,16 @@ export function acmeSeed(): FakeOrgSeed {
   };
 }
 
+/** A 24×24 PNG: a white "H" on coral. */
+const HIMETRICA_LOGO =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAIAAABvFaqvAAAALElEQVR42mP4n+1FFcQwatDAGgQHpEiNGkShQXjAABk0Gmu0N2i0PBrsBgEAgBRBMV74eN0AAAAASUVORK5CYII=";
+
 export function himetricaSeed(): FakeOrgSeed {
   const [lia, nino] = HIMETRICA_AGENTS;
   return {
     org: { id: "org_himetrica", name: "Himetrica" },
     slug: "himetrica",
+    logo: HIMETRICA_LOGO,
     agents: HIMETRICA_AGENTS,
     jobs: [
       {
@@ -357,6 +364,8 @@ export class FakeRunner {
         this.connection = "unpaired";
         this.emit({ kind: "status", status: this.status() });
         return reply({ unpaired: true });
+      case "org.logo":
+        return reply({ logo: s?.logo ?? null });
       case "diagnostics":
         return reply({
           text: `agentes ${VERSION}\nmacOS 15.1 arm64\nhome ${this.homeId}\nconnection ${this.connection}\n(no secrets)`,
@@ -430,7 +439,7 @@ export class FakeRunner {
     return {
       paired: !!s,
       server: SERVER,
-      org: s?.org,
+      org: s ? { ...s.org, ...(s.logo ? { logoEtag: `"${s.org.id}.png"` } : {}) } : undefined,
       machine: s ? { id: `m_${this.homeId}`, name: this.machineName } : undefined,
       connection: this.connection,
       version: VERSION,

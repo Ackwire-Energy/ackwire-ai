@@ -400,7 +400,7 @@ function NowList({ homes, paused, now }: { homes: Home[]; paused: boolean; now: 
       {homes.map((h) => (
         <div key={h.homeId}>
           <div className="dk-ohead">
-            <OrgTile name={orgName(h)} size="sm" />
+            <OrgTile name={orgName(h)} logo={h.logo} size="sm" />
             {orgName(h)}
             <Count n={h.jobs.length} />
             {h.jobs.length === 0 && (
@@ -483,7 +483,7 @@ function RequestCard({ home, request, now }: { home: Home; request: ControlAcces
         <span className="dk-req__whotext">
           <b>{t("desktop.tray.wantsFolder", { agent: agent.name })}</b>
           <small>
-            <OrgTile name={orgName(home)} size="sm" />
+            <OrgTile name={orgName(home)} logo={home.logo} size="sm" />
             {orgName(home)} · {since(request.at, t, now)}
           </small>
         </span>

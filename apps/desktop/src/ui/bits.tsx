@@ -1,10 +1,35 @@
 import type { ControlAgent, ControlStatus } from "@agenteschat/adapters/runner-control";
 import { type AgentState, Avatar, Chip, CountChip, Icon, type IconName, normalizeAppearance } from "@agenteschat/ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-/** An organization's tile: its first letter on ink, with the agent symbol's cut corner. */
-export function OrgTile({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+/**
+ * An organization's tile: its logo when it has one (a `data:` URL from the runner), otherwise its
+ * first letter on ink, with the agent symbol's cut corner either way.
+ */
+export function OrgTile({
+  name,
+  logo,
+  size = "md",
+}: {
+  name: string;
+  logo?: string | null;
+  size?: "sm" | "md" | "lg";
+}) {
+  const [broken, setBroken] = useState<string | null>(null);
+  if (logo && broken !== logo) {
+    return (
+      <img
+        className="dk-org dk-org--logo"
+        data-size={size}
+        src={logo}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        onError={() => setBroken(logo)}
+      />
+    );
+  }
   return (
     <span className="dk-org" data-size={size} aria-hidden="true">
       {(name.trim()[0] ?? "?").toUpperCase()}

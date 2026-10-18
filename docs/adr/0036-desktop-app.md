@@ -41,6 +41,7 @@ That works for developers and servers. It does not work for the people the produ
   - `config.get` / `config.set` for the non-secret fields (name, limits, workspace). The token is never sent over the channel.
   - `pair.start` / `pair.cancel` (section 5), `unpair`.
   - `diagnostics` → a redacted bundle (versions, OS, recent log lines with secrets removed).
+  - `org.logo` → the organization's logo as a `data:` URL (PNG/JPEG/WebP) or null. The runner fetches it after each `welcome` from `GET /api/machines/org-logo` (machine token, ETag/304), caches it in `<home>/org-logo.json` (at most 512 KB) and reports `status.org.logoEtag`, so the app asks again only when it changes. The token never reaches the web view.
   - v0.2: `folders.*`, `tools.*` and the `access.requested` event (section 8).
 - **The config file stays the single source of settings.** The runner watches `config.json` and reloads on change, so `agentes-runner` commands in a terminal and the app edit the same thing. Writes stay atomic with mode 600.
 - The protocol has its own version in `hello` between app and runner; the app refuses a runner it doesn't understand (can't happen when both ship together, but guards development builds).

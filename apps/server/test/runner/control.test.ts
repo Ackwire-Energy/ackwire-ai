@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters/machine-protocol";
@@ -8,6 +8,7 @@ import { configPath, readStoredConfig, type StoredConfig, writeConfig } from "..
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
 import { EXIT_LOCKED, type RunControlOptions, runControl } from "../../runner/control";
 import { RUNNER_VERSION } from "../../runner/errors";
+import { ORG_LOGO_MAX_BYTES, orgLogoPath } from "../../runner/org-logo";
 import type { FetchFn } from "../../runner/pairing";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -103,7 +104,17 @@ function control(
     input,
     output,
     locked: locked ?? null,
-    daemon: { log: () => {}, watch: false, executors: () => ({}), self: SELF, caffeinate: false, dial, ...daemon },
+    daemon: {
+      log: () => {},
+      watch: false,
+      executors: () => ({}),
+      self: SELF,
+      caffeinate: false,
+      dial,
+      // No network: the org logo asked after each welcome finds none.
+      fetch: async () => new Response(null, { status: 404 }),
+      ...daemon,
+    },
   });
   running.push({ input, done });
   let n = 0;
@@ -518,3 +529,77 @@ test("an edit of config.json from a terminal reaches the app and the server", as
   expect(s.of("access.changed")).toHaveLength(1);
   expect((await c.data<{ access: { tools: { claude: boolean } } }>({ type: "status" })).access.tools.claude).toBe(true);
 }, 10_000);
+
+test("the org logo: fetched after welcome, cached by ETag, a data URL for the app, gone on 404", async () => {
+  const { home } = pairedHome();
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const calls: { url: string; headers: Headers }[] = [];
+  let answer: () => Response = () => new Response(png, { headers: { "content-type": "image/png", etag: '"a1.png"' } });
+  const fetch: FetchFn = async (url, init) => {
+    calls.push({ url, headers: new Headers(init.headers) });
+    return answer();
+  };
+  const c = control(home, { fetch });
+  const s = await c.connect();
+  const logoEtag = () => c.events("status").map((e) => (e.kind === "status" ? e.status.org?.logoEtag : undefined));
+  await waitFor(() => logoEtag().includes('"a1.png"'));
+  expect(calls[0]?.url).toBe("https://agentes.test/api/machines/org-logo");
+  expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${TOKEN}`);
+  expect(calls[0]?.headers.get("if-none-match")).toBeNull();
+  const dataUrl = `data:image/png;base64,${Buffer.from(png).toString("base64")}`;
+  expect(await c.data({ type: "org.logo" })).toEqual({ logo: dataUrl });
+  expect(JSON.parse(readFileSync(orgLogoPath(home), "utf8"))).toEqual({
+    etag: '"a1.png"',
+    contentType: "image/png",
+    base64: Buffer.from(png).toString("base64"),
+  });
+  // The token never crosses the channel.
+  expect(JSON.stringify(c.out)).not.toContain(TOKEN);
+
+  // Next connection: the cached ETag; 304 keeps it.
+  answer = () => new Response(null, { status: 304 });
+  const welcome = () => s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+  welcome();
+  await waitFor(() => calls.length === 2);
+  expect(calls[1]?.headers.get("if-none-match")).toBe('"a1.png"');
+  await new Promise((r) => setTimeout(r, 20));
+  expect(await c.data({ type: "org.logo" })).toEqual({ logo: dataUrl });
+
+  // Too big or not an image the app draws: not kept.
+  answer = () =>
+    new Response(new Uint8Array(ORG_LOGO_MAX_BYTES + 1), { headers: { "content-type": "image/png", etag: '"b.png"' } });
+  welcome();
+  await waitFor(() => calls.length === 3);
+  await waitFor(() => !existsSync(orgLogoPath(home)));
+  await new Promise((r) => setTimeout(r, 20));
+  expect(await c.data({ type: "org.logo" })).toEqual({ logo: null });
+  answer = () => new Response("<svg/>", { headers: { "content-type": "image/svg+xml", etag: '"c.svg"' } });
+  welcome();
+  await waitFor(() => calls.length === 4);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(await c.data({ type: "org.logo" })).toEqual({ logo: null });
+
+  // Back, then removed on the site (404).
+  answer = () => new Response(png, { headers: { "content-type": "image/png", etag: '"a1.png"' } });
+  welcome();
+  await waitFor(() => existsSync(orgLogoPath(home)));
+  await new Promise((r) => setTimeout(r, 20));
+  answer = () => new Response(null, { status: 404 });
+  welcome();
+  await waitFor(() => !existsSync(orgLogoPath(home)));
+  await new Promise((r) => setTimeout(r, 20));
+  const status = await c.data<{ org: { logoEtag?: string } }>({ type: "status" });
+  expect(status.org.logoEtag).toBeUndefined();
+  expect(await c.data({ type: "org.logo" })).toEqual({ logo: null });
+});
+
+test("the org logo cached by an earlier run is offered at once, and unpair removes it", async () => {
+  const { home } = pairedHome();
+  writeFileSync(orgLogoPath(home), JSON.stringify({ etag: '"x.webp"', contentType: "image/webp", base64: "UklGRg==" }));
+  const c = control(home, { fetch: async () => new Response(null, { status: 304 }) });
+  expect(await c.data({ type: "status" })).toMatchObject({ org: { id: "o1", name: "Acme", logoEtag: '"x.webp"' } });
+  expect(await c.data({ type: "org.logo" })).toEqual({ logo: "data:image/webp;base64,UklGRg==" });
+  await c.data({ type: "unpair" });
+  expect(existsSync(orgLogoPath(home))).toBe(false);
+  expect(await c.data({ type: "org.logo" })).toEqual({ logo: null });
+});
