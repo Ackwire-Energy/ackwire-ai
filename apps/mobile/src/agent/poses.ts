@@ -48,3 +48,22 @@ export function agentLayout(size: number, hasAccessory: boolean) {
     cells: size <= 18 ? 9 : size <= 32 ? 12 : undefined,
   };
 }
+
+/**
+ * Inside a framed tile (the web's `drawFramed`, telas/RefinoUI.html "Céu"): the agent stands centered,
+ * feet near the bottom edge, smaller with an accessory so it has room above (accessories from 26pt).
+ */
+export function framedLayout(size: number, hasAccessory: boolean) {
+  const withAccessory = hasAccessory && size >= 26;
+  const inner = size * (withAccessory ? 0.6 : 0.66);
+  return {
+    x: (size - inner) / 2,
+    y: size - inner - size * (withAccessory ? 0.1 : 0.14),
+    inner,
+    withAccessory,
+    cells: size <= 32 ? 12 : undefined,
+  };
+}
+
+/** Framed by default, like the web: not the tiny receipt faces nor the big hero, which stand on their own. */
+export const framedByDefault = (size: number) => size >= 20 && size < 64;

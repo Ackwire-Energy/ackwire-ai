@@ -1,12 +1,13 @@
 import { drawAccessory, drawAgent } from "@agenteschat/ui/agent/engine";
+import { avatarSkyCell, avatarSkyCells, avatarSkyTones } from "@agenteschat/ui/sky/avatar";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
 import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
-import { useReducedMotion } from "@/ui/theme";
+import { StyleSheet, View } from "react-native";
+import { useReducedMotion, useTheme } from "@/ui/theme";
 import { useFrameTime } from "./live";
 import type { AgentLookInput } from "./looks";
-import { type AgentMode, agentLayout, poseFor, STILL_T, seedOf } from "./poses";
+import { type AgentMode, agentLayout, framedByDefault, framedLayout, poseFor, STILL_T, seedOf } from "./poses";
 import { asCtx, compile, RecordingContext } from "./recorder";
 import { replay } from "./skia-ctx";
 
@@ -19,6 +20,11 @@ export interface AgentAvatarProps {
   live?: boolean;
   /** The agent's name, for screen readers. */
   name?: string;
+  /**
+   * The agent standing in its own pixel sky, in a rounded tile (like the web's framed avatar). Default:
+   * framed from 20 to 63pt; the tiny faces and the big hero stand on their own.
+   */
+  framed?: boolean;
 }
 
 /** One frame of an agent as drawing commands (the engine draws, the recorder keeps the commands). */
@@ -29,10 +35,22 @@ export function agentFrame(
   t: number,
   seed: number,
   reduced: boolean,
+  frame?: { dark: boolean },
 ) {
   const accessory = agent.accessory && agent.accessory !== "none" ? agent.accessory : undefined;
-  const box = agentLayout(size, Boolean(accessory));
+  const box = frame ? framedLayout(size, Boolean(accessory)) : agentLayout(size, Boolean(accessory));
   const rec = new RecordingContext();
+  if (frame) {
+    // The tile's sky (`@agenteschat/ui/sky/avatar`): a Bayer dither from the top tone to the bottom one.
+    const [top, bottom] = avatarSkyTones(agent.color, frame.dark);
+    const n = avatarSkyCells(size * 2);
+    const cell = size / n;
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        rec.fillStyle = avatarSkyCell(x, y, n) ? bottom : top;
+        rec.fillRect(x * cell, y * cell, cell, cell);
+      }
+  }
   drawAgent(asCtx(rec), box.x, box.y, box.inner, {
     color: agent.color,
     eyes: agent.eyes,
@@ -46,21 +64,37 @@ export function agentFrame(
   return compile(rec.commands);
 }
 
-function AgentAvatarView({ agent, size, mode = "idle", live = true, name }: AgentAvatarProps) {
+function AgentAvatarView({ agent, size, mode = "idle", live = true, name, framed }: AgentAvatarProps) {
   const reduced = useReducedMotion();
+  const { scheme, colors: c } = useTheme();
+  const tile = framed ?? framedByDefault(size);
+  const dark = scheme === "dark";
   const { t: tr } = useTranslation();
   const { color, eyes, accessory, id } = agent;
   const seed = useMemo(() => seedOf(id ?? `${color}:${eyes}:${accessory ?? ""}`), [id, color, eyes, accessory]);
   const t = useFrameTime(live && !reduced, STILL_T);
   const picture = useMemo(() => {
-    const frame = agentFrame({ color, eyes, accessory }, size, mode, t, seed, reduced);
+    const frame = agentFrame({ color, eyes, accessory }, size, mode, t, seed, reduced, tile ? { dark } : undefined);
     return createPicture((canvas) => replay(canvas, frame), { width: size, height: size });
-  }, [color, eyes, accessory, size, mode, t, seed, reduced]);
+  }, [color, eyes, accessory, size, mode, t, seed, reduced, tile, dark]);
   const label = name
     ? tr(mode === "run" ? "mobile.a11y.agentWorking" : "mobile.a11y.agent", { name })
     : tr("mobile.a11y.agentPlain");
   return (
-    <View accessible accessibilityRole="image" accessibilityLabel={label} style={{ width: size, height: size }}>
+    <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={label}
+      style={[
+        { width: size, height: size },
+        tile && {
+          borderRadius: size * 0.3,
+          overflow: "hidden",
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: c.line,
+        },
+      ]}
+    >
       <Canvas style={{ width: size, height: size }}>
         <Picture picture={picture} />
       </Canvas>
@@ -80,6 +114,7 @@ export const AgentAvatar = memo(
     a.mode === b.mode &&
     a.live === b.live &&
     a.name === b.name &&
+    a.framed === b.framed &&
     a.agent.color === b.agent.color &&
     a.agent.eyes === b.agent.eyes &&
     a.agent.accessory === b.agent.accessory &&

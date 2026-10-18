@@ -23,6 +23,7 @@
       "default": "./src/computer/portrait.js"
     },
     "./sky/math": "./src/sky/math.ts",
+    "./sky/avatar": "./src/sky/avatar.ts",
     "./timezones": "./src/timezones.ts"
   },
   "scripts": {

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { orbitCells, orbitHead, RING } from "../src/agent/orbit";
-import { agentLayout, poseFor, seedOf } from "../src/agent/poses";
+import { agentLayout, framedByDefault, framedLayout, poseFor, seedOf } from "../src/agent/poses";
 
 test("run: writing eyes", () => {
   expect(poseFor("run", 1, 0.5).writing).toBe(true);
@@ -47,4 +47,22 @@ test("the pixel orbit walks the 3×3 ring with a three-cell tail", () => {
   expect(cells.filter((c) => c.opacity === 1)).toHaveLength(3);
   expect(orbitHead(110 * 9)).toBe(1);
   expect(orbitHead(5000, true)).toBe(0);
+});
+
+test("framed: list and chat faces get the sky tile, tiny faces and heroes don't (like the web)", () => {
+  expect(framedByDefault(18)).toBe(false);
+  expect(framedByDefault(32)).toBe(true);
+  expect(framedByDefault(50)).toBe(true);
+  expect(framedByDefault(78)).toBe(false);
+});
+
+test("framed layout: the agent stands centered above the bottom edge, smaller with an accessory", () => {
+  const plain = framedLayout(50, false);
+  expect(plain.inner).toBeCloseTo(33);
+  expect(plain.x).toBeCloseTo(8.5);
+  expect(plain.y + plain.inner).toBeCloseTo(50 - 7);
+  const hat = framedLayout(50, true);
+  expect(hat.withAccessory).toBe(true);
+  expect(hat.inner).toBeLessThan(plain.inner);
+  expect(framedLayout(22, true).withAccessory).toBe(false);
 });
