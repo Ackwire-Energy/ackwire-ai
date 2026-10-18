@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { accessSync, constants } from "node:fs";
+import { delimiter, join } from "node:path";
 import type { RunnerInfo } from "@agenteschat/adapters/machine-protocol";
 
 /**
@@ -11,11 +13,30 @@ export const EXECUTORS_TTL_MS = 10 * 60_000;
 
 type Run = (command: string, args: string[]) => { status: number | null; stdout: string; error?: unknown };
 
+/**
+ * `command`'s full path on the current `process.env.PATH`, or the bare name. The app mode adopts the login
+ * shell's PATH after start (`adoptLoginPath`); a compiled runner still looks commands up on the PATH it
+ * started with (macOS's bare one from Finder) unless told otherwise, so we resolve it ourselves.
+ */
+export function resolveCommand(command: string, pathList = process.env.PATH ?? ""): string {
+  if (process.platform === "win32" || command.includes("/")) return command;
+  for (const dir of pathList.split(delimiter)) {
+    if (!dir) continue;
+    const full = join(dir, command);
+    try {
+      accessSync(full, constants.X_OK);
+      return full;
+    } catch {}
+  }
+  return command;
+}
+
 const defaultRun: Run = (command, args) => {
-  const r = spawnSync(command, args, {
+  const r = spawnSync(resolveCommand(command), args, {
     encoding: "utf8",
     timeout: 8000,
     windowsHide: true,
+    env: process.env,
     // Windows finds `claude.cmd` / `codex.cmd` only through the shell.
     shell: process.platform === "win32",
   });

@@ -8,7 +8,7 @@ import {
   parseRunnerFrame,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
-import { cachedExecutors, detectExecutors } from "../../runner/executors";
+import { cachedExecutors, detectExecutors, resolveCommand } from "../../runner/executors";
 import {
   claudePermissionSettings,
   FOLDER_PATH_PREFIX,
@@ -421,3 +421,16 @@ test.skipIf(!posix || !hasGit)(
   },
   20_000,
 );
+
+test("coding CLIs are looked up on the current PATH (the app adopts the login shell's after start)", () => {
+  const { mkdtempSync, writeFileSync, chmodSync } = require("node:fs") as typeof import("node:fs");
+  const { tmpdir } = require("node:os") as typeof import("node:os");
+  const { join } = require("node:path") as typeof import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "bin-"));
+  writeFileSync(join(dir, "claude"), "#!/bin/sh\necho 2.1.300\n");
+  chmodSync(join(dir, "claude"), 0o755);
+  writeFileSync(join(dir, "codex"), "not executable");
+  expect(resolveCommand("claude", `/nope:${dir}`)).toBe(join(dir, "claude"));
+  expect(resolveCommand("codex", dir)).toBe("codex");
+  expect(resolveCommand("/abs/claude", dir)).toBe("/abs/claude");
+});

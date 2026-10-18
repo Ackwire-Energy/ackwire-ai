@@ -14,6 +14,7 @@ import {
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
+import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
 import { claudeSessionExists, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
@@ -346,7 +347,8 @@ export class ClaudeProcess {
 
   constructor(command: string[], args: string[], cwd: string, env: NodeJS.ProcessEnv) {
     const [file, ...pre] = command;
-    this.child = spawn(file ?? "claude", [...pre, ...args], {
+    // A full path: the compiled runner would look the bare name up on the PATH it started with.
+    this.child = spawn(resolveCommand(file ?? "claude", env.PATH), [...pre, ...args], {
       cwd,
       env,
       stdio: ["pipe", "pipe", "pipe"],

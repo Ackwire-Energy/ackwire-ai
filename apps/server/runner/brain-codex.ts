@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { cachedExecutors } from "./executors";
+import { cachedExecutors, resolveCommand } from "./executors";
 import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
 import { agentWorkspace, isInside, resolveForAgent } from "./paths";
 import { agentSecrets } from "./secrets";
@@ -430,7 +430,7 @@ export async function runCodexTurn(
 
   let child: ChildProcess;
   try {
-    child = spawn(opts.bin ?? "codex", args, {
+    child = spawn(resolveCommand(opts.bin ?? "codex", env.PATH), args, {
       cwd: input.cwd,
       env,
       stdio: ["pipe", "pipe", "pipe"],
