@@ -7,6 +7,7 @@ import { Button, EmptyState, useTheme } from "@/ui";
 /**
  * A link to something the app doesn't have (or no longer has). Signed out, every screen is behind the
  * sign-in (the app's routes, `/` included, exist only for a session), so anything lands on it instead.
+ * Like a native empty state: the sky, the two lines and the way back, centered on the screen.
  */
 export default function NotFound() {
   const { t } = useTranslation();
@@ -16,12 +17,16 @@ export default function NotFound() {
   if (!session.signedIn) return <Redirect href="/sign-in" />;
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <EmptyState title={t("mobile.notFound.title")} subtitle={t("mobile.notFound.subtitle")} sky />
-      <Button variant="primary" label={t("mobile.notFound.home")} onPress={() => router.replace("/")} />
+      <EmptyState
+        title={t("mobile.notFound.title")}
+        subtitle={t("mobile.notFound.subtitle")}
+        sky
+        action={<Button variant="primary" label={t("mobile.notFound.home")} onPress={() => router.replace("/")} />}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, padding: 24 },
+  screen: { flex: 1, justifyContent: "center", padding: 24 },
 });

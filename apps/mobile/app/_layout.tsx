@@ -22,8 +22,11 @@ export default function RootLayout() {
 }
 
 /**
- * Signed out → `(auth)`; signed in with an organization → `(app)` (the screens). The splash stays up
- * until the fonts, the session and the organization are known, so nobody sees a flash of the wrong side.
+ * Signed out → `(auth)`; signed in → `(app)` (the screens, which wait for the organization themselves). The
+ * splash stays up until the fonts, the session and the organization are known, so nobody sees a flash of the
+ * wrong side. Exactly one group is open at any moment: with both guarded (e.g. signed in while the
+ * organization still loads), expo-router sends the guarded screen to the first open route, `+not-found`, and
+ * the app would stay there once the organization arrived.
  */
 function Gate() {
   const fontsReady = useAppFonts();
@@ -32,7 +35,6 @@ function Gate() {
   const { colors, scheme } = useTheme();
   const navigationTheme = useNavigationTheme();
   const signedIn = session.signedIn;
-  const hasOrg = signedIn && Boolean(org.state);
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading);
 
   useEffect(() => {
@@ -45,7 +47,7 @@ function Gate() {
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Protected guard={hasOrg}>
+        <Stack.Protected guard={signedIn}>
           <Stack.Screen name="(app)" />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>

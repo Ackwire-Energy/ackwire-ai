@@ -1,6 +1,8 @@
 import { Stack } from "expo-router";
+import { View } from "react-native";
 import { useRememberAgentLooks } from "@/features/shared/hooks";
 import { useUserEvents } from "@/features/shared/userEvents";
+import { useOrgGate } from "@/providers/org";
 import { coverBarOptions, useFormSheetOptions, usePushedOptions, useScrollUnderPushedOptions, useTheme } from "@/ui";
 
 /** A link straight to a pushed screen or a sheet still has the tabs under it (the back button works). */
@@ -14,6 +16,15 @@ export const unstable_settings = { anchor: "(tabs)" };
  * the title and actions.
  */
 export default function AppLayout() {
+  const { colors } = useTheme();
+  const org = useOrgGate();
+  // Signed in, the organization not known yet (the splash covers this) or none (`NoOrganization` covers it):
+  // the screens need one, so they mount once it's chosen, at the URL the app opened with.
+  if (!org.state) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  return <AppStack />;
+}
+
+function AppStack() {
   const { colors } = useTheme();
   useUserEvents();
   useRememberAgentLooks();

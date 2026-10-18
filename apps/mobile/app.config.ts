@@ -15,6 +15,17 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://agentes.chat";
 // Our EAS project on expo.dev (not a secret: it only names the project).
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
 
+/**
+ * Paths the app no longer has (the old Início, Conversas and Busca routes), sent to Conversas (`/`) so a stale
+ * link, notification or restored URL never lands on "not found". expo-router applies these to deep links and
+ * to in-app navigation alike.
+ */
+export const LEGACY_REDIRECTS = [
+  { source: "/chats", destination: "/" },
+  { source: "/search", destination: "/" },
+  { source: "/home", destination: "/" },
+];
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: variant === "production" ? "agentes" : `agentes ${variant}`,
@@ -44,7 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     en: "./assets/locales/en.json",
   },
   plugins: [
-    "expo-router",
+    ["expo-router", { redirects: LEGACY_REDIRECTS }],
     "expo-secure-store",
     "expo-localization",
     "expo-web-browser",
