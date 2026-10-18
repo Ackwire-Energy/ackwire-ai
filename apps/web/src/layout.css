@@ -6318,6 +6318,8 @@ button.live-call__head:hover {
 }
 .machine-row__name {
   font-weight: 600;
+  color: inherit;
+  text-decoration: none;
 }
 .machine-row__workspace code,
 .machine-command__code {
@@ -6363,6 +6365,124 @@ button.live-call__head:hover {
   gap: 8px;
   margin: 0;
   font-weight: 600;
+}
+a.machine-row__name:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Connect a computer: the Mac app first, the terminal under "Outras formas" (ADR 0036). */
+.machine-connect,
+.machine-connect__release,
+.machine-connect__other {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.machine-connect__other {
+  align-items: flex-start;
+  gap: 8px;
+}
+.machine-connect__other > div {
+  align-self: stretch;
+}
+.machine-connect__sha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.machine-connect__hash {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The computer page (PastasComputador.html, view "computer"). */
+.machine-page__back {
+  align-self: flex-start;
+}
+.machine-page__head {
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+.machine-page__agent {
+  align-items: center;
+}
+.machine-folder,
+.machine-tool {
+  align-items: center;
+}
+.machine-folder__name {
+  font-weight: 600;
+}
+.machine-folder__path {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-folder__agents {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.agent-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-folders li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.agent-folders code {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* /conectar: confirm a computer's code (ADR 0036 §5). Calm; the sky only as a faint horizon. */
+.connect-page__code {
+  margin: 4px 0;
+  font-family: var(--font-dot);
+  font-variation-settings: "ROND" 100;
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+.connect-page__computer {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.connect-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Agent page: which computer. */

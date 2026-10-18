@@ -15,7 +15,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
-import { resolveInWorkspace } from "./paths";
+import { isInside, resolveForAgent } from "./paths";
 import { claudeSessionExists, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
 
 /**
@@ -292,6 +292,8 @@ export interface ClaudeLaunch {
   /** Commands off the allow list ask a person through our tool. */
   promptTool: boolean;
   permissionMode: "acceptEdits" | "dontAsk";
+  /** Protocol 10: folders allowed for the agent besides its own (`--add-dir` each). */
+  addDirs?: string[];
 }
 
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
@@ -319,6 +321,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.settingsFile ? ["--settings", l.settingsFile] : []),
     ...(l.mcpConfigFile ? ["--allowedTools", "mcp__agentes"] : []),
     ...(l.promptTool && l.mcpConfigFile ? ["--permission-prompt-tool", PERMISSION_PROMPT_TOOL] : []),
+    ...(l.addDirs ?? []).flatMap((d) => ["--add-dir", d]),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -560,6 +563,8 @@ export interface BrainTurnContext {
   secrets?: TaskSecrets | null;
   emit: (e: WireBrainEvent) => void;
   signal?: AbortSignal;
+  /** Protocol 10: folders allowed for the agent besides its own (real paths): `cwd` may be inside one, `--add-dir` each. */
+  grants?: string[];
 }
 
 const errorEvent = (code: string, message: string, retryable: boolean): WireBrainEvent => ({
@@ -580,6 +585,12 @@ export class BrainManager {
 
   constructor(private readonly opts: BrainManagerOptions) {
     this.log = opts.log ?? (() => {});
+  }
+
+  /** New limits from the config: idle time for processes started from now on, the process cap at once. */
+  setLimits(limits: { idleMs?: number; maxProcesses?: number }) {
+    if (limits.idleMs !== undefined) this.opts.idleMs = limits.idleMs;
+    if (limits.maxProcesses !== undefined) this.opts.maxProcesses = limits.maxProcesses;
   }
 
   /** Persistent processes alive now (tests, status). */
@@ -637,7 +648,7 @@ export class BrainManager {
     if (typeof req.prompt !== "string" || !req.prompt.trim()) throw new RunnerError("bad_request", "Empty prompt");
     let cwd = ctx.folder;
     if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
-      const resolved = await resolveInWorkspace(ctx.folder, req.cwd);
+      const resolved = await resolveForAgent(ctx.folder, ctx.grants, req.cwd);
       if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
       cwd = resolved.abs;
@@ -653,12 +664,14 @@ export class BrainManager {
     }
   }
 
-  private signature(cwd: string, req: BrainTurnRequest) {
+  private signature(cwd: string, req: BrainTurnRequest, ctx: BrainTurnContext) {
     return JSON.stringify({
       cwd,
       model: req.model ?? null,
       personal: req.personalMcp === true,
       perm: req.permissions ?? null,
+      // Folders allowed or removed on the machine: the process restarts (resumed) with the new `--add-dir`s.
+      dirs: ctx.grants ?? [],
     });
   }
 
@@ -670,7 +683,7 @@ export class BrainManager {
     ctx: BrainTurnContext,
   ): Promise<WireBrainEvent> {
     if (ctx.signal?.aborted) return errorEvent("canceled", "The turn was canceled.", false);
-    const sig = this.signature(cwd, req);
+    const sig = this.signature(cwd, req, ctx);
     let live = this.live.get(key);
     if (live && (live.proc.exited || live.sig !== sig)) {
       this.drop(live);
@@ -833,6 +846,7 @@ export class BrainManager {
       strictMcp: req.personalMcp !== true,
       promptTool: mode === "work",
       permissionMode: mode === "plan" ? "dontAsk" : "acceptEdits",
+      ...(ctx.grants?.length ? { addDirs: ctx.grants.filter((g) => !isInside(g, cwd)) } : {}),
     });
     const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
     const live: Live = { key, id, proc, sig, busy: false, lastUsed: Date.now(), idleTimer: null, persistent };

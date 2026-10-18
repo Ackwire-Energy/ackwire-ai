@@ -17,6 +17,7 @@ import {
   listAgents,
   listCredentials,
   NotFoundError,
+  publishMachineAgentsChanged,
   revokeCredential,
   setAgentAppearance,
   setAgentAudience,
@@ -293,6 +294,10 @@ export function agentRoutes(deps: AppDeps) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
+      // Its computer shows its name and look (the desktop app, ADR 0036).
+      if (agent.machineId && (input.name !== undefined || appearance !== undefined)) {
+        await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      }
       const [seesCost, brains] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
@@ -314,6 +319,7 @@ export function agentRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       await archiveAgent(db, c.get("user").id, orgId, agentId);
+      await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.body(null, 204);
     },
   );

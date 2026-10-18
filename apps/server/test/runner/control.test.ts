@@ -1,0 +1,520 @@
+import { afterEach, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { PassThrough } from "node:stream";
+import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters/machine-protocol";
+import { CONTROL_PROTOCOL_VERSION, type ControlEvent, type ControlOut } from "@agenteschat/adapters/runner-control";
+import { configPath, readStoredConfig, type StoredConfig, writeConfig } from "../../runner/config";
+import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
+import { EXIT_LOCKED, type RunControlOptions, runControl } from "../../runner/control";
+import { RUNNER_VERSION } from "../../runner/errors";
+import type { FetchFn } from "../../runner/pairing";
+import { removeDirs, tempDir, waitFor } from "./helpers";
+
+const dirs: string[] = [];
+const running: { input: PassThrough; done: Promise<number> }[] = [];
+afterEach(async () => {
+  for (const r of running.splice(0)) {
+    r.input.end();
+    await r.done;
+  }
+  removeDirs(dirs);
+});
+
+const TOKEN = "agm_machine_token_never_shown_123456";
+const AGENT = { id: "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0000", handle: "dev", name: "Dev" };
+const SELF = { command: ["/opt/agentes/agentes-runner"], compiled: true };
+
+class FakeSocket implements Socket {
+  readonly sent: Record<string, unknown>[] = [];
+  closed = false;
+  constructor(readonly handlers: SocketHandlers) {}
+  send(data: string) {
+    this.sent.push(JSON.parse(data) as Record<string, unknown>);
+  }
+  close() {
+    if (this.closed) return;
+    this.closed = true;
+    queueMicrotask(() => this.handlers.onClose(1000, ""));
+  }
+  frame(f: ServerFrame) {
+    this.handlers.onMessage(JSON.stringify(f));
+  }
+  of(type: string) {
+    return this.sent.filter((f) => f.type === type);
+  }
+}
+
+function pairedHome(over: StoredConfig = {}) {
+  const home = tempDir("home-");
+  const ws = tempDir("ws-");
+  dirs.push(home, ws);
+  writeConfig(
+    {
+      server: "https://agentes.test",
+      machineId: "m1",
+      name: "box",
+      token: TOKEN,
+      workspace: ws,
+      exec: false,
+      managedBy: "desktop",
+      orgId: "o1",
+      orgName: "Acme",
+      access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+      ...over,
+    },
+    home,
+  );
+  return { home, ws };
+}
+
+type Reply = Extract<ControlOut, { type: "reply" }>;
+
+function control(
+  home: string,
+  daemon: Partial<RunControlOptions["daemon"]> = {},
+  locked?: RunControlOptions["locked"],
+) {
+  const input = new PassThrough();
+  const out: ControlOut[] = [];
+  let buf = "";
+  const output = {
+    write(chunk: string, cb?: (err?: Error | null) => void) {
+      buf += chunk;
+      for (;;) {
+        const i = buf.indexOf("\n");
+        if (i < 0) break;
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 1);
+        if (line) out.push(JSON.parse(line) as ControlOut);
+      }
+      cb?.();
+      return true;
+    },
+  };
+  const sockets: FakeSocket[] = [];
+  const dial: Dial = (_url, handlers) => {
+    const s = new FakeSocket(handlers);
+    sockets.push(s);
+    return s;
+  };
+  const done = runControl({
+    home,
+    input,
+    output,
+    locked: locked ?? null,
+    daemon: { log: () => {}, watch: false, executors: () => ({}), self: SELF, caffeinate: false, dial, ...daemon },
+  });
+  running.push({ input, done });
+  let n = 0;
+  const request = async (body: Record<string, unknown>): Promise<Reply> => {
+    const id = `r${++n}`;
+    input.write(`${JSON.stringify({ id, ...body })}\n`);
+    await waitFor(() => out.some((o) => o.type === "reply" && o.id === id));
+    return out.find((o) => o.type === "reply" && o.id === id) as Reply;
+  };
+  const data = async <T = Record<string, unknown>>(body: Record<string, unknown>): Promise<T> => {
+    const r = await request(body);
+    if (!r.ok) throw new Error(`${String(body.type)} failed: ${r.error.code} ${r.error.message}`);
+    return r.data as T;
+  };
+  const events = (kind?: ControlEvent["kind"]) =>
+    out
+      .filter((o): o is Extract<ControlOut, { type: "event" }> => o.type === "event")
+      .map((o) => o.event)
+      .filter((e) => !kind || e.kind === kind);
+  /** The server side: the socket opened, hello read, welcome sent. */
+  const connect = async () => {
+    await waitFor(() => sockets.length >= 1);
+    const s = sockets[sockets.length - 1] as FakeSocket;
+    s.handlers.onOpen();
+    await waitFor(() => s.of("hello").length === 1);
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+    return s;
+  };
+  return { input, out, done, request, data, events, sockets, connect };
+}
+
+const stored = (home: string) => JSON.parse(readFileSync(configPath(home), "utf8")) as Record<string, unknown>;
+
+test("hello comes first; an unpaired runner answers status; unknown requests are bad_request; stdin closing ends it", async () => {
+  const home = tempDir("home-");
+  dirs.push(home);
+  const c = control(home);
+  await waitFor(() => c.out.length >= 1);
+  expect(c.out[0]).toEqual({
+    type: "hello",
+    control: CONTROL_PROTOCOL_VERSION,
+    version: RUNNER_VERSION,
+    protocol: MACHINE_PROTOCOL_VERSION,
+    home,
+  });
+  const status = await c.data<{ paired: boolean; connection: string; paused: unknown; agents: unknown[] }>({
+    type: "status",
+  });
+  expect(status).toMatchObject({ paired: false, connection: "unpaired", paused: { paused: false }, agents: [] });
+  expect(await c.request({ type: "make.coffee" })).toMatchObject({ ok: false, error: { code: "bad_request" } });
+  expect(await c.request({ type: "pause", until: null })).toMatchObject({ ok: false, error: { code: "not_paired" } });
+  // A line that isn't a request (no id) is ignored, nothing breaks.
+  c.input.write("not json\n");
+  expect((await c.request({ type: "jobs" })).ok).toBe(true);
+  c.input.end();
+  expect(await c.done).toBe(0);
+});
+
+test("paired: status and hello carry pause and access; pause/resume persist, go to the server, resume on their own", async () => {
+  const { home } = pairedHome();
+  const c = control(home);
+  const s = await c.connect();
+  expect(s.of("hello")[0]).toMatchObject({
+    type: "hello",
+    token: TOKEN,
+    protocol: MACHINE_PROTOCOL_VERSION,
+    exec: false,
+    paused: { paused: false },
+    access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+  });
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "online"));
+  s.frame({ type: "agents", agents: [{ id: AGENT.id, handle: "dev", name: "Dev", look: { color: "amber" } }] });
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.agents.length === 1));
+  const status = await c.data<Record<string, unknown>>({ type: "status" });
+  expect(status).toMatchObject({
+    paired: true,
+    server: "https://agentes.test",
+    org: { id: "o1", name: "Acme" },
+    machine: { id: "m1", name: "box" },
+    connection: "online",
+    agents: [{ id: AGENT.id, handle: "dev", name: "Dev", look: { color: "amber" } }],
+  });
+  expect(JSON.stringify(status)).not.toContain(TOKEN);
+
+  expect(await c.data({ type: "pause", until: null })).toEqual({ paused: { paused: true, until: null } });
+  expect(stored(home).paused).toEqual({ until: null });
+  expect(s.of("runner.state").at(-1)).toEqual({ type: "runner.state", paused: { paused: true, until: null } });
+  expect(c.events("activity").some((e) => e.kind === "activity" && e.entry.kind === "pause")).toBe(true);
+
+  // While paused, new work from the server is refused; the runner says why.
+  s.frame({ type: "request", id: "q1", op: "list", path: "", depth: 1, agent: AGENT });
+  await waitFor(() => s.sent.some((f) => f.id === "q1"));
+  expect(s.sent.find((f) => f.id === "q1")).toMatchObject({ ok: false, error: { code: "paused" } });
+
+  expect(await c.data({ type: "resume" })).toEqual({ paused: { paused: false } });
+  expect(stored(home).paused).toBeUndefined();
+  expect(s.of("runner.state").at(-1)).toEqual({ type: "runner.state", paused: { paused: false } });
+
+  // A pause with an end resumes by itself when it passes.
+  const until = new Date(Date.now() + 300).toISOString();
+  expect(await c.data({ type: "pause", until })).toEqual({ paused: { paused: true, until } });
+  expect(await c.request({ type: "pause", until: "2000-01-01T00:00:00Z" })).toMatchObject({
+    ok: false,
+    error: { code: "bad_request" },
+  });
+  await waitFor(() => stored(home).paused === undefined, 3000);
+  await waitFor(() => (s.of("runner.state").at(-1) as { paused?: { paused: boolean } }).paused?.paused === false);
+
+  expect(await c.data({ type: "shutdown" })).toEqual({ stopping: true });
+  expect(await c.done).toBe(0);
+  expect(s.closed).toBe(true);
+});
+
+test("jobs and the activity log: each request is a job while it runs and a line after, newest first", async () => {
+  const { home } = pairedHome();
+  const c = control(home);
+  const s = await c.connect();
+  const write = { op: "write" as const, path: "notes.txt", base64: Buffer.from("hello").toString("base64") };
+  s.frame({ type: "request", id: "w1", ...write, agent: AGENT });
+  await waitFor(() => s.sent.some((f) => f.id === "w1"));
+  s.frame({ type: "request", id: "w2", op: "read", path: "notes.txt", maxBytes: 100, agent: AGENT });
+  await waitFor(() => c.events("activity").length >= 2);
+  const started = c.events("job.started");
+  expect(started[0]).toMatchObject({
+    kind: "job.started",
+    job: { id: "w1", kind: "write", agent: { id: AGENT.id, name: "Dev" } },
+  });
+  expect(c.events("job.finished")).toContainEqual({ kind: "job.finished", jobId: "w1", result: "ok" });
+  expect((await c.data<{ jobs: unknown[] }>({ type: "jobs" })).jobs).toEqual([]);
+
+  const page = await c.data<{ entries: { summary: string; kind: string; result: string }[]; more: boolean }>({
+    type: "activity",
+    limit: 1,
+  });
+  expect(page.entries).toEqual([expect.objectContaining({ summary: "read notes.txt", kind: "file", result: "ok" })]);
+  expect(page.more).toBe(true);
+  const all = await c.data<{ entries: { summary: string }[] }>({ type: "activity", agentId: AGENT.id });
+  expect(all.entries.map((e) => e.summary)).toEqual(["read notes.txt", "wrote notes.txt"]);
+  expect(readFileSync(path.join(home, "activity.jsonl"), "utf8")).not.toContain(TOKEN);
+  // Commands are off on a new app pairing: refused, and the log says so.
+  s.frame({
+    type: "request",
+    id: "x1",
+    op: "exec",
+    command: "echo hi",
+    timeoutSeconds: 10,
+    stream: false,
+    agent: AGENT,
+  });
+  await waitFor(() => s.sent.some((f) => f.id === "x1"));
+  expect(s.sent.find((f) => f.id === "x1")).toMatchObject({ ok: false, error: { code: "exec_disabled" } });
+  await waitFor(() => c.events("activity").some((e) => e.kind === "activity" && e.entry.result === "refused"));
+});
+
+test("access requests: pending until the person answers on the machine; the answer reaches the server", async () => {
+  const { home } = pairedHome();
+  const folder = tempDir("proj-");
+  const other = tempDir("other-");
+  dirs.push(folder, other);
+  const lines: string[] = [];
+  const c = control(home, { print: (l) => lines.push(l) });
+  const s = await c.connect();
+  s.frame({
+    type: "agents",
+    agents: [AGENT, { id: "0193cccc-bbbb-7ccc-8ddd-eeeeffff0000", handle: "ops", name: "Ops" }],
+  });
+  const ask = (id: string, requestId: string, p: string) =>
+    s.frame({ type: "request", id, op: "access.request", requestId, path: p, reason: "run the tests", agent: AGENT });
+
+  ask("a1", "req-00000001", folder);
+  await waitFor(() => s.sent.some((f) => f.id === "a1"));
+  expect(s.sent.find((f) => f.id === "a1")).toMatchObject({
+    ok: true,
+    data: { requestId: "req-00000001", status: "pending" },
+  });
+  await waitFor(() => c.events("access.requested").length === 1);
+  expect(c.events("access.requested")[0]).toMatchObject({
+    request: { requestId: "req-00000001", agent: { id: AGENT.id, name: "Dev" }, path: folder, reason: "run the tests" },
+  });
+  const pending = await c.data<{ requests: { requestId: string }[] }>({ type: "access.pending" });
+  expect(pending.requests.map((r) => r.requestId)).toEqual(["req-00000001"]);
+
+  const answered = await c.data<{ access: { folders: unknown[] } }>({
+    type: "access.answer",
+    requestId: "req-00000001",
+    decision: "granted",
+    scope: "agent",
+  });
+  expect(answered.access.folders).toEqual([{ path: folder, agents: [AGENT.id] }]);
+  expect((stored(home).access as { folders: unknown[] }).folders).toEqual([{ path: folder, agents: [AGENT.id] }]);
+  expect(s.of("access.changed").at(-1)).toMatchObject({ access: { folders: [{ path: folder, agents: [AGENT.id] }] } });
+  expect(s.of("access.decided")).toEqual([
+    { type: "access.decided", requestId: "req-00000001", decision: "granted", scope: "agent" },
+  ]);
+  expect(c.events("access.resolved")).toContainEqual({
+    kind: "access.resolved",
+    requestId: "req-00000001",
+    decision: "granted",
+  });
+
+  // Already allowed: granted at once. A path inside it too.
+  ask("a2", "req-00000002", path.join(folder, "sub"));
+  await waitFor(() => s.sent.some((f) => f.id === "a2"));
+  expect(s.sent.find((f) => f.id === "a2")).toMatchObject({ ok: true, data: { status: "granted" } });
+
+  // "Agora não".
+  ask("a3", "req-00000003", other);
+  await waitFor(() => c.events("access.requested").length === 2);
+  await c.data({ type: "access.answer", requestId: "req-00000003", decision: "denied", scope: "agent" });
+  expect(s.of("access.decided").at(-1)).toEqual({
+    type: "access.decided",
+    requestId: "req-00000003",
+    decision: "denied",
+  });
+  expect((stored(home).access as { folders: unknown[] }).folders).toHaveLength(1);
+  expect(
+    await c.request({ type: "access.answer", requestId: "req-00000003", decision: "granted", scope: "agent" }),
+  ).toMatchObject({
+    ok: false,
+    error: { code: "not_found" },
+  });
+
+  // For every agent of the organization on this machine.
+  ask("a4", "req-00000004", other);
+  await waitFor(() => c.events("access.requested").length === 3);
+  const all = await c.data<{ access: { folders: { path: string; agents: string[] }[] } }>({
+    type: "access.answer",
+    requestId: "req-00000004",
+    decision: "granted",
+    scope: "all",
+  });
+  expect(all.access.folders.find((f) => f.path === other)?.agents.sort()).toEqual(
+    [AGENT.id, "0193cccc-bbbb-7ccc-8ddd-eeeeffff0000"].sort(),
+  );
+  expect(s.of("access.decided").at(-1)).toMatchObject({ requestId: "req-00000004", decision: "granted", scope: "all" });
+
+  // The site can only reduce.
+  s.frame({ type: "request", id: "r1", op: "access.reduce", removeFolder: { path: folder } });
+  await waitFor(() => s.sent.some((f) => f.id === "r1"));
+  expect(s.sent.find((f) => f.id === "r1")).toMatchObject({ ok: true });
+  expect((stored(home).access as { folders: { path: string }[] }).folders.map((f) => f.path)).toEqual([other]);
+  expect(s.of("access.changed").at(-1)).toMatchObject({ access: { folders: [{ path: other }] } });
+  // Terminal mode would print the command; the app gets the event instead (both kept in sync).
+  expect(lines.some((l) => l.includes(`agentes-runner folders allow ${other} --agent dev`))).toBe(true);
+});
+
+test("folders, tools and settings from the app: system folders refused, everything lands in config.json", async () => {
+  const { home } = pairedHome();
+  const folder = tempDir("proj-");
+  dirs.push(folder);
+  const c = control(home);
+  expect(await c.request({ type: "folders.add", path: "/", agents: [] })).toMatchObject({
+    ok: false,
+    error: { code: "invalid_path" },
+  });
+  expect(await c.request({ type: "folders.add", path: home, agents: [] })).toMatchObject({
+    ok: false,
+    error: { code: "invalid_path" },
+  });
+  expect(await c.data({ type: "folders.add", path: folder, agents: [AGENT.id] })).toMatchObject({
+    folders: [{ path: folder, agents: [AGENT.id] }],
+  });
+  expect(await c.data({ type: "folders.setAgents", path: folder, agents: [] })).toMatchObject({
+    folders: [{ path: folder, agents: [] }],
+  });
+  expect(await c.data({ type: "folders.remove", path: folder })).toMatchObject({ folders: [] });
+  expect(await c.request({ type: "folders.remove", path: folder })).toMatchObject({
+    ok: false,
+    error: { code: "not_found" },
+  });
+  expect(await c.data({ type: "tools.set", tool: "commands", on: true })).toMatchObject({ tools: { commands: true } });
+  expect(stored(home)).toMatchObject({ exec: true, access: { tools: { commands: true } } });
+  await waitFor(() => c.events("access.changed").length >= 1);
+
+  expect(await c.data({ type: "config.get" })).toEqual({
+    name: "box",
+    maxConcurrentTasks: 3,
+    taskMaxSeconds: 14400,
+    brainIdleMinutes: 10,
+    brainMaxProcesses: 3,
+    workspace: expect.any(String),
+    managedBy: "desktop",
+  });
+  expect(await c.data({ type: "config.set", patch: { name: "Notebook", maxConcurrentTasks: 5 } })).toMatchObject({
+    name: "Notebook",
+    maxConcurrentTasks: 5,
+  });
+  expect(await c.request({ type: "config.set", patch: { maxConcurrentTasks: 0 } })).toMatchObject({
+    ok: false,
+    error: { code: "bad_request" },
+  });
+  expect(stored(home)).toMatchObject({ name: "Notebook", maxConcurrentTasks: 5, token: TOKEN });
+
+  const diag = await c.data<{ text: string }>({ type: "diagnostics" });
+  expect(diag.text).toContain(`agentes runner ${RUNNER_VERSION}`);
+  expect(diag.text).not.toContain(TOKEN);
+});
+
+test("device pairing from the app: code, confirmation, a desktop home with safe defaults; unpair forgets the token", async () => {
+  const home = tempDir("home-");
+  const base = tempDir("agentes-");
+  dirs.push(home, base);
+  const answers = [
+    { error: "authorization_pending" },
+    { token: TOKEN, machineId: "m9", name: "Notebook", org: { id: "o1", name: "Acme Ltda" } },
+  ];
+  const fetch: FetchFn = async (url) => {
+    if (url.endsWith("/api/machines/device")) {
+      return Response.json({
+        deviceCode: "dc",
+        userCode: "K7Q4ZP",
+        verificationUrl: "https://agentes.test/conectar?code=K7Q4ZP",
+        expiresIn: 600,
+        interval: 3,
+      });
+    }
+    const next = answers.shift();
+    return Response.json(next, { status: next && "token" in next ? 200 : 400 });
+  };
+  const c = control(home, { fetch, pairSleep: async () => {}, workspaceBase: base });
+  expect(
+    await c.data({ type: "pair.start", server: "https://agentes.test/", name: "Notebook", tools: { claude: true } }),
+  ).toEqual({
+    started: true,
+  });
+  await waitFor(() => c.events("pair.done").length === 1);
+  expect(c.events("pair.code")[0]).toMatchObject({
+    userCode: "K7Q4ZP",
+    verificationUrl: "https://agentes.test/conectar?code=K7Q4ZP",
+  });
+  expect(c.events("pair.done")[0]).toEqual({
+    kind: "pair.done",
+    org: { id: "o1", name: "Acme Ltda" },
+    machine: { id: "m9", name: "Notebook" },
+  });
+  const config = readStoredConfig(home);
+  expect(config).toMatchObject({
+    managedBy: "desktop",
+    server: "https://agentes.test",
+    machineId: "m9",
+    token: TOKEN,
+    orgId: "o1",
+    orgName: "Acme Ltda",
+    exec: false,
+    workspace: path.join(base, "acme-ltda"),
+    access: { folders: [], tools: { claude: true, codex: false, commands: false } },
+  });
+  // The token never crosses the channel.
+  expect(JSON.stringify(c.out)).not.toContain(TOKEN);
+  expect(await c.request({ type: "pair.start", server: "https://agentes.test" })).toMatchObject({
+    ok: false,
+    error: { code: "already_paired" },
+  });
+  expect(await c.data({ type: "unpair" })).toEqual({ unpaired: true });
+  expect(readStoredConfig(home)).toMatchObject({ managedBy: "desktop", workspace: path.join(base, "acme-ltda") });
+  expect(readStoredConfig(home)?.token).toBeUndefined();
+  expect(await c.data({ type: "status" })).toMatchObject({ paired: false, connection: "unpaired" });
+});
+
+test("device pairing refused on the site: pair.failed with `denied`; cancel stops a pairing in progress", async () => {
+  const home = tempDir("home-");
+  dirs.push(home);
+  let denied = true;
+  const fetch: FetchFn = async (url) => {
+    if (url.endsWith("/api/machines/device")) {
+      return Response.json({ deviceCode: "dc", userCode: "ABC234", verificationUrl: "x", expiresIn: 600, interval: 3 });
+    }
+    return Response.json({ error: denied ? "access_denied" : "authorization_pending" }, { status: 400 });
+  };
+  const c = control(home, { fetch, pairSleep: async () => new Promise((r) => setTimeout(r, 5)) });
+  await c.data({ type: "pair.start", server: "https://agentes.test" });
+  await waitFor(() => c.events("pair.failed").length === 1);
+  expect(c.events("pair.failed")[0]).toMatchObject({ code: "denied" });
+  denied = false;
+  await c.data({ type: "pair.start", server: "https://agentes.test" });
+  await waitFor(() => c.events("pair.code").length === 2);
+  expect(await c.data({ type: "pair.cancel" })).toEqual({ canceled: true });
+  expect(await c.data({ type: "pair.cancel" })).toEqual({ canceled: false });
+  expect(readStoredConfig(home)).toBeNull();
+});
+
+test("a second runner on the same home answers every request with the reason, then exits", async () => {
+  const home = tempDir("home-");
+  dirs.push(home);
+  const c = control(home, {}, { pid: 4242, mode: "app", startedAt: "" });
+  const r = await c.request({ type: "status" });
+  expect(r).toMatchObject({ ok: false, error: { code: "internal" } });
+  expect(!r.ok && r.error.message).toContain("pid 4242");
+  c.input.end();
+  expect(await c.done).toBe(EXIT_LOCKED);
+});
+
+test("an edit of config.json from a terminal reaches the app and the server", async () => {
+  const { home, ws } = pairedHome();
+  const folder = tempDir("proj-");
+  dirs.push(folder);
+  const c = control(home, { watch: true });
+  const s = await c.connect();
+  await new Promise((r) => setTimeout(r, 50));
+  writeConfig(
+    {
+      ...(readStoredConfig(home) as StoredConfig),
+      workspace: ws,
+      access: {
+        folders: [{ path: folder, agents: [AGENT.id] }],
+        tools: { claude: true, codex: false, commands: false },
+      },
+    },
+    home,
+  );
+  await waitFor(() => c.events("access.changed").length === 1, 5000);
+  expect(s.of("access.changed")).toHaveLength(1);
+  expect((await c.data<{ access: { tools: { claude: boolean } } }>({ type: "status" })).access.tools.claude).toBe(true);
+}, 10_000);

@@ -161,6 +161,7 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
+  else if (n.kind === "machine_connected") [icon, label] = ["computer", t("notifications.source.machine")];
   else if (s.topicId) [icon, label] = ["message", t("notifications.source.forum")];
   else if (s.issueNumber != null)
     [icon, label] = ["issues", t("notifications.source.issue", { number: s.issueNumber })];
@@ -199,6 +200,8 @@ type WhatKey =
   | "missionStopped"
   | "routineFinished"
   | "routineFailed"
+  | "machineConnected"
+  | "machineConnectedAny"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -247,6 +250,10 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routineFinished", { name });
     case "routine_failed":
       return k("routineFailed", { name });
+    case "machine_connected":
+      return n.source.label
+        ? k("machineConnected", { name, label: n.source.label })
+        : k("machineConnectedAny", { name });
     case "reaction":
       return k("reaction", { names, count });
   }
@@ -1260,6 +1267,10 @@ export function NotificationsPage() {
         return void navigate({ to: target.to, params: { orgId, ...target.params } });
       case "/org/$orgId/threads":
         return void navigate({ to: target.to, params: { orgId }, search: target.search });
+      case "/org/$orgId/settings/computers/$machineId":
+        return void navigate({ to: target.to, params: { orgId, ...target.params } });
+      case "/org/$orgId/settings/$section":
+        return void navigate({ to: target.to, params: { orgId, ...target.params }, search: {} });
       default:
         return void navigate({ to: target.to, params: { orgId } });
     }

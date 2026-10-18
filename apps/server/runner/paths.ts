@@ -41,23 +41,43 @@ export interface Resolved {
   /** Absolute path to act on (the real path when it exists). */
   abs: string;
   exists: boolean;
+  /** Protocol 10, absolute requests only: the allowed folder (real path) it was found in. */
+  root?: string;
 }
 
 /**
- * Resolves a request path inside the workspace. `workspaceReal` must already
- * be a real path (fs.realpath). Existing targets are resolved through their
- * symlinks and refused when they leave the workspace; missing targets are
- * checked through their nearest existing parent (so a write can't go through
- * a symlinked folder that points outside).
+ * Whether a request path is absolute on this machine (protocol 10: allowed
+ * when it falls inside a folder the person allowed for the agent).
+ * `/workspace/…` is the agent's own folder, never absolute.
  */
-export async function resolveInWorkspace(workspaceReal: string, input: string): Promise<Resolved> {
-  const rel = normalizeRequestPath(input);
-  const abs = rel === "" ? workspaceReal : path.join(workspaceReal, ...rel.split("/"));
-  const outside = () => new RunnerError("outside_workspace", `${input} points outside the workspace`);
+export function isAbsoluteRequest(input: unknown): input is string {
+  if (typeof input !== "string") return false;
+  const p = input.trim().replace(/\\/g, "/");
+  if (p === AGENT_ROOT || p.startsWith(`${AGENT_ROOT}/`)) return false;
+  return p.startsWith("/") || /^[a-zA-Z]:\//.test(p);
+}
+
+/**
+ * Resolves `abs` (absolute, normalized) through its symlinks and returns it
+ * when it lands inside one of `roots` (real paths). Missing targets are
+ * checked through their nearest existing parent (so a write can't go
+ * through a symlinked folder that points outside); a dangling symlink is
+ * refused (writing would follow it wherever it points).
+ */
+async function resolveWithin(
+  roots: string[],
+  abs: string,
+  rel: string,
+  outside: () => RunnerError,
+  withRoot: boolean,
+): Promise<Resolved> {
+  const rootOf = (real: string) => roots.find((r) => isInside(r, real));
+  const found = (r: Resolved, root: string): Resolved => (withRoot ? { ...r, root } : r);
   try {
     const real = await realpath(abs);
-    if (!isInside(workspaceReal, real)) throw outside();
-    return { rel, abs: real, exists: true };
+    const root = rootOf(real);
+    if (!root) throw outside();
+    return found({ rel, abs: real, exists: true }, root);
   } catch (err) {
     if (err instanceof RunnerError) throw err;
     if (errnoCode(err) !== "ENOENT" && errnoCode(err) !== "ENOTDIR") throw err;
@@ -69,14 +89,15 @@ export async function resolveInWorkspace(workspaceReal: string, input: string): 
   } catch (err) {
     if (err instanceof RunnerError) throw err;
   }
-  // The nearest parent that exists must be inside the workspace.
+  // The nearest parent that exists must be inside.
   let parent = path.dirname(abs);
   for (;;) {
     try {
       const real = await realpath(parent);
-      if (!isInside(workspaceReal, real)) throw outside();
+      const root = rootOf(real);
+      if (!root) throw outside();
       const rest = path.relative(parent, abs);
-      return { rel, abs: path.join(real, rest), exists: false };
+      return found({ rel, abs: path.join(real, rest), exists: false }, root);
     } catch (err) {
       if (err instanceof RunnerError) throw err;
       const code = errnoCode(err);
@@ -86,6 +107,55 @@ export async function resolveInWorkspace(workspaceReal: string, input: string): 
       parent = up;
     }
   }
+}
+
+/**
+ * Resolves a request path inside the workspace. `workspaceReal` must already
+ * be a real path (fs.realpath). Existing targets are resolved through their
+ * symlinks and refused when they leave the workspace; missing targets are
+ * checked through their nearest existing parent.
+ */
+export async function resolveInWorkspace(workspaceReal: string, input: string): Promise<Resolved> {
+  const rel = normalizeRequestPath(input);
+  const abs = rel === "" ? workspaceReal : path.join(workspaceReal, ...rel.split("/"));
+  return resolveWithin(
+    [workspaceReal],
+    abs,
+    rel,
+    () => new RunnerError("outside_workspace", `${input} points outside the workspace`),
+    false,
+  );
+}
+
+/**
+ * Protocol 10: an absolute request path inside one of the folders allowed
+ * for the agent (`rootsReal`: real paths). Symlinks are resolved before the
+ * check, so a link inside an allowed folder that points elsewhere is refused
+ * (`not_allowed`). The result's `rel` is the absolute path itself (what the
+ * agent uses again, e.g. the entries of a listing).
+ */
+export async function resolveInRoots(rootsReal: string[], input: string): Promise<Resolved> {
+  if (typeof input !== "string") throw new RunnerError("bad_request", "The path must be a string");
+  if (input.includes("\0")) throw new RunnerError("bad_request", "The path has a null byte");
+  const abs = path.resolve(input.trim());
+  const notAllowed = () =>
+    new RunnerError(
+      "not_allowed",
+      `${input} is outside your folder and outside every folder allowed for you on this computer (ask for it with request_folder_access)`,
+    );
+  if (rootsReal.length === 0) throw notAllowed();
+  const shown = process.platform === "win32" ? abs : abs.split(path.sep).join("/");
+  return resolveWithin(rootsReal, abs, shown, notAllowed, true);
+}
+
+/**
+ * A request path for an agent: relative to its folder (`workspaceReal`), or
+ * absolute inside one of its allowed folders when `grants` is given
+ * (protocol 10). Without `grants` an absolute path is refused as before.
+ */
+export function resolveForAgent(workspaceReal: string, grants: string[] | undefined, input: string) {
+  if (grants && isAbsoluteRequest(input)) return resolveInRoots(grants, input);
+  return resolveInWorkspace(workspaceReal, input);
 }
 
 /** `<handle>-<first 8 of id>`: readable, and the id part survives a rename. */

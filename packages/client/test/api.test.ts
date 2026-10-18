@@ -339,14 +339,53 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     expect(await (await api.artifacts.fileBlob("o1", "a1", 1)).text()).toBe('{"raw":true}');
   });
 
-  test("connected computers: list, pairing, rename, remove, and the agent's target", async () => {
+  test("connected computers: the device code, desktop release and access reduce (ADR 0036)", async () => {
+    const access = { folders: [], tools: { claude: true, codex: false, commands: false } };
+    const release = {
+      version: "0.2.0",
+      url: "/api/desktop/download/0.2.0/agentes.dmg",
+      sha256: "ab",
+      publishedAt: "t",
+    };
+    const { fetch, calls } = fakeFetch({
+      "GET /api/app/machines/device/K7Q4ZP": {
+        status: 200,
+        body: { name: "MacBook", os: "darwin", arch: "arm64", hostname: "mbp", version: "0.2.0" },
+      },
+      [`POST ${org}/machines/device/K7Q4ZP/confirm`]: { status: 201, body: { id: "m9", name: "Mac" } },
+      "POST /api/app/machines/device/K7Q4ZP/deny": { status: 204 },
+      [`POST ${org}/machines/m1/access/reduce`]: { status: 200, body: { access } },
+      [`POST ${org}/machines/m2/access/reduce`]: { status: 200, body: access },
+      "GET /api/desktop/latest?target=darwin&arch=aarch64": { status: 200, body: release },
+    });
+    const api = createHttpApi({ fetch });
+    expect((await api.machines.device("K7Q4ZP")).name).toBe("MacBook");
+    expect((await api.machines.confirmDevice("o1", "K7Q4ZP", { name: "Mac" })).id).toBe("m9");
+    await api.machines.denyDevice("K7Q4ZP");
+    // The new access comes bare or wrapped in `{ access }`.
+    expect(await api.machines.reduceAccess("o1", "m1", { disableTool: "claude" })).toEqual(access);
+    expect(await api.machines.reduceAccess("o1", "m2", { removeFolder: { path: "/p", agentId: "a1" } })).toEqual(
+      access,
+    );
+    expect(await api.machines.desktopLatest("darwin", "aarch64")).toEqual(release);
+    // No release published (or the server can't read them): 404 → null.
+    expect(await api.machines.desktopLatest("darwin", "x86_64")).toBeNull();
+    // An expired code is an error the page turns into "Esse código expirou".
+    await expect(api.machines.device("ZZZZZZ")).rejects.toBeInstanceOf(ApiError);
+    expect(calls.slice(0, 6).map((c) => `${c.init.method} ${c.url} ${c.init.body ?? ""}`)).toEqual([
+      "GET /api/app/machines/device/K7Q4ZP ",
+      `POST ${org}/machines/device/K7Q4ZP/confirm {"name":"Mac"}`,
+      "POST /api/app/machines/device/K7Q4ZP/deny {}",
+      `POST ${org}/machines/m1/access/reduce {"disableTool":"claude"}`,
+      `POST ${org}/machines/m2/access/reduce {"removeFolder":{"path":"/p","agentId":"a1"}}`,
+      "GET /api/desktop/latest?target=darwin&arch=aarch64 ",
+    ]);
+  });
+
+  test("connected computers: list, rename, remove, and the agent's target", async () => {
     const machine = { id: "m1", name: "Escritório", online: true };
     const { fetch, calls } = fakeFetch({
       [`GET ${org}/machines`]: { status: 200, body: { machines: [machine] } },
-      [`POST ${org}/machines/pairings`]: {
-        status: 201,
-        body: { code: "K7QM-4XTB", expiresAt: "t", installCommand: "curl … | sh" },
-      },
       [`PATCH ${org}/machines/m1`]: { status: 200, body: { id: "m1", name: "Sala 2" } },
       [`DELETE ${org}/machines/m1`]: { status: 204 },
       [`PUT ${org}/agents/ag/computer/target`]: {
@@ -356,13 +395,11 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     });
     const api = createHttpApi({ fetch });
     expect(await api.machines.list("o1")).toEqual([machine] as never);
-    expect((await api.machines.createPairing("o1", { name: "Escritório" })).code).toBe("K7QM-4XTB");
     expect(await api.machines.rename("o1", "m1", "Sala 2")).toEqual({ id: "m1", name: "Sala 2" });
     await api.machines.remove("o1", "m1");
     expect((await api.sandbox.setTarget("o1", "ag", "m1")).kind).toBe("machine");
     expect(calls.map((c) => `${c.init.method} ${c.url} ${c.init.body ?? ""}`)).toEqual([
       `GET ${org}/machines `,
-      `POST ${org}/machines/pairings {"name":"Escritório"}`,
       `PATCH ${org}/machines/m1 {"name":"Sala 2"}`,
       `DELETE ${org}/machines/m1 `,
       `PUT ${org}/agents/ag/computer/target {"machineId":"m1"}`,

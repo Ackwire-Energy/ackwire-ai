@@ -27,7 +27,7 @@ That works for developers and servers. It does not work for the people the produ
 - **Desktop mode has no OS service.** The app starts at login (Tauri autostart) and spawns the runner; quitting the app stops it. If the runner exits unexpectedly the app restarts it with backoff (1 s, 2 s, 4 s… capped at 60 s) and shows the state in the tray.
 - Background tasks and missions are unaffected: they already run detached under a wrapper and survive runner restarts (ADR 0029), and Claude Code resumes with `--resume`.
 - Accepted trade-off: with the app closed, agents can't use the computer. The Quit dialog says so.
-- **Headless mode is unchanged**: the shell installer, Node/Bun and the OS service stay for servers and people who prefer the terminal.
+- **Both modes stay.** The app is the way for people on a Mac (Settings → Computers leads with "Baixar o app para Mac"). The shell installer, Node/Bun and the OS service stay for servers, computers without a screen, and Windows/Linux until the app gets there ("Outras formas: servidor ou Linux"). Later the installer can fetch the compiled binary instead of the `.mjs`, dropping the Node requirement and leaving one way to ship the runner.
 - Paths that pointed at "runtime + script" (the service definition, the `agentes-runner mcp` command written into Claude Code's MCP config) resolve to the compiled binary when there is no separate runtime (`process.execPath === script`).
 
 ### 3. App ↔ runner: stdio for live state, the config file for settings
@@ -45,11 +45,11 @@ That works for developers and servers. It does not work for the people the produ
 - **The config file stays the single source of settings.** The runner watches `config.json` and reloads on change, so `agentes-runner` commands in a terminal and the app edit the same thing. Writes stay atomic with mode 600.
 - The protocol has its own version in `hello` between app and runner; the app refuses a runner it doesn't understand (can't happen when both ship together, but guards development builds).
 
-### 4. Single instance and adopting a terminal install
+### 4. Single instance; no migration
 
 - One runner per OS user and runner home: a lock file (`~/.agentes-runner/runner.lock` with PID, checked for liveness) taken by `start` and `app`. A second one exits with a clear message. Tauri's single-instance plugin keeps one app.
-- On first launch the app looks for an existing install: a `config.json` and/or the OS service. If found, it stops and uninstalls the service, keeps the config (pairing, workspace, limits), marks `"managedBy": "desktop"` and starts its own runner. Nothing is re-paired.
-- With `managedBy: "desktop"`, `agentes-runner update` and `service install` from a terminal refuse and point to the app, so the two install modes can't fight.
+- The app never adopts a terminal install. We are building the MVP with a single user, so there is no migration: to move a computer to the app, disconnect it and connect again from the app.
+- Homes the app creates carry `"managedBy": "desktop"`; there `agentes-runner update` and `service install` from a terminal refuse and point to the app, so the two modes can't fight over the same home.
 
 ### 4b. More than one organization on one computer
 
@@ -57,19 +57,19 @@ That works for developers and servers. It does not work for the people the produ
 - **One runner per organization**, each with its own home and workspace: `~/.agentes-runner/orgs/<orgId>/` (config, token, lock, tasks, logs, activity) and `~/agentes/<org-slug>/` (agent folders). The app spawns one child per organization and shows them grouped in the popover. Today's runner code works unchanged per home (`AGENTES_RUNNER_HOME`).
 - Why not one process with several connections: separate processes keep one organization's ops, tasks and tokens out of another's memory and journal, and need no refactor of the runner.
 - "Adicionar organização" in the popover and in Preferences runs the same sign-in (section 5) into a new home. Leaving one organization stops and removes only its home (agent folders stay on disk).
-- Adopting a terminal install moves the existing single home into `orgs/<orgId>/`.
 - Honest limit: file tools keep each organization in its own folders, but commands run as the same OS user and can reach the other organization's folders (ADR 0030). Protected mode (ADR 0030 level 2) closes that; until then the Tools tab says so.
 - Limits (background tasks, Claude Code processes) apply per organization in v0.1. A computer-wide cap comes later if several organizations compete for the same machine.
 
-### 5. Signing in from the app (device code, started by the computer)
+### 5. Connecting a computer: one device-code flow for the app and the terminal
 
-Today the code is created on the site and typed into the computer. The app reverses it, like OAuth's device flow; the runner drives it so the CLI can use it too (`agentes-runner pair --browser`).
+The code is now created by the computer, like OAuth's device flow, and the person confirms it on the site with their normal session (email, Google, Apple). Nobody types a code: it is shown on both sides only to compare. **This replaces the old code created on the site** (`POST /organizations/{orgId}/machines/pairings`, `POST /api/machines/pair`, `install.sh --code`), for the app and for the terminal alike (MVP, one path). The runner drives the flow (`agentes-runner pair --server <url> [--name <name>]` prints the code and the URL), so a server without a screen is confirmed from any device.
 
-- `POST /api/machines/device` (no session, rate limited per IP): returns `deviceCode` (secret, 32 bytes), `userCode` (6 characters, unambiguous alphabet, shown as `K7Q·4ZP`), `verificationUrl` (`<PUBLIC_URL>/conectar?code=K7Q4ZP`), `expiresIn` 600, `interval` 3.
-- The app opens the URL. The page (signed in, or after sign-in) shows the code, the computer's name and OS, and the organization picker; "Conectar" confirms. Only people allowed to connect computers in that org (as today's pairing) can confirm.
-- `POST /api/machines/device/token { deviceCode }`: `authorization_pending` until confirmed, then the machine token once (same `agm_…` token and machine row as today's pairing), then `expired_token`. Polling faster than `interval` gets `slow_down`.
-- The token goes straight into the runner's config; the web view never sees it.
-- **Against a link sent by someone else** (the classic device-code phishing: an attacker starts the flow on their own computer and sends you the link): the code lasts 10 minutes and works once; the page shows the computer's name, OS and approximate location, and says "Só confirme se você acabou de abrir isso no seu computador"; the new computer is announced in the org (notification to admins) and can be disconnected at once; and **a new computer gets no agents**: an admin or an agent's owner has to point an agent at it (`setAgentComputerTarget`), so a rogue computer receives no work and no secrets.
+- `POST /api/machines/device` (no session, rate limited per IP, at most 10 pending codes per IP), body `{ name, os, arch, hostname, version }`: returns `{ deviceCode, userCode, verificationUrl, expiresIn: 600, interval: 3 }`. `deviceCode` is 32 random bytes (base64url), stored only as a SHA-256; `userCode` is 6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, shown as `K7Q·4ZP`; `verificationUrl` is `<PUBLIC_URL>/conectar?code=K7Q4ZP`.
+- `POST /api/machines/device/token { deviceCode }`: `400 { error: "authorization_pending" }` until confirmed, `"slow_down"` when polled faster than `interval`, `"access_denied"` after "Não fui eu", `"expired_token"` after 10 minutes or once the token was taken; on success `200 { token, machineId, name, org: { id, name } }` exactly once. The token is today's `agm_…` machine token.
+- Web: the page `/conectar?code=…` (signed in, or after sign-in) calls `GET /api/app/machines/device/{userCode}` → `{ name, os, arch, hostname, version, approxLocation?, createdAt, expiresAt }` (approximate location from the requesting IP, best effort), shows the code, the computer and the warning "Só confirme se você acabou de abrir isso no seu computador", lets the person pick the organization (only those where they may connect computers, as today) and the computer's name, then `POST /api/app/organizations/{orgId}/machines/device/{userCode}/confirm { name? }` (201, the machine) or `POST /api/app/machines/device/{userCode}/deny` (204).
+- Against a link sent by someone else (device-code phishing): 10 minutes, single use, the page shows name/OS/approximate location, admins get a notification for every new computer, the computer can be disconnected at once, and **a new computer gets no agents** until an admin or an agent's owner points one at it (`setAgentComputerTarget`).
+- The token goes straight into the runner's config; the app's web view never sees it.
+- The installer (`install.sh`) loses `--code`: it downloads the runner, runs `pair` (which prints the URL and code and waits) and installs the service.
 
 ### 6. Pause
 
@@ -82,43 +82,50 @@ Today the code is created on the site and typed into the computer. The app rever
 - Each runner appends to `activity.jsonl` in its home. When the file reaches 5 MB it becomes `activity.1.jsonl` and a new one starts; at most 3 files are kept (about 15 MB, weeks of normal use), the oldest is deleted. Each line holds: time, agent (id and display name, sent with each op from protocol 9), kind (file read/write, command, task, access change, update), a short summary, the command line with secrets redacted (ADR 0027), and the result (ok, failed, refused).
 - Local only. The server keeps its own audit; this is what the person sees about their own computer.
 
-### 8. Folders and tools (v0.2, separate ADR or an amendment)
+### 8. Folders and tools on the machine (v0.2, protocol 10)
 
-The machine-side access model from `PastasComputador.html` (allowed folders, which agents use each, tools on/off, enforced in file tools, commands and Claude Code `--add-dir`) is built in the runner and exposed both as `agentes-runner folders|tools` and through the app. An agent missing access posts its request; the runner raises `access.requested`; the app shows a notification and the request in the popover; "Liberar" writes the config; the runner reports the new access and the agent continues. Granting never comes from the server.
+The machine-side access model from `PastasComputador.html`, built in the runner and shown in the app and on the site.
 
-### 9. Updates
+- **Config** (`config.json`, per organization home): `access: { folders: [{ path, agents: [agentId] }], tools: { claude, codex, commands } }`. Defaults for a new pairing from the app: no folders, `claude` on only if the person chose it at first run, `codex` likewise, `commands` off. A terminal pairing keeps today's behaviour (`--no-exec` → `commands` off, otherwise on).
+- **Enforcement in the runner:** a request's paths stay relative to the agent's folder, or may be absolute when inside a folder allowed for that agent (`not_allowed` otherwise; symlinks resolved before checking). `exec` and `shell` tasks need `commands`; `claude`/`codex` tasks and brain turns need their tool. Claude Code and Codex get each allowed folder of that agent (`--add-dir` / Codex's writable roots). System folders (`/`, the home itself, `/System`, `/Library`…) are refused when adding.
+- **Reporting:** `hello.access` and `access.changed` (after any change, from the app, the CLI or a config edit). The server stores the last report per machine (`machines.access`, jsonb) and shows it on the computer page and the agent page; the site can only reduce (`access.reduce`).
+- **Requests:** a tool `request_folder_access { path, reason }` for agents on a connected computer. The server sends `access.request`; the runner answers `pending` (or `granted` when already allowed), keeps the request (24 h) and raises `access.requested` to the app, which shows a macOS notification and the request in the popover. "Liberar" (this agent / all agents) or "Agora não" → `access.decided` (+ `access.changed`). The server posts the outcome in the agent's thread and wakes the agent (as a background task's end does). A request on a machine without the app (terminal) shows the exact `agentes-runner folders allow …` command in the chat card.
+- **CLI:** `agentes-runner folders [list|allow <path> [--agent <handle>]…|remove <path> [--agent <handle>]]` and `agentes-runner tools [list|enable <tool>|disable <tool>]`, editing the same config.
+- Granting never comes from the server.
 
-- Tauri's updater with our own signing key (free, independent of Apple). The private key lives in GitHub secrets; the public key is built into the app. An update whose signature doesn't verify is refused.
-- The app checks every 6 hours. It downloads in the background and installs when the runner reports no op or brain turn in progress (background tasks don't block: they survive the restart), or overnight, or when the person clicks "Instalar agora". "Atualizar sozinho" can be turned off.
-- Since the runner ships inside the app, updating the app updates the runner. If the server ever requires a newer protocol than the runner has, the tray shows "Atualize para continuar" instead of failing silently.
-- **Where updates live.** This repository's CI builds the binaries and publishes them as a GitHub Release here (private). The updater can't read a private release, so our server proxies it: `GET /api/desktop/update/{target}/{arch}/{current}` returns Tauri's manifest (204 when current) and `GET /api/desktop/download/{target}/{arch}/{version}` streams the asset, both reading the release with a fine-grained GitHub token (`DESKTOP_RELEASES_TOKEN`, read-only on this repo's contents). The download page links to the same route. The update signature is checked by the app, so the proxy can't alter what it serves.
+### 9. Updates (manual until we notarize)
+
+- No automatic updater yet: it comes with notarization. Until then an update means quitting the app, deleting the old one and installing the new `.dmg` (the pairing and settings live in `~/.agentes-runner`, so nothing is lost).
+- The app checks `GET /api/desktop/latest?target=darwin&arch=<arch>` every 6 hours and at start: `{ version, url, sha256, notes, publishedAt, minVersion? }`. When newer, the tray shows "Versão nova" and Preferences → Atualizações shows the notes and "Baixar" (opens the download in the browser) with the three steps (quit, delete, install). Below `minVersion`, or when a runner reports `outdated`, it says "Atualize para continuar".
+- **Where builds live.** This repository's CI publishes a GitHub Release (private). The server reads it with a fine-grained token (`DESKTOP_RELEASES_TOKEN`, read-only contents on this repo; without it the endpoints answer 404): `GET /api/desktop/latest` (cached 5 minutes) and `GET /api/desktop/download/{version}/{file}` (streams the asset). The site's download button and the page's SHA-256 come from the same release.
+- Since the runner ships inside the app, installing a new app updates the runner.
 
 ### 10. Distribution without code signing (for now)
 
-- macOS builds are ad-hoc signed only (required on Apple Silicon), not notarized. First launch needs System Settings → Privacy & Security → "Abrir mesmo assim"; the download page shows that step with a screenshot. Updates installed by the app don't carry the quarantine flag and don't ask again.
+- macOS builds are ad-hoc signed only (required on Apple Silicon), not notarized. First launch of each downloaded build needs System Settings → Privacy & Security → "Abrir mesmo assim"; the download page shows that step.
 - Side effect: macOS may ask again for Documents/Desktop/Downloads access after an update, because the ad-hoc identity changes per build. Folders outside those (`~/agentes`, `~/Projects`) never ask. Revisit when we sign.
 - Windows (later): SmartScreen's "Mais informações → Executar assim mesmo" until we sign.
-- CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, sign the update bundle, publish. Nothing runs on a developer's machine; testing means installing the CI build. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).
+- CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, publish a GitHub Release with the SHA-256. Pull requests run the build without publishing. Nothing runs on a developer's machine; testing means installing the CI build. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).
 
 ### 11. Security
 
-- The machine token stays in `config.json` (mode 600, folder 700). The web view never receives it; Tauri capabilities allow only our sidecar, the updater, autostart, notifications, dialogs and opening our own URLs. No general filesystem or shell access from the web view.
+- The machine token stays in `config.json` (mode 600, folder 700). The web view never receives it; Tauri capabilities allow only our sidecar, autostart, notifications, the folder dialog and opening our own URLs. No general filesystem or shell access from the web view.
 - A click in the app is an action on the machine, so the rule "access only widens on the machine" holds. The server can show and reduce, never grant.
 - The control channel exists only between the app and its child.
 - The web view loads only the app's own bundle, with a strict CSP. It never loads agentes.chat or any remote page with access to the app's commands; the site opens in the person's browser.
-- Without Apple notarization, the OS doesn't vouch for the first download: someone could pass around a fake "agentes". The app is downloaded only from agentes.chat over HTTPS, and the page shows the SHA-256 of each build. From then on, updates are verified by our own key.
-- The updater private key is the one secret that could push code to every installed app. It lives only in GitHub secrets (with a passphrase); rotating it means shipping a release signed with the old key that trusts the new one.
+- Without Apple notarization, the OS doesn't vouch for the download: someone could pass around a fake "agentes". The app is downloaded only from agentes.chat over HTTPS, and the page shows the SHA-256 of each build. Signed, verified updates come with notarization.
 - Not new, but now reachable by non-technical people: commands run as the person's OS user (ADR 0030). Safe defaults matter more: no extra folders, commands off, and Claude Code on only when found and chosen at first run.
 
 ### 12. Order
 
-- **v0.1 (Mac):** compiled runner, `agentes-runner app` with the stdio protocol, lock file, adoption of terminal installs, device-code sign-in (server + `/conectar` page), pause (protocol 9), activity log, the app (tray, popover, first run, Preferences without Folders), autostart, updater (server proxy of the private release), several organizations, CI and a download entry in Settings → Computers.
-- **v0.2:** folders and tools on the machine, access requests and notifications.
-- **v0.3:** Windows and Linux (tray quirks, WebView2 visual QA, SmartScreen), then signing and notarization.
+- **v0.1 (Mac):** compiled runner, `agentes-runner app` with the stdio protocol (`packages/adapters/src/runner-control.ts`), lock file, device-code connection for app and terminal (replacing the old code), pause and the `agents` frame (protocol 9), activity log, the app (tray, popover grouped by organization, first run, Preferences), autostart, "Versão nova" check, several organizations, CI and a download entry in Settings → Computers.
+- **v0.2:** folders and tools on the machine (protocol 10), access requests with notifications, the CLI `folders`/`tools`, access shown and reduced on the site.
+- **v0.3:** Windows and Linux (tray quirks, WebView2 visual QA, SmartScreen), then signing, notarization and the automatic updater.
 
 ## Resolved in review (2026-10-17)
 
-- Updates: built and released by this repository's CI (macOS only for now); served through our server because the repo is private (section 9). Notarization later.
+- Updates: built and released by this repository's CI (macOS only for now); served through our server because the repo is private (section 9). Manual (delete the old app, install the new one) until notarization brings the automatic updater.
+- Connecting: one device-code flow for the app and the terminal; the old site-created code goes away (section 5).
 - Several organizations and several agents per computer: yes (section 4b).
 - Pause with brain-engine agents: the agent's existing fallback choice decides (section 6).
 

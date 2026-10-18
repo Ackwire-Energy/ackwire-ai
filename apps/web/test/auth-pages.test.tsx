@@ -235,21 +235,22 @@ describe("Onboarding", () => {
     expect(screen().getByText("Passo 5 de 7 · opcional")).toBeTruthy();
   });
 
-  test("computer: this computer creates a pairing, shows the command and connects live; team invites go out", async () => {
+  test("computer: this computer shows how to connect it (app or terminal) and connects live; team invites go out", async () => {
     const { state, api, services, router } = await start();
     await throughAgents(state);
 
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await click(button(/Este computador ou um servidor/), 8);
-    expect(calls(state, "machines.createPairing")[0]?.args[1]).toEqual({ name: "Meu computador" });
-    expect(document.querySelector(".machine-command__code")?.textContent).toContain(
-      "install.sh | sh -s -- --code K7QM-4XTB",
+    // No code made on the site anymore: the computer makes it and the person confirms on /conectar.
+    expect(calls(state, "machines.createPairing")).toHaveLength(0);
+    expect(document.body.textContent).toContain("O app para Mac ainda não está disponível.");
+    await click(button("Outras formas: servidor ou Linux"), 2);
+    expect(document.querySelector(".machine-command__code")?.textContent).toBe(
+      "curl -fsSL http://localhost:3000/api/machines/install.sh | sh",
     );
-    expect(document.body.textContent).toContain("acrescente --no-exec ao final");
     expect(document.body.textContent).toContain("Esperando o computador conectar…");
-    expect(screen().getByRole("radiogroup", { name: "Sistema" })).toBeTruthy();
 
-    // The runner pairs; the list refreshes (polling, or an invalidation like here).
+    // The computer connects; the list refreshes (polling, or an invalidation like here).
     fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);

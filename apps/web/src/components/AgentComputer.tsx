@@ -19,6 +19,7 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { folderName, foldersOfAgent } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
@@ -449,6 +450,49 @@ export function AgentComputerPanel({
           </span>
         )}
       </div>
+      {target.kind === "machine" && <AgentMachineFolders agentId={agent.id} machineId={target.machineId} />}
+    </div>
+  );
+}
+
+/**
+ * "Pastas no computador" (PastasComputador.html, view "agent"): the folders of
+ * its computer this agent may use beyond its own, as the machine reported them.
+ * Read-only here: granting happens on the computer.
+ */
+function AgentMachineFolders({ agentId, machineId }: { agentId: string; machineId: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const machines = useMachines(org.id);
+  const m = machines.data?.find((x) => x.id === machineId);
+  if (!m) return null;
+  const folders = foldersOfAgent(m.access, agentId);
+  return (
+    <div className="stack-4" style={{ gap: 6 }} data-agent-folders>
+      <span className="newag__label">{t("agentPage.computer.folders")}</span>
+      {!m.access ? (
+        <span className="small muted">
+          {m.canManage
+            ? t("agentPage.computer.foldersUnknown", { machine: m.name })
+            : t("agentPage.computer.foldersHidden", { machine: m.name })}
+        </span>
+      ) : folders.length === 0 ? (
+        <span className="small muted">{t("agentPage.computer.foldersOwn", { machine: m.name })}</span>
+      ) : (
+        <>
+          <span className="small muted">{t("agentPage.computer.foldersMore", { machine: m.name })}</span>
+          <ul className="agent-folders">
+            {folders.map((f) => (
+              <li key={f.path}>
+                <Icon name="drive" size={14} />
+                <span className="machine-folder__name">{folderName(f.path)}</span>
+                <code>{f.path}</code>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <span className="small muted">{t("agentPage.computer.foldersHint")}</span>
     </div>
   );
 }

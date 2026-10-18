@@ -10,14 +10,19 @@ import {
   MIN_RUNNER_PROTOCOL,
   machineRpcReplyTopic,
   machineRpcTopic,
+  PAUSE_PROTOCOL,
   type PubSub,
   parseRunnerFrame,
+  type RunnerAccess,
   type RunnerFrame,
+  type RunnerPause,
   type ServerFrame,
   TASKS_PROTOCOL,
   type Unsubscribe,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, lt, schema } from "@agenteschat/db";
+import { getAgentCached } from "./agents";
+import { applyAccessDecided, storeMachineAccess } from "./machine-access";
 import {
   applyTaskDone,
   applyTaskEvent,
@@ -30,12 +35,17 @@ import {
   type TaskCall,
 } from "./machine-tasks";
 import {
+  assertNotPaused,
   authenticateMachine,
   getMachineById,
   MACHINE_CONTROL_TOPIC,
   MachineOfflineError,
+  machineAgents,
   machineOnline,
+  machineOwnerTimezone,
+  machinePause,
   publishMachineStatus,
+  publishMachineUpdated,
 } from "./machines";
 import { enqueue } from "./outbox";
 
@@ -61,6 +71,13 @@ const { machines, machineRpc } = schema;
  *   the `task.event` and `task.done` frames of the sockets it holds and acks
  *   each `task.done`; `hello` reconciles the runner's journal; a socket that
  *   closes schedules `machine.tasks_offline` after a grace.
+ * - Desktop app (protocols 9 and 10, ADR 0036): the pause (`hello.paused`,
+ *   `runner.state`) and the access report (`hello.access`, `access.changed`)
+ *   are stored on the row and told to the org; a paused machine gets no new
+ *   work (`call` refuses with `MachinePausedError`); every request's `agent`
+ *   carries the agent's name; the `agents` frame goes out after `welcome`
+ *   and again on `machine.agents` (any replica); `access.decided` wakes the
+ *   agent that asked (`machine-access.ts`).
  */
 export interface MachineSocket {
   send(text: string): void;
@@ -106,6 +123,10 @@ export interface MachineStatus {
   protocol: number;
   /** Coding CLIs found at its last hello (protocol 7; empty for older runners). */
   executors: schema.MachineExecutors;
+  /** The owner paused it (protocol 9): `until` null = until resumed; `timezone` is the owner's, for messages. */
+  paused?: { until: string | null; timezone: string | null } | null;
+  /** Folders and tools the machine allows (protocol 10); null when it doesn't report them. */
+  access?: RunnerAccess | null;
 }
 
 /** What the machine provider needs from the hub. */
@@ -137,6 +158,10 @@ export interface MachineConnection {
   lastSeenWrite: number;
   helloTimer: ReturnType<typeof setTimeout> | null;
   pingTimer: ReturnType<typeof setInterval> | null;
+  /** The runner's protocol (from its hello). */
+  protocol: number;
+  /** The pause the runner last reported (protocol 9); null = not paused. */
+  pause: { until: string | null } | null;
 }
 
 export interface MachineHubDeps {
@@ -163,6 +188,32 @@ export function requestTimeoutMs(request: MachineRequest) {
 }
 
 type RpcReply = { ok: true; data: unknown } | { ok: false; error: { code: string; message: string } };
+
+/**
+ * Requests that start something new on the machine: refused while it is
+ * paused (ADR 0036 §6). Following running work (a task's output, canceling
+ * it), cleaning up and reducing access still go through.
+ */
+export function isNewWork(request: MachineRequest) {
+  switch (request.op) {
+    case "task.status":
+    case "task.cancel":
+    case "task.output":
+    case "access.reduce":
+      return false;
+    case "secret":
+      return request.action !== "discard" && request.action !== "remove";
+    default:
+      return true;
+  }
+}
+
+/** The pause in force (a past `until` is over). */
+const pauseActive = (pause: { until: string | null } | null, now = Date.now()) =>
+  Boolean(pause && (!pause.until || Date.parse(pause.until) > now));
+
+const pauseOf = (p: RunnerPause | undefined): { until: string | null } | null =>
+  p?.paused ? { until: p.until ?? null } : null;
 
 /** `machine_rpc` rows older than this are deleted (opportunistically). */
 export const MACHINE_RPC_KEEP_MS = 60 * 60_000;
@@ -240,7 +291,7 @@ export function createMachineHub(deps: MachineHubDeps) {
   const localStarter =
     (conn: MachineConnection): LocalTaskStarter =>
     (input) => {
-      const call: TaskCall = (_machineId, request) => callLocal(conn, request);
+      const call: TaskCall = async (_machineId, request) => callLocal(conn, await withAgentName(conn.orgId, request));
       return startMachineTask({ db, pubsub, call }, input);
     };
 
@@ -279,6 +330,9 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.machineId = machine.id;
     conn.orgId = machine.orgId;
     conn.name = machine.name;
+    conn.protocol = frame.protocol;
+    // Protocol 9: a runner that says nothing about the pause isn't paused.
+    conn.pause = frame.protocol >= PAUSE_PROTOCOL ? pauseOf(frame.paused) : null;
     const old = local.get(machine.id);
     local.set(machine.id, conn);
     if (old && old !== conn) {
@@ -300,12 +354,18 @@ export function createMachineHub(deps: MachineHubDeps) {
         execAllowed: frame.exec,
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
         ...(frame.executors ? { executors: { ...frame.executors, detectedAt: now.toISOString() } } : {}),
+        paused: conn.pause !== null,
+        pausedUntil: conn.pause?.until ? new Date(conn.pause.until) : null,
+        // Protocol 10: what the machine allows (an older runner reports nothing: unknown).
+        access: frame.access ?? null,
         updatedAt: now,
       })
       .where(eq(machines.id, machine.id));
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
     send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
+    // Protocol 9: the agents that use this computer, for the desktop app.
+    if (frame.protocol >= PAUSE_PROTOCOL) await sendAgents(conn);
     conn.pingTimer = setInterval(() => {
       if (Date.now() - conn.lastPong > 3 * heartbeatMs) {
         try {
@@ -316,6 +376,9 @@ export function createMachineHub(deps: MachineHubDeps) {
       send(conn, { type: "ping", at: Date.now() });
     }, heartbeatMs);
     await publishMachineStatus(pubsub, machine.orgId, machine.id, true);
+    if (frame.protocol >= PAUSE_PROTOCOL) {
+      await publishMachineUpdated(pubsub, machine.orgId, machine.id, { paused: conn.pause, access: true });
+    }
     if (frame.protocol >= TASKS_PROTOCOL) {
       await reconcileMachineTasks({ db, pubsub, start: localStarter(conn) }, machine.id, frame.tasks ?? []).catch(
         (error) => deps.log?.warn("task reconcile failed", { machineId: machine.id, error: String(error) }),
@@ -331,6 +394,49 @@ export function createMachineHub(deps: MachineHubDeps) {
           ),
       );
     }
+  }
+
+  /** The `agents` frame (protocol 9): the org's agents pointed at this machine. */
+  async function sendAgents(conn: MachineConnection) {
+    if (!conn.machineId || !conn.orgId || conn.protocol < PAUSE_PROTOCOL) return;
+    const agents = await machineAgents(db, conn.orgId, conn.machineId).catch(() => null);
+    if (agents) send(conn, { type: "agents", agents });
+  }
+
+  /** `runner.state` (protocol 9): paused, resumed or a new `until`; stored and told to the org. */
+  async function runnerState(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "runner.state" }>) {
+    const machineId = conn.machineId as string;
+    const wasPaused = pauseActive(conn.pause);
+    conn.pause = pauseOf(frame.paused);
+    const [row] = await db
+      .update(machines)
+      .set({
+        paused: conn.pause !== null,
+        pausedUntil: conn.pause?.until ? new Date(conn.pause.until) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(machines.id, machineId))
+      .returning({ orgId: machines.orgId });
+    if (!row) return;
+    await publishMachineUpdated(pubsub, row.orgId, machineId, { paused: conn.pause });
+    // Resumed: what waited for this computer goes on (runs waiting for its brain, missions' queued work).
+    if (wasPaused && !pauseActive(conn.pause) && hooks.online) {
+      const online = hooks.online;
+      queueMicrotask(
+        () =>
+          void online(machineId).catch((error) =>
+            deps.log?.warn("resume after pause failed", { machineId, error: String(error) }),
+          ),
+      );
+    }
+  }
+
+  /** Fills `agent.name` (protocol 9, for the machine's activity log) when a caller left it out. */
+  async function withAgentName<R extends MachineRequest>(orgId: string | null, request: R): Promise<R> {
+    const scope = request.agent;
+    if (!scope || scope.name || !orgId) return request;
+    const agent = await getAgentCached(db, orgId, scope.id).catch(() => null);
+    return agent ? { ...request, agent: { ...scope, name: agent.name } } : request;
   }
 
   /** `mcp.call` (protocol 5): run by the missions hook, answered with `mcp.result`; never blocks other frames. */
@@ -574,6 +680,13 @@ export function createMachineHub(deps: MachineHubDeps) {
       } else if (event.type === "machine.rpc.cancel") running.get(rpcId)?.abort();
     }),
     pubsub.subscribe(MACHINE_CONTROL_TOPIC, (event) => {
+      if (event.type === "machine.agents" && typeof event.orgId === "string") {
+        // The org's agents changed: its machines here list them again (outside the publisher's call stack).
+        for (const conn of local.values()) {
+          if (conn.orgId === event.orgId) queueMicrotask(() => void sendAgents(conn).catch(() => undefined));
+        }
+        return;
+      }
       if (event.type !== "machine.revoke" || typeof event.machineId !== "string") return;
       const conn = local.get(event.machineId);
       if (!conn) return;
@@ -602,6 +715,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         lastSeenWrite: 0,
         helloTimer: null,
         pingTimer: null,
+        protocol: 0,
+        pause: null,
       };
       conn.helloTimer = setTimeout(() => {
         if (!conn.machineId) refuse(conn, "invalid_token", "No hello in time.", MACHINE_CLOSE.timeout);
@@ -644,6 +759,18 @@ export function createMachineHub(deps: MachineHubDeps) {
         await taskDone(conn, frame).catch((error) =>
           deps.log?.warn("task.done failed", { taskId: frame.taskId, error: String(error) }),
         );
+      } else if (frame.type === "runner.state") {
+        await runnerState(conn, frame).catch((error) =>
+          deps.log?.warn("runner.state failed", { machineId: conn.machineId, error: String(error) }),
+        );
+      } else if (frame.type === "access.changed") {
+        await storeMachineAccess({ db, pubsub }, conn.machineId, frame.access).catch((error) =>
+          deps.log?.warn("access.changed failed", { machineId: conn.machineId, error: String(error) }),
+        );
+      } else if (frame.type === "access.decided") {
+        await applyAccessDecided({ db, pubsub }, conn.machineId, frame).catch((error) =>
+          deps.log?.warn("access.decided failed", { requestId: frame.requestId, error: String(error) }),
+        );
       }
     },
 
@@ -657,13 +784,22 @@ export function createMachineHub(deps: MachineHubDeps) {
       options: MachineCallOptions = {},
     ): Promise<MachineReplies[Op]> {
       const conn = local.get(machineId);
-      if (conn) return callLocal(conn, request, options);
+      if (conn) {
+        // Paused (ADR 0036 §6): nothing new starts; the row says until when, in whose time zone.
+        if (isNewWork(request) && pauseActive(conn.pause)) {
+          const row = await getMachineById(db, machineId);
+          if (row) await assertNotPaused(db, row);
+        }
+        return callLocal(conn, await withAgentName(conn.orgId, request), options);
+      }
       const row = await getMachineById(db, machineId);
       if (!row || row.deletedAt) throw new MachineOfflineError(row?.name ?? "computer");
       if (!machineOnline(row) || !row.connectedReplica || row.connectedReplica === replicaId) {
         throw new MachineOfflineError(row.name);
       }
-      return callRemote({ ...row, connectedReplica: row.connectedReplica }, request, options);
+      if (isNewWork(request)) await assertNotPaused(db, row);
+      const named = await withAgentName(row.orgId, request);
+      return callRemote({ ...row, connectedReplica: row.connectedReplica }, named, options);
     },
 
     /** The machine as tools see it: online here, or online (and recently seen) on another replica. */
@@ -671,6 +807,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       const row = await getMachineById(db, machineId);
       if (!row || row.deletedAt) return null;
       const online = local.has(machineId) || (machineOnline(row) && row.connectedReplica !== replicaId);
+      const pause = machinePause(row);
       return {
         id: row.id,
         orgId: row.orgId,
@@ -680,6 +817,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         os: row.os,
         protocol: row.protocol,
         executors: row.executors ?? {},
+        paused: pause ? { until: pause.until, timezone: await machineOwnerTimezone(db, row).catch(() => null) } : null,
+        access: row.access ?? null,
       };
     },
 

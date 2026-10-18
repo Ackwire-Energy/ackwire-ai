@@ -1,0 +1,95 @@
+/**
+ * Activity across organizations: each runner keeps its own log (newest first, paged with `before`),
+ * and "Todas" shows them merged. A page asks every home for `limit` entries before its own cursor,
+ * merges them by time and keeps the newest `limit`; each home's cursor moves to the last entry of
+ * it that was shown, so what wasn't shown comes again on the next page.
+ */
+import type { ActivityEntry } from "@agenteschat/adapters/runner-control";
+
+export interface HomeEntry extends ActivityEntry {
+  homeId: string;
+}
+
+export interface HomeCursor {
+  /** `at` of the last entry shown from this home; absent: start from the newest. */
+  before?: string;
+  /** This home may have older entries. */
+  more: boolean;
+}
+
+export type ActivityCursor = Record<string, HomeCursor>;
+
+export interface HomePage {
+  homeId: string;
+  entries: ActivityEntry[];
+  more: boolean;
+}
+
+export const startCursor = (homeIds: readonly string[]): ActivityCursor =>
+  Object.fromEntries(homeIds.map((id) => [id, { more: true }]));
+
+/** The homes worth asking for the next page. */
+export const homesToFetch = (cursor: ActivityCursor): string[] =>
+  Object.entries(cursor)
+    .filter(([, c]) => c.more)
+    .map(([id]) => id);
+
+export const hasMore = (cursor: ActivityCursor) => Object.values(cursor).some((c) => c.more);
+
+const time = (at: string) => {
+  const t = Date.parse(at);
+  return Number.isFinite(t) ? t : 0;
+};
+
+/** Merges one page from several homes: the newest `limit` entries and the cursor for the next page. */
+export function mergePages(
+  pages: readonly HomePage[],
+  cursor: ActivityCursor,
+  limit: number,
+): { entries: HomeEntry[]; cursor: ActivityCursor } {
+  const all: HomeEntry[] = pages.flatMap((p) => p.entries.map((e) => ({ ...e, homeId: p.homeId })));
+  all.sort((a, b) => time(b.at) - time(a.at));
+  const shown = all.slice(0, Math.max(0, limit));
+  const next: ActivityCursor = { ...cursor };
+  for (const p of pages) {
+    const mine = shown.filter((e) => e.homeId === p.homeId);
+    const last = mine[mine.length - 1];
+    const leftOver = p.entries.length > mine.length;
+    next[p.homeId] = {
+      before: last ? last.at : cursor[p.homeId]?.before,
+      more: p.more || leftOver,
+    };
+  }
+  return { entries: shown, cursor: next };
+}
+
+export type DayKey = "today" | "yesterday" | "date";
+
+export interface DayGroup<T> {
+  key: string;
+  kind: DayKey;
+  /** Local midnight of that day. */
+  day: Date;
+  entries: T[];
+}
+
+const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** Groups entries (already newest first) by local day: Hoje, Ontem, then dates. */
+export function groupByDay<T extends { at: string }>(entries: readonly T[], now: Date = new Date()): DayGroup<T>[] {
+  const today = midnight(now).getTime();
+  const yesterday = midnight(new Date(today - 12 * 60 * 60 * 1000)).getTime();
+  const groups: DayGroup<T>[] = [];
+  for (const e of entries) {
+    const day = midnight(new Date(time(e.at)));
+    const key = `${day.getFullYear()}-${day.getMonth() + 1}-${day.getDate()}`;
+    let g = groups[groups.length - 1];
+    if (!g || g.key !== key) {
+      const t = day.getTime();
+      g = { key, kind: t === today ? "today" : t === yesterday ? "yesterday" : "date", day, entries: [] };
+      groups.push(g);
+    }
+    g.entries.push(e);
+  }
+  return groups;
+}

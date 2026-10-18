@@ -35,4 +35,6 @@ export interface AppExtras {
   gitProxy?: GitProxyDeps;
   /** Revokes Apple tokens when an account is deleted (ADR 0035); absent/null = Apple sign-in off. */
   appleRevoke?: AppleTokenRevoker | null;
+  /** Outbound HTTP to GitHub for the desktop app's releases (ADR 0036; tests inject a fake GitHub). */
+  desktopFetch?: typeof fetch;
 }

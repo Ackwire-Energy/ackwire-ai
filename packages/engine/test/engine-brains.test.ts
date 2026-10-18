@@ -12,7 +12,6 @@ import {
   clearPlanLimits,
   computerBrainUnavailable,
   createJobHandlers,
-  createMachinePairing,
   createMissionEngine,
   decideApproval,
   drainOutbox,
@@ -24,12 +23,12 @@ import {
   type MachineStatus,
   notePlanLimit,
   postPersonMessage,
-  redeemMachinePairing,
   resumeRunsWaitingForMachine,
   runWhere,
   type ToolSource,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 /**
@@ -70,8 +69,7 @@ const statusOf = (machineId: string, over: Partial<MachineStatus> = {}): Machine
 /** Pairs a computer and makes it the agent's, thinking with Claude Code. */
 async function computerAgent(fx: Fixture, over: Partial<typeof schema.agents.$inferInsert> = {}) {
   const deps = { db: fx.db, pubsub: fx.pubsub, publicUrl: "https://agentes.chat" };
-  const { code } = await createMachinePairing(deps, fx.owner.id, fx.org.id, { name: "MacBook" });
-  const paired = await redeemMachinePairing(deps, { code, ...RUNNER, exec: true });
+  const paired = await pairMachine(deps, fx.owner.id, fx.org.id, { name: "MacBook", ...RUNNER, exec: true });
   await fx.db
     .update(schema.agents)
     .set({ machineId: paired.machineId, brain: "claude_code", ...over })

@@ -1,0 +1,108 @@
+import { appendFileSync, closeSync, mkdirSync, openSync, readSync, renameSync, rmSync, statSync } from "node:fs";
+import path from "node:path";
+
+/**
+ * Append-only files that rotate by size (ADR 0036 §3 and §7): the runner's
+ * log in app mode (`<home>/logs/runner.log`) and the activity log
+ * (`<home>/activity.jsonl`). When a file would pass `maxBytes` it becomes
+ * `<name>.1<ext>`, the older ones move up, and at most `keep` files remain
+ * (the oldest is deleted).
+ */
+
+export const ROTATE_BYTES = 5 * 1024 * 1024;
+export const ROTATE_KEEP = 3;
+
+/** `runner.log`, 2 → `runner.2.log`; 0 is the file itself. */
+export function rotatedName(file: string, index: number): string {
+  if (index === 0) return file;
+  const ext = path.extname(file);
+  return `${file.slice(0, file.length - ext.length)}.${index}${ext}`;
+}
+
+export class RotatingFile {
+  private size: number | null = null;
+
+  constructor(
+    readonly file: string,
+    private readonly maxBytes = ROTATE_BYTES,
+    private readonly keep = ROTATE_KEEP,
+  ) {}
+
+  /** Every file, newest first (only the ones that exist). */
+  files(): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < this.keep; i++) {
+      const f = rotatedName(this.file, i);
+      try {
+        statSync(f);
+        out.push(f);
+      } catch {
+        // not there
+      }
+    }
+    return out;
+  }
+
+  append(text: string) {
+    const bytes = Buffer.byteLength(text);
+    if (this.size === null) {
+      mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 });
+      try {
+        this.size = statSync(this.file).size;
+      } catch {
+        this.size = 0;
+      }
+    }
+    if (this.size > 0 && this.size + bytes > this.maxBytes) this.rotate();
+    appendFileSync(this.file, text, { mode: 0o600 });
+    this.size += bytes;
+  }
+
+  private rotate() {
+    rmSync(rotatedName(this.file, this.keep - 1), { force: true });
+    for (let i = this.keep - 2; i >= 0; i--) {
+      try {
+        renameSync(rotatedName(this.file, i), rotatedName(this.file, i + 1));
+      } catch {
+        // that one didn't exist
+      }
+    }
+    this.size = 0;
+  }
+}
+
+/** The last `lines` lines of a file (reads at most `maxBytes` from its end). */
+export function tailLines(file: string, lines: number, maxBytes = 256 * 1024): string[] {
+  let fd: number | undefined;
+  try {
+    const size = statSync(file).size;
+    const start = Math.max(0, size - maxBytes);
+    const buf = Buffer.alloc(size - start);
+    fd = openSync(file, "r");
+    const n = readSync(fd, buf, 0, buf.length, start);
+    let text = buf.subarray(0, n).toString("utf8");
+    if (start > 0) text = text.slice(text.indexOf("\n") + 1);
+    return text.split("\n").filter(Boolean).slice(-lines);
+  } catch {
+    return [];
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+/**
+ * Masks what looks like a credential in free text (diagnostics, the
+ * activity log): machine tokens, bearer headers, common API key shapes,
+ * `password=`/`token=` values. The agent's own secrets are masked by their
+ * values (ADR 0027) before this.
+ */
+export function redactCommon(text: string): string {
+  return text
+    .replace(/\bagm_[A-Za-z0-9_-]{6,}/g, "agm_***")
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, "$1 ***")
+    .replace(/\b(sk-(?:ant-)?[A-Za-z0-9_-]{12,})/g, "sk-***")
+    .replace(/\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, "gh_***")
+    .replace(/\b(xox[abposr]-[A-Za-z0-9-]{10,})/g, "xox-***")
+    .replace(/\b(AKIA[0-9A-Z]{16})\b/g, "AKIA***")
+    .replace(/((?:password|passwd|secret|token|api[_-]?key)\s*[=:]\s*)("[^"]*"|'[^']*'|\S+)/gi, "$1***");
+}

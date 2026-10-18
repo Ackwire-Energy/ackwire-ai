@@ -43,7 +43,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { SandboxSection } from "@/components/AgentComputer";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ErrorState, LoadingList } from "@/components/Loading";
-import { MachinesSection } from "@/components/Machines";
+import { MachinePage, MachinesSection } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { SkillsSection } from "@/components/Skills";
@@ -95,10 +95,13 @@ export function SettingsPage({
   section = "general",
   connected,
   review,
+  machineId,
 }: {
   section?: SettingsSection;
   connected?: string;
   review?: boolean;
+  /** Computadores → one computer (`/settings/computers/{id}`). */
+  machineId?: string;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -147,7 +150,7 @@ export function SettingsPage({
         {current === "keys" && <KeysSection />}
         {current === "storage" && <StorageSection />}
         {current === "sandbox" && <SandboxSection />}
-        {current === "computers" && <MachinesSection />}
+        {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <MachinesSection />)}
         {current === "usage" && <UsageSection />}
       </div>
     </div>

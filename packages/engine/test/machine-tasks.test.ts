@@ -3,7 +3,6 @@ import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapter
 import { and, eq, schema } from "@agenteschat/db";
 import {
   createMachineHub,
-  createMachinePairing,
   drainOutbox,
   grantScopes,
   interruptOfflineMachineTasks,
@@ -11,12 +10,12 @@ import {
   type MachineHub,
   postPersonMessage,
   RESUME_PROMPT,
-  redeemMachinePairing,
   setAgentComputerTarget,
   startMachineTask,
   taskNotice,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 const hubs: MachineHub[] = [];
@@ -94,8 +93,7 @@ function taskRunner(hub: MachineHub, options: { noSlot?: boolean } = {}) {
 }
 
 async function pairedMachine() {
-  const { code } = await createMachinePairing(deps(), f.owner.id, f.org.id, { name: "MacBook" });
-  const paired = await redeemMachinePairing(deps(), { code, ...RUNNER, exec: true });
+  const paired = await pairMachine(deps(), f.owner.id, f.org.id, { name: "MacBook", ...RUNNER, exec: true });
   await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
   await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
   return paired;

@@ -11,7 +11,7 @@ import {
 import { type Database, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
-import { MachineOfflineError } from "../machines";
+import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 
@@ -61,12 +61,12 @@ export interface ClaudeCodeBrainDeps {
   finalGraceMs?: number;
 }
 
-/** The agent's id and handle, as the runner names its folder. */
+/** The agent's id and handle, as the runner names its folder (and its name, for the machine's activity log). */
 export const agentScopeFromDb =
   (db: Database) =>
   async (turn: BrainTurn): Promise<AgentScope> => {
     const agent = await getAgentCached(db, turn.orgId, turn.agentId);
-    return { id: turn.agentId, handle: agent?.handle ?? "agent" };
+    return { id: turn.agentId, handle: agent?.handle ?? "agent", ...(agent ? { name: agent.name } : {}) };
   };
 
 /**
@@ -94,6 +94,9 @@ const err = (code: string, message: string, retryable: boolean): BrainEvent => (
 export function claudeCodeAvailability(status: MachineStatus | null): BrainEvent | null {
   if (!status) return err("machine_offline", "The agent's computer is not connected to the organization.", true);
   if (!status.online) return err("machine_offline", `Claude Code on ${status.name} is offline.`, true);
+  if (status.paused) {
+    return err("machine_paused", pausedMessage(status.name, status.paused.until, status.paused.timezone), true);
+  }
   if (!status.execAllowed) return err("exec_disabled", `Commands are turned off on ${status.name}.`, true);
   if (status.protocol < BRAIN_PROTOCOL) {
     return err(
@@ -113,6 +116,7 @@ export function claudeCodeAvailability(status: MachineStatus | null): BrainEvent
 /** A failed `brain.turn` request as the turn's error. */
 export function claudeCodeCallError(error: unknown): BrainEvent {
   if (error instanceof MachineOfflineError) return err("machine_offline", error.message, true);
+  if (error instanceof MachinePausedError) return err("machine_paused", error.message, true);
   if (error instanceof MachineRequestError) {
     switch (error.code) {
       case "canceled":

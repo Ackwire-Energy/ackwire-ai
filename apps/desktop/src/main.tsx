@@ -1,0 +1,60 @@
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { I18nextProvider } from "react-i18next";
+import "./styles.css";
+import { AppProvider } from "./app";
+import { DesktopStore } from "./control/store";
+import { DevFrame } from "./dev/DevFrame";
+import { readPref } from "./hooks";
+import { createFakeHost } from "./host/fake";
+import { createTauriHost, inTauri } from "./host/tauri";
+import { type Host, WINDOW_NAMES, type WindowName } from "./host/types";
+import { createDesktopI18n } from "./i18n";
+import { ToastProvider } from "./ui/Toast";
+import { baseName } from "./ui/time";
+import { WindowView } from "./WindowView";
+
+const params = new URLSearchParams(window.location.search);
+const asked = params.get("window");
+const fakeHost = inTauri()
+  ? null
+  : createFakeHost(
+      (WINDOW_NAMES as readonly string[]).includes(asked ?? "") ? (asked as WindowName) : "popover",
+      params.get("scenario") === "first" ? "first" : "default",
+    );
+const host: Host = fakeHost ?? createTauriHost();
+
+const i18n = createDesktopI18n();
+document.documentElement.lang = i18n.language;
+
+// Light or dark like the Mac.
+const dark = window.matchMedia("(prefers-color-scheme: dark)");
+const applyTheme = () => {
+  document.documentElement.dataset.theme = dark.matches ? "dark" : "light";
+};
+applyTheme();
+dark.addEventListener("change", applyTheme);
+
+const store = new DesktopStore(host, {
+  // Only the popover window raises notifications (every window has its own store).
+  onAccessRequested: (home, request) => {
+    if (host.window !== "popover" || !readPref("notify", true)) return;
+    const title = i18n.t("desktop.tray.notifTitle", { agent: request.agent.name, folder: baseName(request.path) });
+    const org = home.status?.org?.name;
+    void host.notify(title, org ? `${org} · ${request.reason}` : request.reason).catch(() => {});
+  },
+});
+store.start();
+
+const root = document.getElementById("root");
+if (root) {
+  createRoot(root).render(
+    <StrictMode>
+      <I18nextProvider i18n={i18n}>
+        <AppProvider host={host} store={store}>
+          <ToastProvider>{fakeHost ? <DevFrame host={fakeHost} /> : <WindowView name={host.window} />}</ToastProvider>
+        </AppProvider>
+      </I18nextProvider>
+    </StrictMode>,
+  );
+}

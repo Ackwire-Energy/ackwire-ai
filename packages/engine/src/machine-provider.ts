@@ -9,12 +9,25 @@ import {
   SECRETS_PROTOCOL,
 } from "@agenteschat/adapters";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
-import { MachineOfflineError } from "./machines";
+import { MachineOfflineError, MachinePausedError } from "./machines";
 
 /** Provider id of connected machines; their computer id is the machine id. */
 export const MACHINE_PROVIDER_ID = "machine";
 
 const MB = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
+
+/**
+ * A runner's `not_allowed` (protocol 10): the path is outside every folder
+ * this agent may use on the machine, or the tool is off there. Points the
+ * agent at `request_folder_access` for a folder.
+ */
+export function notAllowedMessage(name: string, detail: string, path?: string) {
+  return `${detail || "Not allowed on this computer."} ${
+    path && /^(\/|~|[A-Za-z]:)/.test(path)
+      ? `${path} is outside the folders you may use on ${name}: ask its owner for it with request_folder_access (path and a short reason), or work inside your own folder.`
+      : `On ${name}, only the person at the computer can allow folders or turn tools on: for a folder outside your own, ask with request_folder_access; for a tool that is off, tell the people.`
+  }`;
+}
 
 /** Runner error codes → what the agent reads (and tells the people). */
 function explain(error: unknown, name: string, path?: string): Error {
@@ -34,6 +47,12 @@ function explain(error: unknown, name: string, path?: string): Error {
       );
     case "not_found":
       return new Error(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
+    case "not_allowed":
+      return new Error(notAllowedMessage(name, error.message, path));
+    case "paused":
+      return new Error(
+        `The owner paused the computer ${name}: nothing new can start there until they resume it. Tell the people.`,
+      );
     case "timeout":
     case "canceled":
       return new Error(error.message);
@@ -55,7 +74,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
     try {
       return await fn();
     } catch (error) {
-      if (error instanceof MachineOfflineError) throw error;
+      if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
       throw explain(error, await nameOf(id), path);
     }
   };

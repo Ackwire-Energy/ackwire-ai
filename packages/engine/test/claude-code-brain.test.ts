@@ -17,7 +17,6 @@ import {
   claudeCodeAvailability,
   createClaudeCodeBrain,
   createJobHandlers,
-  createMachinePairing,
   drainOutbox,
   listMessages,
   type MachineCallOptions,
@@ -26,10 +25,10 @@ import {
   type MachineStatus,
   postPersonMessage,
   recordPlanUsage,
-  redeemMachinePairing,
   restatesReaction,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture | undefined;
 afterEach(async () => {
@@ -261,7 +260,6 @@ test("end to end through the real hub: the runner's brain.event frames reach the
   const hub = fx.machineHub;
   if (!hub) throw new Error("no hub");
   const deps = { db: fx.db, pubsub: fx.pubsub, publicUrl: "https://agentes.chat" };
-  const { code } = await createMachinePairing(deps, fx.owner.id, fx.org.id, { name: "MacBook" });
   const RUNNER = {
     hostname: "mac",
     os: "darwin" as const,
@@ -270,7 +268,7 @@ test("end to end through the real hub: the runner's brain.event frames reach the
     protocol: MACHINE_PROTOCOL_VERSION,
     workspace: "/Users/w/agentes",
   };
-  const paired = await redeemMachinePairing(deps, { code, ...RUNNER, exec: true });
+  const paired = await pairMachine(deps, fx.owner.id, fx.org.id, { name: "MacBook", ...RUNNER, exec: true });
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const conn = hub.open({
     send(text: string) {
@@ -367,7 +365,6 @@ test("live text end to end: the runner's partial deltas reach the channel as age
   const hub = fx.machineHub;
   if (!hub) throw new Error("no hub");
   const deps = { db: fx.db, pubsub: fx.pubsub, publicUrl: "https://agentes.chat" };
-  const { code } = await createMachinePairing(deps, fx.owner.id, fx.org.id, { name: "MacBook" });
   const RUNNER = {
     hostname: "mac",
     os: "darwin" as const,
@@ -376,7 +373,7 @@ test("live text end to end: the runner's partial deltas reach the channel as age
     protocol: MACHINE_PROTOCOL_VERSION,
     workspace: "/Users/w/agentes",
   };
-  const paired = await redeemMachinePairing(deps, { code, ...RUNNER, exec: true });
+  const paired = await pairMachine(deps, fx.owner.id, fx.org.id, { name: "MacBook", ...RUNNER, exec: true });
   await fx.db
     .update(schema.agents)
     .set({ machineId: paired.machineId, brain: "claude_code" })

@@ -1,0 +1,505 @@
+/**
+ * An in-browser runner for design work (`bun run dev`, ADR 0036 §10): it speaks the same control
+ * protocol as `agentes-runner app` (packages/adapters/src/runner-control.ts) with realistic data
+ * (two organizations, agents at work, a folder request), so every screen can be seen without the
+ * Tauri shell. Never part of the real app's behaviour: the host picks it only outside Tauri.
+ */
+import type { RunnerAccess, RunnerPause } from "@agenteschat/adapters/machine-protocol";
+import {
+  type ActivityEntry,
+  CONTROL_PROTOCOL_VERSION,
+  type ControlAccessRequest,
+  type ControlAgent,
+  type ControlConfig,
+  type ControlEvent,
+  type ControlJob,
+  type ControlOut,
+  type ControlStatus,
+  parseControlIn,
+} from "@agenteschat/adapters/runner-control";
+
+const SERVER = "https://agentes.chat";
+const VERSION = "0.1.0";
+const MACHINE_PROTOCOL = 10;
+
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+const rid = () => Math.random().toString(36).slice(2, 10);
+
+export interface FakeOrgSeed {
+  org: { id: string; name: string };
+  slug: string;
+  agents: ControlAgent[];
+  jobs: ControlJob[];
+  access: RunnerAccess;
+  activity: ActivityEntry[];
+  requests: ControlAccessRequest[];
+}
+
+const agent = (id: string, name: string, color: string, eyes: string, accessory: string): ControlAgent => ({
+  id,
+  handle: name.toLowerCase(),
+  name,
+  look: { color, eyes, accessory },
+});
+
+export const ACME_AGENTS = [
+  agent("ag_dev", "Dev", "indigo", "wide", "headphones"),
+  agent("ag_bento", "Bento", "amber", "round", "cap"),
+  agent("ag_ada", "Ada", "green", "happy", "none"),
+];
+export const HIMETRICA_AGENTS = [
+  agent("ag_lia", "Lia", "rose", "round", "flower"),
+  agent("ag_nino", "Nino", "teal", "dots", "beanie"),
+];
+
+const who = (a: ControlAgent | undefined) => (a ? { id: a.id, name: a.name } : undefined);
+
+export function acmeSeed(): FakeOrgSeed {
+  const [dev, bento, ada] = ACME_AGENTS;
+  return {
+    org: { id: "org_acme", name: "Acme" },
+    slug: "acme",
+    agents: ACME_AGENTS,
+    jobs: [
+      {
+        id: "j1",
+        agent: who(dev),
+        kind: "exec",
+        summary: "Rodando os testes",
+        where: "viajolo-v5",
+        command: "bun test",
+        startedAt: minutesAgo(2),
+      },
+      {
+        id: "j2",
+        agent: who(bento),
+        kind: "write",
+        summary: "Escrevendo o roteiro",
+        where: "Roteiros",
+        startedAt: minutesAgo(0),
+      },
+    ],
+    access: {
+      folders: [
+        { path: "/Users/voce/Projects/Personal/viajolo-v5", agents: ["ag_dev"] },
+        { path: "/Users/voce/Documents/Roteiros", agents: ["ag_bento"] },
+      ],
+      tools: { claude: true, codex: false, commands: true },
+    },
+    activity: [
+      {
+        at: minutesAgo(2),
+        agent: who(dev),
+        kind: "command",
+        summary: "bun test",
+        command: "bun test",
+        where: "viajolo-v5",
+        result: "running",
+      },
+      {
+        at: minutesAgo(4),
+        agent: who(bento),
+        kind: "file",
+        summary: "write roteiro-curitiba.md",
+        where: "Roteiros",
+        result: "running",
+      },
+      { at: minutesAgo(43), kind: "access", summary: "Roteiros allowed for Bento", result: "ok" },
+      {
+        at: minutesAgo(82),
+        agent: who(ada),
+        kind: "command",
+        summary: "git diff main…feat/checkout",
+        command: "git diff main…feat/checkout",
+        where: "viajolo-v5",
+        result: "ok",
+      },
+      {
+        at: minutesAgo(60 * 22),
+        agent: who(bento),
+        kind: "access",
+        summary: "asked for Notas: refused",
+        result: "refused",
+      },
+      ...Array.from({ length: 40 }, (_, i) => ({
+        at: minutesAgo(60 * 26 + i * 37),
+        agent: who(i % 2 ? dev : ada),
+        kind: "file" as const,
+        summary: `read src/file-${i}.ts`,
+        where: "viajolo-v5",
+        result: "ok" as const,
+      })),
+    ],
+    requests: [
+      {
+        requestId: "req_1",
+        agent: { id: "ag_bento", name: "Bento" },
+        path: "/Users/voce/Projects/Personal/viajolo-v5/roteiros",
+        reason: "Preciso dos roteiros que estão no viajolo-v5 para montar o vídeo de Curitiba.",
+        at: minutesAgo(1),
+        expiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+      },
+    ],
+  };
+}
+
+export function himetricaSeed(): FakeOrgSeed {
+  const [lia, nino] = HIMETRICA_AGENTS;
+  return {
+    org: { id: "org_himetrica", name: "Himetrica" },
+    slug: "himetrica",
+    agents: HIMETRICA_AGENTS,
+    jobs: [
+      {
+        id: "j3",
+        agent: who(lia),
+        kind: "task",
+        summary: "Build do site",
+        where: "site",
+        command: "bun run build",
+        startedAt: minutesAgo(12),
+        background: true,
+      },
+    ],
+    access: {
+      folders: [{ path: "/Users/voce/Projects/Himetrica/site", agents: ["ag_lia", "ag_nino"] }],
+      tools: { claude: true, codex: false, commands: true },
+    },
+    activity: [
+      {
+        at: minutesAgo(12),
+        agent: who(lia),
+        kind: "task",
+        summary: "bun run build",
+        command: "bun run build",
+        where: "site",
+        result: "running",
+      },
+      {
+        at: minutesAgo(60 * 20),
+        agent: who(nino),
+        kind: "command",
+        summary: "bun test: 2 of 148 failed",
+        command: "bun test",
+        where: "site",
+        result: "failed",
+      },
+      { at: minutesAgo(60 * 23), kind: "pair", summary: "connected to Himetrica", result: "ok" },
+    ],
+    requests: [],
+  };
+}
+
+/** Organizations a fake sign-in can land in, in order. */
+const SIGN_IN_POOL: (() => FakeOrgSeed)[] = [
+  acmeSeed,
+  himetricaSeed,
+  () => ({
+    org: { id: `org_${rid()}`, name: "Estúdio Norte" },
+    slug: "estudio-norte",
+    agents: [agent("ag_iris", "Íris", "violet", "round", "bow")],
+    jobs: [],
+    access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+    activity: [],
+    requests: [],
+  }),
+];
+
+const DEFAULT_CONFIG = { maxConcurrentTasks: 3, taskMaxSeconds: 4 * 3600, brainIdleMinutes: 10, brainMaxProcesses: 3 };
+
+export class FakeRunner {
+  private seed: FakeOrgSeed | null;
+  private paused: RunnerPause = { paused: false };
+  private connection: ControlStatus["connection"];
+  private config: ControlConfig;
+  private timers: ReturnType<typeof setTimeout>[] = [];
+  private pairTimers: ReturnType<typeof setTimeout>[] = [];
+  private tick: ReturnType<typeof setInterval> | null = null;
+  private machineName = "MacBook de Você";
+
+  constructor(
+    readonly homeId: string,
+    seed: FakeOrgSeed | null,
+    private readonly out: (line: string) => void,
+    private readonly signInIndex: () => number,
+  ) {
+    this.seed = seed;
+    this.connection = seed ? "online" : "unpaired";
+    this.config = {
+      ...DEFAULT_CONFIG,
+      name: this.machineName,
+      workspace: `/Users/voce/agentes/${seed?.slug ?? "nova"}`,
+      managedBy: "desktop",
+    };
+  }
+
+  start() {
+    this.write({
+      type: "hello",
+      control: CONTROL_PROTOCOL_VERSION,
+      version: VERSION,
+      protocol: MACHINE_PROTOCOL,
+      home: `/Users/voce/.agentes-runner/orgs/${this.homeId}`,
+    });
+    this.tick = setInterval(() => this.simulate(), 7000);
+  }
+
+  stop() {
+    for (const t of [...this.timers, ...this.pairTimers]) clearTimeout(t);
+    if (this.tick) clearInterval(this.tick);
+  }
+
+  /** Dev controls: flip the connection to see the offline banner. */
+  setOnline(online: boolean) {
+    if (!this.seed) return;
+    this.connection = online ? "online" : "offline";
+    this.emit({ kind: "status", status: this.status() });
+  }
+
+  /** Dev controls: an agent asks for a folder now. */
+  raiseRequest() {
+    const s = this.seed;
+    const a = s?.agents[0];
+    if (!s || !a) return;
+    const request: ControlAccessRequest = {
+      requestId: `req_${rid()}`,
+      agent: { id: a.id, name: a.name },
+      path: "/Users/voce/Documents/Notas",
+      reason: "Quero ler as notas da reunião de ontem para escrever o resumo.",
+      at: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+    };
+    s.requests.push(request);
+    this.emit({ kind: "access.requested", request });
+  }
+
+  handle(line: string) {
+    const msg = parseControlIn(line);
+    if (!msg) return;
+    const reply = (data: unknown) => this.later(() => this.write({ type: "reply", id: msg.id, ok: true, data }), 120);
+    const fail = (
+      code: "not_paired" | "already_paired" | "invalid_path" | "not_found" | "bad_request",
+      message: string,
+    ) => this.later(() => this.write({ type: "reply", id: msg.id, ok: false, error: { code, message } }), 120);
+    const s = this.seed;
+    switch (msg.type) {
+      case "status":
+        return reply(this.status());
+      case "jobs":
+        return reply({ jobs: s?.jobs ?? [] });
+      case "pause":
+        this.paused = { paused: true, until: msg.until };
+        this.emit({ kind: "status", status: this.status() });
+        return reply({ paused: this.paused });
+      case "resume":
+        this.paused = { paused: false };
+        this.emit({ kind: "status", status: this.status() });
+        return reply({ paused: this.paused });
+      case "activity": {
+        const all = (s?.activity ?? [])
+          .filter((e) => !msg.agentId || e.agent?.id === msg.agentId)
+          .filter((e) => !msg.before || Date.parse(e.at) < Date.parse(msg.before))
+          .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+        const limit = msg.limit ?? 50;
+        return reply({ entries: all.slice(0, limit), more: all.length > limit });
+      }
+      case "config.get":
+        return reply(this.config);
+      case "config.set":
+        this.config = { ...this.config, ...msg.patch };
+        if (msg.patch.name) this.machineName = msg.patch.name;
+        this.emit({ kind: "status", status: this.status() });
+        return reply(this.config);
+      case "pair.start": {
+        if (s) return fail("already_paired", "already paired");
+        reply({ started: true });
+        const code = Array.from(
+          { length: 6 },
+          () => "ABCDEFGHJKMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)],
+        ).join("");
+        this.pairTimers.push(
+          setTimeout(
+            () =>
+              this.emit({
+                kind: "pair.code",
+                userCode: code,
+                verificationUrl: `${SERVER}/conectar?code=${code}`,
+                expiresAt: new Date(Date.now() + 600_000).toISOString(),
+              }),
+            500,
+          ),
+          setTimeout(() => {
+            const make = SIGN_IN_POOL[Math.min(this.signInIndex(), SIGN_IN_POOL.length - 1)] ?? acmeSeed;
+            const seed = make();
+            seed.jobs = [];
+            seed.requests = [];
+            this.seed = seed;
+            this.connection = "online";
+            this.config.workspace = `/Users/voce/agentes/${seed.slug}`;
+            this.emit({
+              kind: "pair.done",
+              org: seed.org,
+              machine: { id: `m_${this.homeId}`, name: this.machineName },
+            });
+            this.emit({ kind: "status", status: this.status() });
+          }, 5500),
+        );
+        return;
+      }
+      case "pair.cancel": {
+        const had = this.pairTimers.length > 0;
+        for (const t of this.pairTimers) clearTimeout(t);
+        this.pairTimers = [];
+        return reply({ canceled: had });
+      }
+      case "unpair":
+        this.seed = null;
+        this.connection = "unpaired";
+        this.emit({ kind: "status", status: this.status() });
+        return reply({ unpaired: true });
+      case "diagnostics":
+        return reply({
+          text: `agentes ${VERSION}\nmacOS 15.1 arm64\nhome ${this.homeId}\nconnection ${this.connection}\n(no secrets)`,
+        });
+      case "access.get":
+        return s ? reply(s.access) : fail("not_paired", "not paired");
+      case "folders.add": {
+        if (!s) return fail("not_paired", "not paired");
+        if (
+          !msg.path.startsWith("/") ||
+          msg.path === "/" ||
+          msg.path === "/Users/voce" ||
+          msg.path.startsWith("/System")
+        )
+          return fail("invalid_path", "system folder");
+        const found = s.access.folders.find((f) => f.path === msg.path);
+        if (found) found.agents = [...new Set([...found.agents, ...msg.agents])];
+        else s.access.folders.push({ path: msg.path, agents: [...msg.agents] });
+        return this.accessChanged(reply);
+      }
+      case "folders.remove": {
+        if (!s) return fail("not_paired", "not paired");
+        if (msg.agentId) {
+          const f = s.access.folders.find((x) => x.path === msg.path);
+          if (f) f.agents = f.agents.filter((a) => a !== msg.agentId);
+        } else s.access.folders = s.access.folders.filter((f) => f.path !== msg.path);
+        return this.accessChanged(reply);
+      }
+      case "folders.setAgents": {
+        if (!s) return fail("not_paired", "not paired");
+        const f = s.access.folders.find((x) => x.path === msg.path);
+        if (!f) return fail("not_found", "no such folder");
+        f.agents = [...msg.agents];
+        return this.accessChanged(reply);
+      }
+      case "tools.set":
+        if (!s) return fail("not_paired", "not paired");
+        s.access.tools = { ...s.access.tools, [msg.tool]: msg.on };
+        return this.accessChanged(reply);
+      case "access.pending":
+        return reply({ requests: s?.requests ?? [] });
+      case "access.answer": {
+        if (!s) return fail("not_paired", "not paired");
+        const r = s.requests.find((x) => x.requestId === msg.requestId);
+        if (!r) return fail("not_found", "no such request");
+        s.requests = s.requests.filter((x) => x !== r);
+        if (msg.decision === "granted") {
+          const agents = msg.scope === "all" ? s.agents.map((a) => a.id) : [r.agent.id];
+          const f = s.access.folders.find((x) => x.path === r.path);
+          if (f) f.agents = [...new Set([...f.agents, ...agents])];
+          else s.access.folders.push({ path: r.path, agents });
+        }
+        this.emit({ kind: "access.resolved", requestId: r.requestId, decision: msg.decision });
+        this.emit({ kind: "access.changed", access: s.access });
+        return reply({ access: s.access });
+      }
+      case "shutdown":
+        return reply({ stopping: true });
+    }
+  }
+
+  private accessChanged(reply: (data: unknown) => void) {
+    const access = this.seed?.access;
+    if (!access) return;
+    this.emit({ kind: "access.changed", access });
+    reply(access);
+  }
+
+  private status(): ControlStatus {
+    const s = this.seed;
+    return {
+      paired: !!s,
+      server: SERVER,
+      org: s?.org,
+      machine: s ? { id: `m_${this.homeId}`, name: this.machineName } : undefined,
+      connection: this.connection,
+      version: VERSION,
+      protocol: MACHINE_PROTOCOL,
+      paused: this.paused,
+      executors: { claude: { version: "2.1.4 (Claude Code)", loggedIn: true, authMethod: "claude.ai", plan: "max" } },
+      workspace: this.config.workspace,
+      agents: s?.agents ?? [],
+      access: s?.access,
+    };
+  }
+
+  /** Agents come and go: a job finishes, another starts. */
+  private simulate() {
+    const s = this.seed;
+    if (!s || this.connection !== "online" || this.paused.paused) return;
+    const fg = s.jobs.filter((j) => !j.background);
+    if (fg.length > 0 && Math.random() < 0.5) {
+      const done = fg[0];
+      if (!done) return;
+      s.jobs = s.jobs.filter((j) => j !== done);
+      this.emit({ kind: "job.finished", jobId: done.id, result: "ok" });
+      this.emit({
+        kind: "activity",
+        entry: {
+          at: new Date().toISOString(),
+          agent: done.agent,
+          kind: "command",
+          summary: done.summary,
+          where: done.where,
+          command: done.command,
+          result: "ok",
+        },
+      });
+      return;
+    }
+    const a = s.agents[Math.floor(Math.random() * s.agents.length)];
+    if (!a) return;
+    const folder = s.access.folders[0]?.path.split("/").pop() ?? s.slug;
+    const options = [
+      { kind: "read" as const, summary: "Lendo o README", command: undefined },
+      { kind: "exec" as const, summary: "Rodando os testes", command: "bun test" },
+      { kind: "write" as const, summary: "Escrevendo notas.md", command: undefined },
+    ];
+    const o = options[Math.floor(Math.random() * options.length)] ?? options[0];
+    if (!o) return;
+    const job: ControlJob = {
+      id: `j_${rid()}`,
+      agent: { id: a.id, name: a.name },
+      kind: o.kind,
+      summary: o.summary,
+      where: folder,
+      command: o.command,
+      startedAt: new Date().toISOString(),
+    };
+    s.jobs.push(job);
+    this.emit({ kind: "job.started", job });
+  }
+
+  private emit(event: ControlEvent) {
+    this.later(() => this.write({ type: "event", event }), 40);
+  }
+
+  private write(out: ControlOut) {
+    this.out(JSON.stringify(out));
+  }
+
+  private later(fn: () => void, ms: number) {
+    this.timers.push(setTimeout(fn, ms));
+    if (this.timers.length > 200) this.timers = this.timers.slice(-100);
+  }
+}

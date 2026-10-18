@@ -15,7 +15,13 @@ const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 const key = (el: Element | Window, k: string, extra: KeyboardEventInit = {}) =>
   act(async () => fireEvent.keyDown(el, { key: k, ...extra }));
-const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+/** Minutes ago, squeezed into today (same order) when the suite runs soon after midnight. */
+const ago = (m: number) => {
+  const now = Date.now();
+  const sinceMidnight = (now - new Date().setHours(0, 0, 0, 0)) / 60_000 - 1;
+  const k = sinceMidnight < 120 ? Math.max(0, sinceMidnight) / 120 : 1;
+  return new Date(now - m * k * 60_000).toISOString();
+};
 const yesterdayNoon = () => {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12).toISOString();
@@ -295,5 +301,25 @@ describe("Notificações", () => {
     await go(seedState({ notifications: [] }));
     expect(document.body.textContent).toContain("Tudo em dia");
     expect((screen().getByRole("button", { name: "Marcar tudo como lido" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe("a new computer connected (ADR 0036, admins)", () => {
+  test("who connected which computer; Abrir goes to the computer's page", async () => {
+    const connected = notification({
+      id: "n-machine",
+      kind: "machine_connected",
+      actors: [{ type: "user", id: "u-joao" }],
+      source: { machineId: "m-9", label: "MacBook do João" },
+      latest: {},
+      updatedAt: ago(3),
+    });
+    const { router } = await go(seedState({ notifications: [connected] }));
+    const row = document.querySelector('[data-n="n-machine"]') as HTMLElement;
+    expect(row.textContent).toContain("João conectou o computador MacBook do João");
+    expect(row.textContent).toContain("Computador");
+    await click(within(row).getByRole("button", { name: "Abrir" }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
   });
 });

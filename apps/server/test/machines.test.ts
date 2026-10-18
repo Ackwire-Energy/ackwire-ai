@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { ARTIFACT_LIMITS, createUpload } from "@agenteschat/engine";
-import { browser, createTestServer, listen, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 let server: ReturnType<typeof listen> | null = null;
@@ -15,8 +15,8 @@ const RUNNER = { hostname: "box", os: "linux", arch: "x64", version: "0.1.0", pr
 
 /** The runner's own calls: no cookie, no Origin. */
 const runnerCall = (path: string, init: RequestInit = {}) => t.app.request(path, init);
-const pairCall = (body: unknown, ip = "203.0.113.7") =>
-  runnerCall("/api/machines/pair", {
+const runnerPost = (path: string, body: unknown, ip = "203.0.113.7") =>
+  runnerCall(path, {
     method: "POST",
     headers: { "content-type": "application/json", "x-forwarded-for": ip },
     body: JSON.stringify(body),
@@ -29,38 +29,79 @@ async function start() {
   const seeded = await seedOrg(owner);
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${seeded.orgId}${path}`, init);
-  const pair = async (name = "Build box") => {
-    const res = await api("/machines/pairings", { json: { name } });
-    expect(res.status).toBe(201);
-    const pairing = (await res.json()) as { code: string; expiresAt: string; installCommand: string };
-    const paired = await pairCall({ code: pairing.code, ...RUNNER, exec: true });
-    expect(paired.status).toBe(200);
-    return { pairing, ...((await paired.json()) as { machineId: string; name: string; token: string }) };
-  };
+  const pair = (name = "Build box") => pairComputer(t, api, { ...RUNNER, exec: true }, { name });
   return { owner, api, pair, ...seeded };
 }
 
-test("pairing over HTTP: code and install command, single use, same error for any bad code, rate limited", async () => {
-  const { api, pair } = await start();
-  const { pairing, machineId, name, token } = await pair();
-  expect(pairing.code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
-  expect(pairing.installCommand).toBe(`curl -fsSL ${ORIGIN}/api/machines/install.sh | sh -s -- --code ${pairing.code}`);
-  expect(name).toBe("Build box");
-  expect(token).toStartWith("agm_");
+test("connecting over HTTP: code, confirm page, confirm, the token once; errors in the device-flow shape", async () => {
+  const { owner, api, orgId } = await start();
+  const started = await runnerPost("/api/machines/device", { name: "Build box", ...RUNNER });
+  expect(started.status).toBe(200);
+  const code = (await started.json()) as { deviceCode: string; userCode: string; verificationUrl: string };
+  expect(code).toMatchObject({ expiresIn: 600, interval: 3 });
+  expect(code.verificationUrl).toBe(`${ORIGIN}/conectar?code=${code.userCode}`);
 
-  const again = await pairCall({ code: pairing.code, ...RUNNER, exec: true });
-  expect(again.status).toBe(400);
-  expect(((await again.json()) as { error: { code: string } }).error.code).toBe("machine.pairing_invalid");
+  const poll = () => runnerPost("/api/machines/device/token", { deviceCode: code.deviceCode });
+  const pending = await poll();
+  expect(pending.status).toBe(400);
+  expect(await pending.json()).toEqual({ error: "authorization_pending" });
+  expect(await (await poll()).json()).toEqual({ error: "slow_down" });
 
-  const list = (await (await api("/machines")).json()) as { machines: { id: string; name: string; online: boolean }[] };
-  expect(list.machines).toEqual([expect.objectContaining({ id: machineId, name: "Build box", online: false })]);
+  // The confirm page needs a session; it shows what asked.
+  expect((await runnerCall(`/api/app/machines/device/${code.userCode}`)).status).toBe(401);
+  const view = await owner(`/api/app/machines/device/${code.userCode}`);
+  expect(view.status).toBe(200);
+  expect(await view.json()).toMatchObject({ name: "Build box", hostname: "box", os: "linux", approxLocation: null });
+  expect((await owner("/api/app/machines/device/AAAAAA")).status).toBe(404);
 
-  // 10 a minute per address.
+  // CSRF: another origin can't confirm.
+  const cross = await api(`/machines/device/${code.userCode}/confirm`, { json: {}, origin: "https://evil.example" });
+  expect(cross.status).toBe(403);
+  const confirmed = await api(`/machines/device/${code.userCode}/confirm`, { json: { name: "Servidor" } });
+  expect(confirmed.status).toBe(201);
+  const machine = (await confirmed.json()) as { id: string; name: string; paused: unknown; access: unknown };
+  expect(machine).toMatchObject({ name: "Servidor", paused: null, access: null, agents: [] });
+
+  const token = await poll();
+  expect(token.status).toBe(200);
+  const body = (await token.json()) as { token: string; machineId: string; org: { id: string } };
+  expect(body).toMatchObject({ machineId: machine.id, name: "Servidor", org: { id: orgId, name: "Acme" } });
+  expect(body.token).toStartWith("agm_");
+  expect(await (await poll()).json()).toEqual({ error: "expired_token" });
+
+  const list = (await (await api("/machines")).json()) as { machines: { id: string; online: boolean }[] };
+  expect(list.machines).toEqual([expect.objectContaining({ id: machine.id, name: "Servidor", online: false })]);
+  // The old pairing is gone.
+  expect((await api("/machines/pairings", { json: { name: "x" } })).status).toBe(404);
+  expect((await runnerPost("/api/machines/pair", { code: "AAAA-BBBB" })).status).toBe(404);
+});
+
+test("\"it wasn't me\", outsiders can't confirm, and new codes are rate limited per address", async () => {
+  const { api, orgId } = await start();
+  const denied = (await (await runnerPost("/api/machines/device", { name: "x", ...RUNNER })).json()) as {
+    deviceCode: string;
+    userCode: string;
+  };
+  const stranger = browser(t);
+  await signUp(stranger, "zed@example.com");
+  // Signed in but not a member: can deny a code shown to them, never connect it to someone else's org.
+  const outsider = await stranger(`/api/app/organizations/${orgId}/machines/device/${denied.userCode}/confirm`, {
+    json: {},
+  });
+  expect(outsider.status).toBe(403);
+  const deny = await stranger(`/api/app/machines/device/${denied.userCode}/deny`, { method: "POST", json: {} });
+  expect(deny.status).toBe(204);
+  expect(await (await runnerPost("/api/machines/device/token", { deviceCode: denied.deviceCode })).json()).toEqual({
+    error: "access_denied",
+  });
+  expect((await api(`/machines/device/${denied.userCode}/confirm`, { json: {} })).status).toBe(404);
+
+  // 10 new codes a minute per address (and at most 10 pending).
   const statuses: number[] = [];
-  for (let i = 0; i < 11; i++)
-    statuses.push((await pairCall({ code: "AAAA-BBBB", ...RUNNER, exec: true }, "198.51.100.1")).status);
-  expect(statuses.slice(0, 10).every((s) => s === 400)).toBe(true);
+  for (let i = 0; i < 11; i++) statuses.push((await runnerPost("/api/machines/device", RUNNER, "198.51.100.1")).status);
+  expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
   expect(statuses[10]).toBe(429);
+  expect((await runnerPost("/api/machines/device", RUNNER, "198.51.100.2")).status).toBe(200);
 });
 
 test("install.sh is served without a session, never cached", async () => {

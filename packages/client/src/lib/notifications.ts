@@ -204,11 +204,17 @@ export type OpenTarget =
   | { to: "/org/$orgId/forum/$topicId"; params: { topicId: string } }
   | { to: "/org/$orgId/approvals" }
   | { to: "/org/$orgId/routines" }
-  | { to: "/org/$orgId/threads"; search: { tab: "missions" } };
+  | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
+  | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
+  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" } };
 
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
   if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
+  if (n.kind === "machine_connected")
+    return s.machineId
+      ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
+      : { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   if (s.topicId) return { to: "/org/$orgId/forum/$topicId", params: { topicId: s.topicId } };
   if (s.issueNumber != null) return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) } };
   if (n.kind === "routine_finished" || n.kind === "routine_failed") return { to: "/org/$orgId/routines" };

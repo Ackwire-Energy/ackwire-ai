@@ -1,4 +1,5 @@
 import {
+  ACCESS_PROTOCOL,
   type ExecRequest,
   type ExecResult,
   type NetworkMode,
@@ -25,7 +26,9 @@ import {
 import { recordAudit } from "./audit";
 import { getChannelCached } from "./context";
 import { publishChannelEvent } from "./events";
+import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
+import { notAllowedMessage } from "./machine-provider";
 import {
   enqueueWake,
   formatDuration,
@@ -39,7 +42,7 @@ import {
   taskSeconds,
   taskThreadOf,
 } from "./machine-tasks";
-import { MachineOfflineError } from "./machines";
+import { MachineOfflineError, pausedMessage } from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
 import {
   agentComputerInfo,
@@ -234,13 +237,36 @@ export function computerSentence(info: ComputerInfo, network: Network) {
     info.online
       ? "It is online now."
       : "It is offline now: calls fail until its owner starts the runner; tell the people.",
+    info.paused
+      ? `${pausedMessage(info.name, info.paused.until, info.paused.timezone)} Tell the people when they ask for work there.`
+      : "",
     info.execAllowed ? "" : "Commands are turned off on it (files and uploads only).",
+    info.folders.length > 0
+      ? `Besides your own folder, its owner allowed you these folders (use their absolute paths): ${info.folders.slice(0, 20).join(", ")}.`
+      : "",
+    info.protocol >= ACCESS_PROTOCOL
+      ? "Paths outside your folder (and those) are refused; ask for another folder with request_folder_access."
+      : "",
     info.execAllowed
       ? "When asked about something on it, find out yourself before answering: run the tool's CLI in a non-interactive form (--help, --json, -p) or a tool made for that question (e.g. `npx ccusage` sums Claude Code's token use and cost from its local session logs). A command that only works interactively is not a dead end: look for another way to the same data. Never read or show credential files, tokens, keys or .env files, even when you can reach them. Hand work back to the person only when it truly needs them (a sign-in, a password, a screen only they can see), and then say exactly what to do."
       : "",
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+/**
+ * A file tool's path: relative to the agent's folder, or absolute on a
+ * connected computer that grants folders (protocol 10), where the runner
+ * checks it against the folders allowed for this agent (`not_allowed`).
+ */
+export function toolPath(raw: string, info: ComputerInfo): string {
+  const path = raw.trim();
+  if (info.kind === "machine" && info.protocol >= ACCESS_PROTOCOL && isAbsoluteMachinePath(path)) {
+    if (path.replace(/\\/g, "/").split("/").includes("..")) throw new Error(`invalid path: ${raw}`);
+    return path;
+  }
+  return workspacePath(raw);
 }
 
 const networkOf = (mode: string | undefined): Network => ({
@@ -704,7 +730,7 @@ export function createSandboxToolSource(
           }
           const name = str(input.name);
           const file = input.target === "file";
-          const path = file ? workspacePath(str(input.path)) : "";
+          const path = file ? toolPath(str(input.path), computerInfo) : "";
           if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {
             return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };
           }
@@ -813,7 +839,7 @@ export function createSandboxToolSource(
       },
       async execute(input, ctx) {
         try {
-          const path = workspacePath(str(input.path));
+          const path = toolPath(str(input.path), computerInfo);
           if (!path) return { content: "path is required", isError: true };
           const data = new TextEncoder().encode(str(input.content));
           await run(ctx, 30, (c) => c.provider.writeFile(c.id, path, data));
@@ -835,7 +861,7 @@ export function createSandboxToolSource(
       },
       async execute(input, ctx) {
         try {
-          const path = workspacePath(str(input.path));
+          const path = toolPath(str(input.path), computerInfo);
           const data = await run(ctx, 30, async (c) => {
             await refuseSecretPath(ctx, c, path);
             return c.provider.readFile(c.id, path);
@@ -860,7 +886,7 @@ export function createSandboxToolSource(
       },
       async execute(input, ctx) {
         try {
-          const path = workspacePath(str(input.path));
+          const path = toolPath(str(input.path), computerInfo);
           const files = await run(ctx, 30, (c) => c.provider.listFiles(c.id, path, 3));
           const shown = files.filter((f) => !f.path.startsWith(".agentes/") && f.path !== ".agentes").slice(0, 300);
           if (shown.length === 0) return { content: `${path || "workspace"}: empty.` };
@@ -892,7 +918,7 @@ export function createSandboxToolSource(
       },
       async execute(input, ctx) {
         try {
-          const path = workspacePath(str(input.path));
+          const path = toolPath(str(input.path), computerInfo);
           const data = await run(ctx, 30, async (c) => {
             await refuseSecretPath(ctx, c, path);
             return c.provider.readFile(c.id, path);
@@ -940,7 +966,7 @@ export function createSandboxToolSource(
       describe: (input) => ({ title: `Send ${str(input.path)} to the Drive` }),
       async execute(input, ctx) {
         try {
-          const path = workspacePath(str(input.path));
+          const path = toolPath(str(input.path), computerInfo);
           if (!path) return { content: "path is required (a file or folder inside the workspace)", isError: true };
           const targetArtifactId = str(input.artifact_id) || null;
           if (targetArtifactId) {
@@ -992,13 +1018,13 @@ export function createSandboxToolSource(
           if (!file) {
             // An uploaded file: its bytes as they are, under its original name.
             const raw = await readFileArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
-            const path = workspacePath(str(input.path)) || `imports/${cleanFileName(raw.name)}`;
+            const path = toolPath(str(input.path), computerInfo) || `imports/${cleanFileName(raw.name)}`;
             await run(ctx, 60, (c) => c.provider.writeFile(c.id, path, raw.bytes));
             return {
               content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.bytes.byteLength)}).`,
             };
           }
-          const path = workspacePath(str(input.path)) || `imports/${slug(a.title)}.${file.ext}`;
+          const path = toolPath(str(input.path), computerInfo) || `imports/${slug(a.title)}.${file.ext}`;
           const data = new TextEncoder().encode(file.text);
           await run(ctx, 30, (c) => c.provider.writeFile(c.id, path, data));
           return { content: `Copied "${a.title}" (v${a.version}) to ${path} (${data.byteLength} bytes).` };
@@ -1033,7 +1059,7 @@ export function createSandboxToolSource(
           const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, str(input.skill));
           if (!skill) return { content: `No skill named ${str(input.skill)} is enabled for you.`, isError: true };
           const files = await skillFolderFiles(skillDeps(ctx), skill);
-          const target = files.find((f) => f.path === workspacePath(str(input.path)));
+          const target = files.find((f) => f.path === toolPath(str(input.path), computerInfo));
           if (target?.status !== "script") {
             return { content: `${str(input.path)} is not a script of ${skill.name}.`, isError: true };
           }
@@ -1174,6 +1200,13 @@ export function createSandboxToolSource(
           if (error instanceof MachineRequestError && error.code === "no_slot") {
             return { content: `Not started: ${error.message}.`, isError: true, data: { code: "task.no_slot" } };
           }
+          if (error instanceof MachineRequestError && error.code === "not_allowed") {
+            return {
+              content: `Not started: ${notAllowedMessage(info.name, error.message)}`,
+              isError: true,
+              data: { code: "machine.not_allowed" },
+            };
+          }
           if (error instanceof MachineRequestError && error.code !== "timeout" && error.code !== "canceled") {
             return { content: `Not started: ${error.message}`, isError: true };
           }
@@ -1297,6 +1330,49 @@ export function createSandboxToolSource(
     },
   ];
 
+  /**
+   * `request_folder_access` (ADR 0036 §8, protocol 10): asks the person at the
+   * computer for a folder outside the agent's own. Never blocks: granted at
+   * once when already allowed, else the agent is woken here when they answer.
+   */
+  const folderAccessTool = (info: Extract<ComputerInfo, { kind: "machine" }>): ToolDefinition => ({
+    name: "request_folder_access",
+    description: `Ask the owner of the connected computer "${info.name}" to let you use a folder outside your own folder (a project, documents). They answer on that computer; only they can allow it. Give its absolute path and a short reason in the people's language. Returns at once: if it is already allowed you can use it now; otherwise you are woken in this conversation when they answer, so tell the people you asked and end your turn (don't retry or wait).`,
+    scope: SANDBOX_SCOPE,
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", minLength: 1, maxLength: 1024, description: "Absolute path of the folder there" },
+        reason: { type: "string", minLength: 1, maxLength: 500, description: "Why you need it, in a sentence" },
+      },
+      required: ["path", "reason"],
+      additionalProperties: false,
+    },
+    describe: (input) => ({ title: `Ask for the folder ${str(input.path)}`, detail: str(input.reason).slice(0, 500) }),
+    async execute(input, ctx) {
+      try {
+        const result = await requestFolderAccess(
+          { db: ctx.db, pubsub: deps.pubsub, hub: hubOf() },
+          ctx,
+          info.machineId,
+          { path: str(input.path), reason: str(input.reason) },
+        );
+        if (result.status === "granted") {
+          return {
+            content: `${result.path} is already allowed for you on ${info.name}: use it now with its absolute path.`,
+            data: { requestId: result.requestId, status: "granted" },
+          };
+        }
+        return {
+          content: `Asked the owner of ${info.name} for ${result.path}; they decide on that computer. You will be woken in this conversation when they answer: tell the people you asked (and why) and end your turn.`,
+          data: { requestId: result.requestId, status: "pending" },
+        };
+      } catch (error) {
+        return failed(error);
+      }
+    },
+  });
+
   const build = (
     requireApproval: boolean,
     execTimeout: number,
@@ -1306,6 +1382,9 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     ...baseTools(requireApproval, execTimeout, network, computerInfo, sessionId),
     ...(computerInfo.kind === "machine" && tasksOn(computerInfo) ? taskTools(requireApproval, computerInfo) : []),
+    ...(computerInfo.kind === "machine" && computerInfo.protocol >= ACCESS_PROTOCOL
+      ? [folderAccessTool(computerInfo)]
+      : []),
   ];
 
   return {
@@ -1332,6 +1411,7 @@ export function createSandboxToolSource(
           "list_tasks",
           "task_status",
           "cancel_task",
+          "request_folder_access",
         ].some((n) => keys.has(grantKey(null, toolAllowScope(n))));
       if (!granted) return withNotices(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);

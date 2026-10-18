@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t.close());
@@ -83,15 +83,8 @@ async function workspace() {
   return { ...seeded, api, asBia };
 }
 
-async function pairMac(api: (path: string, init?: Parameters<ReturnType<typeof browser>>[1]) => Promise<Response>) {
-  const pairing = (await (await api("/machines/pairings", { json: { name: "mac" } })).json()) as { code: string };
-  return (await (
-    await t.app.request("/api/machines/pair", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
-      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
-    })
-  ).json()) as { machineId: string; token: string };
+function pairMac(api: (path: string, init?: Parameters<ReturnType<typeof browser>>[1]) => Promise<Response>) {
+  return pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
 }
 
 test("agent brain: defaults, who may, the plan warning, what the computer has, model and fallback", async () => {

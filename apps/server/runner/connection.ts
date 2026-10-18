@@ -5,7 +5,7 @@ import {
   type RunnerFrame,
   type RunnerInfo,
 } from "@agenteschat/adapters/machine-protocol";
-import { type HandlerContext, handleRequest, RequestRunner } from "./handlers";
+import { type HandlerContext, handleRequest, type RequestObserver, RequestRunner } from "./handlers";
 import type { McpBridge } from "./mcp";
 
 export const BACKOFF_MIN_MS = 1_000;
@@ -84,7 +84,8 @@ export interface ConnectionOptions {
   /** `wss://…/api/machines/connect`. */
   url: string;
   token: string;
-  info: RunnerInfo;
+  /** What `hello` says; a function is asked again for each `hello` (pause and access change over time). */
+  info: RunnerInfo | (() => RunnerInfo);
   context: HandlerContext;
   dial?: Dial;
   log?: (line: string) => void;
@@ -101,8 +102,14 @@ export interface ConnectionOptions {
   mcp?: Pick<McpBridge, "attach" | "detach" | "result"> & Partial<Pick<McpBridge, "tools">>;
   /** Protocol 7: the coding CLIs on the machine, looked up for each `hello` (cached by the caller). */
   executors?: () => RunnerInfo["executors"];
-  /** Called after each `welcome`. */
+  /** Called after each `welcome` (frames sent from here on reach the server). */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
+  /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
+  onAgents?: (agents: unknown) => void;
+  /** The socket's state: dialing, welcomed, or down (reconnecting). */
+  onState?: (state: "connecting" | "online" | "offline") => void;
+  /** Sees every request start and end (the desktop app's jobs, the activity log). */
+  observer?: RequestObserver;
 }
 
 interface SessionEnd {
@@ -120,10 +127,24 @@ export class RunnerConnection {
   private stopped = false;
   private endSession?: () => void;
   private wake?: () => void;
+  /** The welcomed session's sender (null while connecting or down). */
+  private live: ((frame: RunnerFrame) => void) | null = null;
   private readonly log: (line: string) => void;
 
   constructor(private readonly opts: ConnectionOptions) {
     this.log = opts.log ?? (() => {});
+  }
+
+  /** Whether a session is welcomed right now. */
+  get online() {
+    return this.live !== null;
+  }
+
+  /** Sends a frame on the welcomed session; false when not connected (the next `hello` carries the state). */
+  send(frame: RunnerFrame): boolean {
+    if (!this.live) return false;
+    this.live(frame);
+    return true;
   }
 
   async run(): Promise<ConnectionOutcome> {
@@ -179,18 +200,27 @@ export class RunnerConnection {
           // closing; the session ends on `close`
         }
       };
-      const runner = new RequestRunner(opts.context, send, log, opts.handler ?? handleRequest);
+      const runner = new RequestRunner(
+        opts.context,
+        send,
+        log,
+        opts.handler ?? handleRequest,
+        undefined,
+        opts.observer,
+      );
       const tasks = opts.tasks ?? opts.context.tasks;
 
       const end = () => {
         if (finished) return;
         finished = true;
         if (watchdog) clearTimeout(watchdog);
+        if (this.live === send) this.live = null;
         runner.close();
         tasks?.detach();
         opts.mcp?.detach();
         socket?.close();
         this.endSession = undefined;
+        opts.onState?.("offline");
         resolve({ welcomed, outcome });
       };
       const arm = () => {
@@ -213,11 +243,16 @@ export class RunnerConnection {
             if (typeof frame.heartbeatMs === "number" && frame.heartbeatMs > 0) heartbeatMs = frame.heartbeatMs;
             log(`connected as ${frame.name}`);
             arm();
+            this.live = send;
+            opts.onState?.("online");
             opts.onWelcome?.({ machineId: frame.machineId, name: frame.name, heartbeatMs });
             tasks?.attach(send);
             opts.mcp?.attach(send);
             return;
           }
+          case "agents":
+            opts.onAgents?.(frame.agents);
+            return;
           case "mcp.result":
             opts.mcp?.result(frame);
             return;
@@ -249,6 +284,7 @@ export class RunnerConnection {
       };
 
       this.endSession = end;
+      opts.onState?.("connecting");
       try {
         socket = (opts.dial ?? webSocketDial)(opts.url, {
           onOpen: () => {
@@ -256,7 +292,7 @@ export class RunnerConnection {
               send({
                 type: "hello",
                 token: opts.token,
-                ...opts.info,
+                ...(typeof opts.info === "function" ? opts.info() : opts.info),
                 ...(opts.executors ? { executors: opts.executors() ?? {} } : {}),
                 ...(tasks ? { tasks: tasks.list() } : {}),
               }),

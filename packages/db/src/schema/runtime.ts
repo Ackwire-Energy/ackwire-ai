@@ -661,6 +661,51 @@ export const machineTasks = pgTable(
 );
 
 /**
+ * An agent's request for a folder on its connected computer (ADR 0036 §8,
+ * `request_folder_access`). The person decides on the machine; the runner
+ * reports `access.decided`, and the server posts the outcome in the thread
+ * the request came from and wakes the agent there (`woke_at`, once).
+ */
+export const machineAccessRequests = pgTable(
+  "machine_access_requests",
+  {
+    /** Also the runner's request id. */
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    /** Where the agent asked: the outcome is posted there and wakes it there. */
+    channelId: uuid().notNull(),
+    /** The thread; null = the main timeline (a flat DM). */
+    threadRootId: uuid(),
+    runId: uuid().references(() => agentRuns.id, { onDelete: "set null" }),
+    /** The person the agent worked for (the woken run's audience). */
+    requestedByUserId: text(),
+    /** Absolute path on the machine, as the agent asked for it. */
+    path: text().notNull(),
+    reason: text().notNull().default(""),
+    /** `pending`, `granted`, `denied`, `expired` or `failed` (never reached the machine). */
+    status: text().notNull().default("pending"),
+    /** `agent` or `all` when granted. */
+    scope: text(),
+    decidedAt: timestamp({ withTimezone: true }),
+    /** The outcome was posted and the agent woken (the `machine.access_decided` job ran). */
+    wokeAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index().on(t.machineId, t.status),
+    index().on(t.orgId, t.agentId, t.createdAt),
+  ],
+);
+
+/**
  * Tokens of the runner's `agentes` MCP bridge (ADR 0032): issued when a
  * computer-brain run or a mission task starts, bound to the org, agent,
  * machine and that run (or task). The runner sends it with every tool call;

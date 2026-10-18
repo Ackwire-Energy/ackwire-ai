@@ -30,6 +30,8 @@ import type {
   Credential,
   CustomConnectStart,
   CustomServer,
+  DesktopRelease,
+  DeviceRequest,
   DirectMessage,
   ForumPost,
   ForumSuggestion,
@@ -44,7 +46,7 @@ import type {
   Issue,
   IssueActivity,
   Machine,
-  MachinePairing,
+  MachineAccess,
   MachineTask,
   Me,
   Member,
@@ -394,13 +396,26 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     machines: {
       list: async (orgId) => (await request<{ machines: Machine[] }>(`${org(orgId)}/machines`)).machines,
-      createPairing: (orgId, input) => request<MachinePairing>(`${org(orgId)}/machines/pairings`, { json: input }),
       rename: (orgId, machineId, name) =>
         request<{ id: string; name: string }>(`${org(orgId)}/machines/${enc(machineId)}`, {
           method: "PATCH",
           json: { name },
         }),
       remove: (orgId, machineId) => request<void>(`${org(orgId)}/machines/${enc(machineId)}`, { method: "DELETE" }),
+      device: (userCode) => request<DeviceRequest>(`/api/app/machines/device/${enc(userCode)}`),
+      confirmDevice: (orgId, userCode, input) =>
+        request<Machine>(`${org(orgId)}/machines/device/${enc(userCode)}/confirm`, { json: input }),
+      denyDevice: (userCode) => request<void>(`/api/app/machines/device/${enc(userCode)}/deny`, { json: {} }),
+      reduceAccess: async (orgId, machineId, input) => {
+        const out = await request<MachineAccess | { access: MachineAccess }>(
+          `${org(orgId)}/machines/${enc(machineId)}/access/reduce`,
+          { json: input },
+        );
+        // The new access, bare or wrapped.
+        return "access" in out ? out.access : out;
+      },
+      desktopLatest: (target, arch) =>
+        nullOn(404, () => request<DesktopRelease>("/api/desktop/latest", { query: { target, arch } })),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

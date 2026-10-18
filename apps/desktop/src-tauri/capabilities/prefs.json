@@ -1,0 +1,19 @@
+{
+  "identifier": "prefs",
+  "description": "Preferences: name, organizations, folders, tools, updates, activity, limits.",
+  "windows": ["prefs"],
+  "permissions": [
+    "core:default",
+    "allow-runners-list",
+    "allow-runner-send",
+    "allow-runner-remove",
+    "allow-open-external",
+    "allow-reveal-folder",
+    "allow-pick-folder",
+    "allow-show-window",
+    "allow-hide-window",
+    "allow-app-info",
+    "allow-autostart-get",
+    "allow-autostart-set"
+  ]
+}

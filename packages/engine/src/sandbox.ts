@@ -24,7 +24,7 @@ import {
 import { gitAccess } from "./git/proxy";
 import type { MachineCaller } from "./machine-hub";
 import { createMachineSandboxProvider } from "./machine-provider";
-import { type ComputerTarget, computerTarget, MachineOfflineError } from "./machines";
+import { type ComputerTarget, computerTarget, MachineOfflineError, MachinePausedError } from "./machines";
 import { missionOfRun } from "./mission-context";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -537,9 +537,16 @@ export async function withSandbox<T>(
     if (!mission.machineId) {
       throw new SandboxUnavailableError("This mission has no computer yet: its owner chooses one first.");
     }
-    return withMachine(deps, ctx, { machineId: mission.machineId, handle: agent?.handle ?? "agent" }, fn);
+    return withMachine(
+      deps,
+      ctx,
+      { machineId: mission.machineId, handle: agent?.handle ?? "agent", name: agent?.name },
+      fn,
+    );
   }
-  if (agent?.machineId) return withMachine(deps, ctx, { machineId: agent.machineId, handle: agent.handle }, fn);
+  if (agent?.machineId) {
+    return withMachine(deps, ctx, { machineId: agent.machineId, handle: agent.handle, name: agent.name }, fn);
+  }
   const { settings, updatedAt } = await settingsRow(deps.db, ctx.orgId);
   const provider = deps.provider;
   if (!provider) throw new SandboxUnavailableError(NO_COMPUTER_MESSAGE);
@@ -578,7 +585,7 @@ export async function withSandbox<T>(
 async function withMachine<T>(
   deps: SandboxDeps,
   ctx: ToolContext,
-  { machineId, handle }: { machineId: string; handle: string },
+  { machineId, handle, name }: { machineId: string; handle: string; name?: string },
   fn: (computer: ComputerHandle) => Promise<T>,
 ): Promise<T> {
   const settings = await getSandboxSettings(deps.db, ctx.orgId);
@@ -593,13 +600,15 @@ async function withMachine<T>(
     );
   }
   if (!status.online) throw new MachineOfflineError(status.name);
+  // Paused by its owner (ADR 0036 §6): nothing new starts there; the agent relays why and until when.
+  if (status.paused) throw new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
   // An old runner would ignore `agent` and put every agent in the same folder.
   if (status.protocol < AGENT_FOLDERS_PROTOCOL) {
     throw new SandboxUnavailableError(
       `The runner on the computer ${status.name} is out of date (it can't give each agent its own folder). Tell the person: its owner should update it with \`agentes-runner update\`.`,
     );
   }
-  const provider = createMachineSandboxProvider(machines.hub, { id: ctx.agentId, handle });
+  const provider = createMachineSandboxProvider(machines.hub, { id: ctx.agentId, handle, ...(name ? { name } : {}) });
   return fn({ id: machineId, provider, ref: `machine:${machineId}`, machineId });
 }
 
@@ -619,8 +628,12 @@ export async function agentComputerInfo(
       online: boolean;
       execAllowed: boolean;
       os: string;
-      /** The runner's protocol (4+: background tasks). */
+      /** The runner's protocol (4+: background tasks; 10+: folders granted on the machine). */
       protocol: number;
+      /** The owner paused it (protocol 9). */
+      paused: { until: string | null; timezone: string | null } | null;
+      /** The folders the machine allows this agent beyond its own folder (protocol 10; empty when none or unknown). */
+      folders: string[];
     }
   | { kind: "removed" }
 > {
@@ -638,6 +651,8 @@ export async function agentComputerInfo(
     execAllowed: status.execAllowed,
     os: status.os,
     protocol: status.protocol,
+    paused: status.paused ?? null,
+    folders: status.access ? status.access.folders.filter((f) => f.agents.includes(agentId)).map((f) => f.path) : [],
   };
 }
 

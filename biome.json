@@ -12,7 +12,9 @@
       "!docs/prototipo",
       "!**/*.html",
       "!docs/design",
-      "!**/routeTree.gen.ts"
+      "!**/routeTree.gen.ts",
+      "!**/src-tauri/target",
+      "!**/src-tauri/gen"
     ]
   },
   "formatter": {

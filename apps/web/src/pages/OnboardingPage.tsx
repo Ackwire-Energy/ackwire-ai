@@ -1,4 +1,4 @@
-import type { Machine, MachinePairing, Role } from "@agenteschat/client";
+import type { Machine, Role } from "@agenteschat/client";
 import { keys, useMachines, useModels, useSandboxSettings } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -29,7 +29,6 @@ import {
   Input,
   Logo,
   OptionCard,
-  Segmented,
   Select,
   Spinner,
   Textarea,
@@ -40,7 +39,7 @@ import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useEffect, use
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { CommandBlock, countdown, NO_EXEC_FLAG, osOf, PAIR_POLL_MS, useNow } from "@/components/Machines";
+import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImport";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, WelcomeSky } from "@/components/Sky";
@@ -90,8 +89,6 @@ interface ImportedCrew extends CrewMember {
   id: string;
   handle: string;
 }
-type InstallOs = "darwin" | "linux" | "windows";
-const INSTALL_OSES: InstallOs[] = ["darwin", "linux", "windows"];
 
 /** The guide's mood: writing while the person types, happy for a moment after a step. */
 function useGuideMood() {
@@ -923,7 +920,7 @@ function ChoiceCard({
 
 /**
  * Where the agents work: the workspace's cloud computer, or this computer / a
- * server paired with the runner (the install command, live until it connects).
+ * server (the Mac app or the terminal; the computer shows a code to confirm, live until it connects).
  */
 function ComputerStep({
   orgId,
@@ -942,35 +939,22 @@ function ComputerStep({
 }) {
   const { t } = useTranslation();
   const api = useApi();
-  const [os, setOs] = useState<InstallOs>(() =>
-    typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent ?? "")
-      ? "darwin"
-      : typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent ?? "")
-        ? "windows"
-        : "linux",
-  );
-  const [pairing, setPairing] = useState<{ pairing: MachinePairing; known: Set<string> } | null>(null);
-  const create = useMutation({
-    mutationFn: async () => {
-      const before = await api.machines.list(orgId).catch(() => [] as Machine[]);
-      const p = await api.machines.createPairing(orgId, { name: t("onboarding.computer.defaultName") });
-      return { pairing: p, known: new Set(before.map((m) => m.id)) };
-    },
-    meta: { silent: true },
-    onSuccess: setPairing,
-  });
-  const waiting = computer === "machine" && pairing !== null && machine === null;
-  const now = useNow(waiting);
-  const left = pairing ? countdown(pairing.pairing.expiresAt, now) : null;
-  const machines = useMachines(orgId, waiting, waiting && left ? PAIR_POLL_MS : false);
-  const found = pairing ? (machines.data ?? []).find((m) => !pairing.known.has(m.id)) : undefined;
+  // The computers already there when "this computer" was picked: a new one is the one being connected.
+  const [known, setKnown] = useState<Set<string> | null>(null);
+  const waiting = computer === "machine" && known !== null && machine === null;
+  const machines = useMachines(orgId, waiting, waiting ? PAIR_POLL_MS : false);
+  const found = known ? (machines.data ?? []).find((m) => !known.has(m.id)) : undefined;
   useEffect(() => {
     if (found && !machine) onPaired(found);
   }, [found, machine, onPaired]);
 
   const chooseMachine = () => {
     onChoose("machine");
-    if (!pairing && !create.isPending) create.mutate();
+    if (known) return;
+    void api.machines
+      .list(orgId)
+      .catch(() => [] as Machine[])
+      .then((before) => setKnown(new Set(before.map((m) => m.id))));
   };
 
   return (
@@ -1014,54 +998,13 @@ function ComputerStep({
                 })}
               </span>
             </p>
-          ) : create.isError ? (
-            <div className="row" role="alert">
-              <span className="small">{errorText(t, create.error)}</span>
-              <Button size="sm" onClick={() => create.mutate()}>
-                {t("onboarding.computer.again")}
-              </Button>
-            </div>
-          ) : !pairing ? (
-            <span className="row small muted" role="status" style={{ gap: 8 }}>
-              <Spinner />
-              {t("onboarding.computer.creating")}
-            </span>
           ) : (
             <>
-              <Segmented
-                value={os}
-                onValueChange={setOs}
-                label={t("onboarding.computer.osLabel")}
-                size="sm"
-                options={INSTALL_OSES.map((o) => ({ value: o, label: t(`machines.os.${o}`) }))}
-              />
-              <span className="onb__label">{t("onboarding.computer.run")}</span>
-              {os === "windows" && <span className="small muted">{t("onboarding.computer.windowsHint")}</span>}
-              <CommandBlock command={pairing.pairing.installCommand} />
-              <span className="small muted">{t("machines.step.noExec", { flag: NO_EXEC_FLAG })}</span>
-              <span className="small muted tabular">
-                {left
-                  ? t("machines.expiresIn", { time: left, code: pairing.pairing.code })
-                  : t("machines.expired", { code: pairing.pairing.code })}
+              <ConnectComputer />
+              <span className="row small muted" role="status" style={{ gap: 8 }}>
+                <Spinner />
+                {t("machines.download.waiting")}
               </span>
-              {left ? (
-                <span className="row small muted" role="status" style={{ gap: 8 }}>
-                  <Spinner />
-                  {t("machines.waiting")}
-                </span>
-              ) : (
-                <div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setPairing(null);
-                      create.mutate();
-                    }}
-                  >
-                    {t("onboarding.computer.again")}
-                  </Button>
-                </div>
-              )}
             </>
           )}
         </Card>

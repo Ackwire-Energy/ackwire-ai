@@ -15,6 +15,13 @@ test("the install script quotes the server URL and is valid sh", () => {
   expect(script).toContain("SERVER='https://agentes.chat'\n");
   expect(script).toContain('"$SERVER/runner/agentes-runner.mjs"');
   expect(script).toContain("service install");
+  // Device-code connection (ADR 0036 §5): no code from the site; `pair` shows one and waits for the confirmation.
+  expect(script).not.toContain("--code");
+  expect(script).not.toContain("CODE=");
+  expect(script).toContain('set -- pair --server "$SERVER"');
+  // A home already connected keeps its connection; one managed by the desktop app is left alone.
+  expect(script).toContain("grep -q '\"token\"'");
+  expect(script).toContain("managedBy");
   expect(installScript("https://x.test/it's")).toContain("SERVER='https://x.test/it'\\''s'\n");
   if (process.platform !== "win32") {
     const check = spawnSync("sh", ["-n"], { input: script, encoding: "utf8" });

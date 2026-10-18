@@ -1,9 +1,44 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { keys } from "../api/keys";
-import type { AgentComputer, ComputerTarget, Machine } from "../api/types";
+import type { AgentComputer, ComputerTarget, Machine, MachineAccess, MachinePause } from "../api/types";
 
-const isMachineEvent = (type: string) =>
-  type === "machine.status" || type === "machine.paired" || type === "machine.updated" || type === "machine.deleted";
+const MACHINE_EVENTS = new Set([
+  "machine.status",
+  "machine.paired",
+  "machine.updated",
+  "machine.state",
+  "machine.access",
+  "machine.deleted",
+]);
+const isMachineEvent = (type: string) => MACHINE_EVENTS.has(type);
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+
+/**
+ * A pause state from an event: the server's `{ until }` (paused) or `null` (not paused); `{ paused: false }`
+ * is understood too. Undefined when the event says nothing about it.
+ */
+export function pauseOf(v: unknown): MachinePause | undefined {
+  if (v === null) return { paused: false };
+  if (!isObject(v)) return undefined;
+  if (v.paused === false) return { paused: false };
+  return { paused: true, until: typeof v.until === "string" ? v.until : null };
+}
+
+/** Access from an event (`{ folders, tools }`), checked; `null` when the machine stopped reporting it. */
+export function accessOf(v: unknown): MachineAccess | null | undefined {
+  if (v === null) return null;
+  if (!isObject(v) || !Array.isArray(v.folders) || !isObject(v.tools)) return undefined;
+  const t = v.tools;
+  return {
+    folders: v.folders.flatMap((f) =>
+      isObject(f) && typeof f.path === "string" && f.path
+        ? [{ path: f.path, agents: Array.isArray(f.agents) ? f.agents.filter((a) => typeof a === "string") : [] }]
+        : [],
+    ),
+    tools: { claude: t.claude === true, codex: t.codex === true, commands: t.commands === true },
+  };
+}
 
 /** Every cached agent computer view whose target is this machine gets `patch`. */
 function patchTargets(
@@ -26,7 +61,14 @@ function patchTargets(
  */
 export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (!isMachineEvent(event.type)) return false;
-  const e = event as { type: string; machineId?: unknown; online?: unknown; name?: unknown };
+  const e = event as {
+    type: string;
+    machineId?: unknown;
+    online?: unknown;
+    name?: unknown;
+    paused?: unknown;
+    access?: unknown;
+  };
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;
   const list = keys.machines(orgId);
@@ -48,12 +90,23 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       void qc.invalidateQueries({ queryKey: list });
       break;
     case "machine.updated":
-      if (typeof e.name === "string") {
-        const name = e.name;
-        qc.setQueryData<Machine[]>(list, (old) => old?.map((m) => (m.id === machineId ? { ...m, name } : m)));
-        patchTargets(qc, orgId, machineId, { name });
-      } else void qc.invalidateQueries({ queryKey: list });
+    case "machine.state":
+    case "machine.access": {
+      // A rename, a pause on the machine, or what it allows now (ADR 0036): patch what came, refetch otherwise.
+      const patch: Partial<Machine> = {};
+      if (typeof e.name === "string") patch.name = e.name;
+      const paused = pauseOf(e.paused);
+      if (paused) patch.paused = paused;
+      const access = accessOf(e.access);
+      if (access !== undefined) patch.access = access;
+      if (Object.keys(patch).length > 0) {
+        qc.setQueryData<Machine[]>(list, (old) => old?.map((m) => (m.id === machineId ? { ...m, ...patch } : m)));
+        if (patch.name) patchTargets(qc, orgId, machineId, { name: patch.name });
+      }
+      // Nothing to patch, or `access: true` (it changed, and who may see it differs per person): refetch.
+      if (Object.keys(patch).length === 0 || e.access === true) void qc.invalidateQueries({ queryKey: list });
       break;
+    }
     case "machine.deleted":
       qc.setQueryData<Machine[]>(list, (old) => old?.filter((m) => m.id !== machineId));
       // Its agents went back to the cloud (`agent.computer` events follow; refetch anyway).

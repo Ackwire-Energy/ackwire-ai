@@ -1593,23 +1593,89 @@ export interface Machine {
   agents: { id: string; name: string; handle: string }[];
   /** Workspace folder on the machine; null unless admin or the person who paired it. */
   workspace: string | null;
-  /** This person may rename or remove it. */
+  /** This person may rename or remove it (an admin or whoever connected it); they may also reduce its access. */
   canManage: boolean;
   createdAt: string;
+  /** ADR 0036 §6: the owner paused it on the machine; nothing new starts until it resumes. Null or absent: not paused. */
+  paused?: MachinePause | null;
+  /** ADR 0036 §8 (protocol 10): what the machine allows, as last reported. Absent until the machine reports it. */
+  access?: MachineAccess | null;
 }
 
-/** `POST …/machines/pairings`: a one-time code (10 minutes) and the command to run on the machine. */
-export interface MachinePairing {
-  code: string;
+/**
+ * The pause the machine reported. The server sends `{ until }` (present = paused) or null;
+ * `paused: false` is also understood. `until` null: until the owner resumes.
+ */
+export interface MachinePause {
+  paused?: boolean;
+  until?: string | null;
+}
+
+/** A tool the person turns on or off on the machine. */
+export type MachineToolName = "claude" | "codex" | "commands";
+
+/** A folder allowed on the machine and the agents (ids) that may use it; empty: allowed, no agent yet. */
+export interface MachineFolderGrant {
+  path: string;
+  agents: string[];
+}
+
+/** What the machine allows (the runner's `RunnerAccess`). Granting only ever happens on the machine. */
+export interface MachineAccess {
+  folders: MachineFolderGrant[];
+  tools: Record<MachineToolName, boolean>;
+}
+
+/** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
+export interface MachineAccessReduce {
+  /** Without `agentId`: the folder for everyone. */
+  removeFolder?: { path: string; agentId?: string };
+  disableTool?: MachineToolName;
+}
+
+/** Approximate location of the computer that asked for a code (best effort, from its IP). */
+export type DeviceLocation = string | { city?: string | null; region?: string | null; country?: string | null };
+
+/** `GET /api/app/machines/device/{userCode}` (ADR 0036 §5): the computer waiting for someone to confirm it. */
+export interface DeviceRequest {
+  name: string;
+  os: string;
+  arch: string;
+  hostname: string;
+  version: string;
+  approxLocation?: DeviceLocation | null;
+  createdAt: string;
   expiresAt: string;
-  installCommand: string;
+}
+
+/** `GET /api/desktop/latest?target=&arch=` (ADR 0036 §9): the newest app build. */
+export interface DesktopRelease {
+  version: string;
+  /** Download link (`/api/desktop/download/{version}/{file}`), relative or absolute. */
+  url: string;
+  sha256: string;
+  notes?: string | null;
+  publishedAt: string;
+  minVersion?: string | null;
+  /** Bytes, when the server knows it. */
+  size?: number | null;
 }
 
 /** Org events about connected computers. */
 export type MachineEvent =
   | { type: "machine.status"; machineId: string; online: boolean }
   | { type: "machine.paired"; machineId: string; name: string }
-  | { type: "machine.updated"; machineId: string; name: string }
+  | {
+      type: "machine.updated";
+      machineId: string;
+      name?: string;
+      paused?: MachinePause | null;
+      /** `true`: what it allows changed; refetch the list (each person sees only what they may). */
+      access?: MachineAccess | null | true;
+    }
+  /** ADR 0036: a new pause state or access reported by the machine (also accepted inside `machine.updated`). */
+  | { type: "machine.state"; machineId: string; paused?: MachinePause | null }
+  | { type: "machine.access"; machineId: string; access?: MachineAccess | null }
   | { type: "machine.deleted"; machineId: string };
 
 // ── Forum (apps/server/src/routes/app/forum.ts, D33 revised by D45) ─────────
@@ -2721,7 +2787,9 @@ export type NotificationKind =
   | "mission_stopped"
   | "routine_finished"
   | "routine_failed"
-  | "reaction";
+  | "reaction"
+  /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
+  | "machine_connected";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -2742,7 +2810,9 @@ export interface NotificationSource {
   questionId?: string;
   missionId?: string;
   routineId?: string;
-  /** Channel name, thread title, issue title, topic title, mission or routine name. */
+  /** `machine_connected`: the computer. */
+  machineId?: string;
+  /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
 

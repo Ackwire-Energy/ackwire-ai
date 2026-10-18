@@ -49,6 +49,9 @@ export const keys = {
   computers: (orgId: string) => ["org", orgId, "sandbox", "computer"] as const,
   agentSecrets: (orgId: string, agentId: string) => ["org", orgId, "agent-secrets", agentId] as const,
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
+  /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
+  machineDevice: (userCode: string) => ["machine-device", userCode] as const,
+  desktopLatest: (target: string, arch: string) => ["desktop-latest", target, arch] as const,
   artifactBlob: (orgId: string, id: string, version: number) =>
     ["org", orgId, "artifacts", "blob", id, version] as const,
   skills: (orgId: string) => ["org", orgId, "skills"] as const,

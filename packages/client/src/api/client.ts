@@ -37,6 +37,8 @@ import type {
   Credential,
   CustomConnectStart,
   CustomServer,
+  DesktopRelease,
+  DeviceRequest,
   DirectMessage,
   DmTarget,
   ForumParticipantsInput,
@@ -59,7 +61,8 @@ import type {
   IssueInput,
   IssuePatch,
   Machine,
-  MachinePairing,
+  MachineAccess,
+  MachineAccessReduce,
   MachineTask,
   Me,
   Member,
@@ -338,11 +341,22 @@ export interface ApiClient {
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {
     list(orgId: string): Promise<Machine[]>;
-    /** A one-time pairing code (10 minutes) and the command to run on the machine. */
-    createPairing(orgId: string, input: { name: string }): Promise<MachinePairing>;
     rename(orgId: string, machineId: string, name: string): Promise<{ id: string; name: string }>;
     /** Revokes its token and disconnects the runner at once; agents on it go back to the cloud. */
     remove(orgId: string, machineId: string): Promise<void>;
+    /**
+     * ADR 0036 §5, the device flow: the computer made the code; the person sees it here
+     * (`machine.device_not_found` once expired, used or unknown).
+     */
+    device(userCode: string): Promise<DeviceRequest>;
+    /** Connects it to the organization (201, the new machine). */
+    confirmDevice(orgId: string, userCode: string, input: { name?: string }): Promise<Machine>;
+    /** "Não fui eu": the computer gets `access_denied`. */
+    denyDevice(userCode: string): Promise<void>;
+    /** ADR 0036 §8: the site only takes away (a folder, for everyone or one agent; a tool). The new access. */
+    reduceAccess(orgId: string, machineId: string, input: MachineAccessReduce): Promise<MachineAccess>;
+    /** ADR 0036 §9: the newest desktop app build; `null` when there is none (404). */
+    desktopLatest(target: string, arch: string): Promise<DesktopRelease | null>;
   };
   skills: {
     /** The org library. */
