@@ -235,14 +235,6 @@ export const featureKeysPtBR = {
     copy: "Copiar texto",
     copied: "Copiado",
     seeAgent: "Ver {{name}}",
-    working: {
-      isWorking: "está trabalhando…",
-      areWorking: "estão trabalhando…",
-      and: "e",
-      andMore: "e mais {{count}}",
-      askingF: "está perguntando à",
-      askingM: "está perguntando ao",
-    },
     suggest: {
       summary: "Resumir a conversa",
       task: "Pedir uma tarefa",

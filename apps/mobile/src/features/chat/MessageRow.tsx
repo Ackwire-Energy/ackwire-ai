@@ -1,7 +1,8 @@
 import { type Message, type ThreadInfo, useReactions, useToggleReaction } from "@agenteschat/client";
 import { serverBody } from "@agenteschat/client/lib/message-body";
+import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { CHROME_MAX_SCALE, Count, Icon, Text } from "@/ui";
@@ -20,6 +21,7 @@ import {
   missionPlanOf,
   questionOf,
   reactionPills,
+  routineAgents,
   workStepsOf,
 } from "./logic";
 import { MessageText } from "./MessageText";
@@ -53,8 +55,20 @@ export const MessageRow = memo(function MessageRow({
   const agent = isAgent && m.author.id ? dir.agentById.get(m.author.id) : undefined;
   const name = dir.nameOf(m.author) || t("mobile.chat.someone");
   const meta = m.meta;
+  // Posted by a routine on its creator's behalf (as on the web): shown as the routine, never as if the person
+  // typed it; its text is the instructions it gives the agent, one line ("Chamou @Atlas…") and the rest on demand.
+  const routine = routineOfMessage(meta);
+  const [routineOpen, setRoutineOpen] = useState(false);
+  const called = useMemo(() => (routine ? routineAgents(m.body, dir.agents) : []), [routine, m.body, dir.agents]);
+  // An agent's answer to a routine: the routine's call is hidden, so a small tag says so.
+  const viaRoutine = isAgent ? viaRoutineOf(meta) : null;
+  // A plain reminder: the agent's own message with a "Lembrete" label (the server's prefix dropped).
+  const reminder = isReminderMessage(meta);
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
-  const body = hidesBody(m) ? "" : splitCanceled(serverBody(t, m.body, meta), meta).body;
+  const body =
+    hidesBody(m) || (routine && !routineOpen)
+      ? ""
+      : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   const steps = isAgent && m.agentRunId ? workStepsOf(meta) : null;
   const approvalId = approvalIdOf(meta);
@@ -75,14 +89,41 @@ export const MessageRow = memo(function MessageRow({
       accessibilityHint={t("mobile.chat.longPressHint")}
       style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && { backgroundColor: c.sunken }]}
     >
-      <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
+      <View style={styles.avslot}>
+        {grouped ? null : routine ? (
+          <View
+            style={[styles.routineMark, { backgroundColor: c.sunken }]}
+            accessible
+            accessibilityLabel={t("channel.routineAuthor", { name: routine.name })}
+          >
+            <Icon name="clock" size={17} color={c.ink2} />
+          </View>
+        ) : (
+          <Face who={m.author} size={32} live={false} />
+        )}
+      </View>
       <View style={styles.body}>
-        {grouped ? null : (
+        {grouped ? null : routine ? (
+          <View style={styles.who}>
+            <Text variant="footnote" tone="ink" style={[styles.name, styles.shrink]} numberOfLines={1}>
+              {t("channel.routineAuthor", { name: routine.name })}
+            </Text>
+            <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+              {t("channel.routineBy", { name })}
+            </Text>
+            <Text variant="caption" tone="faint">
+              {when.time(m.createdAt)}
+            </Text>
+            {m.pinned ? <PinMark /> : null}
+          </View>
+        ) : (
           <View style={styles.who}>
             <Text variant="footnote" tone="ink" style={styles.name} numberOfLines={1}>
               {name}
             </Text>
-            {agent?.role ? (
+            {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
+            {viaRoutine ? <Tag icon="clock" label={t("channel.viaRoutine", { name: viaRoutine.name })} /> : null}
+            {!reminder && !viaRoutine && agent?.role ? (
               <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
                 {agent.role}
               </Text>
@@ -100,6 +141,24 @@ export const MessageRow = memo(function MessageRow({
               {t("mobile.pins.mark")}
             </Text>
           </View>
+        ) : null}
+        {routine ? (
+          <Text variant="small" tone="muted">
+            {called.length
+              ? t("channel.routineCalled", { names: called.map((a) => `@${a.name}`).join(", ") })
+              : t("channel.routineRan")}{" "}
+            <Text
+              variant="small"
+              tone="ink"
+              style={styles.link}
+              onPress={() => setRoutineOpen((o) => !o)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: routineOpen }}
+              suppressHighlighting
+            >
+              {routineOpen ? t("channel.routineHide") : t("channel.routineShow")}
+            </Text>
+          </Text>
         ) : null}
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
@@ -139,6 +198,19 @@ export const MessageRow = memo(function MessageRow({
     </Pressable>
   );
 });
+
+/** A small neutral chip next to the name ("Lembrete", "Rotina · Bom dia"): icon, no colored dot. */
+function Tag({ icon, label }: { icon: "bell" | "clock"; label: string }) {
+  const c = useColors();
+  return (
+    <View style={[styles.tag, { backgroundColor: c.sunken }]}>
+      <Icon name={icon} size={11} color={c.muted} />
+      <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
+        {label}
+      </Text>
+    </View>
+  );
+}
 
 /** Pinned: a small neutral pin (no colored dot). */
 function PinMark() {
@@ -214,6 +286,18 @@ const styles = StyleSheet.create({
   name: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
   pin: { alignSelf: "center" },
+  routineMark: { width: 32, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  link: { fontWeight: "600" },
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "center",
+    flexShrink: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
   pinLine: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
   reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   react: {

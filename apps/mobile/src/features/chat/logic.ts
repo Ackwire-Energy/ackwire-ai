@@ -1,4 +1,14 @@
-import type { AgentQuestion, Message, MessageConsultation, MessagePin, ReactionCount } from "@agenteschat/client";
+import type {
+  AgentQuestion,
+  LiveConsult,
+  LiveRun,
+  Message,
+  MessageConsultation,
+  MessagePin,
+  ReactionCount,
+} from "@agenteschat/client";
+import { type ActivityEntry, barEntries, isWriting } from "@agenteschat/client/lib/activity";
+import { isRoutineCall, routineOfMessage } from "@agenteschat/client/lib/routines";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -61,17 +71,22 @@ export function standsAlone(m: Message) {
       meta.missionLink ||
       meta.threadStart ||
       questionOf(meta) ||
-      consultationsOf(meta).length > 0,
+      consultationsOf(meta).length > 0 ||
+      routineOfMessage(meta),
   );
 }
 
-/** Day dividers and messages, oldest first (the list draws them newest at the bottom). */
+/**
+ * Day dividers and messages, oldest first (the list draws them newest at the bottom). A routine's
+ * message stands alone with its own header; its top-level call is left out, like the web's `buildTimeline`.
+ */
 export function buildRows(messages: Message[], hidden: (m: Message) => boolean = () => false): ChatRow[] {
   const rows: ChatRow[] = [];
   let lastDay = "";
   let prev: Message | null = null;
   for (const m of [...messages].sort(byTime)) {
-    if (hidden(m)) continue;
+    // The message a routine posts to call its agent isn't shown (as on the web): only the agent's answer is.
+    if (hidden(m) || isRoutineCall(m)) continue;
     const day = dayKey(m.createdAt);
     if (day !== lastDay) {
       rows.push({ kind: "day", key: `day-${day}`, iso: m.createdAt });
@@ -193,36 +208,80 @@ export const hidesBody = (m: Message) =>
 
 // ── Live work ────────────────────────────────────────────────────────────────
 
-/** One agent at work in the conversation (from the live runs and the questions it asked). */
-export interface WorkingEntry {
-  agentId: string;
-  name: string;
-  /** Asking another agent right now. */
-  asking?: { agentId: string; name: string } | null;
+/**
+ * Who shows in the working line, as on the web's bar (`barEntries`): agents
+ * asking another agent, then agents about to answer (not writing yet), one
+ * entry per agent even when it has two runs (a provisional "thinking" row and
+ * the real run, or two tasks at once).
+ */
+export function workingEntries(
+  runs: LiveRun[],
+  consults: LiveConsult[],
+  agentName: (id: string) => string,
+): ActivityEntry[] {
+  return barEntries(runs, [], agentName, () => undefined, consults);
 }
 
-/** The working line: what to say, with which names (the screen bolds the names). */
-export type WorkingLine =
-  | { key: "one"; params: { name: string } }
-  | { key: "two"; params: { first: string; second: string } }
-  | { key: "many"; params: { first: string; second: string; count: number } }
-  | { key: "asking"; params: { from: string; to: string; toGender: "F" | "M" } };
+/** Still working (thinking, queued or running a tool) and not writing yet: "Parar" in the working line. */
+export const stoppableInLine = (runs: LiveRun[]) =>
+  runs.filter(
+    (r) =>
+      !r.provisional && !isWriting(r) && (r.status === "thinking" || r.status === "queued" || r.status === "running"),
+  );
 
-/** "Theo está trabalhando…", "Theo e Iris…", "Theo, Iris e mais 2…", or "Dev está perguntando ao Infra…". */
-export function workingLine(entries: WorkingEntry[], gender: (name: string) => "F" | "M"): WorkingLine | null {
-  const unique = entries.filter((e, i) => entries.findIndex((x) => x.agentId === e.agentId) === i);
-  if (unique.length === 0) return null;
-  const asking = unique.find((e) => e.asking);
-  if (unique.length === 1 && asking?.asking)
-    return {
-      key: "asking",
-      params: { from: asking.name, to: asking.asking.name, toGender: gender(asking.asking.name) },
-    };
-  const [a, b] = unique;
-  if (!a) return null;
-  if (!b) return { key: "one", params: { name: a.name } };
-  if (unique.length === 2) return { key: "two", params: { first: a.name, second: b.name } };
-  return { key: "many", params: { first: a.name, second: b.name, count: unique.length - 2 } };
+/**
+ * Who may press "Parar" (the web's `useStopRun`): admins, the agent's owner,
+ * or the person whose message started the run. The server checks it again.
+ */
+export function mayStopRun(
+  run: Pick<LiveRun, "agentId" | "threadId" | "triggerMessageId">,
+  who: { meId: string | null; manageAgents: boolean; agentOwnerId: string | null | undefined; messages: Message[] },
+): boolean {
+  if (who.manageAgents) return true;
+  if (!who.meId) return false;
+  if (who.agentOwnerId === who.meId) return true;
+  const rootId = run.triggerMessageId ?? run.threadId;
+  const root = who.messages.find((m) => m.id === rootId);
+  return root?.author.type === "person" && root.author.id === who.meId;
+}
+
+// Names travel through i18n wrapped in these, then come back bold (the web's WorkingLine does the same).
+export const NAME_OPEN = "\u0001";
+export const NAME_CLOSE = "\u0002";
+export const markName = (name: string) => `${NAME_OPEN}${name}${NAME_CLOSE}`;
+
+/** A marked sentence split into plain and bold (name) pieces. */
+export function markedParts(text: string): { text: string; bold: boolean }[] {
+  const [head = "", ...rest] = text.split(NAME_OPEN);
+  const out: { text: string; bold: boolean }[] = head ? [{ text: head, bold: false }] : [];
+  for (const part of rest) {
+    const at = part.indexOf(NAME_CLOSE);
+    const name = at < 0 ? part : part.slice(0, at);
+    const after = at < 0 ? "" : part.slice(at + 1);
+    if (name) out.push({ text: name, bold: true });
+    if (after) out.push({ text: after, bold: false });
+  }
+  return out;
+}
+
+// ── Routines ─────────────────────────────────────────────────────────────────
+
+/**
+ * The agents a routine's message calls (its @handles, known agents only, in
+ * order, once each): "Chamou @Atlas com as instruções da rotina".
+ */
+export function routineAgents<A extends { handle: string }>(body: string, agents: A[]): A[] {
+  const byHandle = new Map(agents.map((a) => [a.handle.toLowerCase(), a]));
+  const seen = new Set<string>();
+  const out: A[] = [];
+  for (const match of body.matchAll(/@([\w.-]+)/g)) {
+    const h = (match[1] ?? "").toLowerCase();
+    const a = byHandle.get(h);
+    if (!a || seen.has(h)) continue;
+    seen.add(h);
+    out.push(a);
+  }
+  return out;
 }
 
 // ── Reactions ────────────────────────────────────────────────────────────────

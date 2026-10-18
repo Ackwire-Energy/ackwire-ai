@@ -23,6 +23,7 @@ import {
   useThreadMission,
   useThreads,
 } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,6 +36,7 @@ import { type LayoutChangeEvent, Pressable, StyleSheet, View } from "react-nativ
 import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOrg } from "@/providers/org";
 import { Button, Composer, Count, Icon, IconButton, PressScale, Text, useTheme, useToast } from "@/ui";
 import { isListedThread, threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
@@ -47,7 +49,7 @@ import { PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
 import { useChatLive } from "./live";
-import { buildRows, type ChatRow, mergeTimeline, parseSlash, pinTarget, threadRootsToLoad } from "./logic";
+import { buildRows, type ChatRow, mayStopRun, mergeTimeline, parseSlash, pinTarget, threadRootsToLoad } from "./logic";
 import { MessageRow } from "./MessageRow";
 import { PinsSheet } from "./PinsSheet";
 import {
@@ -160,6 +162,26 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const consults = useMemo(
     () => live.consults.filter((x) => (isThread ? x.threadId === threadId : !linkThreads.has(x.threadId))),
     [live.consults, isThread, threadId, linkThreads],
+  );
+
+  // "Parar" in the working line (as on the web): admins, the agent's owner, or who started it.
+  const role = useOrg().org?.role;
+  const canStop = useCallback(
+    (r: LiveRun) =>
+      mayStopRun(r, {
+        meId,
+        manageAgents: can(role, "manage_agents"),
+        agentOwnerId: dir.agentById.get(r.agentId)?.ownerUserId,
+        messages: list,
+      }),
+    [meId, role, dir.agentById, list],
+  );
+  const { stop } = live;
+  const stopRun = useCallback(
+    (r: LiveRun) => {
+      if (meId) stop(r.runId, meId);
+    },
+    [meId, stop],
   );
 
   // ── Streaming rows ──
@@ -705,7 +727,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             keyboardOffset={lift}
             contentInsetEndAdjustment={contentInsetEndAdjustment}
             contentContainerStyle={styles.listPad}
-            ListFooterComponent={<WorkingLine runs={runs} consults={consults} />}
+            ListFooterComponent={<WorkingLine runs={runs} consults={consults} canStop={canStop} onStop={stopRun} />}
           />
         )}
         <KeyboardStickyView

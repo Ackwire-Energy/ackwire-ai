@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
 import {
   artifactsOf,
   buildRows,
   consultationsOf,
   hidesBody,
+  markedParts,
+  markName,
+  mayStopRun,
   mergeTimeline,
   missionCardRef,
   missionPlanOf,
@@ -14,14 +18,16 @@ import {
   reactionEmoji,
   reactionName,
   reactionPills,
+  routineAgents,
+  standsAlone,
+  stoppableInLine,
   threadFaces,
   threadRootsToLoad,
   threadTitleFrom,
   toggleReaction,
-  workingLine,
+  workingEntries,
   workStepsOf,
 } from "../../src/features/chat/logic";
-import { genderOf } from "../../src/features/shared/logic";
 import { at, message } from "./fixtures";
 
 describe("timeline", () => {
@@ -107,31 +113,135 @@ describe("what a message carries", () => {
 });
 
 describe("working line", () => {
-  const e = (agentId: string, name: string, asking?: { agentId: string; name: string }) => ({
-    agentId,
-    name,
-    ...(asking ? { asking } : {}),
+  const run = (over: Partial<LiveRun> & { runId: string; agentId: string }): LiveRun => ({
+    channelId: "c1",
+    threadId: "m1",
+    status: "thinking",
+    text: "",
+    lastSeq: 0,
+    ...over,
   });
-  test("one, two, many (Theo, Iris e mais 2)", () => {
-    expect(workingLine([], genderOf)).toBeNull();
-    expect(workingLine([e("t", "Theo")], genderOf)).toEqual({ key: "one", params: { name: "Theo" } });
-    expect(workingLine([e("t", "Theo"), e("i", "Iris"), e("t", "Theo")], genderOf)).toEqual({
-      key: "two",
-      params: { first: "Theo", second: "Iris" },
-    });
-    expect(workingLine([e("t", "Theo"), e("i", "Iris"), e("n", "Nina"), e("d", "Dev")], genderOf)).toEqual({
-      key: "many",
-      params: { first: "Theo", second: "Iris", count: 2 },
-    });
+  const names: Record<string, string> = { atlas: "Atlas", ada: "Ada", infra: "Infra" };
+  const name = (id: string) => names[id] ?? id;
+
+  test("one entry per agent: a provisional row plus the real run, or two runs, show one face", () => {
+    const entries = workingEntries(
+      [
+        run({ runId: "pending:atlas:m1", agentId: "atlas", provisional: true }),
+        run({ runId: "r1", agentId: "atlas", threadId: "m2", status: "running", tool: "sentry_list_issues" }),
+        run({ runId: "r2", agentId: "ada" }),
+      ],
+      [],
+      name,
+    );
+    expect(entries.map((e) => e.id)).toEqual(["atlas", "ada"]);
   });
-  test("an agent asking another (ao / à by the name)", () => {
-    expect(workingLine([e("d", "Dev", { agentId: "i", name: "Infra" })], genderOf)).toEqual({
-      key: "asking",
-      params: { from: "Dev", to: "Infra", toGender: "F" },
+
+  test("an agent asking another is one entry (with its consult), not also a working run", () => {
+    const consult: LiveConsult = {
+      runId: "r1",
+      agentId: "atlas",
+      consultedAgentId: "infra",
+      channelId: "c1",
+      threadId: "m1",
+      status: "asking",
+      since: 1,
+      at: 1,
+    };
+    const entries = workingEntries([run({ runId: "r1", agentId: "atlas" })], [consult], name);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.consult).toMatchObject({ to: "infra", toName: "Infra", status: "asking" });
+  });
+
+  test("writing, failed and waiting runs leave the line (their rows say it)", () => {
+    const entries = workingEntries(
+      [
+        run({ runId: "w", agentId: "atlas", status: "running", text: "Oi" }),
+        run({ runId: "f", agentId: "ada", status: "failed" }),
+        run({ runId: "a", agentId: "infra", status: "waiting_approval" }),
+      ],
+      [],
+      name,
+    );
+    expect(entries).toEqual([]);
+  });
+
+  test("the tool step comes through (what it is doing, as on the web)", () => {
+    const [e] = workingEntries([run({ runId: "r", agentId: "atlas", tool: "sentry_list_issues" })], [], name);
+    expect(e?.activity).toEqual({ kind: "consulting", app: "Sentry" });
+  });
+
+  test("Parar: only real runs that are not writing yet", () => {
+    const list = stoppableInLine([
+      run({ runId: "p", agentId: "atlas", provisional: true }),
+      run({ runId: "r", agentId: "atlas", status: "running" }),
+      run({ runId: "w", agentId: "ada", status: "running", text: "Oi" }),
+      run({ runId: "a", agentId: "infra", status: "waiting_approval" }),
+    ]);
+    expect(list.map((r) => r.runId)).toEqual(["r"]);
+  });
+
+  test("who may stop: admins, the agent's owner, or who sent the message that started it", () => {
+    const r = run({ runId: "r", agentId: "atlas", triggerMessageId: "m1" });
+    const messages = [message({ id: "m1", author: { type: "person", id: "me" } })];
+    const base = { meId: "me", manageAgents: false, agentOwnerId: null, messages: [] as Message[] };
+    expect(mayStopRun(r, base)).toBe(false);
+    expect(mayStopRun(r, { ...base, manageAgents: true })).toBe(true);
+    expect(mayStopRun(r, { ...base, agentOwnerId: "me" })).toBe(true);
+    expect(mayStopRun(r, { ...base, messages })).toBe(true);
+    expect(mayStopRun(r, { ...base, meId: "other", messages })).toBe(false);
+  });
+
+  test("names come back bold from the marked sentence", () => {
+    expect(markedParts(`${markName("Atlas")} está trabalhando…`)).toEqual([
+      { text: "Atlas", bold: true },
+      { text: " está trabalhando…", bold: false },
+    ]);
+    expect(markedParts(`${markName("Theo")} e ${markName("Iris")}`)).toEqual([
+      { text: "Theo", bold: true },
+      { text: " e ", bold: false },
+      { text: "Iris", bold: true },
+    ]);
+  });
+});
+
+describe("routine messages", () => {
+  const routineMeta = { routineId: "rt1", routine: { id: "rt1", name: "Erros do Sentry", runId: "x" } };
+
+  test("the routine's top-level call is left out; only the agent's answer shows", () => {
+    const call = message({ id: "call", body: "@atlas Verificar no Sentry…", meta: routineMeta, createdAt: at(10) });
+    const answer = message({
+      id: "ans",
+      threadId: "call",
+      author: { type: "agent", id: "atlas" },
+      meta: { viaRoutine: { id: "rt1", name: "Erros do Sentry" } },
+      createdAt: at(9),
     });
-    expect(workingLine([e("d", "Dev", { agentId: "t", name: "Theo" })], genderOf)?.params).toMatchObject({
-      toGender: "M",
-    });
+    const rows = buildRows([call, answer]);
+    expect(rows.filter((r) => r.kind === "message").map((r) => (r.kind === "message" ? r.message.id : ""))).toEqual([
+      "ans",
+    ]);
+  });
+
+  test("a routine's message inside a thread shows with its own header: never grouped, nothing groups under it", () => {
+    const before = message({ id: "a", threadId: "t", createdAt: at(10) });
+    const routine = message({ id: "b", threadId: "t", meta: routineMeta, createdAt: at(9) });
+    const after = message({ id: "c", threadId: "t", createdAt: at(8) });
+    const rows = buildRows([before, routine, after]).flatMap((r) => (r.kind === "message" ? [r.grouped] : []));
+    expect(rows).toEqual([false, false, false]);
+    expect(standsAlone(routine)).toBe(true);
+  });
+
+  test("the agents it calls: known @handles, in order, once each", () => {
+    const agents = [
+      { handle: "atlas", name: "Atlas" },
+      { handle: "ada", name: "Ada" },
+    ];
+    expect(routineAgents("@ada veja os issues; @Atlas e @ada, @nobody", agents).map((a) => a.name)).toEqual([
+      "Ada",
+      "Atlas",
+    ]);
+    expect(routineAgents("sem menção", agents)).toEqual([]);
   });
 });
 

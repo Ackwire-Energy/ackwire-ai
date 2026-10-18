@@ -1,5 +1,6 @@
 import {
   type AgentQuestion,
+  ApiError,
   applyChannelEvent,
   applyConsultEvent,
   type ChannelEvent,
@@ -7,16 +8,19 @@ import {
   cacheApproval,
   cacheMessage,
   consultsIn,
+  dismissRun,
   emptyStreams,
   expectReply,
   keys,
   type LiveConsult,
   type LiveRun,
   type Message,
+  markStopping,
   type ReactionCount,
   reconcileRuns,
   runsInChannel,
   type StreamsState,
+  unmarkStopping,
   useApi,
 } from "@agenteschat/client";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
@@ -39,7 +43,10 @@ interface LiveState {
 type Action =
   | { type: "event"; event: ChannelEvent; at: number }
   | { type: "reconcile"; channelId: string; active: Parameters<typeof reconcileRuns>[2]; at: number; askedAt: number }
-  | { type: "expect"; channelId: string; threadId: string; agentIds: string[]; at: number };
+  | { type: "expect"; channelId: string; threadId: string; agentIds: string[]; at: number }
+  | { type: "stopping"; runId: string; byUserId: string }
+  | { type: "unstopping"; runId: string }
+  | { type: "dismiss"; runId: string };
 
 function reduce(state: LiveState, action: Action): LiveState {
   switch (action.type) {
@@ -60,6 +67,12 @@ function reduce(state: LiveState, action: Action): LiveState {
         streams = expectReply(streams, { channelId: action.channelId, threadId: action.threadId, agentId }, action.at);
       return { ...state, streams };
     }
+    case "stopping":
+      return { ...state, streams: markStopping(state.streams, action.runId, action.byUserId) };
+    case "unstopping":
+      return { ...state, streams: unmarkStopping(state.streams, action.runId) };
+    case "dismiss":
+      return { ...state, streams: dismissRun(state.streams, action.runId) };
   }
 }
 
@@ -165,6 +178,8 @@ export interface ChatLive {
   consults: LiveConsult[];
   /** Right after sending: "pensando…" for the agents that will answer (an agent DM). */
   expect: (threadId: string, agentIds: string[]) => void;
+  /** "Parar" (as on the web): "Parando…" until the run's event; a run that already ended just leaves. */
+  stop: (runId: string, byUserId: string) => void;
 }
 
 export function useChatLive(orgId: string, channelId: string, enabled: boolean): ChatLive {
@@ -212,12 +227,27 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     [channelId],
   );
 
+  const stop = useCallback(
+    (runId: string, byUserId: string) => {
+      dispatch({ type: "stopping", runId, byUserId });
+      api.agents.cancelRun(orgId, runId).catch((err: unknown) => {
+        // 409 `run_finished`: it ended on its own meanwhile; its message is on the way (or already here).
+        if (err instanceof ApiError && err.status === 409) {
+          dispatch({ type: "dismiss", runId });
+          void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
+        } else dispatch({ type: "unstopping", runId });
+      });
+    },
+    [api, orgId, channelId, qc],
+  );
+
   return useMemo(
     () => ({
       runs: runsInChannel(state.streams, channelId),
       consults: consultsIn(state.consults, channelId),
       expect,
+      stop,
     }),
-    [state, channelId, expect],
+    [state, channelId, expect, stop],
   );
 }

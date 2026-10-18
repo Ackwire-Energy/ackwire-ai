@@ -231,14 +231,6 @@ export const featureKeysEn: FeatureTranslations = {
     copy: "Copy text",
     copied: "Copied",
     seeAgent: "See {{name}}",
-    working: {
-      isWorking: "is working…",
-      areWorking: "are working…",
-      and: "and",
-      andMore: "and {{count}} more",
-      askingF: "is asking",
-      askingM: "is asking",
-    },
     suggest: {
       summary: "Sum up the chat",
       task: "Ask for a task",

@@ -1,12 +1,13 @@
-import type { LiveConsult, LiveRun } from "@agenteschat/client";
-import type { ReactNode } from "react";
+import { elapsedClock, type LiveConsult, type LiveRun } from "@agenteschat/client";
+import { activitySentence } from "@agenteschat/client/lib/activity";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { useTranslation } from "react-i18next";
-import { Text as RNText, StyleSheet, View } from "react-native";
-import { PixelOrbit, Text } from "@/ui";
+import { ActivityIndicator, Alert, Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import { CHROME_MAX_SCALE, fonts, Icon, PixelOrbit, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
-import { agentLook, genderOf } from "../shared/logic";
-import { type WorkingEntry, workingLine } from "./logic";
+import { useColors, useDirectory, useNow } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
+import { markedParts, markName, stoppableInLine, workingEntries } from "./logic";
 import { MessageText } from "./MessageText";
 
 /** An agent's reply while it is being written: the words so far and the blue caret. */
@@ -35,85 +36,121 @@ export function StreamingRow({ run }: { run: LiveRun }) {
   );
 }
 
-const isWriting = (r: LiveRun) => r.text.length > 0 && (r.status === "running" || r.status === "canceled");
-const isWorking = (r: LiveRun) =>
-  !isWriting(r) && (r.status === "thinking" || r.status === "queued" || r.status === "running");
-
 /** The runs that stream as rows (words arrived). */
-export const writingRuns = (runs: LiveRun[]) => runs.filter(isWriting);
+export const writingRuns = (runs: LiveRun[]) =>
+  runs.filter((r) => r.text.length > 0 && (r.status === "running" || r.status === "canceled"));
+
+/** How many faces the stack shows (the sentence says "e mais N"), as on the web. */
+const STACK_MAX = 4;
 
 /**
- * "Theo está trabalhando…", "Theo, Iris e mais 2…", "Dev está perguntando ao
- * Infra…": the orbit in the first agent's color, their faces, names in ink.
+ * The working line, as the web's bar above the composer (WorkingLine.tsx +
+ * ActivityBar): the orbit in the first agent's color, one live face per agent
+ * (an agent asking another shows both, with an arrow), the sentence with names
+ * in ink ("Atlas está consultando o Sentry…", "Theo, Iris e mais 2 estão
+ * trabalhando…", "Dev está perguntando ao Infra…"), the clock of a question
+ * that is out, and "Parar" for the runs I may stop.
  */
-export function WorkingLine({ runs, consults }: { runs: LiveRun[]; consults: LiveConsult[] }) {
+export function WorkingLine({
+  runs,
+  consults,
+  canStop,
+  onStop,
+}: {
+  runs: LiveRun[];
+  consults: LiveConsult[];
+  canStop: (run: LiveRun) => boolean;
+  onStop: (run: LiveRun) => void;
+}) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
-  const asking = new Map(consults.filter((x) => x.status === "asking").map((x) => [x.agentId, x.consultedAgentId]));
-  const entries: WorkingEntry[] = [...runs.filter(isWorking).map((r) => r.agentId), ...[...asking.keys()]].map(
-    (agentId) => {
-      const to = asking.get(agentId);
-      return {
-        agentId,
-        name: dir.agentById.get(agentId)?.name ?? "",
-        asking: to ? { agentId: to, name: dir.agentById.get(to)?.name ?? "" } : null,
-      };
-    },
-  );
-  const line = workingLine(entries, genderOf);
-  if (!line) return null;
+  const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
+  const entries = workingEntries(runs, consults, agentName);
+  const asking = entries.find((e) => e.consult?.status === "asking")?.consult;
+  const now = useNow(asking ? 1000 : 60_000);
   const first = entries[0];
-  const bold = (s: string) => (
-    <RNText key={s} style={[styles.ink, { color: c.ink }]}>
-      {s}
-    </RNText>
+  if (!first) return null;
+  const stoppable = stoppableInLine(runs).filter(canStop);
+  const words = markedParts(activitySentence(t, entries, markName)).map((p, i) =>
+    p.bold ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+      <RNText key={i} style={[styles.ink, { color: c.ink }]}>
+        {p.text}
+      </RNText>
+    ) : (
+      p.text
+    ),
   );
-  let words: ReactNode[];
-  switch (line.key) {
-    case "one":
-      words = [bold(line.params.name), ` ${t("mobile.chat.working.isWorking")}`];
-      break;
-    case "two":
-      words = [
-        bold(line.params.first),
-        ` ${t("mobile.chat.working.and")} `,
-        bold(line.params.second),
-        ` ${t("mobile.chat.working.areWorking")}`,
-      ];
-      break;
-    case "many":
-      words = [
-        bold(line.params.first),
-        ", ",
-        bold(line.params.second),
-        ` ${t("mobile.chat.working.andMore", { count: line.params.count })} ${t("mobile.chat.working.areWorking")}`,
-      ];
-      break;
-    case "asking":
-      words = [
-        bold(line.params.from),
-        ` ${t(`mobile.chat.working.asking${line.params.toGender}`)} `,
-        bold(line.params.to),
-        "…",
-      ];
-      break;
-  }
+  const clock = asking ? elapsedClock(now - asking.since) : null;
+  const confirm = (run: LiveRun) => {
+    const name = agentName(run.agentId);
+    Alert.alert(t("run.confirmTitle", agentGrammar(t, name)), t("run.kept"), [
+      { text: t("run.continue"), style: "cancel" },
+      { text: t("run.stop"), style: "destructive", onPress: () => onStop(run) },
+    ]);
+  };
   return (
-    <View style={styles.work} accessibilityLiveRegion="polite">
-      {first ? <PixelOrbit color={agentLook(dir.agentById.get(first.agentId)).color} size={13} /> : null}
-      <View style={styles.faces}>
-        {entries.slice(0, 4).map((e, i) => (
-          <View key={e.agentId} style={i > 0 ? styles.overlap : undefined}>
-            <AgentFace agentId={e.agentId} size={18} mode="run" />
-          </View>
+    <View style={styles.workWrap}>
+      <View style={[styles.work, { backgroundColor: c.sunken }]} accessibilityLiveRegion="polite">
+        <PixelOrbit color={agentLook(dir.agentById.get(first.id)).color} size={13} />
+        <View style={styles.faces} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {entries.slice(0, STACK_MAX).map((e, i) => {
+            const plate = [styles.plate, { borderColor: c.sunken, backgroundColor: c.sunken }, i > 0 && styles.overlap];
+            if (e.consult?.status === "asking")
+              return (
+                <View key={e.id} style={[styles.pair, i > 0 && styles.overlap]}>
+                  <View style={[styles.plate, { borderColor: c.sunken, backgroundColor: c.sunken }]}>
+                    <AgentFace agentId={e.id} size={18} mode="idle" />
+                  </View>
+                  <Icon name="right" size={12} color={c.faint} />
+                  <View style={[styles.plate, { borderColor: c.sunken, backgroundColor: c.sunken }]}>
+                    <AgentFace agentId={e.consult.to} size={18} mode="think" />
+                  </View>
+                </View>
+              );
+            return (
+              <View key={e.id} style={plate}>
+                <AgentFace agentId={e.id} size={18} mode="run" />
+              </View>
+            );
+          })}
+        </View>
+        <Text variant="small" tone="muted" style={styles.grow} numberOfLines={2}>
+          {words}
+        </Text>
+        {clock ? (
+          <RNText
+            accessibilityRole="timer"
+            accessibilityLabel={t("chat.consult.clock", { time: clock })}
+            maxFontSizeMultiplier={CHROME_MAX_SCALE}
+            style={[styles.clock, { color: c.muted, fontFamily: fonts.dot }]}
+          >
+            {clock}
+          </RNText>
+        ) : null}
+        {stoppable.map((r) => (
+          <Pressable
+            key={r.runId}
+            onPress={() => confirm(r)}
+            disabled={r.stopping}
+            accessibilityRole="button"
+            accessibilityLabel={r.stopping ? t("run.stopping") : `${t("run.stop")} · ${agentName(r.agentId)}`}
+            accessibilityState={{ disabled: Boolean(r.stopping), busy: Boolean(r.stopping) }}
+            hitSlop={10}
+            style={({ pressed }) => [styles.stop, { borderColor: c.line }, pressed && { backgroundColor: c.bg }]}
+          >
+            {r.stopping ? <ActivityIndicator size="small" color={c.muted} /> : <StopGlyph color={c.ink2} />}
+          </Pressable>
         ))}
       </View>
-      <Text variant="small" tone="muted" style={styles.grow} numberOfLines={2}>
-        {words}
-      </Text>
     </View>
   );
+}
+
+/** A rounded square in a circle: "stop" (the web's StopGlyph). */
+function StopGlyph({ color }: { color: string }) {
+  return <View style={[styles.stopSquare, { backgroundColor: color }]} />;
 }
 
 const styles = StyleSheet.create({
@@ -123,9 +160,31 @@ const styles = StyleSheet.create({
   who: { flexDirection: "row", alignItems: "baseline", gap: 7 },
   name: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
-  work: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, paddingLeft: 18, paddingRight: 14 },
-  faces: { flexDirection: "row" },
-  overlap: { marginLeft: -5 },
+  workWrap: { paddingHorizontal: 12, paddingVertical: 6 },
+  work: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    minHeight: 40,
+    paddingVertical: 7,
+    paddingLeft: 12,
+    paddingRight: 8,
+    borderRadius: 14,
+  },
+  faces: { flexDirection: "row", alignItems: "center" },
+  plate: { borderRadius: 999, borderWidth: 2 },
+  pair: { flexDirection: "row", alignItems: "center", gap: 2 },
+  overlap: { marginLeft: -6 },
   grow: { flex: 1 },
   ink: { fontWeight: "600" },
+  clock: { fontSize: 13 },
+  stop: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stopSquare: { width: 9, height: 9, borderRadius: 2 },
 });
