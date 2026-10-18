@@ -2,14 +2,14 @@ import { bodyPath, EYE_STYLES, EYE_X } from "@agenteschat/ui/agent/engine";
 import { ICONS } from "./icons.data";
 
 /**
- * The tab bar's own glyphs (Início, Conversas, Agentes, Atividade) as SVG documents, in two states:
+ * The tab bar's own glyphs (Conversas, Agentes, Atividade) as SVG documents, in two states:
  * outline (unselected) and filled (selected). They are template images: one opaque color, and the
  * native tab bar tints them by state. 24×24 viewBox, stroke 1.7 with round caps, the line icons'
  * geometry; Agentes is our agent (the engine's body with the cut bottom-left corner and two pill eyes).
  * Pure: `tabIcons.ts` rasterizes them with Skia.
  */
 
-export const TAB_GLYPHS = ["home", "chats", "agents", "activity"] as const;
+export const TAB_GLYPHS = ["chats", "agents", "activity"] as const;
 export type TabGlyph = (typeof TAB_GLYPHS)[number];
 
 /** A glyph and its state, as one name (the icon "family" of the tab bar takes a single name). */
@@ -28,7 +28,7 @@ export function parseTabGlyphKey(key: string): { glyph: TabGlyph; selected: bool
 const STROKE = 1.7;
 const f = (n: number) => Number(n.toFixed(3));
 
-function pathD(name: "home" | "chat" | "bell", index = 0): string {
+function pathD(name: "chat" | "bell", index = 0): string {
   const shape = ICONS[name][index];
   if (shape?.t !== "path") throw new Error(`icon ${name} has no path ${index}`);
   return shape.d;
@@ -84,10 +84,6 @@ function agentGlyph(selected: boolean, color: string): string {
 export function tabGlyphSvg(glyph: TabGlyph, selected: boolean, color = "#000000"): string {
   let body: string;
   switch (glyph) {
-    case "home":
-      // The house path traces the door as a notch, so the solid house keeps an open door.
-      body = selected ? solid(pathD("home"), color) : line(pathD("home"), color);
-      break;
     case "chats":
       body = selected ? solid(pathD("chat"), color) : line(pathD("chat"), color);
       break;

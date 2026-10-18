@@ -97,6 +97,13 @@ export const ICONS = {
   circle: [c(12, 12, 7)],
   pause: [p("M9 6v12M15 6v12")],
   flag: [p("M6 21V4M6 4h11l-2 4 2 4H6")],
+  // From MobileConversas.html: the question card, "Conversa com…" and "Livre".
+  help: [c(12, 12, 8.5), p("M9.6 9.5a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01", 2)],
+  compose: [
+    p("M12 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"),
+    p("M16.5 4.5a2 2 0 0 1 3 3L12 15l-3.5.5L9 12Z"),
+  ],
+  checkc: [c(12, 12, 8.5), p("m8.5 12 2.5 2.5 4.5-5")],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

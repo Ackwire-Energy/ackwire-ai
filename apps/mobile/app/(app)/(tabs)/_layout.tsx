@@ -7,14 +7,13 @@ import { type TabGlyph, tabGlyphKey } from "@/ui/tabGlyphs";
 import { tabGlyphFamily } from "@/ui/tabIcons";
 
 const TABS: { name: string; glyph: TabGlyph; label: string }[] = [
-  { name: "(home)", glyph: "home", label: "mobile.tabs.home" },
-  { name: "chats", glyph: "chats", label: "mobile.tabs.chats" },
+  { name: "(chats)", glyph: "chats", label: "mobile.tabs.chats" },
   { name: "agents", glyph: "agents", label: "mobile.tabs.agents" },
   { name: "activity", glyph: "activity", label: "mobile.tabs.activity" },
 ];
 
 /**
- * Início, Conversas, Agentes, Atividade in the system tab bar (UITabBarController on iOS, Liquid Glass on
+ * Conversas (the home), Agentes, Atividade in the system tab bar (UITabBarController on iOS, Liquid Glass on
  * iOS 26; Material bottom navigation on Android). Our own glyphs on both platforms (outline, filled when
  * selected), drawn as template images the bar tints. Badges for unread conversations and what waits on
  * you. Every tab holds a stack with a native header.
@@ -24,7 +23,7 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   const unread = useUnreadConversations();
   const waiting = useWaitingCount();
-  const counts: Record<string, number> = { chats: unread, activity: waiting };
+  const counts: Record<string, number> = { "(chats)": unread, activity: waiting };
   return (
     <NativeTabs
       tintColor={colors.ink}

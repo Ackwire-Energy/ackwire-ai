@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AgentAccess, WorkingRun } from "@agenteschat/client";
 import { activitySections, dayGroupOf, emojisOf, subtitleOf, whoOf } from "../../src/features/activity/logic";
 import { busyAgents, canUse, crewOf, spendOf, workingNow } from "../../src/features/agents/logic";
-import { fold, isEmpty, matches, searchResults } from "../../src/features/search/logic";
+import { filterResults, fold, isEmpty, matches, searchCounts, searchResults } from "../../src/features/search/logic";
 import { agent, mission, notification } from "./fixtures";
 
 const NOW = new Date(2026, 9, 17, 15, 0);
@@ -212,6 +212,43 @@ describe("Busca", () => {
     expect(r.agents).toEqual([]);
     expect(r.channels.map((c) => c.id)).toEqual(["c"]);
     expect(r.messages.map((h) => h.sourceId)).toEqual(["m1"]);
+    expect(r.files).toEqual([]);
     expect(isEmpty(r)).toBe(false);
+  });
+
+  test("files come from the search API too; chips count each group", () => {
+    const file = {
+      kind: "file" as const,
+      sourceId: "f1",
+      channelIds: [],
+      title: "Nova proposta.pdf",
+      snippet: "",
+      score: 1,
+      createdAt: "",
+    };
+    const r = searchResults("nova", {
+      actionLabels: { newConversation: "Nova conversa", newTask: "Pedir uma tarefa", newAgent: "Criar agente" },
+      agents: [agent({ id: "n", name: "Nova", role: "Dados" })],
+      channels: [],
+      dms: [],
+      hits: [file, { ...file, kind: "message", sourceId: "m1", channelIds: ["c"] }],
+    });
+    expect(r.files.map((h) => h.sourceId)).toEqual(["f1"]);
+    expect(searchCounts(r)).toEqual({ all: 3, chats: 1, messages: 1, files: 1 });
+    const onlyFiles = filterResults(r, "files");
+    expect(onlyFiles.files).toHaveLength(1);
+    expect(onlyFiles.actions.length + onlyFiles.agents.length + onlyFiles.messages.length).toBe(0);
+    expect(filterResults(r, "chats").agents).toHaveLength(1);
+    expect(filterResults(r, "all")).toBe(r);
+    // No words: no hits at all, whatever the API still holds.
+    expect(
+      searchResults("", {
+        actionLabels: { newConversation: "a", newTask: "b", newAgent: "c" },
+        agents: [],
+        channels: [],
+        dms: [],
+        hits: [file],
+      }).files,
+    ).toEqual([]);
   });
 });

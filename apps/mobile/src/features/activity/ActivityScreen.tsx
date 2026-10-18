@@ -8,6 +8,7 @@ import { notificationHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
+import { useTabHeader } from "../shared/tabHeader";
 import { type ActivityFilter, activitySections, type DayGroup, placeOf, subtitleOf, whoOf } from "./logic";
 
 /**
@@ -24,9 +25,12 @@ export function ActivityScreen() {
   const counts = list.data?.pages[0]?.counts;
   const { waiting, days } = activitySections(items, filter);
   const pull = usePullRefresh(list.refetch);
+  const header = useTabHeader();
   return (
     <LargeTitleScreen
       title={t("mobile.activity.title")}
+      left={header.left}
+      actions={header.actions}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <Filters

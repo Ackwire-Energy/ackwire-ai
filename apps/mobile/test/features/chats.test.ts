@@ -2,11 +2,16 @@ import { describe, expect, test } from "bun:test";
 import type { Channel, DirectMessage } from "@agenteschat/client";
 import {
   buildConversations,
+  CHAT_FILTERS,
   filterConversations,
   filterCounts,
   isListedThread,
+  missionsWaiting,
+  missionWaitingItems,
+  openQuestions,
   unreadConversationCount,
   unreadConversations,
+  waitingTotal,
 } from "../../src/features/chats/logic";
 import { at, thread } from "./fixtures";
 
@@ -152,5 +157,59 @@ describe("channels with their last message and unread", () => {
       threads: [],
     });
     expect(unreadConversations(read)).toBe(0);
+  });
+});
+
+describe("agents at work in the list", () => {
+  test("an agent DM says it is working when the agent has a run there; a person DM never does", () => {
+    const person: DirectMessage = {
+      ...dm("d3", "Ana", 0, 3),
+      with: { type: "person", id: "u2", name: "Ana", handle: "ana" },
+    };
+    const rows = buildConversations({
+      channels: [channel("c1", "geral")],
+      dms: [dm("d1", "Dev", 0, 10), dm("d2", "Iris", 0, 20), person],
+      threads: [],
+      workingChannels: new Set(["d1", "d3", "c1"]),
+    });
+    const working = Object.fromEntries(rows.map((r) => [r.key, r.kind === "dm" ? r.working : null]));
+    expect(working).toEqual({ "d:d3": false, "d:d1": true, "d:d2": false, "c:c1": null });
+  });
+
+  test("without who is working, nobody is", () => {
+    const rows = buildConversations({ channels: [], dms: [dm("d1", "Dev", 0, 10)], threads: [] });
+    expect(rows[0]?.kind === "dm" && rows[0].working).toBe(false);
+  });
+
+  test("the chips' order: Todas, Não lidas, Diretas, Threads e missões", () => {
+    expect(CHAT_FILTERS).toEqual(["all", "unread", "dm", "threads"]);
+  });
+});
+
+describe("Esperando você", () => {
+  const mission = (id: string, canAct: boolean, reviews: number, decisions: number) => ({
+    id,
+    canAct,
+    pending: { reviews, decisions },
+  });
+
+  test("missions you can act on with something pending, and their items", () => {
+    const list = [mission("m1", true, 1, 1), mission("m2", false, 2, 0), mission("m3", true, 0, 0)];
+    expect(missionsWaiting(list).map((m) => m.id)).toEqual(["m1"]);
+    expect(missionWaitingItems(mission("m", true, 2, 3))).toBe(5);
+  });
+
+  test("open agent questions only", () => {
+    const items = [
+      { id: "1", kind: "agent_question", doneAt: null },
+      { id: "2", kind: "agent_question", doneAt: at(1) },
+      { id: "3", kind: "mention", doneAt: null },
+    ] as const;
+    expect(openQuestions([...items]).map((n) => n.id)).toEqual(["1"]);
+  });
+
+  test("the count: requests, mission items and questions", () => {
+    expect(waitingTotal({ approvals: 2, missions: [mission("m", true, 1, 2)], questions: 1 })).toBe(6);
+    expect(waitingTotal({ approvals: 0, missions: [], questions: 0 })).toBe(0);
   });
 });

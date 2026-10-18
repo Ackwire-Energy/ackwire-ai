@@ -71,6 +71,10 @@ describe("cover parallax", () => {
 });
 
 describe("tab glyphs", () => {
+  test("three tabs: Conversas, Agentes, Atividade", () => {
+    expect([...TAB_GLYPHS]).toEqual(["chats", "agents", "activity"]);
+  });
+
   test("every glyph in both states is a 24×24 SVG with finite numbers", () => {
     for (const glyph of TAB_GLYPHS) {
       for (const selected of [false, true]) {

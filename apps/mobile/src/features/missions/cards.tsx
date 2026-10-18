@@ -13,7 +13,7 @@ import {
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, Icon, PixelOrbit, PlanTrack, Text, useToast } from "@/ui";
+import { Button, Chip, Count, Icon, PixelOrbit, PlanTrack, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -72,10 +72,18 @@ export function MissionCardView({ mission: m, pinned = false }: { mission: Missi
           {t("mobile.mission.kind")}
         </Text>
         <View style={styles.grow} />
-        {working ? <PixelOrbit color={color} size={11} /> : null}
-        <Text variant="caption" tone="muted">
-          {working ? t("mobile.mission.working", { name: agent?.name ?? "" }) : t(`mobile.mission.status.${m.status}`)}
-        </Text>
+        <Chip
+          {...(working
+            ? { leading: <PixelOrbit color={color} size={11} /> }
+            : m.status === "done"
+              ? { icon: "checkc" as const }
+              : m.status === "paused"
+                ? { icon: "pause" as const }
+                : {})}
+          label={
+            working ? t("mobile.mission.working", { name: agent?.name ?? "" }) : t(`mobile.mission.status.${m.status}`)
+          }
+        />
       </View>
       <Text variant="body" style={[styles.bold, pinned ? styles.titlePinned : styles.title]} numberOfLines={2}>
         {m.title}
@@ -447,7 +455,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
 }
 
 const styles = StyleSheet.create({
-  mcard: { marginTop: 8, padding: 12, borderRadius: 16, gap: 0 },
+  mcard: { marginTop: 8, padding: 14, borderRadius: 20, gap: 0 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1 },

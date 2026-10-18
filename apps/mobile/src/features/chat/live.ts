@@ -1,4 +1,5 @@
 import {
+  type AgentQuestion,
   applyChannelEvent,
   applyConsultEvent,
   type ChannelEvent,
@@ -25,7 +26,7 @@ import { useConnection } from "../shared/hooks";
 /**
  * A conversation, live: subscribes to its channel while the screen is open,
  * keeps the message caches current (new messages, reactions, approvals,
- * threads, missions) and holds the runs in progress (streaming text, who is
+ * agents' questions, threads, missions) and holds the runs in progress (streaming text, who is
  * working, agents asking agents). The database stays the truth: on open and
  * after a reconnect the active runs come from the server.
  */
@@ -93,6 +94,17 @@ export function cachePinned(qc: QueryClient, orgId: string, channelId: string, m
   });
 }
 
+/** A question was asked or answered: its card (`meta.question`) in every loaded list of the channel. */
+function cacheQuestion(qc: QueryClient, orgId: string, channelId: string, question: AgentQuestion) {
+  if (!question.messageId) return;
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === question.messageId)) return data;
+    return list.map((m) => (m.id === question.messageId ? { ...m, meta: { ...m.meta, question } } : m));
+  });
+}
+
 /** What each event changes in the caches (the run rows are the reducer's). */
 function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: ChannelEvent) {
   switch (event.type) {
@@ -132,6 +144,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       void qc.invalidateQueries({ queryKey: keys.missions(orgId) });
       if (event.change === "suggestion" || event.change === "closed" || event.change === "done")
         void qc.invalidateQueries({ queryKey: keys.thread(orgId, event.channelId, event.threadId) });
+      break;
+    case "question.asked":
+    case "question.answered":
+      cacheQuestion(qc, orgId, channelId, event.question);
       break;
     case "machine.task":
       if (event.task.threadId) void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, event.task.threadId) });

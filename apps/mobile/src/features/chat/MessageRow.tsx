@@ -9,7 +9,7 @@ import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/car
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
-import { ApprovalInline, ConsultationCard, FileCard, StepsCard, ThreadLink } from "./cards";
+import { ApprovalInline, ConsultationCard, FileCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
 import {
   approvalIdOf,
   artifactsOf,
@@ -18,6 +18,7 @@ import {
   missionCardRef,
   missionLinkOf,
   missionPlanOf,
+  questionOf,
   reactionPills,
   workStepsOf,
 } from "./logic";
@@ -62,6 +63,7 @@ export const MessageRow = memo(function MessageRow({
   const plan = missionPlanOf(meta);
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
+  const question = isAgent ? questionOf(meta) : null;
 
   return (
     <Pressable
@@ -114,6 +116,7 @@ export const MessageRow = memo(function MessageRow({
           />
         ))}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
+        {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
         {thread && !meta?.missionStart ? <ThreadLink thread={thread} /> : null}
         {meta?.missionStart ? <MissionCard threadId={m.id} /> : null}
         {link ? <MissionCard missionId={link.missionId} /> : null}

@@ -3,12 +3,14 @@ import {
   artifactsOf,
   buildRows,
   consultationsOf,
+  hidesBody,
   mergeTimeline,
   missionCardRef,
   missionPlanOf,
   parseBlocks,
   parseInline,
   parseSlash,
+  questionOf,
   reactionEmoji,
   reactionName,
   reactionPills,
@@ -215,5 +217,48 @@ describe("markdown", () => {
     expect(blocks[1]).toEqual({ kind: "paragraph", inline: [{ kind: "text", text: "Linha um\nlinha dois" }] });
     expect(blocks[3]).toMatchObject({ kind: "bullet", ordinal: "2" });
     expect(blocks[5]).toEqual({ kind: "code", text: "const a = 1;" });
+  });
+});
+
+describe("an agent's question (ask_user)", () => {
+  const question = {
+    id: "q1",
+    agentId: "dev",
+    channelId: "c1",
+    threadId: null,
+    messageId: "m1",
+    text: "Publico agora ou depois das 18h?",
+    choices: ["Agora", "Depois das 18h", 3],
+    status: "open",
+    answer: null,
+    answeredByUserId: null,
+  };
+
+  test("meta.question becomes the card's data; bad shapes are ignored", () => {
+    expect(questionOf({ question })).toEqual({ ...question, choices: ["Agora", "Depois das 18h"] });
+    expect(questionOf({ question: { ...question, choices: [] } })?.choices).toBeNull();
+    expect(questionOf({ question: { ...question, status: "answered", answer: "Agora" } })).toMatchObject({
+      status: "answered",
+      answer: "Agora",
+    });
+    expect(questionOf({ question: { id: "q", text: "" } })).toBeNull();
+    expect(questionOf({})).toBeNull();
+    expect(questionOf(undefined)).toBeNull();
+  });
+
+  test("the question stands alone and its text is not repeated above the card", () => {
+    const asked = message({
+      id: "m1",
+      author: { type: "agent", id: "dev" },
+      body: "Publico agora ou depois das 18h?",
+      meta: { question },
+    });
+    expect(hidesBody(asked)).toBe(true);
+    expect(hidesBody({ ...asked, body: "Antes, uma pergunta." })).toBe(false);
+    const rows = buildRows([message({ id: "p", author: { type: "agent", id: "dev" }, createdAt: at(11) }), asked]);
+    expect(rows.filter((r) => r.kind === "message").map((r) => r.kind === "message" && r.grouped)).toEqual([
+      false,
+      false,
+    ]);
   });
 });

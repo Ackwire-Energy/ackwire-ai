@@ -199,12 +199,15 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: "row", alignItems: "center" },
 });
 
-/** A raised, neutral surface (the cards inside messages): raised background, the e1 shadow and lit top edge. */
-export function useSurface() {
+/**
+ * A raised, neutral surface (the cards inside messages): raised background, the e1 shadow (e2 for what
+ * asks for you: an approval) and lit top edge.
+ */
+export function useSurface(elevation: "e1" | "e2" = "e1") {
   const { colors, shadows } = useTheme();
   return useMemo(
-    () => ({ backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }),
-    [colors.raised, shadows],
+    () => ({ backgroundColor: colors.raised, boxShadow: `${shadows[elevation]}, ${shadows.top}` }),
+    [colors.raised, shadows, elevation],
   );
 }
 

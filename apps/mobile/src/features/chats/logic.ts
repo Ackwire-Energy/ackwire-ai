@@ -1,4 +1,12 @@
-import type { Channel, DirectMessage, MissionStatus, ThreadActor, ThreadInfo } from "@agenteschat/client";
+import type {
+  AppNotification,
+  Channel,
+  DirectMessage,
+  Mission,
+  MissionStatus,
+  ThreadActor,
+  ThreadInfo,
+} from "@agenteschat/client";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -6,8 +14,9 @@ import { previewOf } from "../shared/logic";
  * (newest activity first), its filters and counts.
  */
 
-export type ChatFilter = "all" | "unread" | "threads" | "dm";
-export const CHAT_FILTERS: ChatFilter[] = ["all", "unread", "threads", "dm"];
+export type ChatFilter = "all" | "unread" | "dm" | "threads";
+/** In the order the chips show them (Todas, Não lidas, Diretas, Threads e missões). */
+export const CHAT_FILTERS: ChatFilter[] = ["all", "unread", "dm", "threads"];
 
 export interface LastLine {
   author: ThreadActor | null;
@@ -35,6 +44,8 @@ export type ConversationRow =
       last: LastLine | null;
       at: string | null;
       unread: number;
+      /** An agent DM where the agent is working right now ("trabalhando…"). */
+      working: boolean;
     }
   | {
       kind: "thread" | "mission";
@@ -74,11 +85,15 @@ export function isListedThread(t: Pick<ThreadInfo, "mission" | "title" | "contex
 
 export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || previewOf(t.rootText);
 
-/** One list: threads and missions, DMs and channels, by the latest activity (channels without any last, by name). */
+/**
+ * One list: threads and missions, DMs and channels, by the latest activity (channels without any last, by
+ * name). `workingChannels`: conversations where an agent has a run in progress (who is working now).
+ */
 export function buildConversations(input: {
   channels: Channel[];
   dms: DirectMessage[];
   threads: ThreadInfo[];
+  workingChannels?: ReadonlySet<string>;
 }): ConversationRow[] {
   const rows: ConversationRow[] = [];
   for (const t of input.threads) {
@@ -124,6 +139,7 @@ export function buildConversations(input: {
         : null,
       at: d.lastMessage?.createdAt ?? null,
       unread: Math.max(0, d.unread),
+      working: d.with.type === "agent" && Boolean(input.workingChannels?.has(d.channelId)),
     });
   }
   for (const c of input.channels) {
@@ -194,4 +210,27 @@ export function filterCounts(rows: ConversationRow[]): Record<ChatFilter, number
     threads: rows.filter((r) => r.kind === "thread" || r.kind === "mission").length,
     dm: rows.filter((r) => r.kind === "dm").length,
   };
+}
+
+// ── Esperando você (top of Conversas) ───────────────────────────────────────
+
+/** Agents' questions still open in the inbox ("Pergunta"). */
+export function openQuestions<T extends Pick<AppNotification, "kind" | "doneAt">>(items: T[]): T[] {
+  return items.filter((n) => n.kind === "agent_question" && !n.doneAt);
+}
+
+/** Missions with a review or a decision you may act on, and how many items each has. */
+export function missionsWaiting<T extends Pick<Mission, "canAct" | "pending">>(list: T[]): T[] {
+  return list.filter((m) => m.canAct && m.pending.reviews + m.pending.decisions > 0);
+}
+
+export const missionWaitingItems = (m: Pick<Mission, "pending">) => m.pending.reviews + m.pending.decisions;
+
+/** The count next to "Esperando você": requests, mission items and open questions. */
+export function waitingTotal(input: {
+  approvals: number;
+  missions: Pick<Mission, "pending">[];
+  questions: number;
+}): number {
+  return input.approvals + input.missions.reduce((n, m) => n + missionWaitingItems(m), 0) + input.questions;
 }

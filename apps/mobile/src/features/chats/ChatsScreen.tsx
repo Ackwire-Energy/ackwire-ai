@@ -1,174 +1,137 @@
-import { keys, useApi, useMe } from "@agenteschat/client";
+import { keys, useChannels, useMissionList, useNotifications } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import { Card, EmptyState, Filters, LargeTitleScreen, SearchField, Text, useToast } from "@/ui";
-import { chatHref } from "../links/logic";
-import { AgentFace, Face } from "../shared/Face";
-import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
-import { PromptForm, SheetTitle } from "../shared/PromptForm";
-import { ActionList, Tile } from "../shared/parts";
-import { useConversations } from "../shared/queries";
-import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { RefreshControl, StyleSheet, View } from "react-native";
+import { EmptyState, Filters, LargeTitleScreen, Text } from "@/ui";
+import { busyAgents } from "../agents/logic";
+import { SearchResults } from "../search/SearchResults";
+import { useOrgId, usePullRefresh } from "../shared/hooks";
+import { useConversations, useWaitingApprovals, useWorkingNow } from "../shared/queries";
+import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
-import { type ChatFilter, filterConversations, filterCounts } from "./logic";
+import { FirstAgentEmpty, GREETING_HEIGHT, PullDownGreeting } from "./Greeting";
+import {
+  CHAT_FILTERS,
+  type ChatFilter,
+  filterConversations,
+  filterCounts,
+  missionsWaiting,
+  openQuestions,
+  waitingTotal,
+} from "./logic";
+import { WaitingRail } from "./WaitingRail";
 
-/** Conversas: everything you talk in, with filters; "+" starts a conversation. */
+/** Rows of the list whose agent moves (a long list stays light). */
+const LIVE_ROWS = 6;
+/** How often who is working is asked again while Conversas shows (runs start in conversations it doesn't follow). */
+const WORKING_POLL_MS = 20_000;
+
+/**
+ * Conversas, the home (MobileConversas.html): agents, channels, DMs, threads and missions in one list by
+ * activity, under the native large title with your avatar (Você) and "+" (Novo) in the bar and the native
+ * search bar. "Esperando você" sits on top when something waits (requests, missions, agents' questions);
+ * pulling the list down shows the old Início's sky (greeting and crew). Empty, it invites the first agent.
+ */
 export function ChatsScreen() {
-  return (
-    <SheetHostProvider>
-      <Chats />
-    </SheetHostProvider>
-  );
-}
-
-function Chats() {
   const { t } = useTranslation();
-  const sheet = useSheet();
+  const orgId = useOrgId();
+  const qc = useQueryClient();
+  const focused = useIsFocused();
+  const header = useTabHeader();
   const list = useConversations();
+  const work = useWorkingNow();
+  const approvals = useWaitingApprovals();
+  const waitingMissions = useMissionList(orgId, { status: "waiting_you" });
+  const inbox = useNotifications(orgId, "waiting");
+  const channels = useChannels(orgId);
   const [filter, setFilter] = useState<ChatFilter>("all");
-  // Busca → "Nova conversa" opens this screen with `?new=1`.
-  const params = useLocalSearchParams<{ new?: string }>();
+  const [q, setQ] = useState("");
+  const [searching, setSearching] = useState(false);
+
   useEffect(() => {
-    if (!params.new) return;
-    sheet.open(<NewConversation />);
-    router.setParams({ new: undefined });
-  }, [params.new, sheet]);
-  const pull = usePullRefresh(list.refetch);
+    if (!focused) return;
+    const timer = setInterval(() => void qc.invalidateQueries({ queryKey: keys.working(orgId) }), WORKING_POLL_MS);
+    return () => clearInterval(timer);
+  }, [focused, qc, orgId]);
+
+  const missions = missionsWaiting(waitingMissions.data?.missions ?? []);
+  const questions = openQuestions(inbox.data?.pages.flatMap((p) => p.items) ?? []);
+  const waiting = waitingTotal({ approvals: approvals.length, missions, questions: questions.length });
+  const busy = busyAgents(work);
+  const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waitingMissions.refetch(), inbox.refetch()]));
   const counts = filterCounts(list.rows);
   const rows = filterConversations(list.rows, filter);
+  const channelName = (id: string | null | undefined) =>
+    (id ? channels.data?.find((c) => c.id === id)?.name : null) ?? null;
+  const showResults = searching || Boolean(q.trim());
+  const empty = !list.loading && list.rows.length === 0;
+  const labels: Record<ChatFilter, string> = {
+    all: t("mobile.chats.filter.all"),
+    unread: t("mobile.chats.filter.unread"),
+    dm: t("mobile.chats.filter.dm"),
+    threads: t("mobile.chats.filter.threads"),
+  };
+
   return (
     <LargeTitleScreen
       title={t("mobile.chats.title")}
-      actions={[
-        { icon: "plus", sf: "plus", label: t("mobile.chats.new"), onPress: () => sheet.open(<NewConversation />) },
-      ]}
-      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+      left={header.left}
+      actions={header.actions}
+      search={{ placeholder: t("mobile.find.short"), onChangeText: setQ, onActiveChange: setSearching }}
+      pullDown={showResults || empty ? undefined : <PullDownGreeting busy={busy} waiting={waiting} />}
+      pullDownHeight={GREETING_HEIGHT}
+      refreshControl={
+        showResults ? undefined : <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
+      }
     >
-      <Pressable
-        onPress={() => router.push("/search")}
-        accessibilityRole="search"
-        accessibilityLabel={t("mobile.find.title")}
-        style={styles.search}
-      >
-        <View pointerEvents="none">
-          <SearchField value="" onChangeText={ignore} editable={false} placeholder={t("mobile.find.short")} />
-        </View>
-      </Pressable>
-      <Filters
-        items={[
-          { key: "all", label: t("mobile.chats.filter.all") },
-          { key: "unread", label: t("mobile.chats.filter.unread"), count: counts.unread },
-          { key: "threads", label: t("mobile.chats.filter.threads") },
-          { key: "dm", label: t("mobile.chats.filter.dm") },
-        ]}
-        value={filter}
-        onChange={(key) => setFilter(key as ChatFilter)}
-      />
-      <View style={styles.list}>
-        {list.loading ? (
-          <Text tone="faint" style={styles.center}>
-            {t("mobile.common.loading")}
-          </Text>
-        ) : rows.length === 0 ? (
-          <EmptyState title={filter === "unread" ? t("mobile.chats.allRead") : t("mobile.chats.empty")} />
-        ) : (
-          <Card>
-            {rows.map((r, i) => (
-              <ConversationRowView key={r.key} row={r} divider={i > 0} />
-            ))}
-          </Card>
-        )}
-      </View>
+      {showResults ? (
+        <SearchResults q={q} />
+      ) : (
+        <>
+          {waiting > 0 ? (
+            <WaitingRail
+              approvals={approvals}
+              missions={missions}
+              questions={questions}
+              channelName={channelName}
+              total={waiting}
+            />
+          ) : null}
+          {empty ? (
+            <FirstAgentEmpty />
+          ) : (
+            <>
+              <Filters
+                items={CHAT_FILTERS.map((key) => ({
+                  key,
+                  label: labels[key],
+                  ...(key === "unread" ? { count: counts.unread } : {}),
+                }))}
+                value={filter}
+                onChange={(key) => setFilter(key as ChatFilter)}
+              />
+              <View style={styles.list}>
+                {list.loading ? (
+                  <Text tone="faint" style={styles.center}>
+                    {t("mobile.common.loading")}
+                  </Text>
+                ) : rows.length === 0 ? (
+                  <EmptyState title={filter === "unread" ? t("mobile.chats.allRead") : t("mobile.chats.empty")} />
+                ) : (
+                  rows.map((r, i) => <ConversationRowView key={r.key} row={r} divider={i > 0} live={i < LIVE_ROWS} />)
+                )}
+              </View>
+            </>
+          )}
+        </>
+      )}
     </LargeTitleScreen>
   );
 }
 
-/** The field here only opens Busca. */
-const ignore = () => undefined;
-
-/** "Nova conversa": an agent, a person, or a new channel. */
-export function NewConversation() {
-  const { t } = useTranslation();
-  const api = useApi();
-  const orgId = useOrgId();
-  const qc = useQueryClient();
-  const dir = useDirectory();
-  const me = useMe();
-  const toast = useToast();
-  const sheet = useSheet();
-  const open = (target: { agentId: string } | { userId: string }) =>
-    api.dms
-      .open(orgId, target)
-      .then(({ channelId }) => {
-        sheet.close();
-        void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
-        router.push(chatHref(channelId));
-      })
-      .catch(() => toast({ title: t("mobile.app.failed"), icon: "x" }));
-  const people = [...dir.memberById.values()].filter((m) => m.userId !== me.data?.user.id);
-  const agents = dir.agents.filter((a) => a.canTalk !== false);
-  return (
-    <>
-      <SheetTitle title={t("mobile.chats.new")} />
-      {agents.length > 0 ? (
-        <ActionList
-          items={agents.map((a) => ({
-            key: a.id,
-            leading: <AgentFace agentId={a.id} size={28} live={false} />,
-            label: a.name,
-            ...(a.role ? { hint: a.role } : {}),
-            onPress: () => void open({ agentId: a.id }),
-          }))}
-        />
-      ) : null}
-      {people.length > 0 ? (
-        <ActionList
-          items={people.map((p) => ({
-            key: p.userId,
-            leading: <Face who={{ type: "person", id: p.userId }} size={28} />,
-            label: p.name,
-            onPress: () => void open({ userId: p.userId }),
-          }))}
-        />
-      ) : null}
-      <ActionList
-        items={[
-          {
-            key: "channel",
-            leading: <Tile icon="hash" size={28} />,
-            label: t("mobile.chats.newChannel"),
-            hint: t("mobile.chats.newChannelHint"),
-            onPress: () =>
-              sheet.open(
-                <PromptForm
-                  leading={<Tile icon="hash" />}
-                  title={t("mobile.chats.newChannel")}
-                  placeholder={t("mobile.chats.channelPlaceholder")}
-                  submitLabel={t("mobile.chats.createChannel")}
-                  onSubmit={(name) =>
-                    api.chat
-                      .createChannel(orgId, { name: name.replace(/^#/, "") })
-                      .then((ch) => {
-                        sheet.close();
-                        void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
-                        router.push(chatHref(ch.id));
-                      })
-                      .catch(() => toast({ title: t("mobile.app.failed"), icon: "x" }))
-                  }
-                />,
-              ),
-          },
-        ]}
-      />
-    </>
-  );
-}
-
 const styles = StyleSheet.create({
-  search: { marginHorizontal: 16, marginBottom: 12 },
-  list: { paddingHorizontal: 16, marginTop: 12 },
+  list: { marginTop: 8 },
   center: { textAlign: "center", paddingVertical: 40 },
 });

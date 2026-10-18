@@ -1,20 +1,32 @@
-import { type MessageConsultation, type ThreadInfo, useApi, useApproval, useRun } from "@agenteschat/client";
+import {
+  type AgentQuestion,
+  type MessageConsultation,
+  type ThreadInfo,
+  useApi,
+  useApproval,
+  useDecideApproval,
+  useRun,
+} from "@agenteschat/client";
 import { toolLabel, workFromSteps } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, Icon, Text, useToast } from "@/ui";
+import { Button, Chip, Count, Fuse, HoldButton, Icon, Text, useToast } from "@/ui";
+import { approvalFacts, approvalRisk } from "../approvals/logic";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
-import { genderOf, previewOf } from "../shared/logic";
-import { tapHaptic, useSurface } from "../shared/parts";
+import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
+import { agentLook, fuseRemaining, genderOf, minutesLeft, previewOf } from "../shared/logic";
+import { PromptForm } from "../shared/PromptForm";
+import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
+import { useSheet } from "../shared/SheetHost";
 import { threadFaces } from "./logic";
 
 /**
  * The cards inside a message: the steps it took (collapsed), the agent it
- * consulted, a file, the approval it asks for, and the link to its thread.
+ * consulted, a file, the approval it asks for, an agent's question, and the
+ * link to its thread.
  */
 
 // ── Steps ────────────────────────────────────────────────────────────────────
@@ -198,7 +210,7 @@ export function FileCard({
       style={({ pressed }) => [styles.art, surface, pressed && styles.pressed]}
     >
       <View style={[styles.thumb, { backgroundColor: c.sunken }]}>
-        <Icon name="doc" size={22} color={c.muted} />
+        <Icon name="doc" size={19} color={c.muted} />
       </View>
       <View style={styles.grow}>
         <Text variant="body" style={styles.bold} numberOfLines={1}>
@@ -214,44 +226,237 @@ export function FileCard({
 
 // ── Approval ─────────────────────────────────────────────────────────────────
 
-/** "Pede sua aprovação" in the conversation; after, one line with what happened. */
+/**
+ * "Pede sua aprovação" in the conversation (MobileConversas.html): the exact action, its values, the
+ * fuse until it expires, Recusar and Aprovar (held for a second when the risk is high). After, one line
+ * with what happened. Someone who can't decide sees the request and opens it.
+ */
 export function ApprovalInline({ approvalId }: { approvalId: string }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
+  const dir = useDirectory();
   const c = useColors();
+  const now = useNow();
+  const toast = useToast();
   const surface = useSurface();
+  const raised = useSurface("e2");
   const approval = useApproval(orgId, approvalId);
+  const decide = useDecideApproval(orgId);
   const a = approval.data;
   if (!a) return null;
   if (a.status !== "pending") {
     const ok = a.status === "approved";
     return (
       <View style={[styles.done, surface]}>
-        <Icon name={ok ? "check" : "x"} size={16} color={ok ? c.ok : c.muted} />
+        <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
           {t(`mobile.chat.approval.${a.status}`, { title: a.title })}
         </Text>
       </View>
     );
   }
+  const agent = dir.agentById.get(a.agentId);
+  const name = agent?.name ?? "";
+  const g = genderOf(name);
+  const high = approvalRisk(a) === "high";
+  const facts = approvalFacts(a.params, 3);
+  const approve = () =>
+    decide.mutate(
+      { id: a.id, decision: "approve" },
+      {
+        onSuccess: () => {
+          if (!high) successHaptic();
+          toast({
+            title: t("mobile.approval.approved"),
+            subtitle: t(`mobile.approval.approvedSub${g}`, { name }),
+            agentId: a.agentId,
+          });
+        },
+        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+      },
+    );
   return (
-    <View style={[styles.askcard, surface]}>
+    <View style={[styles.askcard, raised]}>
       <View style={styles.label}>
         <Icon name="shield" size={15} color={c.muted} />
-        <Text variant="caption" tone="muted" style={styles.bold}>
+        <Text variant="caption" tone="muted" style={[styles.bold, styles.grow]}>
           {t("mobile.chat.approval.asks")}
         </Text>
+        {high ? <Chip label={t("mobile.approval.highRisk")} /> : null}
       </View>
-      <Text variant="body" style={[styles.bold, styles.h4]}>
+      <Text variant="title" style={styles.h4}>
         {a.title}
       </Text>
-      <Button
-        variant="primary"
-        size="sm"
-        wide
-        label={t("mobile.chat.approval.see")}
-        onPress={() => router.push(`/approval/${a.id}`)}
-      />
+      {facts.length > 0 ? (
+        <View style={[styles.facts, { backgroundColor: c.sunken }]}>
+          {facts.map(([k, v], i) => (
+            <View
+              key={k}
+              style={[styles.fact, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 }]}
+            >
+              <Text variant="small" tone="muted" style={styles.factKey} numberOfLines={1}>
+                {k}
+              </Text>
+              <Text variant="small" tone="ink" style={styles.grow} numberOfLines={2}>
+                {v}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.fuse}>
+        <View style={styles.grow}>
+          <Fuse color={agentLook(agent).color} remaining={fuseRemaining(a.createdAt, a.expiresAt, now)} />
+        </View>
+        <Text variant="caption" tone="faint">
+          {t("mobile.approval.expiresIn", { count: minutesLeft(a.expiresAt, now) })}
+        </Text>
+      </View>
+      {a.canDecide ? (
+        <View style={styles.acts}>
+          <Button
+            variant="secondary"
+            label={t("mobile.approval.refuse")}
+            onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+          />
+          <View style={styles.grow}>
+            {high ? (
+              <HoldButton
+                label={t("mobile.approval.hold")}
+                holdLabel={t("mobile.approval.holding")}
+                onConfirm={approve}
+              />
+            ) : (
+              <Button
+                variant="primary"
+                wide
+                icon="check"
+                label={t("mobile.approval.approve")}
+                disabled={decide.isPending}
+                onPress={approve}
+              />
+            )}
+          </View>
+        </View>
+      ) : (
+        <Button
+          variant="secondary"
+          size="sm"
+          wide
+          label={t("mobile.chat.approval.see")}
+          onPress={() => router.push(`/approval/${a.id}`)}
+        />
+      )}
+    </View>
+  );
+}
+
+// ── Question (ask_user) ──────────────────────────────────────────────────────
+
+/**
+ * An agent's question (`ask_user`, `meta.question`): the choices as buttons, or "Responder do meu jeito"
+ * for a free answer; once answered, one line with the answer. Anyone in the conversation may answer.
+ */
+export function QuestionCard({ question }: { question: AgentQuestion }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const orgId = useOrgId();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const c = useColors();
+  const toast = useToast();
+  const sheet = useSheet();
+  const surface = useSurface();
+  const [answered, setAnswered] = useState<AgentQuestion | null>(null);
+  const [picking, setPicking] = useState<string | null>(null);
+  const q = answered ?? question;
+  const agentName = dir.agentById.get(q.agentId)?.name ?? t("mobile.chat.someone");
+  const from = t(`mobile.chat.question.from${genderOf(agentName)}`, { name: agentName });
+
+  const answer = (input: { choice: string } | { text: string }) => {
+    setPicking("choice" in input ? input.choice : null);
+    return api.questions
+      .answer(orgId, q.id, input)
+      .then((res) => {
+        tapHaptic();
+        setAnswered({ ...res, answer: res.answer ?? ("choice" in input ? input.choice : input.text) });
+      })
+      .catch((err: unknown) =>
+        toast({
+          title: (err as { status?: number }).status === 409 ? t("mobile.chat.question.taken") : t("mobile.app.failed"),
+          icon: "x",
+        }),
+      )
+      .finally(() => setPicking(null));
+  };
+
+  if (q.status === "answered") {
+    const who = q.answeredByUserId && q.answeredByUserId !== meId ? dir.memberById.get(q.answeredByUserId)?.name : null;
+    return (
+      <View style={[styles.qdone, surface]}>
+        <Icon name="checkc" size={16} color={c.ok} />
+        <Text variant="small" tone="muted" style={styles.shrink}>
+          {who
+            ? t("mobile.chat.question.answered", { name: who, answer: q.answer ?? "" })
+            : t("mobile.chat.question.answeredByYou", { answer: q.answer ?? "" })}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.qcard, surface]} accessibilityLabel={from}>
+      <View style={styles.label}>
+        <Icon name="help" size={15} color={c.muted} />
+        <Text variant="caption" tone="muted" style={styles.bold}>
+          {from}
+        </Text>
+      </View>
+      <Text variant="title" style={styles.qtitle}>
+        {q.text}
+      </Text>
+      <View style={styles.opts}>
+        {(q.choices ?? []).map((choice) => {
+          const on = picking === choice;
+          return (
+            <Pressable
+              key={choice}
+              disabled={picking !== null}
+              onPress={() => void answer({ choice })}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on, disabled: picking !== null }}
+              style={({ pressed }) => [
+                styles.opt,
+                { backgroundColor: on ? c.ink : c.sunken },
+                pressed && styles.optPressed,
+              ]}
+            >
+              <Text variant="callout" style={{ color: on ? c.bg : c.ink }}>
+                {choice}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          disabled={picking !== null}
+          onPress={() =>
+            sheet.open(
+              <PromptForm
+                title={q.text}
+                placeholder={t("mobile.chat.question.placeholder")}
+                submitLabel={t("mobile.app.send")}
+                onSubmit={(text) => answer({ text }).then(() => sheet.close())}
+              />,
+            )
+          }
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.opt, styles.other, { borderColor: c.line2 }, pressed && styles.optPressed]}
+        >
+          <Icon name="pen" size={17} color={c.muted} />
+          <Text variant="callout" tone="muted">
+            {t("mobile.chat.question.own")}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -321,20 +526,57 @@ const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
-  art: { marginTop: 8, flexDirection: "row", alignItems: "center", gap: 12, padding: 10, borderRadius: 16 },
-  thumb: { width: 52, height: 52, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  art: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  thumb: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   done: {
     marginTop: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  askcard: { marginTop: 8, padding: 14, borderRadius: 20 },
+  label: { flexDirection: "row", alignItems: "center", gap: 6 },
+  h4: { marginTop: 6, marginBottom: 10, fontSize: 18, lineHeight: 23 },
+  facts: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 12 },
+  fact: { flexDirection: "row", gap: 10, paddingVertical: 7 },
+  factKey: { width: 92 },
+  fuse: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  acts: { flexDirection: "row", gap: 8, alignItems: "center" },
+  qcard: { marginTop: 8, padding: 14, borderRadius: 20 },
+  qtitle: { marginTop: 5, marginBottom: 12 },
+  opts: { gap: 6 },
+  opt: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 16,
   },
-  askcard: { marginTop: 8, padding: 12, borderRadius: 16 },
-  label: { flexDirection: "row", alignItems: "center", gap: 8 },
-  h4: { marginTop: 6, marginBottom: 10 },
+  optPressed: { transform: [{ scale: 0.98 }] },
+  other: { backgroundColor: "transparent", borderWidth: 1 },
+  qdone: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 16,
+  },
   tlink: {
     marginTop: 8,
     alignSelf: "flex-start",

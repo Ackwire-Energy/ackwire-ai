@@ -70,6 +70,15 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
 /** Agents with something in progress. */
 export const busyAgents = (work: WorkItem[]) => new Set(work.map((w) => w.agentId));
 
+/** Conversations where an agent is on something now (an agent DM shows "trabalhando…"). */
+export const busyChannels = (work: WorkItem[]) => new Set(work.map((w) => w.channelId));
+
+/** What each working agent is on: its first item (missions come first in `workingNow`). */
+export function workByAgent(work: WorkItem[]): WorkItem[] {
+  const seen = new Set<string>();
+  return work.filter((w) => !seen.has(w.agentId) && Boolean(seen.add(w.agentId)));
+}
+
 /** The crew on Início: working ones first (drawn bigger), then the rest, at most `max`. */
 export function crewOf(agents: Agent[], busy: ReadonlySet<string>, max = 6): { agent: Agent; busy: boolean }[] {
   return [...agents]

@@ -1,4 +1,4 @@
-import type { Message, MessageConsultation, MessagePin, ReactionCount } from "@agenteschat/client";
+import type { AgentQuestion, Message, MessageConsultation, MessagePin, ReactionCount } from "@agenteschat/client";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -60,6 +60,7 @@ export function standsAlone(m: Message) {
       meta.missionStart ||
       meta.missionLink ||
       meta.threadStart ||
+      questionOf(meta) ||
       consultationsOf(meta).length > 0,
   );
 }
@@ -162,8 +163,33 @@ export function artifactsOf(
   });
 }
 
-/** A message the person never needs to read as text (the card says it all). */
-export const hidesBody = (m: Message) => Boolean(approvalIdOf(m.meta) || m.meta?.missionStart || m.meta?.threadStart);
+/** `meta.question`: an agent's question (`ask_user`), with its choices and, once answered, the answer. */
+export function questionOf(meta: Message["meta"]): AgentQuestion | null {
+  const q = obj(meta?.question);
+  if (!q || !str(q.id) || !str(q.text) || !str(q.agentId)) return null;
+  const choices = Array.isArray(q.choices) ? q.choices.filter((c): c is string => typeof c === "string" && !!c) : [];
+  return {
+    id: str(q.id),
+    agentId: str(q.agentId),
+    channelId: str(q.channelId),
+    threadId: str(q.threadId) || null,
+    messageId: str(q.messageId) || null,
+    text: str(q.text),
+    choices: choices.length > 0 ? choices : null,
+    status: q.status === "answered" ? "answered" : "open",
+    answer: str(q.answer) || null,
+    answeredByUserId: str(q.answeredByUserId) || null,
+  };
+}
+
+/** A message the person never needs to read as text (the card says it all; a question's card repeats it). */
+export const hidesBody = (m: Message) =>
+  Boolean(
+    approvalIdOf(m.meta) ||
+      m.meta?.missionStart ||
+      m.meta?.threadStart ||
+      questionOf(m.meta)?.text.trim() === m.body.trim(),
+  );
 
 // ── Live work ────────────────────────────────────────────────────────────────
 

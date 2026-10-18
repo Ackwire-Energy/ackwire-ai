@@ -8,7 +8,7 @@ import {
   useWorkingRuns,
 } from "@agenteschat/client";
 import { useMemo } from "react";
-import { workingNow } from "../agents/logic";
+import { busyChannels, workingNow } from "../agents/logic";
 import { waitingApprovals } from "../approvals/logic";
 import { buildConversations, unreadConversationCount } from "../chats/logic";
 import { useNow, useOrgId } from "./hooks";
@@ -29,20 +29,22 @@ export function useWorkingNow() {
   return useMemo(() => workingNow(runs.data, missions.data?.missions), [runs.data, missions.data]);
 }
 
-/** Conversas: channels, DMs and my threads and missions, newest first. */
+/** Conversas: channels, DMs and my threads and missions, newest first (agent DMs say who is working). */
 export function useConversations() {
   const orgId = useOrgId();
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
   const threads = useThreadList(orgId, { tab: "all", mine: true, limit: 50 });
+  const work = useWorkingNow();
   const rows = useMemo(
     () =>
       buildConversations({
         channels: channels.data ?? [],
         dms: dms.data ?? [],
         threads: threads.data?.pages.flatMap((p) => p.threads) ?? [],
+        workingChannels: busyChannels(work),
       }),
-    [channels.data, dms.data, threads.data],
+    [channels.data, dms.data, threads.data, work],
   );
   return {
     rows,
