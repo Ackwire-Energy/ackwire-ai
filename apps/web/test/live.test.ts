@@ -167,8 +167,112 @@ describe("server confirmation and the safety timeout", () => {
       id: "m1",
       author: { type: "person", id: "u" },
       mentionedAgentIds: ["theo"],
-      receipts: { seenBy: ["theo"], pickedBy: [], handled: [] },
+      receipts: { seenBy: ["theo"], pickedBy: [], handled: [], blocked: ["theo"] },
     } as unknown as Message);
+    // Only when the server says the mentioned agent can't answer this person.
     expect(receiptView(fromServer.m1).status).toEqual({ kind: "nobody" });
+  });
+});
+
+describe("receipts when the mention doesn't start a new run", () => {
+  const person = (id: string, mentioned: string[], extra: Partial<Message> = {}) =>
+    ({ id, author: { type: "person", id: "u" }, mentionedAgentIds: mentioned, ...extra }) as unknown as Message;
+  const ev = (e: Partial<ChannelEvent> & { type: string }) => ({ channelId: "c1", ...e }) as ChannelEvent;
+
+  test("a mention steered into the agent's task: never 'nobody'; picked from the list receipts", () => {
+    // The old list receipts (no run of its own, nothing blocked): seen only, not "nobody".
+    const old = seedReceipt(
+      {},
+      person("m2", ["theo"], { receipts: { seenBy: ["theo"], pickedBy: [], handled: [], blocked: [] } }),
+    );
+    expect(receiptView(old.m2).status).toBeNull();
+    // Today's: the steered run is the one answering it.
+    const s = seedReceipt(
+      {},
+      person("m2", ["theo"], {
+        receipts: {
+          seenBy: ["theo"],
+          pickedBy: ["theo"],
+          handled: [{ agentId: "theo", runId: "r1", status: "running" }],
+          blocked: [],
+        },
+      }),
+    );
+    expect(receiptView(s.m2).status).toEqual({ kind: "claimed", agents: ["theo"] });
+  });
+
+  test("live: agent.run.steered marks the agent on the message; the run's end settles it", () => {
+    let s = seedReceipt({}, person("m2", ["theo"]));
+    s = applyReceiptEvent(s, ev({ type: "agent.run.steered", runId: "r1", agentId: "theo", messageId: "m2" }));
+    expect(receiptView(s.m2).status).toEqual({ kind: "claimed", agents: ["theo"] });
+    // A late "nobody picked it" decision without `blocked` doesn't hide a mention.
+    s = applyReceiptEvent(s, ev({ type: "message.routed", messageId: "m2", seenBy: ["theo"], pickedBy: [] }));
+    expect(receiptView(s.m2).status?.kind).not.toBe("nobody");
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "run.finished", threadId: "m1", runId: "r1", agentId: "theo", status: "done" }),
+    );
+    expect(receiptView(s.m2)).toMatchObject({ status: { kind: "handled", agents: ["theo"] }, done: true });
+  });
+
+  test("a reply that answers the agent's question: message.routed with its run picks the agent", () => {
+    let s = seedReceipt({}, person("m3", []));
+    s = applyReceiptEvent(
+      s,
+      ev({
+        type: "message.routed",
+        messageId: "m3",
+        seenBy: ["theo"],
+        pickedBy: ["theo"],
+        runs: [{ agentId: "theo", runId: "r1" }],
+        strategy: "mention",
+      }),
+    );
+    expect(receiptView(s.m3).status).toEqual({ kind: "picked", agents: ["theo"] });
+    s = applyReceiptEvent(s, ev({ type: "agent.typing", threadId: "root", runId: "r1", agentId: "theo" }));
+    expect(receiptView(s.m3).status?.kind).toBe("claimed");
+  });
+
+  test("a mention the agent can't answer (blocked) says 'nobody'", () => {
+    let s = seedReceipt({}, person("m4", ["theo"]));
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "message.routed", messageId: "m4", seenBy: ["theo"], pickedBy: [], blocked: ["theo"] }),
+    );
+    expect(receiptView(s.m4).status).toEqual({ kind: "nobody" });
+  });
+
+  test("a thread reply's run events land on the reply, not on the thread's root", () => {
+    // Root m1 was answered by ada; the reply m2 mentions theo, whose run r2 has threadId = m1.
+    let s = seedReceipt({}, person("m1", ["ada"]));
+    s = applyReceiptEvent(s, ev({ type: "message.handled", messageId: "m1", agentId: "ada", runId: "r1" }));
+    s = seedReceipt(s, person("m2", ["theo"], { threadId: "m1" }));
+    s = applyReceiptEvent(
+      s,
+      ev({
+        type: "message.routed",
+        messageId: "m2",
+        seenBy: ["theo"],
+        pickedBy: ["theo"],
+        runs: [{ agentId: "theo", runId: "r2" }],
+      }),
+    );
+    s = applyReceiptEvent(s, ev({ type: "agent.thinking", threadId: "m1", runId: "r2", agentId: "theo" }));
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "agent.run", threadId: "m1", runId: "r2", agentId: "theo", status: "running" }),
+    );
+    expect(receiptView(s.m2).status).toEqual({ kind: "claimed", agents: ["theo"] });
+    expect(s.m1?.agents.map(([id]) => id)).toEqual(["ada"]);
+    const reply = {
+      id: "m5",
+      threadId: "m1",
+      agentRunId: "r2",
+      author: { type: "agent", id: "theo" },
+      meta: {},
+    } as unknown as Message;
+    s = applyReceiptEvent(s, ev({ type: "message.created", messageId: "m5", message: reply }));
+    expect(receiptView(s.m2).status).toEqual({ kind: "handled", agents: ["theo"] });
+    expect(s.m1?.agents).toEqual([["ada", "handled"]]);
   });
 });

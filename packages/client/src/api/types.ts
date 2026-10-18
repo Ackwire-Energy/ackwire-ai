@@ -238,7 +238,9 @@ export interface MessageConsultation {
 export interface MessageReceipts {
   seenBy: string[];
   pickedBy: string[];
-  handled: { agentId: string; status: RunStatus }[];
+  handled: { agentId: string; runId?: string; status: RunStatus | "waiting_input" | "canceled" }[];
+  /** Agents it mentions that won't answer (they don't reply to this person). */
+  blocked?: string[];
 }
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
@@ -366,6 +368,10 @@ export type ChannelEvent =
       messageId: string;
       seenBy: string[];
       pickedBy: string[];
+      /** The run each picked agent answers with (new, steered into, or resumed by an answer). */
+      runs?: { agentId: string; runId: string }[];
+      /** Agents it mentions that won't answer. */
+      blocked?: string[];
       strategy?: "mention" | "dm" | "router" | "none";
       reason?: string;
     }

@@ -18,6 +18,8 @@ export interface RunSteeredEvent {
   type: "agent.run.steered";
   channelId: string;
   runId: string;
+  /** The run's agent (receipts: it is on this message now). */
+  agentId?: string;
   messageId: string;
   /** The new message asked it to stop: the run is wrapping up. */
   stop?: boolean;

@@ -180,6 +180,10 @@ export type ChannelEvent =
       messageId: string;
       seenBy: string[];
       pickedBy: string[];
+      /** The run each picked agent answers with (new, steered into, or resumed by an answer). */
+      runs?: { agentId: string; runId: string }[];
+      /** Agents it mentions that won't answer (they don't reply to this person, D31). */
+      blocked?: string[];
       strategy: "mention" | "dm" | "router" | "none";
       reason?: string;
     }

@@ -141,41 +141,78 @@ export interface Receipts {
   pickedBy: string[];
   handled: {
     agentId: string;
+    /** The run answering it: its own, the task it was steered into, or the run its answer resumed. */
+    runId: string;
     status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" | "canceled";
   }[];
+  /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
+  blocked: string[];
 }
 
 /**
  * Receipts for messages, from what is already stored: the routing decision
- * (candidates = seen), mentions, and the runs each message triggered.
- * Router off or no candidates → empty receipts.
+ * (candidates = seen), mentions, the runs each message triggered, the task in
+ * progress it was steered into (`meta.steeredRunIds`) and the run its answer
+ * resumed (`meta.answersQuestionId`). Router off or no candidates → empty receipts.
  */
 export async function receiptsFor(db: Database, orgId: string, list: Message[]): Promise<Map<string, Receipts>> {
   const out = new Map<string, Receipts>();
   const ids = list.map((m) => m.id);
   if (ids.length === 0) return out;
-  const [decisions, runs] = await Promise.all([
+  const steeredOf = (m: Message) =>
+    Array.isArray(m.meta.steeredRunIds) ? m.meta.steeredRunIds.filter((v): v is string => typeof v === "string") : [];
+  const questionOf = (m: Message) => (typeof m.meta.answersQuestionId === "string" ? m.meta.answersQuestionId : null);
+  const steeredIds = [...new Set(list.flatMap(steeredOf))];
+  const questionIds = [...new Set(list.map(questionOf).filter((v): v is string => v !== null))];
+  const runFields = {
+    id: schema.agentRuns.id,
+    triggerMessageId: schema.agentRuns.triggerMessageId,
+    agentId: schema.agentRuns.agentId,
+    status: schema.agentRuns.status,
+  };
+  const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
     db
       .select({ messageId: schema.routingDecisions.messageId, candidates: schema.routingDecisions.candidates })
       .from(schema.routingDecisions)
       .where(and(eq(schema.routingDecisions.orgId, orgId), inArray(schema.routingDecisions.messageId, ids))),
     db
-      .select({
-        triggerMessageId: schema.agentRuns.triggerMessageId,
-        agentId: schema.agentRuns.agentId,
-        status: schema.agentRuns.status,
-      })
+      .select(runFields)
       .from(schema.agentRuns)
       .where(and(eq(schema.agentRuns.orgId, orgId), inArray(schema.agentRuns.triggerMessageId, ids))),
+    steeredIds.length
+      ? db
+          .select(runFields)
+          .from(schema.agentRuns)
+          .where(and(eq(schema.agentRuns.orgId, orgId), inArray(schema.agentRuns.id, steeredIds)))
+      : Promise.resolve([]),
+    questionIds.length
+      ? db
+          .select({ questionId: agentQuestions.id, ...runFields })
+          .from(agentQuestions)
+          .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, agentQuestions.runId))
+          .where(and(eq(agentQuestions.orgId, orgId), inArray(agentQuestions.id, questionIds)))
+      : Promise.resolve([]),
   ]);
   const seen = new Map(decisions.map((d) => [d.messageId, d.candidates.map((c) => c.agentId)]));
+  const steeredById = new Map(steeredRuns.map((r) => [r.id, r]));
+  const answeredByQuestion = new Map(answeredRuns.map((r) => [r.questionId, r]));
   for (const m of list) {
-    const mine = runs.filter((r) => r.triggerMessageId === m.id);
-    const seenBy = [...new Set([...(seen.get(m.id) ?? []), ...m.mentionedAgentIds, ...mine.map((r) => r.agentId)])];
+    const answered = answeredByQuestion.get(questionOf(m) ?? "");
+    const all = [
+      ...runs.filter((r) => r.triggerMessageId === m.id),
+      ...steeredOf(m).flatMap((id) => steeredById.get(id) ?? []),
+      ...(answered ? [answered] : []),
+    ];
+    // One entry per agent (its own run first).
+    const mine = all.filter((r, i) => all.findIndex((o) => o.agentId === r.agentId) === i);
+    const picked = new Set(mine.map((r) => r.agentId));
+    const seenBy = [...new Set([...(seen.get(m.id) ?? []), ...m.mentionedAgentIds, ...picked])];
     out.set(m.id, {
       seenBy,
-      pickedBy: mine.map((r) => r.agentId),
-      handled: mine.map((r) => ({ agentId: r.agentId, status: r.status })),
+      pickedBy: [...picked],
+      handled: mine.map((r) => ({ agentId: r.agentId, runId: r.id, status: r.status })),
+      // A person's mention always starts, steers or resumes a run, unless that agent can't answer them.
+      blocked: m.authorType === "person" ? m.mentionedAgentIds.filter((id) => !picked.has(id)) : [],
     });
   }
   return out;
@@ -238,6 +275,8 @@ interface RawMessage {
   blocked?: string[] | string | null;
   /** Active runs this message was delivered to (no new run). */
   steered?: { id: string; agentId: string }[] | string | null;
+  /** The open question this reply answered: the run it resumes and its agent. */
+  answered?: { id: string | null; agentId: string } | string | null;
   /** The reply reopened a closed thread. */
   reopened?: boolean | null;
 }
@@ -275,6 +314,8 @@ export async function insertMessageWithRuns(
   blocked: string[];
   /** Runs already active in this conversation that will read the message at their next step. */
   steered: { id: string; agentId: string }[];
+  /** The open question a person's reply answered: the run it resumes (null if gone) and its agent. */
+  answered: { id: string | null; agentId: string } | null;
   /** A person's reply reopened a closed thread. */
   reopened: boolean;
 }> {
@@ -445,6 +486,7 @@ export async function insertMessageWithRuns(
         coalesce((select json_agg(ad.agent_id) from addressed ad where not ad.allowed), '[]'::json) as blocked,
         coalesce((select json_agg(json_build_object('id', s.id, 'agentId', s.agent_id)) from steered s), '[]'::json)
           as steered,
+        (select json_build_object('id', an.run_id, 'agentId', an.agent_id) from answered an limit 1) as answered,
         (select count(*) from jobs)::int as jobs,
         exists (select 1 from reopened) as reopened
       from m`),
@@ -484,6 +526,7 @@ export async function insertMessageWithRuns(
     runs: parseJson(row.runs, []),
     blocked: parseJson(row.blocked ?? null, [] as string[]),
     steered: parseJson(row.steered ?? null, [] as { id: string; agentId: string }[]),
+    answered: parseJson<{ id: string | null; agentId: string } | null>(row.answered ?? null, null),
     reopened: row.reopened === true || (row.reopened as unknown) === "t",
   };
 }
@@ -528,7 +571,7 @@ export async function postPersonMessage(
       ? { ...(input.meta ?? {}), ...(replyTo ? { replyTo } : {}), ...(files ? { artifacts: files } : {}) }
       : input.meta;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
-  const { message, runs, blocked, steered, reopened } = await insertMessageWithRuns(
+  const { message, runs, blocked, steered, answered, reopened } = await insertMessageWithRuns(
     deps.db,
     {
       orgId,
@@ -610,17 +653,31 @@ export async function postPersonMessage(
       }
     }
   }
-  if (runs.length > 0) {
-    // DMs are flat: replies to a top-level DM message go in the main timeline.
-    const threadId = message.threadId ?? (channel.kind === "dm" ? null : message.id);
+  // Receipts: who answers it — new runs, the task in progress it was steered into, the run its
+  // answer resumes — and the mentioned agents that won't (D31). Nothing else routes this message.
+  const answering = [
+    ...runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
+    ...steered.map((s) => ({ agentId: s.agentId, runId: s.id })),
+    ...(answered ? [{ agentId: answered.agentId, runId: answered.id }] : []),
+  ].filter((r, i, all) => all.findIndex((o) => o.agentId === r.agentId) === i);
+  const picked = new Set(answering.map((r) => r.agentId));
+  const wontAnswer =
+    message.mentionedAgentIds.length > 0 ? message.mentionedAgentIds.filter((id) => !picked.has(id)) : [];
+  if (answering.length > 0 || wontAnswer.length > 0) {
     await publishChannelEvent(deps.pubsub, {
       type: "message.routed",
       channelId,
       messageId: message.id,
-      seenBy: message.mentionedAgentIds.length > 0 ? message.mentionedAgentIds : runs.map((r) => r.agentId),
-      pickedBy: runs.map((r) => r.agentId),
+      seenBy: [...new Set([...message.mentionedAgentIds, ...picked])],
+      pickedBy: [...picked],
+      runs: answering.flatMap((r) => (r.runId ? [{ agentId: r.agentId, runId: r.runId }] : [])),
+      ...(wontAnswer.length > 0 ? { blocked: wontAnswer } : {}),
       strategy: channel.kind === "dm" && message.mentionedAgentIds.length === 0 ? "dm" : "mention",
     });
+  }
+  if (runs.length > 0) {
+    // DMs are flat: replies to a top-level DM message go in the main timeline.
+    const threadId = message.threadId ?? (channel.kind === "dm" ? null : message.id);
     for (const run of runs) {
       await publishChannelEvent(deps.pubsub, {
         type: "agent.thinking",

@@ -224,6 +224,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           messageId: message.id,
           seenBy,
           pickedBy: runs.map((r) => r.agentId),
+          runs: runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
           strategy,
           ...(reason ? { reason } : {}),
         });

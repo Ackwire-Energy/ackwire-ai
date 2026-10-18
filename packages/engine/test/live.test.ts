@@ -61,7 +61,8 @@ describe("receipts", () => {
     expect(await receiptOf(f, m.id)).toEqual({
       seenBy: [f.agent.id],
       pickedBy: [f.agent.id],
-      handled: [{ agentId: f.agent.id, status: "done" }],
+      handled: [{ agentId: f.agent.id, runId: expect.any(String), status: "done" }],
+      blocked: [],
     });
   });
 
@@ -88,9 +89,10 @@ describe("receipts", () => {
     expect(await receiptOf(f, picked.id)).toEqual({
       seenBy: [f.agent.id],
       pickedBy: [f.agent.id],
-      handled: [{ agentId: f.agent.id, status: "done" }],
+      handled: [{ agentId: f.agent.id, runId: expect.any(String), status: "done" }],
+      blocked: [],
     });
-    expect(await receiptOf(f, none.id)).toEqual({ seenBy: [f.agent.id], pickedBy: [], handled: [] });
+    expect(await receiptOf(f, none.id)).toEqual({ seenBy: [f.agent.id], pickedBy: [], handled: [], blocked: [] });
     const routed = events.filter((e) => e.type === "message.routed");
     expect(routed).toContainEqual(
       expect.objectContaining({ messageId: none.id, seenBy: [f.agent.id], pickedBy: [], strategy: "router" }),
@@ -99,7 +101,7 @@ describe("receipts", () => {
 
     const off = await post(f, "router is off now");
     await drainOutbox(f.db, f.handlers); // fixture handlers: router disabled
-    expect(await receiptOf(f, off.id)).toEqual({ seenBy: [], pickedBy: [], handled: [] });
+    expect(await receiptOf(f, off.id)).toEqual({ seenBy: [], pickedBy: [], handled: [], blocked: [] });
   });
 
   test("a failed run shows in the receipt and as message.handled failed", async () => {
@@ -107,9 +109,78 @@ describe("receipts", () => {
     const events = f.listen(f.general.id);
     const m = await post(f, "@dev hi");
     await drainOutbox(f.db, f.handlers);
-    expect((await receiptOf(f, m.id))?.handled).toEqual([{ agentId: f.agent.id, status: "failed" }]);
+    expect((await receiptOf(f, m.id))?.handled).toEqual([
+      { agentId: f.agent.id, runId: expect.any(String), status: "failed" },
+    ]);
     expect(events).toContainEqual(
       expect.objectContaining({ type: "message.handled", messageId: m.id, status: "failed" }),
+    );
+  });
+});
+
+describe("receipts when no new run starts", () => {
+  const post = (fx: Fixture, body: string, threadId?: string) =>
+    postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body, threadId });
+  const receiptOf = async (fx: Fixture, id: string, threadId?: string) =>
+    (await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id, threadId ? { threadId } : {})).find(
+      (m) => m.id === id,
+    )?.receipts;
+
+  test("a mention steered into the agent's task in progress: picked by it, never 'nobody'", async () => {
+    f = await setup();
+    const first = await post(f, "@dev look at the feedback");
+    const [run] = await f.db.select().from(schema.agentRuns);
+    const events = f.listen(f.general.id);
+    // The run is still queued: the reply in its thread goes to it (no second run).
+    const steered = await post(f, "Theo tem olhado os feedbacks? @dev", first.id);
+    expect(steered.meta.steeredRunIds).toEqual([run?.id]);
+    expect(await f.db.select().from(schema.agentRuns)).toHaveLength(1);
+    expect(await receiptOf(f, steered.id, first.id)).toEqual({
+      seenBy: [f.agent.id],
+      pickedBy: [f.agent.id],
+      handled: [{ agentId: f.agent.id, runId: run?.id ?? "", status: "queued" }],
+      blocked: [],
+    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message.routed",
+        messageId: steered.id,
+        pickedBy: [f.agent.id],
+        runs: [{ agentId: f.agent.id, runId: run?.id }],
+      }),
+    );
+    expect(events).toContainEqual(expect.objectContaining({ type: "agent.run.steered", messageId: steered.id }));
+    await drainOutbox(f.db, f.handlers);
+    expect((await receiptOf(f, steered.id, first.id))?.handled).toEqual([
+      { agentId: f.agent.id, runId: run?.id ?? "", status: "done" },
+    ]);
+  });
+
+  test("a reply that answers the agent's open question: picked by the run it resumes", async () => {
+    f = await setup({
+      askUser: true,
+      reply: (req) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        if (last.includes("tool_result")) return { chunks: ["Ok"] };
+        if (last.includes("deploy it"))
+          return { chunks: [], toolUses: [{ name: "ask_user", input: { question: "Which environment?" } }] };
+        return { chunks: ["Done."] };
+      },
+    });
+    const ask = await post(f, "@dev deploy it");
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    expect(run?.status).toBe("waiting_input");
+    const events = f.listen(f.general.id);
+    const answer = await post(f, "staging @dev", ask.id);
+    expect(typeof answer.meta.answersQuestionId).toBe("string");
+    expect(await receiptOf(f, answer.id, ask.id)).toMatchObject({
+      pickedBy: [f.agent.id],
+      handled: [{ agentId: f.agent.id, runId: run?.id }],
+      blocked: [],
+    });
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "message.routed", messageId: answer.id, pickedBy: [f.agent.id] }),
     );
   });
 });
