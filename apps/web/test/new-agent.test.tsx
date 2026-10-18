@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { AgentInput } from "@agenteschat/client";
+import { en, ptBR } from "@agenteschat/i18n";
 import { cleanup, within } from "@testing-library/react";
 import {
   freeHandle,
@@ -11,6 +12,9 @@ import {
   presetChannels,
   presetLevels,
   presetModel,
+  ROLE_GROUPS,
+  ROLE_IDS,
+  ROLE_PRESETS,
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
@@ -131,6 +135,35 @@ describe("Criar agente: steps", () => {
       model: "claude-sonnet-5-5",
       appearance: { color: "violet", eyes: "round", accessory: "headset" },
     });
+  });
+
+  test("roles for any team, in groups (tech, customers, operations); Do zero last", async () => {
+    await open();
+    const step = screen().getByRole("group", { name: "Papel" });
+    expect(
+      within(step)
+        .getAllByRole("heading", { level: 2 })
+        .map((h) => h.textContent),
+    ).toEqual(["Produto e tecnologia", "Clientes", "Operação"]);
+    const names = (heading: string) =>
+      within(within(step).getByRole("region", { name: heading }))
+        .getAllByRole("button")
+        .map((b) => b.querySelector(".newag__role-name b")?.textContent);
+    expect(names("Produto e tecnologia")).toEqual(["Dev", "Ops", "QA", "PM"]);
+    expect(names("Clientes")).toEqual(["Atendimento", "Vendas", "Marketing", "Conteúdo"]);
+    expect(names("Operação")).toEqual(["Dados", "Financeiro", "Pessoas", "Pesquisa", "Assistente"]);
+    expect(within(step).getAllByRole("button").at(-1)?.textContent).toContain("Do zero");
+
+    // A role outside engineering fills the rest the same way.
+    await click(within(step).getByRole("button", { name: /^Atendimento/ }));
+    await proceed();
+    expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("Nina");
+    expect((screen().getByLabelText("No chat") as HTMLInputElement).value).toBe("nina");
+    await proceed();
+    expect(title()).toBe("O que a Nina faz");
+    expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toContain(
+      "Enviar mensagem ao cliente, reembolso e desconto só com aprovação.",
+    );
   });
 
   test("Dev starts as Ada, whose @ is taken: the error suggests a free one and blocks the step", async () => {
@@ -424,6 +457,29 @@ describe("new-agent rules", () => {
     expect(presetModel("haiku", models, anthropic)).toBe("claude-haiku-5-5");
     expect(presetModel("opus", models, anthropic, "claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
     expect(presetModel("sonnet", models, (m) => m.provider === "openai")).toBe("gpt-5");
+  });
+
+  test("roles: each one in exactly one group, with its texts in both languages and its own starter name", () => {
+    const grouped = ROLE_GROUPS.flatMap((g) => g.roles as readonly string[]);
+    expect(grouped.toSorted()).toEqual(ROLE_IDS.filter((id) => id !== "custom").toSorted());
+    for (const dict of [ptBR, en]) {
+      const roles = dict.newAgent.roles as Record<
+        string,
+        { name: string; agent?: string; desc: string; instructions: string }
+      >;
+      for (const id of grouped) {
+        expect(roles[id]?.name).toBeTruthy();
+        expect(roles[id]?.agent).toBeTruthy();
+        expect(roles[id]?.desc).toBeTruthy();
+        expect(roles[id]?.instructions).toBeTruthy();
+      }
+      const agents = grouped.map((id) => roles[id]?.agent);
+      expect(new Set(agents).size).toBe(agents.length);
+      for (const g of ROLE_GROUPS) expect((dict.newAgent.roleGroups as Record<string, string>)[g.id]).toBeTruthy();
+    }
+    // Money starts read-only; the assistant does volume work on the cheaper family.
+    expect(ROLE_PRESETS.finance.levels).toEqual({ stripe: "read", paypal: "read", square: "read", drive: "read" });
+    expect(ROLE_PRESETS.assistant.model).toBe("haiku");
   });
 
   test("what each step needs", () => {

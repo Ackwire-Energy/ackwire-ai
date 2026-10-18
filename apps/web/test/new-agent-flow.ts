@@ -24,7 +24,7 @@ export async function proceed(times = 1) {
 }
 
 /** Picks a role on the first step and goes on to Identidade. */
-export async function startAs(role: "Dev" | "Ops" | "QA" | "PM" | "Do zero") {
+export async function startAs(role: string) {
   await click(screen().getByRole("button", { name: new RegExp(`^${role}`) }));
   await proceed();
 }

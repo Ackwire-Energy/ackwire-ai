@@ -10,8 +10,31 @@ import { handleFrom, parseAmount } from "./text";
 export const NEW_AGENT_STEPS = ["role", "identity", "instructions", "tools", "where", "model", "review"] as const;
 export type NewAgentStep = (typeof NEW_AGENT_STEPS)[number];
 
-export const ROLE_IDS = ["dev", "ops", "qa", "pm", "custom"] as const;
+export const ROLE_IDS = [
+  "dev",
+  "ops",
+  "qa",
+  "pm",
+  "support",
+  "sales",
+  "marketing",
+  "content",
+  "data",
+  "finance",
+  "people",
+  "research",
+  "assistant",
+  "custom",
+] as const;
 export type RoleId = (typeof ROLE_IDS)[number];
+
+/** The role step in groups, in order (titles in i18n: `newAgent.roleGroups.{id}`); "custom" stays apart, last. */
+export const ROLE_GROUPS = [
+  { id: "tech", roles: ["dev", "ops", "qa", "pm"] },
+  { id: "customers", roles: ["support", "sales", "marketing", "content"] },
+  { id: "operations", roles: ["data", "finance", "people", "research", "assistant"] },
+] as const satisfies readonly { id: string; roles: readonly Exclude<RoleId, "custom">[] }[];
+export type RoleGroupId = (typeof ROLE_GROUPS)[number]["id"];
 
 /** A model family a preset starts with (the catalog's own models; the first usable one of the family). */
 export type ModelFamily = "sonnet" | "haiku" | "opus";

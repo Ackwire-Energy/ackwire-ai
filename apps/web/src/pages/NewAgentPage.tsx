@@ -79,12 +79,16 @@ import {
   presetChannels,
   presetLevels,
   presetModel,
-  ROLE_IDS,
+  ROLE_GROUPS,
   ROLE_PRESETS,
+  type RoleGroupId,
   type RoleId,
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
+
+/** The icon next to each group of roles on the first step. */
+const GROUP_ICON: Record<RoleGroupId, IconName> = { tech: "code", customers: "members", operations: "layers" };
 
 /** How long the preview keeps writing after a keystroke. */
 const TYPING_MS = 700;
@@ -538,51 +542,63 @@ function NewAgentFlow() {
       <>
         {head(t("newAgent.steps.role.title"), t("newAgent.steps.role.lead"))}
         {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-        <div className="newag__roles" role="group" aria-label={t("newAgent.steps.role.name")}>
-          {ROLE_IDS.filter((id): id is Exclude<RoleId, "custom"> => id !== "custom").map((id) => {
-            const preset = ROLE_PRESETS[id];
-            const kit = connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none");
-            const room = presetChannels(id, myChannels)
-              .map((cid) => myChannels.find((c) => c.id === cid)?.name)
-              .filter(Boolean)[0];
-            return (
-              <button
-                key={id}
-                type="button"
-                className="newag__role"
-                aria-pressed={role === id}
-                onClick={() => pickRole(id)}
-              >
-                <span className="newag__check" aria-hidden="true">
-                  <Icon name="check" size={14} />
-                </span>
-                <span className="newag__role-top">
-                  <AgentAvatar
-                    name={t(`newAgent.roles.${id}.agent`)}
-                    appearance={preset.look}
-                    size="lg"
-                    className="newag__role-agent"
-                  />
-                  <span className="newag__role-name">
-                    <b>{t(`newAgent.roles.${id}.name`)}</b>
-                    <span>{t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}</span>
-                  </span>
-                </span>
-                <span className="newag__role-desc">{t(`newAgent.roles.${id}.desc`)}</span>
-                {(kit.length > 0 || room) && (
-                  <span className="newag__chips">
-                    {kit.slice(0, 3).map((i) => (
-                      <span key={i.id} className="ac-chip newag__chip">
-                        <ConnectorIcon def={i.def} label={itemName(t, i)} />
-                        {itemName(t, i)}
+        <div className="newag__role-groups" role="group" aria-label={t("newAgent.steps.role.name")}>
+          {ROLE_GROUPS.map((group) => (
+            <section key={group.id} className="newag__section" aria-labelledby={`ag-roles-${group.id}`}>
+              <div className={group.id === ROLE_GROUPS[0].id ? "newag__sect newag__sect--first" : "newag__sect"}>
+                <h2 id={`ag-roles-${group.id}`}>
+                  <Icon name={GROUP_ICON[group.id]} />
+                  {t(`newAgent.roleGroups.${group.id}`)}
+                </h2>
+              </div>
+              <div className="newag__roles">
+                {group.roles.map((id) => {
+                  const preset = ROLE_PRESETS[id];
+                  const kit = connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none");
+                  const room = presetChannels(id, myChannels)
+                    .map((cid) => myChannels.find((c) => c.id === cid)?.name)
+                    .filter(Boolean)[0];
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className="newag__role"
+                      aria-pressed={role === id}
+                      onClick={() => pickRole(id)}
+                    >
+                      <span className="newag__check" aria-hidden="true">
+                        <Icon name="check" size={14} />
                       </span>
-                    ))}
-                    {room && chip("channel", room)}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                      <span className="newag__role-top">
+                        <AgentAvatar
+                          name={t(`newAgent.roles.${id}.agent`)}
+                          appearance={preset.look}
+                          size="lg"
+                          className="newag__role-agent"
+                        />
+                        <span className="newag__role-name">
+                          <b>{t(`newAgent.roles.${id}.name`)}</b>
+                          <span>{t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}</span>
+                        </span>
+                      </span>
+                      <span className="newag__role-desc">{t(`newAgent.roles.${id}.desc`)}</span>
+                      {(kit.length > 0 || room) && (
+                        <span className="newag__chips">
+                          {kit.slice(0, 3).map((i) => (
+                            <span key={i.id} className="ac-chip newag__chip">
+                              <ConnectorIcon def={i.def} label={itemName(t, i)} />
+                              {itemName(t, i)}
+                            </span>
+                          ))}
+                          {room && chip("channel", room)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
           <button
             type="button"
             className="newag__role newag__role--blank"
