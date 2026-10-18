@@ -1220,7 +1220,8 @@ function ChannelView({
     },
   };
 
-  const reading = Boolean(chrome?.dmAgentId) && !thread;
+  // A DM with an agent: the agent's chip sits in the composer's toolbar row.
+  const agentDm = Boolean(chrome?.dmAgentId) && !thread;
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
     t("newAgent.and"),
@@ -1237,7 +1238,7 @@ function ChannelView({
       <ChannelThreadsContext.Provider value={threadsView}>
         {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
             are a left-aligned team chat (telas/RefinoUI.html, "Conversa: Nova leitura"). */}
-        <main className={cx("shell__main shell__main--chat", reading && "chat--reading")}>
+        <main className="shell__main shell__main--chat">
           {chrome?.header ?? (
             <header className="channel__header">
               <NavToggle />
@@ -1500,7 +1501,7 @@ function ChannelView({
                       sendText={t("channel.send")}
                       attachLabel={t("channel.attach")}
                       pills={composerPills}
-                      inlinePills={reading}
+                      inlinePills={agentDm}
                       links={{
                         listLabel: t("wiki.editor.suggest"),
                         search: (q) =>

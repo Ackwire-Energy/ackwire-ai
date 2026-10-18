@@ -156,11 +156,6 @@
     padding-right: 12px;
     padding-left: 12px;
   }
-  /* The reading column takes the whole phone width (16px gutter). */
-  .chat--reading .channel__messages {
-    padding-right: 4px;
-    padding-left: 4px;
-  }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
   }

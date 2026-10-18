@@ -184,6 +184,20 @@ export function Sidebar() {
     };
   }, [pathname, channels.data, dir.agents.length, people.length, rail]);
 
+  // The open conversation stays in sight: once per navigation (as soon as its row exists), a row
+  // hidden past the list's edge is brought to the middle. Later scrolling is the person's.
+  const shownFor = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retry when the lists load
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
+    if (!nav || !active || shownFor.current === pathname) return;
+    shownFor.current = pathname;
+    const n = nav.getBoundingClientRect();
+    const a = active.getBoundingClientRect();
+    if (a.top < n.top || a.bottom > n.bottom) nav.scrollTop += a.top - n.top - (nav.clientHeight - a.height) / 2;
+  }, [pathname, channels.data, dir.agents.length, people.length, rail]);
+
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
       <div className="sidebar__top">

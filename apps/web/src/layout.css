@@ -638,44 +638,18 @@ p {
   gap: 4px;
   padding: 16px 8px 24px;
 }
-/* Turns are told apart by space (RefinoUI "Nova leitura"): ~10px between messages in a team chat,
-   ~16px in a DM with an agent; the same author within 5 minutes continues the row above. */
+/* Turns are told apart by space (RefinoUI "Nova leitura"): ~10px between messages; the same author
+   within 5 minutes continues the row above. */
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: 6px;
 }
 .channel__messages > .ac-msg--grouped {
   margin-top: -4px;
 }
-/* A team chat (channels, threads, DMs between people): left-aligned and full width, the line capped. */
-.shell__main--chat:not(.chat--reading) .ac-msg__text {
+/* Every conversation (channels, threads, DMs with people or agents) is one layout: left-aligned and full
+   width, the line capped. */
+.shell__main--chat .ac-msg__text {
   max-width: 72ch;
-}
-/* A DM with an agent: one centered reading column (~740px), the composer on the same column. */
-.chat--reading {
-  --read-col: 740px;
-}
-.chat--reading .channel__messages {
-  padding-right: 24px;
-  padding-left: 24px;
-}
-.chat--reading .channel__messages > * {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: var(--read-col);
-  margin-right: auto;
-  margin-left: auto;
-}
-/* The row's padding (and hover plate) sits just outside the column, so its text lines up with it. */
-.chat--reading .channel__messages > .ac-msg {
-  max-width: calc(var(--read-col) + 2 * var(--space-4));
-}
-.chat--reading .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
-  margin-top: 12px;
-}
-.chat--reading .channel__composer > * {
-  max-width: var(--read-col);
-  margin-right: auto;
-  margin-left: auto;
 }
 .channel__composer {
   position: relative;
@@ -2552,6 +2526,8 @@ button.drive-where:focus-visible {
   text-underline-offset: 3px;
 }
 .md--message code {
+  /* The mono face runs wide: a step smaller than the text so code doesn't shout. */
+  font-size: 0.84em;
   padding: 2px 6px;
   border-radius: 6px;
   background: var(--plate);
@@ -7645,6 +7621,14 @@ a.machine-row__name:hover {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
+}
+/* The role step: groups of presets under small headings, "Do zero" last. */
+.newag__role-groups {
+  display: flex;
+  flex-direction: column;
+}
+.newag__role-groups > .newag__role--blank {
+  margin-top: 22px;
 }
 /* Pressable cards: the role presets, the models, the look options. */
 .newag__roles {

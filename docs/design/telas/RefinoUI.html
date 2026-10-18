@@ -333,11 +333,11 @@ button,input{font:inherit;color:inherit}
 [data-read="nova"] .thr span{color:var(--faint)}
 [data-read="nova"] .msg.fresh{animation:fresh 2.4s var(--out)}
 @keyframes fresh{0%,40%{background:var(--plate)}100%{background:transparent}}
-/* DM with an agent: the reading column. Channel: left-aligned like a team chat, the line still capped. */
-[data-read="nova"] .main.canal .col{max-width:none}
-[data-read="nova"] .main.canal .feed{padding:8px 28px 16px}
-[data-read="nova"] .main.canal .compose{padding:8px 28px 20px}
-[data-read="nova"] .main.canal .msg p,[data-read="nova"] .main.canal .md{max-width:72ch}
+/* One layout everywhere (approved 2026-10-18): left-aligned like a team chat, the line capped. */
+[data-read="nova"] .col{max-width:none}
+[data-read="nova"] .feed{padding:8px 28px 16px}
+[data-read="nova"] .compose{padding:8px 28px 20px}
+[data-read="nova"] .msg p,[data-read="nova"] .md{max-width:72ch}
 [data-read="nova"] .main.canal .msg{margin-top:10px}
 [data-read="nova"] .main.canal .msg.cont{margin-top:0}
 
