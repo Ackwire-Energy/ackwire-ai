@@ -129,7 +129,7 @@ export function Meter({
       aria-valuenow={value}
     >
       {/* Anything above zero keeps a visible sliver, so 0.9% doesn't read as empty. */}
-      <div className="ac-meter__bar" style={{ width: exact > 0 ? `max(6px, ${pct}%)` : 0 }} />
+      <div className="ac-meter__bar" style={exact > 0 ? { width: `${pct}%`, minWidth: 6 } : { width: 0 }} />
       {marks?.map((m) => (
         <span key={m} className="ac-meter__mark" style={{ left: `${m}%` }} aria-hidden="true" />
       ))}
