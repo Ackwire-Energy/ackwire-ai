@@ -4,14 +4,8 @@ name: Desktop
 # with Tauri (ad-hoc signed, not notarized, no updater), and on a `desktop-v*` tag publish a GitHub
 # Release with `agentes_<version>_universal.dmg` and its `.sha256` (the server reads those names).
 # Nothing runs on a developer's machine: testing means installing this build.
+# macOS runners cost about 10x Linux minutes: this runs only by hand or on a release tag, never per PR.
 on:
-  pull_request:
-    paths:
-      - "apps/desktop/**"
-      - "apps/server/runner/**"
-      - "packages/adapters/**"
-      - "packages/ui/**"
-      - ".github/workflows/desktop.yml"
   workflow_dispatch:
   push:
     tags:

@@ -1,10 +1,18 @@
 name: CI
 
 # All verification runs here, never on the developer's machine.
+# Cost: docs/Markdown-only changes don't run it, and each test group runs only when its code (or
+# something it depends on) changed; lint, boundaries and typecheck always run (they're quick).
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -16,9 +24,34 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: What changed
+        id: changed
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared:
+              - "packages/**"
+              - "package.json"
+              - "bun.lock"
+              - "tsconfig*.json"
+              - ".github/workflows/ci.yml"
+            backend:
+              - "apps/server/**"
+            web:
+              - "apps/web/**"
+            mobile:
+              - "apps/mobile/**"
+            desktop:
+              - "apps/desktop/**"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
+      - name: Cache Bun downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
       - name: Lint and format
         run: bun run lint
@@ -35,19 +68,29 @@ jobs:
       # backend tests (PGlite, servers). In one process the first PGlite database after the DOM
       # files sometimes never came up, and the whole step hung until the timeout.
       - name: Test (backend)
-        if: success() || failure()
+        if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.backend == 'true')
         timeout-minutes: 10
         shell: bash
         run: |
           set -o pipefail
           bun test packages/adapters packages/config packages/db packages/engine packages/modules packages/providers packages/client packages/i18n packages/tokens apps/server 2>&1 | tee test.log
       - name: Test (web and design system)
-        if: success() || failure()
+        if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.web == 'true' || steps.changed.outputs.mobile == 'true' || steps.changed.outputs.desktop == 'true')
         timeout-minutes: 10
         shell: bash
+        env:
+          SHARED: ${{ steps.changed.outputs.shared }}
+          WEB: ${{ steps.changed.outputs.web }}
+          MOBILE: ${{ steps.changed.outputs.mobile }}
+          DESKTOP: ${{ steps.changed.outputs.desktop }}
         run: |
           set -o pipefail
-          bun test apps/web packages/ui apps/mobile/test apps/desktop/test 2>&1 | tee -a test.log
+          # Only the groups whose code changed (shared packages change them all).
+          paths=()
+          if [ "$SHARED" = true ] || [ "$WEB" = true ]; then paths+=(apps/web packages/ui); fi
+          if [ "$SHARED" = true ] || [ "$MOBILE" = true ]; then paths+=(apps/mobile/test); fi
+          if [ "$SHARED" = true ] || [ "$DESKTOP" = true ]; then paths+=(apps/desktop/test); fi
+          bun test "${paths[@]}" 2>&1 | tee -a test.log
       # GitHub's log storage sometimes loses logs; keep the errors as an artifact and in the summary.
       - name: Keep errors
         if: always()
@@ -68,10 +111,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Build web and server
-        if: success() || failure()
+        if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.backend == 'true' || steps.changed.outputs.web == 'true')
         run: bun run build
       - name: Isolated new-event test (diagnostic, non-blocking)
-        if: always()
+        if: always() && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.web == 'true')
         continue-on-error: true
         timeout-minutes: 3
         env:
