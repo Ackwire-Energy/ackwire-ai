@@ -5184,6 +5184,8 @@ export const ptBR = {
       readOnly: "Só {{name}} e os admins mudam o que este computador libera. Daqui você vê o que está liberado.",
       readOnlyNobody: "Só admins mudam o que este computador libera. Daqui você vê o que está liberado.",
       agents: "Agentes que usam este computador",
+      agentFolders: "Usa {{folders}} e a própria pasta",
+      agentOwnFolder: "Só a própria pasta",
     },
     access: {
       folders: "Pastas liberadas",

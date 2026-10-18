@@ -6451,8 +6451,41 @@ a.machine-row__name:hover {
     padding-left: 0;
   }
 }
+/* Agents using the computer: one row each (face, name, what it may use), to its page. */
+.machine-page__agents {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
 .machine-page__agent {
+  display: flex;
   align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.12s;
+}
+.machine-page__agent + .machine-page__agent {
+  border-top: 1px solid var(--line);
+}
+.machine-page__agent:hover {
+  background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
+}
+.machine-page__agent > .ac-icon {
+  flex: none;
+  color: var(--faint);
+}
+.machine-page__agent-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-page__agent-name .muted {
+  font-weight: 400;
 }
 .machine-folder,
 .machine-tool {

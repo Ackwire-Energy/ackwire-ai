@@ -5175,6 +5175,8 @@ export const en: Translations = {
       readOnly: "Only {{name}} and admins change what this computer allows. Here you see what is allowed.",
       readOnlyNobody: "Only admins change what this computer allows. Here you see what is allowed.",
       agents: "Agents that use this computer",
+      agentFolders: "Uses {{folders}} and its own folder",
+      agentOwnFolder: "Only its own folder",
     },
     access: {
       folders: "Allowed folders",

@@ -790,14 +790,35 @@ export function MachinePage({ machineId }: { machineId: string }) {
         {m.agents.length > 0 && (
           <div className="stack-4" style={{ gap: 6 }}>
             <span className="newag__label">{t("machines.page.agents")}</span>
-            <span className="row" style={{ gap: 8 }}>
-              {m.agents.map((a) => (
-                <span key={a.id} className="row machine-page__agent" style={{ gap: 6 }}>
-                  <AgentAvatar agentId={a.id} size="sm" name={a.name} />
-                  <span className="small">{a.name}</span>
-                </span>
-              ))}
-            </span>
+            <div className="machine-page__agents">
+              {m.agents.map((a) => {
+                // What this agent may use here, beyond its own folder (only who may see the access knows).
+                const folders = m.access?.folders.filter((f) => f.agents.includes(a.id)).map((f) => folderName(f.path));
+                return (
+                  <Link
+                    key={a.id}
+                    to="/org/$orgId/agents/$agentId"
+                    params={{ orgId: org.id, agentId: a.id }}
+                    className="machine-page__agent"
+                  >
+                    <AgentAvatar agentId={a.id} size="md" name={a.name} />
+                    <span className="list-col" style={{ minWidth: 0, flex: 1 }}>
+                      <span className="machine-page__agent-name">
+                        {a.name} <span className="muted">@{a.handle}</span>
+                      </span>
+                      {folders && (
+                        <span className="small muted">
+                          {folders.length > 0
+                            ? t("machines.page.agentFolders", { folders: joinNames(folders, t("newAgent.and")) })
+                            : t("machines.page.agentOwnFolder")}
+                        </span>
+                      )}
+                    </span>
+                    <Icon name="chevronRight" />
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
       </Card>
