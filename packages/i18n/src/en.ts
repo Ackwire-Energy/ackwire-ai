@@ -703,7 +703,7 @@ export const en: Translations = {
       unread: "Unread",
       reactions: "Reactions",
     },
-    keys: { move: "move", done: "done", reply: "reply", open: "open" },
+    keys: { title: "Shortcuts", move: "Move between notifications", done: "Mark as done", reply: "Reply", open: "Open" },
     day: { today: "Today", yesterday: "Yesterday", week: "This week", older: "Older" },
     dayUnread_one: "{{count}} unread",
     dayUnread_other: "{{count}} unread",

@@ -614,6 +614,16 @@ function Row({
           <span className="nt-what">
             <Headline n={n} dir={dir} channelName={channelName} />
           </span>
+          {!reaction && (
+            <span className="nt-tags">
+              <SourceChip n={n} channelName={channelName} />
+              {n.kind === "issue_status" && (l.statusFrom || l.statusTo) && (
+                <Chip icon="arrowRight" className="nt-chip-ink">
+                  {t("notifications.status", { from: statusName(t, l.statusFrom), to: statusName(t, l.statusTo) })}
+                </Chip>
+              )}
+            </span>
+          )}
           <span className="nt-tm">{whenText(t, i18n.language, n.updatedAt)}</span>
         </div>
         {reaction ? (
@@ -638,14 +648,6 @@ function Row({
           </>
         ) : (
           <>
-            <div className="nt-tags">
-              <SourceChip n={n} channelName={channelName} />
-              {n.kind === "issue_status" && (l.statusFrom || l.statusTo) && (
-                <Chip icon="arrowRight" className="nt-chip-ink">
-                  {t("notifications.status", { from: statusName(t, l.statusFrom), to: statusName(t, l.statusTo) })}
-                </Chip>
-              )}
-            </div>
             {(l.text || lead) && (
               <p className="nt-snip">
                 {lead && <b>{t("notifications.lead", { text: lead })} </b>}
@@ -1487,6 +1489,29 @@ export function NotificationsPage() {
           {list.isSuccess && <p>{summary}</p>}
         </div>
         <div className="nt-hd__acts">
+          <Menu
+            align="end"
+            label={t("notifications.keys.title")}
+            trigger={
+              <Button size="sm" variant="ghost" className="nt-keys-btn">
+                {t("notifications.keys.title")}
+              </Button>
+            }
+          >
+            <MenuHeading>{t("notifications.keys.title")}</MenuHeading>
+            <MenuItem hint="J · K" onSelect={() => {}}>
+              {t("notifications.keys.move")}
+            </MenuItem>
+            <MenuItem hint="E" onSelect={() => {}}>
+              {t("notifications.keys.done")}
+            </MenuItem>
+            <MenuItem hint="R" onSelect={() => {}}>
+              {t("notifications.keys.reply")}
+            </MenuItem>
+            <MenuItem hint="↵" onSelect={() => {}}>
+              {t("notifications.keys.open")}
+            </MenuItem>
+          </Menu>
           <Button size="sm" disabled={!counts?.unread || action.isPending} onClick={readAll}>
             {t("notifications.readAll")}
           </Button>
@@ -1508,20 +1533,6 @@ export function NotificationsPage() {
               hint: counts?.[f] ? counts[f] : undefined,
             }))}
           />
-        </div>
-        <div className="nt-keys" aria-hidden="true">
-          <Kbd>J</Kbd>
-          <Kbd>K</Kbd>
-          {t("notifications.keys.move")}
-          <span className="nt-keys__sep" />
-          <Kbd>E</Kbd>
-          {t("notifications.keys.done")}
-          <span className="nt-keys__sep" />
-          <Kbd>R</Kbd>
-          {t("notifications.keys.reply")}
-          <span className="nt-keys__sep" />
-          <Kbd>↵</Kbd>
-          {t("notifications.keys.open")}
         </div>
       </div>
 

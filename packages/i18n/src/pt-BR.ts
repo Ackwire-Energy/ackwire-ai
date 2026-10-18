@@ -709,7 +709,7 @@ export const ptBR = {
       unread: "Não lidas",
       reactions: "Reações",
     },
-    keys: { move: "mover", done: "feito", reply: "responder", open: "abrir" },
+    keys: { title: "Atalhos", move: "Mover entre as notificações", done: "Marcar como feita", reply: "Responder", open: "Abrir" },
     day: { today: "Hoje", yesterday: "Ontem", week: "Esta semana", older: "Mais antigas" },
     dayUnread_one: "{{count}} não lida",
     dayUnread_other: "{{count}} não lidas",
