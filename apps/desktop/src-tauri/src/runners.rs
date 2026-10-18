@@ -134,6 +134,11 @@ impl Runners {
         self.lock().is_empty()
     }
 
+    /// Whether any home is signed in to an organization (its config holds a token).
+    pub fn any_paired(&self) -> bool {
+        self.lock().values().any(|r| paired_home(&r.dir))
+    }
+
     pub fn is_shut_down(&self) -> bool {
         self.shut_down.load(Ordering::SeqCst)
     }
@@ -158,10 +163,17 @@ impl Runners {
         for entry in entries.flatten() {
             let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
             let name = entry.file_name().to_string_lossy().into_owned();
-            if is_dir && valid_id(&name) {
-                self.lock().insert(name.clone(), Runner::new(entry.path()));
-                ids.push(name);
+            if !is_dir || !valid_id(&name) {
+                continue;
             }
+            // A home without a config never finished signing in (the runner writes it on pairing):
+            // drop it instead of starting a runner for it, so failed attempts don't pile up.
+            if !entry.path().join("config.json").exists() {
+                let _ = fs::remove_dir_all(entry.path());
+                continue;
+            }
+            self.lock().insert(name.clone(), Runner::new(entry.path()));
+            ids.push(name);
         }
         for id in ids {
             if let Err(err) = self.spawn(app, &id) {
@@ -432,4 +444,13 @@ fn handle_line(app: &AppHandle, home_id: &str, generation: u64, raw: &[u8]) {
             line: line.to_string(),
         },
     );
+}
+
+/// A home's `config.json` has a machine token: it is signed in (the token itself is never read further).
+fn paired_home(dir: &std::path::Path) -> bool {
+    fs::read_to_string(dir.join("config.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|v| v.get("token").and_then(|t| t.as_str()).map(|t| !t.is_empty()))
+        .unwrap_or(false)
 }

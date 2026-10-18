@@ -247,7 +247,7 @@ pub fn run() {
             let handle = app.handle().clone();
             let runners = app.state::<Runners>();
             runners.start_all(&handle);
-            if runners.is_empty() {
+            if !runners.any_paired() {
                 let _ = present(&handle, "welcome");
             }
             Ok(())
