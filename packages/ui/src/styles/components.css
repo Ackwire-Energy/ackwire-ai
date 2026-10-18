@@ -1245,7 +1245,9 @@ textarea.ac-input {
   :has(> .ac-option[aria-pressed="true"], > .ac-option[data-state="checked"])
   > .ac-option:not([aria-pressed="true"], [data-state="checked"]):hover {
   background: var(--raised);
-  box-shadow: 0 0 0 1px var(--line2), var(--e1);
+  box-shadow:
+    0 0 0 1px var(--line2),
+    var(--e1);
 }
 .ac-option[aria-pressed="true"]::after,
 .ac-option[data-state="checked"]::after {
@@ -1279,9 +1281,7 @@ textarea.ac-input {
 .ac-option[aria-pressed="true"]:has(:focus-visible),
 .ac-option[data-state="checked"]:has(:focus-visible),
 .ac-option[aria-pressed="true"]:focus-visible {
-  box-shadow:
-    var(--chosen-shadow),
-    var(--field-ring);
+  box-shadow: var(--chosen-shadow), var(--field-ring);
 }
 .ac-option__text {
   display: flex;
@@ -5055,9 +5055,7 @@ a.ac-list__row:focus-visible {
   transform: var(--chosen-lift);
 }
 .ac-optrow[data-state="checked"]:focus-visible {
-  box-shadow:
-    var(--chosen-shadow),
-    var(--field-ring);
+  box-shadow: var(--chosen-shadow), var(--field-ring);
 }
 [data-theme="dark"] .ac-optlist:has(.ac-optrow[data-state="checked"]) .ac-optrow:not([data-state="checked"]) {
   background: transparent;
