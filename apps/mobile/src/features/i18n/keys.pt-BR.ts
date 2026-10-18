@@ -511,6 +511,7 @@ export const featureKeysPtBR = {
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
+    unread: "Não lida",
     done: "Feito",
     more: "Ver mais",
     empty: "Nada esperando você. Pode respirar.",

@@ -507,6 +507,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",
+    unread: "Unread",
     done: "Done",
     more: "See more",
     empty: "Nothing is waiting for you. Breathe.",

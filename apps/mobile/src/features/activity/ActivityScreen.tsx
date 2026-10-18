@@ -1,19 +1,29 @@
 import { type AppNotification, useNotificationAction, useNotifications } from "@agenteschat/client";
 import { router } from "expo-router";
-import { memo, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import { Card, EmptyState, Filters, Icon, LargeTitleScreen, Section, Text } from "@/ui";
+import {
+  EmptyState,
+  Filters,
+  Icon,
+  LargeTitleScreen,
+  LIST_AVATAR,
+  LIST_INSET,
+  ListRow,
+  SectionHeader,
+  Text,
+} from "@/ui";
 import { notificationHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
+import { Tile, tapHaptic } from "../shared/parts";
 import { useTabHeader } from "../shared/tabHeader";
-import { type ActivityFilter, activitySections, type DayGroup, placeOf, subtitleOf, whoOf } from "./logic";
+import { type ActivityFilter, activitySections, type DayGroup, emojisOf, placeOf, subtitleOf, whoOf } from "./logic";
 
 /**
  * Atividade (D46): what waits on you on top, then the rest by day, grouped
- * as the server groups them. Swipe right to mark read or unread, left for
+ * as the server groups them, in Conversas' full-width rows under `.sec-h` headers. Swipe right to mark read or unread, left for
  * "Feito". Tapping opens where it happened.
  */
 export function ActivityScreen() {
@@ -40,24 +50,24 @@ export function ActivityScreen() {
         value={filter}
         onChange={(key) => setFilter(key as ActivityFilter)}
       />
-      {waiting.length > 0 ? (
-        <Section title={t("mobile.home.waiting")}>
-          <Card>
+      <View style={styles.list}>
+        {waiting.length > 0 ? (
+          <>
+            <SectionHeader title={t("mobile.home.waiting")} count={counts?.waiting ?? waiting.length} />
             {waiting.map((n, i) => (
-              <ActivityRow key={n.id} item={n} first={i === 0} />
+              <ActivityRow key={n.id} item={n} divider={i > 0} />
             ))}
-          </Card>
-        </Section>
-      ) : null}
-      {days.map(([group, groupItems]) => (
-        <Section key={group} title={t(`mobile.activity.day.${group satisfies DayGroup}`)}>
-          <Card>
+          </>
+        ) : null}
+        {days.map(([group, groupItems]) => (
+          <View key={group}>
+            <SectionHeader title={t(`mobile.activity.day.${group satisfies DayGroup}`)} />
             {groupItems.map((n, i) => (
-              <ActivityRow key={n.id} item={n} first={i === 0} />
+              <ActivityRow key={n.id} item={n} divider={i > 0} />
             ))}
-          </Card>
-        </Section>
-      ))}
+          </View>
+        ))}
+      </View>
       {list.hasNextPage ? (
         <Pressable onPress={() => void list.fetchNextPage()} accessibilityRole="button" style={styles.more}>
           <Text variant="small" tone="muted">
@@ -73,9 +83,15 @@ export function ActivityScreen() {
 }
 
 const SWIPE = 72;
+/** Stands in for the names in the translated title, so they can be drawn bold. */
+const NAMES = "\u2063names\u2063";
 
-/** One item: faces, who did what, the snippet, when. Swipe to act. */
-const ActivityRow = memo(function ActivityRow({ item: n, first }: { item: AppNotification; first: boolean }) {
+/**
+ * One item, in Conversas' row (MobileConversas.html, S.activity): the faces, who did what (the names bold)
+ * and when, the snippet and where; a dot on the left while unread. Swipe right to mark read or unread,
+ * left for "Feito"; tapping opens where it happened.
+ */
+const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppNotification; divider: boolean }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -92,9 +108,13 @@ const ActivityRow = memo(function ActivityRow({ item: n, first }: { item: AppNot
       ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
       : t("mobile.names.two", { first: who.first, second: who.second })
     : who.first;
-  const title = t(`mobile.activity.kind.${n.kind}`, { names, count: who.total, defaultValue: names });
-  const sub = [subtitleOf(n), placeOf(n)].filter(Boolean).join(" · ");
-  const emojis = n.kind === "reaction" ? (n.latest.emojis ?? []).slice(0, 5).join(" ") : "";
+  const template = t(`mobile.activity.kind.${n.kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
+  const parts = template.split(NAMES);
+  const title = parts.join(names);
+  const sub = [emojisOf(n).join(" "), [subtitleOf(n), placeOf(n)].filter(Boolean).join(" · ")]
+    .filter(Boolean)
+    .join(" ");
+  const time = when.short(n.updatedAt);
 
   const toggleRead = () => {
     tapHaptic();
@@ -127,8 +147,24 @@ const ActivityRow = memo(function ActivityRow({ item: n, first }: { item: AppNot
     if (href) router.push(href);
   };
   const faces = n.actors.slice(0, n.count > 1 ? 2 : 1);
+  const leading =
+    faces.length === 0 ? (
+      <Tile icon="bell" size={LIST_AVATAR} />
+    ) : faces.length === 1 ? (
+      <Face who={faceOf(faces[0])} size={faces[0]?.type === "agent" ? LIST_AVATAR - 2 : LIST_AVATAR} live={false} />
+    ) : (
+      <View style={styles.stack}>
+        <View style={styles.back}>
+          <Face who={faceOf(faces[0])} size={STACKED} live={false} />
+        </View>
+        <View style={[styles.front, { backgroundColor: c.bg, borderRadius: STACKED / 2 + 2 }]}>
+          <Face who={faceOf(faces[1])} size={STACKED} live={false} />
+        </View>
+      </View>
+    );
+  const a11y = [title, sub, time, unread ? t("mobile.activity.unread") : null].filter(Boolean).join(", ");
   return (
-    <View style={[!first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}>
+    <View>
       <View style={[StyleSheet.absoluteFill, styles.under, { backgroundColor: c.sunken }]}>
         <View style={styles.side}>
           <Icon name={unread ? "check" : "bell"} size={18} color={c.muted} />
@@ -143,70 +179,54 @@ const ActivityRow = memo(function ActivityRow({ item: n, first }: { item: AppNot
           <Icon name="archive" size={18} color={c.muted} />
         </View>
       </View>
-      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.raised }} {...responder.panHandlers}>
-        <Pressable
+      <Animated.View style={{ transform: [{ translateX: x }], backgroundColor: c.bg }} {...responder.panHandlers}>
+        <ListRow
           onPress={open}
           accessibilityRole="button"
-          accessibilityLabel={`${title}. ${sub}`}
+          accessibilityLabel={a11y}
           accessibilityActions={[
             { name: "read", label: unread ? t("mobile.activity.markRead") : t("mobile.activity.markUnread") },
             { name: "done", label: t("mobile.activity.done") },
           ]}
           onAccessibilityAction={(e) => (e.nativeEvent.actionName === "read" ? toggleRead() : done())}
-          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
-        >
-          <View style={styles.faces}>
-            {faces.length === 0 ? (
-              <Icon name="bell" size={20} color={c.muted} />
-            ) : (
-              faces.map((a, i) => (
-                <View key={`${a.type}:${a.id}`} style={i > 0 ? styles.overlap : undefined}>
-                  <Face
-                    who={{ type: a.type === "agent" ? "agent" : "person", id: a.id }}
-                    size={faces.length > 1 ? 26 : 36}
-                    live={false}
-                  />
-                </View>
-              ))
-            )}
-          </View>
-          <View style={styles.tx}>
-            <Text
-              variant="body"
-              tone={unread ? "ink" : "ink2"}
-              style={unread ? styles.bold : undefined}
-              numberOfLines={2}
-            >
-              {title}
+          dot={unread}
+          leading={leading}
+          title={
+            <Text variant="body" tone={unread ? "ink" : "ink2"} numberOfLines={2}>
+              {parts.map((part, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
+                <Fragment key={i}>
+                  {i > 0 ? (
+                    <Text variant="body" tone="ink" style={styles.bold}>
+                      {names}
+                    </Text>
+                  ) : null}
+                  {part}
+                </Fragment>
+              ))}
             </Text>
-            {sub || emojis ? (
-              <Text variant="small" tone="muted" numberOfLines={2}>
-                {[emojis, sub].filter(Boolean).join(" ")}
-              </Text>
-            ) : null}
-          </View>
-          <Text variant="caption" tone="faint">
-            {when.short(n.updatedAt)}
-          </Text>
-        </Pressable>
+          }
+          time={time}
+          sub={sub || null}
+        />
       </Animated.View>
+      {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
     </View>
   );
 });
 
+/** Two faces share the avatar box (grouped items: reactions, replies). */
+const STACKED = 36;
+const faceOf = (a: AppNotification["actors"][number] | undefined) =>
+  a ? { type: a.type === "agent" ? "agent" : "person", id: a.id } : null;
+
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    minHeight: 60,
-  },
-  faces: { flexDirection: "row", minWidth: 36, alignItems: "center" },
-  overlap: { marginLeft: -8 },
-  tx: { flex: 1, minWidth: 0 },
+  list: { marginTop: 4 },
+  stack: { width: LIST_AVATAR, height: LIST_AVATAR },
+  back: { position: "absolute", top: 0, left: 0 },
+  front: { position: "absolute", right: -2, bottom: -2, padding: 2 },
   bold: { fontWeight: "600" },
+  divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
   under: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18 },
   side: { flexDirection: "row", alignItems: "center", gap: 6 },
   more: { alignItems: "center", paddingVertical: 16 },

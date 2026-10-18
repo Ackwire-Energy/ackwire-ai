@@ -28,6 +28,7 @@ export { Icon, type IconName, type IconProps } from "./Icon";
 export { IconButton, type IconButtonProps } from "./IconButton";
 export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
+export { LIST_AVATAR, LIST_INSET, ListRow, type ListRowProps } from "./ListRow";
 export {
   CoverTabStack,
   coverBarOptions,
@@ -45,6 +46,7 @@ export { PressScale, type PressScaleProps } from "./PressScale";
 export { Row, type RowProps } from "./Row";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";
+export { SectionHeader, type SectionHeaderProps } from "./SectionHeader";
 export { Segmented, type SegmentedProps } from "./Segmented";
 export { Sheet, type SheetProps } from "./Sheet";
 export { SheetScreen, type SheetScreenProps } from "./SheetScreen";
