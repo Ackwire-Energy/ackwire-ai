@@ -26,6 +26,8 @@ import type {
   AgentAction,
   AgentComputer,
   AgentInput,
+  AgentMailbox,
+  AgentMailboxInput,
   ApiRule,
   AppNotification,
   Approval,
@@ -46,6 +48,7 @@ import type {
   IssuePatch,
   Machine,
   MachineAccessReduce,
+  MailImapInput,
   Message,
   MessageMemory,
   NotificationCount,
@@ -571,6 +574,106 @@ export const useAgentScopes = (orgId: string, agentId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId) });
 };
+
+// ── Mailboxes (ADR 0038) ────────────────────────────────────────────────────
+
+/** Which ways in this server offers (Gmail/Outlook, IMAP) and the IMAP presets. */
+export const useMailProviders = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.mailProviders(orgId),
+    queryFn: () => api.mail.providers(orgId),
+    enabled,
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+};
+
+/** The organization's mailboxes (no passwords), with the agents that use each. */
+export const useMailAccounts = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.mailAccounts(orgId),
+    queryFn: () => api.mail.accounts(orgId),
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  });
+};
+
+/** A mailbox's folders (the rules' and routines' folder pickers). */
+export const useMailFolders = (orgId: string, accountId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.mailFolders(orgId, accountId ?? ""),
+    queryFn: () => api.mail.folders(orgId, accountId ?? ""),
+    enabled: Boolean(accountId),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+};
+
+/** An agent's access and rules per mailbox. */
+export const useAgentMail = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentMail(orgId, agentId),
+    queryFn: () => api.mail.agent(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+/** Connect, rename or reconnect, and disconnect a mailbox; each refreshes every mailbox read. */
+export function useMailAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const done = () => qc.invalidateQueries({ queryKey: keys.mail(orgId) });
+  return {
+    connectImap: useMutation({
+      mutationFn: (input: MailImapInput) => api.mail.connectImap(orgId, input),
+      onSuccess: done,
+      // The form says why (wrong password, server not found…).
+      meta: { silent: true },
+    }),
+    connectComposio: useMutation({
+      mutationFn: (input: { provider: "gmail" | "outlook"; label?: string }) => api.mail.connectComposio(orgId, input),
+    }),
+    update: useMutation({
+      mutationFn: ({ accountId, ...input }: { accountId: string; label?: string; password?: string }) =>
+        api.mail.update(orgId, accountId, input),
+      onSuccess: done,
+      meta: { silent: true },
+    }),
+    disconnect: useMutation({
+      mutationFn: (accountId: string) => api.mail.disconnect(orgId, accountId),
+      onSuccess: () => {
+        void done();
+        // Routines watching it and agents' rules change with it.
+        void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+      },
+    }),
+  };
+}
+
+/** Saves an agent's level and rules for one mailbox. */
+export function useSetAgentMail(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, accountId, input }: { agentId: string; accountId: string; input: AgentMailboxInput }) =>
+      api.mail.setAgent(orgId, agentId, accountId, input),
+    // The rules panel shows the error next to the rules.
+    meta: { silent: true },
+    onSuccess: (saved, { agentId }) => {
+      qc.setQueryData<AgentMailbox[]>(keys.agentMail(orgId, agentId), (list) =>
+        list ? list.map((m) => (m.accountId === saved.accountId ? saved : m)) : list,
+      );
+      void qc.invalidateQueries({ queryKey: keys.mailAccounts(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
+    },
+  });
+}
 
 // ── Management (phase 4) ────────────────────────────────────────────────────
 

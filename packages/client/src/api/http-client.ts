@@ -9,6 +9,7 @@ import type {
   AgentChannel,
   AgentComputer,
   AgentDetail,
+  AgentMailbox,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -49,6 +50,9 @@ import type {
   Machine,
   MachineAccess,
   MachineTask,
+  MailAccount,
+  MailFolder,
+  MailProviders,
   Me,
   Member,
   Memory,
@@ -169,6 +173,32 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     working: {
       list: async (orgId) => (await request<{ runs: WorkingRun[] }>(`${org(orgId)}/active-runs`)).runs,
+    },
+    mail: {
+      providers: (orgId) => request<MailProviders>(`${org(orgId)}/mail/providers`),
+      accounts: async (orgId) => (await request<{ accounts: MailAccount[] }>(`${org(orgId)}/mail/accounts`)).accounts,
+      connectImap: async (orgId, input) =>
+        (await request<{ account: MailAccount }>(`${org(orgId)}/mail/accounts/imap`, { json: input })).account,
+      connectComposio: (orgId, input) =>
+        request<{ accountId: string; redirectUrl: string }>(`${org(orgId)}/mail/accounts/composio`, { json: input }),
+      update: async (orgId, accountId, input) =>
+        (
+          await request<{ account: MailAccount }>(`${org(orgId)}/mail/accounts/${enc(accountId)}`, {
+            method: "PATCH",
+            json: input,
+          })
+        ).account,
+      disconnect: (orgId, accountId) =>
+        request<void>(`${org(orgId)}/mail/accounts/${enc(accountId)}`, { method: "DELETE" }),
+      folders: async (orgId, accountId) =>
+        (await request<{ folders: MailFolder[] }>(`${org(orgId)}/mail/accounts/${enc(accountId)}/folders`)).folders,
+      agent: async (orgId, agentId) =>
+        (await request<{ mailboxes: AgentMailbox[] }>(`${org(orgId)}/agents/${enc(agentId)}/mail`)).mailboxes,
+      setAgent: (orgId, agentId, accountId, input) =>
+        request<AgentMailbox>(`${org(orgId)}/agents/${enc(agentId)}/mail/${enc(accountId)}`, {
+          method: "PUT",
+          json: input,
+        }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),

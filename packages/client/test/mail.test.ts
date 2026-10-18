@@ -1,0 +1,128 @@
+import { describe, expect, test } from "bun:test";
+import { ApiError, createHttpApi } from "../src/index";
+import {
+  canSendWithoutAsking,
+  choiceOf,
+  defaultPolicy,
+  loginOf,
+  mailErrorOf,
+  normalizePolicy,
+  splitAddresses,
+} from "../src/lib/mail";
+
+type Call = { url: string; method: string; body: unknown };
+
+function fakeFetch(responses: Record<string, { status: number; body?: unknown }>) {
+  const calls: Call[] = [];
+  const fetch = async (url: string, init: RequestInit) => {
+    calls.push({ url, method: String(init.method), body: init.body ? JSON.parse(String(init.body)) : undefined });
+    const r = responses[`${init.method} ${url}`] ?? { status: 404, body: { error: { code: "not_found" } } };
+    return new Response(r.body === undefined ? null : JSON.stringify(r.body), { status: r.status });
+  };
+  return { fetch, calls };
+}
+
+const ORG = "/api/app/organizations/o1";
+const account = {
+  id: "m1",
+  provider: "imap",
+  via: "imap",
+  address: "ana@icloud.com",
+  label: "Ana",
+  status: "active",
+  lastError: null,
+  preset: "icloud",
+  createdAt: "2026-10-18T00:00:00.000Z",
+  agents: [],
+};
+
+describe("mail API", () => {
+  test("paths, methods and unwrapped answers", async () => {
+    const policy = defaultPolicy();
+    const { fetch, calls } = fakeFetch({
+      [`GET ${ORG}/mail/providers`]: { status: 200, body: { composio: true, imap: true, presets: [] } },
+      [`GET ${ORG}/mail/accounts`]: { status: 200, body: { accounts: [account] } },
+      [`POST ${ORG}/mail/accounts/imap`]: { status: 201, body: { account } },
+      [`POST ${ORG}/mail/accounts/composio`]: { status: 200, body: { accountId: "m2", redirectUrl: "https://x" } },
+      [`PATCH ${ORG}/mail/accounts/m1`]: { status: 200, body: { account } },
+      [`DELETE ${ORG}/mail/accounts/m1`]: { status: 204 },
+      [`GET ${ORG}/mail/accounts/m1/folders`]: { status: 200, body: { folders: [{ id: "INBOX", name: "Inbox" }] } },
+      [`GET ${ORG}/agents/a1/mail`]: {
+        status: 200,
+        body: { mailboxes: [{ accountId: "m1", level: "read", canDelete: false, policy }] },
+      },
+      [`PUT ${ORG}/agents/a1/mail/m1`]: {
+        status: 200,
+        body: { accountId: "m1", level: "read_write", canDelete: false, policy },
+      },
+    });
+    const api = createHttpApi({ fetch });
+    expect((await api.mail.providers("o1")).composio).toBe(true);
+    expect((await api.mail.accounts("o1"))[0]?.id).toBe("m1");
+    expect(
+      (await api.mail.connectImap("o1", { preset: "icloud", address: "ana@icloud.com", password: "abcd" })).id,
+    ).toBe("m1");
+    expect(await api.mail.connectComposio("o1", { provider: "gmail" })).toEqual({
+      accountId: "m2",
+      redirectUrl: "https://x",
+    });
+    await api.mail.update("o1", "m1", { password: "new" });
+    await api.mail.disconnect("o1", "m1");
+    expect(await api.mail.folders("o1", "m1")).toEqual([{ id: "INBOX", name: "Inbox" }]);
+    expect((await api.mail.agent("o1", "a1"))[0]?.level).toBe("read");
+    expect((await api.mail.setAgent("o1", "a1", "m1", { level: "read_write", canDelete: false, policy })).level).toBe(
+      "read_write",
+    );
+    expect(calls.map((c) => `${c.method} ${c.url.slice(ORG.length)}`)).toEqual([
+      "GET /mail/providers",
+      "GET /mail/accounts",
+      "POST /mail/accounts/imap",
+      "POST /mail/accounts/composio",
+      "PATCH /mail/accounts/m1",
+      "DELETE /mail/accounts/m1",
+      "GET /mail/accounts/m1/folders",
+      "GET /agents/a1/mail",
+      "PUT /agents/a1/mail/m1",
+    ]);
+    expect(calls[4]?.body).toEqual({ password: "new" });
+  });
+
+  test('a 422 `{ error: "auth" }` (a plain string) or `{ error: { code } }` maps to the error code', async () => {
+    const { fetch } = fakeFetch({
+      [`POST ${ORG}/mail/accounts/imap`]: { status: 422, body: { error: "auth" } },
+      [`PATCH ${ORG}/mail/accounts/m1`]: { status: 422, body: { error: { code: "tls", message: "TLS failed" } } },
+    });
+    const api = createHttpApi({ fetch });
+    const e1 = await api.mail.connectImap("o1", { preset: "icloud", address: "a@b.co", password: "x" }).catch((e) => e);
+    expect(e1).toBeInstanceOf(ApiError);
+    expect(mailErrorOf(e1)).toBe("auth");
+    expect(mailErrorOf(await api.mail.update("o1", "m1", { password: "x" }).catch((e) => e))).toBe("tls");
+    expect(mailErrorOf(new ApiError(500, "internal", "boom"))).toBe("unknown");
+    expect(mailErrorOf(new Error("network"))).toBe("unknown");
+  });
+});
+
+describe("mail rules", () => {
+  test("addresses and @domains; the rest is invalid", () => {
+    expect(splitAddresses("Ana@Empresa.com, @cliente.com.br;  oops  b@c")).toEqual({
+      valid: ["ana@empresa.com", "@cliente.com.br"],
+      invalid: ["oops", "b@c"],
+    });
+  });
+
+  test("send without asking only with allowed recipients", () => {
+    const p = { ...defaultPolicy(), sendWithoutAsking: true };
+    expect(canSendWithoutAsking(p)).toBe(false);
+    expect(normalizePolicy(p).sendWithoutAsking).toBe(false);
+    const ok = { ...p, allowedRecipients: ["@empresa.com"] };
+    expect(normalizePolicy(ok).sendWithoutAsking).toBe(true);
+  });
+
+  test("the login of a preset; which card a mailbox belongs to", () => {
+    expect(loginOf({ username: "address" }, " ana@x.com ")).toBe("ana@x.com");
+    expect(loginOf({ username: "local" }, "ana@x.com")).toBe("ana");
+    expect(choiceOf({ provider: "gmail", preset: null })).toBe("gmail");
+    expect(choiceOf({ provider: "imap", preset: "icloud" })).toBe("icloud");
+    expect(choiceOf({ provider: "imap", preset: "locaweb" })).toBe("other");
+  });
+});

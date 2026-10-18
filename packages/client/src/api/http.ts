@@ -97,9 +97,11 @@ async function parseResponse<T>(res: Response): Promise<T> {
     data = undefined;
   }
   if (!res.ok) {
-    const error = (
-      data as { error?: { code?: string; message?: string; params?: Record<string, unknown> } } | undefined
+    const raw = (
+      data as { error?: string | { code?: string; message?: string; params?: Record<string, unknown> } } | undefined
     )?.error;
+    // Some routes answer `{ error: "auth" }`: the string is the code.
+    const error = typeof raw === "string" ? { code: raw, message: raw, params: undefined } : raw;
     throw new ApiError(
       res.status,
       error?.code ?? `http_${res.status}`,
