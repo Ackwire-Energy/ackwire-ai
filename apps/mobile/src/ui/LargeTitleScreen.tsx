@@ -1,18 +1,10 @@
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
-import { type ReactElement, type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
+import { type ReactElement, type ReactNode, useMemo } from "react";
 import { Platform, type RefreshControlProps, ScrollView, StyleSheet, View } from "react-native";
 import { LivePause } from "@/agent/live";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
-
-/** The native search bar under the large title (UISearchController on iOS, the toolbar search on Android). */
-export interface LargeTitleSearch {
-  placeholder: string;
-  onChangeText: (text: string) => void;
-  /** The field got or lost focus (the screen may show results while it is focused). */
-  onActiveChange?: (active: boolean) => void;
-}
 
 export interface LargeTitleScreenProps {
   title: string;
@@ -24,8 +16,6 @@ export interface LargeTitleScreenProps {
   left?: ReactNode;
   /** Native buttons on the bar's leading side (iOS). */
   leftActions?: HeaderAction[];
-  /** A native search bar under the large title. */
-  search?: LargeTitleSearch;
   /**
    * Revealed above the content when the list is pulled down (it sits above the first row, outside the
    * content, so only the bounce shows it; iOS only, where scroll views bounce). `pullDownHeight` is its
@@ -44,7 +34,9 @@ export interface LargeTitleScreenProps {
  * inside the tab's stack (`useLargeTitleOptions`). This only sets the screen's header options and lays
  * out the scroll view: `contentInsetAdjustmentBehavior="automatic"` lets iOS place the content under the
  * large title and above the tab bar; it must stay the first view of the screen (nothing laid over it) for
- * the large title to follow its scroll. Agents inside stop moving while the screen is not showing.
+ * the large title to follow its scroll. Nothing React goes inside the bar either (no custom header views, no
+ * native search bar): on iOS 26 any of them keeps the large title expanded with the list scrolling under it.
+ * Agents inside stop moving while the screen is not showing.
  */
 export function LargeTitleScreen({
   title,
@@ -52,7 +44,6 @@ export function LargeTitleScreen({
   actions,
   left,
   leftActions,
-  search,
   pullDown,
   pullDownHeight = 0,
   children,
@@ -62,12 +53,8 @@ export function LargeTitleScreen({
   const { colors } = useTheme();
   const focused = useIsFocused();
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
-  const searchOptions = useSearchBarOptions(search);
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
-  const options = useMemo<NativeStackNavigationOptions>(
-    () => ({ title, ...actionOptions, ...searchOptions }),
-    [title, actionOptions, searchOptions],
-  );
+  const options = useMemo<NativeStackNavigationOptions>(() => ({ title, ...actionOptions }), [title, actionOptions]);
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <Stack.Screen options={options} />
@@ -97,38 +84,6 @@ export function LargeTitleScreen({
 }
 
 const IOS = Platform.OS === "ios";
-
-/** The header's search bar options; they change only with the placeholder, presses reach the latest handlers. */
-function useSearchBarOptions(search: LargeTitleSearch | undefined): NativeStackNavigationOptions {
-  const latest = useRef(search);
-  useLayoutEffect(() => {
-    latest.current = search;
-  });
-  const placeholder = search?.placeholder;
-  return useMemo<NativeStackNavigationOptions>(() => {
-    if (placeholder === undefined) return {};
-    return {
-      headerSearchBarOptions: {
-        placeholder,
-        // Under the large title and always there, like Mail and Messages.
-        placement: "stacked",
-        hideWhenScrolling: false,
-        autoCapitalize: "none",
-        onChangeText: (e) => latest.current?.onChangeText(e.nativeEvent.text),
-        onFocus: () => latest.current?.onActiveChange?.(true),
-        onBlur: () => latest.current?.onActiveChange?.(false),
-        onCancelButtonPress: () => {
-          latest.current?.onChangeText("");
-          latest.current?.onActiveChange?.(false);
-        },
-        onClose: () => {
-          latest.current?.onChangeText("");
-          latest.current?.onActiveChange?.(false);
-        },
-      },
-    };
-  }, [placeholder]);
-}
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },

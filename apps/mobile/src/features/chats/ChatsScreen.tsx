@@ -4,7 +4,7 @@ import { useIsFocused } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import { EmptyState, Filters, LargeTitleScreen, Text } from "@/ui";
+import { EmptyState, Filters, LargeTitleScreen, SearchField, Text } from "@/ui";
 import { busyAgents } from "../agents/logic";
 import { SearchResults } from "../search/SearchResults";
 import { useOrgId, usePullRefresh } from "../shared/hooks";
@@ -30,8 +30,9 @@ const WORKING_POLL_MS = 20_000;
 
 /**
  * Conversas, the home (MobileConversas.html): agents, channels, DMs, threads and missions in one list by
- * activity, under the native large title with your avatar (Você) and "+" (Novo) in the bar and the native
- * search bar. "Esperando você" sits on top when something waits (requests, missions, agents' questions);
+ * activity, under the native large title with Você and "+" (Novo) in the bar, and the search field on top of
+ * the list (in the content, not the bar: anything React inside the native bar keeps the large title from
+ * collapsing on iOS). "Esperando você" sits on top when something waits (requests, missions, agents' questions);
  * pulling the list down shows the old Início's sky (greeting and crew). Empty, it invites the first agent.
  */
 export function ChatsScreen() {
@@ -78,13 +79,22 @@ export function ChatsScreen() {
     <LargeTitleScreen
       title={t("mobile.chats.title")}
       {...header}
-      search={{ placeholder: t("mobile.find.short"), onChangeText: setQ, onActiveChange: setSearching }}
       pullDown={showResults || empty ? undefined : <PullDownGreeting busy={busy} waiting={waiting} />}
       pullDownHeight={GREETING_HEIGHT}
       refreshControl={
         showResults ? undefined : <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
       }
     >
+      <View style={styles.search}>
+        <SearchField
+          value={q}
+          onChangeText={setQ}
+          placeholder={t("mobile.find.short")}
+          onFocus={() => setSearching(true)}
+          onBlur={() => setSearching(false)}
+          autoCapitalize="none"
+        />
+      </View>
       {showResults ? (
         <SearchResults q={q} />
       ) : (
@@ -131,6 +141,7 @@ export function ChatsScreen() {
 }
 
 const styles = StyleSheet.create({
+  search: { paddingHorizontal: 16, paddingBottom: 10 },
   list: { marginTop: 8 },
   center: { textAlign: "center", paddingVertical: 40 },
 });
