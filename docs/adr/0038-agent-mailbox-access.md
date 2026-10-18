@@ -83,19 +83,19 @@ Send detection never trusts the tool name alone. Each email tool declares its ef
   - IDLE (one persistent connection per mailbox) comes later, only if latency matters.
 - **In both cases** the content enters the context wrapped as untrusted external data. A run started by inbound mail can never approve its own send.
 
-### Prerequisites (D53)
+### Prerequisite (D53)
 
-1. A KMS-backed `KeyWrapper` in Cloud before we store IMAP passwords, which open a whole mailbox. Today credentials are wrapped with a key derived from `AGENTES_SECRET`.
-2. The `checkCall` hook in the gateway, with the GitHub repository check moved onto it.
+The `checkCall` hook in the gateway, with the GitHub repository check moved onto it.
+
+KMS is not a prerequisite for email. Gmail and Outlook through Composio store no token of ours. IMAP passwords are sealed the same way as the provider keys, GitHub tokens and MCP OAuth tokens we already store. The KMS-backed `KeyWrapper` is ADR 0007's pending Cloud module, due before the first real customers for every credential (D53).
 
 ### Order
 
 1. `checkCall`.
 2. Gmail/Outlook through Composio: read, draft, and send with approval.
-3. KMS.
-4. Composio inbound triggers into routines.
-5. IMAP/SMTP read and send.
-6. IMAP inbound by polling.
+3. Composio inbound triggers into routines.
+4. IMAP/SMTP read and send.
+5. IMAP inbound by polling.
 
 ## Consequences
 
@@ -106,7 +106,7 @@ Send detection never trusts the tool name alone. Each email tool declares its ef
     - Pro is $29 a month, then about $0.0003–0.0005 per call.
     - **Triggers cost $0.003 per event.** At 100 organizations × 1,000 mails a day that is about $9k a month, so filtering at the source is mandatory.
 - **Exit:** once email is central and there are paying customers, we register our own Google app, pass the assessment, and move Gmail in-house behind the same tool names. Accounts connected earlier stay on the old auth config until they reconnect.
-- **IMAP app passwords can't be scoped at the provider.** Our scopes protect against the agent (prompt injection from mail), not against someone who steals the credential from us. That is why KMS comes first and the screen suggests a dedicated mailbox.
+- **IMAP app passwords can't be scoped at the provider.** Our scopes protect against the agent (prompt injection from mail), not against someone who steals the credential from us. The screen suggests a dedicated mailbox. The KMS from ADR 0007 makes stealing the credential harder for every credential, this one included.
 - **Prompt injection through inbound mail is reduced, not removed.** The defences are untrusted wrapping, approval on send, recipient lists, and runs started by inbound mail never approving their own sends. The agent screen warns about "reads outside mail + sends without asking".
 - **Tests** use a fake Composio source and a fake IMAP/SMTP server (no network), following ADR 0003.
 - **Self-host:** Composio is a Cloud module. The IMAP/SMTP connector works in core. This is noted for the open-source list in the planning doc when it is decided.
