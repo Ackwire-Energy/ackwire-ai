@@ -1,10 +1,15 @@
-import { and, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { canTalkTo } from "./audience";
+import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
 import { schedulesOf } from "./context/summaries";
+import { isAgentOnlyDm } from "./dms";
+import { personBehindRun } from "./requester";
 import {
   cancelReminder,
   createReminder,
   createRoutine,
+  listOrgRoutines,
   listReminders,
   listRoutines,
   type RoutineDeps,
@@ -25,18 +30,27 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
-/** The person whose message started this run (reminders are theirs). */
-async function requesterOf(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ userId: schema.messages.authorUserId })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
-  return m?.userId ?? null;
-}
+/**
+ * The person this run acts for (reminders and routines are theirs): who wrote
+ * its trigger message, or, for a run answering another agent's consultation,
+ * the person at the root of that chain (ADR 0034 addendum: on-behalf-of).
+ */
+const requesterOf = (ctx: ToolContext) => personBehindRun(ctx.db, ctx.orgId, ctx.triggerMessageId);
 
-/** This conversation: the thread in a channel, or the DM itself (flat). */
+/**
+ * This conversation: the thread in a channel, or the DM itself (flat). A run
+ * answering a consultation lives in the agents' private DM, which no person
+ * reads: there it is the conversation where the person asked.
+ */
 async function conversationOf(ctx: ToolContext) {
   const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
+  if (channel && isAgentOnlyDm(channel)) {
+    const origin = await consultationOrigin(ctx.db, ctx.orgId, ctx.runId);
+    if (origin) {
+      const home = await getChannelCached(ctx.db, ctx.orgId, origin.channelId);
+      return { channelId: origin.channelId, threadId: home?.kind === "dm" ? null : origin.threadRootId };
+    }
+  }
   return { channelId: ctx.channelId, threadId: channel?.kind === "dm" ? null : ctx.threadRootId };
 }
 
@@ -114,9 +128,56 @@ async function sameRoutine(ctx: ToolContext, conv: { channelId: string; threadId
 }
 
 const noRequester: ToolOutput = {
-  content: "Only a person's request can schedule something (this run wasn't started by a person).",
+  content:
+    "Only a person's request can schedule or change something (no person is behind this run: not a person's message, nor another agent's question on a person's behalf).",
   isError: true,
 };
+
+const routineLine = (r: RoutineView, where: string, handle: string | null, prompt: string | null, full = false) => {
+  const when = r.trigger.type === "schedule" ? r.trigger.description : `on ${r.trigger.type}`;
+  const text =
+    prompt === null
+      ? "(instructions private: it runs in a conversation you and the person aren't in)"
+      : full
+        ? prompt
+        : prompt.replace(/\s+/g, " ").slice(0, 300);
+  return `${r.id} — ${handle ? `@${handle} ` : ""}"${r.name}" (${r.active ? "active" : "paused"}): ${when}; answers in ${where}\n  ${text}`;
+};
+
+/** Reminders are a person's own: never listed as routines. */
+const isRoutine = (r: RoutineView) =>
+  r.trigger.type !== "once" && !(r.target.type === "conversation" && r.target.reminder);
+
+/**
+ * Conversations whose routines' instructions a reader may see: public
+ * channels, and channels and DMs where this agent or the person it acts for
+ * is a member. Everything else shows the routine without its instructions.
+ */
+async function readableChannels(ctx: ToolContext, channelIds: string[], person: string | null) {
+  if (channelIds.length === 0) return new Set<string>();
+  const { channels, channelMembers } = schema;
+  const rows = await ctx.db
+    .selectDistinct({ id: channels.id })
+    .from(channels)
+    .leftJoin(
+      channelMembers,
+      and(
+        eq(channelMembers.channelId, channels.id),
+        or(eq(channelMembers.agentId, ctx.agentId), person ? eq(channelMembers.userId, person) : sql`false`),
+      ),
+    )
+    .where(
+      and(
+        eq(channels.orgId, ctx.orgId),
+        inArray(channels.id, channelIds),
+        or(
+          and(eq(channels.kind, "channel"), eq(channels.visibility, "public")),
+          sql`${channelMembers.channelId} is not null`,
+        ),
+      ),
+    );
+  return new Set(rows.map((r) => r.id));
+}
 
 /**
  * Scheduling from the chat (scope `schedule:write`, on by default):
@@ -252,24 +313,75 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "list_routines",
       description:
-        "List your routines in this organization (recurring, not reminders): id, name, when, where they answer and their instructions. Use it before update_routine.",
+        "List routines (recurring, not reminders): yours by default; another agent's with `agent` (its handle, e.g. @atlas), or every agent's with `agent: \"all\"`, to check what they do before you answer about them. Shows id, name, when, where they answer and their instructions; `id` shows one in full. Read only: you change only your own routines (update_routine), when a person asks.",
       scope: SCHEDULE_SCOPE,
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      async execute(_input, ctx) {
+      inputSchema: {
+        type: "object",
+        properties: {
+          agent: { type: "string", maxLength: 40, description: 'An agent\'s handle (@atlas), or "all"' },
+          id: { type: "string", minLength: 36, maxLength: 36 },
+        },
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
         try {
-          const requester = await requesterOf(ctx);
-          if (!requester) return noRequester;
-          const mine = (await listRoutines(ctx.db, requester, ctx.orgId)).filter(
+          const person = await requesterOf(ctx);
+          const handle = str(input.agent).trim().replace(/^@/, "").toLowerCase();
+          const { agents } = schema;
+          const team = await ctx.db
+            .select({
+              id: agents.id,
+              handle: agents.handle,
+              audienceMode: agents.audienceMode,
+              audienceUserIds: agents.audienceUserIds,
+              ownerUserId: agents.ownerUserId,
+            })
+            .from(agents)
+            .where(and(eq(agents.orgId, ctx.orgId), isNull(agents.archivedAt)));
+          const byId = new Map(team.map((a) => [a.id, a]));
+          let agentId: string | undefined = ctx.agentId;
+          if (handle === "all") agentId = undefined;
+          else if (handle) {
+            const found = team.find((a) => a.handle === handle);
+            if (!found) return { content: `There is no agent @${handle} in this organization.`, isError: true };
+            agentId = found.id;
+          }
+          const mineOnly = agentId === ctx.agentId;
+          const list = (await listOrgRoutines(ctx.db, ctx.orgId, agentId ? { agentId } : {})).filter(
             (r) =>
-              r.agentId === ctx.agentId &&
-              r.trigger.type !== "once" &&
-              !(r.target.type === "conversation" && r.target.reminder),
+              isRoutine(r) &&
+              (!str(input.id) || r.id === str(input.id)) &&
+              // Another agent's routines only when the person behind this run may talk to it (D31).
+              (r.agentId === ctx.agentId ||
+                (byId.has(r.agentId) && (!person || canTalkTo(byId.get(r.agentId) as (typeof team)[number], person)))),
           );
-          if (mine.length === 0) return { content: "You have no routines." };
+          if (list.length === 0) {
+            if (str(input.id))
+              return { content: `No routine ${str(input.id)} here. Use list_routines.`, isError: true };
+            return {
+              content: mineOnly
+                ? "You have no routines."
+                : handle === "all"
+                  ? "No routines."
+                  : `@${handle} has no routines.`,
+            };
+          }
+          const channelOf = (r: RoutineView) =>
+            r.target.type === "channel" || r.target.type === "conversation" ? r.target.channelId : null;
+          const readable = await readableChannels(ctx, [...new Set(list.flatMap((r) => channelOf(r) ?? []))], person);
           const lines = await Promise.all(
-            mine.map(async (r) => {
-              const when = r.trigger.type === "schedule" ? r.trigger.description : `on ${r.trigger.type}`;
-              return `${r.id} — "${r.name}" (${r.active ? "active" : "paused"}): ${when}; answers in ${await whereOf(ctx, r)}\n  ${r.prompt.replace(/\s+/g, " ").slice(0, 300)}`;
+            list.map(async (r) => {
+              const channelId = channelOf(r);
+              const visible =
+                r.agentId === ctx.agentId ||
+                (channelId ? readable.has(channelId) : r.target.type === "forum" || r.target.type === "artifact");
+              return routineLine(
+                r,
+                await whereOf(ctx, r),
+                mineOnly ? null : (byId.get(r.agentId)?.handle ?? null),
+                visible ? r.prompt : null,
+                Boolean(str(input.id)),
+              );
             }),
           );
           return { content: lines.join("\n") };
@@ -301,10 +413,14 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
           const id = str(input.id);
-          const current = (await listRoutines(ctx.db, requester, ctx.orgId)).find(
-            (r) => r.id === id && r.agentId === ctx.agentId,
-          );
-          if (!current) return { content: `You have no routine ${id}. Use list_routines.`, isError: true };
+          const found = (await listRoutines(ctx.db, requester, ctx.orgId)).find((r) => r.id === id);
+          if (found && found.agentId !== ctx.agentId) {
+            return {
+              content: `Routine ${id} is another agent's: only that agent changes it, when a person asks it. Don't ask it to on the person's behalf if the person already asked it directly.`,
+              isError: true,
+            };
+          }
+          if (!found) return { content: `You have no routine ${id}. Use list_routines.`, isError: true };
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
           const routine = await updateRoutine(routineDeps(ctx), requester, ctx.orgId, id, {
             ...(channel ? { target: channel.target } : {}),

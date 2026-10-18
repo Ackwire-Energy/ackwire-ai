@@ -21,7 +21,7 @@ import { cancelRun } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
-import { isStopRequest, type Judge } from "./judge";
+import { isStopRequest, type Judge, personMentionAddressees } from "./judge";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { enqueue } from "./outbox";
@@ -147,7 +147,15 @@ export interface Receipts {
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
   blocked: string[];
+  /** Agents it only mentions as part of the request to another agent: no run, by design (not blocked). */
+  referenced?: string[];
 }
+
+/** `meta.referencedAgentIds`: agents a person's message only references (no run; see `classifyAddressees`). */
+export const referencedOf = (meta: Record<string, unknown>) =>
+  Array.isArray(meta.referencedAgentIds)
+    ? meta.referencedAgentIds.filter((v): v is string => typeof v === "string")
+    : [];
 
 /**
  * Receipts for messages, from what is already stored: the routing decision
@@ -207,12 +215,18 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     const mine = all.filter((r, i) => all.findIndex((o) => o.agentId === r.agentId) === i);
     const picked = new Set(mine.map((r) => r.agentId));
     const seenBy = [...new Set([...(seen.get(m.id) ?? []), ...m.mentionedAgentIds, ...picked])];
+    const referenced = referencedOf(m.meta).filter((id) => !picked.has(id));
     out.set(m.id, {
       seenBy,
       pickedBy: [...picked],
       handled: mine.map((r) => ({ agentId: r.agentId, runId: r.id, status: r.status })),
-      // A person's mention always starts, steers or resumes a run, unless that agent can't answer them.
-      blocked: m.authorType === "person" ? m.mentionedAgentIds.filter((id) => !picked.has(id)) : [],
+      // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
+      // or the message only references it.
+      blocked:
+        m.authorType === "person"
+          ? m.mentionedAgentIds.filter((id) => !picked.has(id) && !referenced.includes(id))
+          : [],
+      ...(referenced.length > 0 ? { referenced } : {}),
     });
   }
   return out;
@@ -289,6 +303,7 @@ async function isThreadArchived(db: Executor, orgId: string, rootId: string) {
   return row?.state === "archived";
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const asDate = (v: Date | string | null) => (v === null ? null : v instanceof Date ? v : new Date(v));
 const parseUuidArray = (v: string[] | string | null) =>
   Array.isArray(v) ? v : v ? v.replace(/^{|}$/g, "").split(",").filter(Boolean) : [];
@@ -335,6 +350,8 @@ export async function insertMessageWithRuns(
   const hop = input.author.type === "agent" ? input.author.hop : 0;
   const threadId = input.threadId ?? null;
   const startRuns = options.startRuns && person;
+  // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
+  const referenced = `{${(person ? referencedOf(input.meta ?? {}) : []).filter((v) => UUID.test(v)).join(",")}}`;
   const rows = rowsOf<RawMessage>(
     await tx.execute(sql`with archived as (
         -- An archived thread is read only for people (ADR 0029); an agent's run already going still lands.
@@ -388,6 +405,7 @@ export async function insertMessageWithRuns(
         join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
         where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
           and a.id not in (select agent_id from answered)
+          and a.id <> all(${referenced}::uuid[])
           and (a.id in (select id from mentioned)
             or (not exists (select 1 from mentioned) and not exists (select 1 from answered) and exists (
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
@@ -404,6 +422,7 @@ export async function insertMessageWithRuns(
           and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
+          and r.agent_id <> all(${referenced}::uuid[])
           and (
             (r.agent_id in (select agent_id from answering)
               and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
@@ -566,9 +585,19 @@ export async function postPersonMessage(
     input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo) : null,
     input.attachments?.length ? attachmentRefsFor(deps.db, userId, orgId, channelId, input.attachments) : null,
   ]);
+  // Several agents mentioned: who is asked to act now, who is only referenced (no run for those).
+  const addressees = deps.judge
+    ? await classifyAddressees(deps.db, deps.judge, { orgId, channelId, userId, body: input.body })
+    : null;
+  const referencedIds = addressees?.referenced ?? [];
   const meta =
-    replyTo || files
-      ? { ...(input.meta ?? {}), ...(replyTo ? { replyTo } : {}), ...(files ? { artifacts: files } : {}) }
+    replyTo || files || referencedIds.length > 0
+      ? {
+          ...(input.meta ?? {}),
+          ...(replyTo ? { replyTo } : {}),
+          ...(files ? { artifacts: files } : {}),
+          ...(referencedIds.length > 0 ? { referencedAgentIds: referencedIds } : {}),
+        }
       : input.meta;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
   const { message, runs, blocked, steered, answered, reopened } = await insertMessageWithRuns(
@@ -586,6 +615,7 @@ export async function postPersonMessage(
   const [view] = (await withWikiLinks(deps.db, orgId, [messageView(message)])) as [MessageView];
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
+  if (addressees) await recordAddressees(deps.db, message, addressees);
   // People mentioned by handle hear about it on their own topic (notifications).
   for (const mentioned of message.mentionedUserIds) {
     await publishUserEvent(deps.pubsub, orgId, mentioned, {
@@ -661,9 +691,12 @@ export async function postPersonMessage(
     ...(answered ? [{ agentId: answered.agentId, runId: answered.id }] : []),
   ].filter((r, i, all) => all.findIndex((o) => o.agentId === r.agentId) === i);
   const picked = new Set(answering.map((r) => r.agentId));
+  const referenced = referencedOf(message.meta).filter((id) => !picked.has(id));
   const wontAnswer =
-    message.mentionedAgentIds.length > 0 ? message.mentionedAgentIds.filter((id) => !picked.has(id)) : [];
-  if (answering.length > 0 || wontAnswer.length > 0) {
+    message.mentionedAgentIds.length > 0
+      ? message.mentionedAgentIds.filter((id) => !picked.has(id) && !referenced.includes(id))
+      : [];
+  if (answering.length > 0 || wontAnswer.length > 0 || referenced.length > 0) {
     await publishChannelEvent(deps.pubsub, {
       type: "message.routed",
       channelId,
@@ -672,6 +705,7 @@ export async function postPersonMessage(
       pickedBy: [...picked],
       runs: answering.flatMap((r) => (r.runId ? [{ agentId: r.agentId, runId: r.runId }] : [])),
       ...(wontAnswer.length > 0 ? { blocked: wontAnswer } : {}),
+      ...(referenced.length > 0 ? { referenced } : {}),
       strategy: channel.kind === "dm" && message.mentionedAgentIds.length === 0 ? "dm" : "mention",
     });
   }
@@ -689,6 +723,108 @@ export async function postPersonMessage(
     }
   }
   return view;
+}
+
+/** Above this "the person asks this agent to act now" probability, a mentioned agent gets a run. */
+export const ADDRESSEE_THRESHOLD = 0.5;
+/** The classification waits at most this long before the post goes on as before (everyone mentioned acts). */
+export const ADDRESSEE_TIMEOUT_MS = 2500;
+
+export interface AddresseeDecision {
+  strategy: string;
+  scores: { agentId: string; score: number }[];
+  /** Mentioned agents that get a run. */
+  addressees: string[];
+  /** Mentioned agents that are only referenced: no run. */
+  referenced: string[];
+  error?: string;
+}
+
+/**
+ * A person's message that mentions two or more agents of the channel: which
+ * of them is the person asking to act now, and which are only part of the
+ * request ("@atlas, when an error comes in ask @ada to analyze it": Atlas
+ * acts; Ada is referenced and keeps the message as context only). The judge
+ * scores each mentioned agent; code applies the threshold. Fail-open: one
+ * mention, no judge, an error, a timeout, or nobody above the threshold
+ * keeps today's behaviour (every mentioned agent acts). Null when there was
+ * nothing to classify.
+ */
+export async function classifyAddressees(
+  db: Executor,
+  judge: Judge,
+  input: { orgId: string; channelId: string; userId: string; body: string },
+  options: { timeoutMs?: number } = {},
+): Promise<AddresseeDecision | null> {
+  const handles = parseMentionHandles(input.body);
+  if (handles.length < 2) return null;
+  const targets = await db
+    .select({ id: agents.id, handle: agents.handle, name: agents.name, role: agents.role })
+    .from(agents)
+    .innerJoin(
+      channelMembers,
+      and(eq(channelMembers.agentId, agents.id), eq(channelMembers.channelId, input.channelId)),
+    )
+    .where(and(eq(agents.orgId, input.orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
+  if (targets.length < 2) return null;
+  const everyone = targets.map((t) => t.id);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const [author] = await db
+      .select({ name: schema.users.name })
+      .from(schema.users)
+      .where(eq(schema.users.id, input.userId));
+    const judged = await Promise.race([
+      personMentionAddressees(judge, {
+        orgId: input.orgId,
+        body: input.body,
+        author: author?.name ?? "a person",
+        targets: targets.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
+      }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("addressees: timed out")), options.timeoutMs ?? ADDRESSEE_TIMEOUT_MS);
+      }),
+    ]);
+    const scores = targets.map((t) => ({ agentId: t.id, score: judged.get(t.id) ?? 0 }));
+    const addressees = scores.filter((s) => s.score >= ADDRESSEE_THRESHOLD).map((s) => s.agentId);
+    // Nobody clearly addressed: the judge didn't help, so everyone mentioned acts (as before).
+    if (addressees.length === 0)
+      return { strategy: `addressees-${judge.name}`, scores, addressees: everyone, referenced: [] };
+    return {
+      strategy: `addressees-${judge.name}`,
+      scores,
+      addressees,
+      referenced: everyone.filter((id) => !addressees.includes(id)),
+    };
+  } catch (error) {
+    return {
+      strategy: `addressees-${judge.name}`,
+      scores: everyone.map((agentId) => ({ agentId, score: 0 })),
+      addressees: everyone,
+      referenced: [],
+      error: error instanceof Error ? error.message.slice(0, 300) : String(error),
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** The addressee decision, for audit (`routing_decisions`; never fails the post). */
+async function recordAddressees(db: Database, message: Message, d: AddresseeDecision) {
+  await db
+    .insert(schema.routingDecisions)
+    .values({
+      orgId: message.orgId,
+      channelId: message.channelId,
+      messageId: message.id,
+      strategy: d.strategy,
+      candidates: d.scores,
+      selectedAgentIds: d.addressees,
+      reason: d.referenced.length > 0 ? `referenced only: ${d.referenced.length}` : "every mentioned agent acts",
+      error: d.error ?? null,
+    })
+    .onConflictDoNothing()
+    .catch(() => undefined);
 }
 
 /** The quoted message (one statement, with its author's name): it must be a live message of this channel. */

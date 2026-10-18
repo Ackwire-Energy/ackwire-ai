@@ -25,11 +25,15 @@ Output: PASS/FAIL per case with each check, totals per criterion and cost; the f
 | --- | --- |
 | `agent` | `preset` (`dev`, `ops`, `qa`, `pm`: name, role and instructions from the pt-BR presets), or `name`/`role`/`instructions`; `model` |
 | `org` | `name`, `context` |
-| `conversation` | `where` (`channel` or `dm`), `channel`, `topic`, `thread` (prior messages after the first and the trigger go in its thread), `prior` (history: `author` is a person's name or `"agent"`; they start no runs), `trigger`, `routine: { name }` (the trigger is a routine's scheduled message) |
+| `conversation` | `where` (`channel` or `dm`), `channel`, `topic`, `thread` (prior messages after the first and the trigger go in its thread), `prior` (history: `author` is a person's name or `"agent"`; they start no runs), `trigger`, `routine: { name }` (the trigger is a routine's scheduled message), `consultation: { from, origin }` (the trigger is another agent's `ask_agent` question on behalf of the person who wrote `origin`) |
+| `otherAgents` | other agents in the org and the channel (`name`, `handle`, `role`, `instructions`); runs the trigger starts for them are recorded, never executed |
+| `routines` | routines already there (`agent`: a handle or `"self"`, `name`, `prompt`, `schedule`) |
+| `schedule` | the scheduling tools (`list_routines`, `update_routine`…) and `ask_agent` |
+| `addressees` | a message mentioning several agents is classified (who acts, who is only referenced) by the cheap model |
 | `connectors` | fake connectors granted with all their scopes: `github`, `sentry`, `himetrica`, `railway` |
 | `issues`, `seedIssues` | the built-in issue tools, and issues already there |
 | `memory` | the agent's memory items (found with `search_context`) |
 | `fixtures` | per tool name, canned results: the first entry whose `when` words all appear in the call's input (no `when` = default) |
-| `expect` | deterministic: `investigate`, `mustCall` (`"a\|b"` = any), `mustNotExecute`, `approval`, `evidence` (any of), `noReply`, `ask` (`never`/`required`); judge: `behavior` (what a good answer does), `rubric` (extra criteria), `skipJudge` |
+| `expect` | deterministic: `investigate`, `mustCall` (`"a\|b"` = any), `mustNotExecute`, `approval`, `evidence` (any of), `noReply`, `ask` (`never`/`required`), `mustNotCall`, `notTriggered` (other agents' handles the trigger must not start); judge: `behavior` (what a good answer does), `rubric` (extra criteria), `skipJudge` |
 
 Checkers are unit-tested in `test/behavior-checks.test.ts`; `test/behavior-eval.test.ts` runs the harness with the fake provider (no network).

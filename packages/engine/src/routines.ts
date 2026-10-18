@@ -552,6 +552,26 @@ export async function listRoutines(db: Database, actorId: string, orgId: string)
   return views(db, rows);
 }
 
+/**
+ * The org's routines for an agent's read tool (`list_routines` with `agent`):
+ * no person check here, the caller is an agent of the org and filters what it
+ * may show (audiences, private conversations). Optionally one agent's only.
+ */
+export async function listOrgRoutines(db: Database, orgId: string, options: { agentId?: string } = {}) {
+  const rows = await db
+    .select()
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        isNull(routines.deletedAt),
+        options.agentId ? eq(routines.agentId, options.agentId) : undefined,
+      ),
+    )
+    .orderBy(routines.createdAt);
+  return views(db, rows);
+}
+
 async function loadRoutine(db: Database, orgId: string, id: string, options: { deleted?: boolean } = {}) {
   const [row] = await db
     .select()

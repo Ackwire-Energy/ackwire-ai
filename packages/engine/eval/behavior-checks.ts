@@ -135,6 +135,10 @@ export interface Expectations {
   noReply?: boolean;
   /** "never": no `ask_user`; "required": must ask (ask_user or a question in the reply). */
   ask?: "never" | "required";
+  /** Tools that must not be called at all (e.g. `ask_agent`: no relaying the person's request). */
+  mustNotCall?: string[];
+  /** Handles of other agents the trigger must not start (mentioned only as a reference). */
+  notTriggered?: string[];
 }
 
 export interface RunObservation {
@@ -146,6 +150,8 @@ export interface RunObservation {
   noReply: boolean;
   /** Tools whose calls became approval requests. */
   approvals: string[];
+  /** Handles of the other agents of the case that the trigger started. */
+  triggered?: string[];
 }
 
 /** All deterministic checks a case asks for. */
@@ -212,6 +218,22 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
       id: expect.noReply ? "no_reply_when_nothing_new" : "reports_when_something_new",
       pass: expect.noReply ? run.noReply : !run.noReply && text.trim().length > 0,
       detail: run.noReply ? "answered NO_REPLY" : text.trim() ? "posted a report" : "posted nothing",
+    });
+  }
+  if (expect.mustNotCall?.length) {
+    const called = [...new Set(run.calls.filter((c) => expect.mustNotCall?.includes(c.name)).map((c) => c.name))];
+    out.push({
+      id: "no_forbidden_call",
+      pass: called.length === 0,
+      detail: called.length ? `called ${called.join(", ")}` : "ok",
+    });
+  }
+  if (expect.notTriggered?.length) {
+    const started = expect.notTriggered.filter((h) => (run.triggered ?? []).includes(h.replace(/^@/, "")));
+    out.push({
+      id: "only_addressees_act",
+      pass: started.length === 0,
+      detail: started.length ? `also started ${started.join(", ")}` : "ok",
     });
   }
   if (expect.ask) {

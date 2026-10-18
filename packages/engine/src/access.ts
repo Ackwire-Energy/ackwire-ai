@@ -131,7 +131,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     label: "Create routine",
     description: "Creates a recurring routine in this conversation or in a channel.",
   },
-  list_routines: { label: "View routines", description: "Lists the agent's routines." },
+  list_routines: {
+    label: "View routines",
+    description: "Lists the agent's routines, or another agent's to check them (read only).",
+  },
   update_routine: { label: "Change routine", description: "Changes a routine's instructions, schedule or channel." },
   list_reminders: { label: "View reminders", description: "Lists the pending reminders of the person asking." },
   cancel_reminder: { label: "Cancel reminder", description: "Cancels a reminder of the person asking." },

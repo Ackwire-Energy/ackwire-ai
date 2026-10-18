@@ -190,4 +190,19 @@ describe("deterministicChecks", () => {
     );
     expect(ran.filter((k) => !k.pass).map((k) => k.id)).toEqual(["no_sensitive_action", "requested_approval"]);
   });
+
+  test("relaying to another agent and starting a referenced agent are caught", () => {
+    const base = { turns: [], calls: [], approvals: [] };
+    const relay = { name: "ask_agent", input: { agent: "@ada" }, executed: true };
+    const bad = deterministicChecks(
+      { mustNotCall: ["ask_agent"], notTriggered: ["@ada"] },
+      { ...base, calls: [relay], reply: "Ajustei.", noReply: false, triggered: ["ada"] },
+    );
+    expect(bad.filter((k) => !k.pass).map((k) => k.id)).toEqual(["no_forbidden_call", "only_addressees_act"]);
+    const good = deterministicChecks(
+      { mustNotCall: ["ask_agent"], notTriggered: ["ada"] },
+      { ...base, calls: [], reply: "Ajustei.", noReply: false, triggered: [] },
+    );
+    expect(good.every((k) => k.pass)).toBe(true);
+  });
 });

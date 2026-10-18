@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, lt, or, schema } from "@agenteschat/db";
 import { canTalkTo } from "./audience";
 import { stopRun } from "./cancel";
 import { createAgentRuns, requesterOf } from "./dispatch";
@@ -37,7 +37,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
   const tool: ToolDefinition = {
     name: ASK_AGENT_TOOL,
     description:
-      "Ask another agent of the organization something and wait for its answer, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge; you get its reply and go on. Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Write the question so it stands alone: the other agent doesn't see this conversation.",
+      "Ask another agent of the organization something and wait for its answer, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge, acting for the same person you are helping; you get its reply and go on. Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Never relay to an agent what the person already asked that agent directly (it got the message too and is answering it): if it is already working on it here, you are told so; wait for its answer in the conversation. Write the question so it stands alone: the other agent doesn't see this conversation.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -66,6 +66,10 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
       if (!canTalkTo(target, person)) {
         return refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`);
       }
+      // The person already asked that agent here (the same message, or it is working in this thread):
+      // no second request on their behalf (ADR 0034 addendum).
+      const same = await sameRequestRun(db, ctx, target.id);
+      if (same) return same;
       // This run may itself answer a consultation: the chain goes on from there.
       const [parent] = await db
         .select({ chain: agentConsultations.chain })
@@ -151,6 +155,61 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
     },
   };
   return { name: "consultations", tools: async () => [tool] };
+}
+
+const ACTIVE_RUN = ["queued", "running", "waiting_approval", "waiting_input"] as const;
+
+/**
+ * The consulted agent's own run on the same person request: started by the
+ * asker's trigger message, or still working in the asker's thread. Active →
+ * "it's on it, wait"; done → its answer. A failed or canceled run is no reason
+ * not to ask. Null when there is none.
+ */
+async function sameRequestRun(
+  db: Database,
+  ctx: { orgId: string; channelId: string; threadRootId: string; triggerMessageId: string },
+  targetAgentId: string,
+): Promise<ToolOutput | null> {
+  const [run] = await db
+    .select({
+      id: agentRuns.id,
+      status: agentRuns.status,
+      replyMessageId: agentRuns.replyMessageId,
+      handle: agents.handle,
+    })
+    .from(agentRuns)
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    .where(
+      and(
+        eq(agentRuns.orgId, ctx.orgId),
+        eq(agentRuns.agentId, targetAgentId),
+        eq(agentRuns.channelId, ctx.channelId),
+        or(
+          and(eq(agentRuns.triggerMessageId, ctx.triggerMessageId), inArray(agentRuns.status, [...ACTIVE_RUN, "done"])),
+          and(eq(agentRuns.threadRootId, ctx.threadRootId), inArray(agentRuns.status, [...ACTIVE_RUN])),
+        ),
+      ),
+    )
+    .orderBy(desc(agentRuns.createdAt))
+    .limit(1);
+  if (!run) return null;
+  const data = { duplicateOf: { runId: run.id, agentId: targetAgentId, status: run.status } };
+  if (run.status !== "done") {
+    return {
+      content: `@${run.handle} is already working on this person's request here (run ${run.id}, ${run.status}): the person asked it directly. Don't ask it again or relay the request; its answer goes to the person in this conversation. Do only your own part, or end your turn and let it answer.`,
+      data,
+    };
+  }
+  const [reply] = run.replyMessageId
+    ? await db
+        .select({ body: messages.body })
+        .from(messages)
+        .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, run.replyMessageId)))
+    : [];
+  return {
+    content: `@${run.handle} already answered this person's request here (run ${run.id})${reply?.body ? `:\n\n${reply.body.slice(0, 4000)}` : "."}\n\nDon't ask it again; build on its answer.`,
+    data,
+  };
 }
 
 /** What the asking agent hears back. */

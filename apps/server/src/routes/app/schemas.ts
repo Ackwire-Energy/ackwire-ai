@@ -180,6 +180,10 @@ const MessageBase = z.object({
       blocked: z
         .array(z.uuid())
         .openapi({ description: "Agents it mentions that won't answer (they don't reply to this person)." }),
+      referenced: z
+        .array(z.uuid())
+        .optional()
+        .openapi({ description: "Agents it only references as part of the request to another agent: no run." }),
     })
     .optional()
     .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),

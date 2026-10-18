@@ -506,6 +506,7 @@ export const en: Translations = {
       asking: "Waiting for your answer",
       handled: "Answered",
       failed: "Failed",
+      referenced: "Only mentioned",
     },
     failedShort: "Couldn't answer",
     popoverTitle: "Agents",

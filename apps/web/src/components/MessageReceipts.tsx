@@ -64,7 +64,11 @@ export function MessageReceipts({ message }: { message: Message }) {
           <div key={id} className="ac-popover__row">
             <AgentAvatar agentId={id} size="xs" name={name(id)} />
             <span>{name(id)}</span>
-            <span className="ac-popover__row-status">{t(`receipts.status.${phases.get(id) ?? "seen"}`)}</span>
+            <span className="ac-popover__row-status">
+              {view.referenced.includes(id) && (phases.get(id) ?? "seen") === "seen"
+                ? t("receipts.status.referenced")
+                : t(`receipts.status.${phases.get(id) ?? "seen"}`)}
+            </span>
           </div>
         ))}
       </Popover>

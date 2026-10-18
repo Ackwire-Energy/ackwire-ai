@@ -19,6 +19,7 @@ import {
   addChannelMember,
   type ContextDeps,
   createAgent,
+  createAskAgentToolSource,
   createAskUserToolSource,
   createChannel,
   createContextToolSource,
@@ -28,10 +29,13 @@ import {
   createIssue,
   createIssueToolSource,
   createJobHandlers,
+  createLlmJudge,
   createLocalKeyWrapper,
   createModelGateway,
   createOrganization,
   createReactToolSource,
+  createRoutine,
+  createScheduleToolSource,
   createToolGateway,
   drainOutbox,
   grantScopes,
@@ -81,7 +85,20 @@ export interface BehaviorCase {
     trigger: CaseMessage;
     /** The trigger is a routine's scheduled message (meta.routine), not a person typing. */
     routine?: { name: string };
+    /**
+     * The trigger is another agent's question (`ask_agent`) on behalf of the person who wrote
+     * `origin` in the channel: `trigger.author` is that person, `trigger.body` the question.
+     */
+    consultation?: { from: string; origin: string };
   };
+  /** Other agents of the org, in the channel too (their own runs are recorded, never executed). */
+  otherAgents?: { name: string; handle: string; role?: string; instructions?: string }[];
+  /** Routines already there: `agent` is a handle (or "self"), answering in the case's channel. */
+  routines?: { agent: string; name: string; prompt: string; schedule: string }[];
+  /** The scheduling tools (list_routines, update_routine…) and `ask_agent`. */
+  schedule?: boolean;
+  /** Who a person's message with several mentions is for: the org's cheap model decides (real call). */
+  addressees?: boolean;
   /** Fake connectors granted to the agent (all their scopes). */
   connectors?: (keyof typeof CONNECTORS)[];
   /** Built-in issue tools (list_issues, create_issue…) on the real issues table. */
@@ -128,6 +145,8 @@ export interface CaseRun {
   status: string[];
   system: string;
   costNanoUsd: number;
+  /** Handles of the other agents the trigger started. */
+  triggered: string[];
   error?: string;
 }
 
@@ -234,10 +253,15 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       // No reflection or summaries during the eval: only the agent's own calls cost.
       reflect: { everyMessages: 100_000, idleMinutes: 100_000, maxPerThread: 1 },
       judge: createFakeJudge(),
-      schedules: createFakeScheduleReader({}),
+      // Schedule phrases of the seeded routines (a table, not a model).
+      schedules: createFakeScheduleReader({
+        "a cada hora": { rule: { freq: "hourly", times: ["00:00"] } },
+        "dias úteis às 9h": { rule: { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["09:00"] } },
+      }),
     };
     const sources: ToolSource[] = [
       createAskUserToolSource(),
+      ...(c.schedule ? [createAskAgentToolSource({ pubsub }), createScheduleToolSource({ pubsub, context })] : []),
       createReactToolSource({ pubsub }),
       createContextToolSource(context),
       ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
@@ -268,6 +292,37 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       await addChannelMember(db, owner.id, org.id, channelId, { agentId: agent.id });
       for (const [name, p] of people)
         if (name !== ownerName) await addChannelMember(db, owner.id, org.id, channelId, { userId: p.id });
+    }
+    const others = new Map<string, string>();
+    for (const o of c.otherAgents ?? []) {
+      const other = await createAgent(
+        db,
+        owner.id,
+        org.id,
+        {
+          name: o.name,
+          handle: o.handle,
+          role: o.role ?? "",
+          instructions: o.instructions ?? "",
+          credentialId: credential.id,
+        },
+        { model: a.model },
+      );
+      others.set(other.id, o.handle);
+      if (conv.where === "channel") await addChannelMember(db, owner.id, org.id, channelId, { agentId: other.id });
+    }
+    const agentIdOf = (handle: string) =>
+      handle === "self" ? agent.id : [...others].find(([, h]) => h === handle.replace(/^@/, ""))?.[0];
+    for (const r of c.routines ?? []) {
+      const agentId = agentIdOf(r.agent);
+      if (!agentId) throw new Error(`${c.id}: no agent ${r.agent} for routine "${r.name}"`);
+      await createRoutine({ db, pubsub, context }, owner.id, org.id, {
+        name: r.name,
+        agentId,
+        prompt: r.prompt,
+        target: { type: "channel", channelId },
+        trigger: { type: "schedule", phrase: r.schedule, timezone: "America/Sao_Paulo" },
+      });
     }
     for (const m of c.memory ?? []) {
       await insertContextItem(db, {
@@ -311,11 +366,73 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     const routine = conv.routine
       ? { routine: { id: crypto.randomUUID(), name: conv.routine.name, runId: crypto.randomUUID() } }
       : undefined;
-    await postPersonMessage({ db, pubsub }, triggerAuthor.id, org.id, channelId, {
-      body: conv.trigger.body,
-      threadId,
-      meta: routine,
-    });
+    let askerRunId: string | null = null;
+    if (conv.consultation) {
+      // Another agent asks this one on the person's behalf: the person's message, the asking
+      // agent's run on it, and its `ask_agent` call (the real tool: DM, question, consultation).
+      const askerId = agentIdOf(conv.consultation.from);
+      if (!askerId) throw new Error(`${c.id}: no agent ${conv.consultation.from} to ask`);
+      const origin = await insertMessage(db, {
+        orgId: org.id,
+        channelId,
+        threadId,
+        author: { type: "person", userId: triggerAuthor.id },
+        body: conv.consultation.origin,
+      });
+      const [asker] = await db
+        .insert(schema.agentRuns)
+        .values({
+          orgId: org.id,
+          agentId: askerId,
+          channelId,
+          threadRootId: threadId ?? origin.id,
+          triggerMessageId: origin.id,
+          trigger: "mention",
+          hop: 1,
+          status: "running",
+        })
+        .returning();
+      if (!asker) throw new Error(`${c.id}: could not start the asking run`);
+      askerRunId = asker.id;
+      const ask = (await createAskAgentToolSource({ pubsub }).tools({} as never))[0];
+      const asked = await ask?.execute(
+        { agent: `@${agent.handle}`, question: conv.trigger.body },
+        {
+          db,
+          orgId: org.id,
+          agentId: askerId,
+          runId: asker.id,
+          channelId,
+          threadRootId: asker.threadRootId,
+          triggerMessageId: origin.id,
+        },
+      );
+      if (asked?.isError) throw new Error(`${c.id}: ask_agent refused: ${asked.content}`);
+    } else {
+      const judge = c.addressees
+        ? createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" })
+        : undefined;
+      await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
+        body: conv.trigger.body,
+        threadId,
+        meta: routine,
+      });
+    }
+    // Other agents' runs: recorded (who the trigger started), never executed.
+    const otherRuns = others.size
+      ? await db
+          .select({ id: schema.agentRuns.id, agentId: schema.agentRuns.agentId })
+          .from(schema.agentRuns)
+          .where(and(eq(schema.agentRuns.orgId, org.id), inArray(schema.agentRuns.agentId, [...others.keys()])))
+      : [];
+    const triggered = [
+      ...new Set(otherRuns.filter((r) => r.id !== askerRunId).map((r) => others.get(r.agentId) ?? "")),
+    ].filter(Boolean);
+    for (const r of otherRuns) {
+      await db
+        .delete(schema.outbox)
+        .where(and(eq(schema.outbox.kind, "agent_run.execute"), sql`${schema.outbox.payload}->>'runId' = ${r.id}`));
+    }
     await drainOutbox(db, handlers, { maxBatches: 500 });
 
     // What happened.
@@ -378,6 +495,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       status: runs.map((r) => (r.error ? `${r.status} (${r.error})` : r.status)),
       system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
       costNanoUsd: Number(usage?.cost ?? 0),
+      triggered,
     };
   } finally {
     await close();

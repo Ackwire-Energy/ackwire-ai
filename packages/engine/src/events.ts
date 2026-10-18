@@ -184,6 +184,8 @@ export type ChannelEvent =
       runs?: { agentId: string; runId: string }[];
       /** Agents it mentions that won't answer (they don't reply to this person, D31). */
       blocked?: string[];
+      /** Agents it only references (part of the request to another agent): no run, by design. */
+      referenced?: string[];
       strategy: "mention" | "dm" | "router" | "none";
       reason?: string;
     }

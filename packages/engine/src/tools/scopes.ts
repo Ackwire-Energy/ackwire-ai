@@ -50,11 +50,14 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
 };
 
 /**
- * Granted to every new agent: reading context, keeping its own notes, and
- * reading and writing Drive files (low risk). Admins and owners can revoke them.
+ * Granted to every new agent: reading context, keeping its own notes,
+ * reading and writing Drive files, and reading issues (so any agent can check
+ * the org's issues before answering about them; low risk). Admins and owners
+ * can revoke them.
  */
 export const DEFAULT_AGENT_SCOPES = [
   "context:read",
+  "issues:read",
   "memory:write",
   "drive:read",
   "drive:write",

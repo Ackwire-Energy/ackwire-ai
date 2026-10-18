@@ -275,6 +275,50 @@ export async function mentionHandoffs(
 }
 
 /**
+ * A person's message @mentions several agents: for each, is the person asking
+ * that agent to act or answer now (an addressee), or only naming it as part
+ * of the request ("@atlas, when an error comes in, ask @ada to analyze it":
+ * Atlas acts, Ada is referenced)? Probability per agent id. Policy (who gets
+ * a run, the fail-open default) stays in `messages.ts`.
+ */
+export async function personMentionAddressees(
+  judge: Judge,
+  input: {
+    orgId: string;
+    body: string;
+    author: string;
+    targets: { agentId: string; handle: string; name: string; role: string | null }[];
+  },
+): Promise<Map<string, number>> {
+  if (input.targets.length === 0) return new Map();
+  const questions: Record<string, JudgeQuestion> = {};
+  input.targets.forEach((t, i) => {
+    questions[`acts_${i}`] = {
+      type: "noul",
+      instructions: {
+        agent: { handle: `@${t.handle}`, name: t.name, role: t.role },
+        question:
+          'A person wrote `message`, which mentions several agents. Is the person asking `agent` itself to do something or to answer something now? No when `agent` is only part of what another agent is asked to do ("@x, ask @agent to…", "@x, when it happens have @agent review it"), or is only named, quoted or referred to.',
+      },
+      criteria: {
+        true: "The person speaks to this agent: it should act or reply now.",
+        false: "This agent is only referenced: another agent is asked to involve it later, or it is just named.",
+      },
+    };
+  });
+  const answers = await judge.ask({
+    orgId: input.orgId,
+    kind: "mention_addressees",
+    state: {
+      message: { from: input.author, from_a_person: true, text: input.body.slice(0, 4000) },
+      mentioned_agents: input.targets.map((t) => `@${t.handle}`),
+    },
+    questions,
+  });
+  return new Map(input.targets.map((t, i) => [t.agentId, answers[`acts_${i}`]?.noul ?? 0]));
+}
+
+/**
  * For tests: answers from `answer(kind, questionId, state, question)` (default: every
  * Noul 0, no Choice picked). Never calls a model.
  */

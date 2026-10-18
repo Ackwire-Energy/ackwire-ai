@@ -241,6 +241,8 @@ export interface MessageReceipts {
   handled: { agentId: string; runId?: string; status: RunStatus | "waiting_input" | "canceled" }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
+  /** Agents it only references as part of the request to another agent: no run, by design. */
+  referenced?: string[];
 }
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
@@ -372,6 +374,8 @@ export type ChannelEvent =
       runs?: { agentId: string; runId: string }[];
       /** Agents it mentions that won't answer. */
       blocked?: string[];
+      /** Agents it only references (part of the request to another agent): no run, by design. */
+      referenced?: string[];
       strategy?: "mention" | "dm" | "router" | "none";
       reason?: string;
     }

@@ -599,5 +599,151 @@
       "behavior": "Looks the issue up with the issue tools and reports its real state (title, status, what's known), then a next step (e.g. who could pick it up). Doesn't guess or ask which issue.",
       "rubric": ["Reports the checkout issue from the issue tools (its title, state and details), not from guesses."]
     }
+  },
+  {
+    "id": "ops-addressee-routine-mentions-other-agent",
+    "title": "\"@atlas … pede para a @ada …\": só o Atlas age e ajusta a própria rotina",
+    "source": "real failure 2026-10-18 (anonymized): both agents started; Ada relayed the request to Atlas privately and the two answers contradicted",
+    "agent": {
+      "preset": "ops"
+    },
+    "org": {
+      "name": "Lumen",
+      "context": "Lumen é um app de meditação e hábitos por assinatura (iOS e Android). Repositórios no GitHub: lumen/app (app React Native) e lumen/api (backend). Erros no Sentry (projetos lumen-app e lumen-api). A API roda no Railway. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Ada",
+        "handle": "ada",
+        "role": "Dev",
+        "instructions": "Você é a dev do time: lê o código, analisa erros e escreve análises técnicas nas issues."
+      }
+    ],
+    "routines": [
+      {
+        "agent": "self",
+        "name": "Monitorar erros novos do Sentry",
+        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução e avise aqui com o que encontrou. Se não houver nada novo, responda NO_REPLY.",
+        "schedule": "a cada hora"
+      }
+    ],
+    "schedule": true,
+    "addressees": true,
+    "conversation": {
+      "where": "channel",
+      "channel": "tech",
+      "topic": "Engenharia",
+      "trigger": {
+        "author": "Marina",
+        "body": "gente, quero ajustar a rotina de vcs, @atlas quando entrar algum erro pede para a @ada analisar e escrever uma analise tecnica na issue"
+      }
+    },
+    "expect": {
+      "mustCall": ["update_routine"],
+      "mustNotCall": ["ask_agent"],
+      "notTriggered": ["ada"],
+      "ask": "never",
+      "behavior": "Only Atlas acts (Ada is only referenced, so she gets no run). Atlas finds its routine 'Monitorar erros novos do Sentry' (list_routines) and updates its instructions (update_routine) so that, when a new error comes in, it asks @ada to analyze it and write a technical analysis on the issue. It confirms the change to Marina in one short message. It doesn't ask Ada anything now: the request is for future runs of the routine.",
+      "skipJudge": ["looked_first", "next_step"],
+      "rubric": [
+        "Says the routine was changed and what it will do when a new error comes in (ask Ada for a technical analysis on the issue), without contradicting itself."
+      ]
+    }
+  },
+  {
+    "id": "ops-consulted-on-behalf-edits-routine",
+    "title": "Consultado pela Ada em nome da Marina, o Atlas ajusta a própria rotina",
+    "source": "real failure 2026-10-18 (anonymized): the consulted agent answered that routine tools only accept a person's direct request",
+    "agent": {
+      "preset": "ops"
+    },
+    "org": {
+      "name": "Lumen",
+      "context": "Lumen é um app de meditação e hábitos por assinatura (iOS e Android). Repositórios no GitHub: lumen/app (app React Native) e lumen/api (backend). Erros no Sentry (projetos lumen-app e lumen-api). A API roda no Railway. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Ada",
+        "handle": "ada",
+        "role": "Dev",
+        "instructions": "Você é a dev do time: lê o código, analisa erros e escreve análises técnicas nas issues."
+      }
+    ],
+    "routines": [
+      {
+        "agent": "self",
+        "name": "Monitorar erros novos do Sentry",
+        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução e avise aqui com o que encontrou. Se não houver nada novo, responda NO_REPLY.",
+        "schedule": "a cada hora"
+      }
+    ],
+    "schedule": true,
+    "conversation": {
+      "where": "channel",
+      "channel": "tech",
+      "topic": "Engenharia",
+      "consultation": {
+        "from": "ada",
+        "origin": "@ada combina com o Atlas: quando entrar erro novo no Sentry, a rotina dele te pede uma análise técnica na issue"
+      },
+      "trigger": {
+        "author": "Marina",
+        "body": "A Marina pediu: na sua rotina 'Monitorar erros novos do Sentry', quando entrar um erro novo, peça para mim (@ada) uma análise técnica na issue do erro. Pode ajustar a rotina?"
+      }
+    },
+    "expect": {
+      "mustCall": ["update_routine"],
+      "ask": "never",
+      "behavior": "Acting for Marina (the person behind Ada's question), Atlas updates its own routine with update_routine so that new errors go to Ada for a technical analysis on the issue, and answers Ada briefly that it's done and what changed. It never says it can't change the routine because the request came from an agent.",
+      "skipJudge": ["looked_first", "next_step"],
+      "rubric": ["Does not claim the routine tools refuse requests from agents; reports the routine as changed."]
+    }
+  },
+  {
+    "id": "dev-reads-other-agent-routine",
+    "title": "A Ada confere a rotina do Atlas antes de responder",
+    "source": "real failure 2026-10-18 (anonymized): 'Não consigo ler as rotinas do Atlas para conferir'",
+    "agent": {
+      "preset": "dev"
+    },
+    "org": {
+      "name": "Lumen",
+      "context": "Lumen é um app de meditação e hábitos por assinatura (iOS e Android). Repositórios no GitHub: lumen/app (app React Native) e lumen/api (backend). Erros no Sentry (projetos lumen-app e lumen-api). A API roda no Railway. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Atlas",
+        "handle": "atlas",
+        "role": "Ops",
+        "instructions": "Você cuida da operação: deploys, Railway, monitoramento de erros no Sentry e rotinas de alerta."
+      }
+    ],
+    "routines": [
+      {
+        "agent": "atlas",
+        "name": "Monitorar erros novos do Sentry",
+        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução. Para cada erro novo, peça para a @ada analisar e escrever uma análise técnica na issue do erro. Se não houver nada novo, responda NO_REPLY.",
+        "schedule": "a cada hora"
+      }
+    ],
+    "schedule": true,
+    "conversation": {
+      "where": "channel",
+      "channel": "tech",
+      "topic": "Engenharia",
+      "trigger": {
+        "author": "Marina",
+        "body": "@ada a rotina de erros do Atlas já te chama pra analisar quando entra erro novo? confere aí"
+      }
+    },
+    "expect": {
+      "investigate": true,
+      "mustCall": ["list_routines"],
+      "evidence": ["Monitorar erros novos do Sentry", "análise técnica", "analise tecnica"],
+      "ask": "never",
+      "behavior": "Reads Atlas's routines with list_routines (agent @atlas), finds 'Monitorar erros novos do Sentry' and confirms from its instructions that, for each new error, it asks Ada for a technical analysis on the issue. Never says it can't read Atlas's routines, and doesn't need to ask Atlas.",
+      "skipJudge": ["next_step"],
+      "rubric": ["Answers from the routine's actual instructions (quotes or paraphrases them), not from assumptions."]
+    }
   }
 ]

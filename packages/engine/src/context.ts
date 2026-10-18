@@ -336,9 +336,10 @@ export async function buildRunContext(
       return `${m.agentName} (@${m.agentHandle}${m.agentRole ? `, ${m.agentRole}` : ""}): ${summarizeScopes(scopes)}`;
     })
     .join("; ");
-  // The router sent this message to several agents (D49): each answers its own part, at the same time.
+  // The router (or the addressee check of a message mentioning several agents) sent this message to
+  // several agents (D49): each answers its own part, at the same time.
   const [routed] =
-    run.trigger === "router" && others.length > 0
+    (run.trigger === "router" || run.trigger === "mention") && others.length > 0
       ? await db
           .select({ selected: schema.routingDecisions.selectedAgentIds })
           .from(schema.routingDecisions)
@@ -351,6 +352,11 @@ export async function buildRunContext(
       : [];
   const alsoAnswering = others
     .filter((m) => m.agentId && routed?.selected.includes(m.agentId))
+    .map((m) => `@${m.agentHandle}`);
+  // Agents the person only referenced (part of what this agent is asked): they got no request.
+  const referencedIds = Array.isArray(trigger.meta?.referencedAgentIds) ? trigger.meta.referencedAgentIds : [];
+  const referenced = others
+    .filter((m) => m.agentId && referencedIds.includes(m.agentId))
     .map((m) => `@${m.agentHandle}`);
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
@@ -443,16 +449,20 @@ export async function buildRunContext(
         channel.kind === "forum"
           ? `# Where you are\nThe forum topic "${channel.topic}": an asynchronous discussion in rounds among ${memberList}. You speak once per round, when it's your turn (the latest "[Forum]" message says the round and the goal). Bring your own view and data from your tools; agree or disagree with reasons, and address the others with @ (they answer in their turn; mentions start nobody). Don't repeat what was already said; if you have nothing new, say so in one line. Write your post as the reply text.`
           : isAgentOnlyDm(channel)
-            ? `# Where you are\nA private conversation between agents: ${memberList}. Another agent is asking you for help with a task it is doing for ${requesterName} (\`ask_agent\`); your reply goes back to it, and no person reads this conversation. Answer its question directly and completely with your own knowledge and tools, as one agent briefing another (facts, values, steps; no greetings). Don't ask questions back: if something is missing, say what in your answer. Anything sensitive still needs a person's approval.`
+            ? `# Where you are\nA private conversation between agents: ${memberList}. Another agent is asking you for help with a task it is doing for ${requesterName} (\`ask_agent\`); your reply goes back to it, and no person reads this conversation. Answer its question directly and completely with your own knowledge and tools, as one agent briefing another (facts, values, steps; no greetings). Don't ask questions back: if something is missing, say what in your answer. You act for the person behind the request: tools that need a person's request (routines, reminders) accept it, within your own permissions. Anything sensitive still needs a person's approval.`
             : channel.kind === "dm"
               ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
               : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
                   otherAgents
-                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task. Never name your tools to people.`
+                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. Never name your tools to people.`
                     : ""
                 }${
                   alsoAnswering.length > 0
                     ? `\n${alsoAnswering.join(", ")} also got this message and ${alsoAnswering.length > 1 ? "are" : "is"} answering right now, each for their own part. Answer only yours; don't speak for them, mention them or say what they will answer.`
+                    : ""
+                }${
+                  referenced.length > 0
+                    ? `\n${referenced.join(", ")} ${referenced.length > 1 ? "are" : "is"} only mentioned in this message as part of what you are asked: no request went to ${referenced.length > 1 ? "them" : "it"}.`
                     : ""
                 }`,
     },

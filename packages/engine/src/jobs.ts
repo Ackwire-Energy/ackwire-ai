@@ -15,7 +15,7 @@ import { advanceForumTopic } from "./forum";
 import { mentionHandoffs } from "./judge";
 import { wakeForAccessDecision } from "./machine-access";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
-import { getMessage } from "./messages";
+import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
@@ -290,7 +290,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         return;
       }
       if (message.mentionedAgentIds.length > 0) {
-        await dispatchMentions(deps.db, input, { maxHops: deps.maxHops }); // no-op unless inserted elsewhere
+        // No-op unless inserted elsewhere; never the agents the person only referenced.
+        const referenced = referencedOf(message.meta);
+        await dispatchMentions(deps.db, input, {
+          maxHops: deps.maxHops,
+          ...(referenced.length > 0
+            ? { onlyAgentIds: message.mentionedAgentIds.filter((id) => !referenced.includes(id)) }
+            : {}),
+        });
         return;
       }
       // An answer to an agent's question resumes that run; nobody else is routed.

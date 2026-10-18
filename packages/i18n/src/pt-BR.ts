@@ -512,6 +512,7 @@ export const ptBR = {
       asking: "Esperando sua resposta",
       handled: "Respondeu",
       failed: "Falhou",
+      referenced: "Só mencionado",
     },
     failedShort: "Não conseguiu responder",
     popoverTitle: "Agentes",

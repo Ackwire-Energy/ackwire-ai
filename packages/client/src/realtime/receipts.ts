@@ -24,6 +24,8 @@ export interface MessageReceipt {
   mentioned?: string[];
   /** Mentioned agents that won't answer (they don't reply to this person). */
   blocked?: string[];
+  /** Mentioned agents the message only references (part of the request to another agent): no answer expected. */
+  referenced?: string[];
 }
 
 export type ReceiptsState = Record<string, MessageReceipt>;
@@ -107,13 +109,21 @@ export function seedReceipt(state: ReceiptsState, message: Message): ReceiptsSta
   if (message.author?.type !== "person") return state;
   const existing = state[message.id];
   const r = message.receipts;
+  const metaReferenced = message.meta?.referencedAgentIds;
+  const referenced = r?.referenced ?? (Array.isArray(metaReferenced) ? (metaReferenced as string[]) : []);
   const mentioned = message.mentionedAgentIds ?? [];
   // The mentions stay on the receipt: "nobody will answer" needs the server to say they can't.
   const withMentions = (s: ReceiptsState): ReceiptsState => {
     const current = s[message.id];
-    return current && mentioned.length > 0 && !current.mentioned
-      ? { ...s, [message.id]: { ...current, mentioned } }
-      : s;
+    if (!current || mentioned.length === 0) return s;
+    const next = {
+      ...current,
+      ...(current.mentioned ? {} : { mentioned }),
+      ...(referenced.length > 0 && !current.referenced ? { referenced } : {}),
+    };
+    return next.mentioned === current.mentioned && next.referenced === current.referenced
+      ? s
+      : { ...s, [message.id]: next };
   };
   // Server receipts replace a local guess; otherwise keep what we have.
   if (existing && (existing.confirmed || !r)) return withMentions(state);
@@ -131,8 +141,9 @@ export function seedReceipt(state: ReceiptsState, message: Message): ReceiptsSta
     const current = next[message.id] ?? { routed: false, agents: [] };
     return withMentions({ ...next, [message.id]: { ...current, routed: true, blocked: r.blocked ?? [] } });
   }
-  // A mention: the server resolved it, so that agent will answer.
-  for (const id of mentioned) next = set(next, message.id, id, "picked", false, false);
+  // A mention: the server resolved it, so that agent will answer (unless the message only references it).
+  for (const id of mentioned)
+    next = set(next, message.id, id, referenced.includes(id) ? "seen" : "picked", false, false);
   return withMentions(next);
 }
 
@@ -167,9 +178,16 @@ export function applyReceiptEvent(
       const current = next[event.messageId] ?? { routed: false, agents: [] };
       // Mentioned agents that got nothing: said explicitly, or the whole decision was "nobody".
       const blocked = event.blocked ?? (event.strategy === "none" ? event.seenBy : current.blocked);
+      const referenced = event.referenced ?? current.referenced;
       return {
         ...next,
-        [event.messageId]: { ...current, routed: true, confirmed: true, ...(blocked ? { blocked } : {}) },
+        [event.messageId]: {
+          ...current,
+          routed: true,
+          confirmed: true,
+          ...(blocked ? { blocked } : {}),
+          ...(referenced ? { referenced } : {}),
+        },
       };
     }
     case "message.claimed":
@@ -238,20 +256,24 @@ export interface ReceiptView {
     | null;
   /** Everyone who answered answered: the row can shrink to avatars. */
   done: boolean;
+  /** Agents the message only references (no answer expected from them). */
+  referenced: string[];
 }
 
 export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
-  if (!receipt || receipt.agents.length === 0) return { seen: [], status: null, done: false };
+  if (!receipt || receipt.agents.length === 0) return { seen: [], status: null, done: false, referenced: [] };
   const seen = receipt.agents.map(([id]) => id);
+  const referenced = (receipt.referenced ?? []).filter((id) => seen.includes(id));
   const with_ = (phase: ReceiptPhase) => receipt.agents.filter(([, p]) => p === phase).map(([id]) => id);
   for (const kind of ["failed", "asking", "waiting", "claimed", "picked"] as const) {
     const agents = with_(kind);
-    if (agents.length) return { seen, status: { kind, agents }, done: false };
+    if (agents.length) return { seen, status: { kind, agents }, done: false, referenced };
   }
   const handled = with_("handled");
-  if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true };
-  // A mention always gets an answer unless the server said that agent can't (never "nobody" on a guess).
-  const blocked = new Set(receipt.blocked ?? []);
+  if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced };
+  // A mention always gets an answer unless the server said that agent can't, or that the message only
+  // references it (never "nobody" on a guess).
+  const blocked = new Set([...(receipt.blocked ?? []), ...(receipt.referenced ?? [])]);
   const unanswered = (receipt.mentioned ?? []).some((id) => !blocked.has(id));
-  return { seen, status: receipt.routed && !unanswered ? { kind: "nobody" } : null, done: false };
+  return { seen, status: receipt.routed && !unanswered ? { kind: "nobody" } : null, done: false, referenced };
 }

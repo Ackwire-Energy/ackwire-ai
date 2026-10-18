@@ -180,6 +180,43 @@ describe("receipts when the mention doesn't start a new run", () => {
   // Loose on purpose: some events (agent.run.steered) live in the client stream union, not ChannelEvent.
   const ev = (e: Record<string, unknown> & { type: string }) => ({ channelId: "c1", ...e }) as unknown as ChannelEvent;
 
+  test("an agent the message only references: 'only mentioned', never 'will answer' nor 'nobody'", () => {
+    // The sender's copy carries meta.referencedAgentIds: Atlas will answer, Ada is only referenced.
+    let s = seedReceipt({}, person("m5", ["atlas", "ada"], { meta: { referencedAgentIds: ["ada"] } }));
+    expect(s.m5?.agents).toEqual([
+      ["atlas", "picked"],
+      ["ada", "seen"],
+    ]);
+    s = applyReceiptEvent(
+      s,
+      ev({
+        type: "message.routed",
+        messageId: "m5",
+        seenBy: ["atlas", "ada"],
+        pickedBy: ["atlas"],
+        runs: [{ agentId: "atlas", runId: "r5" }],
+        referenced: ["ada"],
+        strategy: "mention",
+      }),
+    );
+    expect(receiptView(s.m5).status).toEqual({ kind: "picked", agents: ["atlas"] });
+    expect(receiptView(s.m5).referenced).toEqual(["ada"]);
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "run.finished", runId: "r5", threadId: "m5", agentId: "atlas", status: "done" }),
+    );
+    expect(receiptView(s.m5)).toMatchObject({ status: { kind: "handled", agents: ["atlas"] }, done: true });
+    // From the list API: referenced, nothing blocked.
+    const listed = seedReceipt(
+      {},
+      person("m6", ["atlas", "ada"], {
+        receipts: { seenBy: ["atlas", "ada"], pickedBy: [], handled: [], blocked: [], referenced: ["ada", "atlas"] },
+      }),
+    );
+    // Everyone only referenced: the decision is final, nobody answers.
+    expect(receiptView(listed.m6).status).toEqual({ kind: "nobody" });
+  });
+
   test("a mention steered into the agent's task: never 'nobody'; picked from the list receipts", () => {
     // The old list receipts (no run of its own, nothing blocked): seen only, not "nobody".
     const old = seedReceipt(

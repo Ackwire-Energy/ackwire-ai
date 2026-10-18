@@ -20,6 +20,10 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "comment_issue",
     "search_context",
     "ask_user",
+    "ask_agent",
+    "list_routines",
+    "update_routine",
+    "create_routine",
   ]);
   const ids = new Set<string>();
   for (const c of all) {
@@ -32,6 +36,7 @@ test("every case is well formed: known presets, connectors and tools", () => {
       ...Object.keys(c.fixtures ?? {}),
       ...(c.expect.mustCall ?? []).flatMap((g) => g.split("|")),
       ...(c.expect.mustNotExecute ?? []),
+      ...(c.expect.mustNotCall ?? []),
       ...(c.expect.approval ?? []),
     ];
     for (const t of tools) expect(known.has(t), `${c.id}: ${t}`).toBe(true);
@@ -113,5 +118,26 @@ test("a routine run: the trigger is the routine's, earlier messages are history,
   expect(history).toContain("Sigo acompanhando LUMEN-API-3A1");
   expect(run.noReply).toBe(true);
   expect(run.reply).toBe("");
+  expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
+});
+
+test("a consultation case: the agent answers another agent's question as the person behind it", async () => {
+  const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+  const provider = createFakeProvider((req, n) => {
+    if (n === 1) return { chunks: [], toolUses: [{ name: "list_routines", input: {} }] };
+    if (n === 2) {
+      const id = uuid.exec(JSON.stringify(req.messages.at(-1)?.content))?.[0] ?? "";
+      return { chunks: [], toolUses: [{ name: "update_routine", input: { id, prompt: "Peça à @ada uma análise." } }] };
+    }
+    return { chunks: ["Ajustei a rotina: erros novos vão para a Ada analisar na issue."] };
+  });
+  const c = byId("ops-consulted-on-behalf-edits-routine");
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 6 });
+  expect(run.system).toContain("A private conversation between agents");
+  expect(run.calls.map((t) => [t.name, t.executed, t.isError])).toEqual([
+    ["list_routines", true, false],
+    ["update_routine", true, false],
+  ]);
+  expect(run.triggered).toEqual([]);
   expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
 });
