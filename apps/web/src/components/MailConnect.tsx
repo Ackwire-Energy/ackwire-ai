@@ -1,5 +1,12 @@
-import type { Agent, MailAccount, MailConnectError, MailProviders } from "@agenteschat/client";
-import { keys, useAgents, useMailAction, useMailProviders } from "@agenteschat/client";
+import type {
+  Agent,
+  MailAccount,
+  MailActionName,
+  MailConnectError,
+  MailPolicy,
+  MailProviders,
+} from "@agenteschat/client";
+import { keys, useAgentMail, useAgents, useMailAction, useMailProviders } from "@agenteschat/client";
 import { LEVELS, type Level } from "@agenteschat/client/lib/access-levels";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import {
@@ -10,6 +17,8 @@ import {
   MAIL_ACTIONS,
   type MailChoice,
   mailErrorOf,
+  normalizePolicy,
+  toMailLevel,
 } from "@agenteschat/client/lib/mail";
 import {
   Alert,
@@ -25,6 +34,7 @@ import {
   Input,
   Segmented,
   Select,
+  Switch,
   ToolLevelSwatch,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +45,7 @@ import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
+import { MailRulesPanel, rulesCount } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
@@ -384,18 +395,37 @@ export function ImapStep({
   );
 }
 
-/** Step 2: what the email connector does, by level (Lê · Escreve · Sempre pede aprovação · Desligado). */
+/** Step 2: what agents may do in this mailbox; each action turns on or off for every agent. */
 function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNext: () => void; onClose: () => void }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const { update } = useMailAction(org.id);
+  const [off, setOff] = useState<Set<MailActionName>>(() => new Set(account.offActions ?? []));
+  const changed = off.size !== (account.offActions ?? []).length || (account.offActions ?? []).some((a) => !off.has(a));
+  const next = () => {
+    if (!changed) return onNext();
+    update.mutate({ accountId: account.id, offActions: [...off] }, { onSuccess: onNext });
+  };
   return (
     <>
       <DialogBody className="cflow__body">
         <p className="muted cflow__text">{t("mail.toolsLead", { name: account.address })}</p>
-        <MailActionsList />
+        <MailActionsList
+          off={off}
+          onToggle={(action, on) =>
+            setOff((prev) => {
+              const s = new Set(prev);
+              if (on) s.delete(action);
+              else s.add(action);
+              return s;
+            })
+          }
+        />
+        {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
       </DialogBody>
       <DialogFooter bar>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button variant="primary" onClick={onNext}>
+        <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={next}>
           {t("connectFlow.next")}
         </Button>
       </DialogFooter>
@@ -403,7 +433,13 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
   );
 }
 
-export function MailActionsList() {
+export function MailActionsList({
+  off,
+  onToggle,
+}: {
+  off: Set<MailActionName>;
+  onToggle: (action: MailActionName, on: boolean) => void;
+}) {
   const { t } = useTranslation();
   return (
     <div className="mail-actions">
@@ -416,11 +452,18 @@ export function MailActionsList() {
           </h3>
           <ul className="cflow-tools">
             {MAIL_ACTIONS[level].map((a) => (
-              <li key={a} className="cflow-tool" data-off={level === "off" || undefined}>
+              <li key={a} className="cflow-tool" data-off={off.has(a) || undefined}>
                 <span className="cflow-tool__text">
                   <span className="cflow-tool__name">{t(`mail.action.${a}.name`)}</span>
-                  <span className="cflow-tool__desc">{t(`mail.action.${a}.text`)}</span>
+                  <span className="cflow-tool__desc">
+                    {off.has(a) ? t("mail.actionOff") : t(`mail.action.${a}.text`)}
+                  </span>
                 </span>
+                <Switch
+                  checked={!off.has(a)}
+                  onCheckedChange={(on) => onToggle(a, on)}
+                  aria-label={t("mail.actionToggle", { name: t(`mail.action.${a}.name`) })}
+                />
               </li>
             ))}
           </ul>
@@ -432,7 +475,39 @@ export function MailActionsList() {
 
 const toLevel = (l: "none" | "read" | "read_write" | undefined): Level =>
   l === "read_write" ? "write" : l === "read" ? "read" : "none";
-const toMail = (l: Level) => (l === "write" ? "read_write" : l);
+
+/** "Regras" under an agent with access: which folders it reads, from whom, to whom it sends. */
+function AgentMailRules({
+  agentId,
+  account,
+  policy,
+  onChange,
+}: {
+  agentId: string;
+  account: MailAccount;
+  policy: MailPolicy | undefined;
+  onChange: (policy: MailPolicy) => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const saved = useAgentMail(org.id, agentId).data?.find((m) => m.accountId === account.id);
+  const shown = policy ?? (saved ? { ...defaultPolicy(), ...saved.policy } : defaultPolicy());
+  const count = rulesCount(shown);
+  return (
+    <details className="mail-rules cflow-agent__rules">
+      <summary aria-label={t("mail.agent.rulesOf", { address: account.address })}>
+        <Icon name="filter" size={14} />
+        <span>{t("mail.agent.rules")}</span>
+        {count > 0 ? (
+          <CountChip size="sm">{count}</CountChip>
+        ) : (
+          <span className="small muted">{t("mail.agent.noRules")}</span>
+        )}
+      </summary>
+      <MailRulesPanel accountId={account.id} address={account.address} policy={shown} onChange={onChange} />
+    </details>
+  );
+}
 
 /** Step 3: one level per agent; each saves that agent's access to this mailbox (rules kept). */
 function WhoStep({ account, onBack, onClose }: { account: MailAccount; onBack: () => void; onClose: () => void }) {
@@ -445,19 +520,21 @@ function WhoStep({ account, onBack, onClose }: { account: MailAccount; onBack: (
   const list = agents.data ?? [];
   const current = (agentId: string) => toLevel(account.agents.find((a) => a.agentId === agentId)?.level);
   const [who, setWho] = useState<Record<string, Level>>({});
+  // Rules edited here (which folders, senders…); untouched agents keep what they have.
+  const [rules, setRules] = useState<Record<string, MailPolicy>>({});
   const levelOf = (agentId: string) => who[agentId] ?? current(agentId);
   const levelLabel = (l: Level) => t(`access.level.${l}`);
 
   const grant = useMutation({
     mutationFn: async () => {
-      const changed = list.filter((a) => levelOf(a.id) !== current(a.id));
+      const changed = list.filter((a) => levelOf(a.id) !== current(a.id) || rules[a.id] !== undefined);
       for (const a of changed) {
         // Keep the agent's rules for this mailbox; only the level changes here.
         const saved = (await api.mail.agent(org.id, a.id)).find((m) => m.accountId === account.id);
         await api.mail.setAgent(org.id, a.id, account.id, {
-          level: toMail(levelOf(a.id)),
+          level: toMailLevel(levelOf(a.id)),
           canDelete: saved?.canDelete ?? false,
-          policy: saved?.policy ?? defaultPolicy(),
+          policy: normalizePolicy(rules[a.id] ?? saved?.policy ?? defaultPolicy()),
         });
       }
     },
@@ -507,6 +584,14 @@ function WhoStep({ account, onBack, onClose }: { account: MailAccount; onBack: (
                     onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
                     options={LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
                   />
+                  {levelOf(a.id) !== "none" && (
+                    <AgentMailRules
+                      agentId={a.id}
+                      account={account}
+                      policy={rules[a.id]}
+                      onChange={(policy) => setRules((r) => ({ ...r, [a.id]: policy }))}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

@@ -5188,13 +5188,16 @@ export const en: Translations = {
       blocked_host: "That server isn't allowed. Use your provider's public address.",
       unknown: "Couldn't connect right now. Try again in a moment.",
     },
+    actionToggle: "{{name}} in this mailbox",
+    actionOff: "Off: no agent does this in this mailbox.",
+    actionsError: "Couldn't save. Try again.",
     toolsLead:
-      "What agents can do in {{name}}. Sending, replying and forwarding always ask for approval in the chat, showing who it goes to and the text.",
+      "What agents can do in {{name}}. Turn off what no agent should do. Sending, replying and forwarding always ask for approval in the chat, showing who it goes to and the text.",
     group: {
       read: "Reads",
       write: "Writes",
       approval: "Always asks for approval",
-      off: "Off",
+      off: "Per agent only",
     },
     action: {
       search: { name: "Search email", text: "Looks by sender, subject or text." },
@@ -5205,7 +5208,7 @@ export const en: Translations = {
       send: { name: "Send", text: "A new email." },
       reply: { name: "Reply", text: "Answers in the same conversation." },
       forward: { name: "Forward", text: "Forwards an email received." },
-      delete: { name: "Delete", text: "Off. You turn it on per agent, and it still asks for approval." },
+      delete: { name: "Delete", text: "Each agent needs its own permission, and it still asks for approval." },
     },
     whoLead: "Each agent's rules (folders, senders, who it sends to) are on the agent's page.",
     status: { pending: "Connecting", active: "Active", needs_reconnect: "Needs reconnecting" },

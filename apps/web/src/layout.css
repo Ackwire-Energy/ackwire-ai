@@ -3298,6 +3298,10 @@ button.drive-where:focus-visible {
   gap: 12px;
   padding: 8px 0;
 }
+.cflow-agent__rules {
+  flex-basis: 100%;
+  margin-left: 44px;
+}
 .cflow-agent__name {
   flex: 1 1 140px;
   min-width: 0;
@@ -7953,7 +7957,7 @@ a.machine-row__name:hover {
   gap: 8px;
 }
 .newag__money-field {
-  width: 170px;
+  width: 150px;
 }
 /* The label is for screen readers only: take its (empty) row out of the layout so the input lines up
    with the amount buttons. */
@@ -7966,9 +7970,40 @@ a.machine-row__name:hover {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
-.newag__money-field .ac-input-affix input {
-  font-size: 17px;
+/* "Outro valor" is one more amount button you can type in: same pill, height and type as the others. */
+.newag__money-field .ac-input-affix {
+  border: 0;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  font-size: 13px;
   font-weight: 600;
+  transition:
+    background-color 0.15s,
+    box-shadow 0.18s var(--out);
+}
+.newag__money-field .ac-input-affix:focus-within {
+  background: var(--raised);
+  box-shadow: var(--e2), var(--field-ring);
+}
+.newag__money-field .ac-input-affix__prefix {
+  padding: 0 4px 0 14px;
+  color: var(--muted);
+}
+.newag__money-field .ac-input-affix input {
+  padding-right: 14px;
+  color: var(--ink);
+}
+.newag__money-field .ac-input-affix input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+.newag__money-field--on .ac-input-affix,
+.newag__money-field--on .ac-input-affix:focus-within {
+  background: var(--chosen-bg);
+}
+.newag__money-field--on .ac-input-affix:not(:focus-within) {
+  box-shadow: var(--chosen-shadow);
 }
 .newag__tog {
   height: 40px;

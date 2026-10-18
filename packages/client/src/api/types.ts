@@ -3113,9 +3113,23 @@ export interface MailAccount {
   /** The IMAP preset (`icloud`, `locaweb`…); null for Gmail/Outlook or a custom server. */
   preset: string | null;
   createdAt: string;
+  /** Actions turned off in this mailbox for every agent ("O que faz"). */
+  offActions: MailActionName[];
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }
+
+/** What can be turned on or off for a mailbox; each of the agents' email tools belongs to one. */
+export type MailActionName =
+  | "search"
+  | "read"
+  | "folders"
+  | "draft"
+  | "organize"
+  | "send"
+  | "reply"
+  | "forward"
+  | "delete";
 
 /** Why an IMAP mailbox didn't connect (`422 { error }`). */
 export type MailConnectError = "auth" | "imap_unreachable" | "smtp_unreachable" | "tls" | "blocked_host" | "unknown";

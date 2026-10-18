@@ -58,6 +58,16 @@ const EFFECTS: Record<string, Effect> = {
   trash: "delete",
 };
 const effectOf = (verb: string): Effect => EFFECTS[verb] ?? "send";
+
+/** The action people turn on or off for a mailbox ("O que faz") that each verb belongs to. */
+const ACTION_OF: Record<string, string> = {
+  attachment: "read",
+  move: "organize",
+  mark: "organize",
+  archive: "organize",
+  trash: "delete",
+};
+const actionOf = (verb: string) => ACTION_OF[verb] ?? verb;
 const SCOPE_OF: Record<Effect, string> = {
   read: MAIL_SCOPES.read,
   draft: MAIL_SCOPES.draft,
@@ -763,6 +773,9 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       },
     );
 
+    // Actions an admin turned off for this mailbox never become tools.
+    const off = new Set(account.offActions);
+    const prefix = `mail_${slug}_`;
     return [
       search,
       readTool,
@@ -776,7 +789,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       mark,
       archive,
       trash,
-    ];
+    ].filter((tool) => !off.has(actionOf(tool.name.slice(prefix.length))));
   }
 
   return {

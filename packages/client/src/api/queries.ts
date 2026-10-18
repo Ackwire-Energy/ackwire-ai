@@ -48,6 +48,7 @@ import type {
   IssuePatch,
   Machine,
   MachineAccessReduce,
+  MailActionName,
   MailImapInput,
   Message,
   MessageMemory,
@@ -640,8 +641,15 @@ export function useMailAction(orgId: string) {
       mutationFn: (input: { provider: "gmail" | "outlook"; label?: string }) => api.mail.connectComposio(orgId, input),
     }),
     update: useMutation({
-      mutationFn: ({ accountId, ...input }: { accountId: string; label?: string; password?: string }) =>
-        api.mail.update(orgId, accountId, input),
+      mutationFn: ({
+        accountId,
+        ...input
+      }: {
+        accountId: string;
+        label?: string;
+        password?: string;
+        offActions?: MailActionName[];
+      }) => api.mail.update(orgId, accountId, input),
       onSuccess: done,
       meta: { silent: true },
     }),

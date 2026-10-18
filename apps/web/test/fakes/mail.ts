@@ -98,6 +98,7 @@ export function createFakeMail(log: (method: string, ...args: unknown[]) => void
         address: input.address,
         label: input.label ?? input.address,
         status: "active",
+        offActions: [],
         lastError: null,
         preset: input.preset === "custom" ? null : input.preset,
         createdAt: now().toISOString(),
@@ -115,6 +116,7 @@ export function createFakeMail(log: (method: string, ...args: unknown[]) => void
       if (input.password) failOnce();
       const a = find(accountId);
       if (input.label) a.label = input.label;
+      if (input.offActions) a.offActions = [...input.offActions];
       if (input.password) {
         a.status = "active";
         a.lastError = null;

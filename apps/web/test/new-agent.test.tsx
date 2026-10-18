@@ -14,7 +14,7 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
-import { createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, ENG_ID, fakeMailOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import {
   click,
   continueButton,
@@ -238,7 +238,7 @@ describe("Criar agente: what gets created", () => {
     expect(body.connectors).toEqual({ "conn-gh": true });
   });
 
-  test("budget: empty is the workspace default; zero or text is invalid; a quick amount fills it", async () => {
+  test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {
     const state = await open();
     await startAs("QA");
     await proceed(4);
@@ -252,13 +252,50 @@ describe("Criar agente: what gets created", () => {
     await typeIn(field, "abc");
     expect(screen().getAllByText("Use um valor maior que zero.").length).toBeGreaterThan(0);
     await click(screen().getByRole("button", { name: "US$ 30" }));
-    expect(field.value).toBe("30");
+    // "Outro valor" stays empty: only an amount of its own goes there.
+    expect(field.value).toBe("");
     expect(screen().getByRole("button", { name: "US$ 30" }).getAttribute("aria-pressed")).toBe("true");
-    await typeIn(field, "");
+    await click(screen().getByRole("button", { name: "Padrão do workspace (US$ 50)" }));
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(createdWith(state)?.monthlyBudgetUsd).toBeNull();
+  });
+
+  test("connected mailboxes are in 'Ferramentas e acesso', off by default; the chosen level is saved", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const mail = fakeMailOf.get(api);
+    if (!mail) throw new Error("no mail fake");
+    mail.accounts = [
+      {
+        id: "mail-1",
+        provider: "imap",
+        via: "imap",
+        address: "ola@acme.com.br",
+        label: "Atendimento",
+        status: "active",
+        lastError: null,
+        preset: "icloud",
+        createdAt: new Date().toISOString(),
+        offActions: [],
+        agents: [],
+      },
+    ];
+    await renderApp(`/org/${ORG_ID}/agents/new`, { api });
+    await settle(8);
+    await startAs("QA");
+    await proceed(2);
+    expect(title()).toBe("Ferramentas e acesso");
+    const levels = within(screen().getByRole("list", { name: "Conectores e níveis" }));
+    const box = levels.getByRole("radiogroup", { name: "Nível em ola@acme.com.br" });
+    expect(within(box).getByRole("radio", { name: "Sem acesso" }).getAttribute("aria-checked")).toBe("true");
+    await click(within(box).getByRole("radio", { name: "Ler" }));
+    await proceed(3);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    const saved = state.calls.find((c) => c.method === "mail.setAgent");
+    expect(saved?.args.slice(2)).toEqual(["mail-1", expect.objectContaining({ level: "read", canDelete: false })]);
   });
 
   test("a set budget is sent; the key defaults to the workspace's (credentialId null)", async () => {

@@ -46,6 +46,10 @@ const MailPreset = z
   })
   .openapi("MailPreset");
 
+const MailActionName = z
+  .enum(["search", "read", "folders", "draft", "organize", "send", "reply", "forward", "delete"])
+  .openapi("MailAction");
+
 const MailAccount = z
   .object({
     id: z.uuid(),
@@ -57,6 +61,7 @@ const MailAccount = z
     lastError: z.string().nullable(),
     preset: z.string().nullable(),
     createdAt: z.string(),
+    offActions: z.array(MailActionName),
     agents: z.array(z.object({ agentId: z.uuid(), level: z.enum(["read", "read_write"]), canDelete: z.boolean() })),
   })
   .openapi("MailAccount");
@@ -228,10 +233,17 @@ export function mailRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/mail/accounts/{accountId}",
       tags,
       security,
-      summary: "Rename a mailbox, or replace an IMAP mailbox's app password (tested first) (admins)",
+      summary:
+        "Rename a mailbox, turn its actions on or off for every agent, or replace an IMAP mailbox's app password (tested first) (admins)",
       request: {
         params: AccountParams,
-        body: body(z.object({ label: z.string().max(80).optional(), password: z.string().min(1).max(500).optional() })),
+        body: body(
+          z.object({
+            label: z.string().max(80).optional(),
+            password: z.string().min(1).max(500).optional(),
+            offActions: z.array(MailActionName).max(9).optional(),
+          }),
+        ),
       },
       responses: { 200: json(z.object({ account: MailAccount })), ...testFailed, ...errors },
     }),

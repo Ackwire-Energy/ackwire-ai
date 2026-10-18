@@ -45,8 +45,24 @@ export interface MailAccountView {
   lastError: string | null;
   preset: string | null;
   createdAt: string;
+  /** Actions turned off for every agent (see `MAIL_ACTIONS`). */
+  offActions: MailAction[];
   agents: { agentId: string; level: "read" | "read_write"; canDelete: boolean }[];
 }
+
+/** What people turn on or off for a mailbox ("O que faz"); each tool belongs to one. */
+export const MAIL_ACTIONS = [
+  "search",
+  "read",
+  "folders",
+  "draft",
+  "organize",
+  "send",
+  "reply",
+  "forward",
+  "delete",
+] as const;
+export type MailAction = (typeof MAIL_ACTIONS)[number];
 
 const aadFor = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
 /** Our Composio user id for an organization. */
@@ -112,6 +128,7 @@ export function mailAccountView(row: MailAccountRow, grants?: Map<string, Set<st
     lastError: row.lastError,
     preset: row.preset,
     createdAt: row.createdAt.toISOString(),
+    offActions: row.offActions.filter((a): a is MailAction => (MAIL_ACTIONS as readonly string[]).includes(a)),
     agents,
   };
 }
@@ -474,12 +491,17 @@ export async function updateMailAccount(
   actorId: string,
   orgId: string,
   accountId: string,
-  input: { label?: string; password?: string },
+  input: { label?: string; password?: string; offActions?: string[] },
 ): Promise<{ ok: true; account: MailAccountView } | { ok: false; error: MailTestError }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const row = await loadAccount(deps.db, orgId, accountId);
   const set: Partial<typeof mailAccounts.$inferInsert> = {};
   if (input.label !== undefined) set.label = input.label.trim().slice(0, 80) || row.address;
+  if (input.offActions !== undefined) {
+    const unknown = input.offActions.filter((a) => !(MAIL_ACTIONS as readonly string[]).includes(a));
+    if (unknown.length > 0) throw new ValidationError(`Unknown mail actions: ${unknown.join(", ")}`, "mail.action");
+    set.offActions = [...new Set(input.offActions)];
+  }
   if (input.password !== undefined) {
     if (row.via !== "imap") throw new ValidationError("Only IMAP mailboxes have a password", "mail.no_password");
     const imap = imapOf(deps);

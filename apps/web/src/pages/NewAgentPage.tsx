@@ -5,6 +5,7 @@ import {
   useCreateAgent,
   useCredentials,
   useDms,
+  useMailAccounts,
   useMembers,
   useModels,
   usePlatformKey,
@@ -15,6 +16,7 @@ import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-l
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
@@ -58,6 +60,7 @@ import {
   usd,
 } from "@/components/AgentFields";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { MailIcon } from "@/components/MailConnect";
 import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
@@ -161,6 +164,9 @@ function NewAgentFlow() {
   const create = useCreateAgent(org.id);
   const connected = useConnectedById();
   const connectedList = useMemo(() => [...connected.values()], [connected]);
+  const mail = useMailAccounts(org.id);
+  // Mailboxes (ADR 0038) start without access: email is always granted on purpose.
+  const mailboxes = useMemo(() => (mail.data ?? []).filter((a) => a.status === "active"), [mail.data]);
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -180,6 +186,7 @@ function NewAgentFlow() {
   const [look, setLook] = useState<Required<AgentAppearance>>(BLANK_LOOK);
   const [instructions, setInstructions] = useState("");
   const [levels, setLevels] = useState<Record<string, Level>>({});
+  const [mailLevels, setMailLevels] = useState<Record<string, Level>>({});
   const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
   const [owner, setOwner] = useState(me.user.id);
@@ -273,6 +280,8 @@ function NewAgentFlow() {
   const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
   const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
   const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
+  const grantedMail = mailboxes.filter((a) => (mailLevels[a.id] ?? "none") !== "none");
+  const mailAsks = MAIL_ACTIONS.approval.map((a) => t(`mail.action.${a}.name`));
   const skills = (library.data ?? []).filter((s) => skillIds?.has(s.id));
   const joined = myChannels.filter((c) => channelIds.has(c.id));
   const asksOf = (item: ConnectedItem) =>
@@ -339,6 +348,14 @@ function NewAgentFlow() {
         .map((item) => [`connector:${item.id}`, levels[item.id] as Level]),
     );
     if (Object.keys(chosen).length > 0) await saveLevels(api, org.id, agent.id, chosen);
+    // Mailboxes: the chosen level with the default rules (every send asks); rules are set on the agent page.
+    for (const account of grantedMail) {
+      await api.mail.setAgent(org.id, agent.id, account.id, {
+        level: toMailLevel(mailLevels[account.id] ?? "none"),
+        canDelete: false,
+        policy: defaultPolicy(),
+      });
+    }
     const libraryList = library.data ?? [];
     if (libraryList.length > 0) {
       await api.skills.setForAgent(
@@ -483,6 +500,14 @@ function NewAgentFlow() {
         {errorText(e)}
       </span>
     ) : null;
+  const mailChip = (account: (typeof mailboxes)[number]) => (
+    <span key={account.id} className="ac-chip newag__chip">
+      <MailIcon choice={choiceOf(account)} />
+      {t(mailLevels[account.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", {
+        name: account.address,
+      })}
+    </span>
+  );
   const connectorChip = (item: ConnectedItem) => {
     const n = itemName(t, item);
     return (
@@ -710,19 +735,31 @@ function NewAgentFlow() {
       <>
         {head(t("newAgent.steps.tools.title"), t("newAgent.steps.tools.lead", { ...g, org: org.name }))}
         <Card as="div" className="newag__card">
-          {connectedList.length > 0 ? (
+          {connectedList.length + mailboxes.length > 0 ? (
             <>
               <div className="newag__list-head">
-                <span className="small muted">{t("newAgent.connectedCount", { count: connectedList.length })}</span>
+                <span className="small muted">
+                  {t("newAgent.connectedCount", { count: connectedList.length + mailboxes.length })}
+                </span>
                 <span className="newag__quick">
                   {t("newAgent.all")}
-                  <Button size="sm" variant="ghost" onClick={() => setLevels(presetLevels("custom", connectedList))}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setLevels(presetLevels("custom", connectedList));
+                      setMailLevels({});
+                    }}
+                  >
                     {t("access.level.none")}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])))}
+                    onClick={() => {
+                      setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])));
+                      setMailLevels(Object.fromEntries(mailboxes.map((a) => [a.id, "read" as Level])));
+                    }}
                   >
                     {t("access.level.read")}
                   </Button>
@@ -742,6 +779,24 @@ function NewAgentFlow() {
                       levels={LEVELS}
                       value={level}
                       onChange={(l) => setLevel(item.id, l)}
+                    />
+                  );
+                })}
+                {mailboxes.map((account) => {
+                  const level = mailLevels[account.id] ?? "none";
+                  return (
+                    <LevelRow
+                      key={account.id}
+                      icon={<MailIcon choice={choiceOf(account)} />}
+                      name={account.address}
+                      description={account.label || null}
+                      asks={level === "write" ? mailAsks : []}
+                      levels={LEVELS}
+                      value={level}
+                      onChange={(l) => {
+                        setMailLevels((prev) => ({ ...prev, [account.id]: l }));
+                        if (l === "write") mood.react("star", 900);
+                      }}
                     />
                   );
                 })}
@@ -973,7 +1028,11 @@ function NewAgentFlow() {
               "plug",
               t("newAgent.tools"),
               chips(
-                [...granted.map(connectorChip), ...skills.map((s) => chip("book", s.name, s.id))],
+                [
+                  ...granted.map(connectorChip),
+                  ...grantedMail.map(mailChip),
+                  ...skills.map((s) => chip("book", s.name, s.id)),
+                ],
                 t("newAgent.noTools"),
               ),
             )}
@@ -1052,7 +1111,10 @@ function NewAgentFlow() {
         {t("newAgent.hints.instructions")}
       </>
     ),
-    tools: granted.length ? t("newAgent.hints.tools", { count: granted.length }) : t("newAgent.hints.noTools"),
+    tools:
+      granted.length + grantedMail.length
+        ? t("newAgent.hints.tools", { count: granted.length + grantedMail.length })
+        : t("newAgent.hints.noTools"),
     where: joined.length ? t("newAgent.hints.where", { count: joined.length }) : t("newAgent.noChannelsYet"),
     model: modelInfo?.label ?? "",
     review: t("newAgent.hints.review"),
@@ -1145,14 +1207,18 @@ function NewAgentFlow() {
               )}
               {instructions.trim() && <p className="newag__pv-instr">{instructions.trim().split("\n")[0]}</p>}
               <PreviewSection label={t("newAgent.preview.uses")}>
-                {granted.length || skills.length ? (
+                {granted.length || grantedMail.length || skills.length ? (
                   <>
                     <span className="newag__chips">
                       {granted.map(connectorChip)}
+                      {grantedMail.map(mailChip)}
                       {skills.map((s) => chip("book", s.name, s.id))}
                     </span>
                     {(() => {
-                      const asks = granted.filter((i) => levels[i.id] === "write").flatMap(asksOf);
+                      const asks = [
+                        ...granted.filter((i) => levels[i.id] === "write").flatMap(asksOf),
+                        ...(grantedMail.some((a) => mailLevels[a.id] === "write") ? mailAsks : []),
+                      ];
                       return asks.length ? (
                         <span className="newag__asks">
                           <Icon name="lock" size={14} />
