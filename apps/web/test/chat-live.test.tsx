@@ -194,6 +194,8 @@ describe("bottom anchoring", () => {
     await sendText("primeira");
     await settle(3);
     expect(log.scrollTop).toBe(2000);
+    // A browser reports the scroll to the bottom too (happy-dom doesn't on its own).
+    await act(async () => fireEvent.scroll(log));
     // Still inside the "near bottom" band, but moving up.
     log.scrollTop = 1960;
     await act(async () => {

@@ -1238,7 +1238,8 @@ function ChannelView({
                   const near = nearBottom(e.currentTarget);
                   if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
                   // Pinned again only when the person comes back down, not by layout.
-                  if (near && !stick.current && !byPerson) return;
+                  const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
+                  if (near && !stick.current && !(byPerson && movedDown)) return;
                   stick.current = near;
                   if (near) setUnseen(false);
                 }}
