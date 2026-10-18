@@ -42,8 +42,7 @@ export function AgentsScreen() {
     <LargeTitleScreen
       title={t("mobile.agents.title")}
       subtitle={t("mobile.agents.subtitle", { count: agents.length, working: busy.size })}
-      left={header.left}
-      actions={header.actions}
+      {...header}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {working.length > 0 ? (

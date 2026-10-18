@@ -77,8 +77,7 @@ export function ChatsScreen() {
   return (
     <LargeTitleScreen
       title={t("mobile.chats.title")}
-      left={header.left}
-      actions={header.actions}
+      {...header}
       search={{ placeholder: t("mobile.find.short"), onChangeText: setQ, onActiveChange: setSearching }}
       pullDown={showResults || empty ? undefined : <PullDownGreeting busy={busy} waiting={waiting} />}
       pullDownHeight={GREETING_HEIGHT}

@@ -29,8 +29,7 @@ export function ActivityScreen() {
   return (
     <LargeTitleScreen
       title={t("mobile.activity.title")}
-      left={header.left}
-      actions={header.actions}
+      {...header}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <Filters

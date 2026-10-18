@@ -32,20 +32,28 @@ const IOS = Platform.OS === "ios";
 export function useHeaderActionOptions({
   right,
   left,
+  leftActions,
 }: {
   right?: HeaderAction[] | undefined;
   left?: ReactNode;
+  /** Native buttons on the left (iOS): unlike a custom `left` view, they keep the large title collapsing. */
+  leftActions?: HeaderAction[] | undefined;
 }): NativeStackNavigationOptions {
   const latest = useRef(right);
+  const latestLeft = useRef(leftActions);
   useLayoutEffect(() => {
     latest.current = right;
+    latestLeft.current = leftActions;
   });
   const leftSlot = useHeaderSlot(left ?? null);
   const hasLeft = left != null;
-  const signature = JSON.stringify((right ?? []).map(({ icon, sf, label }) => ({ icon, sf, label })));
+  const describe = (list: HeaderAction[] | undefined) =>
+    (list ?? []).map(({ icon, sf, label }) => ({ icon, sf, label }));
+  const signature = JSON.stringify([describe(right), describe(leftActions)]);
   return useMemo<NativeStackNavigationOptions>(() => {
-    const actions = JSON.parse(signature) as Omit<HeaderAction, "onPress">[];
+    const [actions, lefts] = JSON.parse(signature) as Omit<HeaderAction, "onPress">[][];
     const press = (i: number) => () => latest.current?.[i]?.onPress();
+    const pressLeft = (i: number) => () => latestLeft.current?.[i]?.onPress();
     const options: NativeStackNavigationOptions = {};
     if (IOS) {
       options.unstable_headerRightItems = actions.length
@@ -58,9 +66,18 @@ export function useHeaderActionOptions({
               onPress: press(i),
             }))
         : undefined;
-      options.unstable_headerLeftItems = hasLeft
-        ? () => [{ type: "custom" as const, element: <HeaderSlot slot={leftSlot} />, hidesSharedBackground: true }]
-        : undefined;
+      options.unstable_headerLeftItems = lefts.length
+        ? () =>
+            lefts.map((a, i) => ({
+              type: "button" as const,
+              label: a.label,
+              accessibilityLabel: a.label,
+              icon: { type: "sfSymbol" as const, name: a.sf },
+              onPress: pressLeft(i),
+            }))
+        : hasLeft
+          ? () => [{ type: "custom" as const, element: <HeaderSlot slot={leftSlot} />, hidesSharedBackground: true }]
+          : undefined;
     } else {
       options.headerRight = actions.length
         ? () => (

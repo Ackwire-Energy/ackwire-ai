@@ -20,8 +20,10 @@ export interface LargeTitleScreenProps {
   subtitle?: string;
   /** Buttons in the bar (native bar buttons on iOS). */
   actions?: HeaderAction[];
-  /** The bar's leading item (the person's avatar, which opens Você). */
+  /** The bar's leading item, a custom view (Android; on iOS it stops the large title collapsing). */
   left?: ReactNode;
+  /** Native buttons on the bar's leading side (iOS). */
+  leftActions?: HeaderAction[];
   /** A native search bar under the large title. */
   search?: LargeTitleSearch;
   /**
@@ -49,6 +51,7 @@ export function LargeTitleScreen({
   subtitle,
   actions,
   left,
+  leftActions,
   search,
   pullDown,
   pullDownHeight = 0,
@@ -58,7 +61,7 @@ export function LargeTitleScreen({
 }: LargeTitleScreenProps) {
   const { colors } = useTheme();
   const focused = useIsFocused();
-  const actionOptions = useHeaderActionOptions({ right: actions, left });
+  const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   const searchOptions = useSearchBarOptions(search);
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
   const options = useMemo<NativeStackNavigationOptions>(
