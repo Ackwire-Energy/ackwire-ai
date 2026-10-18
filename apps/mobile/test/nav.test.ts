@@ -71,8 +71,8 @@ describe("cover parallax", () => {
 });
 
 describe("tab glyphs", () => {
-  test("three tabs: Conversas, Agentes, Atividade", () => {
-    expect([...TAB_GLYPHS]).toEqual(["chats", "agents", "activity"]);
+  test("four tabs: Conversas, Threads, Agentes, Atividade", () => {
+    expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity"]);
   });
 
   test("every glyph in both states is a 24×24 SVG with finite numbers", () => {
@@ -104,6 +104,15 @@ describe("tab glyphs", () => {
     expect(svg).toContain('fill-rule="evenodd"');
     // Body plus two eyes: three closed subpaths in one path.
     expect(svg.match(/Z/g)?.length).toBe(3);
+  });
+
+  test("Threads: two bubbles (filled when selected) and the branch between them stays a line", () => {
+    const outline = tabGlyphSvg("threads", false, "#000");
+    const filled = tabGlyphSvg("threads", true, "#000");
+    expect(outline.match(/<path /g)?.length).toBe(3);
+    expect(outline.match(/fill="none"/g)?.length).toBe(3);
+    expect(filled.match(/fill="#000"/g)?.length).toBe(2);
+    expect(filled.match(/fill="none"/g)?.length).toBe(1);
   });
 
   test("glyph keys round-trip and reject unknown names", () => {

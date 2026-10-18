@@ -27,6 +27,7 @@ export const featureKeysPtBR = {
   },
   tabs: {
     chats: "Conversas",
+    threads: "Threads",
     agents: "Agentes",
     activity: "Atividade",
     withCount: "{{label}}, {{count}}",
@@ -92,7 +93,6 @@ export const featureKeysPtBR = {
       agents: "Agentes",
       channels: "Canais",
       people: "Pessoas",
-      threads: "Threads e missões",
     },
     seeAll: {
       agents: "Ver todos os agentes",
@@ -437,6 +437,11 @@ export const featureKeysPtBR = {
       noted: "Decisão anotada",
       notedSub: "Fica nas decisões da missão.",
     },
+  },
+  threads: {
+    title: "Threads e missões",
+    empty: "Nenhuma thread ou missão ainda",
+    emptyHint: "Segure uma mensagem para responder em thread ou transformar em missão.",
   },
   agents: {
     title: "Agentes",

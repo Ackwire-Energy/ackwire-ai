@@ -15,6 +15,7 @@ describe("deep links", () => {
     expect(hrefFromUrl("agenteschat://approval/a1")).toBe("/approval/a1");
     expect(hrefFromUrl("agenteschat://mission/m1")).toBe("/mission/m1");
     expect(hrefFromUrl("agenteschat://activity")).toBe("/activity");
+    expect(hrefFromUrl("agenteschat://threads")).toBe("/threads");
     expect(hrefFromUrl("/agent/x1")).toBe("/agent/x1");
     expect(hrefFromUrl("agenteschat://chat/../../etc")).toBeNull();
     expect(hrefFromUrl("agenteschat://chat")).toBeNull();

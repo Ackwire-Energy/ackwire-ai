@@ -10,7 +10,7 @@ import {
 import { useMemo } from "react";
 import { busyChannels, workingNow } from "../agents/logic";
 import { waitingApprovals } from "../approvals/logic";
-import { buildConversations, unreadConversationCount } from "../chats/logic";
+import { buildConversations, unreadConversationCount, unreadThreadCount } from "../chats/logic";
 import { useNow, useOrgId } from "./hooks";
 
 /**
@@ -29,12 +29,15 @@ export function useWorkingNow() {
   return useMemo(() => workingNow(runs.data, missions.data?.missions), [runs.data, missions.data]);
 }
 
+/** My threads and missions, the latest 50 (Conversas' rows and the Threads tab). */
+const THREAD_LIST = { tab: "all", mine: true, limit: 50 } as const;
+
 /** Conversas: channels, DMs and my threads and missions, newest first (agent DMs say who is working). */
 export function useConversations() {
   const orgId = useOrgId();
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
-  const threads = useThreadList(orgId, { tab: "all", mine: true, limit: 50 });
+  const threads = useThreadList(orgId, THREAD_LIST);
   const work = useWorkingNow();
   const rows = useMemo(
     () =>
@@ -53,7 +56,7 @@ export function useConversations() {
   };
 }
 
-/** The badge of Conversas: channels and DMs with something unread. */
+/** The badge of Conversas: channels and DMs with something unread (the home's sections; threads have their tab). */
 export function useUnreadConversations() {
   const orgId = useOrgId();
   const channels = useChannels(orgId);
@@ -61,6 +64,20 @@ export function useUnreadConversations() {
   return useMemo(
     () => unreadConversationCount({ channels: channels.data ?? [], dms: dms.data ?? [] }),
     [channels.data, dms.data],
+  );
+}
+
+/** The badge of Threads: thread and mission rows with something unread. */
+export function useUnreadThreads() {
+  const orgId = useOrgId();
+  // The same query as Conversas' list (shared cache); channels and DMs aren't needed for these rows.
+  const threads = useThreadList(orgId, THREAD_LIST);
+  return useMemo(
+    () =>
+      unreadThreadCount(
+        buildConversations({ channels: [], dms: [], threads: threads.data?.pages.flatMap((p) => p.threads) ?? [] }),
+      ),
+    [threads.data],
   );
 }
 

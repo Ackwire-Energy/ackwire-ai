@@ -2,14 +2,15 @@ import { bodyPath, EYE_STYLES, EYE_X } from "@agenteschat/ui/agent/engine";
 import { ICONS } from "./icons.data";
 
 /**
- * The tab bar's own glyphs (Conversas, Agentes, Atividade) as SVG documents, in two states:
+ * The tab bar's own glyphs (Conversas, Threads, Agentes, Atividade) as SVG documents, in two states:
  * outline (unselected) and filled (selected). They are template images: one opaque color, and the
  * native tab bar tints them by state. 24×24 viewBox, stroke 1.7 with round caps, the line icons'
- * geometry; Agentes is our agent (the engine's body with the cut bottom-left corner and two pill eyes).
+ * geometry; Threads is a message with a reply branching off it; Agentes is our agent (the engine's body with
+ * the cut bottom-left corner and two pill eyes).
  * Pure: `tabIcons.ts` rasterizes them with Skia.
  */
 
-export const TAB_GLYPHS = ["chats", "agents", "activity"] as const;
+export const TAB_GLYPHS = ["chats", "threads", "agents", "activity"] as const;
 export type TabGlyph = (typeof TAB_GLYPHS)[number];
 
 /** A glyph and its state, as one name (the icon "family" of the tab bar takes a single name). */
@@ -39,6 +40,21 @@ const line = (d: string, color: string) =>
 /** Filled and stroked with the same color: the solid shape keeps the outline's outer edge. */
 const solid = (d: string, color: string) =>
   `<path d="${d}" fill="${color}" stroke="${color}" stroke-width="${STROKE}" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+/**
+ * Threads: a message (top left), a line branching down from it, and the reply it leads to (bottom right).
+ * The two bubbles fill when selected; the branch stays a line.
+ */
+const THREAD_MESSAGE =
+  "M6 3.5h7A2.5 2.5 0 0 1 15.5 6v2A2.5 2.5 0 0 1 13 10.5H6A2.5 2.5 0 0 1 3.5 8V6A2.5 2.5 0 0 1 6 3.5Z";
+const THREAD_BRANCH = "M7 10.5v4.25a2.5 2.5 0 0 0 2.5 2.5";
+const THREAD_REPLY =
+  "M12 14h6a2.5 2.5 0 0 1 2.5 2.5V18a2.5 2.5 0 0 1-2.5 2.5h-6A2.5 2.5 0 0 1 9.5 18v-1.5A2.5 2.5 0 0 1 12 14Z";
+
+function threadsGlyph(selected: boolean, color: string): string {
+  const bubble = selected ? solid : line;
+  return `${bubble(THREAD_MESSAGE, color)}${line(THREAD_BRANCH, color)}${bubble(THREAD_REPLY, color)}`;
+}
 
 /** A vertical pill (an eye) as a closed path. */
 function pill(cx: number, cy: number, w: number, h: number): string {
@@ -89,6 +105,9 @@ export function tabGlyphSvg(glyph: TabGlyph, selected: boolean, color = "#000000
       break;
     case "activity":
       body = `${selected ? solid(pathD("bell"), color) : line(pathD("bell"), color)}${line(pathD("bell", 1), color)}`;
+      break;
+    case "threads":
+      body = threadsGlyph(selected, color);
       break;
     case "agents":
       body = agentGlyph(selected, color);

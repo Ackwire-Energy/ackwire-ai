@@ -1,6 +1,6 @@
 import { NativeTabs } from "expo-router/native-tabs";
 import { useTranslation } from "react-i18next";
-import { useUnreadConversations, useWaitingCount } from "@/features/shared/queries";
+import { useUnreadConversations, useUnreadThreads, useWaitingCount } from "@/features/shared/queries";
 import { TAB_BADGE, tabBadge } from "@/lib/nav";
 import { haptics, useTheme } from "@/ui";
 import { type TabGlyph, tabGlyphKey } from "@/ui/tabGlyphs";
@@ -8,22 +8,24 @@ import { tabGlyphFamily } from "@/ui/tabIcons";
 
 const TABS: { name: string; glyph: TabGlyph; label: string }[] = [
   { name: "(chats)", glyph: "chats", label: "mobile.tabs.chats" },
+  { name: "threads", glyph: "threads", label: "mobile.tabs.threads" },
   { name: "agents", glyph: "agents", label: "mobile.tabs.agents" },
   { name: "activity", glyph: "activity", label: "mobile.tabs.activity" },
 ];
 
 /**
- * Conversas (the home), Agentes, Atividade in the system tab bar (UITabBarController on iOS, Liquid Glass on
- * iOS 26; Material bottom navigation on Android). Our own glyphs on both platforms (outline, filled when
- * selected), drawn as template images the bar tints. Badges for unread conversations and what waits on
- * you. Every tab holds a stack with a native header.
+ * Conversas (the home), Threads (threads and missions), Agentes, Atividade in the system tab bar
+ * (UITabBarController on iOS, Liquid Glass on iOS 26; Material bottom navigation on Android). Our own glyphs on both platforms (outline, filled when
+ * selected), drawn as template images the bar tints. Badges for unread conversations (Conversas: channels
+ * and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a stack with a native header.
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const unread = useUnreadConversations();
+  const unreadThreads = useUnreadThreads();
   const waiting = useWaitingCount();
-  const counts: Record<string, number> = { "(chats)": unread, activity: waiting };
+  const counts: Record<string, number> = { "(chats)": unread, threads: unreadThreads, activity: waiting };
   return (
     <NativeTabs
       tintColor={colors.ink}

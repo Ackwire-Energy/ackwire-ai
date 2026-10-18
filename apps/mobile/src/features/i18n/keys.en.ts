@@ -23,6 +23,7 @@ export const featureKeysEn: FeatureTranslations = {
   },
   tabs: {
     chats: "Chats",
+    threads: "Threads",
     agents: "Agents",
     activity: "Activity",
     withCount: "{{label}}, {{count}}",
@@ -88,7 +89,6 @@ export const featureKeysEn: FeatureTranslations = {
       agents: "Agents",
       channels: "Channels",
       people: "People",
-      threads: "Threads and missions",
     },
     seeAll: {
       agents: "See all agents",
@@ -433,6 +433,11 @@ export const featureKeysEn: FeatureTranslations = {
       noted: "Decision noted",
       notedSub: "It stays in the mission's decisions.",
     },
+  },
+  threads: {
+    title: "Threads and missions",
+    empty: "No threads or missions yet",
+    emptyHint: "Hold a message to reply in a thread or turn it into a mission.",
   },
   agents: {
     title: "Agents",

@@ -12,8 +12,8 @@ import { type ListKind, rowsOfKind } from "./logic";
 const LIVE_ROWS = 8;
 
 /**
- * Every conversation of one kind, pushed from Conversas: threads and missions (their shortcut), or a
- * section's "Ver todos" (agents, channels, people), by latest activity, in Conversas' rows.
+ * Every conversation of one kind, pushed from a section's "Ver todos" on Conversas (agents, channels,
+ * people), by latest activity, in Conversas' rows.
  */
 export function ConversationListScreen({ kind }: { kind: ListKind }) {
   const { t } = useTranslation();

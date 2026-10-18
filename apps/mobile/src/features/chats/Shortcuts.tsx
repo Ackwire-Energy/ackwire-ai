@@ -9,7 +9,7 @@ export interface ShortcutItem {
   icon: IconName;
   title: string;
   count: number;
-  /** One line under the title (the first waiting item, the latest thread). */
+  /** One line under the title (the first waiting item). */
   preview: string | null;
   /** The icon on an inverted ink tile (something waits on you). */
   hot?: boolean;
@@ -17,9 +17,9 @@ export interface ShortcutItem {
 }
 
 /**
- * The shortcuts on top of Conversas, where the filters were (MobileHomeAgentes.html `.sc`/`.sct`): two cards
- * side by side ("Esperando você" only while something waits, "Threads e missões"), one card full width when
- * only one shows. Each has its icon tile, its count in Doto, the title and a one-line preview.
+ * The shortcuts on top of Conversas, where the filters were (MobileHomeAgentes.html `.sc`/`.sct`): today only
+ * "Esperando você", full width while something waits, nothing otherwise (threads and missions are a tab).
+ * Each has its icon tile, its count in Doto, the title and a one-line preview.
  */
 export function Shortcuts({ items }: { items: ShortcutItem[] }) {
   if (items.length === 0) return null;

@@ -12,8 +12,8 @@ import { previewOf } from "../shared/logic";
 
 /**
  * Conversas: channels, direct messages, threads and missions in one list
- * (newest activity first), split by kind on the home (Agentes, Canais, Pessoas, and threads and missions
- * behind their shortcut), and what waits on you.
+ * (newest activity first), split by kind: the home's sections (Agentes, Canais, Pessoas), threads and
+ * missions in their own tab, and what waits on you.
  */
 
 export interface LastLine {
@@ -205,8 +205,9 @@ export const rowName = (r: ConversationRow) =>
 export const unreadConversations = (rows: ConversationRow[]) => rows.filter((r) => r.unread > 0).length;
 
 /**
- * The badge of Conversas, straight from the two lists (no thread list
- * needed): joined channels and DMs with something unread.
+ * The badge of Conversas, straight from the two lists (no thread list needed): joined channels and DMs
+ * with something unread, the rows of the home's sections. Threads and missions have their own tab and
+ * badge (`unreadThreadCount`), so nothing is counted twice.
  */
 export function unreadConversationCount(input: {
   channels: Pick<Channel, "isMember" | "unreadCount">[];
@@ -219,26 +220,27 @@ export function unreadConversationCount(input: {
 
 // ── The home by kind (MobileHomeAgentes.html, Recomendada) ─────────────────
 
-/** A list of one kind: the home's sections, and threads and missions (behind their shortcut). */
-export type ListKind = "agents" | "channels" | "people" | "threads";
 /** The home's collapsible sections, in order. */
 export const HOME_SECTIONS = ["agents", "channels", "people"] as const;
 export type HomeSection = (typeof HOME_SECTIONS)[number];
-export const LIST_KINDS: ListKind[] = [...HOME_SECTIONS, "threads"];
+/** The kinds of rows: the home's sections, and threads and missions (their own tab). */
+export type RowKind = HomeSection | "threads";
+/** A pushed list of one kind: a section's "Ver todos" (threads and missions are a tab). */
+export type ListKind = HomeSection;
 /** Rows a section shows before "Ver todos". */
 export const SECTION_MAX = 5;
 
-export const isListKind = (v: unknown): v is ListKind => LIST_KINDS.includes(v as ListKind);
+export const isListKind = (v: unknown): v is ListKind => HOME_SECTIONS.includes(v as ListKind);
 
 /** Which list a row belongs to: agent DMs, channels, DMs with people, threads and missions. */
-export function kindOf(r: ConversationRow): ListKind {
+export function kindOf(r: ConversationRow): RowKind {
   if (r.kind === "channel") return "channels";
   if (r.kind === "dm") return r.with.type === "agent" ? "agents" : "people";
   return "threads";
 }
 
 /** The rows of one kind, in the list's order (latest activity first). */
-export const rowsOfKind = (rows: ConversationRow[], kind: ListKind) => rows.filter((r) => kindOf(r) === kind);
+export const rowsOfKind = (rows: ConversationRow[], kind: RowKind) => rows.filter((r) => kindOf(r) === kind);
 
 /** The home's sections that have rows: the first `max` of each, and how many there are in all. */
 export function homeSections(
@@ -251,12 +253,15 @@ export function homeSections(
   }).filter((s) => s.total > 0);
 }
 
-/** The "Threads e missões" shortcut: how many, and the latest one's title. */
-export function threadsShortcut(rows: ConversationRow[]): { count: number; preview: string | null } {
-  const list = rowsOfKind(rows, "threads");
-  const first = list[0];
-  return { count: list.length, preview: first ? rowName(first) || null : null };
-}
+/** The Threads tab: threads and missions, by latest activity. */
+export const threadRows = (rows: ConversationRow[]) => rowsOfKind(rows, "threads");
+
+/**
+ * The badge of the Threads tab: thread and mission rows with something unread. The server keeps reads per
+ * channel (a thread's replies count in its channel), so today a thread row's `unread` is 0 and the badge
+ * stays empty until the thread list carries a count of its own.
+ */
+export const unreadThreadCount = (rows: ConversationRow[]) => threadRows(rows).filter((r) => r.unread > 0).length;
 
 /** The sections the person collapsed, as remembered (anything unreadable: none). */
 export function parseCollapsed(raw: string | null): HomeSection[] {

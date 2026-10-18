@@ -4,16 +4,18 @@ import {
   buildConversations,
   homeSections,
   isListedThread,
+  isListKind,
   missionsWaiting,
   missionWaitingItems,
   openQuestions,
   parseCollapsed,
   rowPlace,
   rowsOfKind,
-  threadsShortcut,
+  threadRows,
   toggleCollapsed,
   unreadConversationCount,
   unreadConversations,
+  unreadThreadCount,
   waitingPreview,
   waitingTotal,
 } from "../../src/features/chats/logic";
@@ -279,9 +281,26 @@ describe("the home by kind", () => {
     expect(homeSections([])).toEqual([]);
   });
 
-  test("the threads shortcut: threads and missions, and the latest one's title", () => {
-    expect(threadsShortcut(rows)).toEqual({ count: 2, preview: "Fechamento de setembro" });
-    expect(threadsShortcut([])).toEqual({ count: 0, preview: null });
+  test("the Threads tab: threads and missions by latest activity", () => {
+    expect(threadRows(rows).map((r) => [r.key, r.kind])).toEqual([
+      ["t:t1", "thread"],
+      ["t:t2", "mission"],
+    ]);
+    expect(threadRows([])).toEqual([]);
+  });
+
+  test("the Threads badge counts only its own unread rows (an unread DM is Conversas')", () => {
+    // The server sends no per-thread unread (reads are per channel): nothing to count yet.
+    expect(unreadThreadCount(rows)).toBe(0);
+    const withUnread = rows.map((r) => (r.key === "t:t2" || r.key === "d:d0" ? { ...r, unread: 2 } : r));
+    expect(unreadThreadCount(withUnread)).toBe(1);
+    expect(unreadThreadCount(withUnread.filter((r) => r.kind !== "mission"))).toBe(0);
+  });
+
+  test("the pushed lists are the sections' Ver todos; threads are a tab", () => {
+    expect(["agents", "channels", "people"].every(isListKind)).toBe(true);
+    expect(isListKind("threads")).toBe(false);
+    expect(isListKind("nope")).toBe(false);
   });
 
   test("collapsed sections are remembered as a list; anything unreadable is none", () => {

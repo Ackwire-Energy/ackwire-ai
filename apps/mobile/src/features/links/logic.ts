@@ -3,7 +3,7 @@ import { isSafeId } from "../shared/logic";
 
 /**
  * Where things open in the app (Expo Router paths). Deep links
- * (`agenteschat://chat/<id>`, `approval/<id>`, `mission/<id>`, `activity`),
+ * (`agenteschat://chat/<id>`, `approval/<id>`, `mission/<id>`, `activity`, `threads`),
  * push payloads (ADR 0035 §4) and inbox items all end up here.
  */
 
@@ -13,7 +13,8 @@ export type AppHref =
   | `/approval/${string}`
   | `/mission/${string}`
   | `/agent/${string}`
-  | "/activity";
+  | "/activity"
+  | "/threads";
 
 export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
@@ -53,6 +54,8 @@ export function hrefFromUrl(url: string): AppHref | null {
   switch (screen.toLowerCase()) {
     case "activity":
       return "/activity";
+    case "threads":
+      return "/threads";
     case "chat": {
       if (!isSafeId(id)) return null;
       const thread = queryParam(query, "thread");

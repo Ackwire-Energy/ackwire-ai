@@ -18,7 +18,6 @@ import {
   type ListKind,
   missionsWaiting,
   openQuestions,
-  threadsShortcut,
   type WaitingPreview,
   waitingPreview,
   waitingTotal,
@@ -30,15 +29,15 @@ const LIVE_ROWS = 6;
 /** How often who is working is asked again while Conversas shows (runs start in conversations it doesn't follow). */
 const WORKING_POLL_MS = 20_000;
 
-/** A list of one kind, pushed (threads and missions, or a section's "Ver todos"). */
+/** A section's "Ver todos", pushed. */
 export const openKindList = (kind: ListKind) => router.push(`/conversations/${kind}`);
 
 /**
  * Conversas, the home (MobileHomeAgentes.html, Recomendada): the one-line greeting over a light sky, the native
- * large title with Você and "+" (Novo) in the bar, the search field (results in place), the shortcuts
- * "Esperando você" (only while something waits; opens Atividade on Esperando) and "Threads e missões" (opens
- * their list), then Agentes, Canais and Pessoas by latest activity, each collapsible (remembered), five rows
- * and "Ver todos". Empty, it invites the first agent.
+ * large title with Você and "+" (Novo) in the bar, the search field (results in place), the "Esperando você"
+ * shortcut (only while something waits; opens Atividade on Esperando), then Agentes, Canais and Pessoas by
+ * latest activity, each collapsible (remembered), five rows and "Ver todos". Threads and missions have their
+ * own tab. Empty, it invites the first agent.
  */
 export function ChatsScreen() {
   const { t } = useTranslation();
@@ -70,7 +69,6 @@ export function ChatsScreen() {
     .filter((id) => dir.agentById.has(id));
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waitingMissions.refetch(), inbox.refetch()]));
   const sections = homeSections(list.rows);
-  const threads = threadsShortcut(list.rows);
   const showResults = searching || Boolean(q.trim());
   const empty = !list.loading && list.rows.length === 0;
 
@@ -90,15 +88,6 @@ export function ChatsScreen() {
       preview: previewText(waitingPreview({ approvals, missions, questions })),
       hot: true,
       onPress: () => router.navigate({ pathname: "/activity", params: { filter: "waiting", at: String(Date.now()) } }),
-    });
-  if (threads.count > 0)
-    shortcuts.push({
-      key: "threads",
-      icon: "target",
-      title: t("mobile.chats.section.threads"),
-      count: threads.count,
-      preview: threads.preview,
-      onPress: () => openKindList("threads"),
     });
 
   let live = 0;
