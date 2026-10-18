@@ -9,6 +9,13 @@ export const featureKeysEn: FeatureTranslations = {
   time: {
     today: "Today",
     yesterday: "Yesterday",
+    justNow: "now",
+    minutesAgo_one: "{{count}} min ago",
+    minutesAgo_other: "{{count}} min ago",
+    hoursAgo_one: "{{count}}h ago",
+    hoursAgo_other: "{{count}}h ago",
+    daysAgo_one: "{{count}} day ago",
+    daysAgo_other: "{{count}} days ago",
   },
   names: {
     two: "{{first}} and {{second}}",
@@ -77,13 +84,22 @@ export const featureKeysEn: FeatureTranslations = {
   },
   chats: {
     title: "Chats",
-    filter: {
-      all: "All",
-      unread: "Unread",
+    section: {
+      agents: "Agents",
+      channels: "Channels",
+      people: "People",
       threads: "Threads and missions",
-      dm: "Direct",
     },
-    allRead: "All caught up.",
+    seeAll: {
+      agents: "See all agents",
+      channels: "See all channels",
+      people: "See all people",
+    },
+    waitPreview: {
+      approval: "{{name}} asks for approval",
+      mission: "{{name}}: {{title}}",
+      question: "{{name}} asked",
+    },
     empty: "No chats yet.",
     closed: "Closed",
     working: "working…",
@@ -98,14 +114,9 @@ export const featureKeysEn: FeatureTranslations = {
     channelPlaceholder: "Channel name, e.g. marketing",
     createChannel: "Create channel",
     waitIn: "in {{where}}",
-    waitApprove: "Approve",
-    waitQuestion: "Question",
-    answerInChat: "Answer in the chat",
     workingNowLine_one: "{{count}} agent working now",
     workingNowLine_other: "{{count}} agents working now",
     nobodyWorking: "No agent working right now",
-    waitingLine_one: "{{count}} thing waiting for you",
-    waitingLine_other: "{{count}} things waiting for you",
     first: {
       title: "Start with your first agent",
       subtitle: "Give it a name and say what it does. It shows up here, as a chat.",
@@ -427,7 +438,6 @@ export const featureKeysEn: FeatureTranslations = {
     title: "Agents",
     subtitle_one: "{{count}} on the team · {{working}} working",
     subtitle_other: "{{count}} on the team · {{working}} working",
-    working: "Working",
     free: "Free",
     workingLabel: "{{name}}, working",
     new: "New agent",
@@ -438,7 +448,7 @@ export const featureKeysEn: FeatureTranslations = {
     created: "{{name}} joined the team",
     createFailed: "Couldn't create the agent. Maybe that name is taken.",
     empty: "No agents yet.",
-    all: "All",
+    freeSection: "Free",
   },
   agent: {
     talk: "Chat",

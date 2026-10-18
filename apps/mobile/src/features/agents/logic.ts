@@ -1,4 +1,5 @@
-import type { Agent, AgentAccess, AgentUsage, Mission, WorkingRun } from "@agenteschat/client";
+import type { Agent, AgentAccess, AgentUsage, DirectMessage, Mission, WorkingRun } from "@agenteschat/client";
+import { previewOf } from "../shared/logic";
 
 /**
  * Who is working now (runs in progress and active missions), the crew on
@@ -21,6 +22,8 @@ export interface WorkItem {
   where: { kind: "channel" | "dm"; name: string | null };
   missionId: string | null;
   plan: { done: number; total: number } | null;
+  /** Since when (the mission's or the run's start, else when it was created). */
+  since: string;
 }
 
 /**
@@ -44,6 +47,7 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
       where: { kind: "channel", name: null },
       missionId: m.id,
       plan: { done: m.plan.done, total: m.plan.total },
+      since: m.startedAt ?? m.createdAt,
     });
     seen.add(spot(m.agentId, m.channelId, m.threadId));
   }
@@ -62,6 +66,7 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
       where: { kind: r.channelKind, name: r.channelName },
       missionId: null,
       plan: null,
+      since: newest(r),
     });
   }
   return out;
@@ -79,12 +84,64 @@ export function workByAgent(work: WorkItem[]): WorkItem[] {
   return work.filter((w) => !seen.has(w.agentId) && Boolean(seen.add(w.agentId)));
 }
 
-/** The crew on Início: working ones first (drawn bigger), then the rest, at most `max`. */
-export function crewOf(agents: Agent[], busy: ReadonlySet<string>, max = 6): { agent: Agent; busy: boolean }[] {
-  return [...agents]
-    .sort((a, b) => Number(busy.has(b.id)) - Number(busy.has(a.id)) || a.name.localeCompare(b.name))
-    .slice(0, max)
-    .map((agent) => ({ agent, busy: busy.has(agent.id) }));
+/** One agent on Agentes: what it is on (working) or its last conversation (free). */
+export interface TeamLine {
+  agent: Agent;
+  /** What it is on now; null when free. */
+  work: WorkItem | null;
+  /** Working: since when. Free: its DM's last message. */
+  at: string | null;
+  /** Free: the last message of its DM (one line), else null. */
+  preview: string | null;
+}
+
+/**
+ * Agentes: "Trabalhando agora" (in `workByAgent` order: missions, then the newest runs) and "Livres" (the
+ * latest conversation first, then by name), each agent once.
+ */
+export function teamLines(
+  agents: Agent[],
+  work: WorkItem[],
+  dms: Pick<DirectMessage, "with" | "lastMessage">[],
+): { working: TeamLine[]; free: TeamLine[] } {
+  const byId = new Map(agents.map((a) => [a.id, a]));
+  const working: TeamLine[] = [];
+  for (const w of workByAgent(work)) {
+    const agent = byId.get(w.agentId);
+    if (agent) working.push({ agent, work: w, at: w.since, preview: null });
+  }
+  const busy = new Set(working.map((l) => l.agent.id));
+  const lastOf = new Map<string, NonNullable<DirectMessage["lastMessage"]>>();
+  for (const d of dms) {
+    if (d.with.type !== "agent" || !d.lastMessage) continue;
+    const prev = lastOf.get(d.with.id);
+    if (!prev || d.lastMessage.createdAt > prev.createdAt) lastOf.set(d.with.id, d.lastMessage);
+  }
+  const free = agents
+    .filter((a) => !busy.has(a.id))
+    .map((agent): TeamLine => {
+      const last = lastOf.get(agent.id);
+      return { agent, work: null, at: last?.createdAt ?? null, preview: last ? previewOf(last.body) || null : null };
+    })
+    .sort((a, b) => {
+      if (a.at && b.at) return b.at.localeCompare(a.at);
+      if (a.at) return -1;
+      if (b.at) return 1;
+      return a.agent.name.localeCompare(b.agent.name);
+    });
+  return { working, free };
+}
+
+/** "há 4 min": how long ago, in the largest whole unit (under a minute: now). */
+export type Ago = { unit: "now" } | { unit: "minutes" | "hours" | "days"; count: number };
+
+export function agoOf(iso: string, now = Date.now()): Ago {
+  const min = Math.floor((now - new Date(iso).getTime()) / 60_000);
+  if (!Number.isFinite(min) || min < 1) return { unit: "now" };
+  if (min < 60) return { unit: "minutes", count: min };
+  const h = Math.floor(min / 60);
+  if (h < 24) return { unit: "hours", count: h };
+  return { unit: "days", count: Math.floor(h / 24) };
 }
 
 /**

@@ -2,16 +2,19 @@ import { describe, expect, test } from "bun:test";
 import type { Channel, DirectMessage } from "@agenteschat/client";
 import {
   buildConversations,
-  CHAT_FILTERS,
-  filterConversations,
-  filterCounts,
+  homeSections,
   isListedThread,
   missionsWaiting,
   missionWaitingItems,
   openQuestions,
+  parseCollapsed,
   rowPlace,
+  rowsOfKind,
+  threadsShortcut,
+  toggleCollapsed,
   unreadConversationCount,
   unreadConversations,
+  waitingPreview,
   waitingTotal,
 } from "../../src/features/chats/logic";
 import { at, thread } from "./fixtures";
@@ -94,12 +97,11 @@ describe("the list", () => {
     expect(dev?.kind === "dm" ? dev.last?.text : null).toBe("Feito! Já anotei.");
   });
 
-  test("filters and counts", () => {
-    expect(filterConversations(rows, "unread").map((r) => r.key)).toEqual(["d:d2"]);
-    expect(filterConversations(rows, "threads").map((r) => r.key)).toEqual(["t:t1"]);
-    expect(filterConversations(rows, "dm").map((r) => r.key)).toEqual(["d:d2", "d:d1"]);
-    expect(filterConversations(rows, "all")).toHaveLength(5);
-    expect(filterCounts(rows)).toEqual({ all: 5, unread: 1, threads: 1, dm: 2 });
+  test("rows by kind, in the list's order", () => {
+    expect(rowsOfKind(rows, "threads").map((r) => r.key)).toEqual(["t:t1"]);
+    expect(rowsOfKind(rows, "agents").map((r) => r.key)).toEqual(["d:d2", "d:d1"]);
+    expect(rowsOfKind(rows, "channels").map((r) => r.key)).toEqual(["c:c1", "c:c2"]);
+    expect(rowsOfKind(rows, "people")).toEqual([]);
     expect(unreadConversations(rows)).toBe(1);
   });
 });
@@ -166,8 +168,7 @@ describe("channels with their last message and unread", () => {
   });
 
   test("Não lidas and the tab badge count channels and DMs with something unread", () => {
-    expect(filterConversations(rows, "unread").map((r) => r.key)).toEqual(["c:c1", "d:d1"]);
-    expect(filterCounts(rows).unread).toBe(2);
+    expect(unreadConversations(rows)).toBe(2);
     expect(
       unreadConversationCount({
         channels: [
@@ -210,10 +211,6 @@ describe("agents at work in the list", () => {
     const rows = buildConversations({ channels: [], dms: [dm("d1", "Dev", 0, 10)], threads: [] });
     expect(rows[0]?.kind === "dm" && rows[0].working).toBe(false);
   });
-
-  test("the chips' order: Todas, Não lidas, Diretas, Threads e missões", () => {
-    expect(CHAT_FILTERS).toEqual(["all", "unread", "dm", "threads"]);
-  });
 });
 
 describe("Esperando você", () => {
@@ -241,5 +238,86 @@ describe("Esperando você", () => {
   test("the count: requests, mission items and questions", () => {
     expect(waitingTotal({ approvals: 2, missions: [mission("m", true, 1, 2)], questions: 1 })).toBe(6);
     expect(waitingTotal({ approvals: 0, missions: [], questions: 0 })).toBe(0);
+  });
+});
+
+describe("the home by kind", () => {
+  const person = (channelId: string, name: string, minutesAgo: number): DirectMessage => ({
+    ...dm(channelId, name, 0, minutesAgo),
+    with: { type: "person", id: `u-${name}`, name, handle: null },
+  });
+  const rows = buildConversations({
+    channels: [channel("c1", "geral", true, { lastMessage: undefined })],
+    dms: [
+      ...["A", "B", "C", "D", "E", "F", "G"].map((n, i) => dm(`d${i}`, n, i === 6 ? 2 : 0, (i + 1) * 10)),
+      person("p1", "Ana", 15),
+    ],
+    threads: [
+      thread({ id: "t1", title: "Fechamento de setembro", lastActivityAt: at(3) }),
+      thread({
+        id: "t2",
+        lastActivityAt: at(40),
+        mission: { id: "m", agentId: "a-A", status: "active", planDone: 1, planTotal: 3, waitingYou: 0 },
+      }),
+    ],
+  });
+
+  test("Agentes, Canais, Pessoas: the first five by latest activity and how many in all; threads stay out", () => {
+    const s = homeSections(rows);
+    expect(s.map((x) => [x.key, x.total, x.more])).toEqual([
+      ["agents", 7, true],
+      ["channels", 1, false],
+      ["people", 1, false],
+    ]);
+    expect(s[0]?.rows.map((r) => r.key)).toEqual(["d:d0", "d:d1", "d:d2", "d:d3", "d:d4"]);
+    expect(s.flatMap((x) => x.rows).some((r) => r.kind === "thread" || r.kind === "mission")).toBe(false);
+  });
+
+  test("empty sections are left out", () => {
+    const only = buildConversations({ channels: [], dms: [person("p1", "Ana", 1)], threads: [] });
+    expect(homeSections(only).map((x) => x.key)).toEqual(["people"]);
+    expect(homeSections([])).toEqual([]);
+  });
+
+  test("the threads shortcut: threads and missions, and the latest one's title", () => {
+    expect(threadsShortcut(rows)).toEqual({ count: 2, preview: "Fechamento de setembro" });
+    expect(threadsShortcut([])).toEqual({ count: 0, preview: null });
+  });
+
+  test("collapsed sections are remembered as a list; anything unreadable is none", () => {
+    expect(parseCollapsed(null)).toEqual([]);
+    expect(parseCollapsed("{oops")).toEqual([]);
+    expect(parseCollapsed('{"a":1}')).toEqual([]);
+    expect(parseCollapsed('["people","x","agents"]')).toEqual(["agents", "people"]);
+    expect(toggleCollapsed([], "people")).toEqual(["people"]);
+    expect(toggleCollapsed(["people"], "agents")).toEqual(["agents", "people"]);
+    expect(toggleCollapsed(["agents", "people"], "agents")).toEqual(["people"]);
+  });
+});
+
+describe("the Esperando você shortcut's line", () => {
+  test("a request first, then a mission, then a question; nothing when nothing waits", () => {
+    const approval = { agentId: "theo", title: "Publicar a página" };
+    const missionItem = { agentId: "dev", title: "Migrar o banco" };
+    const question = {
+      actors: [{ type: "agent" as const, id: "nina" }],
+      latest: { text: "Qual mês?", title: null },
+    } as unknown as Parameters<typeof waitingPreview>[0]["questions"][number];
+    expect(waitingPreview({ approvals: [approval], missions: [missionItem], questions: [question] })).toEqual({
+      kind: "approval",
+      agentId: "theo",
+      title: "Publicar a página",
+    });
+    expect(waitingPreview({ approvals: [], missions: [missionItem], questions: [question] })).toEqual({
+      kind: "mission",
+      agentId: "dev",
+      title: "Migrar o banco",
+    });
+    expect(waitingPreview({ approvals: [], missions: [], questions: [question] })).toEqual({
+      kind: "question",
+      agentId: "nina",
+      title: "Qual mês?",
+    });
+    expect(waitingPreview({ approvals: [], missions: [], questions: [] })).toBeNull();
   });
 });

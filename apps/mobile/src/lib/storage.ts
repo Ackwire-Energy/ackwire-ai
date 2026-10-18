@@ -2,7 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import { STORAGE_PREFIX } from "@/config";
 
 /**
- * Small values the app remembers (theme, current organization, push token), in SecureStore.
+ * Small values the app remembers (theme, current organization, push token, collapsed sections), in SecureStore.
  * Reads never throw: a missing or unreadable value is `null`.
  */
 const key = (name: string) => `${STORAGE_PREFIX}.${name}`;
@@ -40,6 +40,8 @@ export const STORED = {
   pushAsked: "push-asked",
   /** The person turned notifications off in the app (no silent re-registration). */
   pushOff: "push-off",
+  /** Conversas' sections the person collapsed (JSON list). */
+  homeCollapsed: "home-collapsed",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

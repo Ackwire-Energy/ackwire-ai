@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentAccess, WorkingRun } from "@agenteschat/client";
 import { activitySections, dayGroupOf, emojisOf, subtitleOf, whoOf } from "../../src/features/activity/logic";
-import { busyAgents, canUse, crewOf, spendOf, workingNow } from "../../src/features/agents/logic";
+import { agoOf, busyAgents, canUse, spendOf, teamLines, workingNow } from "../../src/features/agents/logic";
 import { filterResults, fold, isEmpty, matches, searchCounts, searchResults } from "../../src/features/search/logic";
 import { agent, mission, notification } from "./fixtures";
 
@@ -134,16 +134,52 @@ describe("who is working", () => {
     expect(dm).toMatchObject({ what: null, channelId: "d1", where: { kind: "dm", name: null } });
   });
 
-  test("the crew: working ones first, then by name", () => {
-    const crew = crewOf(
-      [agent({ id: "b", name: "Bento" }), agent({ id: "n", name: "Nina" }), agent({ id: "a", name: "Ana" })],
-      new Set(["n"]),
-      2,
+  test("since when: the run's start, else when it was queued; a mission's start, else its creation", () => {
+    const [m, started, queued] = workingNow(
+      [run("r1", "nina", "running", "t9", ago(5), { startedAt: ago(1) }), run("r2", "theo", "queued", null, ago(2))],
+      [mission({ id: "m1", agentId: "dev", threadId: "t1", startedAt: null, createdAt: ago(3) })],
     );
-    expect(crew.map((c) => [c.agent.name, c.busy])).toEqual([
-      ["Nina", true],
-      ["Ana", false],
+    expect(m?.since).toBe(ago(3));
+    expect(started?.since).toBe(ago(1));
+    expect(queued?.since).toBe(ago(2));
+  });
+
+  test("Agentes: working ones with since when, then free ones by their last conversation, then by name", () => {
+    const agents = [
+      agent({ id: "bento", name: "Bento" }),
+      agent({ id: "nina", name: "Nina" }),
+      agent({ id: "iris", name: "Iris" }),
+      agent({ id: "ana", name: "Ana" }),
+      agent({ id: "theo", name: "Theo" }),
+    ];
+    const work = workingNow([run("r1", "theo", "running", "t9", ago(0.1)), run("r2", "ghost", "running", "t2")], []);
+    const dm = (id: string, hours: number | null, body = "**Pronto**, mandei.") => ({
+      with: { type: "agent" as const, id, name: id, handle: id },
+      lastMessage: hours === null ? null : { id: `m-${id}`, body, createdAt: ago(hours), authorType: "agent" },
+    });
+    const { working, free } = teamLines(agents, work, [
+      dm("nina", 5),
+      dm("iris", 1),
+      dm("theo", 0.5),
+      dm("ana", null),
+      { ...dm("x", 1), with: { type: "person" as const, id: "bento", name: "B", handle: null } },
     ]);
+    expect(working.map((l) => [l.agent.id, l.at])).toEqual([["theo", ago(0.1)]]);
+    expect(free.map((l) => [l.agent.id, l.at, l.preview])).toEqual([
+      ["iris", ago(1), "Pronto, mandei."],
+      ["nina", ago(5), "Pronto, mandei."],
+      ["ana", null, null],
+      ["bento", null, null],
+    ]);
+  });
+
+  test("how long ago, in the largest whole unit", () => {
+    const now = NOW.getTime();
+    expect(agoOf(ago(0.001), now)).toEqual({ unit: "now" });
+    expect(agoOf(new Date(now + 60_000).toISOString(), now)).toEqual({ unit: "now" });
+    expect(agoOf(ago(4 / 60), now)).toEqual({ unit: "minutes", count: 4 });
+    expect(agoOf(ago(2.5), now)).toEqual({ unit: "hours", count: 2 });
+    expect(agoOf(ago(50), now)).toEqual({ unit: "days", count: 2 });
   });
 
   test("this month: money only when the API shows it, else the share of the budget", () => {

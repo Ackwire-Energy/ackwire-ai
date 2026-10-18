@@ -1,6 +1,6 @@
 import { type AppNotification, useNotificationAction, useNotifications } from "@agenteschat/client";
-import { router } from "expo-router";
-import { Fragment, memo, useMemo, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Animated, PanResponder, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import {
@@ -29,7 +29,13 @@ import { type ActivityFilter, activitySections, type DayGroup, emojisOf, placeOf
 export function ActivityScreen() {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const [filter, setFilter] = useState<ActivityFilter>("all");
+  // `?filter=waiting`: opened from Conversas' "Esperando você" (selects Esperando; each visit with it does).
+  const params = useLocalSearchParams<{ filter?: string; at?: string }>();
+  const [filter, setFilter] = useState<ActivityFilter>(params.filter === "waiting" ? "waiting" : "all");
+  const asked = params.filter === "waiting" ? (params.at ?? "link") : null;
+  useEffect(() => {
+    if (asked) setFilter("waiting");
+  }, [asked]);
   const list = useNotifications(orgId, filter === "waiting" ? "waiting" : "all");
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const counts = list.data?.pages[0]?.counts;

@@ -1,5 +1,6 @@
 import type {
   AppNotification,
+  Approval,
   Channel,
   DirectMessage,
   Mission,
@@ -11,12 +12,9 @@ import { previewOf } from "../shared/logic";
 
 /**
  * Conversas: channels, direct messages, threads and missions in one list
- * (newest activity first), its filters and counts.
+ * (newest activity first), split by kind on the home (Agentes, Canais, Pessoas, and threads and missions
+ * behind their shortcut), and what waits on you.
  */
-
-export type ChatFilter = "all" | "unread" | "dm" | "threads";
-/** In the order the chips show them (Todas, Não lidas, Diretas, Threads e missões). */
-export const CHAT_FILTERS: ChatFilter[] = ["all", "unread", "dm", "threads"];
 
 export interface LastLine {
   author: ThreadActor | null;
@@ -203,19 +201,6 @@ export function rowPlace(
 export const rowName = (r: ConversationRow) =>
   r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title;
 
-export function filterConversations(rows: ConversationRow[], filter: ChatFilter): ConversationRow[] {
-  switch (filter) {
-    case "all":
-      return rows;
-    case "unread":
-      return rows.filter((r) => r.unread > 0);
-    case "threads":
-      return rows.filter((r) => r.kind === "thread" || r.kind === "mission");
-    case "dm":
-      return rows.filter((r) => r.kind === "dm");
-  }
-}
-
 /** The "Não lidas" count: conversations with something unread. */
 export const unreadConversations = (rows: ConversationRow[]) => rows.filter((r) => r.unread > 0).length;
 
@@ -232,14 +217,62 @@ export function unreadConversationCount(input: {
   return channels + dms;
 }
 
-/** Counts per filter (only "Não lidas" shows one). */
-export function filterCounts(rows: ConversationRow[]): Record<ChatFilter, number> {
-  return {
-    all: rows.length,
-    unread: unreadConversations(rows),
-    threads: rows.filter((r) => r.kind === "thread" || r.kind === "mission").length,
-    dm: rows.filter((r) => r.kind === "dm").length,
-  };
+// ── The home by kind (MobileHomeAgentes.html, Recomendada) ─────────────────
+
+/** A list of one kind: the home's sections, and threads and missions (behind their shortcut). */
+export type ListKind = "agents" | "channels" | "people" | "threads";
+/** The home's collapsible sections, in order. */
+export const HOME_SECTIONS = ["agents", "channels", "people"] as const;
+export type HomeSection = (typeof HOME_SECTIONS)[number];
+export const LIST_KINDS: ListKind[] = [...HOME_SECTIONS, "threads"];
+/** Rows a section shows before "Ver todos". */
+export const SECTION_MAX = 5;
+
+export const isListKind = (v: unknown): v is ListKind => LIST_KINDS.includes(v as ListKind);
+
+/** Which list a row belongs to: agent DMs, channels, DMs with people, threads and missions. */
+export function kindOf(r: ConversationRow): ListKind {
+  if (r.kind === "channel") return "channels";
+  if (r.kind === "dm") return r.with.type === "agent" ? "agents" : "people";
+  return "threads";
+}
+
+/** The rows of one kind, in the list's order (latest activity first). */
+export const rowsOfKind = (rows: ConversationRow[], kind: ListKind) => rows.filter((r) => kindOf(r) === kind);
+
+/** The home's sections that have rows: the first `max` of each, and how many there are in all. */
+export function homeSections(
+  rows: ConversationRow[],
+  max = SECTION_MAX,
+): { key: HomeSection; rows: ConversationRow[]; total: number; more: boolean }[] {
+  return HOME_SECTIONS.map((key) => {
+    const all = rowsOfKind(rows, key);
+    return { key, rows: all.slice(0, max), total: all.length, more: all.length > max };
+  }).filter((s) => s.total > 0);
+}
+
+/** The "Threads e missões" shortcut: how many, and the latest one's title. */
+export function threadsShortcut(rows: ConversationRow[]): { count: number; preview: string | null } {
+  const list = rowsOfKind(rows, "threads");
+  const first = list[0];
+  return { count: list.length, preview: first ? rowName(first) || null : null };
+}
+
+/** The sections the person collapsed, as remembered (anything unreadable: none). */
+export function parseCollapsed(raw: string | null): HomeSection[] {
+  if (!raw) return [];
+  try {
+    const v: unknown = JSON.parse(raw);
+    return Array.isArray(v) ? HOME_SECTIONS.filter((k) => v.includes(k)) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Collapses or opens a section (in the sections' order). */
+export function toggleCollapsed(list: readonly HomeSection[], key: HomeSection): HomeSection[] {
+  const on = list.includes(key);
+  return HOME_SECTIONS.filter((k) => (k === key ? !on : list.includes(k)));
 }
 
 // ── Esperando você (top of Conversas) ───────────────────────────────────────
@@ -263,4 +296,32 @@ export function waitingTotal(input: {
   questions: number;
 }): number {
   return input.approvals + input.missions.reduce((n, m) => n + missionWaitingItems(m), 0) + input.questions;
+}
+
+/** The first thing waiting on you, for the shortcut's line ("Theo pede aprovação"). */
+export type WaitingPreview =
+  | { kind: "approval"; agentId: string; title: string }
+  | { kind: "mission"; agentId: string; title: string }
+  | { kind: "question"; agentId: string | null; title: string };
+
+/** In the rail's old order: requests (the one closest to expiring first), missions, questions. */
+export function waitingPreview(input: {
+  approvals: Pick<Approval, "agentId" | "title">[];
+  missions: Pick<Mission, "agentId" | "title">[];
+  questions: Pick<AppNotification, "actors" | "latest">[];
+}): WaitingPreview | null {
+  const a = input.approvals[0];
+  if (a) return { kind: "approval", agentId: a.agentId, title: a.title };
+  const m = input.missions[0];
+  if (m) return { kind: "mission", agentId: m.agentId, title: m.title };
+  const q = input.questions[0];
+  if (q) {
+    const actor = q.actors[0];
+    return {
+      kind: "question",
+      agentId: actor?.type === "agent" ? actor.id : null,
+      title: q.latest.text ?? q.latest.title ?? "",
+    };
+  }
+  return null;
 }

@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { WorkItem } from "./logic";
+import type { Ago, WorkItem } from "./logic";
 
 /** The line a working item shows: the mission, what the run works on, else where it is. */
 export function workTitle(t: TFunction, w: WorkItem): string {
@@ -11,4 +11,11 @@ export function workTitle(t: TFunction, w: WorkItem): string {
 /** "#produto", or "Conversa direta". */
 export function workWhere(t: TFunction, w: WorkItem): string {
   return w.where.kind === "channel" && w.where.name ? `#${w.where.name}` : t("mobile.home.directChat");
+}
+
+/** "há 4 min", "há 2 h", "agora". */
+export function agoText(t: TFunction, ago: Ago): string {
+  if (ago.unit === "now") return t("mobile.time.justNow");
+  const key = { minutes: "minutesAgo", hours: "hoursAgo", days: "daysAgo" }[ago.unit];
+  return t(`mobile.time.${key}`, { count: ago.count });
 }

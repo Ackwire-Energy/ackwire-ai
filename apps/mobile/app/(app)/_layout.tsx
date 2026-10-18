@@ -39,6 +39,7 @@ function AppStack() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[channelId]" options={pushed} />
+      <Stack.Screen name="conversations/[kind]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="account-delete" options={{ ...pushed, ...scrollUnder }} />

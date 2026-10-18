@@ -1,39 +1,44 @@
-import { keys, useChannels, useMissionList, useNotifications } from "@agenteschat/client";
+import { keys, useMissionList, useNotifications } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import { EmptyState, Filters, LargeTitleScreen, SearchField, Text } from "@/ui";
-import { busyAgents } from "../agents/logic";
+import { LargeTitleScreen, SearchField, Text } from "@/ui";
+import { workByAgent } from "../agents/logic";
 import { SearchResults } from "../search/SearchResults";
-import { useOrgId, usePullRefresh } from "../shared/hooks";
+import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useConversations, useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { FirstAgentEmpty, Greeting } from "./Greeting";
+import { CollapsibleSection, SeeAllRow, useCollapsedSections } from "./HomeSection";
 import {
-  CHAT_FILTERS,
-  type ChatFilter,
-  filterConversations,
-  filterCounts,
+  homeSections,
+  type ListKind,
   missionsWaiting,
   openQuestions,
+  threadsShortcut,
+  type WaitingPreview,
+  waitingPreview,
   waitingTotal,
 } from "./logic";
-import { WaitingRail } from "./WaitingRail";
+import { type ShortcutItem, Shortcuts } from "./Shortcuts";
 
-/** Rows of the list whose agent moves (a long list stays light). */
+/** Rows of the home whose agent moves (a long list stays light). */
 const LIVE_ROWS = 6;
 /** How often who is working is asked again while Conversas shows (runs start in conversations it doesn't follow). */
 const WORKING_POLL_MS = 20_000;
 
+/** A list of one kind, pushed (threads and missions, or a section's "Ver todos"). */
+export const openKindList = (kind: ListKind) => router.push(`/conversations/${kind}`);
+
 /**
- * Conversas, the home (MobileConversas.html): agents, channels, DMs, threads and missions in one list by
- * activity, under the native large title with Você and "+" (Novo) in the bar, and the search field on top of
- * the list (in the content, not the bar: anything React inside the native bar keeps the large title from
- * collapsing on iOS). "Esperando você" sits on top when something waits (requests, missions, agents' questions);
- * the old Início's sky (greeting and crew) sits on top. Empty, it invites the first agent.
+ * Conversas, the home (MobileHomeAgentes.html, Recomendada): the one-line greeting over a light sky, the native
+ * large title with Você and "+" (Novo) in the bar, the search field (results in place), the shortcuts
+ * "Esperando você" (only while something waits; opens Atividade on Esperando) and "Threads e missões" (opens
+ * their list), then Agentes, Canais and Pessoas by latest activity, each collapsible (remembered), five rows
+ * and "Ver todos". Empty, it invites the first agent.
  */
 export function ChatsScreen() {
   const { t } = useTranslation();
@@ -41,13 +46,13 @@ export function ChatsScreen() {
   const qc = useQueryClient();
   const focused = useIsFocused();
   const header = useTabHeader();
+  const dir = useDirectory();
   const list = useConversations();
   const work = useWorkingNow();
   const approvals = useWaitingApprovals();
   const waitingMissions = useMissionList(orgId, { status: "waiting_you" });
   const inbox = useNotifications(orgId, "waiting");
-  const channels = useChannels(orgId);
-  const [filter, setFilter] = useState<ChatFilter>("all");
+  const { collapsed, toggle } = useCollapsedSections();
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
 
@@ -60,26 +65,48 @@ export function ChatsScreen() {
   const missions = missionsWaiting(waitingMissions.data?.missions ?? []);
   const questions = openQuestions(inbox.data?.pages.flatMap((p) => p.items) ?? []);
   const waiting = waitingTotal({ approvals: approvals.length, missions, questions: questions.length });
-  const busy = busyAgents(work);
+  const working = workByAgent(work)
+    .map((w) => w.agentId)
+    .filter((id) => dir.agentById.has(id));
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waitingMissions.refetch(), inbox.refetch()]));
-  const counts = filterCounts(list.rows);
-  const rows = filterConversations(list.rows, filter);
-  const channelName = (id: string | null | undefined) =>
-    (id ? channels.data?.find((c) => c.id === id)?.name : null) ?? null;
+  const sections = homeSections(list.rows);
+  const threads = threadsShortcut(list.rows);
   const showResults = searching || Boolean(q.trim());
   const empty = !list.loading && list.rows.length === 0;
-  const labels: Record<ChatFilter, string> = {
-    all: t("mobile.chats.filter.all"),
-    unread: t("mobile.chats.filter.unread"),
-    dm: t("mobile.chats.filter.dm"),
-    threads: t("mobile.chats.filter.threads"),
-  };
 
+  const previewText = (p: WaitingPreview | null) => {
+    if (!p) return null;
+    const name = p.agentId ? (dir.agentById.get(p.agentId)?.name ?? "") : "";
+    if (!name) return p.title || null;
+    return t(`mobile.chats.waitPreview.${p.kind}`, { name, title: p.title });
+  };
+  const shortcuts: ShortcutItem[] = [];
+  if (waiting > 0)
+    shortcuts.push({
+      key: "waiting",
+      icon: "shield",
+      title: t("mobile.home.waiting"),
+      count: waiting,
+      preview: previewText(waitingPreview({ approvals, missions, questions })),
+      hot: true,
+      onPress: () => router.navigate({ pathname: "/activity", params: { filter: "waiting", at: String(Date.now()) } }),
+    });
+  if (threads.count > 0)
+    shortcuts.push({
+      key: "threads",
+      icon: "target",
+      title: t("mobile.chats.section.threads"),
+      count: threads.count,
+      preview: threads.preview,
+      onPress: () => openKindList("threads"),
+    });
+
+  let live = 0;
   return (
     <LargeTitleScreen
       title={t("mobile.chats.title")}
       {...header}
-      header={showResults || empty ? undefined : (reach) => <Greeting busy={busy} waiting={waiting} reach={reach} />}
+      header={showResults || empty ? undefined : (reach) => <Greeting working={working} reach={reach} />}
       refreshControl={
         showResults ? undefined : <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
       }
@@ -96,42 +123,38 @@ export function ChatsScreen() {
       </View>
       {showResults ? (
         <SearchResults q={q} />
+      ) : empty ? (
+        <>
+          <Shortcuts items={shortcuts} />
+          <FirstAgentEmpty />
+        </>
       ) : (
         <>
-          {waiting > 0 ? (
-            <WaitingRail
-              approvals={approvals}
-              missions={missions}
-              questions={questions}
-              channelName={channelName}
-              total={waiting}
-            />
-          ) : null}
-          {empty ? (
-            <FirstAgentEmpty />
+          <Shortcuts items={shortcuts} />
+          {list.loading ? (
+            <Text tone="faint" style={styles.center}>
+              {t("mobile.common.loading")}
+            </Text>
           ) : (
-            <>
-              <Filters
-                items={CHAT_FILTERS.map((key) => ({
-                  key,
-                  label: labels[key],
-                  ...(key === "unread" ? { count: counts.unread } : {}),
-                }))}
-                value={filter}
-                onChange={(key) => setFilter(key as ChatFilter)}
-              />
-              <View style={styles.list}>
-                {list.loading ? (
-                  <Text tone="faint" style={styles.center}>
-                    {t("mobile.common.loading")}
-                  </Text>
-                ) : rows.length === 0 ? (
-                  <EmptyState title={filter === "unread" ? t("mobile.chats.allRead") : t("mobile.chats.empty")} />
-                ) : (
-                  rows.map((r, i) => <ConversationRowView key={r.key} row={r} divider={i > 0} live={i < LIVE_ROWS} />)
-                )}
-              </View>
-            </>
+            sections.map((s) => {
+              const off = collapsed.includes(s.key);
+              return (
+                <CollapsibleSection
+                  key={s.key}
+                  title={t(`mobile.chats.section.${s.key}`)}
+                  count={s.total}
+                  collapsed={off}
+                  onToggle={() => toggle(s.key)}
+                >
+                  {s.rows.map((r, i) => (
+                    <ConversationRowView key={r.key} row={r} divider={i > 0} live={!off && live++ < LIVE_ROWS} />
+                  ))}
+                  {s.more ? (
+                    <SeeAllRow label={t(`mobile.chats.seeAll.${s.key}`)} onPress={() => openKindList(s.key)} />
+                  ) : null}
+                </CollapsibleSection>
+              );
+            })
           )}
         </>
       )}
@@ -141,6 +164,5 @@ export function ChatsScreen() {
 
 const styles = StyleSheet.create({
   search: { paddingHorizontal: 16, paddingBottom: 10 },
-  list: { marginTop: 8 },
   center: { textAlign: "center", paddingVertical: 40 },
 });

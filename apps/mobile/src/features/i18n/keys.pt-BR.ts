@@ -13,6 +13,13 @@ export const featureKeysPtBR = {
   time: {
     today: "Hoje",
     yesterday: "Ontem",
+    justNow: "agora",
+    minutesAgo_one: "há {{count}} min",
+    minutesAgo_other: "há {{count}} min",
+    hoursAgo_one: "há {{count}} h",
+    hoursAgo_other: "há {{count}} h",
+    daysAgo_one: "há {{count}} dia",
+    daysAgo_other: "há {{count}} dias",
   },
   names: {
     two: "{{first}} e {{second}}",
@@ -81,13 +88,22 @@ export const featureKeysPtBR = {
   },
   chats: {
     title: "Conversas",
-    filter: {
-      all: "Todas",
-      unread: "Não lidas",
+    section: {
+      agents: "Agentes",
+      channels: "Canais",
+      people: "Pessoas",
       threads: "Threads e missões",
-      dm: "Diretas",
     },
-    allRead: "Tudo lido por aqui.",
+    seeAll: {
+      agents: "Ver todos os agentes",
+      channels: "Ver todos os canais",
+      people: "Ver todas as pessoas",
+    },
+    waitPreview: {
+      approval: "{{name}} pede aprovação",
+      mission: "{{name}}: {{title}}",
+      question: "{{name}} perguntou",
+    },
     empty: "Nenhuma conversa ainda.",
     closed: "Fechada",
     working: "trabalhando…",
@@ -102,14 +118,9 @@ export const featureKeysPtBR = {
     channelPlaceholder: "Nome do canal, ex.: marketing",
     createChannel: "Criar canal",
     waitIn: "em {{where}}",
-    waitApprove: "Aprovar",
-    waitQuestion: "Pergunta",
-    answerInChat: "Responder na conversa",
     workingNowLine_one: "{{count}} agente trabalhando agora",
     workingNowLine_other: "{{count}} agentes trabalhando agora",
     nobodyWorking: "Nenhum agente trabalhando agora",
-    waitingLine_one: "{{count}} coisa esperando você",
-    waitingLine_other: "{{count}} coisas esperando você",
     first: {
       title: "Comece pelo seu primeiro agente",
       subtitle: "Dê um nome e diga o que ele faz. Ele aparece aqui, como uma conversa.",
@@ -431,7 +442,6 @@ export const featureKeysPtBR = {
     title: "Agentes",
     subtitle_one: "{{count}} na equipe · {{working}} trabalhando",
     subtitle_other: "{{count}} na equipe · {{working}} trabalhando",
-    working: "Trabalhando",
     free: "Livre",
     workingLabel: "{{name}}, trabalhando",
     new: "Novo agente",
@@ -442,7 +452,7 @@ export const featureKeysPtBR = {
     created: "{{name}} chegou na equipe",
     createFailed: "Não deu para criar o agente. Talvez esse nome já exista.",
     empty: "Nenhum agente ainda.",
-    all: "Todos",
+    freeSection: "Livres",
   },
   agent: {
     talk: "Conversar",

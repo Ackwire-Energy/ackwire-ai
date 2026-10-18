@@ -1,178 +1,160 @@
-import { useWorkingRuns } from "@agenteschat/client";
+import { useDms, useWorkingRuns } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import { AgentAvatar, Card, Count, EmptyState, Icon, LargeTitleScreen, PixelOrbit, Section, Sky, Text } from "@/ui";
+import { Chip, EmptyState, LargeTitleScreen, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
 import { useOpenDm } from "../new/useOpenDm";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { Tile, useSurface } from "../shared/parts";
+import { Tile } from "../shared/parts";
 import { useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
-import { busyAgents, workByAgent } from "./logic";
-import { workTitle } from "./work";
+import { agoOf, type TeamLine, teamLines } from "./logic";
+import { agoText, workTitle } from "./work";
 
-/** Working agents named in the "Trabalhando agora" card (the crew above shows them all, up to this too). */
-const WORKING_LINES = 4;
+/** Rows whose agent moves (a long team stays light). */
+const LIVE_ROWS = 8;
 
 /**
- * Agentes (MobileConversas.html): who is working now on top (the crew over the sky and what each one is
- * on), then the whole team in two columns, Trabalhando (orbit) or Livre. Tapping an agent opens the
- * direct conversation with it (its profile is in that conversation's bar); "Novo agente" at the end.
+ * Agentes (MobileHomeAgentes.html, Recomendada): the team in Conversas' rows. "Trabalhando agora" (moving,
+ * since when, and what each one is on, with the pixel orbit), then "Livres" (its last conversation and when).
+ * Tapping an agent opens the direct conversation with it (its profile is in that conversation's bar; one that
+ * doesn't talk to you opens its profile); "Novo agente" at the end.
  */
 export function AgentsScreen() {
   const { t } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
-  const surface = useSurface();
   const header = useTabHeader();
   const openDm = useOpenDm();
-  const runs = useWorkingRuns(useOrgId());
+  const orgId = useOrgId();
+  const runs = useWorkingRuns(orgId);
+  const dms = useDms(orgId);
   const work = useWorkingNow();
-  const busy = busyAgents(work);
-  const agents = [...dir.agents].sort((a, b) => a.name.localeCompare(b.name));
-  const working = workByAgent(work).filter((w) => dir.agentById.has(w.agentId));
-  const pull = usePullRefresh(runs.refetch);
-  const open = (a: (typeof agents)[number]) => {
-    if (a.canTalk === false) router.push(`/agent/${a.id}`);
-    else void openDm({ agentId: a.id });
-  };
+  const { working, free } = teamLines(dir.agents, work, dms.data ?? []);
+  const pull = usePullRefresh(() => Promise.allSettled([runs.refetch(), dms.refetch()]));
+  const total = dir.agents.length;
   return (
     <LargeTitleScreen
       title={t("mobile.agents.title")}
-      subtitle={t("mobile.agents.subtitle", { count: agents.length, working: busy.size })}
+      subtitle={t("mobile.agents.subtitle", { count: total, working: working.length })}
       {...header}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
+      {dir.loading ? null : total === 0 ? <EmptyState title={t("mobile.agents.empty")} sky /> : null}
       {working.length > 0 ? (
-        <View style={[styles.now, surface]}>
-          <View style={styles.band}>
-            <Sky
-              color={agentLook(dir.agentById.get(working[0]?.agentId ?? "")).color}
-              depth={0.8}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.k}>
-              <PixelOrbit color={agentLook(dir.agentById.get(working[0]?.agentId ?? "")).color} size={11} />
-              <Text variant="footnote" tone="muted" style={styles.bold}>
-                {t("mobile.home.workingNow")}
-              </Text>
-              <Count value={working.length} size={15} />
-            </View>
-            <View style={styles.crew}>
-              {working.slice(0, WORKING_LINES).map((w) => (
-                <AgentFace key={w.key} agentId={w.agentId} size={44} mode="run" />
-              ))}
-            </View>
-          </View>
-          <View style={styles.lines}>
-            {working.slice(0, WORKING_LINES).map((w) => (
-              <Pressable
-                key={w.key}
-                onPress={() => {
-                  const a = dir.agentById.get(w.agentId);
-                  if (a) open(a);
-                }}
-                accessibilityRole="button"
-                style={styles.line}
-              >
-                <AgentFace agentId={w.agentId} size={22} mode="run" live={false} />
-                <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-                  <Text variant="small" tone="ink" style={styles.bold}>
-                    {dir.agentById.get(w.agentId)?.name ?? ""}
-                  </Text>
-                  {` ${workTitle(t, w)}`}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+        <>
+          <SectionHeader title={t("mobile.home.workingNow")} count={working.length} />
+          {working.map((l, i) => (
+            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={i < LIVE_ROWS} onOpen={openDm} />
+          ))}
+        </>
       ) : null}
-      {dir.loading ? null : agents.length === 0 ? <EmptyState title={t("mobile.agents.empty")} sky /> : null}
-      <Section title={t("mobile.agents.all")} count={agents.length}>
-        <View style={styles.grid}>
-          {agents.map((a, i) => {
-            const on = busy.has(a.id);
-            const look = agentLook(a);
-            return (
-              <Pressable
-                key={a.id}
-                onPress={() => open(a)}
-                accessibilityRole="button"
-                accessibilityLabel={on ? t("mobile.agents.workingLabel", { name: a.name }) : a.name}
-                style={({ pressed }) => [styles.cell, pressed && styles.pressed]}
-              >
-                <Card>
-                  <View style={styles.agc}>
-                    <AgentAvatar agent={look} size={50} mode={on ? "run" : "idle"} live={i < 8} />
-                    <Text variant="callout" style={styles.name} numberOfLines={1}>
-                      {a.name}
-                    </Text>
-                    <Text variant="small" tone="muted" numberOfLines={1}>
-                      {a.role || " "}
-                    </Text>
-                    <View style={styles.st}>
-                      {on ? (
-                        <PixelOrbit color={look.color} size={11} />
-                      ) : (
-                        <Icon name="checkc" size={14} color={c.faint} />
-                      )}
-                      <Text variant="footnote" tone="faint">
-                        {on ? t("mobile.agents.working") : t("mobile.agents.free")}
-                      </Text>
-                    </View>
-                  </View>
-                </Card>
-              </Pressable>
-            );
-          })}
-          <Pressable
-            onPress={() => router.push("/new-agent")}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.cell, pressed && styles.pressed]}
-          >
-            <View style={[styles.newCard, { borderColor: c.line2 }]}>
-              <Tile icon="plus" size={44} />
-              <Text variant="small" tone="muted" style={styles.bold}>
-                {t("mobile.agents.new")}
-              </Text>
-            </View>
-          </Pressable>
-        </View>
-      </Section>
+      {free.length > 0 ? (
+        <>
+          <SectionHeader title={t("mobile.agents.freeSection")} count={free.length} />
+          {free.map((l, i) => (
+            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={working.length + i < LIVE_ROWS} onOpen={openDm} />
+          ))}
+        </>
+      ) : null}
+      <Pressable
+        onPress={() => router.push("/new-agent")}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.newRow, pressed && { backgroundColor: c.sunken }]}
+      >
+        <Tile icon="plus" size={36} />
+        <Text variant="callout" tone="ink2" style={styles.bold}>
+          {t("mobile.agents.new")}
+        </Text>
+      </Pressable>
     </LargeTitleScreen>
   );
 }
 
+/** One agent (`.arow`): its body, the name and role, since when or its last conversation, then what it is on or said. */
+function AgentRow({
+  line: l,
+  divider,
+  live,
+  onOpen,
+}: {
+  line: TeamLine;
+  divider: boolean;
+  live: boolean;
+  onOpen: ReturnType<typeof useOpenDm>;
+}) {
+  const { t } = useTranslation();
+  const when = useWhen();
+  const now = useNow();
+  const { agent: a, work: w } = l;
+  const time = l.at ? (w ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
+  const sub = w ? workTitle(t, w) : (l.preview ?? "");
+  const open = () => {
+    if (a.canTalk === false) router.push(`/agent/${a.id}`);
+    else void onOpen({ agentId: a.id });
+  };
+  return (
+    <ListRow
+      onPress={open}
+      accessibilityRole="button"
+      accessibilityLabel={[
+        w ? t("mobile.agents.workingLabel", { name: a.name }) : a.name,
+        a.role.trim() || null,
+        time,
+        sub || null,
+      ]
+        .filter(Boolean)
+        .join(", ")}
+      divider={divider}
+      leading={<AgentFace agentId={a.id} size={50} mode={w ? "run" : "idle"} live={live} />}
+      title={
+        <View style={styles.l1}>
+          <Text variant="title" numberOfLines={1} style={styles.name}>
+            {a.name}
+          </Text>
+          {a.role.trim() ? (
+            <View style={styles.role}>
+              <Chip label={a.role.trim()} />
+            </View>
+          ) : null}
+        </View>
+      }
+      time={time}
+      sub={
+        w ? (
+          <View style={styles.work}>
+            <PixelOrbit color={agentLook(a).color} size={12} />
+            <Text variant="small" tone="ink2" numberOfLines={1} style={[styles.medium, styles.shrink]}>
+              {sub}
+            </Text>
+          </View>
+        ) : sub ? (
+          <Text variant="small" tone="muted" numberOfLines={1}>
+            {sub}
+          </Text>
+        ) : null
+      }
+    />
+  );
+}
+
 const styles = StyleSheet.create({
-  now: { marginHorizontal: 16, marginTop: 6, borderRadius: 26, overflow: "hidden", paddingBottom: 14 },
-  band: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
-  k: { flexDirection: "row", alignItems: "center", gap: 6 },
-  crew: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "flex-end",
-    gap: 28,
-    marginTop: 8,
-    minHeight: 52,
-  },
-  lines: { paddingHorizontal: 16, marginTop: 12, gap: 6 },
-  line: { flexDirection: "row", alignItems: "center", gap: 8 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  cell: { width: "48.5%" },
-  pressed: { transform: [{ scale: 0.97 }] },
-  agc: { padding: 14, gap: 1 },
-  name: { fontWeight: "600", marginTop: 10 },
-  bold: { fontWeight: "600" },
+  l1: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
+  name: { flexShrink: 0, maxWidth: "70%" },
+  role: { flexShrink: 1, minWidth: 0 },
+  work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0, marginTop: 2 },
+  medium: { fontWeight: "500" },
   shrink: { flexShrink: 1 },
-  st: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  newCard: {
-    minHeight: 152,
-    borderRadius: 22,
-    borderWidth: 1.5,
+  bold: { fontWeight: "600" },
+  newRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
+    gap: 12,
+    paddingVertical: 12,
+    paddingLeft: 22,
+    paddingRight: 16,
+    marginTop: 4,
   },
 });

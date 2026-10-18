@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AgentAvatar, Button, Card, Icon, PixelOrbit, Sky, Text } from "@/ui";
-import { crewOf } from "../agents/logic";
+import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook, firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
@@ -26,52 +26,49 @@ function useGreeting() {
   return name ? t(`mobile.home.greeting.${greetingKey()}`, { name }) : t(`mobile.home.hello.${greetingKey()}`);
 }
 
+/** Faces of working agents drawn over the greeting (the rest is the count). */
+const FACES = 4;
+
 /**
- * The old Início's sky on top of Conversas, seen at rest and scrolling away with the list: the greeting,
- * who is working and what waits on you, and the crew (working ones bigger, with their orbit and name).
- * `reach`: how far the sky extends up behind the clear bar.
+ * The one-line greeting on top of Conversas (MobileHomeAgentes.html `.gmini`), seen at rest and scrolling
+ * away with the list: "Boa noite, Walter", how many agents are working with the pixel orbit, and the faces of
+ * the ones working (moving), over a light sky that fades out. `reach`: how far the sky extends up behind
+ * the clear bar.
  */
-export function Greeting({ busy, waiting, reach }: { busy: ReadonlySet<string>; waiting: number; reach: number }) {
+export function Greeting({ working, reach }: { working: readonly string[]; reach: number }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const greeting = useGreeting();
-  const crew = crewOf(dir.agents, busy, 5);
+  const color = agentLook(working[0] ? dir.agentById.get(working[0]) : undefined).color;
+  const line =
+    working.length > 0 ? t("mobile.chats.workingNowLine", { count: working.length }) : t("mobile.chats.nobodyWorking");
   return (
-    <View style={styles.pull}>
-      <Sky color="sky" depth={0.95} style={[StyleSheet.absoluteFill, { top: -reach }]} />
-      <Text variant="display" accessibilityRole="header">
-        {greeting}
-      </Text>
-      <Text variant="small" tone="muted" style={styles.sub}>
-        {[
-          busy.size > 0 ? t("mobile.chats.workingNowLine", { count: busy.size }) : t("mobile.chats.nobodyWorking"),
-          waiting > 0 ? t("mobile.chats.waitingLine", { count: waiting }) : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </Text>
-      {crew.length > 0 ? (
-        <View style={styles.crew}>
-          {crew.map(({ agent, busy: on }, i) => {
-            const look = agentLook(agent);
-            return (
-              <Pressable
-                key={agent.id}
-                onPress={() => router.push(`/agent/${agent.id}`)}
-                accessibilityRole="button"
-                accessibilityLabel={on ? t("mobile.agents.workingLabel", { name: agent.name }) : agent.name}
-                style={styles.ag}
-              >
-                <AgentAvatar agent={look} size={on ? 46 - i * 2 : 34} mode={on ? "run" : "idle"} />
-                <View style={styles.agName}>
-                  {on ? <PixelOrbit color={look.color} size={9} /> : null}
-                  <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
-                    {agent.name}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
+    <View style={styles.mini}>
+      <Sky color="sky" depth={0.9} fade={0.45} style={[StyleSheet.absoluteFill, { top: -reach }]} />
+      <View style={styles.grow} accessible accessibilityLabel={`${greeting}. ${line}`}>
+        <Text variant="small" tone="ink" style={styles.bold} numberOfLines={1} accessibilityRole="header">
+          {greeting}
+        </Text>
+        <View style={styles.line}>
+          {working.length > 0 ? <PixelOrbit color={color} size={9} /> : null}
+          <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+            {line}
+          </Text>
+        </View>
+      </View>
+      {working.length > 0 ? (
+        <View style={styles.faces}>
+          {working.slice(0, FACES).map((id, i) => (
+            <Pressable
+              key={id}
+              onPress={() => router.push(`/agent/${id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.agents.workingLabel", { name: dir.agentById.get(id)?.name ?? "" })}
+              style={i > 0 ? styles.overlap : undefined}
+            >
+              <AgentFace agentId={id} size={30} mode="run" />
+            </Pressable>
+          ))}
         </View>
       ) : null}
     </View>
@@ -147,12 +144,11 @@ export function FirstAgentEmpty() {
 }
 
 const styles = StyleSheet.create({
-  pull: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 18 },
-  sub: { marginTop: 4 },
-  crew: { flexDirection: "row", alignItems: "flex-end", gap: 16, marginTop: 16, minHeight: 60 },
-  ag: { alignItems: "center", gap: 3 },
-  agName: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: 70 },
-  medium: { fontWeight: "500" },
+  mini: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 6 },
+  line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
+  shrink: { flexShrink: 1 },
+  faces: { flexDirection: "row" },
+  overlap: { marginLeft: -8 },
   empty: { marginHorizontal: 16, marginTop: 6, borderRadius: 28, overflow: "hidden", padding: 22, paddingTop: 0 },
   emptySky: { height: 150, marginHorizontal: -22, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   center: { textAlign: "center" },
