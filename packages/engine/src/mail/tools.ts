@@ -1,0 +1,806 @@
+import {
+  MailAuthError,
+  MailError,
+  type MailMessage,
+  type MailProvider,
+  type MailSummary,
+  type OutgoingMail,
+} from "@agenteschat/adapters";
+import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
+import { type ArtifactDeps, createFileArtifact } from "../artifacts";
+import { recordAudit } from "../audit";
+import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import {
+  connectorFor,
+  MAIL_SCOPES,
+  type MailAccountRow,
+  type MailDeps,
+  mailSlugs,
+  markNeedsReconnect,
+  openAccount,
+  orgMailAccounts,
+} from "./accounts";
+import { agentMailPolicies, type MailPolicy } from "./policies";
+import {
+  cutBody,
+  formatAddress,
+  isEmailAddress,
+  matchesAddressRules,
+  normalizeAddress,
+  oneLine,
+  wrapUntrusted,
+} from "./text";
+
+const { mailSends, routineRuns, agentRuns } = schema;
+
+export interface MailToolDeps extends Omit<MailDeps, "db"> {
+  /** Drive files, for `attachment` (absent = that tool is off). */
+  artifacts?: ArtifactDeps;
+}
+
+/**
+ * What each verb does to the mailbox. Sending is decided by this table,
+ * never by a tool's name: a verb missing here counts as a send.
+ */
+type Effect = "read" | "draft" | "send" | "organize" | "delete";
+const EFFECTS: Record<string, Effect> = {
+  search: "read",
+  read: "read",
+  folders: "read",
+  attachment: "read",
+  draft: "draft",
+  send: "send",
+  reply: "send",
+  forward: "send",
+  move: "organize",
+  mark: "organize",
+  archive: "organize",
+  trash: "delete",
+};
+const effectOf = (verb: string): Effect => EFFECTS[verb] ?? "send";
+const SCOPE_OF: Record<Effect, string> = {
+  read: MAIL_SCOPES.read,
+  draft: MAIL_SCOPES.draft,
+  send: MAIL_SCOPES.send,
+  organize: MAIL_SCOPES.organize,
+  delete: MAIL_SCOPES.delete,
+};
+
+const DETAIL_BODY_CHARS = 1500;
+const str = (v: unknown) => (typeof v === "string" ? v : "");
+const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+const addresses = (v: unknown) => list(v).map(normalizeAddress).filter(Boolean);
+const shown = (rules: string[]) => rules.join(", ");
+
+const ARRAY_OF_ADDRESSES = { type: "array", items: { type: "string", maxLength: 320 }, maxItems: 50 };
+const MESSAGE_ID = { type: "string", minLength: 1, maxLength: 500, description: "The message id from search results." };
+
+/** The day (UTC) a send counts toward the cap. */
+const utcDayStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+/**
+ * Whether this run was started by mail (an `email.received` routine), or
+ * continues that conversation: then a send always asks a person, whatever
+ * the policy says (ADR 0038: inbound mail can't approve its own sends).
+ */
+async function startedByMail(db: Database, ctx: ToolContext) {
+  if (!ctx.runId) return false;
+  const rows = await db
+    .select({ id: routineRuns.id })
+    .from(routineRuns)
+    .innerJoin(agentRuns, eq(agentRuns.id, routineRuns.agentRunId))
+    .where(
+      and(
+        eq(routineRuns.orgId, ctx.orgId),
+        sql`${routineRuns.event}->>'type' = 'email.received'`,
+        sql`(${agentRuns.id} = ${ctx.runId} or (${agentRuns.channelId} = ${ctx.channelId} and ${agentRuns.threadRootId} = ${ctx.threadRootId}))`,
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** Why a message is outside what the agent may read; null = inside. */
+function messageRefusal(policy: MailPolicy, m: MailSummary, now: Date): string | null {
+  if (policy.folders.length > 0 && (!m.folder || !policy.folders.includes(m.folder))) {
+    return `Not allowed: this agent may only read mail in the folders ${shown(policy.folders)}.`;
+  }
+  if (policy.senders.length > 0 && (!m.from || !matchesAddressRules(policy.senders, m.from.address))) {
+    return `Not allowed: this agent may only read mail from ${shown(policy.senders)}.`;
+  }
+  if (policy.windowDays !== null) {
+    const since = now.getTime() - policy.windowDays * 86_400_000;
+    const at = Date.parse(m.date);
+    if (Number.isNaN(at) || at < since) {
+      return `Not allowed: this agent may only read mail from the last ${policy.windowDays} days.`;
+    }
+  }
+  return null;
+}
+
+function replyRecipients(original: MailMessage, own: string[], replyAll: boolean) {
+  const mine = new Set(own.map(normalizeAddress));
+  const first = original.replyTo.length > 0 ? original.replyTo : original.from ? [original.from] : [];
+  const to = [...new Set(first.map((a) => normalizeAddress(a.address)))].filter((a) => !mine.has(a));
+  const cc = replyAll
+    ? [...new Set([...original.to, ...original.cc].map((a) => normalizeAddress(a.address)))].filter(
+        (a) => !mine.has(a) && !to.includes(a),
+      )
+    : [];
+  // A reply to our own sent message goes back to its recipients.
+  if (to.length === 0 && original.from && mine.has(normalizeAddress(original.from.address))) {
+    return { to: original.to.map((a) => normalizeAddress(a.address)).filter((a) => !mine.has(a)), cc };
+  }
+  return { to, cc };
+}
+
+const prefixed = (prefix: string, subject: string) =>
+  subject.toLowerCase().startsWith(prefix.toLowerCase()) ? subject : `${prefix} ${subject}`;
+
+/** The exact message a send verb will send (recipients computed from the original for replies). */
+interface Planned {
+  kind: "send" | "reply" | "forward";
+  from: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  body: string;
+}
+
+function summaryLine(m: MailSummary) {
+  const flags = [m.unread ? "unread" : null, m.flagged ? "flagged" : null, m.hasAttachments ? "attachments" : null]
+    .filter(Boolean)
+    .join(", ");
+  return [
+    `id: ${m.id}`,
+    `date: ${m.date}`,
+    `from: ${formatAddress(m.from)}`,
+    `subject: ${oneLine(m.subject, 300)}`,
+    ...(m.folder ? [`folder: ${m.folder}`] : []),
+    ...(flags ? [`flags: ${flags}`] : []),
+    `snippet: ${oneLine(m.snippet, 200)}`,
+  ].join("\n");
+}
+
+function messageText(m: MailMessage) {
+  return [
+    `id: ${m.id}`,
+    ...(m.threadId ? [`thread: ${m.threadId}`] : []),
+    `date: ${m.date}`,
+    `from: ${formatAddress(m.from)}`,
+    `to: ${m.to.map(formatAddress).join(", ")}`,
+    ...(m.cc.length > 0 ? [`cc: ${m.cc.map(formatAddress).join(", ")}`] : []),
+    ...(m.replyTo.length > 0 ? [`reply-to: ${m.replyTo.map(formatAddress).join(", ")}`] : []),
+    `subject: ${oneLine(m.subject, 500)}`,
+    ...(m.folder ? [`folder: ${m.folder}`] : []),
+    ...(m.attachments.length > 0
+      ? [
+          `attachments: ${m.attachments
+            .map((a) => `${oneLine(a.filename, 120)} (id ${a.id}, ${a.contentType}, ${a.size} bytes)`)
+            .join("; ")}`,
+        ]
+      : []),
+    "",
+    cutBody(m.text),
+  ].join("\n");
+}
+
+/**
+ * The org's mailboxes as tools (ADR 0038): `mail_<slug>_<verb>` per active
+ * account, with `connectionId` = the account, so an agent sees only the
+ * mailboxes and verbs it was granted. Every call's arguments are checked
+ * against the agent's policy (`checkCall`) before running or asking anyone,
+ * and again before an approved send. Mailbox text reaches the model only
+ * wrapped as untrusted.
+ */
+export function createMailToolSource(deps: MailToolDeps): ToolSource {
+  /** Originals read by `checkCall`, so `describe` can show a reply's exact recipients. */
+  const originals = new Map<string, { at: number; message: MailMessage }>();
+  const ORIGINAL_TTL_MS = 10 * 60_000;
+  const now = () => deps.now?.() ?? new Date();
+
+  const remember = (accountId: string, m: MailMessage) => {
+    const t = Date.now();
+    for (const [k, v] of originals) if (t - v.at > ORIGINAL_TTL_MS) originals.delete(k);
+    originals.set(`${accountId}|${m.id}`, { at: t, message: m });
+  };
+  const recalled = (accountId: string, id: string) => originals.get(`${accountId}|${id}`)?.message ?? null;
+
+  async function withMailbox<T>(db: Database, account: MailAccountRow, fn: (p: MailProvider) => Promise<T>) {
+    const provider = await openAccount({ ...deps, db }, account);
+    try {
+      return await fn(provider);
+    } finally {
+      await provider.close().catch(() => {});
+    }
+  }
+
+  async function read(db: Database, account: MailAccountRow, id: string) {
+    const m = await withMailbox(db, account, (p) => p.read(id));
+    remember(account.id, m);
+    return m;
+  }
+
+  /** A mailbox failure as the model sees it; refused credentials mark the account for reconnecting. */
+  async function failure(db: Database, account: MailAccountRow, error: unknown): Promise<ToolOutput> {
+    if (error instanceof MailAuthError) {
+      await markNeedsReconnect(db, account.id, error.message).catch(() => {});
+      return {
+        content: `The mailbox ${account.address} needs to be reconnected by a person (its sign-in expired or the password changed). Tell the person; don't retry.`,
+        isError: true,
+        data: { mailAccountId: account.id, needsReconnect: true },
+      };
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    const retry = error instanceof MailError && error.retryable ? " (temporary; you may retry later)" : "";
+    return { content: `Mailbox error${retry}: ${message}`, isError: true };
+  }
+
+  async function checkFailure(db: Database, account: MailAccountRow, error: unknown): Promise<CallCheck> {
+    const out = await failure(db, account, error);
+    return { ok: false, message: out.content, data: out.data };
+  }
+
+  function toolsFor(account: MailAccountRow, slug: string, policy: MailPolicy, askToSend: boolean): ToolDefinition[] {
+    const label = `[Email ${account.address}]`;
+    const fromAddress = policy.fromAddress ?? account.address;
+    const own = [account.address, ...(policy.fromAddress ? [policy.fromAddress] : [])];
+
+    const make = (
+      verb: string,
+      description: string,
+      inputSchema: Record<string, unknown>,
+      extra: Pick<ToolDefinition, "execute"> & Partial<ToolDefinition>,
+    ): ToolDefinition => {
+      const effect = effectOf(verb);
+      return {
+        name: `mail_${slug}_${verb}`,
+        description: `${label} ${description}`.slice(0, 1024),
+        inputSchema: { type: "object", additionalProperties: false, ...inputSchema },
+        scope: SCOPE_OF[effect],
+        connectionId: account.id,
+        connectorLabel: "Email",
+        sensitive: effect === "delete" || (effect === "send" && askToSend),
+        ...extra,
+      };
+    };
+
+    // ── Reading ──────────────────────────────────────────────────────────
+    const folderAllowed = (folder: string | undefined): CallCheck =>
+      folder && policy.folders.length > 0 && !policy.folders.includes(folder)
+        ? { ok: false, message: `Not allowed: this agent may only use the folders ${shown(policy.folders)}.` }
+        : { ok: true };
+
+    const checkMessage = async (db: Database, id: string): Promise<CallCheck> => {
+      try {
+        const m = await read(db, account, id);
+        const refused = messageRefusal(policy, m, now());
+        return refused ? { ok: false, message: refused, data: { mailAccountId: account.id } } : { ok: true };
+      } catch (error) {
+        return checkFailure(db, account, error);
+      }
+    };
+
+    const search = make(
+      "search",
+      "Search this mailbox (newest first). Returns ids, senders, subjects and short snippets; read a message with the read tool.",
+      {
+        properties: {
+          folder: {
+            type: "string",
+            maxLength: 300,
+            description: "Folder id from the folders tool; default the inbox.",
+          },
+          from: { type: "string", maxLength: 320, description: "Sender address or @domain." },
+          to: { type: "string", maxLength: 320 },
+          subject: { type: "string", maxLength: 300 },
+          text: { type: "string", maxLength: 300, description: "Words in the subject or body." },
+          since: { type: "string", maxLength: 40, description: "ISO date (inclusive)." },
+          before: { type: "string", maxLength: 40, description: "ISO date (exclusive)." },
+          unread_only: { type: "boolean" },
+          limit: { type: "integer", minimum: 1, maximum: 50 },
+        },
+      },
+      {
+        checkCall: async (input) => folderAllowed(str(input.folder) || undefined),
+        execute: async (input, ctx) => {
+          try {
+            const t = now();
+            let since = str(input.since) || undefined;
+            if (policy.windowDays !== null) {
+              const floor = new Date(t.getTime() - policy.windowDays * 86_400_000).toISOString();
+              if (!since || since < floor) since = floor;
+            }
+            const results = await withMailbox(ctx.db, account, (p) =>
+              p.search({
+                folder: str(input.folder) || policy.folders[0] || undefined,
+                from: str(input.from) || undefined,
+                to: str(input.to) || undefined,
+                subject: str(input.subject) || undefined,
+                text: str(input.text) || undefined,
+                since,
+                before: str(input.before) || undefined,
+                unreadOnly: input.unread_only === true,
+                limit: typeof input.limit === "number" ? input.limit : 20,
+              }),
+            );
+            const visible = results.filter((m) => !messageRefusal(policy, m, t));
+            if (visible.length === 0) return { content: "No messages found.", data: { count: 0 } };
+            return {
+              content: wrapUntrusted(visible.map(summaryLine).join("\n\n")),
+              data: { count: visible.length },
+            };
+          } catch (error) {
+            return failure(ctx.db, account, error);
+          }
+        },
+      },
+    );
+
+    const readTool = make(
+      "read",
+      "Read one message in full (headers, text, attachment list).",
+      { properties: { message_id: MESSAGE_ID }, required: ["message_id"] },
+      {
+        checkCall: (input, ctx) => checkMessage(ctx.db, str(input.message_id)),
+        execute: async (input, ctx) => {
+          try {
+            const m =
+              recalled(account.id, str(input.message_id)) ?? (await read(ctx.db, account, str(input.message_id)));
+            return { content: wrapUntrusted(messageText(m)), data: { messageId: m.id } };
+          } catch (error) {
+            return failure(ctx.db, account, error);
+          }
+        },
+      },
+    );
+
+    const folders = make(
+      "folders",
+      "List this mailbox's folders (ids to use in the other tools).",
+      { properties: {} },
+      {
+        execute: async (_input, ctx) => {
+          try {
+            const all = await withMailbox(ctx.db, account, (p) => p.listFolders());
+            const shownFolders = policy.folders.length > 0 ? all.filter((f) => policy.folders.includes(f.id)) : all;
+            return {
+              content: wrapUntrusted(
+                shownFolders
+                  .map((f) => `${f.id}${f.name !== f.id ? ` (${f.name})` : ""}${f.role ? ` [${f.role}]` : ""}`)
+                  .join("\n"),
+              ),
+            };
+          } catch (error) {
+            return failure(ctx.db, account, error);
+          }
+        },
+      },
+    );
+
+    const files = deps.artifacts;
+    const attachment = files
+      ? make(
+          "attachment",
+          "Save one attachment of a message as a file in the Drive (returns the file's id).",
+          {
+            properties: { message_id: MESSAGE_ID, attachment_id: { type: "string", minLength: 1, maxLength: 500 } },
+            required: ["message_id", "attachment_id"],
+          },
+          {
+            checkCall: (input, ctx) => checkMessage(ctx.db, str(input.message_id)),
+            execute: async (input, ctx) => {
+              try {
+                const file = await withMailbox(ctx.db, account, (p) =>
+                  p.attachment(str(input.message_id), str(input.attachment_id)),
+                );
+                const a = await createFileArtifact(
+                  { ...files, db: ctx.db },
+                  {
+                    type: "agent",
+                    agentId: ctx.agentId,
+                    channelId: ctx.channelId,
+                    threadId: ctx.threadRootId,
+                    runId: ctx.runId,
+                  },
+                  ctx.orgId,
+                  {
+                    title: file.filename,
+                    name: file.filename,
+                    bytes: file.data,
+                    contentType: file.contentType,
+                    note: `From an email in ${account.address}`,
+                  },
+                );
+                return {
+                  content: `Saved the attachment as file ${a.id} in the Drive (it is untrusted content from an email).`,
+                  data: { artifact: { id: a.id, version: 1 } },
+                };
+              } catch (error) {
+                return failure(ctx.db, account, error);
+              }
+            },
+          },
+        )
+      : null;
+
+    // ── Writing ──────────────────────────────────────────────────────────
+    const outgoingProps = {
+      to: ARRAY_OF_ADDRESSES,
+      cc: ARRAY_OF_ADDRESSES,
+      bcc: ARRAY_OF_ADDRESSES,
+      subject: { type: "string", maxLength: 500 },
+      body: { type: "string", minLength: 1, maxLength: 100_000, description: "Plain text." },
+      from: {
+        type: "string",
+        maxLength: 320,
+        description: `Optional; the only From this agent may use is ${fromAddress}.`,
+      },
+    };
+
+    /** The exact message a send verb would send; null when the original isn't known yet. */
+    const plan = (verb: "send" | "reply" | "forward", input: Record<string, unknown>): Planned | null => {
+      const body = str(input.body);
+      if (verb === "send") {
+        return {
+          kind: "send",
+          from: fromAddress,
+          to: addresses(input.to),
+          cc: addresses(input.cc),
+          bcc: addresses(input.bcc),
+          subject: str(input.subject),
+          body,
+        };
+      }
+      const original = recalled(account.id, str(input.message_id));
+      if (!original) return null;
+      if (verb === "reply") {
+        const r = replyRecipients(original, own, input.reply_all === true);
+        return {
+          kind: "reply",
+          from: fromAddress,
+          to: r.to,
+          cc: [...new Set([...r.cc, ...addresses(input.cc)])],
+          bcc: addresses(input.bcc),
+          subject: prefixed("Re:", original.subject),
+          body,
+        };
+      }
+      return {
+        kind: "forward",
+        from: fromAddress,
+        to: addresses(input.to),
+        cc: addresses(input.cc),
+        bcc: addresses(input.bcc),
+        subject: prefixed("Fwd:", original.subject),
+        body,
+      };
+    };
+
+    const describeSend = (verb: "send" | "reply" | "forward") => (input: Record<string, unknown>) => {
+      const p = plan(verb, input);
+      if (!p) {
+        return {
+          title: `${verb === "reply" ? "Reply to" : "Forward"} email ${str(input.message_id)} from ${account.address}`,
+          detail: `From: ${fromAddress}\n\n${str(input.body).slice(0, DETAIL_BODY_CHARS)}`,
+        };
+      }
+      const action = verb === "send" ? "Send email to" : verb === "reply" ? "Reply by email to" : "Forward email to";
+      const body = p.body.length > DETAIL_BODY_CHARS ? `${p.body.slice(0, DETAIL_BODY_CHARS)}\n[…]` : p.body;
+      return {
+        title: `${action} ${[...p.to, ...p.cc, ...p.bcc].join(", ")}: "${oneLine(p.subject, 120)}"`,
+        detail: [
+          `From: ${p.from}`,
+          `To: ${p.to.join(", ")}`,
+          ...(p.cc.length > 0 ? [`Cc: ${p.cc.join(", ")}`] : []),
+          ...(p.bcc.length > 0 ? [`Bcc: ${p.bcc.join(", ")}`] : []),
+          `Subject: ${p.subject}`,
+          "",
+          body,
+        ].join("\n"),
+      };
+    };
+
+    /** Recipients, From and the daily cap: every send verb, before asking anyone and again before sending. */
+    const checkSend =
+      (verb: "send" | "reply" | "forward") =>
+      async (input: Record<string, unknown>, ctx: ToolContext): Promise<CallCheck> => {
+        const from = str(input.from) ? normalizeAddress(str(input.from)) : null;
+        if (from && from !== fromAddress) {
+          return {
+            ok: false,
+            message: `Not allowed: send from ${fromAddress} (the only From address this agent may use).`,
+          };
+        }
+        if (verb !== "send") {
+          const read = await checkMessage(ctx.db, str(input.message_id));
+          if (!read.ok) return read;
+        }
+        const p = plan(verb, input);
+        if (!p) return { ok: false, message: "Could not read the original message." };
+        const recipients = [...p.to, ...p.cc, ...p.bcc];
+        if (p.to.length === 0) return { ok: false, message: "Give at least one recipient in to." };
+        const invalid = recipients.find((a) => !isEmailAddress(a));
+        if (invalid) return { ok: false, message: `"${invalid}" is not an email address.` };
+        if (policy.allowedRecipients.length > 0) {
+          const outside = recipients.filter((a) => !matchesAddressRules(policy.allowedRecipients, a));
+          if (outside.length > 0) {
+            return {
+              ok: false,
+              message: `Not allowed: ${outside.join(", ")} ${outside.length > 1 ? "are not allowed recipients" : "is not an allowed recipient"}. This agent may only email ${shown(policy.allowedRecipients)}.`,
+              data: { deniedRecipients: outside },
+            };
+          }
+        }
+        const [row] = await ctx.db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(mailSends)
+          .where(
+            and(
+              eq(mailSends.agentId, ctx.agentId),
+              eq(mailSends.accountId, account.id),
+              gte(mailSends.sentAt, utcDayStart(now())),
+            ),
+          );
+        if ((row?.n ?? 0) >= policy.dailySendCap) {
+          return {
+            ok: false,
+            message: `Not allowed: this agent reached its limit of ${policy.dailySendCap} emails a day from ${account.address}. Try again tomorrow (UTC) or ask a person to raise the limit.`,
+          };
+        }
+        return { ok: true, data: { mailAccountId: account.id, recipients } };
+      };
+
+    const executeSend =
+      (verb: "send" | "reply" | "forward") => async (input: Record<string, unknown>, ctx: ToolContext) => {
+        try {
+          if (verb !== "send" && !recalled(account.id, str(input.message_id)))
+            await read(ctx.db, account, str(input.message_id));
+          const p = plan(verb, input);
+          if (!p) return { content: "Could not read the original message.", isError: true };
+          const mail: OutgoingMail = {
+            ...(policy.fromAddress ? { from: policy.fromAddress } : {}),
+            to: p.to,
+            cc: p.cc,
+            bcc: p.bcc,
+            subject: p.subject,
+            text: p.body,
+            ...(verb === "reply" ? { inReplyTo: str(input.message_id) } : {}),
+            ...(verb === "forward" ? { forwardOf: str(input.message_id) } : {}),
+          };
+          const sent = await withMailbox(ctx.db, account, (provider) => provider.send(mail));
+          const recipients = [...p.to, ...p.cc, ...p.bcc];
+          await ctx.db.insert(mailSends).values({
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            accountId: account.id,
+            runId: ctx.runId || null,
+            kind: verb,
+            recipients,
+            subject: p.subject.slice(0, 500),
+            providerMessageId: sent.id,
+          });
+          await recordAudit(ctx.db, {
+            orgId: ctx.orgId,
+            actor: { type: "agent", id: ctx.agentId },
+            action: "mail.sent",
+            target: { type: "mail_account", id: account.id },
+            details: { kind: verb, recipients, subject: p.subject.slice(0, 200), runId: ctx.runId },
+          });
+          return {
+            content: `Sent "${oneLine(p.subject, 120)}" to ${recipients.join(", ")} from ${p.from}.`,
+            data: { mailAccountId: account.id, recipients, providerMessageId: sent.id },
+          };
+        } catch (error) {
+          return failure(ctx.db, account, error);
+        }
+      };
+
+    const send = make(
+      "send",
+      "Send a new email. A person approves each send unless this agent was set up to send to these recipients without asking.",
+      { properties: outgoingProps, required: ["to", "subject", "body"] },
+      { describe: describeSend("send"), checkCall: checkSend("send"), execute: executeSend("send") },
+    );
+    const reply = make(
+      "reply",
+      "Reply to a message in its thread (recipients come from the original; reply_all adds its other recipients).",
+      {
+        properties: {
+          message_id: MESSAGE_ID,
+          body: outgoingProps.body,
+          reply_all: { type: "boolean" },
+          cc: ARRAY_OF_ADDRESSES,
+          bcc: ARRAY_OF_ADDRESSES,
+          from: outgoingProps.from,
+        },
+        required: ["message_id", "body"],
+      },
+      { describe: describeSend("reply"), checkCall: checkSend("reply"), execute: executeSend("reply") },
+    );
+    const forward = make(
+      "forward",
+      "Forward a message (with its attachments) to other people, with an optional note above it.",
+      {
+        properties: {
+          message_id: MESSAGE_ID,
+          to: ARRAY_OF_ADDRESSES,
+          cc: ARRAY_OF_ADDRESSES,
+          bcc: ARRAY_OF_ADDRESSES,
+          body: { type: "string", maxLength: 100_000 },
+          from: outgoingProps.from,
+        },
+        required: ["message_id", "to"],
+      },
+      { describe: describeSend("forward"), checkCall: checkSend("forward"), execute: executeSend("forward") },
+    );
+
+    const draft = make(
+      "draft",
+      "Save a draft in the mailbox for a person to review and send (never sends).",
+      { properties: { ...outgoingProps, in_reply_to: MESSAGE_ID }, required: ["subject", "body"] },
+      {
+        checkCall: async (input) => {
+          const from = str(input.from) ? normalizeAddress(str(input.from)) : null;
+          return from && from !== fromAddress
+            ? {
+                ok: false,
+                message: `Not allowed: drafts are from ${fromAddress} (the only From address this agent may use).`,
+              }
+            : { ok: true };
+        },
+        execute: async (input, ctx) => {
+          try {
+            const saved = await withMailbox(ctx.db, account, (p) =>
+              p.createDraft({
+                ...(policy.fromAddress ? { from: policy.fromAddress } : {}),
+                to: addresses(input.to),
+                cc: addresses(input.cc),
+                bcc: addresses(input.bcc),
+                subject: str(input.subject),
+                text: str(input.body),
+                ...(str(input.in_reply_to) ? { inReplyTo: str(input.in_reply_to) } : {}),
+              }),
+            );
+            return { content: `Draft saved in ${account.address} (id ${saved.id}).`, data: { draftId: saved.id } };
+          } catch (error) {
+            return failure(ctx.db, account, error);
+          }
+        },
+      },
+    );
+
+    // ── Organizing ───────────────────────────────────────────────────────
+    const organize = (
+      verb: "move" | "mark" | "archive" | "trash",
+      description: string,
+      properties: Record<string, unknown>,
+      required: string[],
+      run: (p: MailProvider, input: Record<string, unknown>) => Promise<void>,
+      done: (input: Record<string, unknown>) => string,
+      checkCall?: ToolDefinition["checkCall"],
+    ) =>
+      make(
+        verb,
+        description,
+        { properties: { message_id: MESSAGE_ID, ...properties }, required: ["message_id", ...required] },
+        {
+          ...(checkCall ? { checkCall } : {}),
+          ...(verb === "trash"
+            ? {
+                describe: (input: Record<string, unknown>) => {
+                  const m = recalled(account.id, str(input.message_id));
+                  return {
+                    title: `Delete email${m ? ` "${oneLine(m.subject, 120)}" from ${m.from?.address ?? "?"}` : ` ${str(input.message_id)}`} in ${account.address}`,
+                    detail: `Moves the message to the trash of ${account.address}.`,
+                  };
+                },
+              }
+            : {}),
+          execute: async (input, ctx) => {
+            try {
+              await withMailbox(ctx.db, account, (p) => run(p, input));
+              await recordAudit(ctx.db, {
+                orgId: ctx.orgId,
+                actor: { type: "agent", id: ctx.agentId },
+                action: `mail.${verb}`,
+                target: { type: "mail_account", id: account.id },
+                details: { messageId: str(input.message_id), runId: ctx.runId },
+              }).catch(() => {});
+              return { content: done(input), data: { mailAccountId: account.id } };
+            } catch (error) {
+              return failure(ctx.db, account, error);
+            }
+          },
+        },
+      );
+
+    const move = organize(
+      "move",
+      "Move a message to another folder.",
+      { folder: { type: "string", minLength: 1, maxLength: 300, description: "Folder id from the folders tool." } },
+      ["folder"],
+      (p, input) => p.move(str(input.message_id), str(input.folder)),
+      (input) => `Moved to ${str(input.folder)}.`,
+      async (input) => folderAllowed(str(input.folder)),
+    );
+    const mark = organize(
+      "mark",
+      "Mark a message read or unread, flagged or not.",
+      { read: { type: "boolean" }, flagged: { type: "boolean" } },
+      [],
+      (p, input) =>
+        p.setFlags(str(input.message_id), {
+          ...(typeof input.read === "boolean" ? { read: input.read } : {}),
+          ...(typeof input.flagged === "boolean" ? { flagged: input.flagged } : {}),
+        }),
+      () => "Done.",
+    );
+    const archive = organize(
+      "archive",
+      "Archive a message (out of the inbox, kept).",
+      {},
+      [],
+      (p, input) => p.archive(str(input.message_id)),
+      () => "Archived.",
+    );
+    const trash = organize(
+      "trash",
+      "Move a message to the trash. A person approves every deletion.",
+      {},
+      [],
+      (p, input) => p.trash(str(input.message_id)),
+      () => "Moved to the trash.",
+      async (input, ctx) => {
+        // Read it first: the approval card says which message goes.
+        try {
+          await read(ctx.db, account, str(input.message_id));
+          return { ok: true };
+        } catch (error) {
+          return checkFailure(ctx.db, account, error);
+        }
+      },
+    );
+
+    return [
+      search,
+      readTool,
+      folders,
+      ...(attachment ? [attachment] : []),
+      draft,
+      send,
+      reply,
+      forward,
+      move,
+      mark,
+      archive,
+      trash,
+    ];
+  }
+
+  return {
+    name: "mail",
+    async tools(ctx) {
+      if (!deps.mail?.composio && !deps.mail?.imap) return [];
+      const accounts = await orgMailAccounts(ctx.db, ctx.orgId);
+      if (accounts.length === 0) return [];
+      const slugs = mailSlugs(accounts.filter((a) => a.address));
+      const usable = accounts.filter((a) => a.status === "active" && connectorFor(deps, a.via));
+      if (usable.length === 0) return [];
+      const policies = await agentMailPolicies(
+        ctx.db,
+        ctx.orgId,
+        ctx.agentId,
+        usable.map((a) => a.id),
+      );
+      const fromMail = await startedByMail(ctx.db, ctx);
+      return usable.flatMap((a) => {
+        const policy = policies.get(a.id);
+        if (!policy) return [];
+        const askToSend = fromMail || !(policy.sendWithoutAsking && policy.allowedRecipients.length > 0);
+        return toolsFor(a, slugs.get(a.id) ?? "mailbox", policy, askToSend);
+      });
+    },
+  };
+}

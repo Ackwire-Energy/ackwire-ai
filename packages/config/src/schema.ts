@@ -27,6 +27,7 @@ export interface EnvVarDefinition {
     | "Storage"
     | "Sandbox"
     | "Email"
+    | "Email for agents"
     | "Push"
     | "Observability";
   /** Example value for docs. Never a real secret. */

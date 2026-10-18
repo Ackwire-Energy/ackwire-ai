@@ -22,6 +22,7 @@ import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
 import { knowledgeRoutes } from "./routes/app/knowledge";
+import { mailRoutes } from "./routes/app/mail";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { missionRoutes } from "./routes/app/missions";
@@ -106,6 +107,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", approvalRoutes(deps));
     api.route("/app", customConnectorRoutes(deps));
     api.route("/app", connectorRoutes(deps));
+    api.route("/app", mailRoutes(deps));
     api.route("/app", managementRoutes(deps));
     api.route("/app", knowledgeRoutes(deps));
     api.route("/app", memoryRoutes(deps));

@@ -1,0 +1,659 @@
+import { isIP } from "node:net";
+import {
+  type KeyWrapper,
+  type MailAccountRef,
+  type MailAdapters,
+  MailError,
+  type MailPreset,
+  type MailProvider,
+  type MailTestError,
+} from "@agenteschat/adapters";
+import { and, asc, type Database, eq, inArray, isNull, like, ne, schema, sql } from "@agenteschat/db";
+import { recordAudit } from "../audit";
+import { caches } from "../cache";
+import { openSecret, sealSecret, sha256 } from "../crypto";
+import { ConflictError, NotFoundError, ValidationError } from "../errors";
+import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard";
+import { requirePermission } from "../organizations";
+import { isEmailAddress, normalizeAddress } from "./text";
+
+const { mailAccounts, mailWatches, agentScopes } = schema;
+
+export type MailAccountRow = typeof mailAccounts.$inferSelect;
+
+/** What the mail code needs (accounts, tools, inbound). */
+export interface MailDeps {
+  db: Database;
+  /** Current wrapper first (seals), then legacy ones (open only). */
+  keyWrappers: KeyWrapper[];
+  /** Absent or null members = that path is off on this server. */
+  mail?: MailAdapters | null;
+  /** Public base URL, for Composio's callback. */
+  publicUrl: string;
+  /** DNS for the SSRF guard on custom IMAP/SMTP hosts (tests: fake). */
+  resolveHost?: ResolveHost;
+  now?: () => Date;
+}
+
+export interface MailAccountView {
+  id: string;
+  provider: "gmail" | "outlook" | "imap";
+  via: "composio" | "imap";
+  address: string;
+  label: string;
+  status: "pending" | "active" | "needs_reconnect";
+  lastError: string | null;
+  preset: string | null;
+  createdAt: string;
+  agents: { agentId: string; level: "read" | "read_write"; canDelete: boolean }[];
+}
+
+const aadFor = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
+/** Our Composio user id for an organization. */
+export const composioUserId = (orgId: string) => `org_${orgId}`;
+export const composioCallbackUrl = (publicUrl: string, accountId: string) =>
+  `${publicUrl.replace(/\/$/, "")}/api/app/mail/composio/callback?account=${encodeURIComponent(accountId)}`;
+
+/** The mail scopes an agent can hold on one mailbox (`agent_scopes.connection_id` = the account). */
+export const MAIL_SCOPES = {
+  read: "mail:read",
+  draft: "mail:draft",
+  send: "mail:send",
+  organize: "mail:organize",
+  delete: "mail:delete",
+} as const;
+export const ALL_MAIL_SCOPES: string[] = Object.values(MAIL_SCOPES);
+
+/** Level and delete flag from an agent's mail scopes on one mailbox. */
+export function levelOf(scopes: Set<string>): { level: "none" | "read" | "read_write"; canDelete: boolean } {
+  const write = [MAIL_SCOPES.draft, MAIL_SCOPES.send, MAIL_SCOPES.organize].some((s) => scopes.has(s));
+  const level = write ? "read_write" : scopes.has(MAIL_SCOPES.read) ? "read" : "none";
+  return { level, canDelete: level !== "none" && scopes.has(MAIL_SCOPES.delete) };
+}
+
+/** Agents' mail grants per account (account id → agent id → scopes). */
+export async function mailGrants(db: Database, orgId: string, accountIds: string[]) {
+  const out = new Map<string, Map<string, Set<string>>>();
+  if (accountIds.length === 0) return out;
+  const rows = await db
+    .select({ connectionId: agentScopes.connectionId, agentId: agentScopes.agentId, scope: agentScopes.scope })
+    .from(agentScopes)
+    .where(
+      and(
+        eq(agentScopes.orgId, orgId),
+        inArray(agentScopes.connectionId, accountIds),
+        like(agentScopes.scope, "mail:%"),
+      ),
+    );
+  for (const r of rows) {
+    if (!r.connectionId) continue;
+    const byAgent = out.get(r.connectionId) ?? new Map<string, Set<string>>();
+    const set = byAgent.get(r.agentId) ?? new Set<string>();
+    set.add(r.scope);
+    byAgent.set(r.agentId, set);
+    out.set(r.connectionId, byAgent);
+  }
+  return out;
+}
+
+export function mailAccountView(row: MailAccountRow, grants?: Map<string, Set<string>>): MailAccountView {
+  const agents: MailAccountView["agents"] = [];
+  for (const [agentId, scopes] of grants ?? []) {
+    const { level, canDelete } = levelOf(scopes);
+    if (level !== "none") agents.push({ agentId, level, canDelete });
+  }
+  return {
+    id: row.id,
+    provider: row.provider as MailAccountView["provider"],
+    via: row.via as MailAccountView["via"],
+    address: row.address,
+    label: row.label,
+    status: row.status as MailAccountView["status"],
+    lastError: row.lastError,
+    preset: row.preset,
+    createdAt: row.createdAt.toISOString(),
+    agents,
+  };
+}
+
+/** The org's mailboxes (not disconnected), oldest first. */
+export async function orgMailAccounts(db: Database, orgId: string) {
+  return db
+    .select()
+    .from(mailAccounts)
+    .where(and(eq(mailAccounts.orgId, orgId), isNull(mailAccounts.revokedAt)))
+    .orderBy(asc(mailAccounts.createdAt), asc(mailAccounts.id));
+}
+
+export async function listMailAccounts(db: Database, actorId: string, orgId: string): Promise<MailAccountView[]> {
+  await requirePermission(db, actorId, orgId, "read");
+  const rows = await orgMailAccounts(db, orgId);
+  const grants = await mailGrants(
+    db,
+    orgId,
+    rows.map((r) => r.id),
+  );
+  return rows.map((r) => mailAccountView(r, grants.get(r.id)));
+}
+
+async function loadAccount(db: Database, orgId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(mailAccounts)
+    .where(and(eq(mailAccounts.id, id), eq(mailAccounts.orgId, orgId), isNull(mailAccounts.revokedAt)));
+  if (!row) throw new NotFoundError("Mailbox not found", "mail.account_not_found");
+  return row;
+}
+
+export async function getMailAccountView(db: Database, orgId: string, id: string) {
+  const row = await loadAccount(db, orgId, id);
+  const grants = await mailGrants(db, orgId, [row.id]);
+  return mailAccountView(row, grants.get(row.id));
+}
+
+async function assertAddressFree(db: Database, orgId: string, address: string, exceptId?: string) {
+  const [taken] = await db
+    .select({ id: mailAccounts.id })
+    .from(mailAccounts)
+    .where(
+      and(
+        eq(mailAccounts.orgId, orgId),
+        eq(mailAccounts.address, address),
+        isNull(mailAccounts.revokedAt),
+        exceptId ? ne(mailAccounts.id, exceptId) : undefined,
+      ),
+    );
+  return !taken;
+}
+
+/**
+ * Tool name slugs per account (`mail_<slug>_search`): the address's local
+ * part as `[a-z0-9]`, at most 20 characters; when two mailboxes clash, the
+ * later ones (by creation) get a short hash of their id instead of the tail.
+ * Deterministic for the same set of accounts.
+ */
+export function mailSlugs(accounts: { id: string; address: string }[]) {
+  const out = new Map<string, string>();
+  const used = new Set<string>();
+  for (const a of accounts) {
+    const local = a.address.split("@")[0] ?? "";
+    const base =
+      local
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+        .slice(0, 20) || "mailbox";
+    let slug = base;
+    if (used.has(slug)) slug = `${base.slice(0, 14)}${sha256(a.id).slice(0, 6)}`;
+    for (let n = 2; used.has(slug); n++) slug = `${base.slice(0, 14)}${sha256(`${a.id}:${n}`).slice(0, 6)}`;
+    used.add(slug);
+    out.set(a.id, slug);
+  }
+  return out;
+}
+
+// ── IMAP accounts ───────────────────────────────────────────────────────────
+
+export interface ImapAccountInput {
+  preset: string;
+  address: string;
+  password: string;
+  label?: string;
+  username?: string;
+  imapHost?: string;
+  imapPort?: number;
+  smtpHost?: string;
+  smtpPort?: number;
+}
+
+const HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+/** A custom host may not point inside our network (SSRF): private, loopback, metadata addresses. */
+async function hostAllowed(host: string, resolve: ResolveHost): Promise<"ok" | "blocked" | "unreachable"> {
+  const h = host.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal"))
+    return "blocked";
+  if (isIP(h)) return isBlockedAddress(h) ? "blocked" : "ok";
+  if (!HOST.test(h)) return "blocked";
+  try {
+    const addresses = await resolve(h);
+    if (addresses.length === 0) return "unreachable";
+    return addresses.some(isBlockedAddress) ? "blocked" : "ok";
+  } catch {
+    return "unreachable";
+  }
+}
+
+const imapOf = (deps: MailDeps) => deps.mail?.imap ?? null;
+
+/** The servers and login for an IMAP account (preset, or custom hosts checked against the SSRF guard). */
+async function imapSettings(
+  deps: MailDeps,
+  input: ImapAccountInput,
+): Promise<
+  | {
+      ok: true;
+      preset: string;
+      imapHost: string;
+      imapPort: number;
+      smtpHost: string;
+      smtpPort: number;
+      username: string;
+    }
+  | { ok: false; error: MailTestError }
+> {
+  const imap = imapOf(deps);
+  if (!imap) throw new ConflictError("IMAP mailboxes are off on this server", "mail.imap_disabled");
+  const address = normalizeAddress(input.address);
+  const preset: MailPreset | undefined = imap.presets.find((p) => p.id === input.preset);
+  if (!preset && input.preset !== "custom") throw new ValidationError(`Unknown preset ${input.preset}`, "mail.preset");
+  const imapHost = (input.imapHost ?? preset?.imapHost ?? "").trim().toLowerCase();
+  const smtpHost = (input.smtpHost ?? preset?.smtpHost ?? "").trim().toLowerCase();
+  const imapPort = input.imapPort ?? preset?.imapPort ?? 993;
+  const smtpPort = input.smtpPort ?? preset?.smtpPort ?? 587;
+  if (!imapHost || !smtpHost) throw new ValidationError("Give the IMAP and SMTP servers", "mail.hosts_required");
+  // Hosts not from a preset are typed by a person: never inside our network.
+  const resolve = deps.resolveHost ?? resolveHostDns;
+  if (imapHost !== preset?.imapHost) {
+    const r = await hostAllowed(imapHost, resolve);
+    if (r !== "ok") return { ok: false, error: r === "blocked" ? "blocked_host" : "imap_unreachable" };
+  }
+  if (smtpHost !== preset?.smtpHost) {
+    const r = await hostAllowed(smtpHost, resolve);
+    if (r !== "ok") return { ok: false, error: r === "blocked" ? "blocked_host" : "smtp_unreachable" };
+  }
+  const username =
+    input.username?.trim() || (preset?.username === "local" ? (address.split("@")[0] ?? address) : address);
+  return { ok: true, preset: preset?.id ?? "custom", imapHost, imapPort, smtpHost, smtpPort, username };
+}
+
+/**
+ * Connects an IMAP/SMTP mailbox (admins): the login and both servers are
+ * tested first; the app password is sealed bound to (org, account). Returns
+ * the test's error instead of saving when it fails.
+ */
+export async function createImapAccount(
+  deps: MailDeps,
+  actorId: string,
+  orgId: string,
+  input: ImapAccountInput,
+): Promise<{ ok: true; account: MailAccountView } | { ok: false; error: MailTestError }> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const address = normalizeAddress(input.address);
+  if (!isEmailAddress(address)) throw new ValidationError("Invalid email address", "mail.invalid_address");
+  const password = input.password.trim();
+  if (!password) throw new ValidationError("Paste the app password", "mail.password_required");
+  const settings = await imapSettings(deps, input);
+  if (!settings.ok) return settings;
+  if (!(await assertAddressFree(deps.db, orgId, address))) {
+    throw new ConflictError("This mailbox is already connected", "mail.already_connected");
+  }
+  const imap = imapOf(deps);
+  if (!imap) throw new ConflictError("IMAP mailboxes are off on this server", "mail.imap_disabled");
+  const id = crypto.randomUUID();
+  const ref: MailAccountRef = {
+    id,
+    orgId,
+    provider: "imap",
+    via: "imap",
+    address,
+    imap: {
+      host: settings.imapHost,
+      port: settings.imapPort,
+      smtpHost: settings.smtpHost,
+      smtpPort: settings.smtpPort,
+      username: settings.username,
+      password,
+      sentFolder: null,
+    },
+  };
+  const tested = await imap.tester.test(ref);
+  if (!tested.ok) return tested;
+  const wrapper = deps.keyWrappers[0];
+  if (!wrapper) throw new Error("no key wrapper");
+  const sealed = await sealSecret(wrapper, password, aadFor(orgId, id));
+  const [row] = await deps.db
+    .insert(mailAccounts)
+    .values({
+      id,
+      orgId,
+      provider: "imap",
+      via: "imap",
+      address,
+      label: input.label?.trim().slice(0, 80) || address,
+      status: "active",
+      preset: settings.preset,
+      imapHost: settings.imapHost,
+      imapPort: settings.imapPort,
+      smtpHost: settings.smtpHost,
+      smtpPort: settings.smtpPort,
+      username: settings.username,
+      secretCiphertext: sealed.ciphertext,
+      wrappedDataKey: sealed.wrappedDataKey,
+      kekId: sealed.kekId,
+      sentFolder: tested.sentFolder,
+      createdByUserId: actorId,
+    })
+    .returning();
+  if (!row) throw new Error("mail account insert returned nothing");
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "mail_account.connected",
+    target: { type: "mail_account", id },
+    details: { via: "imap", preset: settings.preset, address },
+  });
+  return { ok: true, account: mailAccountView(row) };
+}
+
+// ── Composio accounts (Gmail, Outlook) ──────────────────────────────────────
+
+const composioOf = (deps: MailDeps) => deps.mail?.composio ?? null;
+
+/**
+ * Starts connecting Gmail or Outlook through Composio (admins): a pending
+ * row and Composio's link; the person signs in there and comes back to
+ * `/api/app/mail/composio/callback?account=<id>`.
+ */
+export async function startComposioConnect(
+  deps: MailDeps,
+  actorId: string,
+  orgId: string,
+  input: { provider: "gmail" | "outlook"; label?: string },
+): Promise<{ accountId: string; redirectUrl: string }> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const composio = composioOf(deps);
+  if (!composio)
+    throw new ConflictError("Gmail and Outlook are not configured on this server", "mail.composio_disabled");
+  const id = crypto.randomUUID();
+  await deps.db.insert(mailAccounts).values({
+    id,
+    orgId,
+    provider: input.provider,
+    via: "composio",
+    label: input.label?.trim().slice(0, 80) ?? "",
+    status: "pending",
+    createdByUserId: actorId,
+  });
+  try {
+    const link = await composio.client.createConnectLink({
+      toolkit: input.provider,
+      userId: composioUserId(orgId),
+      callbackUrl: composioCallbackUrl(deps.publicUrl, id),
+    });
+    await deps.db
+      .update(mailAccounts)
+      .set({ externalAccountId: link.connectedAccountId, updatedAt: new Date() })
+      .where(eq(mailAccounts.id, id));
+    return { accountId: id, redirectUrl: link.redirectUrl };
+  } catch (error) {
+    await deps.db.delete(mailAccounts).where(eq(mailAccounts.id, id));
+    throw error;
+  }
+}
+
+/**
+ * Applies Composio's state of an account to our row: active (with its
+ * address) or, for an account that never worked, disconnected. Returns
+ * whether it is active now.
+ */
+export async function applyComposioStateFor(
+  deps: MailDeps,
+  row: MailAccountRow,
+  actorId: string | null = null,
+): Promise<boolean> {
+  const composio = composioOf(deps);
+  if (!composio || !row.externalAccountId) return false;
+  const remote = await composio.client.getConnectedAccount(row.externalAccountId);
+  const now = deps.now?.() ?? new Date();
+  if (remote.status === "active" && remote.address) {
+    const address = normalizeAddress(remote.address);
+    if (!(await assertAddressFree(deps.db, row.orgId, address, row.id))) {
+      // The same mailbox is connected already: this second connection goes away.
+      await composio.client.deleteConnectedAccount(row.externalAccountId).catch(() => {});
+      await deps.db
+        .update(mailAccounts)
+        .set({ status: "needs_reconnect", lastError: "already_connected", revokedAt: now, updatedAt: now })
+        .where(eq(mailAccounts.id, row.id));
+      return false;
+    }
+    await deps.db
+      .update(mailAccounts)
+      .set({
+        address,
+        label: row.label || address,
+        status: "active",
+        lastError: null,
+        updatedAt: now,
+      })
+      .where(eq(mailAccounts.id, row.id));
+    if (row.status !== "active") {
+      await recordAudit(deps.db, {
+        orgId: row.orgId,
+        actor: actorId ? { type: "person", id: actorId } : { type: "system", id: null },
+        action: "mail_account.connected",
+        target: { type: "mail_account", id: row.id },
+        details: { via: "composio", provider: row.provider, address },
+      });
+    }
+    return true;
+  }
+  if (remote.status === "pending") return false;
+  if (row.status === "pending") {
+    // It never worked: nothing to keep.
+    await deps.db
+      .update(mailAccounts)
+      .set({ lastError: remote.status, revokedAt: now, updatedAt: now })
+      .where(eq(mailAccounts.id, row.id));
+  } else {
+    await markNeedsReconnect(deps.db, row.id, `composio_${remote.status}`);
+  }
+  return false;
+}
+
+/**
+ * Composio sent the person back (`GET /api/app/mail/composio/callback`):
+ * reads the connected account; an admin of the account's organization only.
+ */
+export async function completeComposioConnect(
+  deps: MailDeps,
+  actorId: string,
+  accountId: string,
+): Promise<{ orgId: string; ok: boolean }> {
+  const [row] = await deps.db.select().from(mailAccounts).where(eq(mailAccounts.id, accountId));
+  if (row?.via !== "composio" || row.revokedAt) throw new NotFoundError("Mailbox not found");
+  await requirePermission(deps.db, actorId, row.orgId, "manage_connectors");
+  const ok = await applyComposioStateFor(deps, row, actorId);
+  return { orgId: row.orgId, ok };
+}
+
+// ── Changes ─────────────────────────────────────────────────────────────────
+
+/** Renames, or (IMAP) replaces the app password after testing it. */
+export async function updateMailAccount(
+  deps: MailDeps,
+  actorId: string,
+  orgId: string,
+  accountId: string,
+  input: { label?: string; password?: string },
+): Promise<{ ok: true; account: MailAccountView } | { ok: false; error: MailTestError }> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const row = await loadAccount(deps.db, orgId, accountId);
+  const set: Partial<typeof mailAccounts.$inferInsert> = {};
+  if (input.label !== undefined) set.label = input.label.trim().slice(0, 80) || row.address;
+  if (input.password !== undefined) {
+    if (row.via !== "imap") throw new ValidationError("Only IMAP mailboxes have a password", "mail.no_password");
+    const imap = imapOf(deps);
+    if (!imap) throw new ConflictError("IMAP mailboxes are off on this server", "mail.imap_disabled");
+    const password = input.password.trim();
+    if (!password) throw new ValidationError("Paste the app password", "mail.password_required");
+    const ref = await accountRef(deps, row, password);
+    const tested = await imap.tester.test(ref);
+    if (!tested.ok) return tested;
+    const wrapper = deps.keyWrappers[0];
+    if (!wrapper) throw new Error("no key wrapper");
+    const sealed = await sealSecret(wrapper, password, aadFor(orgId, row.id));
+    Object.assign(set, {
+      secretCiphertext: sealed.ciphertext,
+      wrappedDataKey: sealed.wrappedDataKey,
+      kekId: sealed.kekId,
+      sentFolder: tested.sentFolder ?? row.sentFolder,
+      status: "active",
+      lastError: null,
+    });
+  }
+  if (Object.keys(set).length > 0) {
+    await deps.db
+      .update(mailAccounts)
+      .set({ ...set, updatedAt: new Date() })
+      .where(eq(mailAccounts.id, row.id));
+    if (input.password !== undefined) {
+      // Watches stopped by the old password start again.
+      await deps.db
+        .update(mailWatches)
+        .set({ status: "active", lastError: null, updatedAt: new Date() })
+        .where(and(eq(mailWatches.accountId, row.id), eq(mailWatches.status, "needs_reconnect")));
+      await recordAudit(deps.db, {
+        orgId,
+        actor: { type: "person", id: actorId },
+        action: "mail_account.password_rotated",
+        target: { type: "mail_account", id: row.id },
+      });
+    }
+  }
+  return { ok: true, account: await getMailAccountView(deps.db, orgId, row.id) };
+}
+
+/**
+ * Disconnects a mailbox (admins): Composio forgets the account and its
+ * triggers; agents lose their mail scopes on it; routines watching it stop.
+ */
+export async function revokeMailAccount(deps: MailDeps, actorId: string, orgId: string, accountId: string) {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const row = await loadAccount(deps.db, orgId, accountId);
+  const watches = await deps.db.select().from(mailWatches).where(eq(mailWatches.accountId, row.id));
+  const composio = composioOf(deps);
+  if (row.via === "composio" && composio) {
+    for (const w of watches) {
+      if (w.externalTriggerId) await composio.client.deleteTrigger(w.externalTriggerId).catch(() => {});
+    }
+    if (row.externalAccountId) await composio.client.deleteConnectedAccount(row.externalAccountId).catch(() => {});
+  }
+  const now = new Date();
+  await deps.db.transaction(async (tx) => {
+    await tx.update(mailAccounts).set({ revokedAt: now, updatedAt: now }).where(eq(mailAccounts.id, row.id));
+    await tx.delete(agentScopes).where(and(eq(agentScopes.orgId, orgId), eq(agentScopes.connectionId, row.id)));
+    await tx
+      .update(mailWatches)
+      .set({ status: "needs_reconnect", lastError: "account_removed", externalTriggerId: null, updatedAt: now })
+      .where(eq(mailWatches.accountId, row.id));
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "mail_account.disconnected",
+      target: { type: "mail_account", id: row.id },
+      details: { via: row.via, address: row.address },
+    });
+  });
+  caches.scopes.deletePrefix(`${orgId}:`);
+}
+
+/** The credentials were refused: a person must reconnect (routines watching it show "Reconnect"). */
+export async function markNeedsReconnect(db: Database, accountId: string, reason: string) {
+  const now = new Date();
+  await db
+    .update(mailAccounts)
+    .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: now })
+    .where(and(eq(mailAccounts.id, accountId), isNull(mailAccounts.revokedAt)));
+  await db
+    .update(mailWatches)
+    .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: now })
+    .where(eq(mailWatches.accountId, accountId));
+}
+
+// ── Opening a mailbox ───────────────────────────────────────────────────────
+
+/** What a connector needs for one account; the IMAP password opened in memory for this call only. */
+export async function accountRef(deps: MailDeps, row: MailAccountRow, password?: string): Promise<MailAccountRef> {
+  const base = {
+    id: row.id,
+    orgId: row.orgId,
+    provider: row.provider as MailAccountRef["provider"],
+    via: row.via as MailAccountRef["via"],
+    address: row.address,
+  };
+  if (row.via !== "imap") return { ...base, externalAccountId: row.externalAccountId };
+  let secret = password;
+  if (secret === undefined) {
+    if (!row.secretCiphertext || !row.wrappedDataKey || !row.kekId)
+      throw new MailError("Mailbox has no password", false);
+    secret = await openSecret(
+      deps.keyWrappers,
+      { ciphertext: row.secretCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
+      aadFor(row.orgId, row.id),
+    );
+  }
+  return {
+    ...base,
+    imap: {
+      host: row.imapHost ?? "",
+      port: row.imapPort ?? 993,
+      smtpHost: row.smtpHost ?? "",
+      smtpPort: row.smtpPort ?? 587,
+      username: row.username ?? row.address,
+      password: secret,
+      sentFolder: row.sentFolder,
+    },
+  };
+}
+
+/** The connector for an account's path; null when that path is off on this server. */
+export function connectorFor(deps: Pick<MailDeps, "mail">, via: string) {
+  if (via === "composio") return deps.mail?.composio?.connector ?? null;
+  if (via === "imap") return deps.mail?.imap?.connector ?? null;
+  return null;
+}
+
+/** Opens one mailbox of the org (backend only; the caller closes it). */
+export async function openMailProvider(deps: MailDeps, orgId: string, accountId: string): Promise<MailProvider> {
+  const row = await loadAccount(deps.db, orgId, accountId);
+  return openAccount(deps, row);
+}
+
+export async function openAccount(deps: MailDeps, row: MailAccountRow): Promise<MailProvider> {
+  const connector = connectorFor(deps, row.via);
+  if (!connector) throw new MailError(`${row.via === "imap" ? "IMAP" : "Gmail/Outlook"} mailboxes are off`, false);
+  return connector.open(await accountRef(deps, row));
+}
+
+/** Folders of a mailbox, for the agent settings screen (admins). */
+export async function listMailFolders(deps: MailDeps, actorId: string, orgId: string, accountId: string) {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const provider = await openMailProvider(deps, orgId, accountId);
+  try {
+    return await provider.listFolders();
+  } finally {
+    await provider.close().catch(() => {});
+  }
+}
+
+/** Which paths this server offers (`GET …/mail/providers`). */
+export function mailProviders(mail: MailAdapters | null | undefined) {
+  return { composio: !!mail?.composio, imap: !!mail?.imap, presets: mail?.imap?.presets ?? [] };
+}
+
+/** Active mailboxes for agents: not pending, not disconnected. */
+export const usableAccount = (row: MailAccountRow) => row.status === "active" && !row.revokedAt;
+
+/** Accounts with the given ids still connected (for grant validation). */
+export async function activeMailAccountIds(db: Database, orgId: string, ids: string[]) {
+  if (ids.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ id: mailAccounts.id })
+    .from(mailAccounts)
+    .where(and(eq(mailAccounts.orgId, orgId), inArray(mailAccounts.id, ids), isNull(mailAccounts.revokedAt)));
+  return new Set(rows.map((r) => r.id));
+}
+
+/** Every mail account id of an org, connected or not (grants on them are managed only by the mail API). */
+export const mailAccountIdsSql = (orgId: string) =>
+  sql`(select ${mailAccounts.id} from ${mailAccounts} where ${mailAccounts.orgId} = ${orgId})`;
