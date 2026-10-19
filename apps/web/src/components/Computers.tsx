@@ -1,6 +1,7 @@
 import { useAgents, useMachines, useSandboxSettings } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Chip, ComputerPortrait, Icon } from "@agenteschat/ui";
+import { Button, ComputerPortrait, Icon, Popover } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentComputersCard, CloudComputerCard } from "@/components/AgentComputer";
 import { DownloadMacButton, MachinesSection } from "@/components/Machines";
@@ -40,9 +41,10 @@ function ComputerKinds() {
   const mine = (agents.data ?? []).filter((a) => onMine.has(a.id)).length;
   const cloudOff = settings.data ? !settings.data.enabled || !settings.data.available : false;
   const count = (n: number) => (
-    <Chip icon="agent" lead={<span className="ac-num">{n}</span>}>
-      {t("computers.kinds.agentsUse", { count: n })}
-    </Chip>
+    <li>
+      <Icon name="agent" size={14} />
+      <b className="ac-num">{n}</b> {t("computers.kinds.agentsUse", { count: n })}
+    </li>
   );
   return (
     <section className="computers-kinds" aria-label={t("computers.kinds.label")}>
@@ -50,7 +52,10 @@ function ComputerKinds() {
         <div className="computers-kind__pic">
           <ComputerPortrait kind="cloud" state={cloudOff ? "offline" : "online"} size={96} />
         </div>
-        <h3 className="computers-kind__title">{t("computers.kinds.cloud.title")}</h3>
+        <div className="computers-kind__head">
+          <h3 className="computers-kind__title">{t("computers.kinds.cloud.title")}</h3>
+          {agents.data && <KindInfo where={t("computers.kinds.cloud.title")}>{count(total - mine)}</KindInfo>}
+        </div>
         <ul className="computers-kind__points">
           {POINTS.map((p) => (
             <li key={p}>
@@ -60,7 +65,6 @@ function ComputerKinds() {
           ))}
         </ul>
         <div className="computers-kind__foot">
-          <span className="computers-kind__chips">{agents.data && count(total - mine)}</span>
           {admin && (
             <Button asChild size="sm">
               <a href="#nuvem">
@@ -75,7 +79,28 @@ function ComputerKinds() {
         <div className="computers-kind__pic">
           <ComputerPortrait kind="mac" state={list.length > 0 ? "online" : "offline"} size={96} />
         </div>
-        <h3 className="computers-kind__title">{t("computers.kinds.mine.title")}</h3>
+        <div className="computers-kind__head">
+          <h3 className="computers-kind__title">{t("computers.kinds.mine.title")}</h3>
+          {machines.isSuccess && (
+            <KindInfo where={t("computers.kinds.mine.title")}>
+              {list.length > 0 ? (
+                <>
+                  <li>
+                    <Icon name="check" size={14} />
+                    <b className="ac-num">{list.length}</b>{" "}
+                    {t("computers.kinds.mine.connected", { count: list.length })}
+                  </li>
+                  {agents.data && count(mine)}
+                </>
+              ) : (
+                <li>
+                  <Icon name="dash" size={14} />
+                  {t("computers.kinds.mine.none")}
+                </li>
+              )}
+            </KindInfo>
+          )}
+        </div>
         <ul className="computers-kind__points">
           {POINTS.map((p) => (
             <li key={p}>
@@ -85,19 +110,25 @@ function ComputerKinds() {
           ))}
         </ul>
         <div className="computers-kind__foot">
-          <span className="computers-kind__chips">
-            {list.length > 0 ? (
-              <>
-                <Chip icon="check">{`${list.length} ${t("computers.kinds.mine.connected", { count: list.length })}`}</Chip>
-                {agents.data && count(mine)}
-              </>
-            ) : (
-              machines.isSuccess && <Chip icon="dash">{t("computers.kinds.mine.none")}</Chip>
-            )}
-          </span>
           <DownloadMacButton primary={machines.isSuccess && list.length === 0} />
         </div>
       </div>
     </section>
+  );
+}
+
+/** The ⓘ beside a kind's title: how many computers and agents use it (no chips on the card). */
+function KindInfo({ where, children }: { where: string; children: ReactNode }) {
+  const { t } = useTranslation();
+  const label = t("computers.kinds.details", { where });
+  return (
+    <Popover
+      label={label}
+      side="bottom"
+      align="start"
+      trigger={<Button size="sm" variant="ghost" iconOnly icon="info" aria-label={label} title={label} />}
+    >
+      <ul className="computers-kind__info">{children}</ul>
+    </Popover>
   );
 }

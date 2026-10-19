@@ -7260,22 +7260,39 @@ a.machine-row__name:hover {
   margin-top: 3px;
   color: var(--ok);
 }
+.computers-kind__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* The numbers behind the ⓘ: one line each, the icon then the count. */
+.computers-kind__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.computers-kind__info li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.computers-kind__info .ac-icon {
+  color: var(--muted);
+}
 .computers-kind__foot {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
   min-height: 44px;
   margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid var(--line);
-}
-/* The chips wrap among themselves; the action stays on the right, on the same line in both cards. */
-.computers-kind__chips {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
 }
 .computers-kind__foot > .ac-btn {
   flex: none;

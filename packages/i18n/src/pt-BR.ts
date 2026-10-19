@@ -5936,6 +5936,7 @@ export const ptBR = {
   computers: {
     kinds: {
       label: "Onde os agentes trabalham",
+      details: "Quem usa: {{where}}",
       agentsUse_one: "agente usa",
       agentsUse_other: "agentes usam",
       cloud: {

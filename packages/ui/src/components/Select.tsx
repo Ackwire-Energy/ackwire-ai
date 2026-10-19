@@ -33,10 +33,8 @@ export interface SelectProps<V extends string = string> {
 
 function renderItem<V extends string>(o: SelectOption<V>) {
   return (
+    // The chosen option shows by its background (no check column, so every row lines up).
     <RSelect.Item key={o.value} value={o.value} disabled={o.disabled} className="ac-menu__item">
-      <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
-        <path d="m5.5 10.5 3 3 6-7" />
-      </svg>
       {o.leading && (
         <span className="ac-menu__leading" aria-hidden="true">
           {o.leading}

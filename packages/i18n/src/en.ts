@@ -5921,6 +5921,7 @@ export const en: Translations = {
   computers: {
     kinds: {
       label: "Where agents work",
+      details: "Who uses it: {{where}}",
       agentsUse_one: "agent uses it",
       agentsUse_other: "agents use it",
       cloud: {

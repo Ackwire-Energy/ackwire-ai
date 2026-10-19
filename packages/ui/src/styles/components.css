@@ -1016,6 +1016,12 @@ textarea.ac-input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A chosen value drawn with an icon (`renderValue`): icon and text on one center line. */
+.ac-select__value > span:has(> *) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
 .ac-select__trigger[data-placeholder] .ac-select__value {
   color: var(--ink-muted);
 }
@@ -1145,6 +1151,9 @@ textarea.ac-input {
   flex: none;
   display: inline-flex;
   align-self: center;
+}
+.ac-menu__leading .ac-icon {
+  margin-top: 0;
 }
 .ac-menu__desc {
   font-size: 13px;
@@ -1309,10 +1318,14 @@ textarea.ac-input {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E")
     center / 12px no-repeat;
 }
-/* The title never runs under the check. */
+/* Nothing runs under the check: the title, and whatever sits on the right (a chip like "Em uso"). */
 .ac-option[aria-pressed="true"] .ac-option__title,
 .ac-option[data-state="checked"] .ac-option__title {
   padding-right: 22px;
+}
+.ac-option[aria-pressed="true"] .ac-option__aside,
+.ac-option[data-state="checked"] .ac-option__aside {
+  margin-right: 26px;
 }
 /* Dark: the check's mark takes the page color (ink is light there). */
 [data-theme="dark"] .ac-option[aria-pressed="true"]::after,
@@ -3250,6 +3263,14 @@ a.ac-list__row:focus-visible {
 .ac-menu__item[data-highlighted],
 .ac-menu__item[data-active] {
   background: rgba(127, 127, 127, 0.12);
+}
+/* A select's chosen option: its background (the others light only on hover). */
+.ac-menu--select .ac-menu__item:hover,
+.ac-menu--select .ac-menu__item[data-highlighted] {
+  background: rgba(127, 127, 127, 0.07);
+}
+.ac-menu--select .ac-menu__item[data-state="checked"] {
+  background: rgba(127, 127, 127, 0.14);
 }
 .ac-menu__heading {
   font-size: 11px;

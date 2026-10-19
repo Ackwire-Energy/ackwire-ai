@@ -250,9 +250,21 @@ describe("Configurações → Computadores", () => {
     const kinds = screen().getByRole("region", { name: "Onde os agentes trabalham" });
     expect(kinds.textContent).toContain("Na nuvem");
     expect(kinds.textContent).toContain("No seu computador");
-    expect(kinds.textContent).toContain("Nenhum conectado");
+    // The numbers sit behind each kind's ⓘ, not as chips on the card.
+    expect(kinds.querySelector(".ac-chip")).toBeNull();
+    const info = async (where: string) => {
+      const button = within(kinds).getByRole("button", { name: `Quem usa: ${where}` });
+      button.focus();
+      await act(async () => fireEvent.click(button));
+      const pop = screen().getByRole("dialog", { name: `Quem usa: ${where}` });
+      const text = pop.textContent;
+      await act(async () => fireEvent.keyDown(pop, { key: "Escape" }));
+      await act(() => new Promise((r) => setTimeout(r, 0)));
+      return text;
+    };
     // Every agent is on the cloud until a computer of yours takes one.
-    expect(kinds.textContent).toContain("2agentes usam");
+    expect(await info("Na nuvem")).toContain("2 agentes usam");
+    expect(await info("No seu computador")).toContain("Nenhum conectado");
     expect(kinds.querySelectorAll("canvas.ac-computer")).toHaveLength(2);
     expect(screen().getByRole("region", { name: "Computador na nuvem" })).toBeTruthy();
     expect(screen().getByText("Nenhum computador seu ainda")).toBeTruthy();
