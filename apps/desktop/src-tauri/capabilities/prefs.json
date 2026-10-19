@@ -14,6 +14,7 @@
     "allow-hide-window",
     "allow-app-info",
     "allow-autostart-get",
-    "allow-autostart-set"
+    "allow-autostart-set",
+    "allow-update-install"
   ]
 }

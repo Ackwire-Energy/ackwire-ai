@@ -36,6 +36,7 @@ function fakeGithub(releases: Record<string, unknown>[]) {
       if (auth) return new Response("two auth mechanisms", { status: 400 });
       const name = url.slice("https://signed.example/".length);
       if (name.endsWith(".sha256")) return new Response(`${SUM}  agentes.dmg\n`);
+      if (name.endsWith(".sig")) return new Response("SIGNATURE-BASE64\n");
       const headers = { "content-type": "application/x-apple-diskimage", "content-length": "9" };
       return new Response("DMG-BYTES", { headers });
     }
@@ -106,6 +107,37 @@ test("latest: the newest desktop-v* release with its dmg and checksum, cached, o
   const preflight = await server().app.request("/api/desktop/latest", { method: "OPTIONS" });
   expect(preflight.status).toBe(204);
   expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
+});
+
+test("update: Tauri's format for signed builds, 204 when the release has no updater bundle", async () => {
+  const signed = release("0.3.0", {
+    assets: [
+      asset("agentes_0.3.0_universal.dmg"),
+      asset("agentes_0.3.0_universal.dmg.sha256"),
+      asset("agentes_0.3.0_universal.app.tar.gz"),
+      asset("agentes_0.3.0_universal.app.tar.gz.sig"),
+    ],
+  });
+  const github = fakeGithub([signed]);
+  t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
+  const res = await server().app.request("/api/desktop/update?target=darwin&arch=aarch64&current=0.2.0");
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({
+    version: "0.3.0",
+    notes: "Melhorias.",
+    pub_date: "2026-10-17T12:00:00Z",
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_universal.app.tar.gz",
+    signature: "SIGNATURE-BASE64",
+  });
+  // The web view's endpoint doesn't carry the updater fields.
+  const latest = (await (await server().app.request("/api/desktop/latest?target=darwin")).json()) as object;
+  expect("updater" in latest).toBe(false);
+  expect((await server().app.request("/api/desktop/update?target=windows&arch=x64")).status).toBe(204);
+
+  const old = fakeGithub([release("0.2.0")]);
+  t.close();
+  t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: old.fetch });
+  expect((await server().app.request("/api/desktop/update?target=darwin&arch=x86_64")).status).toBe(204);
 });
 
 test("download streams an asset of a desktop-v* release, as an attachment; nothing else", async () => {

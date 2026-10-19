@@ -95,17 +95,20 @@ The machine-side access model from `PastasComputador.html`, built in the runner 
 - **CLI:** `agentes-runner folders [list|allow <path> [--agent <handle>]…|remove <path> [--agent <handle>]]` and `agentes-runner tools [list|enable <tool>|disable <tool>]`, editing the same config.
 - Granting never comes from the server.
 
-### 9. Updates (manual until we notarize)
+### 9. Updates (automatic since 2026-10-19)
 
-- No automatic updater yet: it comes with notarization. Until then an update means quitting the app, deleting the old one and installing the new `.dmg` (the pairing and settings live in `~/.agentes-runner`, so nothing is lost).
-- The app checks `GET /api/desktop/latest?target=darwin&arch=<arch>` every 6 hours and at start: `{ version, url, sha256, notes, publishedAt, minVersion? }`. When newer, the tray shows "Versão nova" and Preferences → Atualizações shows the notes and "Baixar" (opens the download in the browser) with the three steps (quit, delete, install). Below `minVersion`, or when a runner reports `outdated`, it says "Atualize para continuar".
+- The app checks `GET /api/desktop/latest?target=darwin&arch=<arch>` every 6 hours and at start: `{ version, url, sha256, notes, publishedAt, minVersion? }`. When newer, the tray shows "Versão nova" and Preferences → Atualizações shows the notes and "Atualizar e reabrir". Below `minVersion`, or when a runner reports `outdated`, it says "Atualize para continuar".
+- "Atualizar e reabrir" runs the Tauri updater (`update_install`): it reads `GET /api/desktop/update?target=…&arch=…&current=…` (Tauri's format; 204 when the release has no updater bundle), downloads `agentes_<version>_universal.app.tar.gz` through our download route, checks its minisign signature against the public key built into the app, replaces the app, stops the runners as when quitting, and relaunches. The private updater key lives only in the `TAURI_SIGNING_PRIVATE_KEY` secret (and an offline backup): losing it means no further automatic updates.
+- Fallback (an old release without the bundle, a failed download): the download link and the three manual steps (quit, delete, install); pairing and settings live in `~/.agentes-runner`, so nothing is lost. Builds from before the updater (0.1.x, ad-hoc signed) update by hand once.
 - **Where builds live.** This repository's CI publishes a GitHub Release (private). The server reads it with a fine-grained token (`DESKTOP_RELEASES_TOKEN`, read-only contents on this repo; without it the endpoints answer 404): `GET /api/desktop/latest` (cached 5 minutes) and `GET /api/desktop/download/{version}/{file}` (streams the asset). The site's download button and the page's SHA-256 come from the same release.
 - Since the runner ships inside the app, installing a new app updates the runner.
 
-### 10. Distribution without code signing (for now)
+### 10. Signing and notarization (macOS)
 
-- macOS builds are ad-hoc signed only (required on Apple Silicon), not notarized. Recent macOS versions call such a downloaded app "damaged" and offer only the Trash (no "Open Anyway"), so each downloaded build needs `xattr -dr com.apple.quarantine /Applications/agentes.app` once; the download page shows that command.
-- Side effect: macOS may ask again for Documents/Desktop/Downloads access after an update, because the ad-hoc identity changes per build. Folders outside those (`~/agentes`, `~/Projects`) never ask. Revisit when we sign.
+- Since 2026-10-19 macOS builds are signed with a Developer ID Application certificate, with the hardened runtime, and notarized by Apple (App Store Connect API key); the ticket is stapled to the app. The bundled runner (a compiled Bun binary) is signed with the same entitlements (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`); a signed and notarized Bun binary was checked to run and be accepted before switching.
+- CI secrets: `APPLE_CERTIFICATE` (.p12, base64), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_P8`, `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The build fails without them; it verifies the signature, the stapled ticket and Gatekeeper (`spctl`) before publishing.
+- The Developer ID certificate expires on 2027-02-01: renew it before then (apps already notarized keep opening; new builds need the new one).
+- The identity is now the same on every build, so macOS stops asking again for Documents/Desktop/Downloads access after an update.
 - Windows (later): SmartScreen's "Mais informações → Executar assim mesmo" until we sign.
 - CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, publish a GitHub Release with the SHA-256. Pull requests run the build without publishing. Nothing runs on a developer's machine; testing means installing the CI build. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).
 

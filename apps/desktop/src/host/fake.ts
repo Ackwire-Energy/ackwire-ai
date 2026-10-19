@@ -135,6 +135,11 @@ export function createFakeHost(initial: WindowName, scenario: "first" | "default
     notify: async (title, body) => {
       console.info("[fake] notification:", title, "—", body);
     },
+    installUpdate: async () => {
+      console.info("[fake] install update and relaunch");
+      await new Promise((r) => setTimeout(r, 1500));
+      return false;
+    },
     resize: async () => {},
     onDev: (cb) => {
       devListeners.add(cb);

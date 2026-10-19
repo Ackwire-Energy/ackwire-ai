@@ -58,6 +58,8 @@ export interface Host {
   autostart(): Promise<boolean>;
   setAutostart(on: boolean): Promise<void>;
   notify(title: string, body: string): Promise<void>;
+  /** Installs the newer version and relaunches the app; false when there is nothing to install. */
+  installUpdate(): Promise<boolean>;
   /** The current window's size in points (the popover follows its content). */
   resize(width: number, height: number): Promise<void>;
 }

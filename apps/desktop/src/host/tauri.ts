@@ -53,6 +53,7 @@ export function createTauriHost(): Host {
     autostart: () => invoke<boolean>("autostart_get"),
     setAutostart: (on) => invoke<void>("autostart_set", { on }),
     notify: (title, body) => invoke<void>("notify", { title, body }),
+    installUpdate: () => invoke<boolean>("update_install"),
     resize: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
   };
 }

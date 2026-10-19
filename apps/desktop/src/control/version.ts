@@ -1,7 +1,7 @@
 /**
  * The "Versão nova" check (ADR 0036 §9): `GET https://agentes.chat/api/desktop/latest?target=darwin&arch=…`
- * at start and every 6 hours. No automatic updater yet: a newer version shows the notes, a download
- * link (opened in the browser) and the three manual steps.
+ * at start and every 6 hours. A newer version shows the notes and "Atualizar e reabrir" (the Tauri
+ * updater, `update_install`); the download link and the manual steps are the fallback.
  */
 
 export const SITE_URL = "https://agentes.chat";

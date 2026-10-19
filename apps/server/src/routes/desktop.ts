@@ -11,6 +11,8 @@ const tags = ["Desktop app"];
  * follows it): tag `desktop-v<semver>`; assets `agentes_<version>_universal.dmg`
  * and `agentes_<version>_universal.dmg.sha256`; an optional line
  * `min-version: x.y.z` in the release body (the rest of the body is the notes).
+ * Signed builds also carry the updater bundle `agentes_<version>_universal.app.tar.gz`
+ * and its minisign signature `….app.tar.gz.sig` (Tauri updater).
  */
 export const DESKTOP_TAG_PREFIX = "desktop-v";
 const LATEST_TTL_MS = 5 * 60_000;
@@ -25,6 +27,8 @@ export interface DesktopRelease {
   notes: string;
   publishedAt: string;
   minVersion?: string;
+  /** The Tauri updater bundle and its signature; absent on builds made before the updater. */
+  updater?: { url: string; signature: string };
 }
 
 interface GitHubAsset {
@@ -45,6 +49,7 @@ interface GitHubRelease {
 }
 
 export const dmgName = (version: string) => `agentes_${version}_universal.dmg`;
+export const updaterName = (version: string) => `agentes_${version}_universal.app.tar.gz`;
 
 /** `min-version: x.y.z` out of a release body, and the notes without that line. */
 export function parseReleaseBody(body: string | null | undefined): { notes: string; minVersion?: string } {
@@ -120,6 +125,9 @@ export function createDesktopReleases(options: {
     const sha256 = sumAsset ? parseSha256(await (await assetResponse(sumAsset)).text()) : null;
     if (!sha256) return null;
     const { notes, minVersion } = parseReleaseBody(release.body);
+    const bundle = assets.find((a) => a.name === updaterName(version));
+    const sigAsset = assets.find((a) => a.name === `${updaterName(version)}.sig`);
+    const signature = bundle && sigAsset ? (await (await assetResponse(sigAsset)).text()).trim() : "";
     return {
       version,
       url: `${base}/api/desktop/download/${version}/${dmg.name}`,
@@ -127,6 +135,9 @@ export function createDesktopReleases(options: {
       notes,
       publishedAt: release.published_at ?? release.created_at ?? "",
       ...(minVersion ? { minVersion } : {}),
+      ...(bundle && signature
+        ? { updater: { url: `${base}/api/desktop/download/${version}/${bundle.name}`, signature } }
+        : {}),
     };
   }
 
@@ -177,8 +188,9 @@ const Latest = z
   .openapi("DesktopRelease");
 
 /**
- * `GET /api/desktop/latest` and `GET /api/desktop/download/{version}/{file}`
- * (ADR 0036 §9): public, no session; 404 without `DESKTOP_RELEASES_TOKEN`.
+ * `GET /api/desktop/latest`, `GET /api/desktop/update` (the Tauri updater) and
+ * `GET /api/desktop/download/{version}/{file}` (ADR 0036 §9): public, no session;
+ * 404 (204 for the updater) without `DESKTOP_RELEASES_TOKEN`.
  */
 export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases: DesktopReleases) {
   const { rateLimiter } = deps.adapters;
@@ -201,7 +213,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       method: "get",
       path: "/desktop/latest",
       tags,
-      summary: "The newest desktop app build (manual updates until we notarize)",
+      summary: "The newest desktop app build (notes, download link, minimum version)",
       request: {
         query: z.object({
           target: z.string().max(20).openapi({ example: "darwin" }),
@@ -222,9 +234,31 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       const known = target === "darwin" && (!arch || MAC_ARCHES.has(arch));
       const release = known ? await releases.latest().catch(() => null) : null;
       if (!release) return apiError(c, 404, "desktop.no_release", "No desktop build for this computer yet");
-      return c.json(release, 200);
+      const { updater: _, ...latest } = release;
+      return c.json(latest, 200);
     },
   );
+
+  // The app's updater (Rust, no web view): Tauri's format, 204 when there is nothing to install.
+  // It installs only a newer version whose bundle matches the public key built into the app.
+  api.get("/desktop/update", async (c) => {
+    const limit = await rateLimiter.consume(`desktop-update:${requestIp(c.req.raw.headers)}`, LATEST_LIMIT);
+    if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
+    const arch = c.req.query("arch");
+    const known = c.req.query("target") === "darwin" && (!arch || MAC_ARCHES.has(arch));
+    const release = known ? await releases.latest().catch(() => null) : null;
+    if (!release?.updater) return c.body(null, 204);
+    return c.json(
+      {
+        version: release.version,
+        notes: release.notes,
+        pub_date: release.publishedAt,
+        url: release.updater.url,
+        signature: release.updater.signature,
+      },
+      200,
+    );
+  });
 
   api.get("/desktop/download/:version/:file", async (c) => {
     const limit = await rateLimiter.consume(`desktop-download:${requestIp(c.req.raw.headers)}`, DOWNLOAD_LIMIT);

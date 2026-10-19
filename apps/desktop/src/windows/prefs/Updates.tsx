@@ -1,4 +1,5 @@
 import { Button, Chip } from "@agenteschat/ui";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../../app";
 import { noteLines } from "../../control/version";
@@ -7,12 +8,30 @@ import { useToast } from "../../ui/Toast";
 import { clock } from "../../ui/time";
 import { CardTitle, PrefCard, PrefHead } from "./shared";
 
-/** Manual updates until we notarize (ADR 0036 §9): notes, a download link, three steps. */
+/**
+ * Updates (ADR 0036 §9): one click installs the signed update and reopens the app. When that can't
+ * happen (a release without the updater bundle, a failed download) the manual steps come back.
+ */
 export function Updates({ update }: { update: UpdateCheck }) {
   const { t, i18n } = useTranslation();
   const host = useHost();
   const toast = useToast();
   const { latest, available, required } = update.state;
+  const [installing, setInstalling] = useState(false);
+  const [manual, setManual] = useState(false);
+
+  const install = async () => {
+    setInstalling(true);
+    try {
+      // true: the app is about to reopen as the new version; keep the button busy until then.
+      if (await host.installUpdate()) return;
+      setManual(true);
+    } catch {
+      toast(t("desktop.prefs.updates.installFailed"), "alert");
+      setManual(true);
+    }
+    setInstalling(false);
+  };
 
   const checkNow = async () => {
     const result = await update.check();
@@ -58,20 +77,34 @@ export function Updates({ update }: { update: UpdateCheck }) {
 
       {available && latest && (
         <>
-          <CardTitle>{t("desktop.prefs.updates.howTitle")}</CardTitle>
-          <PrefCard padded>
-            <ol className="dk-steps-list">
-              <li>{t("desktop.prefs.updates.step1")}</li>
-              <li>{t("desktop.prefs.updates.step2")}</li>
-              <li>{t("desktop.prefs.updates.step3")}</li>
-            </ol>
-            <div className="dk-ver__acts">
-              <Button variant="primary" icon="download" onClick={() => void host.openExternal(latest.url)}>
-                {t("desktop.prefs.updates.download", { version: latest.version })}
-              </Button>
-              <span className="dk-help">{t("desktop.prefs.updates.keepNote")}</span>
-            </div>
-          </PrefCard>
+          {!manual && (
+            <PrefCard padded>
+              <div className="dk-ver__acts">
+                <Button variant="primary" icon="download" loading={installing} onClick={() => void install()}>
+                  {t("desktop.prefs.updates.install")}
+                </Button>
+                <span className="dk-help">{t("desktop.prefs.updates.keepNote")}</span>
+              </div>
+            </PrefCard>
+          )}
+          {manual && (
+            <>
+              <CardTitle>{t("desktop.prefs.updates.howTitle")}</CardTitle>
+              <PrefCard padded>
+                <ol className="dk-steps-list">
+                  <li>{t("desktop.prefs.updates.step1")}</li>
+                  <li>{t("desktop.prefs.updates.step2")}</li>
+                  <li>{t("desktop.prefs.updates.step3")}</li>
+                </ol>
+                <div className="dk-ver__acts">
+                  <Button variant="primary" icon="download" onClick={() => void host.openExternal(latest.url)}>
+                    {t("desktop.prefs.updates.download", { version: latest.version })}
+                  </Button>
+                  <span className="dk-help">{t("desktop.prefs.updates.keepNote")}</span>
+                </div>
+              </PrefCard>
+            </>
+          )}
           {noteLines(latest.notes).length > 0 && (
             <>
               <CardTitle>{t("desktop.prefs.updates.whatsNew", { version: latest.version })}</CardTitle>

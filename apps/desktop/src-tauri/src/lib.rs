@@ -1,6 +1,6 @@
 //! agentes for macOS (ADR 0036): a menu bar icon, a popover and two small windows around the
 //! runners it spawns, one per organization. Rust stays thin: tray, windows, the runner children,
-//! single instance, start at login, notifications and native dialogs. Everything else lives in the
+//! single instance, start at login, notifications, native dialogs and self-update. Everything else lives in the
 //! runner (TypeScript) and in the web view.
 
 mod runners;
@@ -17,6 +17,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_positioner::{Position, WindowExt};
+use tauri_plugin_updater::UpdaterExt;
 
 use runners::{RunnerInfo, Runners};
 
@@ -224,6 +225,26 @@ fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Downloads and installs the newer version (signed with the key built into the app, checked by
+/// the plugin), stops the runners and relaunches. `false`: nothing newer to install.
+#[tauri::command]
+async fn update_install(app: AppHandle) -> Result<bool, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Ok(false);
+    };
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    // The runners finish their work first, as when quitting; then the new app opens.
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<Runners>().shutdown_all();
+        app.restart();
+    });
+    Ok(true)
+}
+
 pub fn run() {
     let app = tauri::Builder::default()
         // First: a second launch only shows the popover of the running app.
@@ -236,6 +257,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
@@ -253,7 +275,8 @@ pub fn run() {
             app_info,
             autostart_get,
             autostart_set,
-            notify
+            notify,
+            update_install
         ])
         .on_window_event(|window, event| match event {
             WindowEvent::Focused(false) if window.label() == "popover" => {
