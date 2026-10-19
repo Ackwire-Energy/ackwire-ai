@@ -31,6 +31,7 @@ import {
   DialogFooter,
   Field,
   Icon,
+  type IconName,
   Kbd,
   MenuOverlay,
   MenuOverlayGroup,
@@ -44,7 +45,7 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
@@ -121,6 +122,10 @@ export function Sidebar() {
     const channelId = dmWith.get(partnerId);
     if (channelId) prefetch(channelId);
   };
+  // A closed conversation category still says how many unread messages it holds.
+  const agentsUnread = dir.agents.reduce((n, a) => n + (unreadWith.get(a.id) ?? 0), 0);
+  const peopleUnread = people.reduce((n, m) => n + (unreadWith.get(m.userId) ?? 0), 0);
+  const sections = useSidebarSections();
 
   // How many of the workspace's agents are working now: the sky at the bottom rises with it.
   const agentIds = dir.agents.map((a) => a.id).join();
@@ -265,7 +270,42 @@ export function Sidebar() {
           />
         )}
 
-        <div className="sidebar__group">
+        {/* Tools in categories that open and close (telas/SidebarDoisNiveis.html, option D). Closed, a
+            category keeps its tools one click away as icons on its header and its open page in sight. */}
+        <SidebarSection
+          id="inbox"
+          label={t("shell.inbox")}
+          sections={sections}
+          summary={
+            unreadNotifications + pending > 0 && (
+              <CountBadge aria-label={t("shell.waitingInSection", { count: unreadNotifications + pending })}>
+                {unreadNotifications + pending}
+              </CountBadge>
+            )
+          }
+          shortcuts={
+            <>
+              <ToolShortcut
+                to="/org/$orgId/notifications"
+                icon="bell"
+                label={t("shell.notifications")}
+                waiting={unreadNotifications > 0}
+              />
+              <ToolShortcut
+                to="/org/$orgId/approvals"
+                icon="waiting"
+                label={t("shell.approvals")}
+                waiting={pending > 0}
+              />
+              <ToolShortcut
+                to="/org/$orgId/threads"
+                icon="thread"
+                label={t("shell.threads")}
+                waiting={missionsWaiting > 0}
+              />
+            </>
+          }
+        >
           <Link
             to="/org/$orgId/notifications"
             params={{ orgId }}
@@ -305,6 +345,20 @@ export function Sidebar() {
               </CountChip>
             )}
           </Link>
+        </SidebarSection>
+
+        <SidebarSection
+          id="work"
+          label={t("shell.work")}
+          sections={sections}
+          shortcuts={
+            <>
+              <ToolShortcut to="/org/$orgId/issues" icon="issues" label={t("shell.issues")} />
+              <ToolShortcut to="/org/$orgId/routines" icon="routines" label={t("shell.routines")} />
+              <ToolShortcut to="/org/$orgId/calendar" icon="calendar" label={t("shell.calendar")} />
+            </>
+          }
+        >
           <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>
             <Icon name="issues" />
             <span className="sidebar__item-label">{t("shell.issues")}</span>
@@ -317,10 +371,20 @@ export function Sidebar() {
             <Icon name="calendar" />
             <span className="sidebar__item-label">{t("shell.calendar")}</span>
           </Link>
-          <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
-            <Icon name="message" />
-            <span className="sidebar__item-label">{t("shell.forum")}</span>
-          </Link>
+        </SidebarSection>
+
+        <SidebarSection
+          id="knowledge"
+          label={t("shell.knowledge")}
+          sections={sections}
+          shortcuts={
+            <>
+              <ToolShortcut to="/org/$orgId/wiki" icon="book" label={t("shell.wiki")} />
+              <ToolShortcut to="/org/$orgId/drive" icon="drive" label={t("shell.drive")} />
+              <ToolShortcut to="/org/$orgId/forum" icon="message" label={t("shell.forum")} />
+            </>
+          }
+        >
           <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item" title={t("shell.wiki")}>
             <Icon name="book" />
             <span className="sidebar__item-label">{t("shell.wiki")}</span>
@@ -329,20 +393,30 @@ export function Sidebar() {
             <Icon name="drive" />
             <span className="sidebar__item-label">{t("shell.drive")}</span>
           </Link>
-        </div>
+          <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
+            <Icon name="message" />
+            <span className="sidebar__item-label">{t("shell.forum")}</span>
+          </Link>
+        </SidebarSection>
 
-        <div className="sidebar__group">
-          <div className="sidebar__label-row">
-            <span className="sidebar__label">{t("shell.channels")}</span>
+        <span className="sidebar__divider" aria-hidden="true" />
+
+        <SidebarSection
+          id="channels"
+          label={t("shell.channels")}
+          sections={sections}
+          action={
             <Button
               variant="ghost"
               size="sm"
               iconOnly
               icon="plus"
+              className="sidebar__section-add"
               aria-label={t("newChannel.open")}
               onClick={() => setCreatingChannel(true)}
             />
-          </div>
+          }
+        >
           {channels.isLoading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
           {(channels.data ?? [])
             .filter((c) => !dmChannels.has(c.id))
@@ -361,7 +435,7 @@ export function Sidebar() {
                 <span className="sidebar__item-label">{c.name}</span>
               </Link>
             ))}
-        </div>
+        </SidebarSection>
 
         {dir.loading && dir.agents.length === 0 && (
           <div className="sidebar__group">
@@ -370,8 +444,12 @@ export function Sidebar() {
           </div>
         )}
         {dir.agents.length > 0 && (
-          <div className="sidebar__group">
-            <span className="sidebar__label">{t("shell.agents")}</span>
+          <SidebarSection
+            id="agents"
+            label={t("shell.agents")}
+            sections={sections}
+            summary={agentsUnread > 0 && <UnreadCount count={agentsUnread} />}
+          >
             <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item" title={t("shell.team")}>
               <Icon name="agent" />
               <span className="sidebar__item-label">{t("shell.team")}</span>
@@ -386,12 +464,16 @@ export function Sidebar() {
                 onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
               />
             ))}
-          </div>
+          </SidebarSection>
         )}
 
         {people.length > 0 && (
-          <div className="sidebar__group">
-            <span className="sidebar__label">{t("shell.directMessages")}</span>
+          <SidebarSection
+            id="people"
+            label={t("shell.directMessages")}
+            sections={sections}
+            summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
+          >
             {people.map((m) => {
               const unread = unreadWith.get(m.userId) ?? 0;
               return (
@@ -412,7 +494,7 @@ export function Sidebar() {
                 </Link>
               );
             })}
-          </div>
+          </SidebarSection>
         )}
       </div>
 
@@ -443,6 +525,110 @@ export function Sidebar() {
         </div>
       </div>
     </nav>
+  );
+}
+
+type SectionId = "inbox" | "work" | "knowledge" | "channels" | "agents" | "people";
+/** The tools people reach for less start closed; everything else starts open. */
+const CLOSED_BY_DEFAULT: SectionId[] = ["work", "knowledge"];
+
+/** Which sidebar categories are closed, remembered per browser. */
+function useSidebarSections() {
+  const [closed, setClosed] = useState<Set<string>>(() => {
+    try {
+      const saved = storage.get(STORAGE_KEYS.sidebarSections);
+      if (saved) return new Set(JSON.parse(saved) as string[]);
+    } catch {
+      // A bad value falls back to the defaults.
+    }
+    return new Set(CLOSED_BY_DEFAULT);
+  });
+  const toggle = (id: SectionId) =>
+    setClosed((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      storage.set(STORAGE_KEYS.sidebarSections, JSON.stringify([...next]));
+      return next;
+    });
+  return { isOpen: (id: SectionId) => !closed.has(id), toggle };
+}
+
+/**
+ * A sidebar category that opens and closes. Closed, it keeps its open page's row in sight (CSS shows
+ * only the active item), and shows `shortcuts` (its tools as icons) or `summary` (a count) on its header.
+ * On the icon rail the header goes away and every item shows.
+ */
+function SidebarSection({
+  id,
+  label,
+  sections,
+  summary,
+  shortcuts,
+  action,
+  children,
+}: {
+  id: SectionId;
+  label: string;
+  sections: ReturnType<typeof useSidebarSections>;
+  summary?: ReactNode;
+  shortcuts?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  const open = sections.isOpen(id);
+  const bodyId = `sidebar-section-${id}`;
+  return (
+    <div className="sidebar__group sidebar__section" data-open={open}>
+      <div className="sidebar__section-head">
+        <button
+          type="button"
+          className="sidebar__section-toggle"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => sections.toggle(id)}
+        >
+          <Icon name="chevronDown" size={14} className="sidebar__section-chevron" />
+          <span className="sidebar__label">{label}</span>
+        </button>
+        {!open && (shortcuts ? <span className="sidebar__shortcuts">{shortcuts}</span> : summary)}
+        {action}
+      </div>
+      <div id={bodyId} className="sidebar__section-body">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+type ToolRoute =
+  | "/org/$orgId/notifications"
+  | "/org/$orgId/approvals"
+  | "/org/$orgId/threads"
+  | "/org/$orgId/issues"
+  | "/org/$orgId/routines"
+  | "/org/$orgId/calendar"
+  | "/org/$orgId/wiki"
+  | "/org/$orgId/drive"
+  | "/org/$orgId/forum";
+
+/** A tool as an icon on a closed category's header; a dot when something there waits for you. */
+function ToolShortcut({
+  to,
+  icon,
+  label,
+  waiting,
+}: {
+  to: ToolRoute;
+  icon: IconName;
+  label: string;
+  waiting?: boolean;
+}) {
+  const { org } = useOrg();
+  return (
+    <Link to={to} params={{ orgId: org.id }} className="sidebar__shortcut" aria-label={label} title={label}>
+      <Icon name={icon} size={16} />
+      {waiting && <span className="sidebar__shortcut-dot" aria-hidden="true" />}
+    </Link>
   );
 }
 

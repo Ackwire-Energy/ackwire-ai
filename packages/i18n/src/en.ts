@@ -317,6 +317,11 @@ export const en: Translations = {
     skip: "Skip for now",
   },
   shell: {
+    inbox: "Inbox",
+    work: "Work",
+    knowledge: "Knowledge",
+    waitingInSection_one: "{{count}} waiting for you",
+    waitingInSection_other: "{{count}} waiting for you",
     inviteHint: "By email or link",
     profileHint: "Name, photo and @",
     thisMonth: "This month",
