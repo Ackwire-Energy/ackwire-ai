@@ -74,6 +74,7 @@ export function createFakeThreads(
         participants: [],
         working: false,
         needsYou: false,
+        suggestedResolved: false,
         canManage: true,
         // Tests may seed the row's mission summary (the server joins it from `missions`).
         mission: (input as { mission?: ThreadInfo["mission"] }).mission ?? null,

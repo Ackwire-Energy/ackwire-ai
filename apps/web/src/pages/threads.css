@@ -67,7 +67,57 @@
   align-self: center;
 }
 
-/* ── Rows ──────────────────────────────────────────────────────────────── */
+/* ── Rows (ThreadsRefino.html "Por canal") ───────────────────────────────
+ * Grouped by channel; one line each: who carries it, title + last line, then
+ * fixed columns (tag right-aligned, people, time) so they line up row to row.
+ */
+.threads-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.threads-group__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0 4px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.threads-group__head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.threads-group__head button:hover {
+  color: var(--ink);
+}
+.threads-group__head button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+.threads-group__head .ac-icon {
+  color: var(--faint);
+}
+.threads-group__chev {
+  transition: transform 0.15s;
+}
+.threads-group__head [aria-expanded="false"] .threads-group__chev {
+  transform: rotate(-90deg);
+}
+.threads-group__count {
+  font-weight: 500;
+  color: var(--faint);
+}
 .threads-list {
   border-radius: var(--radius-section);
   background: var(--raised);
@@ -77,11 +127,11 @@
 .thread-row {
   position: relative;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 360px) 96px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
-  min-height: 66px;
-  padding: 12px 12px 12px 16px;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 16px;
   border-top: 1px solid var(--line);
   cursor: pointer;
   transition: background 0.12s;
@@ -90,73 +140,57 @@
   border-top: 0;
 }
 .thread-row:hover {
-  background: color-mix(in srgb, var(--sunken) 45%, transparent);
+  background: color-mix(in srgb, var(--sunken) 45%, var(--raised));
 }
 .thread-row.is-open {
-  background: color-mix(in srgb, var(--sunken) 80%, transparent);
-}
-.thread-row.is-open::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 10px;
-  bottom: 10px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--ink);
+  background: color-mix(in srgb, var(--sunken) 80%, var(--raised));
 }
 .thread-row.is-picked {
   background: color-mix(in srgb, var(--ink) 4%, var(--raised));
 }
-/* The checkbox takes the kind icon's place (hover, picked or selecting): no empty column on the left. */
+.thread-row__lead {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+.thread-row__face {
+  display: grid;
+  place-items: center;
+  transition: opacity 0.12s;
+}
 .thread-row__check {
   position: absolute;
-  left: 23px;
-  top: 50%;
-  transform: translateY(-50%);
+  inset: 5px;
   opacity: 0;
 }
 .thread-row:hover .thread-row__check,
 .thread-row__check:focus-visible,
 .thread-row.is-picked .thread-row__check,
-.threads-list[data-selecting] .thread-row__check {
+.threads-groups[data-selecting] .thread-row__check {
   opacity: 1;
 }
-.thread-row:hover > .thread-kind,
-.thread-row:has(.thread-row__check:focus-visible) > .thread-kind,
-.thread-row.is-picked > .thread-kind,
-.threads-list[data-selecting] .thread-row > .thread-kind {
-  visibility: hidden;
-}
-@media (hover: none) {
-  .thread-row__check {
-    opacity: 1;
-  }
-  .thread-row > .thread-kind {
-    visibility: hidden;
-  }
-}
-.thread-kind {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-item);
-  background: var(--sunken);
-  color: var(--ink2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.thread-row:hover .thread-row__face,
+.thread-row:has(.thread-row__check:focus-visible) .thread-row__face,
+.thread-row.is-picked .thread-row__face,
+.threads-groups[data-selecting] .thread-row__face {
+  opacity: 0;
 }
 .thread-row__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
 }
 .thread-row__name {
-  display: block;
-  max-width: 100%;
+  flex: none;
+  max-width: 55%;
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ink);
@@ -175,93 +209,85 @@
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm);
 }
-.thread-row__title small {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-top: 2px;
-  font-size: 12.5px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.thread-row__where {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-  font-weight: 600;
-  color: var(--ink2);
-}
-.thread-row__where .ac-icon {
-  color: var(--faint);
-}
-/* A mission's thread: the mission header's look ("Missão · 4 de 12 itens"); the avatar sits in the kind column. */
-.thread-kind--agent {
-  background: none;
-}
-.thread-kind--agent .ac-avatar {
-  width: 32px;
-  height: 32px;
-}
-.thread-row__mission {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-  color: var(--muted);
-}
-.thread-row__mission b {
-  font-weight: 600;
-  color: var(--ink2);
-}
-.thread-row__mission > .ac-avatar {
-  display: none;
-}
 .thread-row__last {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
 }
-.thread-row__meta {
+.thread-row__last b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.thread-row__end {
+  position: relative;
   display: grid;
-  grid-template-columns: 92px 96px minmax(0, 1fr);
+  grid-template-columns: 168px 76px 64px;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+}
+.thread-row__state {
+  display: flex;
+  justify-content: flex-end;
   min-width: 0;
 }
-.thread-row__count {
-  font-size: 12.5px;
-  color: var(--faint);
+.thread-row__resolved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  cursor: pointer;
+}
+.thread-row__resolved:hover {
+  background: var(--sunken);
+  color: var(--ink);
+}
+.thread-row__resolved:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .thread-row__who {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 .thread-row__more {
   font-size: 12px;
   color: var(--faint);
 }
-.thread-row__end {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-width: 0;
-}
 .thread-row__ago {
+  justify-self: end;
   font-size: 12.5px;
   color: var(--faint);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+/* Hover actions sit over the time column (right-aligned), so nothing shifts. */
 .thread-row__actions {
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: none;
   gap: 1px;
+  padding-left: 6px;
+  background: color-mix(in srgb, var(--sunken) 45%, var(--raised));
+}
+.thread-row.is-open .thread-row__actions {
+  background: color-mix(in srgb, var(--sunken) 80%, var(--raised));
 }
 .thread-row:hover .thread-row__actions,
 .thread-row:focus-within .thread-row__actions,
@@ -270,7 +296,7 @@
 }
 .thread-row:hover .thread-row__ago,
 .thread-row:focus-within .thread-row__ago {
-  display: none;
+  visibility: hidden;
 }
 @media (hover: none) {
   .thread-row__actions {
@@ -280,93 +306,49 @@
     display: none;
   }
   .thread-row .thread-row__ago {
-    display: none;
+    visibility: hidden;
   }
 }
 
-/* Fewer columns as the list narrows; stacked cards on a phone. */
+/* Narrower: the last line drops under the title, then the people column goes. */
 @container threads (max-width: 1000px) {
-  .thread-row__meta {
-    grid-template-columns: 100px 164px;
+  .thread-row__title {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .thread-row__name {
+    max-width: 100%;
+  }
+  .thread-row__end {
+    grid-template-columns: 168px 64px;
   }
   .thread-row__who {
     display: none;
   }
 }
-@container threads (max-width: 740px) {
-  .threads-list {
-    background: transparent;
-    box-shadow: none;
-    overflow: visible;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+@container threads (max-width: 640px) {
   .thread-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "ti end" "meta meta";
-    gap: 8px 10px;
-    padding: 12px 10px 12px 14px;
-    border-top: 0;
-    border-radius: 16px;
-    background: var(--raised);
-    box-shadow: var(--e1), var(--top);
-  }
-  .thread-row:hover {
-    background: var(--raised);
-  }
-  .thread-row.is-open {
-    background: color-mix(in srgb, var(--sunken) 50%, var(--raised));
-  }
-  .thread-row__check,
-  .thread-row > .thread-kind {
-    display: none;
-  }
-  /* No kind column on a phone: the agent's small avatar leads the mission line instead. */
-  .thread-row__mission > .ac-avatar {
-    display: inline-flex;
-  }
-  .threads-list[data-selecting] .thread-row {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    grid-template-areas: "ck ti end" "ck meta meta";
-  }
-  .threads-list[data-selecting] .thread-row__check {
-    display: inline-flex;
-    position: static;
-    transform: none;
-    grid-area: ck;
-    align-self: start;
-    margin-top: 2px;
-  }
-  .thread-row__title {
-    grid-area: ti;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+    padding: 10px 12px;
   }
   .thread-row__end {
-    grid-area: end;
-    align-self: start;
-  }
-  .thread-row__meta {
-    grid-area: meta;
+    grid-column: 2;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 10px;
+    justify-content: space-between;
+    gap: 8px;
   }
   .thread-row__state {
-    order: -1;
+    justify-content: flex-start;
   }
-  .thread-row__who {
-    display: inline-flex;
-    margin-left: auto;
+  .thread-row__state:empty {
+    display: none;
   }
   .thread-row__actions {
-    display: flex;
-  }
-  .thread-row__quick {
-    display: none;
-  }
-  .thread-row .thread-row__ago {
-    display: none;
+    position: static;
+    transform: none;
+    margin-left: auto;
   }
 }
 

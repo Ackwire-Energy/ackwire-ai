@@ -2,7 +2,7 @@ import type { ThreadActor, ThreadInfo, ThreadTab } from "@agenteschat/client";
 import { useChannels, useMissionList, useThreadList } from "@agenteschat/client";
 import { formatFullDate, relativeTime } from "@agenteschat/client/lib/format";
 import { previewBody } from "@agenteschat/client/lib/message-body";
-import { threadMessageCount, threadTitle } from "@agenteschat/client/lib/threads";
+import { threadMessageCount, threadStatus, threadTitle } from "@agenteschat/client/lib/threads";
 import {
   AvatarStack,
   Button,
@@ -25,7 +25,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -38,9 +38,10 @@ import { useOpenParam } from "@/lib/open-param";
 import "./threads.css";
 
 /**
- * Threads (docs/design/telas/Threads.html): the subjects that left the
- * channels and DMs. Tabs, search and filters, rows in aligned columns
- * (stacked cards on a phone), hover actions, ⋯, multi-select with the
+ * Threads (docs/design/telas/Threads.html, rows from ThreadsRefino.html
+ * "Por canal"): the subjects that left the channels and DMs. Tabs, search
+ * and filters, rows grouped by channel (DMs together) with the tag, people
+ * and time in fixed columns, hover actions, ⋯, multi-select with the
  * floating bar, and the details panel. No unread counts (reads are per
  * channel) and no counts on the tabs (the API doesn't give them).
  */
@@ -70,6 +71,15 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
   const [openId, setOpenId] = useOpenParam();
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [newMission, setNewMission] = useState(false);
+  // Channel groups folded by the person (this visit only).
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const missions = tab === "missions";
   const filters = {
     tab,
@@ -268,24 +278,40 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           <ThreadsEmpty tab={tab} filtered={filtered} onClear={clearFilters} onAll={() => setTab("all")} />
         )}
         {!missions && threads.length > 0 && (
-          <section
-            className="threads-list"
-            aria-label={t("threads.listLabel")}
-            data-selecting={picked.size > 0 || undefined}
-          >
-            {threads.map((thread) => (
-              <ThreadRow
-                key={thread.id}
-                thread={thread}
-                open={thread.id === openId}
-                picked={picked.has(thread.id)}
-                onOpen={() => setOpenId(openId === thread.id ? null : thread.id)}
-                onGo={() => go(thread)}
-                onPick={() => toggle(thread.id)}
-                onAction={(action) => controls.request([thread], action)}
-              />
-            ))}
-          </section>
+          <div className="threads-groups" data-selecting={picked.size > 0 || undefined}>
+            {byPlace(threads).map((group) => {
+              const shut = collapsed.has(group.key);
+              const label = group.dm ? t("threads.dms") : `#${group.name}`;
+              return (
+                <section key={group.key} className="threads-group" aria-label={label}>
+                  <h2 className="threads-group__head">
+                    <button type="button" aria-expanded={!shut} onClick={() => toggleGroup(group.key)}>
+                      <Icon name="chevronDown" size={14} className="threads-group__chev" />
+                      <Icon name={group.dm ? "person" : "channel"} size={14} />
+                      {group.dm ? label : group.name}
+                    </button>
+                    <span className="threads-group__count">{group.threads.length}</span>
+                  </h2>
+                  {!shut && (
+                    <div className="threads-list">
+                      {group.threads.map((thread) => (
+                        <ThreadRow
+                          key={thread.id}
+                          thread={thread}
+                          open={thread.id === openId}
+                          picked={picked.has(thread.id)}
+                          onOpen={() => setOpenId(openId === thread.id ? null : thread.id)}
+                          onGo={() => go(thread)}
+                          onPick={() => toggle(thread.id)}
+                          onAction={(action) => controls.request([thread], action)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
         )}
         {!missions && list.hasNextPage && (
           <Button className="threads-more" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
@@ -378,9 +404,30 @@ function ThreadRow({
   const title = threadTitle(thread);
   const people = actorsOf(thread);
   const last = thread.lastMessage;
-  const where = thread.channelKind === "dm" ? t("threads.dm") : `#${thread.channelName}`;
   const more = t("threads.more", { title });
   const missionAgent = thread.mission ? actors.name({ type: "agent", id: thread.mission.agentId }) : "";
+  const lead = leadOf(thread);
+  const status = threadStatus(thread);
+  // The tag shows only what asks for something: open and quiet shows nothing.
+  const tag =
+    thread.mission && thread.state === "open" ? (
+      <MissionStatusChip
+        status={missionSummaryStatusKey(thread.mission, thread.working)}
+        agentId={thread.mission.agentId}
+      />
+    ) : status !== "open" ? (
+      <ThreadStatusChip thread={thread} />
+    ) : thread.suggestedResolved && thread.canManage ? (
+      <button
+        type="button"
+        className="thread-row__resolved"
+        title={t("threads.resolvedHint")}
+        onClick={() => onAction("close")}
+      >
+        <Icon name="check" size={14} />
+        {t("threads.resolved")}
+      </button>
+    ) : null;
   return (
     // biome-ignore lint/a11y: a mouse shortcut to the details; the title button is the keyboard way
     <article
@@ -393,77 +440,49 @@ function ThreadRow({
       }}
       onDoubleClick={onGo}
     >
-      <Checkbox
-        className="thread-row__check"
-        checked={picked}
-        onCheckedChange={onPick}
-        aria-label={t("threads.pick", { title })}
-      />
-      {thread.mission ? (
-        // A mission's thread: the mission header's look (its agent, "Missão · 4 de 12 itens", its state).
-        <span className="thread-kind thread-kind--agent" aria-hidden="true">
-          <AgentAvatar agentId={thread.mission.agentId} name={missionAgent} size="md" />
+      {/* Who carries the thread; the checkbox takes its place on hover or while selecting. */}
+      <span className="thread-row__lead">
+        <span className="thread-row__face" aria-hidden="true">
+          <ActorAvatar actor={lead} name={actors.name(lead)} size="sm" />
         </span>
-      ) : (
-        <span className="thread-kind" aria-hidden="true">
-          <Icon name="thread" size={16} />
-        </span>
-      )}
+        <Checkbox
+          className="thread-row__check"
+          checked={picked}
+          onCheckedChange={onPick}
+          aria-label={t("threads.pick", { title })}
+        />
+      </span>
       <div className="thread-row__title">
         <button type="button" className="thread-row__name" aria-haspopup="dialog" onClick={onOpen}>
           {title}
         </button>
-        <small>
-          <span className="thread-row__where">
-            <Icon name={thread.channelKind === "dm" ? "person" : "channel"} size={14} />
-            {where}
+        {thread.mission ? (
+          <span className="thread-row__last thread-row__mission">
+            <b>{t("missions.pinned.lab")}</b> ·{" "}
+            {t("missions.items", { done: thread.mission.planDone, count: thread.mission.planTotal })}
+            {missionAgent ? ` · ${missionAgent}` : ""}
           </span>
-          {thread.mission && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="thread-row__mission">
-                <AgentAvatar agentId={thread.mission.agentId} name={missionAgent} size="xs" />
-                <b>{t("missions.pinned.lab")}</b>
-                <span aria-hidden="true">·</span>
-                {t("missions.items", { done: thread.mission.planDone, count: thread.mission.planTotal })}
-              </span>
-            </>
-          )}
-          {last && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="thread-row__last">
-                {t("threads.lastLine", {
-                  name: actors.name(lastActor(last.author)),
-                  text: previewBody(t, last.excerpt, last.meta ?? null),
-                })}
-              </span>
-            </>
-          )}
-        </small>
+        ) : (
+          last && (
+            <span className="thread-row__last">
+              {t("threads.lastLine", {
+                name: actors.name(lastActor(last.author)),
+                text: previewBody(t, last.excerpt, last.meta ?? null),
+              })}
+            </span>
+          )
+        )}
       </div>
-      <div className="thread-row__meta">
-        <span className="thread-row__count">{t("threads.messages", { count: threadMessageCount(thread) })}</span>
+      <div className="thread-row__end">
+        <span className="thread-row__state">{tag}</span>
         <span className="thread-row__who">
           <AvatarStack aria-label={people.map((p) => actors.name(p)).join(", ")}>
-            {people.slice(0, 4).map((p) => (
+            {people.slice(0, 3).map((p) => (
               <ActorAvatar key={`${p.type}:${p.id}`} actor={p} name={actors.name(p)} size="xs" />
             ))}
           </AvatarStack>
-          {people.length > 4 && <span className="thread-row__more">+{people.length - 4}</span>}
+          {people.length > 3 && <span className="thread-row__more">+{people.length - 3}</span>}
         </span>
-        <span className="thread-row__state">
-          {thread.mission && thread.state === "open" ? (
-            <MissionStatusChip
-              status={missionSummaryStatusKey(thread.mission, thread.working)}
-              agentId={thread.mission.agentId}
-            />
-          ) : (
-            <ThreadStatusChip thread={thread} />
-          )}
-        </span>
-      </div>
-      <div className="thread-row__end">
         <span className="thread-row__ago">{relativeTime(t, i18n.language, thread.lastActivityAt)}</span>
         <span className="thread-row__actions">
           {quickActions(thread).map((a) => (
@@ -510,6 +529,30 @@ function ThreadRow({
       </div>
     </article>
   );
+}
+
+/** Who carries the thread: the mission's agent, else the agent who spoke last, else the last agent in it, else whoever started it. */
+function leadOf(thread: ThreadInfo): { type: ThreadActor["type"]; id: string } {
+  if (thread.mission) return { type: "agent", id: thread.mission.agentId };
+  const lastAuthor = thread.lastMessage?.author;
+  if (lastAuthor?.type === "agent" && lastAuthor.id) return { type: "agent", id: lastAuthor.id };
+  const agent = actorsOf(thread)
+    .filter((p) => p.type === "agent")
+    .at(-1);
+  return agent ?? lastActor(thread.rootAuthor);
+}
+
+/** Threads by where they live, in the list's order (most recent first); every DM goes under one group. */
+function byPlace(threads: ThreadInfo[]) {
+  const groups = new Map<string, { key: string; dm: boolean; name: string; threads: ThreadInfo[] }>();
+  for (const thread of threads) {
+    const dm = thread.channelKind === "dm";
+    const key = dm ? "dm" : thread.channelId;
+    const group = groups.get(key) ?? { key, dm, name: thread.channelName, threads: [] };
+    group.threads.push(thread);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
 }
 
 const lastActor = (a: ThreadActor) => ({ type: a.type, id: a.id ?? "" });

@@ -54,13 +54,11 @@ describe("Missões (Threads.html)", () => {
     const line = row.querySelector(".thread-row__mission") as HTMLElement;
     expect(line.textContent).toContain("Missão");
     expect(line.textContent).toContain("4 de 12 itens");
-    // The agent's avatar in the kind column (and a small one in the line for phones), no flag icon.
-    expect(row.querySelector(".thread-kind--agent .ac-avatar")).toBeTruthy();
-    expect(line.querySelector(".ac-avatar")).toBeTruthy();
+    // The mission's agent leads the row (ThreadsRefino.html), no flag icon.
+    expect(row.querySelector(".thread-row__face .ac-avatar")).toBeTruthy();
     expect(within(row).getByText("Esperando você")).toBeTruthy();
     const plain = screen().getByRole("article", { name: "Só conversa" });
     expect(plain.querySelector(".thread-row__mission")).toBeNull();
-    expect(plain.querySelector(".thread-kind--agent")).toBeNull();
   });
 
   test("an old proposal's thread-start marker (no link card in the reply) shows the mission card instead", async () => {
