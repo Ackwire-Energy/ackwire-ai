@@ -1,4 +1,5 @@
 import type { ChannelEvent, UserEvent } from "../api/types";
+import { type BrowserWatcher, createBrowserWatches } from "../browser/watches";
 
 /**
  * WebSocket client for `/api/ws?orgId=` (apps/server/src/realtime/ws.ts,
@@ -92,6 +93,13 @@ export class RealtimeConnection {
   private readonly errorListeners = new Set<(code: string, channelId?: string) => void>();
   private readonly userListeners = new Set<(event: UserEvent) => void>();
   private readonly browserListeners = new Set<(frame: Record<string, unknown>) => void>();
+  private readonly browserWatches = createBrowserWatches({
+    send: (frame) => this.send(frame),
+    timers: {
+      setTimeout: (fn, ms) => this.timers.setTimeout(fn, ms),
+      clearTimeout: (id) => this.timers.clearTimeout(id),
+    },
+  });
   private attempt = 0;
   private retryTimer: unknown = null;
   private pingTimer: unknown = null;
@@ -191,6 +199,15 @@ export class RealtimeConnection {
     };
   }
 
+  /**
+   * Who watches which agent's browser on this socket: views of one agent share one
+   * `browser.watch` and unwatch a moment after the last leaves (pass it to
+   * `createBrowserLiveConnection`). Watched again after every (re)connect.
+   */
+  get browserWatcher(): BrowserWatcher {
+    return this.browserWatches;
+  }
+
   /** Sends a live-view frame (`browser.watch`, `browser.unwatch`, `browser.input`); dropped while not connected. */
   sendBrowserFrame(frame: { type: `browser.${string}`; agentId: string; [key: string]: unknown }) {
     this.send(frame);
@@ -224,6 +241,8 @@ export class RealtimeConnection {
       this.attempt = 0;
       this.setStatus("open");
       for (const channelId of this.listeners.keys()) this.send({ type: "subscribe", channelId });
+      // The agents' browsers someone is looking at (a watch sent before the socket opened was dropped).
+      this.browserWatches.resumeAll();
       this.startPing();
       if (reconnected) for (const l of this.reconnectListeners) l();
     };

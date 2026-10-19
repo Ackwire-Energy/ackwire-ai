@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
+  BROWSER_DRAG_FLUSH_MS,
+  BROWSER_HOVER_MS,
   BROWSER_INPUT_BATCH,
+  BROWSER_UNWATCH_DELAY_MS,
   browserHandoffOf,
   browserSteps,
   clickEvents,
   createBrowserLiveConnection,
+  createBrowserWatches,
   fitFrame,
   framePoint,
   handoffFuse,
@@ -13,7 +17,10 @@ import {
   keyEvents,
   modifiersOf,
   parseBrowserLiveMessage,
+  usesBrowser,
+  wheelEvent,
 } from "../src/browser";
+import { toolActivity } from "../src/lib/activity";
 
 const AGENT = "11111111-1111-4111-8111-111111111111";
 
@@ -121,7 +128,7 @@ describe("agent browser live connection (ADR 0040)", () => {
   });
 
   test("retries the watch with backoff while the computer is reconnecting; close stops it", () => {
-    const sent: { type: string }[] = [];
+    const sent: { type: string; agentId?: string }[] = [];
     const t = fakeTimers();
     const live = createBrowserLiveConnection({
       send: (f) => sent.push(f),
@@ -154,7 +161,7 @@ describe("agent browser live connection (ADR 0040)", () => {
   });
 
   test("an ended stream (the browser closed) is watched again after a backoff; a stop we asked for isn't", () => {
-    const sent: { type: string }[] = [];
+    const sent: { type: string; agentId?: string }[] = [];
     const t = fakeTimers();
     const live = createBrowserLiveConnection({
       send: (f) => sent.push(f),
@@ -246,5 +253,148 @@ describe("agent browser requests (ADR 0040)", () => {
         },
       ]).map((s) => s.tool),
     ).toEqual(["browser_open"]);
+  });
+});
+
+describe("one watch per agent on a socket (no stream flapping)", () => {
+  const live = (watcher: ReturnType<typeof createBrowserWatches>, sent: unknown[]) =>
+    createBrowserLiveConnection({
+      send: (f) => sent.push(f),
+      watcher,
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+    });
+
+  test("views of the same agent share one watch; it ends a moment after the last leaves", () => {
+    const sent: { type: string; agentId?: string }[] = [];
+    const t = fakeTimers();
+    const watches = createBrowserWatches({ send: (f) => sent.push(f), timers: t.timers });
+    const card = live(watches, sent);
+    const full = live(watches, sent);
+    card.start();
+    full.start();
+    expect(sent).toEqual([{ type: "browser.watch", agentId: AGENT }]);
+    card.close();
+    full.close();
+    // Not yet: a view coming back meanwhile keeps the stream.
+    expect(sent.filter((f) => f.type === "browser.unwatch")).toHaveLength(0);
+    expect(t.pending[0]?.ms).toBe(BROWSER_UNWATCH_DELAY_MS);
+    t.run();
+    expect(sent.at(-1)).toEqual({ type: "browser.unwatch", agentId: AGENT });
+    expect(watches.watching()).toEqual([]);
+  });
+
+  test("a remount (StrictMode, a re-render) neither unwatches nor watches again", () => {
+    const sent: { type: string; agentId?: string }[] = [];
+    const t = fakeTimers();
+    const watches = createBrowserWatches({ send: (f) => sent.push(f), timers: t.timers });
+    const first = live(watches, sent);
+    first.start();
+    first.close();
+    const again = live(watches, sent);
+    again.start();
+    t.run();
+    expect(sent).toEqual([{ type: "browser.watch", agentId: AGENT }]);
+    expect(watches.watching()).toEqual([AGENT]);
+    // After the socket comes back, every agent someone looks at is watched again, once.
+    watches.resumeAll();
+    expect(sent.filter((f) => f.type === "browser.watch")).toHaveLength(2);
+    again.close();
+  });
+});
+
+describe("input in bursts, not one message per event", () => {
+  type Sent = { type: string; events?: { kind: string; type?: string; deltaY?: number; x?: number }[] };
+  const make = (t: ReturnType<typeof fakeTimers>, clock: { now: number }) => {
+    const sent: Sent[] = [];
+    const conn = createBrowserLiveConnection({
+      send: (f) => sent.push(f as Sent),
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      timers: t.timers,
+      now: () => clock.now,
+    });
+    return { sent, conn };
+  };
+  const at = (x: number) => ({ x, y: 1 });
+
+  test("wheel ticks add up into one event per frame", () => {
+    const t = fakeTimers();
+    const { sent, conn } = make(t, { now: 0 });
+    for (let i = 0; i < 10; i++) conn.sendInput([wheelEvent(at(i), 0, 10)]);
+    expect(sent).toHaveLength(0);
+    expect(t.pending[0]?.ms).toBe(BROWSER_DRAG_FLUSH_MS);
+    t.run();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.events).toHaveLength(1);
+    expect(sent[0]?.events?.[0]?.deltaY).toBe(100);
+    expect(sent[0]?.events?.[0]?.x).toBe(9);
+  });
+
+  test("a drag's moves merge; the click after them goes at once, in order", () => {
+    const t = fakeTimers();
+    const { sent, conn } = make(t, { now: 0 });
+    const move = (x: number) => ({
+      kind: "mouse" as const,
+      type: "mouseMoved" as const,
+      button: "left" as const,
+      ...at(x),
+    });
+    conn.sendInput([move(1)]);
+    conn.sendInput([move(2)]);
+    conn.sendInput([move(3)]);
+    conn.sendInput(clickEvents(at(4)));
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.events?.map((e) => `${e.type}:${e.x}`)).toEqual([
+      "mouseMoved:3",
+      "mousePressed:4",
+      "mouseReleased:4",
+    ]);
+  });
+
+  test("hovering sends the latest position at most every 66 ms", () => {
+    const t = fakeTimers();
+    const clock = { now: 1000 };
+    const { sent, conn } = make(t, clock);
+    const hover = (x: number) => ({ kind: "mouse" as const, type: "mouseMoved" as const, ...at(x) });
+    conn.sendInput([hover(1)]);
+    expect(sent).toHaveLength(1);
+    clock.now += 10;
+    conn.sendInput([hover(2)]);
+    conn.sendInput([hover(3)]);
+    expect(sent).toHaveLength(1);
+    expect(t.pending[0]?.ms).toBe(BROWSER_HOVER_MS - 10);
+    t.run();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]?.events?.[0]?.x).toBe(3);
+  });
+
+  test("closing drops what was still waiting", () => {
+    const t = fakeTimers();
+    const { sent, conn } = make(t, { now: 0 });
+    conn.sendInput([wheelEvent(at(1), 0, 5)]);
+    conn.close();
+    t.run();
+    expect(sent.filter((f) => f.type === "browser.input")).toHaveLength(0);
+  });
+});
+
+describe("the agent is in its browser", () => {
+  test("its current tool, or its latest call, is a browser tool (also through the computer's bridge)", () => {
+    expect(usesBrowser({ tool: "browser_click" })).toBe(true);
+    expect(usesBrowser({ tool: "mcp__agentes__browser_read" })).toBe(true);
+    const call = (id: string, tool: string) => ({ kind: "call", id, tool, detail: null, running: false });
+    expect(
+      usesBrowser({ tool: null, work: [call("1", "browser_open"), { kind: "say", text: "Abri." }] as never }),
+    ).toBe(true);
+    expect(usesBrowser({ work: [call("1", "browser_open"), call("2", "run_code")] as never })).toBe(false);
+    expect(usesBrowser({})).toBe(false);
+  });
+
+  test("the bar says 'usando o navegador', not 'consultando o browser'", () => {
+    expect(toolActivity("browser_open")).toEqual({ kind: "browsing" });
+    expect(toolActivity("mcp__agentes__browser_click")).toEqual({ kind: "browsing" });
   });
 });

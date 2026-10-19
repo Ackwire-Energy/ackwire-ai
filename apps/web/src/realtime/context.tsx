@@ -717,6 +717,8 @@ export function useBrowserLive(agentId: string, enabled = true) {
     setState(EMPTY_LIVE);
     const live = createBrowserLiveConnection({
       send: (frame) => connection.sendBrowserFrame(frame),
+      // Shared per socket: the card, the bar and the full view of one agent are one watch.
+      watcher: connection.browserWatcher,
       agentId,
       onFrame: (frame) => setState((s) => ({ ...s, frame, unavailable: null, ended: false })),
       onStatus: (status) => setState((s) => ({ ...s, status, unavailable: null, ended: false })),
