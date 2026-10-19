@@ -55,6 +55,8 @@ export const NOTIFICATION_KINDS = [
   "routine_failed",
   "reaction",
   "machine_connected",
+  /** An agent needs a person in its browser (ADR 0040 §6). */
+  "browser_handoff",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -80,6 +82,8 @@ export interface NotificationSource {
   routineId?: string;
   /** A computer connected to the organization (ADR 0036). */
   machineId?: string;
+  /** An agent's browser handoff (ADR 0040). */
+  handoffId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
   label?: string;
 }

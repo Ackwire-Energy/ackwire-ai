@@ -1,5 +1,6 @@
 import type {
   ArtifactDeps,
+  BrowserLive,
   ContextDeps,
   GitProxyDeps,
   McpConnect,
@@ -37,4 +38,6 @@ export interface AppExtras {
   appleRevoke?: AppleTokenRevoker | null;
   /** Outbound HTTP to GitHub for the desktop app's releases (ADR 0036; tests inject a fake GitHub). */
   desktopFetch?: typeof fetch;
+  /** The agent browser's live view (ADR 0040): handoff changes switch its stream; absent = handoffs only. */
+  browserLive?: BrowserLive;
 }

@@ -11,16 +11,24 @@ import {
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
+  type BrowserLive,
   ForbiddenError,
   getMembership,
   NotFoundError,
   type OrgEvent,
+  requireBrowserAccess,
   requireChannelAccess,
   touchLastSeen,
 } from "@agenteschat/engine";
 import { type Auth, type SessionUser, sessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
+import {
+  BROWSER_INPUT_PER_SECOND,
+  type BrowserClientFrame,
+  MAX_WATCHED_BROWSERS,
+  parseBrowserClientFrame,
+} from "./browser";
 import type { MachineSocketData, MachineSockets } from "./machines";
 
 /**
@@ -55,6 +63,8 @@ export interface RealtimeDeps {
   log: Logger;
   /** Connected computers' runners (`/api/machines/connect`, ADR 0025): same server, own handlers. */
   machines?: MachineSockets;
+  /** The agent browser's live view (ADR 0040, `browser.*` frames); absent = not offered. */
+  browserLive?: BrowserLive;
 }
 
 /** A browser tab of the web app. */
@@ -68,6 +78,8 @@ export interface BrowserSocketData {
   system: Unsubscribe[];
   /** Channels being authorized right now; a revocation during the check marks them. */
   pending: Map<string, { revoked: boolean }>;
+  /** Agents' browsers this socket watches (ADR 0040), by agent id: the stop function. */
+  browsers: Map<string, () => void>;
 }
 
 /** Every socket of the server: browsers (`/api/ws`) and runners (`/api/machines/connect`). */
@@ -134,6 +146,66 @@ export function createRealtime(deps: RealtimeDeps) {
     ws.send(JSON.stringify(frame));
   };
 
+  /** An agent's browser on this socket (ADR 0040): watch, stop watching, a person's input. */
+  async function browserMessage(ws: BrowserSocket, frame: BrowserClientFrame): Promise<void> {
+    const live = deps.browserLive;
+    if (!live) return;
+    const { agentId } = frame;
+    const { orgId, user } = ws.data;
+    if (frame.type === "browser.unwatch") {
+      ws.data.browsers.get(agentId)?.();
+      ws.data.browsers.delete(agentId);
+      return;
+    }
+    if (frame.type === "browser.input") {
+      const t = await deps.rateLimiter.consume(`ws-browser:${ws.data.connectionId}`, {
+        limit: BROWSER_INPUT_PER_SECOND,
+        windowMs: 1000,
+      });
+      if (!t.allowed) return send(ws, { type: "error", code: "rate_limited", agentId });
+      if (!ws.data.browsers.has(agentId)) return send(ws, { type: "error", code: "not_in_control", agentId });
+      try {
+        const sent = await live.input(user.id, orgId, agentId, frame.events);
+        if (sent.refused) send(ws, { type: "error", code: "not_in_control", agentId });
+      } catch (error) {
+        send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: String(error) });
+      }
+      return;
+    }
+    const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
+    if (!limit.allowed) return send(ws, { type: "error", code: "rate_limited", agentId });
+    if (ws.data.browsers.has(agentId)) return;
+    if (ws.data.browsers.size >= MAX_WATCHED_BROWSERS) {
+      return send(ws, { type: "error", code: "too_many_browsers", agentId });
+    }
+    // Held while it starts, so a second `browser.watch` meanwhile is a no-op and an unwatch cancels it.
+    const starting = () => {};
+    ws.data.browsers.set(agentId, starting);
+    try {
+      await requireBrowserAccess(deps.db, user.id, orgId, agentId);
+    } catch (error) {
+      if (ws.data.browsers.get(agentId) === starting) ws.data.browsers.delete(agentId);
+      const code = error instanceof NotFoundError ? "not_found" : error instanceof ForbiddenError ? "forbidden" : "";
+      if (!code) throw error;
+      return send(ws, { type: "error", code, agentId });
+    }
+    const stop = await live.watch(
+      {
+        userId: user.id,
+        send: (message) => {
+          if (ws.readyState === 1) send(ws, message);
+        },
+        // Backed up (a slow phone link): skip frames, the next one sent is the newest.
+        busy: () => ws.getBufferedAmount() > 1024 * 1024,
+      },
+      orgId,
+      agentId,
+    );
+    // Closed or unwatched while it was starting: stop at once.
+    if (ws.readyState !== 1 || ws.data.browsers.get(agentId) !== starting) return stop();
+    ws.data.browsers.set(agentId, stop);
+  }
+
   const realtime = {
     path: "/api/ws",
 
@@ -174,6 +246,7 @@ export function createRealtime(deps: RealtimeDeps) {
         subscriptions: new Map(),
         system: [],
         pending: new Map(),
+        browsers: new Map(),
       };
       return server.upgrade(req, { data }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
     },
@@ -224,6 +297,8 @@ export function createRealtime(deps: RealtimeDeps) {
       async message(socket: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
         const ws = socket as BrowserSocket;
+        const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
+        if (browserFrame) return browserMessage(ws, browserFrame);
         const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
         if (!limit.allowed) return send(ws, { type: "error", code: "rate_limited" });
         const frame = parseClientFrame(raw);
@@ -281,6 +356,8 @@ export function createRealtime(deps: RealtimeDeps) {
         const ws = socket as BrowserSocket;
         for (const off of ws.data.subscriptions.values()) off();
         ws.data.subscriptions.clear();
+        for (const stop of ws.data.browsers.values()) stop();
+        ws.data.browsers.clear();
         for (const off of ws.data.system) off();
         ws.data.system = [];
         await deps.presence.disconnect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);

@@ -52,6 +52,8 @@ interface Strings {
   routineFailedTitle: string;
   routineFailedBody: string;
   machineConnectedTitle: string;
+  browserHandoffTitle: (actor: string) => string;
+  browserHandoffBody: string;
   waitingTitle: string;
   openBody: string;
 }
@@ -72,6 +74,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     routineFailedTitle: "Uma rotina não terminou",
     routineFailedBody: "Toque para ver o que aconteceu.",
     machineConnectedTitle: "Um computador novo entrou na organização",
+    browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
+    browserHandoffBody: "Toque para abrir a tela.",
     waitingTitle: "Tem algo esperando você",
     openBody: "Toque para abrir.",
   },
@@ -90,6 +94,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     routineFailedTitle: "A routine didn't finish",
     routineFailedBody: "Tap to see what happened.",
     machineConnectedTitle: "A new computer joined the organization",
+    browserHandoffTitle: (a) => `${a} needs you in the browser`,
+    browserHandoffBody: "Tap to open the screen.",
     waitingTitle: "Something is waiting for you",
     openBody: "Tap to open.",
   },
@@ -130,6 +136,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "machine_connected":
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
       return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);
+    case "browser_handoff":
+      // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste").
+      return out(s.browserHandoffTitle(actor), text || s.browserHandoffBody);
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);
   }

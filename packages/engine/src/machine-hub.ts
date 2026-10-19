@@ -253,6 +253,17 @@ export interface MachineMissionHooks {
   online?(machineId: string): Promise<void>;
 }
 
+/**
+ * What the agent browser's live view plugs into the hub (ADR 0040 §7): the
+ * runner's frames of the sockets held here, never stored, and a socket
+ * closing (its viewers retry).
+ */
+export interface MachineBrowserHooks {
+  frame?(machineId: string, frame: Extract<RunnerFrame, { type: "browser.frame" }>): void;
+  streamEnded?(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>): void;
+  closed?(machineId: string): void;
+}
+
 export function createMachineHub(deps: MachineHubDeps) {
   const { db, pubsub } = deps;
   const replicaId = deps.replicaId ?? crypto.randomUUID();
@@ -269,6 +280,7 @@ export function createMachineHub(deps: MachineHubDeps) {
   let lastCleanup = 0;
   const subscriptions: Unsubscribe[] = [];
   let hooks: MachineMissionHooks = {};
+  let browserHooks: MachineBrowserHooks = {};
 
   const send = (conn: MachineConnection, frame: ServerFrame) => {
     if (conn.closed) return;
@@ -753,6 +765,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.pending.clear();
     if (conn.machineId && local.get(conn.machineId) === conn) {
       local.delete(conn.machineId);
+      browserHooks.closed?.(conn.machineId);
       await markOffline(conn.machineId, conn.orgId).catch(() => undefined);
     }
   }
@@ -835,6 +848,9 @@ export function createMachineHub(deps: MachineHubDeps) {
       }
       if (frame.type === "output") conn.pending.get(frame.id)?.onOutput?.(frame.stream, frame.chunk);
       else if (frame.type === "result") conn.pending.get(frame.id)?.settle(frame);
+      // The agent browser's live view (ADR 0040): straight to the viewers in memory.
+      else if (frame.type === "browser.frame") browserHooks.frame?.(conn.machineId, frame);
+      else if (frame.type === "browser.stream.ended") browserHooks.streamEnded?.(conn.machineId, frame);
       else if (frame.type === "pong") await touch(conn);
       else if (frame.type === "task.event") {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
@@ -936,6 +952,11 @@ export function createMachineHub(deps: MachineHubDeps) {
     /** Missions plug in their MCP tools and their reconnect follow-up (set once the engine is built). */
     setMissionHooks(next: MachineMissionHooks) {
       hooks = next;
+    },
+
+    /** The agent browser's live view plugs in (set once the engine is built). */
+    setBrowserHooks(next: MachineBrowserHooks) {
+      browserHooks = next;
     },
 
     /** Whether this replica holds the machine's socket. */
