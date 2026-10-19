@@ -234,6 +234,16 @@ export const en: Translations = {
       count_other: "{{count}} agents in #general.",
       none: "Pick at least one agent.",
     },
+    brain: {
+      title: "Who thinks",
+      help: "Your agents can think with the Claude Code on {{computer}}, on your Claude plan. The key below still covers the rest (who answers, summaries) and is the fallback.",
+      model: "Model through the API",
+      modelDesc: "Uses the workspace key, just below.",
+      claudeCode: "Claude Code on {{computer}}",
+      claudeCodeDesc: "Uses your Claude plan, on your computer.",
+      failed:
+        "Claude Code isn't available on {{computer}} yet: your agents use the API model. You can switch each agent later.",
+    },
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organizes tasks, summarizes conversations and runs the forum." },
       ada: { name: "Ada", role: "Dev", desc: "Codes in branches, reviews PRs and investigates bugs." },

@@ -239,6 +239,16 @@ export const ptBR = {
       count_other: "{{count}} agentes no #general.",
       none: "Escolha pelo menos um agente.",
     },
+    brain: {
+      title: "Quem pensa",
+      help: "Os agentes podem pensar pelo Claude Code do {{computer}}, com o seu plano do Claude. A chave abaixo segue valendo para o resto (quem responde, resumos) e como reserva.",
+      model: "Modelo pela API",
+      modelDesc: "Usa a chave do workspace, logo abaixo.",
+      claudeCode: "Claude Code no {{computer}}",
+      claudeCodeDesc: "Usa o seu plano do Claude, no seu computador.",
+      failed:
+        "O Claude Code ainda não está disponível no {{computer}}: os agentes seguem pelo modelo da API. Dá para trocar em cada agente.",
+    },
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organiza tarefas, resume conversas e cuida do fórum." },
       ada: { name: "Ada", role: "Dev", desc: "Programa em branches, revisa PRs e investiga bugs." },

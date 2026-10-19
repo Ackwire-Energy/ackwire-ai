@@ -948,6 +948,10 @@ body[data-window="popover"] {
 .dk-card[data-padded] {
   padding: 14px 16px;
 }
+/* Two cards in a row (no title between them) keep a gap. */
+.dk-card + .dk-card {
+  margin-top: 12px;
+}
 .dk-crow {
   display: flex;
   gap: 12px;
@@ -1101,10 +1105,14 @@ body[data-window="popover"] {
 }
 .dk-ver__acts {
   display: flex;
-  gap: 12px;
+  gap: 8px 12px;
   align-items: center;
   flex-wrap: wrap;
   margin-top: 14px;
+}
+/* Alone in its card: no space above the button. */
+.dk-ver__acts:first-child {
+  margin-top: 0;
 }
 .dk-steps-list {
   margin: 0;

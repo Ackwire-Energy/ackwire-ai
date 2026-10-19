@@ -41,6 +41,7 @@ import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useEffect, use
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { PlanTermsDialog } from "@/components/AgentBrain";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImport";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
@@ -165,9 +166,11 @@ export function OnboardingPage() {
   const [keyTouched, setKeyTouched] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
   const [platform, setPlatform] = useState(false);
-  // Computer
+  // Computer (before the agents): with one connected, the model step can pick its Claude Code.
   const [computer, setComputer] = useState<Computer>(null);
   const [machine, setMachine] = useState<Machine | null>(null);
+  const [brain, setBrain] = useState<"model" | "claude_code">("model");
+  const [askingTerms, setAskingTerms] = useState(false);
   // Team
   const [invites, setInvites] = useState<InviteDraft[]>([]);
   const [sent, setSent] = useState<Set<string>>(new Set());
@@ -196,9 +199,6 @@ export function OnboardingPage() {
     })),
     ...importedCrew,
   ];
-  const crewIds = [...createdPresets.map((p) => agentIds[p]), ...importedCrew.map((c) => c.id)].filter(
-    (id): id is string => Boolean(id),
-  );
   const ready = validInvites(invites);
   const toSend = ready.filter((i) => !sent.has(i.email));
 
@@ -349,6 +349,21 @@ export function OnboardingPage() {
         crewSoFar.push({ key, id: agent.id, handle, name: a.name, appearance: a.appearance });
         setImportedCrew([...crewSoFar]);
       }
+      // The connected computer chosen a step before: every agent works there, and thinks with its
+      // Claude Code when that was picked (the person confirmed the plan warning).
+      if (computer !== "machine" || !machine) return;
+      const all = [...PRESETS.flatMap((p) => (ids[p] ? [ids[p]] : [])), ...crewSoFar.map((c) => c.id)];
+      for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
+      if (brain !== "claude_code") return;
+      let failed = false;
+      for (const agentId of all) {
+        await api.agents
+          .setBrain(created.orgId, agentId, { brain: "claude_code", fallback: true, acceptPlanTerms: true })
+          .catch(() => {
+            failed = true;
+          });
+      }
+      if (failed) toast.show(t("onboarding.brain.failed", { computer: machine.name }), "error");
     },
   });
 
@@ -362,10 +377,7 @@ export function OnboardingPage() {
         const saved = await api.sandbox.saveSettings(created.orgId, { enabled: true });
         qc.setQueryData(keys.sandboxSettings(created.orgId), saved);
       }
-      // The chosen agents work on the connected computer (else they keep the cloud one).
-      if (computer === "machine" && machine) {
-        for (const agentId of crewIds) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
-      }
+      // The agents come next: they go to the connected computer when they are created.
     },
   });
 
@@ -427,6 +439,8 @@ export function OnboardingPage() {
       if (step.id === "team") await sendInvites.mutateAsync();
     } else if (step.id === "computer") {
       setComputer(null);
+      setMachine(null);
+      setBrain("model");
     } else if (step.id === "import") {
       setImportFrom(null);
       resetImport();
@@ -698,6 +712,44 @@ export function OnboardingPage() {
                   );
                 })}
               </div>
+              {computer === "machine" && machine && (
+                <Card as="section" aria-labelledby="brain-title">
+                  <div className="stack-4">
+                    <h2 id="brain-title" className="section-title">
+                      {t("onboarding.brain.title")}
+                    </h2>
+                    <span className="small muted">{t("onboarding.brain.help", { computer: machine.name })}</span>
+                  </div>
+                  {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+                  <div className="grid-options grid-options--sm" role="group" aria-label={t("onboarding.brain.title")}>
+                    <OptionCard pressed={brain === "model"} onClick={() => setBrain("model")}>
+                      <span className="ac-option__text">
+                        <span className="ac-option__title">{t("onboarding.brain.model")}</span>
+                        <span className="ac-option__desc">{t("onboarding.brain.modelDesc")}</span>
+                      </span>
+                    </OptionCard>
+                    <OptionCard
+                      pressed={brain === "claude_code"}
+                      onClick={() => brain !== "claude_code" && setAskingTerms(true)}
+                    >
+                      <span className="ac-option__text">
+                        <span className="ac-option__title">
+                          {t("onboarding.brain.claudeCode", { computer: machine.name })}
+                        </span>
+                        <span className="ac-option__desc">{t("onboarding.brain.claudeCodeDesc")}</span>
+                      </span>
+                    </OptionCard>
+                  </div>
+                  <PlanTermsDialog
+                    brain={askingTerms ? "claude_code" : null}
+                    onCancel={() => setAskingTerms(false)}
+                    onConfirm={() => {
+                      setBrain("claude_code");
+                      setAskingTerms(false);
+                    }}
+                  />
+                </Card>
+              )}
               <KeySection
                 title={t("onboarding.workspaceKeyTitle")}
                 help={t("onboarding.workspaceKeyHelp")}
@@ -805,7 +857,10 @@ export function OnboardingPage() {
               machine={machine}
               onChoose={(c) => {
                 setComputer(c);
-                if (c !== "machine") setMachine(null);
+                if (c !== "machine") {
+                  setMachine(null);
+                  setBrain("model");
+                }
               }}
               onPaired={setMachine}
             />

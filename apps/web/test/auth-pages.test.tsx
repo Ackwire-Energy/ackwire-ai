@@ -143,11 +143,20 @@ describe("Onboarding", () => {
     expect(screen().getByText("Passo 3 de 7 · opcional")).toBeTruthy();
   };
 
-  /** Workspace → Contexto → (no import) → Agentes e chave, with Ada (the default) and Theo. */
-  const throughAgents = async (state: ReturnType<typeof seedState>) => {
+  /** Workspace → Contexto → (no import) → Computador, before the agents. */
+  const throughImport = async (state: ReturnType<typeof seedState>) => {
     await throughContext(state);
     // Optional: continuing without a source brings nothing.
     await next();
+    expect(screen().getByRole("heading", { name: "Onde os agentes trabalham" })).toBeTruthy();
+    expect(screen().getByText("Passo 4 de 7 · opcional")).toBeTruthy();
+  };
+
+  /** … → (no computer) → Agentes e chave, with Ada (the default) and Theo. */
+  const throughAgents = async (state: ReturnType<typeof seedState>, computer?: () => Promise<void>) => {
+    await throughImport(state);
+    if (computer) await computer();
+    else await click(button("Pular por agora"), 6);
 
     expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
     expect(button(/Ada · Dev/).getAttribute("aria-pressed")).toBe("true");
@@ -231,13 +240,13 @@ describe("Onboarding", () => {
       appearance: { color: "green", eyes: "wide", accessory: "headphones" },
     });
     expect(calls(state, "chat.addMember")).toHaveLength(2);
-    expect(screen().getByRole("heading", { name: "Onde os agentes trabalham" })).toBeTruthy();
-    expect(screen().getByText("Passo 5 de 7 · opcional")).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Chame quem trabalha com você" })).toBeTruthy();
+    expect(screen().getByText("Passo 6 de 7 · opcional")).toBeTruthy();
   });
 
-  test("computer: this computer shows how to connect it (app or terminal) and connects live; team invites go out", async () => {
+  test("computer before the agents: it connects live, then the model step can pick its Claude Code; team invites go out", async () => {
     const { state, api, services, router } = await start();
-    await throughAgents(state);
+    await throughImport(state);
 
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await click(button(/Este computador ou um servidor/), 8);
@@ -256,8 +265,24 @@ describe("Onboarding", () => {
     await settle(6);
     expect(document.body.textContent).toContain("MacBook do Walter conectado · macOS.");
     await next();
-    // Both agents now use the connected computer.
+
+    // The model step: who thinks, with the computer's Claude Code once the plan warning is confirmed.
+    expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Quem pensa" })).toBeTruthy();
+    expect(button(/Modelo pela API/).getAttribute("aria-pressed")).toBe("true");
+    await click(button(/Claude Code no MacBook do Walter/), 2);
+    await click(button("Entendi, usar mesmo assim"), 2);
+    expect(button(/Claude Code no MacBook do Walter/).getAttribute("aria-pressed")).toBe("true");
+    await click(button(/Theo · PM/), 1);
+    await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
+    await next();
+    await settle(4);
+    // Both agents use the connected computer and think with its Claude Code.
     expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
+    expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
+      { brain: "claude_code", fallback: true, acceptPlanTerms: true },
+      { brain: "claude_code", fallback: true, acceptPlanTerms: true },
+    ]);
 
     expect(screen().getByRole("heading", { name: "Chame quem trabalha com você" })).toBeTruthy();
     const link = screen().getByLabelText("Link de convite") as HTMLInputElement;
@@ -290,9 +315,9 @@ describe("Onboarding", () => {
   test("optional steps can be skipped: no computer, no invites", async () => {
     const { state } = await start();
     await throughAgents(state);
-    await click(button("Pular por agora"), 6);
     expect(calls(state, "machines.createPairing")).toHaveLength(0);
     expect(calls(state, "sandbox.setTarget")).toHaveLength(0);
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
 
     expect(screen().getByRole("heading", { name: "Chame quem trabalha com você" })).toBeTruthy();
     await next();
@@ -344,6 +369,7 @@ describe("Onboarding", () => {
     await click(bring("Quill"), 1);
     expect(bring("Quill").getAttribute("aria-checked")).toBe("false");
     await next();
+    await click(button("Pular por agora"), 6);
 
     expect(screen().getByRole("heading", { name: "Seus agentes, e mais alguém?" })).toBeTruthy();
     expect(button(/Morgan · Sales lead/).getAttribute("aria-pressed")).toBe("true");
@@ -368,10 +394,9 @@ describe("Onboarding", () => {
     );
     expect(created[2]).toMatchObject({ handle: "scout", role: "Prospect researcher", appearance: { color: "sky" } });
     expect(calls(state, "chat.addMember")).toHaveLength(3);
-    expect(screen().getByRole("heading", { name: "Onde os agentes trabalham" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Chame quem trabalha com você" })).toBeTruthy();
 
     // They're in the crew at the end.
-    await click(button("Pular por agora"), 6);
     await next();
     expect(document.body.textContent).toContain("Ada, Morgan e Scout já estão no #general.");
   });
@@ -407,6 +432,7 @@ describe("Onboarding", () => {
     await click(button(/Começar do zero/), 1);
     expect(screen().queryByRole("checkbox", { name: "Trazer Knowledge" })).toBeNull();
     await next();
+    await click(button("Pular por agora"), 6);
     expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: /Knowledge · Company Knowledge/ })).toBeNull();
     await keyAndContinue();
@@ -420,6 +446,6 @@ describe("Onboarding", () => {
     await pickFiles([new File([fixture("agents.yaml")], "agents.yaml")]);
     expect(screen().getByRole("alert").textContent).toContain("Isso não parece um arquivo de time do OpenMausBot");
     await click(button("Pular por agora"), 6);
-    expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Onde os agentes trabalham" })).toBeTruthy();
   });
 });
