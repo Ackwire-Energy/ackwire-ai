@@ -9,6 +9,7 @@ const MACHINE_EVENTS = new Set([
   "machine.state",
   "machine.access",
   "machine.deleted",
+  "machine.agents_moved",
 ]);
 const isMachineEvent = (type: string) => MACHINE_EVENTS.has(type);
 
@@ -72,6 +73,10 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;
   const list = keys.machines(orgId);
+  // Who waits for an offline computer changes when one comes back, goes away or its agents move.
+  if (e.type === "machine.status" || e.type === "machine.deleted" || e.type === "machine.agents_moved") {
+    void qc.invalidateQueries({ queryKey: keys.machineOutages(orgId) });
+  }
   switch (e.type) {
     case "machine.status": {
       const online = e.online === true;
@@ -107,6 +112,10 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       if (Object.keys(patch).length === 0 || e.access === true) void qc.invalidateQueries({ queryKey: list });
       break;
     }
+    case "machine.agents_moved":
+      void qc.invalidateQueries({ queryKey: list });
+      void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+      break;
     case "machine.deleted":
       qc.setQueryData<Machine[]>(list, (old) => old?.filter((m) => m.id !== machineId));
       // Its agents went back to the cloud (`agent.computer` events follow; refetch anyway).

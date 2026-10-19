@@ -34,4 +34,6 @@ export const STORAGE_KEYS = {
   driveView: "agentes.drive.view",
   /** "1" when the person shrank the sidebar to its icon rail (desktop). */
   sidebarCollapsed: "agentes.sidebar.collapsed",
+  /** Offline-computer notices the person closed (`machineId@offlineSince`), until that computer comes back. */
+  outagesDismissed: "agentes.outages.dismissed",
 } as const;

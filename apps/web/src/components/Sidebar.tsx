@@ -6,6 +6,7 @@ import {
   useChannels,
   useConnections,
   useDms,
+  useMachineOutages,
   useMissionList,
   useNotificationCount,
   useOverview,
@@ -14,6 +15,7 @@ import {
 } from "@agenteschat/client";
 import { audienceChip } from "@agenteschat/client/lib/audience";
 import { formatPercent } from "@agenteschat/client/lib/format";
+import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
@@ -42,7 +44,7 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
@@ -104,6 +106,9 @@ export function Sidebar() {
   const missionList = useMissionList(orgId, { status: "waiting_you", limit: 1 });
   const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
   const people = dir.members.filter((m) => m.userId !== me.user.id);
+  // Agents waiting for an offline computer: "esperando" instead of anything "working".
+  const outages = useMachineOutages(orgId);
+  const waitingFor = useMemo(() => waitingAgents(outages.data), [outages.data]);
   const budgetUsed = overview.data ? overview.data.budgetUsedPercent : null;
   const dms = useDms(orgId);
   const dmChannels = new Set((dms.data ?? []).map((d) => d.channelId));
@@ -372,6 +377,7 @@ export function Sidebar() {
                 key={a.id}
                 agent={a}
                 unread={unreadWith.get(a.id) ?? 0}
+                waitingFor={waitingFor.get(a.id)}
                 onPrefetch={() => prefetchDm(a.id)}
                 onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
               />
@@ -440,18 +446,21 @@ export function Sidebar() {
 function AgentRow({
   agent: a,
   unread,
+  waitingFor,
   onPrefetch,
   onOpen,
 }: {
   agent: Agent;
   unread: number;
+  /** The offline computer it waits for (its brain runs there). */
+  waitingFor?: string;
   onPrefetch: () => void;
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const state = useStreams((st) => agentStateIn(st, a.id));
-  const busy = state !== "idle";
+  const busy = state !== "idle" && !waitingFor;
   const color = colorOf(a);
   const chip = audienceChip(t, a);
   return (
@@ -468,10 +477,20 @@ function AgentRow({
     >
       {busy && <AgentTrail color={color} />}
       {busy && <AgentGlow color={color} />}
-      <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+      <AgentAvatar
+        agentId={a.id}
+        name={a.name}
+        size="sm"
+        {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
+      />
       <span className="sidebar__item-label">{a.name}</span>
       {unread > 0 ? (
         <UnreadCount count={unread} />
+      ) : waitingFor ? (
+        <span className="sidebar__item-meta sidebar__waiting" title={t("outage.sidebar.tip", { name: waitingFor })}>
+          <Icon name="waiting" size={14} />
+          {t("outage.sidebar.waiting")}
+        </span>
       ) : busy ? (
         <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
       ) : (

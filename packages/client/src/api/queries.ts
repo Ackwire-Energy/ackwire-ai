@@ -52,6 +52,7 @@ import type {
   MailImapInput,
   Message,
   MessageMemory,
+  MoveAgentsInput,
   NotificationCount,
   NotificationEvent,
   NotificationFilter,
@@ -1589,6 +1590,47 @@ export const useMachines = (orgId: string, enabled = true, pollMs: number | fals
     meta: { quiet: true },
   });
 };
+
+/**
+ * Offline computers that agents wait for, and where they could move. While any is shown it refetches
+ * every 30 s (and on focus); `machine.status` / `machine.agents_moved` events refresh it too.
+ */
+export const useMachineOutages = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.machineOutages(orgId),
+    queryFn: () => api.machines.outages(orgId),
+    enabled,
+    retry: false,
+    refetchInterval: (q) => ((q.state.data?.outages.length ?? 0) > 0 ? 30_000 : false),
+    refetchOnWindowFocus: true,
+    meta: { quiet: true },
+  });
+};
+
+/** "Trocar computador": moves waiting agents off an offline computer; outages, agents, computers and chats follow. */
+export function useMoveAgents(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ machineId, ...input }: MoveAgentsInput & { machineId: string }) =>
+      api.machines.moveAgents(orgId, machineId, input),
+    meta: { silent: true },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+      // Every conversation's messages (the waiting cards change).
+      void qc.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "org" &&
+          q.queryKey[1] === orgId &&
+          q.queryKey[2] === "channel" &&
+          q.queryKey[4] === "messages",
+      });
+    },
+  });
+}
 
 /** `/conectar?code=`: the computer that made this code (ADR 0036 §5). */
 export const useMachineDevice = (userCode: string, enabled = true) => {

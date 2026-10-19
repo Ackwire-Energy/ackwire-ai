@@ -8,6 +8,7 @@ import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { RefetchBar } from "@/components/Loading";
+import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
@@ -71,7 +72,13 @@ function OrgLayout() {
                   <ShellBar />
                 </>
               )}
-              <Outlet />
+              {/* The work area: a notice on top when a computer the agents run on went offline, then the page. */}
+              <div className="shell__work">
+                {!focused && <OutageNotices />}
+                <div className="shell__pages">
+                  <Outlet />
+                </div>
+              </div>
             </div>
           </NavDrawerProvider>
         </ArtifactViewerProvider>

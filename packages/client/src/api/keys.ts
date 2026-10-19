@@ -52,6 +52,8 @@ export const keys = {
   computers: (orgId: string) => ["org", orgId, "sandbox", "computer"] as const,
   agentSecrets: (orgId: string, agentId: string) => ["org", orgId, "agent-secrets", agentId] as const,
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
+  /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
+  machineOutages: (orgId: string) => ["org", orgId, "machines", "outages"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
   machineDevice: (userCode: string) => ["machine-device", userCode] as const,
   desktopLatest: (target: string, arch: string) => ["desktop-latest", target, arch] as const,

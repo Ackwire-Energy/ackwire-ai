@@ -50,6 +50,7 @@ import type {
   IssueActivity,
   Machine,
   MachineAccess,
+  MachineOutages,
   MachineTask,
   MailAccount,
   MailFolder,
@@ -75,6 +76,7 @@ import type {
   MissionSettings,
   MissionSummary,
   Model,
+  MoveAgentsResult,
   NotificationCount,
   NotificationPage,
   Organization,
@@ -463,6 +465,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       },
       desktopLatest: (target, arch) =>
         nullOn(404, () => request<DesktopRelease>("/api/desktop/latest", { query: { target, arch } })),
+      outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
+      moveAgents: (orgId, machineId, input) =>
+        request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

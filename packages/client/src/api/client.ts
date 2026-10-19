@@ -67,6 +67,7 @@ import type {
   Machine,
   MachineAccess,
   MachineAccessReduce,
+  MachineOutages,
   MachineTask,
   MailAccount,
   MailActionName,
@@ -99,6 +100,8 @@ import type {
   MissionSettings,
   MissionSummary,
   Model,
+  MoveAgentsInput,
+  MoveAgentsResult,
   NotificationCount,
   NotificationFilter,
   NotificationPage,
@@ -367,6 +370,10 @@ export interface ApiClient {
     reduceAccess(orgId: string, machineId: string, input: MachineAccessReduce): Promise<MachineAccess>;
     /** ADR 0036 §9: the newest desktop app build; `null` when there is none (404). */
     desktopLatest(target: string, arch: string): Promise<DesktopRelease | null>;
+    /** Offline computers that agents wait for, and where they could move. */
+    outages(orgId: string): Promise<MachineOutages>;
+    /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
+    moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
   };
   skills: {
     /** The org library. */

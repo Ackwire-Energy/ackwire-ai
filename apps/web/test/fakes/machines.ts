@@ -8,10 +8,19 @@
  * - `POST   /api/app/machines/device/{userCode}/deny` → 204
  * - `POST   …/machines/{id}/access/reduce` `{ removeFolder?, disableTool? }` → the new access
  * - `GET    /api/desktop/latest?target=&arch=` → the release, or 404 (`null`)
- * Tests add machines with `pair()`, codes with `addDevice()` and a release with `setRelease()`.
- * No machines, codes or release by default.
+ * - `GET    …/machines/outages` → `{ outages, targets }` (offline computers agents wait for)
+ * - `POST   …/machines/{id}/move-agents` `{ agentIds, target }` → `{ moved, skipped, resumed, stillWaiting }`
+ * Tests add machines with `pair()`, codes with `addDevice()`, a release with `setRelease()`, outages with
+ * `setOutages()` and the move's answer with `setMoveResult()`. No machines, codes, release or outages by default.
  */
-import type { ApiClient, DesktopRelease, DeviceRequest, Machine } from "@agenteschat/client";
+import type {
+  ApiClient,
+  DesktopRelease,
+  DeviceRequest,
+  Machine,
+  MachineOutages,
+  MoveAgentsResult,
+} from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError } from "./context";
 
@@ -30,6 +39,10 @@ export interface FakeMachines {
   addDevice(userCode: string, input?: Partial<DeviceRequest>): DeviceRequest;
   /** The newest desktop build; `null` = none (404). */
   setRelease(release: DesktopRelease | null): void;
+  /** Offline computers and where their agents could go. */
+  setOutages(outages: MachineOutages): void;
+  /** What `moveAgents` answers (default: every agent moved, nothing else). */
+  setMoveResult(result: MoveAgentsResult | null): void;
 }
 
 let seq = 0;
@@ -40,6 +53,8 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   const machines: Machine[] = [];
   const devices = new Map<string, DeviceRequest>();
   let release: DesktopRelease | null = null;
+  let outages: MachineOutages = { outages: [], targets: [] };
+  let moveResult: MoveAgentsResult | null = null;
   const find = (id: string) => {
     const m = machines.find((x) => x.id === id);
     if (!m) throw new MockNotFoundError("Computador não encontrado.");
@@ -129,6 +144,12 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.desktopLatest", target, arch);
         return release ? clone(release) : null;
       },
+      // Read on every workspace page (the notice): not logged, so tests' call lists stay as they were.
+      outages: async () => clone(outages),
+      moveAgents: async (orgId, machineId, input) => {
+        log("machines.moveAgents", orgId, machineId, input);
+        return clone(moveResult ?? { moved: input.agentIds, skipped: [], resumed: 0, stillWaiting: 0 });
+      },
     },
     pair,
     peek: (id) => machines.find((m) => m.id === id),
@@ -141,6 +162,12 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       if (m) Object.assign(m, patch);
     },
     all: () => clone(machines),
+    setOutages: (next) => {
+      outages = clone(next);
+    },
+    setMoveResult: (next) => {
+      moveResult = next;
+    },
     addDevice: (userCode, input = {}) => {
       const now = ctx.now();
       const d: DeviceRequest = {

@@ -1811,6 +1811,65 @@ export interface DesktopRelease {
   size?: number | null;
 }
 
+/** A computer brain that runs on a connected machine. */
+export type ComputerBrain = "claude_code" | "codex";
+
+/** An agent waiting for an offline computer, and what it has waiting. */
+export interface OutageAgent {
+  agentId: string;
+  name: string;
+  brain: ComputerBrain;
+  waiting: { routines: number; conversations: number };
+}
+
+/** A connected computer that went offline while agents' brains run on it. */
+export interface MachineOutage {
+  machineId: string;
+  name: string;
+  /** The machine's `os` (`darwin`, `windows`, `linux`…). */
+  platform: string;
+  offlineSince: string;
+  agents: OutageAgent[];
+  /** Runs parked until the computer (or another one) can take them. */
+  waitingRuns: number;
+}
+
+/** Where waiting agents may move: another connected machine, or the cloud computer. */
+export type OutageTarget =
+  | {
+      kind: "machine";
+      machineId: string;
+      name: string;
+      platform: string;
+      online: boolean;
+      brains: ComputerBrain[];
+      /** Why it can't take them now, or null. */
+      reasonOff: "offline" | "paused" | null;
+    }
+  /** The cloud computer: runs only the brains listed (none of the computer brains today). */
+  | { kind: "cloud"; available: boolean; brains: ComputerBrain[] };
+
+/** `GET …/machines/outages`. */
+export interface MachineOutages {
+  outages: MachineOutage[];
+  targets: OutageTarget[];
+}
+
+/** `POST …/machines/{machineId}/move-agents`. */
+export interface MoveAgentsInput {
+  agentIds: string[];
+  target: { kind: "machine"; machineId: string } | { kind: "cloud" };
+}
+
+export interface MoveAgentsResult {
+  moved: string[];
+  skipped: { agentId: string; reason: string }[];
+  /** Waiting runs that started again on the new computer. */
+  resumed: number;
+  /** Runs that keep waiting for the old computer (they already changed files there). */
+  stillWaiting: number;
+}
+
 /** Org events about connected computers. */
 export type MachineEvent =
   | { type: "machine.status"; machineId: string; online: boolean }
@@ -1826,7 +1885,9 @@ export type MachineEvent =
   /** ADR 0036: a new pause state or access reported by the machine (also accepted inside `machine.updated`). */
   | { type: "machine.state"; machineId: string; paused?: MachinePause | null }
   | { type: "machine.access"; machineId: string; access?: MachineAccess | null }
-  | { type: "machine.deleted"; machineId: string };
+  | { type: "machine.deleted"; machineId: string }
+  /** Waiting agents moved off an offline computer ("Trocar computador"). */
+  | { type: "machine.agents_moved"; machineId: string };
 
 // ── Forum (apps/server/src/routes/app/forum.ts, D33 revised by D45) ─────────
 

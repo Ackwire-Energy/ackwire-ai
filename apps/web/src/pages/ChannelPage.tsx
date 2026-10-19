@@ -73,6 +73,7 @@ import {
   parseMissionCommand,
   taskNoticeOf,
 } from "@agenteschat/client/lib/missions";
+import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
 import { localMeta, quoteExcerpt, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
@@ -135,6 +136,7 @@ import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfM
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
+import { WaitingCard } from "@/components/MachineOutages";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
@@ -2202,8 +2204,12 @@ export const TimelineMessage = memo(function TimelineMessage({
     : null;
   // The root of an issue's work thread (the person asked the agent to implement it): the issue card, no text.
   const issueWork = issueWorkOf(meta);
+  // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
+  const brainNotice = m.author.type === "agent" ? brainUnavailableOf(meta) : null;
+  const waitNotice = brainNotice && isOfflineNotice(brainNotice) ? brainNotice : null;
   const card =
     approvalId ||
+    waitNotice ||
     proposalId ||
     memoryUpdates.length > 0 ||
     question ||
@@ -2320,6 +2326,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         !missionCard &&
         !forumSuggestion &&
         !issueWork &&
+        !waitNotice &&
         (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
           <MessageText>
             <MessageBody
@@ -2345,6 +2352,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       {proposalId && <InlineProposal proposalId={proposalId} />}
       {agent &&
         memoryUpdates.map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
+      {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
       {question && <QuestionCard question={question} />}
       {secretRequest && <SecretCard request={secretRequest} />}
       {m.author.type === "agent" && m.agentRunId && !card && !m.local && (

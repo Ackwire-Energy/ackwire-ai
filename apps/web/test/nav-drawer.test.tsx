@@ -67,7 +67,8 @@ describe("the sidebar on a phone (drawer)", () => {
     expect(button.getAttribute("aria-expanded")).toBe("true");
     expect(document.activeElement).toBe(nav());
     // The page behind can't be reached while it's open.
-    const main = document.querySelector("main.shell__main") as HTMLElement;
+    // The work area (an offline-computer notice and the page) is inert as a whole.
+    const main = document.querySelector(".shell__work") as HTMLElement;
     expect(main.inert).toBe(true);
 
     await act(async () => {

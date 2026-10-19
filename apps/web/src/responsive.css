@@ -29,6 +29,18 @@
   .shell__main--chat {
     padding-bottom: 0;
   }
+  .shell__work {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+  }
+  .outages {
+    padding: 8px 12px 0;
+  }
+  /* Chat pages hide the bar: the notice keeps clear of the notch itself. */
+  .shell:has(.channel__header) .outages {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  }
 
   /* Menu, the workspace, search. Chat pages put the menu in their own header instead. */
   .shell__bar {
@@ -414,6 +426,22 @@
     display: none;
   }
   .agp-savebar__save {
+    flex: 1;
+  }
+}
+
+/* ── Offline computer notice on phones: the words, then the buttons sharing the width ── */
+@media (max-width: 640px) {
+  .outage {
+    flex-wrap: wrap;
+  }
+  .outage__crew {
+    display: none;
+  }
+  .outage__acts {
+    flex-basis: 100%;
+  }
+  .outage__acts > .ac-btn:not(.ac-btn--icon) {
     flex: 1;
   }
 }

@@ -271,6 +271,173 @@ p {
   flex-direction: column;
   overflow: hidden;
 }
+/*
+ * The work area beside the sidebar: an app-wide notice on top when there is one (telas/ComputadorOffline.html),
+ * then the page, laid out as before (a row: the page's main column and anything beside it).
+ */
+.shell__work {
+  flex: 1 1 560px;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--pane);
+}
+.shell__pages {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.shell__pages > .shell__main {
+  height: auto;
+}
+
+/* "O MacBook Air desconectou": a neutral bar on the page, our attention color only on its icon. */
+.outages {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px 0;
+}
+.outage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--e1), var(--top);
+}
+.outage__icon {
+  color: var(--attention);
+}
+.outage__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.outage__text b {
+  font-weight: 600;
+}
+.outage__text span {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.outage__crew {
+  display: inline-flex;
+  gap: 2px;
+}
+.outage__acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Several at once: the ones after the first stay compact (one line each). */
+.outages[data-count]:not([data-count="1"]) .outage {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.outages[data-count]:not([data-count="1"]) .outage__text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "Trocar o computador" */
+.outage-dialog__h {
+  margin: 4px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.outage-dialog__h--gap {
+  margin-top: 14px;
+}
+.outage-dialog__none {
+  margin-top: 8px;
+}
+.outage-dialog__who {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.outage-dialog__agent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.outage-dialog__agent:hover {
+  background: var(--surface-sunken);
+}
+.outage-dialog__name {
+  flex: 1;
+  min-width: 0;
+}
+.outage-dialog__agent small {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.outage-dialog__hint {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.outage-dialog__hint .ac-icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* The agent's one card while it waits for its computer (instead of repeated messages). */
+.waitcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 520px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.waitcard__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.waitcard__top .ac-icon {
+  color: var(--attention);
+}
+.waitcard[data-done] .waitcard__top .ac-icon {
+  color: var(--success);
+}
+.waitcard p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+.waitcard__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* An agent waiting for its offline computer, in the sidebar: the clock and "esperando". */
+.sidebar__waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Narrow screens: the bar (menu, workspace, search) and the drawer; see "Responsive" at the end. */
 .shell__bar,
 .shell__scrim {
