@@ -4,47 +4,79 @@
 - Date: 2026-10-19
 - Planning: D57
 - First slice of: ADR 0031 (computer use). Where the two disagree, this ADR wins for the browser.
-- Extends: ADR 0025 (connected computers), ADR 0027 (secrets), ADR 0030 (runner isolation), ADR 0032 (one engine, the runner MCP as a bridge), ADR 0036 (desktop app, access on the machine)
-- Out of scope for now: Daytona computers, the simulator (Maestro, its own ADR), the virtual desktop, the owner's desktop, pixel-driving through provider computer-use tools
+- Extends: ADR 0025 (connected computers), ADR 0027 (secrets), ADR 0032 (one engine, the runner MCP as a bridge), ADR 0036 (desktop app, access on the machine), ADR 0010 (realtime)
+- Out of scope for now: Daytona computers, the simulator (Maestro, its own ADR), the virtual desktop, the owner's desktop, video streaming (H.264/WebRTC), DOM replay (rrweb), several server replicas, intent tools with Jev, protected mode (ADR 0030)
 
 ## Context
 
-ADR 0031 plans four kinds of screen. The browser carries most of the value (web apps without an API, test logins, Stripe test checkouts, checking a UI the agent just built) at the least risk, and it works at every isolation level. We take it first, on connected computers only.
+ADR 0031 plans four kinds of screen. The browser carries most of the value (web apps without an API, test logins, Stripe test checkouts, checking a UI the agent just built) at the least risk. We take it first, on connected computers only.
 
-ADR 0031 §4 planned to drive Chromium over CDP ourselves. A tool already does that for agents:
+### `agent-browser`
 
-- **`agent-browser`** (Vercel Labs, Apache-2.0, `github.com/vercel-labs/agent-browser`): a native Rust CLI and daemon, one daemon per session, speaking CDP directly to an installed Chrome (or Chrome for Testing it downloads). No Node, no Playwright.
-- `snapshot` returns the page's accessibility tree as text with refs (`button "Submit" [ref=e2]`); actions take a ref (`click @e2`, `fill @e3 "…"`); a click covered by another element fails with the covering element named. `wait --text/--url/--selector/--load`, tabs, frames, dialogs, upload, console, network, `screenshot` (`--if-changed`, `--annotate`).
-- Per session: `--session`, `--profile <dir>`, `--allowed-domains` (also blocks sub-requests, WebSocket, beacons, WebRTC), `--content-boundaries` (untrusted page text delimited), `--max-output`, `--action-policy`, idle shutdown (1 h by default).
-- A WebSocket stream per session: JPEG frames with viewport metadata and URL changes out, `input_mouse` / `input_keyboard` / `input_touch` in, fps capped per client. Made for "pair browsing".
-- `agent-browser mcp`: the same surface as MCP tools, in profiles.
-- It calls no model, except an optional `chat` command through Vercel's AI Gateway, which we don't use.
+ADR 0031 §4 planned to drive Chromium over CDP ourselves. A tool already does that for agents: **`agent-browser`** (Vercel Labs, Apache-2.0, `github.com/vercel-labs/agent-browser`).
 
-Orca (`stablyai/orca`) ships its built-in browser on it, bridged to an Electron webview over CDP. Most of Orca's own browser code is about keeping agent input out of the user's keyboard focus, because its browser lives in the user's window. Ours is headless on the runner, so that problem doesn't arise.
+- A native Rust CLI and daemon, one daemon per session, speaking CDP directly to an installed Chrome (or Chrome for Testing it downloads). No Node, no Playwright. About 20 MB per platform.
+- `snapshot` returns the page's accessibility tree as text with refs (`button "Submit" [ref=e2]`); actions take a ref (`click @e2`, `fill @e3 "…"`); a click covered by another element fails with the covering element named. `wait --text/--url/--selector/--load`, tabs, frames, dialogs, upload, console, network, `screenshot` (`--if-changed`).
+- Per session: `--session`, `--profile <dir>` (persistent: cookies, storage, cache survive restarts), `--allowed-domains` (also blocks sub-requests, WebSocket, beacons, WebRTC), `--content-boundaries`, `--max-output`, `--action-policy`, idle shutdown.
+- A local WebSocket stream per session: JPEG frames with viewport metadata and URL changes out; `input_mouse`, `input_keyboard`, `input_touch` in; fps capped per client; newest frame wins.
+- It calls no model (an optional `chat` command through Vercel's AI Gateway is not used). The page is text, so any model drives it, including models without image input.
 
-What we have today: the runner's machine-side switches (`hello.access.tools`: `claude`, `codex`, `commands`, protocol 10), agent folders, `request_secret` (ADR 0027), the `agentes` MCP bridge for Claude Code and Codex (ADR 0032), runner protocol 11. The existing `computer_start` / `computer_stop` / `computer_status` tools are about the Daytona computer's lifecycle.
+### How others do it (checked 2026-10-19)
+
+| Product | Live view | Take over |
+|---|---|---|
+| OpenMausBot (Apache-2.0) | Relays `agent-browser`'s JPEG stream; noVNC for full container/VPS computers | A person's "hold" pauses the agents and survives a dropped stream for a while, so the panel reconnects and carries on |
+| OpenBot (CopilotKit, MIT) | Screenshot polling while watching; Chrome's CDP screencast (JPEG) over a WebSocket while a person drives, input back over CDP (after DevTools' `InputModel.ts` and Steel's casting handler) | Command mapped to Control, paste forwarded |
+| Steel | Headful: WebRTC H.264 at 25 fps from the OS display. Headless: CDP screencast, called legacy | `interactive=true` on the viewer |
+| Kernel | WebRTC adapted from neko, or noVNC. Fixed resolution and capped fps because 1080p dropped frames | Read/write by default; pauses recording while a person types sensitive data |
+| Browser Use, Anchor, Hyperbrowser | An iframe with a live URL (a bearer token) | The iframe is interactive; the embedding app locks it |
+| Cloudflare Browser Run | Live view URL | A formal handoff: `handoff(instructions, timeout)` → the person picks Done or Failed → `handoffComplete { success, reason }` → the script resumes |
+
+Conclusions: headless browsers stream JPEG frames; video (WebRTC) appears only where a full display is captured. The two products closest to ours (OpenMausBot, OpenBot) use JPEG for the browser, and OpenMausBot uses `agent-browser`. Cloudflare's handoff is the clearest shape for "the agent needs a person".
+
+Lessons from OpenMausBot's code (`server/browser-relay.ts`, `server/browser-live.ts`):
+
+- The daemon runs one command per session at a time: a read waits behind the agent's command, and a timed-out command stays queued.
+- Some commands relaunch a Chrome that died; check `stream_status` before reading.
+- The stream's `input_keyboard` lacks virtual key codes and text for Enter/Tab; complete them with `agent-browser`'s own key resolver.
+
+### Alternatives considered
+
+- **Our own CDP code:** weeks of work `agent-browser` already did; kept as the fallback behind our tools.
+- **Video (H.264 through ffmpeg's WHIP output to LiveKit or Cloudflare, or WebRTC):** lighter on the wire, but an extra binary, an experimental muxer, a media service (Railway has no inbound UDP) and players on web and phone. For a login of a few minutes, JPEG at 10–15 fps is close enough.
+- **DOM replay (rrweb):** very light and sharp for watching, but logins live in cross-origin iframes (Stripe, Google, captchas), OAuth opens popups, assets load from the viewer's browser without the agent's cookies, and clicks on a replica are fragile. Not for take over.
+- **A visible window on the computer for logins:** dropped; one path everywhere (the stream).
 
 ## Decision
 
 ### 1. `agent-browser` behind our own tools
 
-- The runner drives `agent-browser` (pinned version) as a child process with `--json`. Agents never get the raw CLI or its MCP server: they get our tools, so audit, Stop, allowlist, secrets, take over and caps hold whatever the brain.
-- Our tools are the interface. If `agent-browser` changes course, we replace it with our own CDP code under the same tools without touching agents.
+- The runner drives `agent-browser` (pinned version) as a child process with `--json`. Agents never get the raw CLI or its MCP server: they get our tools, so Stop, the allowlist, secrets, handoff and caps hold whatever the brain.
+- Our tools are the interface: if `agent-browser` changes course, our own CDP code replaces it under the same tools.
 - Turned off on our side: its credential vault (secrets come from `request_secret`), importing auth from the owner's Chrome (`--auto-connect`, Chrome profile reuse), `chat`, plugins, its dashboard.
 
-### 2. Where it runs: connected computers only
+### 2. Shipping
 
-- Desktop app (macOS): `agent-browser` ships as a second Tauri sidecar next to `agentes-runner`. CI downloads the pinned release, checks its SHA-256, signs it with our Developer ID and notarizes it with the app. It updates with the app.
-- Terminal installs (servers, Linux, Windows): the runner downloads the binary on first use from our server (same download route as the app), checks the SHA-256 pinned in the runner, into `~/.agentes-runner/bin/`. Machines that never use the browser download nothing.
-- Chrome: the one already installed (Chrome, Brave, Chromium). If none, the runner runs `agent-browser install` (Chrome for Testing) on first use and the machine page shows the download. Linux without Chrome's libraries needs `install --with-deps` (sudo): the runner doesn't report the browser and the machine page shows the command.
+- **Desktop app (macOS):** a second Tauri sidecar next to `agentes-runner` (`externalBin`). CI downloads the pinned release, checks its SHA-256, signs it with our Developer ID and notarizes it with the app. It updates with the app.
+- **Terminal installs (servers, Linux, Windows):** the runner downloads the binary on first use from our server, checks the SHA-256 pinned in the runner, into `~/.agentes-runner/bin/`. Machines that never use the browser download nothing.
+- **Chrome:** the one already installed (Chrome, Brave, Chromium); if none, `agent-browser install` (Chrome for Testing) on first use, with progress on the machine page. Linux without Chrome's libraries needs `install --with-deps` (sudo): the runner doesn't report the browser and the machine page shows the command.
 - The license and NOTICE go in the app's about box and the runner's `licenses` output.
 
 ### 3. Turned on in two places
 
-- **On the machine** (protocol 12): a fourth switch in `access.tools`, `browser`, set by the person on the computer (tray app or `agentes-runner access`), off by default. Like the other switches, the server can show it and ask to turn it off, never on. `hello.browser` reports whether it can serve (binary, Chrome, version).
-- **On the agent**: the scope `browser:use`, outside "all tools" (like `sandbox:run`), on the agent's page next to its computer. Offered only when the agent's computer reports `browser` on; disabled with the reason otherwise.
+- **On the machine:** a fourth switch in `access.tools`, `browser`, set by the person on the computer (tray app or `agentes-runner access`), off by default. As with the other switches, the server can show it and ask to turn it off, never on. `hello.browser` reports whether it can serve.
+- **On the agent:** the scope `browser:use`, outside "all tools" (like `sandbox:run`), on the agent's page next to its computer. Offered only when the agent's computer reports `browser` on; disabled with the reason otherwise.
 
-### 4. Tools
+### 4. One browser per agent, logins kept
+
+- Session `agent-<id8>`, persistent profile and downloads in the agent's folder (`<handle>-<id8>/.agentes/browser`), headless, idle shutdown after 15 minutes. A login done once stays until the site ends it.
+- Per agent, not shared: another agent signs in on its own. Per computer: an agent moved to another computer signs in again.
+- Logins only to test accounts or the agent's own accounts, never a person's personal account (agent instructions, docs, and one line on the agent's page: "Logins stay on this computer, in the agent's folder"). Until protected mode exists, other unprotected agents and the owner can read that folder.
+- Optional site allowlist per agent (`--allowed-domains`). `file://` and the owner's paths blocked.
+- Cap of live browsers per machine (owner setting, default from memory, about 300 MB each); over it the agent sees "waiting for the computer".
+- The runner serializes commands per session (one at a time, like the daemon), times them out and checks the session before reading.
+
+### 5. Tools
 
 Named `browser_*` (the `computer_*` names are the Daytona lifecycle):
 
@@ -54,72 +86,88 @@ Named `browser_*` (the `computer_*` names are the Daytona lifecycle):
 - `browser_type_secret(ref, secret)`: types a secret already delivered with `request_secret`; the runner reads it locally; refused when the target isn't a password or one-time-code field
 - `browser_wait(text | url | selector | load, timeout)`
 - `browser_screenshot`: saved in the agent's folder (Claude Code and Codex read it there); image results for gateway brains come with ADR 0031 step 2
-- `browser_ask_person(reason)`: asks for take over (§6) and suspends the run until the person hands back
+- `browser_ask_person(instructions, timeout)`: the handoff (§6)
 - `browser_close`
 
-Refs go stale after navigation; the tools say so (`stale_ref`) and the agent reads again.
+Refs go stale after navigation; the tools say so (`stale_ref`) and the agent reads again. Every brain gets the same tools: gateway brains through the Tool Gateway, Claude Code and Codex through the runner's `agentes` MCP bridge.
 
-Every brain gets the same tools: gateway brains through the Tool Gateway, Claude Code and Codex through the runner's `agentes` MCP bridge (ADR 0032). Model-agnostic: the page is text, so models without image input browse too.
+### 6. Handoff: the agent asks, a person does it, the agent checks
 
-### 5. One browser per agent
+Modeled on Cloudflare's handoff:
 
-- Session `agent-<id8>`, profile and downloads in the agent's folder (`<handle>-<id8>/.agentes/browser`), headless, idle shutdown after 15 minutes. Logins persist in that profile.
-- Optional site allowlist per agent (`--allowed-domains`). `file://` and the owner's paths blocked.
-- Cap of live browsers per machine (owner setting, default from memory, about 300 MB each); over it the agent sees "waiting for the computer".
-- Protected mode (ADR 0030 level 2): the browser runs inside the agent's sandbox with an adjusted profile (Chrome's cache, shm, GPU, network). To test on each OS before calling it supported; until then a protected agent's `browser:use` is offered with "not yet in protected mode".
+1. The agent calls `browser_ask_person("Sign in to Stripe with the shop's test account", 30 min)`. The run suspends, like `request_secret` and approvals.
+2. A card in the chat ("Dev needs you · Sign in to Stripe · Open"), at the top of "Waiting for you" in notifications, and a push to the phone. It goes to whoever asked for the work, else the agent's responsible person.
+3. The person opens a full-screen live view (§7) with the agent's instructions on top, a "you're in control" badge, and two buttons: **Done** and **Couldn't** (optional reason).
+4. The agent resumes with `{ result: done | failed | expired, note? }`, reads the page again and checks the outcome (still on the login page → it says so in the chat instead of carrying on). The card resolves itself.
 
-### 6. Take over and live view
+A person watching can also **take over** on their own: the same screen; the agent pauses and, when handed back, is told "a person changed the page" and reads again before acting.
 
-- The runner bridges the session's local stream to our WebSocket (through the machine channel) only while someone watches: about 1 fps watching, 10–15 fps in control.
-- **Take over:** a card in the chat ("Dev needs you to sign in to Stripe · Take over"), from `browser_ask_person` or from a person on the run. The person's mouse, keys and touches go back as stream input; typed text through CDP `Input.insertText` if the stream's key events don't carry accents and paste well (to test). Popups and new tabs (OAuth windows) followed. One person in control per agent browser; others watch.
-- Nothing reaches the model during take over. The audit records who and when, not what was typed.
-- **In front of the computer:** the runner reopens the agent's profile `--headed`; the person signs in in a normal Chrome window (passkeys, password managers, the home IP) and closes it.
-- Passkeys and hardware keys don't cross a remote browser; the person picks another method or uses the local window.
+- One person in control per agent browser; others watch ("Ana is in control").
+- Control survives a dropped stream for a short time (reconnect, deploy overlap), as in OpenMausBot's hold; after that it ends as `expired`.
+- Default timeout 30 minutes, up to the agent's request within a cap.
+- Nothing reaches the model during a handoff: no frames, no keys.
+- Passkeys and hardware keys don't cross a remote view; the person picks another sign-in method.
 - We never copy cookies from the owner's own browser.
 
-### 7. Watching, stopping, audit
+### 7. Live view: `agent-browser`'s JPEG stream, in memory
+
+- The runner opens the session's local stream only while someone watches and forwards frames over its machine socket. The server relays them to the viewers' sockets in memory: nothing written to Postgres, nothing stored.
+- Adaptive: about 1 fps while watching, 10–15 fps while a person is in control. Chrome only sends frames when the page changes; newest frame wins, stale frames are dropped. Smaller frames on the phone.
+- Input from the person: mouse and touch as stream input events (coordinates mapped from the displayed frame to the page); special keys as key events, completed with `agent-browser`'s key resolver; Command mapped to Control where the shortcut expects it; paste forwarded.
+- **Typing through a native text field:** the app shows its own text field (secure for passwords) and sends the whole text into the focused page field (`keyboard inserttext`). Accents work, and the phone's and password manager's autofill fill it.
+- Popups and new tabs (OAuth windows) followed: the view switches to the active tab.
+- The viewer reconnects by itself (backoff), so a deploy (`overlapSeconds`) or a network drop shows "reconnecting…" and carries on.
+- The relay sits behind a small interface of ours (`StreamRelay`), in memory today. Frames come from a `FrameSource` (JPEG today).
+- Load: the server only copies bytes. About 25–50 KB per frame; a 2–3 minute login is about 30–75 MB; nothing while nobody watches.
+
+### 8. What is stored
+
+- Not stored: frames, screenshots (they stay in the agent's folder), the profile and cookies (on the computer), what a person types.
+- Stored: the run's transcript as for any tool (the `browser_*` calls and results), model usage and cost as for any model call, and one record per handoff or take over (who, when, result). No per-action audit table.
+
+### 9. Watching and stopping
 
 - Live view on the run and on the machine page ("Dev is in the browser · shop.example/checkout"), with Watch and Stop.
 - Stop closes the session at once.
-- Audit `browser.action` per action (no typed text for secret fields).
 - Checkout only in test mode; a real payment or any sensitive action the agent recognizes becomes an approval card as usual. Page text never grants permissions or skips an approval.
 
-### 8. Intent tools with Jev (second step)
-
-After the raw tools work, `browser_click_on(target)`, `browser_type_into(target, text | secret)`, `browser_check(condition)` and `browser_wait_until(condition)`:
-
-- The runner sends the snapshot; the server asks the `ScreenJudge` (first implementation: Jev, Choice over the snapshot's elements, Noul for conditions) and the runner acts on the chosen ref. `wait_until` polls about once a second without the main model.
-- On text, not pixels: no dependence on Jev's image preview.
-- Low confidence → the tool fails and returns the snapshot to the main model.
-- Called by the server only, usage and cost recorded with `org_id` and `agent_id`; the judge's name never in the UI.
-- Gate: about 20 real pages × 5 targets (our app, a Stripe test checkout, a few common sites) for hit rate, latency and cost before turning them on by default.
-
-### 9. Runner protocol 12
+### 10. Runner protocol 12
 
 - `access.tools.browser`; `hello.browser { available, version, chrome, reason? }`.
-- Ops: `browser.act { agentId, command, args }` (one `agent-browser` command, returns its JSON), `browser.stop { agentId }`, `browser.stream.start | stop { agentId, mode: watch | control }`, `browser.input { agentId, events[] }`, `browser.headed { agentId }`.
+- Ops: `browser.act { agentId, command, args }` (one `agent-browser` command, returns its JSON), `browser.stop { agentId }`, `browser.stream.start | stop { agentId, mode: watch | control }`, `browser.input { agentId, events[] }`; frames come back as `browser.frame` on the machine socket.
 - The server only offers the tools to agents whose machine reports protocol 12 with the browser on.
 
 ## Order
 
-Difficulty: **easy** (known pattern, little risk), **medium** (new pieces on known patterns), **hard** (open questions, may need a rework). Stages 0–4 are the first version: agents browse, log in with test accounts, and are stopped and audited. Live view and take over come right after.
+First version: stages 0–7. Difficulty: **easy** (known pattern, little risk), **medium** (new pieces on known patterns).
 
-| Stage | What | Difficulty | Why | Depends on |
-|---|---|---|---|---|
-| 0. Try by hand | `agent-browser mcp` in the MCP config of a Claude Code task on one Mac, against our app, a Stripe test checkout and a few common sites. Note snapshot size, stale refs, covered clicks. No code. | Easy | Configuration only | — |
-| 1. Runner core | Protocol 12; `access.tools.browser` switch (tray + `agentes-runner access`); download on first use with pinned SHA-256 into `~/.agentes-runner/bin/`; Chrome detection and Chrome for Testing download; `hello.browser`; `browser.act` and `browser.stop`; one session per agent (profile in its folder, idle shutdown); orphan daemon cleanup when the runner restarts. | Medium | Ops and the access switch follow protocols 10–11. New: managing child daemons and their Chrome processes on three OSes without leaks. | 0 |
-| 2. Tools and screens | `browser:use` scope; the `browser_*` tools in the Tool Gateway, also through the MCP bridge; stale-ref and output-size handling; screenshots in the agent's folder; agent page (scope offered only when the machine serves it, reason when not); machine page (browser available, version, who uses it, Stop). Prototype approved before the screens. | Medium | Same shape as the Postgres connector and machine access. The work is in tool descriptions that make models read before acting. | 1 |
-| 3. Desktop app sidecar | CI fetches the pinned release, checks the hash, ships it as a second `externalBin`, signs it with the hardened runtime, notarizes with the app; the runner prefers the bundled binary; license in the about box. | Medium | Signing a bundled binary was already done for the runner. Risk: entitlements Chrome's child processes need, notarization rejects. | 1 |
-| 4. Safety | `browser_type_secret` (runner reads the secret; refuses non-password fields, from the snapshot's role); per-agent allowlist; `browser.action` audit; per-machine cap with "waiting for the computer"; untrusted-content wrapping; `file://` and owner paths blocked. | Easy–medium | All on pieces from stages 1–2 and ADR 0027. Detecting password fields from the snapshot is the one detail to check. | 2 |
-| 5. Live view | Bridge the session's local stream to our WebSocket through the machine channel (also across replicas, `machine_rpc`), only while someone watches, about 1 fps; viewer on the run and machine page, web and phone. | Hard | Frames are a new kind of traffic on the machine channel (size, backpressure, several replicas); rendering on web and phone. | 2 |
-| 6. Take over | `browser_ask_person` suspends the run with a card; one person in control per agent browser; input back over the stream (coordinate mapping, touch from the phone); accents, IME and paste (CDP `Input.insertText` if the stream's keys don't carry them); OAuth popups and new tabs; local `--headed` window. | Hard | The most unknowns: keyboard fidelity, popups, phone input, handing back cleanly to the agent. | 5 |
-| 7. Intent tools with Jev | Gate (about 20 pages × 5 targets: hit rate, latency, cost); `ScreenJudge` on snapshot text; `browser_click_on`, `browser_type_into`, `browser_check`, `browser_wait_until`. | Medium | The code is small; the open question is whether accuracy on real pages is good enough. If not, the raw tools stay the only path. | 2 |
-| 8. Protected mode | Chrome inside Seatbelt (macOS) and bubblewrap (Linux) with an adjusted profile; tested per OS; until then "not yet in protected mode". | Hard | Chrome's own sandbox inside ours, GPU and shared memory; may not work on every OS. | 1, ADR 0030 level 2 |
+| Stage | What | Difficulty |
+|---|---|---|
+| 0. Try by hand | `agent-browser mcp` in the MCP config of a Claude Code task on one Mac, against our app, a Stripe test checkout and a few common sites. Note snapshot size, stale refs, covered clicks, the keyboard gaps. No code. | Easy |
+| 1. Runner core | Protocol 12; `access.tools.browser`; download with pinned hash; Chrome detection and download; `hello.browser`; `browser.act`, `browser.stop`; one session per agent with its profile; per-session command queue and timeouts; idle shutdown; orphan cleanup; Stop. | Medium |
+| 2. Tools and screens | `browser:use`; the `browser_*` tools in the Tool Gateway and the MCP bridge; stale refs and output size; agent page and machine page. Prototype approved first. | Medium |
+| 3. Desktop app sidecar | Second `externalBin`, signed and notarized in CI, license in the about box. | Medium |
+| 4. Safety | `browser_type_secret`, allowlist, per-machine cap, untrusted-content wrapping, blocked paths, the "test or agent accounts" rule and line. | Easy |
+| 5. Handoff | `browser_ask_person`, suspended run, card, "Waiting for you", push, Done/Couldn't, timeout, the agent checks; take over while watching. Prototype approved first. | Easy–medium |
+| 6. Live view | Stream bridge (`StreamRelay` in memory), adaptive fps, input, tab following, reconnect, web and phone viewers. | Medium |
+| 7. Native typing | The app's text field into the page's focused field, secure for passwords, autofill. | Medium |
+
+Later, each when there is a reason:
+
+| What | When | Difficulty |
+|---|---|---|
+| Several replicas: a direct connection between replicas (the machine's replica recorded once; frames over an internal socket), or Redis pub/sub if the Cloud already has it | When the server runs more than one replica | Medium |
+| Video: screencast → ffmpeg H.264 → WHIP → LiveKit or Cloudflare → WHEP viewers (also removes the replica question) | When bandwidth or smoothness hurts, or with the virtual desktop | Hard |
+| Intent tools with Jev (`click_on`, `type_into`, `check`, `wait_until`) on snapshot text, after a gate of about 20 pages × 5 targets | After real use of the raw tools | Medium |
+| Protected mode (ADR 0030): Chrome inside Seatbelt/bubblewrap | With ADR 0030 level 2 | Hard |
+| Daytona, the simulator (Maestro), the virtual desktop (neko or Kernel's images) | Their own decisions | — |
 
 ## Consequences
 
-- Agents browse on connected computers with any brain and any model, reading pages as text.
+- Agents browse on connected computers with any brain and any model, reading pages as text, and keep their logins per agent.
+- A person helps from anywhere through one handoff: a card, a push, a live view, Done.
+- No new infrastructure: one replica, frames in memory, nothing from the browser stored in Postgres.
 - We depend on a third-party binary: pinned, hash-checked, behind our tools, replaceable by our own CDP code.
 - A second native executable to sign and ship in the app, and a download path for terminal installs.
 - One Chrome per active agent costs memory; the per-machine cap bounds it.
-- Daytona, the simulator and the other screens of ADR 0031 wait for their own decisions.
+- Until protected mode, a login in an agent's profile is readable by other unprotected agents and the owner on that computer, hence the test-or-agent-accounts rule.
