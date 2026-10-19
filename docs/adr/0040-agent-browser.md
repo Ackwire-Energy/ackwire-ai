@@ -102,12 +102,19 @@ After the raw tools work, `browser_click_on(target)`, `browser_type_into(target,
 
 ## Order
 
-1. Try it by hand: `agent-browser mcp` in the MCP config of a Claude Code task on one Mac, against our app and a Stripe test checkout. No code.
-2. Runner: download/sidecar, `access.tools.browser`, `browser.act`, sessions per agent, cap, Stop. Server: scope, tools, agent page, machine page.
-3. Secrets (`browser_type_secret`), allowlist, audit.
-4. Live view and take over (remote, then the headed window).
-5. Intent tools with Jev, after the gate.
-6. Protected mode tested per OS.
+Difficulty: **easy** (known pattern, little risk), **medium** (new pieces on known patterns), **hard** (open questions, may need a rework). Stages 0–4 are the first version: agents browse, log in with test accounts, and are stopped and audited. Live view and take over come right after.
+
+| Stage | What | Difficulty | Why | Depends on |
+|---|---|---|---|---|
+| 0. Try by hand | `agent-browser mcp` in the MCP config of a Claude Code task on one Mac, against our app, a Stripe test checkout and a few common sites. Note snapshot size, stale refs, covered clicks. No code. | Easy | Configuration only | — |
+| 1. Runner core | Protocol 12; `access.tools.browser` switch (tray + `agentes-runner access`); download on first use with pinned SHA-256 into `~/.agentes-runner/bin/`; Chrome detection and Chrome for Testing download; `hello.browser`; `browser.act` and `browser.stop`; one session per agent (profile in its folder, idle shutdown); orphan daemon cleanup when the runner restarts. | Medium | Ops and the access switch follow protocols 10–11. New: managing child daemons and their Chrome processes on three OSes without leaks. | 0 |
+| 2. Tools and screens | `browser:use` scope; the `browser_*` tools in the Tool Gateway, also through the MCP bridge; stale-ref and output-size handling; screenshots in the agent's folder; agent page (scope offered only when the machine serves it, reason when not); machine page (browser available, version, who uses it, Stop). Prototype approved before the screens. | Medium | Same shape as the Postgres connector and machine access. The work is in tool descriptions that make models read before acting. | 1 |
+| 3. Desktop app sidecar | CI fetches the pinned release, checks the hash, ships it as a second `externalBin`, signs it with the hardened runtime, notarizes with the app; the runner prefers the bundled binary; license in the about box. | Medium | Signing a bundled binary was already done for the runner. Risk: entitlements Chrome's child processes need, notarization rejects. | 1 |
+| 4. Safety | `browser_type_secret` (runner reads the secret; refuses non-password fields, from the snapshot's role); per-agent allowlist; `browser.action` audit; per-machine cap with "waiting for the computer"; untrusted-content wrapping; `file://` and owner paths blocked. | Easy–medium | All on pieces from stages 1–2 and ADR 0027. Detecting password fields from the snapshot is the one detail to check. | 2 |
+| 5. Live view | Bridge the session's local stream to our WebSocket through the machine channel (also across replicas, `machine_rpc`), only while someone watches, about 1 fps; viewer on the run and machine page, web and phone. | Hard | Frames are a new kind of traffic on the machine channel (size, backpressure, several replicas); rendering on web and phone. | 2 |
+| 6. Take over | `browser_ask_person` suspends the run with a card; one person in control per agent browser; input back over the stream (coordinate mapping, touch from the phone); accents, IME and paste (CDP `Input.insertText` if the stream's keys don't carry them); OAuth popups and new tabs; local `--headed` window. | Hard | The most unknowns: keyboard fidelity, popups, phone input, handing back cleanly to the agent. | 5 |
+| 7. Intent tools with Jev | Gate (about 20 pages × 5 targets: hit rate, latency, cost); `ScreenJudge` on snapshot text; `browser_click_on`, `browser_type_into`, `browser_check`, `browser_wait_until`. | Medium | The code is small; the open question is whether accuracy on real pages is good enough. If not, the raw tools stay the only path. | 2 |
+| 8. Protected mode | Chrome inside Seatbelt (macOS) and bubblewrap (Linux) with an adjusted profile; tested per OS; until then "not yet in protected mode". | Hard | Chrome's own sandbox inside ours, GPU and shared memory; may not work on every OS. | 1, ADR 0030 level 2 |
 
 ## Consequences
 
