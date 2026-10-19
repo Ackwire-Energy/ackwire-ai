@@ -207,6 +207,36 @@ test("after a person had the browser, the agent must read the page before acting
   expect((await b.call("browser_click", { ref: "e1" })).isError).toBeUndefined();
 });
 
+test("a browser closed after a person had it is never a dead end: opening a page works and counts as seeing it", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  await f.db.insert(schema.browserHandoffs).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    machineId: b.machineId,
+    kind: "takeover",
+    status: "done",
+    controllerUserId: f.owner.id,
+    expiresAt: new Date(),
+    resolvedAt: new Date(),
+  });
+  // The browser closed meanwhile (Stop, idle shutdown, a runner restart): reading fails…
+  b.s.reply = { success: false, data: null, error: "The browser isn't open: open a page first" };
+  expect((await b.call("browser_read", {})).isError).toBe(true);
+  // …but opening a page still works, and then the agent can act on it.
+  b.s.reply = { success: true, data: { url: "https://shop.example/" } };
+  expect((await b.call("browser_open", { url: "https://shop.example/" })).isError).toBeUndefined();
+  expect((await b.call("browser_click", { ref: "e1" })).isError).toBeUndefined();
+});
+
+test("the computer the browser runs on is remembered for the live view, take over and Stop", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  await b.call("browser_read", {});
+  const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+  expect(agent?.browserMachineId).toBe(b.machineId);
+});
+
 test("type_secret names a secret delivered to this computer; the value never passes through", async () => {
   const b = await browserSetup();
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
@@ -230,9 +260,22 @@ test("type_secret names a secret delivered to this computer; the value never pas
     status: "delivered",
     expiresAt: new Date(Date.now() + 60_000),
   });
+  // Asked without a site: the browser won't type it anywhere.
+  const noSite = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
+  expect(noSite.isError).toBe(true);
+  expect(noSite.content).toContain("`site`");
+  expect(b.calls).toHaveLength(0);
+  await f.db
+    .update(schema.secretRequests)
+    .set({ site: "https://dashboard.stripe.com" })
+    .where(eq(schema.secretRequests.name, "STRIPE_TEST_PASSWORD"));
   const typed = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
   expect(typed.isError).toBeUndefined();
-  expect(b.calls.at(-1)).toMatchObject({ command: "agentes:type_secret", args: ["@e2", "STRIPE_TEST_PASSWORD"] });
+  // The site comes from the request the person answered: the runner types it only there.
+  expect(b.calls.at(-1)).toMatchObject({
+    command: "agentes:type_secret",
+    args: ["@e2", "STRIPE_TEST_PASSWORD", "https://dashboard.stripe.com"],
+  });
 
   // A secret delivered to another computer doesn't count: the agent asks again for this one.
   const before = b.calls.length;

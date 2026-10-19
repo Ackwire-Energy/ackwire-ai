@@ -7133,7 +7133,7 @@ export const en: Translations = {
       secure: "Password",
       secureLabel: "Hide what I type (password)",
       keys: { Tab: "Tab", Enter: "Enter", Backspace: "Delete", Escape: "Esc" },
-      doneTitle: "Done!",
+      doneTitle: "Done.",
       doneText: "{{name}} will check it worked and go on. You can close this screen.",
       backToChat: "Back to the chat",
       failTitle: "What happened?",

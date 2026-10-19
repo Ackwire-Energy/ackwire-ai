@@ -7153,7 +7153,7 @@ export const ptBR = {
       secure: "Senha",
       secureLabel: "Esconder o que eu digito (senha)",
       keys: { Tab: "Tab", Enter: "Enter", Backspace: "Apagar", Escape: "Esc" },
-      doneTitle: "Pronto!",
+      doneTitle: "Pronto.",
       doneText: "{{The}} {{name}} vai conferir se deu certo e continuar. Você pode fechar esta tela.",
       backToChat: "Voltar ao chat",
       failTitle: "O que aconteceu?",

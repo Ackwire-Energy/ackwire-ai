@@ -1120,6 +1120,8 @@ export interface SecretRequest {
   name: string;
   purpose: string;
   target: SecretTarget;
+  /** For a browser password: the only site it may be typed on (`https://host`). */
+  site?: string | null;
   /** null = the agent's cloud computer. */
   machineId: string | null;
   /** The computer's key for this request; null once it is closed. */

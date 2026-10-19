@@ -205,7 +205,7 @@ export function buildEngine(o: EngineOptions) {
     sources: [
       createAskUserToolSource(),
       // The agent browser asks a person for help (ADR 0040 §6).
-      createBrowserHandoffToolSource({ pubsub: adapters.pubsub }),
+      createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
       createAskAgentToolSource({ pubsub: adapters.pubsub }),
       createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),

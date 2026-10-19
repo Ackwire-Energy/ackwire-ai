@@ -146,6 +146,9 @@ export function createRealtime(deps: RealtimeDeps) {
     ws.send(JSON.stringify(frame));
   };
 
+  /** Placeholders of browser views still starting (`browser.watch` in flight). */
+  const startingBrowsers = new WeakSet<() => void>();
+
   /** An agent's browser on this socket (ADR 0040): watch, stop watching, a person's input. */
   async function browserMessage(ws: BrowserSocket, frame: BrowserClientFrame): Promise<void> {
     const live = deps.browserLive;
@@ -174,12 +177,21 @@ export function createRealtime(deps: RealtimeDeps) {
     }
     const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
     if (!limit.allowed) return send(ws, { type: "error", code: "rate_limited", agentId });
-    if (ws.data.browsers.has(agentId)) return;
+    const previous = ws.data.browsers.get(agentId);
+    // Still starting: a second `browser.watch` meanwhile is a no-op.
+    if (previous && startingBrowsers.has(previous)) return;
+    // Already here: watching again is the client's retry (after reconnecting, offline, an ended
+    // stream or a lost permission), so the old view goes and a fresh one starts.
+    if (previous) {
+      previous();
+      ws.data.browsers.delete(agentId);
+    }
     if (ws.data.browsers.size >= MAX_WATCHED_BROWSERS) {
       return send(ws, { type: "error", code: "too_many_browsers", agentId });
     }
     // Held while it starts, so a second `browser.watch` meanwhile is a no-op and an unwatch cancels it.
     const starting = () => {};
+    startingBrowsers.add(starting);
     ws.data.browsers.set(agentId, starting);
     let stop: () => void;
     try {
@@ -197,12 +209,14 @@ export function createRealtime(deps: RealtimeDeps) {
         agentId,
       );
     } catch (error) {
+      startingBrowsers.delete(starting);
       // Whatever failed, the placeholder goes: a later `browser.watch` tries again.
       if (ws.data.browsers.get(agentId) === starting) ws.data.browsers.delete(agentId);
       const code = error instanceof NotFoundError ? "not_found" : error instanceof ForbiddenError ? "forbidden" : "";
       if (code) return send(ws, { type: "error", code, agentId });
       return send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: "try again" });
     }
+    startingBrowsers.delete(starting);
     // Closed or unwatched while it was starting: stop at once.
     if (ws.readyState !== 1 || ws.data.browsers.get(agentId) !== starting) return stop();
     ws.data.browsers.set(agentId, stop);

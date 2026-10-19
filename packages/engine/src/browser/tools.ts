@@ -1,5 +1,5 @@
-import { type AgentScope, BROWSER_PROTOCOL, type MachineReplies } from "@agenteschat/adapters";
-import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
+import type { AgentScope, MachineReplies } from "@agenteschat/adapters";
+import { and, type Database, desc, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError } from "../machines";
@@ -8,9 +8,54 @@ import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
+import { agentBrowserStatus, browserUnavailableText } from "./status";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserToolName } from "./types";
 
-const { secretRequests } = schema;
+export {
+  type AgentBrowserStatus,
+  agentBrowserStatus,
+  type BrowserUnavailable,
+  browserUnavailableText,
+} from "./status";
+
+const { agents, secretRequests } = schema;
+
+/** Where the agent's browser runs now (`agents.browser_machine_id`): written only when it changes. */
+export async function rememberBrowserMachine(db: Database, orgId: string, agentId: string, machineId: string) {
+  await db
+    .update(agents)
+    .set({ browserMachineId: machineId })
+    .where(
+      and(
+        eq(agents.id, agentId),
+        eq(agents.orgId, orgId),
+        sql`${agents.browserMachineId} is distinct from ${machineId}`,
+      ),
+    );
+}
+
+/**
+ * A secret delivered to the computer the browser runs on, with the one site it
+ * may be typed on (`request_secret` with `site`). Null when there is none.
+ */
+async function browserSecret(ctx: ToolContext, name: string, machineId: string) {
+  const [held] = await ctx.db
+    .select({ id: secretRequests.id, site: secretRequests.site })
+    .from(secretRequests)
+    .where(
+      and(
+        eq(secretRequests.orgId, ctx.orgId),
+        eq(secretRequests.agentId, ctx.agentId),
+        eq(secretRequests.name, name),
+        eq(secretRequests.status, "delivered"),
+        isNull(secretRequests.removedAt),
+        eq(secretRequests.machineId, machineId),
+      ),
+    )
+    .orderBy(desc(secretRequests.deliveredAt))
+    .limit(1);
+  return held ?? null;
+}
 
 export interface BrowserToolDeps {
   /** Connected machines (ADR 0025); without them the source offers nothing. */
@@ -68,80 +113,12 @@ export function browserErrorText(error: string) {
   return `The browser said: ${error}`;
 }
 
-/** Why the agent's browser isn't usable, as a code (for the app) and a sentence (for the agent). */
-export type BrowserUnavailable =
-  | "no_machine"
-  | "machine_removed"
-  | "outdated"
-  | "switched_off"
-  | "not_installed"
-  | "not_reported";
-
-export type AgentBrowserStatus =
-  | { available: true; machineId: string; machineName: string; online: boolean }
-  | {
-      available: false;
-      code: BrowserUnavailable;
-      machineId: string | null;
-      machineName: string | null;
-      /** The runner's own reason ("Chrome's libraries are missing: run …"). */
-      detail: string | null;
-    };
-
-/**
- * Whether an agent's browser can be offered (ADR 0040 §3): its computer is a
- * connected machine on protocol 12 or later, the person turned the browser
- * on there (`access.tools.browser`) and the runner found it ready
- * (`hello.browser.available`, kept with the machine's executors). Offline
- * machines still count: the call says it's offline, as other tools do.
- */
-export async function agentBrowserStatus(
-  db: Database,
-  hub: MachineCaller | undefined,
-  orgId: string,
-  agentId: string,
-  /** In a mission's thread: the mission's computer (ADR 0029). */
-  machineOverride?: string | null,
-): Promise<AgentBrowserStatus> {
-  const none = (code: BrowserUnavailable, machineId: string | null = null, machineName: string | null = null) => ({
-    available: false as const,
-    code,
-    machineId,
-    machineName,
-    detail: null,
-  });
-  const agent = await getAgentCached(db, orgId, agentId);
-  const machineId = machineOverride ?? agent?.machineId ?? null;
-  if (!machineId || !hub) return none("no_machine");
-  const status = await hub.status(machineId);
-  if (!status || status.orgId !== orgId) return none("machine_removed", machineId);
-  if (status.protocol < BROWSER_PROTOCOL) return none("outdated", machineId, status.name);
-  if (!status.access?.tools.browser) return none("switched_off", machineId, status.name);
-  const info = status.executors.browser;
-  if (!info) return none("not_reported", machineId, status.name);
-  if (!info.available) {
-    return { ...none("not_installed", machineId, status.name), detail: info.reason?.slice(0, 500) ?? null };
+/** Why a secret can't be typed in the browser. */
+function secretMissingText(name: string, held: { site: string | null } | null) {
+  if (!held) {
+    return `No secret named ${name} was delivered to the computer your browser runs on. Ask for it first with request_secret, giving \`site\` (the person types it; you never see it).`;
   }
-  return { available: true, machineId, machineName: status.name, online: status.online };
-}
-
-/** One sentence for the agent (tool errors) about an unavailable browser. */
-export function browserUnavailableText(s: Extract<AgentBrowserStatus, { available: false }>) {
-  const on = s.machineName ? `the computer ${s.machineName}` : "your computer";
-  switch (s.code) {
-    case "no_machine":
-      return "The browser only runs on a connected computer, and you don't use one. Ask your owner or an admin to choose one for you.";
-    case "machine_removed":
-      return "Your connected computer was removed; ask an admin or your owner to choose another one.";
-    case "outdated":
-      return `The runner on ${on} is out of date and has no browser. Tell the person: its owner should update it.`;
-    case "switched_off":
-      return `The browser is turned off on ${on}. Only the person at that computer can turn it on; tell the people.`;
-    case "not_installed":
-      return `The browser isn't ready on ${on}${s.detail ? `: ${s.detail}` : ""}. Tell the person.`;
-    default:
-      return `${on.charAt(0).toUpperCase()}${on.slice(1)} hasn't said whether it can run the browser yet; try again after it reconnects.`;
-  }
+  return `${name} wasn't asked for a site, so the browser won't type it. Ask for it again with request_secret and \`site\` set to the address of the page it goes into (https://…).`;
 }
 
 /** Runner refusals → what the agent reads. */
@@ -183,6 +160,20 @@ function urlOf(data: unknown): string | null {
 }
 
 type Command = { command: string; args: string[]; timeoutSeconds: number };
+
+/** Tools that act on the page the agent last read (refs): held back after a person changed it. */
+const ON_THE_PAGE = new Set<BrowserToolName>([
+  "browser_click",
+  "browser_fill",
+  "browser_select",
+  "browser_check",
+  "browser_press",
+  "browser_scroll",
+  "browser_upload",
+  "browser_type_secret",
+]);
+/** Tools after which the agent knows what the page is: reading it, or opening a new one. */
+const SEES_THE_PAGE = new Set<BrowserToolName>(["browser_read", "browser_open"]);
 
 const refProp = {
   type: "string",
@@ -239,6 +230,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     } catch (error) {
       return { ok: false, text: explain(error, status.machineName) };
     }
+    // The live view, take over and Stop follow the computer the browser runs on (a mission's or the agent's own).
+    await rememberBrowserMachine(ctx.db, ctx.orgId, ctx.agentId, status.machineId).catch(() => {});
     if (!reply.success) return { ok: false, text: browserErrorText(reply.error || "the command failed") };
     return { ok: true, data: reply.data };
   }
@@ -272,12 +265,14 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     execute: async (input, ctx) => {
       const waiting = await waitIfPersonInControl(ctx.db, ctx);
       if (waiting) return waiting;
-      if (name !== "browser_read") {
+      // Only tools that act on what the agent last read are held back: reading, opening a page,
+      // tabs or closing always work (so a browser closed meanwhile can always be opened again).
+      if (ON_THE_PAGE.has(name)) {
         const stale = await requirePageRead(ctx.db, ctx);
         if (stale) return stale;
       }
       const out = await execute(input, ctx);
-      if (name === "browser_read" && !out.isError) await markPageRead(ctx.db, ctx);
+      if (SEES_THE_PAGE.has(name) && !out.isError) await markPageRead(ctx.db, ctx);
       return out;
     },
     ...extra,
@@ -511,7 +506,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
     tool(
       "browser_type_secret",
-      `${BROWSER_TOOL_INFO.browser_type_secret.description} \`secret\` is the name you asked for with request_secret (it must have been delivered to this computer). Only into password or one-time-code fields.`,
+      `${BROWSER_TOOL_INFO.browser_type_secret.description} \`secret\` is the name you asked for with request_secret, giving its \`site\` (it must have been delivered to this computer). It is typed only into password or one-time-code fields, and only while the page is on that site.`,
       {
         type: "object",
         properties: {
@@ -521,42 +516,31 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         required: ["ref", "secret"],
         additionalProperties: false,
       },
-      (input, ctx) =>
-        run(
+      async (input, ctx) => {
+        const name = str(input.secret);
+        const status = await machineOf(ctx);
+        if (!status.available) return { content: browserUnavailableText(status), isError: true };
+        const held = await browserSecret(ctx, name, status.machineId);
+        if (!held?.site) return { content: secretMissingText(name, held), isError: true };
+        // The site comes from the request the person answered, never from the agent: the runner
+        // types it only while the page is on that site.
+        return run(
           ctx,
           {
             command: "agentes:type_secret",
-            args: [normalizeRef(str(input.ref)), str(input.secret)],
+            args: [normalizeRef(str(input.ref)), name, held.site],
             timeoutSeconds: COMMAND_SECONDS,
           },
-          () => `Typed ${str(input.secret)} (you never see its value).`,
-        ),
+          () => `Typed ${name} (you never see its value).`,
+        );
+      },
       {
         async checkCall(input, ctx): Promise<CallCheck> {
           const name = str(input.secret);
           const status = await machineOf(ctx);
           if (!status.available) return { ok: false, message: browserUnavailableText(status) };
-          const machineId = status.machineId;
-          const [held] = await ctx.db
-            .select({ id: secretRequests.id })
-            .from(secretRequests)
-            .where(
-              and(
-                eq(secretRequests.orgId, ctx.orgId),
-                eq(secretRequests.agentId, ctx.agentId),
-                eq(secretRequests.name, name),
-                eq(secretRequests.status, "delivered"),
-                isNull(secretRequests.removedAt),
-                eq(secretRequests.machineId, machineId),
-              ),
-            )
-            .limit(1);
-          return held
-            ? { ok: true }
-            : {
-                ok: false,
-                message: `No secret named ${name} was delivered to your computer. Ask for it first with request_secret (the person types it; you never see it).`,
-              };
+          const held = await browserSecret(ctx, name, status.machineId);
+          return held?.site ? { ok: true } : { ok: false, message: secretMissingText(name, held) };
         },
       },
     ),

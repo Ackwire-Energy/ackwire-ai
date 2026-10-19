@@ -3,6 +3,7 @@ import { and, eq, inArray, schema } from "@agenteschat/db";
 import type { MachineHub } from "../machine-hub";
 import { getMachineById, machineOnline } from "../machines";
 import {
+  BROWSER_HANDOFF_TOPIC,
   type BrowserHandoffRow,
   type BrowserHandoffView,
   browserMachineOf,
@@ -13,6 +14,7 @@ import {
   handoffView,
   openHandoffOf,
   requireBrowserAccess,
+  setControlDeadline,
   touchControl,
 } from "./handoff";
 import type { BrowserFrame, BrowserViewer, StreamRelay } from "./types";
@@ -23,6 +25,8 @@ const { agents, browserHandoffs } = schema;
 const ACCESS_RECHECK_MS = 30_000;
 /** While a handoff is open, the agent's browser is touched this often so its idle shutdown (15 min) never closes it. */
 export const HANDOFF_KEEPALIVE_MS = 5 * 60_000;
+/** Keep-alive pings sent at once (each may wait on a slow computer). */
+const KEEPALIVE_PARALLEL = 5;
 
 /**
  * Frames to viewers, in this process's memory (ADR 0040 §7): nothing is
@@ -209,19 +213,58 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
 
   const handoffDeps: HandoffDeps = { db: deps.db, pubsub: deps.pubsub, live: handoffHooks };
 
+  // A handoff changed on another replica (a person claimed it there, handed it back…): the state
+  // here, where the computer's socket may be, is read again from the database.
+  const unsubscribeHandoffs = deps.pubsub?.subscribe(BROWSER_HANDOFF_TOPIC, (event) => {
+    const agentId = typeof event.agentId === "string" ? event.agentId : null;
+    const state = agentId ? live.get(agentId) : undefined;
+    if (!agentId || !state || event.orgId !== state.orgId) return;
+    void openHandoffOf(deps.db, state.orgId, agentId)
+      .then((row) => {
+        if (live.get(agentId) !== state) return;
+        applyHandoff(state, row);
+        broadcast(state, status(agentId, state));
+        void sync(agentId, state);
+      })
+      .catch((error) => deps.log?.warn("browser handoff reload failed", { agentId, error: String(error) }));
+  });
+
+  /**
+   * The agent's browser moved to another computer (a mission's, or back to
+   * its own): the old stream stops and its viewers are told to reconnect, so
+   * they watch the new one (`browser.watch` again).
+   */
+  function retire(agentId: string, old: AgentLive) {
+    if (old.grace) clearTimeout(old.grace);
+    old.grace = null;
+    broadcast(old, { type: "browser.unavailable", agentId, reason: "reconnecting" });
+    for (const unsubscribe of old.unsubscribe.values()) unsubscribe();
+    old.unsubscribe.clear();
+    old.viewers.clear();
+    if (old.mode !== null) {
+      old.mode = null;
+      void deps.hub
+        .call(old.machineId, { op: "browser.stream.stop", agent: { id: agentId, handle: old.handle } })
+        .catch(() => {});
+    }
+  }
+
   /** The person in control left: after the grace, control ends (expired) unless they watch again. */
   function startGrace(agentId: string, state: AgentLive, userId: string) {
     if (state.grace) clearTimeout(state.grace);
     const handoffId = state.handoff?.id;
     if (!handoffId) return;
+    // Their deadline in the database: another server, or this one after a restart, ends it at the
+    // same time, and coming back anywhere pushes it again.
+    const written = setControlDeadline(deps.db, handoffId, userId, new Date(Date.now() + graceMs)).catch(() => {});
     state.grace = setTimeout(() => {
       state.grace = null;
       if ([...state.viewers].some((v) => v.userId === userId)) return;
       // Nobody left watching: forget this agent here (a later watch starts fresh).
       if (state.viewers.size === 0 && live.get(agentId) === state) live.delete(agentId);
-      void expireControl(handoffDeps, handoffId, userId).catch((error) =>
-        deps.log?.warn("browser control expiry failed", { agentId, error: String(error) }),
-      );
+      void written
+        .then(() => expireControl(handoffDeps, handoffId, userId))
+        .catch((error) => deps.log?.warn("browser control expiry failed", { agentId, error: String(error) }));
     }, graceMs);
   }
 
@@ -254,7 +297,11 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         return () => {};
       }
       let state = live.get(agentId);
-      if (!state || state.machineId !== machineId) {
+      if (state && state.machineId !== machineId) {
+        retire(agentId, state);
+        state = undefined;
+      }
+      if (!state) {
         state = {
           orgId,
           machineId,
@@ -279,10 +326,13 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           ...(viewer.busy ? { busy: viewer.busy } : {}),
         } as BrowserViewer),
       );
-      // The person in control came back within the grace: they keep it.
+      // The person in control is here (back within the grace, maybe from another server): they keep it.
       if (current.grace && current.controllerUserId === viewer.userId) {
         clearTimeout(current.grace);
         current.grace = null;
+      }
+      if (current.handoff && current.controllerUserId === viewer.userId) {
+        await touchControl(deps.db, current.handoff.id, viewer.userId, new Date(), true).catch(() => {});
       }
       viewer.send(status(agentId, current));
       checked.set(`${viewer.userId}:${agentId}`, Date.now());
@@ -407,26 +457,36 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         .where(inArray(browserHandoffs.status, ["pending", "active"]));
       const ids = new Set(open.map((h) => h.id));
       for (const id of touched.keys()) if (!ids.has(id)) touched.delete(id);
-      let pinged = 0;
-      for (const h of open) {
-        if (now - (touched.get(h.id) ?? 0) < HANDOFF_KEEPALIVE_MS) continue;
-        touched.set(h.id, now);
-        pinged++;
-        await deps.hub
-          .call(h.machineId, {
-            op: "browser.act",
-            agent: { id: h.agentId, handle: h.handle },
-            command: "get",
-            args: ["url"],
-            timeoutSeconds: 10,
-          })
-          .catch(() => {});
+      // Only computers held here (each replica pings its own), a few at a time.
+      const due = open.filter(
+        (h) => deps.hub.isLocal(h.machineId) && now - (touched.get(h.id) ?? 0) >= HANDOFF_KEEPALIVE_MS,
+      );
+      for (const h of due) touched.set(h.id, now);
+      for (let i = 0; i < due.length; i += KEEPALIVE_PARALLEL) {
+        await Promise.all(
+          due.slice(i, i + KEEPALIVE_PARALLEL).map((h) =>
+            deps.hub
+              .call(h.machineId, {
+                op: "browser.act",
+                agent: { id: h.agentId, handle: h.handle },
+                command: "get",
+                args: ["url"],
+                timeoutSeconds: 10,
+              })
+              .catch(() => {}),
+          ),
+        );
       }
-      return pinged;
+      return due.length;
     },
 
     /** Whether anyone watches this agent's browser here. */
     watching: (agentId: string) => (live.get(agentId)?.viewers.size ?? 0) > 0,
+
+    /** Stops hearing handoff changes from other replicas (shutdown, tests). */
+    close() {
+      unsubscribeHandoffs?.();
+    },
   };
 }
 

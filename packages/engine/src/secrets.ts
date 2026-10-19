@@ -30,6 +30,8 @@ export interface SecretRequestView {
   name: string;
   purpose: string;
   target: SecretTarget;
+  /** For a browser password: the only site it may be typed on (`https://host`). */
+  site: string | null;
   /** null = the agent's cloud computer. */
   machineId: string | null;
   /** Only useful while pending: the browser seals the value to it. */
@@ -61,6 +63,7 @@ export function secretRequestView(row: SecretRequestRow): SecretRequestView {
     name: row.name,
     purpose: row.purpose,
     target: targetOf(row),
+    site: row.site,
     machineId: row.machineId,
     publicKey: status === "pending" ? row.publicKey : null,
     status,

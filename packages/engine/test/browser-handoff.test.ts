@@ -15,10 +15,13 @@ import {
   createBrowserLive,
   drainOutbox,
   expireBrowserHandoffs,
+  expireControl,
   ForbiddenError,
   finishHandoff,
   grantScopes,
   listMessages,
+  type MachineCaller,
+  type MachineStatus,
   markPageRead,
   postPersonMessage,
   renderPush,
@@ -67,8 +70,33 @@ const probe: ToolSource = {
   ],
 };
 
+/** Computers whose browser is ready, as the browser tools see them (no runner socket in these tests). */
+const ready = new Set<string>();
+const readyHub: MachineCaller = {
+  async status(id): Promise<MachineStatus | null> {
+    if (!ready.has(id)) return null;
+    return {
+      id,
+      orgId: f.org.id,
+      name: "MacBook",
+      online: true,
+      execAllowed: true,
+      os: "darwin",
+      protocol: 12,
+      executors: { browser: { available: true, version: "0.39.1" } },
+      paused: null,
+      access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+    } as MachineStatus;
+  },
+  async call() {
+    throw new Error("no runner in these tests");
+  },
+};
+const askSource = () => createBrowserHandoffToolSource({ machines: { hub: readyHub } });
+
 async function start() {
-  f = await setup({ reply, machines: true, toolSources: [createBrowserHandoffToolSource(), probe] });
+  ready.clear();
+  f = await setup({ reply, machines: true, toolSources: [askSource(), probe] });
   const pubsubDeps = { db: f.db, pubsub: f.pubsub };
   const machine = await pairMachine(pubsubDeps, f.owner.id, f.org.id, { name: "MacBook" });
   // Online as far as the tools can tell (no socket in these tests).
@@ -78,6 +106,7 @@ async function start() {
     .where(eq(schema.machines.id, machine.machineId));
   await f.db.update(schema.agents).set({ machineId: machine.machineId }).where(eq(schema.agents.id, f.agent.id));
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  ready.add(machine.machineId);
   return machine;
 }
 
@@ -258,7 +287,7 @@ describe("browser_ask_person", () => {
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("The person says it's done");
   });
 
-  test("the browser's computer: an open handoff's, else the mission's of a run going on, else the agent's", async () => {
+  test("the browser's computer: an open handoff's, else the one its tools last used, else the agent's", async () => {
     const own = await start();
     expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(own.machineId);
     const other = await pairMachine(deps(), f.owner.id, f.org.id, { name: "Mission box" });
@@ -266,13 +295,13 @@ describe("browser_ask_person", () => {
       .update(schema.machines)
       .set({ online: true, lastSeenAt: new Date() })
       .where(eq(schema.machines.id, other.machineId));
-    // A run going on (it asked, and its request was dropped without waking it) in what becomes a mission's thread.
+    ready.add(other.machineId);
+    // A run (it asked, and its request was dropped without waking it) in what becomes a mission's thread.
     await post("@dev sign in please");
     await drainOutbox(f.db, f.handlers);
     const [run] = await runs();
     const [first] = await handoffs();
     expect(first?.machineId).toBe(own.machineId);
-    expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(own.machineId);
     await f.db
       .update(schema.browserHandoffs)
       .set({ status: "cancelled", resolvedAt: new Date() })
@@ -288,19 +317,65 @@ describe("browser_ask_person", () => {
       status: "active",
       mainSessionId: "s",
     });
+    // Another run going on doesn't move it: the browser tools' last computer does.
+    expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(own.machineId);
+    await f.db.update(schema.agents).set({ browserMachineId: other.machineId }).where(eq(schema.agents.id, f.agent.id));
     expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(other.machineId);
-    // Asking from that thread uses the mission's computer too.
-    const [tool] = await createBrowserHandoffToolSource().tools({} as never);
-    const out = await tool?.execute({ instructions: "Sign in again" }, {
+    // Asking from the mission's thread uses the mission's computer, like the other browser tools.
+    const ctx = {
       db: f.db,
       orgId: f.org.id,
       agentId: f.agent.id,
       runId: run?.id ?? "",
       threadRootId: run?.threadRootId ?? "",
-    } as never);
+    } as never;
+    const [tool] = await askSource().tools(ctx);
+    const out = await tool?.execute({ instructions: "Sign in again" }, ctx);
     expect(out?.isError).toBeUndefined();
     const second = (await handoffs()).find((h) => h.id !== first?.id);
     expect(second?.machineId).toBe(other.machineId);
+    // An open handoff wins.
+    await f.db.update(schema.agents).set({ browserMachineId: null }).where(eq(schema.agents.id, f.agent.id));
+    expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(other.machineId);
+  });
+
+  test("browser_ask_person is offered only when the agent's browser is ready", async () => {
+    const machine = await start();
+    const ctx = { db: f.db, orgId: f.org.id, agentId: f.agent.id, runId: "", threadRootId: null } as never;
+    expect((await askSource().tools(ctx)).map((t) => t.name)).toEqual(["browser_ask_person"]);
+    ready.delete(machine.machineId);
+    expect(await askSource().tools(ctx)).toEqual([]);
+    expect(await createBrowserHandoffToolSource().tools(ctx)).toEqual([]);
+  });
+
+  test("one open handoff per agent's browser, enforced by the database", async () => {
+    const machine = await start();
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    const insertSecond = async () =>
+      f.db.insert(schema.browserHandoffs).values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        machineId: machine.machineId,
+        kind: "takeover",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+    await expect(insertSecond()).rejects.toThrow();
+    // A second take over claims (here: already holds) the open one instead of starting another.
+    const again = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    expect((await handoffs()).filter((h) => h.status === "pending" || h.status === "active")).toHaveLength(1);
+    expect(again.controllerUserId).toBe(f.owner.id);
+  });
+
+  test("control only expires once its deadline in the database passed", async () => {
+    await start();
+    const t = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    // Still within the grace (they came back, or are typing on another server): nothing ends.
+    expect(await expireControl(deps(), t.id, f.owner.id)).toBeNull();
+    expect((await handoffs())[0]?.status).toBe("active");
+    expect(await expireControl(deps(), t.id, f.owner.id, new Date(Date.now() + CONTROL_GRACE_MS + 1000))).toMatchObject(
+      { status: "expired" },
+    );
   });
 
   test("the push says the agent needs the person in the browser, with what it asked", () => {
@@ -511,5 +586,53 @@ describe("live view", () => {
     const b = viewer(f.owner.id);
     await remote.watch(b.viewer, f.org.id, f.agent.id);
     expect(b.got[0]).toMatchObject({ type: "browser.unavailable", reason: "offline" });
+  });
+
+  test("a handoff changed on another server reaches the live view here", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const here = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    const elsewhere = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub: { ...hub, isLocal: () => false } as never });
+    const a = viewer(f.owner.id);
+    await here.watch(a.viewer, f.org.id, f.agent.id);
+    // The person takes over through the other server: this one (with the computer) switches to control.
+    await startTakeover(elsewhere.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(20);
+    expect(a.got.some((m) => m.type === "browser.status" && m.controllerUserId === f.owner.id)).toBe(true);
+    expect(calls.at(-1)).toMatchObject({ op: "browser.stream.start", mode: "control" });
+    here.close();
+    elsewhere.close();
+  });
+
+  test("when the browser moves to another computer, the old stream stops and its viewers reconnect", async () => {
+    const own = await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    const a = viewer(f.owner.id);
+    await live.watch(a.viewer, f.org.id, f.agent.id);
+    const other = await pairMachine(deps(), f.owner.id, f.org.id, { name: "Mission box" });
+    await f.db.update(schema.agents).set({ browserMachineId: other.machineId }).where(eq(schema.agents.id, f.agent.id));
+    const b = viewer(f.owner.id);
+    await live.watch(b.viewer, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    expect(a.got.some((m) => m.type === "browser.unavailable" && m.reason === "reconnecting")).toBe(true);
+    expect(calls.some((c) => c.op === "browser.stream.stop")).toBe(true);
+    // Frames from the old computer no longer reach anyone; the new one's do.
+    live.hubHooks.frame(own.machineId, frame(f.agent.id, 1));
+    live.hubHooks.frame(other.machineId, frame(f.agent.id, 2));
+    expect(a.got.filter((m) => m.type === "browser.frame")).toHaveLength(0);
+    expect(b.got.filter((m) => m.type === "browser.frame")).toHaveLength(1);
+    live.close();
+  });
+
+  test("keep-alive pings only computers held by this server", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const { hub, calls } = fakeHub();
+    const remote = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub: { ...hub, isLocal: () => false } as never });
+    expect(await remote.keepAlive()).toBe(0);
+    expect(calls).toHaveLength(0);
+    remote.close();
   });
 });

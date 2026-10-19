@@ -1,6 +1,6 @@
 // A fake `agent-browser` for browser tests: answers `--json` like the real one.
 // Each run appends `{ args, stdin }` to $FAKE_AB_LOG (one JSON line). The page
-// lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, port }`.
+// lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, tabTo, noHistory, port }`.
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
@@ -43,7 +43,8 @@ switch (command) {
   case "goto":
     state.open = true;
     state.prev = state.url;
-    state.url = args[0].includes("://") ? args[0] : `https://${args[0]}`;
+    // Like the real one: schemes kept (about:blank too), bare hosts get https.
+    state.url = /^[a-z][a-z0-9+.-]*:/i.test(args[0]) ? args[0] : `https://${args[0]}`;
     out({ success: true, data: { url: state.url } });
     break;
   case "stream":
@@ -65,7 +66,13 @@ switch (command) {
     out({ success: true, data: { clicked: args[0] } });
     break;
   case "back":
-    state.url = state.prev ?? "about:blank";
+    // A new tab has no history: `back` leaves it where it is.
+    if (!state.noHistory) state.url = state.prev ?? "about:blank";
+    out({ success: true, data: {} });
+    break;
+  case "tab":
+    // `tab <n>`: switch to a tab that is on `tabTo` (a link that opened a new tab).
+    if (/^\d+$/.test(args[0] ?? "") && state.tabTo) state.url = state.tabTo;
     out({ success: true, data: {} });
     break;
   case "batch": {

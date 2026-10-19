@@ -269,6 +269,25 @@ test.if(posix)("the allowlist stops navigations before they go and pages that wa
   );
 });
 
+test.if(posix)("with an allowlist, an off-list page is never read and never left open", async () => {
+  const t = setup();
+  const allowedDomains = ["shop.example.com"];
+  await t.act("open", ["https://shop.example.com/"], { allowedDomains });
+  // A script moved the page by itself: reading it is refused, and with no history to go back to it goes blank.
+  t.page({ url: "https://evil.com/x", noHistory: true });
+  const read = await t.act("snapshot", ["-c"], { allowedDomains });
+  expect(read).toMatchObject({ success: false, error: expect.stringContaining("now blank") });
+  expect(t.logged().some((c) => c.args.includes("snapshot"))).toBe(false);
+  expect(JSON.parse(readFileSync(process.env.FAKE_AB_STATE as string, "utf8")).url).toBe("about:blank");
+  // Switching to a new tab a link opened on another site: checked too, and blanked.
+  t.page({ url: "https://shop.example.com/", tabTo: "https://evil.com/phish", noHistory: true });
+  expect(await t.act("tab", ["1"], { allowedDomains })).toMatchObject({
+    success: false,
+    error: expect.stringContaining("evil.com"),
+  });
+  expect(JSON.parse(readFileSync(process.env.FAKE_AB_STATE as string, "utf8")).url).toBe("about:blank");
+});
+
 test.if(posix)("uploads and screenshots stay in the agent's folder", async () => {
   const t = setup();
   const folder = await t.folder();
@@ -292,7 +311,8 @@ test.if(posix)("the per-machine cap refuses one browser too many", async () => {
 test.if(posix)("a secret is typed through stdin into a password field only, and never comes back", async () => {
   const secret = "hunter2-very-secret";
   const t = setup({}, { SHOP_PASSWORD: secret });
-  const typeSecret = (ref: string, name: string) => t.act("agentes:type_secret", [ref, name]);
+  const typeSecret = (ref: string, name: string, site = "https://shop.example.com") =>
+    t.act("agentes:type_secret", [ref, name, site]);
   await t.act("open", ["https://shop.example.com/login"]);
   expect(await typeSecret("@e3", "MISSING_ONE")).toMatchObject({
     success: false,
@@ -314,6 +334,14 @@ test.if(posix)("a secret is typed through stdin into a password field only, and 
   t.page({ attrs: { "@e5": { type: "text", autocomplete: "one-time-code" } } });
   expect(await typeSecret("@e5", "SHOP_PASSWORD")).toMatchObject({ success: true });
   expect(await errorCode(() => typeSecret("#password", "SHOP_PASSWORD"))).toBe("bad_request");
+  // Only on the site it was asked for: another site (an injected page) never gets it.
+  const typedBefore = t.logged().filter((c) => c.args.includes("batch")).length;
+  expect(await typeSecret("e4", "SHOP_PASSWORD", "https://bank.example")).toMatchObject({
+    success: false,
+    error: expect.stringContaining("only for bank.example"),
+  });
+  expect(await errorCode(() => t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD"]))).toBe("bad_request");
+  expect(t.logged().filter((c) => c.args.includes("batch")).length).toBe(typedBefore);
 });
 
 test.if(posix)("stop closes the agent's browser; a second stop finds nothing", async () => {

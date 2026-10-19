@@ -226,6 +226,16 @@ export function domainAllowed(url: string, patterns: readonly string[]): boolean
   });
 }
 
+/** A web address's origin (`https://host[:port]`), or null when it isn't one. */
+export function originOf(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    return u.protocol === "http:" || u.protocol === "https:" ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 /** A bare host (`example.com/login`) is how `agent-browser open` takes it too. */
 const asUrl = (raw: string) => (/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`);
 
@@ -641,10 +651,18 @@ export class BrowserManager {
     const checked = this.checkArgs(command, args, folder, allowed);
     const session = await this.session(agent, folder);
     return this.enqueue(session, async () => {
-      if (READS.has(command) && !(await this.browserOpen(session, signal))) {
-        return { success: false, data: null, error: "The browser isn't open: open a page first" };
+      if (READS.has(command)) {
+        if (!(await this.browserOpen(session, signal))) {
+          return { success: false, data: null, error: "The browser isn't open: open a page first" };
+        }
+        // A page can move off the allowed sites by itself (a script redirect): checked before it is read.
+        if (allowed.length > 0) {
+          const left = await this.leftAllowedSites(session, allowed, signal);
+          if (left) return { success: false, data: null, error: left };
+        }
       }
       const answer = await this.run(session, [command, ...checked], { timeoutMs, signal });
+      // After anything that may move the page (a click, a tab switch, a new tab…): still on an allowed site?
       if (allowed.length > 0 && !READS.has(command) && command !== "close") {
         const left = await this.leftAllowedSites(session, allowed, signal);
         if (left) return { success: false, data: null, error: left };
@@ -790,16 +808,31 @@ export class BrowserManager {
     return status.success && isRecord(status.data) && status.data.connected === true;
   }
 
-  /** After an action: the page left the allowed sites → go back and say so (null when still inside). */
-  private async leftAllowedSites(session: Session, allowed: string[], signal?: AbortSignal): Promise<string | null> {
+  /** The active tab's address, or null when the browser can't say. */
+  private async pageUrl(session: Session, signal?: AbortSignal): Promise<string | null> {
     const got = await this.run(session, ["get", "url"], {
       timeoutMs: QUICK_TIMEOUT_MS,
       ...(signal ? { signal } : {}),
     });
-    const url = isRecord(got.data) && typeof got.data.url === "string" ? got.data.url : null;
+    return isRecord(got.data) && typeof got.data.url === "string" ? got.data.url : null;
+  }
+
+  /**
+   * The active page left the allowed sites → it goes back, and when going back
+   * doesn't help (a new tab has no history, a redirect loops) the tab goes to
+   * the blank page, so nothing outside the list stays open to read. Returns
+   * what to tell the agent (null when the page is still inside).
+   */
+  private async leftAllowedSites(session: Session, allowed: string[], signal?: AbortSignal): Promise<string | null> {
+    const url = await this.pageUrl(session, signal);
     if (!url || domainAllowed(url, allowed)) return null;
     await this.run(session, ["back"], { timeoutMs: QUICK_TIMEOUT_MS });
-    return `The page went to ${hostOf(url)}, outside the sites this agent may use; it went back`;
+    const after = await this.pageUrl(session);
+    if (after && domainAllowed(after, allowed)) {
+      return `The page went to ${hostOf(url)}, outside the sites this agent may use; it went back`;
+    }
+    await this.run(session, ["open", "about:blank"], { timeoutMs: QUICK_TIMEOUT_MS });
+    return `The page went to ${hostOf(url)}, outside the sites this agent may use; that tab is now blank`;
   }
 
   /**
@@ -814,10 +847,15 @@ export class BrowserManager {
     timeoutMs: number,
     signal?: AbortSignal,
   ): Promise<BrowserAnswer> {
-    const [rawRef, name] = args;
+    const [rawRef, name, rawSite] = args;
     const ref = typeof rawRef === "string" && /^@?e\d{1,6}$/.test(rawRef) ? `@${rawRef.replace(/^@/, "")}` : null;
     if (!ref || typeof name !== "string" || !SECRET_NAME.test(name)) {
       throw new RunnerError("bad_request", "agentes:type_secret takes a ref (@e3) and a secret name (DB_PASSWORD)");
+    }
+    // The one site the secret was asked for (the person saw it): never typed anywhere else.
+    const site = typeof rawSite === "string" ? originOf(rawSite) : null;
+    if (!site) {
+      throw new RunnerError("bad_request", "agentes:type_secret needs the site the secret is for (https://host)");
     }
     const value = await this.opts.secret(agent, name);
     if (value === null) {
@@ -829,6 +867,14 @@ export class BrowserManager {
     }
     if (!(await this.browserOpen(session, signal))) {
       return { success: false, data: null, error: "The browser isn't open: open a page first" };
+    }
+    const at = await this.pageUrl(session, signal);
+    if (!at || originOf(at) !== site) {
+      return {
+        success: false,
+        data: null,
+        error: `${name} is only for ${new URL(site).host}, and the page is on ${at ? hostOf(at) : "no site"}; it wasn't typed`,
+      };
     }
     const attr = async (a: string) => {
       const got = await this.run(session, ["get", "attr", ref, a], {

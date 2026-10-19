@@ -14,7 +14,9 @@ import { BROWSER_LIMITS, type BrowserInputEvent, parseBrowserInputEvent } from "
  * (`{agentId, seq, data: base64 JPEG, metadata}`), `browser.status`
  * (`{agentId, mode, controllerUserId, handoff}`), `browser.unavailable`
  * (`{agentId, reason: reconnecting | offline | no_computer | unavailable,
- * message?}`: retry `browser.watch` with backoff on `reconnecting`),
+ * message?}`: send `browser.watch` again with backoff on `reconnecting`; a
+ * repeated watch restarts the view, so it also recovers after `offline`, an
+ * ended stream or `forbidden`),
  * `browser.ended` (`{agentId, reason, message?}`), and `error` with
  * `code` and `agentId` (`forbidden`, `not_found`, `too_many_browsers`,
  * `not_in_control`, `rate_limited`).

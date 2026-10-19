@@ -10,14 +10,14 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   schema,
   sql,
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import type { MachineCaller } from "../machine-hub";
-import { getMachineById, machineOnline } from "../machines";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
 import {
@@ -29,7 +29,9 @@ import {
 import { can, getMembership } from "../organizations";
 import { resumeRunWithResult } from "../run-resume";
 import { bodyCode, runWhere } from "../run-tools";
-import type { ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
+import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import { agentBrowserStatus, browserUnavailableText } from "./status";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserHandoffResult } from "./types";
 
 const { browserHandoffs, agentRuns, agents, messages } = schema;
@@ -49,6 +51,13 @@ export const CONTROL_GRACE_MS = 2 * 60_000;
 /** While the person in control watches, their grace is pushed at most this often (one write, not one per frame). */
 const CONTROL_TOUCH_EVERY_MS = 30_000;
 export const ASK_PERSON_TOOL = "browser_ask_person";
+/**
+ * Server-side topic of handoff changes (never sent to clients): every
+ * replica's live view hears them, so the one holding the computer's socket
+ * switches the stream and keeps control even when the change came from
+ * another replica.
+ */
+export const BROWSER_HANDOFF_TOPIC = "browser-handoffs";
 
 const OPEN: BrowserHandoffStatus[] = ["pending", "active"];
 
@@ -173,33 +182,17 @@ export async function requireBrowserAccess(
 
 /**
  * The computer an agent's browser runs on now: an open handoff's, else the
- * mission computer of its latest run going on (ADR 0029), else its own.
- * The same choice as the browser tools (`agentBrowserStatus`).
+ * one its browser tools last used (`agents.browser_machine_id`: a mission's
+ * or its own, whichever run used it), else the agent's own computer.
  */
 export async function browserMachineOf(db: Database, orgId: string, agentId: string): Promise<string | null> {
   const open = await openHandoffOf(db, orgId, agentId);
   if (open) return open.machineId;
   const [agent] = await db
-    .select({ machineId: agents.machineId })
+    .select({ machineId: agents.machineId, browserMachineId: agents.browserMachineId })
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
-  const [run] = await db
-    .select({ threadRootId: agentRuns.threadRootId })
-    .from(agentRuns)
-    .where(
-      and(
-        eq(agentRuns.orgId, orgId),
-        eq(agentRuns.agentId, agentId),
-        inArray(agentRuns.status, ["queued", "running", "waiting_input", "waiting_approval"]),
-      ),
-    )
-    .orderBy(desc(agentRuns.createdAt))
-    .limit(1);
-  if (run) {
-    const mission = await missionOfRun({ db, orgId, agentId, threadRootId: run.threadRootId });
-    if (mission?.machineId) return mission.machineId;
-  }
-  return agent?.machineId ?? null;
+  return agent?.browserMachineId ?? agent?.machineId ?? null;
 }
 
 async function loadHandoff(db: Executor, orgId: string, handoffId: string) {
@@ -257,6 +250,15 @@ async function cardWhere(db: Executor, row: BrowserHandoffRow) {
 /** Tells the conversation (card state) and the live view (who is in control) after a change committed. */
 async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow) {
   deps.live?.changed(row);
+  // The replica holding the computer's socket may be another one: it hears it here.
+  await deps.pubsub
+    ?.publish(BROWSER_HANDOFF_TOPIC, {
+      type: "browser.handoff.changed",
+      orgId: row.orgId,
+      agentId: row.agentId,
+      handoffId: row.id,
+    })
+    .catch(() => {});
   const where = await cardWhere(deps.db, row);
   if (where) {
     await publishChannelEvent(deps.pubsub, {
@@ -281,7 +283,13 @@ async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow) {
  * (`data.pause`) until they press Done or Couldn't, or it expires. The
  * agent then reads the page again and checks.
  */
-export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): ToolSource {
+export function createBrowserHandoffToolSource(
+  deps: { pubsub?: PubSub; machines?: { hub: MachineCaller } } = {},
+): ToolSource {
+  const hub = deps.machines?.hub;
+  /** The same computer and checks as the other browser tools: the mission's in a mission thread, else the agent's. */
+  const statusOf = async (ctx: ToolContext) =>
+    agentBrowserStatus(ctx.db, hub, ctx.orgId, ctx.agentId, (await missionOfRun(ctx))?.machineId ?? null);
   const tool: ToolDefinition = {
     name: ASK_PERSON_TOOL,
     description:
@@ -312,22 +320,15 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
         typeof input.timeout_minutes === "number"
           ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
           : HANDOFF_TIMEOUT_DEFAULT_MINUTES;
-      const [agent] = await ctx.db
-        .select({ machineId: agents.machineId })
-        .from(agents)
-        .where(and(eq(agents.id, ctx.agentId), eq(agents.orgId, ctx.orgId)));
-      // The computer the browser tools use: the mission's in a mission thread, else the agent's.
-      const machineId = (await missionOfRun(ctx))?.machineId ?? agent?.machineId ?? null;
-      if (!machineId) {
-        return { content: "Your browser runs on a connected computer, and you have none.", isError: true };
-      }
-      const machine = await getMachineById(ctx.db, machineId);
-      if (!machine || machine.deletedAt || !machineOnline(machine)) {
+      const status = await statusOf(ctx);
+      if (!status.available) return { content: browserUnavailableText(status), isError: true };
+      if (!status.online) {
         return {
-          content: `Your computer${machine ? ` ${machine.name}` : ""} is offline, so no one can use your browser now. Say so in your reply.`,
+          content: `Your computer ${status.machineName} is offline, so no one can use your browser now. Say so in your reply.`,
           isError: true,
         };
       }
+      const machineId = status.machineId;
       const [run] = await ctx.db
         .select()
         .from(agentRuns)
@@ -345,35 +346,46 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
       }
       const where = await runWhere(ctx.db, run);
       const recipient = await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
-      const created = await ctx.db.transaction(async (tx) => {
-        const card = await insertMessage(tx, {
-          orgId: run.orgId,
-          channelId: where.channelId,
-          threadId: where.threadId,
-          author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-          body: `Help needed in the browser: ${instructions}`,
-          meta: bodyCode("browser_handoff", { instructions }),
-        });
-        // The card's id is the handoff's: the card is found and kept in sync by it.
-        const [row] = await tx
-          .insert(browserHandoffs)
-          .values({
-            id: card.id,
+      const busy = {
+        content: "A person is using your browser, or was just asked to; wait for that before asking.",
+        isError: true,
+      };
+      let created: { card: Awaited<ReturnType<typeof insertMessage>>; row: BrowserHandoffRow };
+      try {
+        created = await ctx.db.transaction(async (tx) => {
+          const card = await insertMessage(tx, {
             orgId: run.orgId,
-            agentId: run.agentId,
-            runId: run.id,
-            machineId,
-            kind: "ask",
-            instructions,
-            requestedForUserId: recipient,
-            expiresAt: new Date(Date.now() + minutes * 60_000),
-          })
-          .returning();
-        if (!row) throw new Error("handoff not created");
-        await syncCard(tx, row);
-        card.meta = { ...card.meta, browserHandoff: handoffView(row) };
-        return { card, row };
-      });
+            channelId: where.channelId,
+            threadId: where.threadId,
+            author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+            body: `Help needed in the browser: ${instructions}`,
+            meta: bodyCode("browser_handoff", { instructions }),
+          });
+          // The card's id is the handoff's: the card is found and kept in sync by it.
+          const [row] = await tx
+            .insert(browserHandoffs)
+            .values({
+              id: card.id,
+              orgId: run.orgId,
+              agentId: run.agentId,
+              runId: run.id,
+              machineId,
+              kind: "ask",
+              instructions,
+              requestedForUserId: recipient,
+              expiresAt: new Date(Date.now() + minutes * 60_000),
+            })
+            .returning();
+          if (!row) throw new Error("handoff not created");
+          await syncCard(tx, row);
+          card.meta = { ...card.meta, browserHandoff: handoffView(row) };
+          return { card, row };
+        });
+      } catch (error) {
+        // Someone took over (or another run asked) between the check and the insert: one open handoff per browser.
+        if (isUniqueViolation(error)) return busy;
+        throw error;
+      }
       if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(created.card));
       await notifyBrowserHandoff({ db: ctx.db, pubsub: deps.pubsub }, created.row, {
         channelId: where.channelId,
@@ -386,7 +398,16 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
       };
     },
   };
-  return { name: "browser-handoff", tools: async () => [tool] };
+  return {
+    name: "browser-handoff",
+    // Offered with the other browser tools: only when the agent's computer serves its browser.
+    async tools(ctx) {
+      if (!hub) return [];
+      const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+      if (!isAllowed(toolAccess(granted, tool))) return [];
+      return (await statusOf(ctx)).available ? [tool] : [];
+    },
+  };
 }
 
 // ── A person's side ───────────────────────────────────────────────────────────
@@ -538,18 +559,27 @@ export async function startTakeover(deps: HandoffDeps, actorId: string, orgId: s
   const machineId = await browserMachineOf(deps.db, orgId, agentId);
   if (!machineId) throw new ValidationError("This agent has no computer");
   const now = Date.now();
-  const [row] = await deps.db
-    .insert(browserHandoffs)
-    .values({
-      orgId,
-      agentId,
-      machineId,
-      kind: "takeover",
-      status: "active",
-      controllerUserId: actorId,
-      expiresAt: new Date(now + CONTROL_GRACE_MS),
-    })
-    .returning();
+  let row: BrowserHandoffRow | undefined;
+  try {
+    [row] = await deps.db
+      .insert(browserHandoffs)
+      .values({
+        orgId,
+        agentId,
+        machineId,
+        kind: "takeover",
+        status: "active",
+        controllerUserId: actorId,
+        expiresAt: new Date(now + CONTROL_GRACE_MS),
+      })
+      .returning();
+  } catch (error) {
+    // Opened meanwhile (another person, or the agent asked): that one is claimed instead, or it says who has it.
+    if (!isUniqueViolation(error)) throw error;
+    const raced = await openHandoffOf(deps.db, orgId, agentId);
+    if (!raced) throw new ConflictError("Someone else just took control");
+    return claimHandoff(deps, actorId, orgId, raced.id);
+  }
   if (!row) throw new Error("takeover not created");
   await afterChange(deps, row);
   return handoffView(row);
@@ -634,15 +664,18 @@ export async function markPageRead(db: Database, ctx: { orgId: string; agentId: 
  * within `CONTROL_GRACE_MS`): the handoff ends as expired, and the waiting
  * run resumes. Nothing when someone else took over meanwhile or it ended.
  */
-export async function expireControl(deps: HandoffDeps, handoffId: string, userId: string) {
+export async function expireControl(deps: HandoffDeps, handoffId: string, userId: string, now = new Date()) {
   const [row] = await deps.db
     .update(browserHandoffs)
-    .set({ status: "expired", resolvedAt: new Date() })
+    .set({ status: "expired", resolvedAt: now })
     .where(
       and(
         eq(browserHandoffs.id, handoffId),
         eq(browserHandoffs.status, "active"),
         eq(browserHandoffs.controllerUserId, userId),
+        // Their presence is kept in the database: back on another server (or still typing there)
+        // pushed the deadline, and only a deadline that passed ends it.
+        lte(browserHandoffs.expiresAt, now),
       ),
     )
     .returning();
@@ -656,9 +689,10 @@ export async function expireControl(deps: HandoffDeps, handoffId: string, userId
  * The person in control is still there (watching or typing): their grace
  * moves to `CONTROL_GRACE_MS` from now. Kept in the database so control ends
  * even when the server that saw them go restarts. Written at most every
- * `CONTROL_TOUCH_EVERY_MS`.
+ * `CONTROL_TOUCH_EVERY_MS`, unless `force` (they just came back: at once, so
+ * a server that saw them leave doesn't end it).
  */
-export async function touchControl(db: Executor, handoffId: string, userId: string, now = new Date()) {
+export async function touchControl(db: Executor, handoffId: string, userId: string, now = new Date(), force = false) {
   const until = new Date(now.getTime() + CONTROL_GRACE_MS);
   await db
     .update(browserHandoffs)
@@ -668,7 +702,24 @@ export async function touchControl(db: Executor, handoffId: string, userId: stri
         eq(browserHandoffs.id, handoffId),
         eq(browserHandoffs.status, "active"),
         eq(browserHandoffs.controllerUserId, userId),
-        lt(browserHandoffs.expiresAt, new Date(until.getTime() - CONTROL_TOUCH_EVERY_MS)),
+        force ? sql`true` : lt(browserHandoffs.expiresAt, new Date(until.getTime() - CONTROL_TOUCH_EVERY_MS)),
+      ),
+    );
+}
+
+/**
+ * The person in control left this server: their control ends at `until`
+ * unless they come back here or elsewhere (`touchControl` pushes it again).
+ */
+export async function setControlDeadline(db: Executor, handoffId: string, userId: string, until: Date) {
+  await db
+    .update(browserHandoffs)
+    .set({ expiresAt: until })
+    .where(
+      and(
+        eq(browserHandoffs.id, handoffId),
+        eq(browserHandoffs.status, "active"),
+        eq(browserHandoffs.controllerUserId, userId),
       ),
     );
 }

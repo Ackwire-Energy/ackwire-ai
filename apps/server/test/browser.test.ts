@@ -161,6 +161,13 @@ describe("live view socket", () => {
         agentId: org.agentId,
         reason: "offline",
       });
+      // Offline: the client's retry (watching again) is answered again, not ignored.
+      frames.length = 0;
+      ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId }));
+      expect(await until((f) => f.type === "browser.unavailable")).toMatchObject({
+        agentId: org.agentId,
+        reason: "offline",
+      });
       ws.send(JSON.stringify({ type: "browser.watch", agentId: AGENT }));
       expect(await until((f) => f.type === "error" && f.agentId === AGENT)).toMatchObject({ code: "not_found" });
       ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: "a" }] }));

@@ -1,4 +1,5 @@
-import { foreignKey, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { foreignKey, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { agents } from "./agents";
 import { users } from "./auth";
 import { machines } from "./machines";
@@ -57,5 +58,7 @@ export const browserHandoffs = pgTable(
     foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }),
     index().on(t.orgId, t.status),
     index().on(t.agentId, t.status),
+    // One open handoff per agent's browser: two people (or a person and the agent) can't race in.
+    uniqueIndex("browser_handoffs_one_open").on(t.agentId).where(sql`${t.status} in ('pending', 'active')`),
   ],
 );

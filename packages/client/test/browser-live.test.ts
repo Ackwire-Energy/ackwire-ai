@@ -153,6 +153,27 @@ describe("agent browser live connection (ADR 0040)", () => {
     expect(t.pending).toHaveLength(0);
   });
 
+  test("an ended stream (the browser closed) is watched again after a backoff; a stop we asked for isn't", () => {
+    const sent: { type: string }[] = [];
+    const t = fakeTimers();
+    const live = createBrowserLiveConnection({
+      send: (f) => sent.push(f),
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      timers: t.timers,
+      backoffMs: [100],
+    });
+    live.start();
+    live.handleMessage({ type: "browser.ended", agentId: AGENT, reason: "stopped" });
+    expect(t.pending).toHaveLength(0);
+    live.handleMessage({ type: "browser.ended", agentId: AGENT, reason: "closed" });
+    expect(t.pending[0]?.ms).toBe(100);
+    t.run();
+    expect(sent.filter((f) => f.type === "browser.watch")).toHaveLength(2);
+    live.close();
+  });
+
   test("input goes in batches the server accepts", () => {
     const sent: { events?: unknown[] }[] = [];
     const live = createBrowserLiveConnection({

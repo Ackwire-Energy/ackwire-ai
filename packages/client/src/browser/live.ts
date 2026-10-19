@@ -185,6 +185,17 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
   let retry: unknown = null;
   let closed = false;
   const watch = () => options.send({ type: "browser.watch", agentId });
+  /** `browser.watch` again after a backoff (a repeated watch restarts the view on the server). */
+  const retryLater = () => {
+    clearRetry();
+    retry = timers.setTimeout(
+      () => {
+        retry = null;
+        if (!closed) watch();
+      },
+      browserRetryDelay(attempt++, options.backoffMs),
+    );
+  };
   const clearRetry = () => {
     if (retry !== null) timers.clearTimeout(retry);
     retry = null;
@@ -216,19 +227,12 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
         case "browser.unavailable":
           options.onUnavailable?.(m.reason, m.message);
           // The server dropped this watch: try again later unless it can't change by waiting.
-          if (m.reason === "reconnecting" || m.reason === "unavailable" || m.reason === "offline") {
-            clearRetry();
-            retry = timers.setTimeout(
-              () => {
-                retry = null;
-                if (!closed) watch();
-              },
-              browserRetryDelay(attempt++, options.backoffMs),
-            );
-          }
+          if (m.reason === "reconnecting" || m.reason === "unavailable" || m.reason === "offline") retryLater();
           return;
         case "browser.ended":
           options.onEnded?.(m.reason, m.message);
+          // The browser closed or failed on the computer: watching again picks it up when it is back.
+          if (m.reason !== "stopped") retryLater();
           return;
         case "error":
           options.onError?.(m.code);

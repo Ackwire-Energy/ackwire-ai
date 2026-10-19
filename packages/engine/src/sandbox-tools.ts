@@ -98,6 +98,16 @@ const READ_ONLY_COMMANDS = new Set([
 ]);
 const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "branch", "rev-parse", "ls-files", "remote"]);
 
+/** A `request_secret` site as its origin (`https://host[:port]`), or null when it isn't a web address. */
+export function secretSite(raw: string): string | null {
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * A bash command that only reads (a proposed mission is planned read only,
  * ADR 0029): every part (split on `&&`, `||`, `;`, `|`, newlines) starts with
@@ -714,6 +724,12 @@ export function createSandboxToolSource(
           purpose: { type: "string", minLength: 1, maxLength: 300, description: "What it is for, shown to the person" },
           target: { enum: ["env", "file"] },
           path: { type: "string", maxLength: 300, description: "With target file: where it goes in your workspace" },
+          site: {
+            type: "string",
+            maxLength: 300,
+            description:
+              "For a password your browser types (browser_type_secret): the address of the page it goes into (https://…). It will only ever be typed on that site.",
+          },
         },
         required: ["name", "purpose", "target"],
         additionalProperties: false,
@@ -733,6 +749,11 @@ export function createSandboxToolSource(
           const path = file ? toolPath(str(input.path), computerInfo) : "";
           if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {
             return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };
+          }
+          const rawSite = str(input.site).trim();
+          const site = rawSite ? secretSite(rawSite) : null;
+          if (rawSite && !site) {
+            return { content: "`site` must be a web address (https://example.com/login).", isError: true };
           }
           const open = await ctx.db
             .select({ id: schema.secretRequests.id })
@@ -756,7 +777,9 @@ export function createSandboxToolSource(
                 toolUseId: ctx.toolUseId ?? id,
                 requestedForUserId: requester,
                 name,
-                purpose: str(input.purpose).trim(),
+                // The person sees the one site a browser password may be typed on.
+                purpose: site ? `${str(input.purpose).trim()} (${new URL(site).host})` : str(input.purpose).trim(),
+                site,
                 targetKind: file ? "file" : "env",
                 targetPath: file ? path : null,
                 machineId: computer.machineId ?? null,
