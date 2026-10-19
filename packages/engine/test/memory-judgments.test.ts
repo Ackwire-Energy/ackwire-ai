@@ -15,7 +15,6 @@ import {
   findCandidates,
   type Judged,
   judgeRelations,
-  memoryJudgeEnabled,
   overlap,
   planConsolidation,
 } from "../src/context/judgments";
@@ -39,14 +38,7 @@ const fact = (fx: Fixture, content: string, extra: Partial<NewContextItem> = {})
 const human = (ref: string) => ({ type: "human" as const, ref, at: new Date().toISOString() });
 const agentClaim = (ref: string) => ({ type: "agent" as const, ref, at: new Date().toISOString() });
 
-describe("memory judgments: switch and words", () => {
-  test("MEMORY_JUDGE_ORGS lists org ids or *", () => {
-    expect(memoryJudgeEnabled("", "o1")).toBe(false);
-    expect(memoryJudgeEnabled(" o1 , o2", "o2")).toBe(true);
-    expect(memoryJudgeEnabled("o1", "o3")).toBe(false);
-    expect(memoryJudgeEnabled("*", "o3")).toBe(true);
-  });
-
+describe("memory judgments: words", () => {
   test("paraphrases keep their nouns, so they become candidates", () => {
     expect(overlap("Deploy é no Railway", "Hospedamos o app no Railway")).toBeGreaterThan(0);
     expect(overlap("Deploy é no Railway", "Reunião às quintas")).toBe(0);
@@ -190,6 +182,17 @@ describe("memory judgments: consolidateItem carries out the plan", () => {
     expect(on).toMatchObject({ action: "merged", item: { id: old.item.id, recurrence: 2 } });
   });
 
+  test("a judge that is sure of nothing leaves it to words: the same item again still merges", async () => {
+    f = await setup();
+    const old = await consolidateItem(f.db, fact(f, "We host the app on Railway."));
+    const silent = createFakeJudge(() => undefined);
+    const again = await consolidateItem(f.db, fact(f, "We host the app on Railway."), {
+      judge: silent,
+      semantic: true,
+    });
+    expect(again).toMatchObject({ action: "merged", item: { id: old.item.id, recurrence: 2 } });
+  });
+
   test("an update supersedes the old item (kept as history)", async () => {
     f = await setup();
     const old = await consolidateItem(f.db, fact(f, "Standup is at 10am."));
@@ -280,7 +283,7 @@ describe("memory judgments: the daily pass", () => {
       fact(f, "Hospedamos a aplicação no Railway.", { evidence: [human("m2")] }),
     );
     await ageOf(older.id);
-    const deps = { ...f.context, judge: relation("same"), memoryJudgeOrgs: "*" };
+    const deps = { ...f.context, judge: relation("same") };
     expect(await consolidateByMeaning(deps, f.org.id)).toEqual({ moved: 1, linked: 0 });
     const rows = await f.db.select().from(schema.contextItems);
     expect(rows.find((r) => r.id === twin.id)).toMatchObject({ status: "archived", supersededBy: older.id });
@@ -297,35 +300,29 @@ describe("memory judgments: the daily pass", () => {
       fact(f, "Fridays are bad for deploys.", { evidence: [agentClaim("m2")] }),
     );
     await ageOf(personSaid.id, 2);
-    await consolidateByMeaning({ ...f.context, judge: relation("contradicts"), memoryJudgeOrgs: "*" }, f.org.id);
+    await consolidateByMeaning({ ...f.context, judge: relation("contradicts") }, f.org.id);
     const [lost] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, claim.id));
     expect(lost).toMatchObject({ status: "archived", supersededBy: personSaid.id });
 
     const a = await insertContextItem(f.db, fact(f, "Railway bills us monthly."));
     await insertContextItem(f.db, fact(f, "We pay Railway with the company card."));
     await ageOf(a.id);
-    const linking = { ...f.context, judge: relation("related"), memoryJudgeOrgs: "*" };
+    const linking = { ...f.context, judge: relation("related") };
     expect((await consolidateByMeaning(linking, f.org.id)).linked).toBeGreaterThan(0);
     const [linked] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, a.id));
     expect(linked?.relatedIds.length).toBeGreaterThan(0);
     expect(await consolidateByMeaning(linking, f.org.id)).toEqual({ moved: 0, linked: 0 });
   });
 
-  test("off for the org, or without Jev: nothing moves", async () => {
+  test("without Jev nothing moves", async () => {
     f = await setup();
     await insertContextItem(f.db, fact(f, "We host the app on Railway."));
     const twin = await insertContextItem(f.db, fact(f, "Hospedamos a aplicação no Railway."));
-    expect(
-      await consolidateByMeaning({ ...f.context, judge: relation("same"), memoryJudgeOrgs: "" }, f.org.id),
-    ).toEqual({
-      moved: 0,
-      linked: 0,
-    });
     const llmOnly = createLlmJudge({
       gateway: { complete: async () => Promise.reject(new Error("must not be called")) },
       resolveModel: async () => "claude-haiku-5-5",
     });
-    expect(await consolidateByMeaning({ ...f.context, judge: llmOnly, memoryJudgeOrgs: "*" }, f.org.id)).toEqual({
+    expect(await consolidateByMeaning({ ...f.context, judge: llmOnly }, f.org.id)).toEqual({
       moved: 0,
       linked: 0,
     });

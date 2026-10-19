@@ -211,8 +211,8 @@ export type ConsolidateResult = {
 
 /**
  * How a write is judged: `judge` keeps permission-bending text out; with
- * `semantic` (the org is in `MEMORY_JUDGE_ORGS`) the judge also says how the
- * item relates to what exists (judgments.ts), else words decide (today's rule).
+ * `semantic` (every organization, `memoryJudging`) the judge also says how the
+ * item relates to what exists (judgments.ts); without it words decide.
  */
 export interface MemoryJudging {
   judge?: Judge;

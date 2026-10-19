@@ -43,7 +43,7 @@ export * from "./context";
 export * from "./context/consolidate";
 export * from "./context/feedback";
 export * from "./context/items";
-export { memoryJudgeEnabled, type Plan, planConsolidation } from "./context/judgments";
+export { type Plan, planConsolidation } from "./context/judgments";
 export * from "./context/outcomes";
 export * from "./context/proposals";
 export * from "./context/reflect";

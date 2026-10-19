@@ -8,7 +8,7 @@ import {
   SAME_ITEM_SIMILARITY,
   similarity,
 } from "./items";
-import { decide, findCandidates, judgeRelations, memoryJudgeEnabled } from "./judgments";
+import { decide, findCandidates, judgeRelations } from "./judgments";
 import { proposeFromItem } from "./proposals";
 import { REFLECT_DEFAULTS } from "./reflect";
 import { type ContextDeps, ensurePeriodSummary, judgeOf } from "./summaries";
@@ -183,7 +183,6 @@ const asNew = (item: ContextItem): NewContextItem => ({
  */
 export async function consolidateByMeaning(deps: ContextDeps, orgId: string, now = new Date()) {
   const out = { moved: 0, linked: 0 };
-  if (!memoryJudgeEnabled(deps.memoryJudgeOrgs, orgId)) return out;
   const { db } = deps;
   const judge = judgeOf(deps);
   const since = new Date(now.getTime() - DAILY_JUDGING.sinceDays * 86_400_000);

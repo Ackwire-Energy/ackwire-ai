@@ -81,11 +81,9 @@ export async function createTestServer(
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
-  // Memory by meaning is on by default in production; tests opt in with env (the fake judge answers nothing).
   const config = testConfig({
     PUBLIC_URL: ORIGIN,
     AGENT_MAX_OUTPUT_TOKENS: "1000",
-    MEMORY_JUDGE_ORGS: "",
     ...options.env,
   });
   const log = createLogger("error");

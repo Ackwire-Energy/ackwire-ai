@@ -125,7 +125,6 @@ export function buildEngine(o: EngineOptions) {
     cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
     pubsub: adapters.pubsub,
     judge: o.judge,
-    memoryJudgeOrgs: config.MEMORY_JUDGE_ORGS,
     schedules: o.schedules,
     reflect: {
       everyMessages: config.REFLECT_EVERY_MESSAGES,

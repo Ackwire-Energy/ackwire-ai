@@ -197,7 +197,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               createdByKind: "person",
               createdById: requester,
             },
-            memoryJudging(deps, ctx.orgId),
+            memoryJudging(deps),
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
           await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, res.item).catch(() => {});

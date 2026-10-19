@@ -436,7 +436,7 @@ export function knowledgeRoutes(deps: AppDeps) {
         {
           db,
           pubsub: adapters.pubsub,
-          memory: deps.extras?.context ? memoryJudging(deps.extras.context, orgId) : undefined,
+          memory: deps.extras?.context ? memoryJudging(deps.extras.context) : undefined,
         },
         c.get("user").id,
         orgId,

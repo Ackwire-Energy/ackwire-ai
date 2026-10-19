@@ -42,15 +42,6 @@ const SCAN_LIMIT = 200;
 const WORLD_KINDS: ContextKind[] = ["decision", "fact", "preference", "open_question"];
 export const kindFamily = (kind: ContextKind): ContextKind[] => (WORLD_KINDS.includes(kind) ? WORLD_KINDS : [kind]);
 
-/** `MEMORY_JUDGE_ORGS`: org ids separated by commas, or `*`. */
-export function memoryJudgeEnabled(setting: string | undefined, orgId: string) {
-  const list = (setting ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return list.includes("*") || list.includes(orgId);
-}
-
 /** Words of 3+ letters (accents and case aside). No word lists: nothing here depends on the language. */
 const terms = (text: string) =>
   new Set(
@@ -213,12 +204,18 @@ export function decide(input: NewContextItem, judged: Judged[]): Plan {
   return { action: "create", related };
 }
 
-/** Candidates, judgment and plan; null when the judge fails (the caller falls back to words). */
+/**
+ * Candidates, judgment and plan; null when the judge fails or is sure of
+ * nothing about any candidate (no answer, all below `THRESHOLDS.related`):
+ * then the caller falls back to words, so a repeat still merges.
+ */
 export async function planConsolidation(db: Executor, judge: Judge, input: NewContextItem): Promise<Plan | null> {
   const candidates = await findCandidates(db, input);
   if (candidates.length === 0) return { action: "create", related: [] };
   try {
-    return decide(input, await judgeRelations(judge, input, candidates));
+    const judged = await judgeRelations(judge, input, candidates);
+    if (!judged.some((j) => j.p >= THRESHOLDS.related)) return null;
+    return decide(input, judged);
   } catch {
     return null;
   }

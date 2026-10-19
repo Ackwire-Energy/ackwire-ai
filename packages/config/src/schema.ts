@@ -279,12 +279,6 @@ export const envVars = {
     description: "Upper bound on reflections per thread (bounds cost and agent-to-agent loops).",
     section: "Agents",
   },
-  MEMORY_JUDGE_ORGS: {
-    schema: z.string().default("*"),
-    description:
-      "Organizations whose memory writes go through the judge (Jev, with the cheap model as fallback): duplicates, refinements, updates and contradictions found by meaning, not by words (ADR 0028). Default `*` (all). Organization ids separated by commas to limit it; empty turns it off (words only).",
-    section: "Agents",
-  },
   EMBEDDINGS_PROVIDER: {
     schema: z.enum(["none", "voyage"]).default("none"),
     description:

@@ -265,7 +265,7 @@ export async function reflectThread(
           confidence: item.confidence,
           createdByKind: "job",
         },
-        memoryJudging(deps, input.orgId),
+        memoryJudging(deps),
       );
       out.results.push(res);
       await announceMessageMemories(deps, input.orgId, res.item).catch(() => {});
