@@ -115,6 +115,7 @@ const TOOL_LABEL: Record<keyof RunnerTools, string> = {
   claude: "Claude Code",
   codex: "Codex",
   commands: "Commands",
+  browser: "Browser",
 };
 
 /** Whether a tool is on: from the machine's access (protocol 10), or `exec` for a runner without it. */

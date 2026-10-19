@@ -476,7 +476,12 @@ function tools(p: Parsed): number {
   if (!paired) return 1;
   const [, sub = "list", tool] = p.positional;
   const access = effectiveAccess(paired.stored);
-  const label: Record<keyof RunnerTools, string> = { claude: "Claude Code", codex: "Codex", commands: "Commands" };
+  const label: Record<keyof RunnerTools, string> = {
+    claude: "Claude Code",
+    codex: "Codex",
+    commands: "Commands",
+    browser: "Browser",
+  };
   if (sub === "list") {
     for (const t of TOOL_NAMES) console.log(`${t.padEnd(9)} ${access.tools[t] ? "on " : "off"}  ${label[t]}`);
     return 0;

@@ -1,6 +1,6 @@
 # 0040. The agent browser on connected computers, built on `agent-browser`
 
-- Status: Proposed
+- Status: Accepted (2026-10-19)
 - Date: 2026-10-19
 - Planning: D57
 - First slice of: ADR 0031 (computer use). Where the two disagree, this ADR wins for the browser.

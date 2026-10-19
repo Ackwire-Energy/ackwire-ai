@@ -18,6 +18,7 @@ export * from "./brains/model";
 export * from "./brains/prompt";
 export * from "./brains/select";
 export * from "./brains/types";
+export * from "./browser/types";
 export * from "./cache";
 export * from "./calendar";
 export * from "./calendar-tools";

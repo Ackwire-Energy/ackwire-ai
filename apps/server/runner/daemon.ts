@@ -451,7 +451,12 @@ export class RunnerDaemon implements RequestObserver {
 
   private describeAccessChange(a: RunnerAccess, b: RunnerAccess): string[] {
     const out: string[] = [];
-    const label: Record<keyof RunnerTools, string> = { claude: "Claude Code", codex: "Codex", commands: "commands" };
+    const label: Record<keyof RunnerTools, string> = {
+      claude: "Claude Code",
+      codex: "Codex",
+      commands: "commands",
+      browser: "the browser",
+    };
     for (const t of TOOL_NAMES)
       if (a.tools[t] !== b.tools[t]) out.push(`${label[t]} turned ${b.tools[t] ? "on" : "off"}`);
     const names = (ids: string[]) =>

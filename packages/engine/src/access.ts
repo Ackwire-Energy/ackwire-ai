@@ -1,6 +1,7 @@
 import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
+import { BROWSER_SCOPE, BROWSER_TOOL_INFO, BROWSER_TOOLS } from "./browser/types";
 import { caches } from "./cache";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorGrantValidator } from "./connectors/connections";
@@ -61,6 +62,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "computer_stop",
     "computer_status",
   ],
+  [BROWSER_SCOPE]: [...BROWSER_TOOLS],
 };
 
 export interface ToolRef {
@@ -177,6 +179,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     label: "Check the computer",
     description: "Says whether it is on, the disk used and this month's cost.",
   },
+  ...BROWSER_TOOL_INFO,
 };
 
 const humanize = (name: string) => {
