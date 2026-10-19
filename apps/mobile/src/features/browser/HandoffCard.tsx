@@ -1,13 +1,13 @@
-import { useBrowserHandoff } from "@agenteschat/client";
+import { type BrowserHandoff, handoffFuse, handoffMinutesLeft, useBrowserHandoff } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Fuse, Icon, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
-import { agentLook, fuseRemaining, genderOf, minutesLeft } from "../shared/logic";
+import { agentLook, genderOf } from "../shared/logic";
 import { tapHaptic, useSurface } from "../shared/parts";
-import { cardStateOf, type HandoffCard as Handoff } from "./logic";
+import { cardStateOf } from "./logic";
 
 /**
  * "Dev precisa de ajuda" in the conversation (NavegadorAgente.html, "Pedido no chat"): who asks, what to
@@ -15,7 +15,7 @@ import { cardStateOf, type HandoffCard as Handoff } from "./logic";
  * is in control it says who; once it ends, one line with how. The card's state comes from the message
  * (`meta.browserHandoff`) and is refreshed from the server.
  */
-export function HandoffCard({ handoff: fromMessage }: { handoff: Handoff }) {
+export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -25,7 +25,7 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: Handoff }) {
   const surface = useSurface();
   const raised = useSurface("e2");
   const fresh = useBrowserHandoff(orgId, fromMessage.id);
-  const h = { ...fromMessage, ...(fresh.data ?? {}) } as Handoff;
+  const h: BrowserHandoff = fresh.data ?? fromMessage;
   const agent = dir.agentById.get(h.agentId);
   const name = agent?.name ?? "";
   const state = cardStateOf(h, meId);
@@ -49,7 +49,7 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: Handoff }) {
   }
 
   const helper = h.controllerUserId ? dir.nameOf({ type: "person", id: h.controllerUserId }) : "";
-  const minutes = h.expiresAt ? minutesLeft(h.expiresAt, now) : null;
+  const minutes = handoffMinutesLeft(h, now);
   return (
     <View style={[styles.card, raised]}>
       <View style={styles.label}>
@@ -91,11 +91,7 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: Handoff }) {
         />
       )}
       {state === "waiting" && h.expiresAt ? (
-        <Fuse
-          color={agentLook(agent).color}
-          remaining={fuseRemaining(h.createdAt, h.expiresAt, now)}
-          style={styles.fuse}
-        />
+        <Fuse color={agentLook(agent).color} remaining={handoffFuse(h, now)} style={styles.fuse} />
       ) : null}
     </View>
   );

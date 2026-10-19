@@ -1,11 +1,10 @@
-import { useAgentBrowserHandoff, useAgentBrowserSettings } from "@agenteschat/client";
+import { isOpenHandoff, useAgentBrowserHandoff, useAgentBrowserSettings } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Card, Row, Section, Text } from "@/ui";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { Tile } from "../shared/parts";
-import { isOpen } from "./logic";
 
 /**
  * "Navegador" on the agent's profile (NavegadorAgente.html, "Assistindo"): when it waits on someone in its
@@ -19,7 +18,7 @@ export function AgentBrowserRow({ agentId }: { agentId: string }) {
   const c = useColors();
   const settings = useAgentBrowserSettings(orgId, agentId);
   const open = useAgentBrowserHandoff(orgId, agentId);
-  const handoff = open.data && isOpen(open.data.status) ? open.data : null;
+  const handoff = open.data && isOpenHandoff(open.data) ? open.data : null;
   if (!settings.data?.available && !handoff) return null;
   const name = dir.agentById.get(agentId)?.name ?? "";
   return (

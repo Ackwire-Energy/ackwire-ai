@@ -1,40 +1,31 @@
 import {
+  type BrowserFrame,
+  type BrowserInputEvent,
+  type BrowserLiveUnavailable,
+  clickEvents,
   createBrowserLiveConnection,
-  realtimeUrl,
-  type SocketLike,
+  fitFrame,
+  framePoint,
+  isOpenHandoff,
+  keyEvents,
+  textEvent,
   useAgentBrowserHandoff,
   useBrowserHandoff,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { API_URL } from "@/config";
-import { lastCookie, readCookie } from "@/lib/auth";
-import { createSocketFactory } from "@/lib/socket";
 import { Button, IconButton, Text, ToastHost, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useConnection, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { goBack, successHaptic, tapHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
-import {
-  type Box,
-  clickAt,
-  FAILED_REASONS,
-  hostOf,
-  isOpen,
-  keyPress,
-  LIVE_KEYS,
-  type LiveInput,
-  type LiveKey,
-  liveBackoff,
-  pagePoint,
-  textInput,
-} from "./logic";
+import { FAILED_REASONS, hostOf, LIVE_KEYS, type LiveKey } from "./logic";
 
 /**
  * The agent's browser, live and full screen (NavegadorAgente.html, "Tela ao vivo", phone frame): what the
@@ -52,14 +43,7 @@ export function LiveView({ agentId, handoffId }: { agentId: string; handoffId?: 
   );
 }
 
-interface Frame {
-  data: string;
-  width: number;
-  height: number;
-  url: string;
-}
-
-type Unavailable = "reconnecting" | "offline" | "no_computer" | "unavailable" | "ended" | "forbidden" | null;
+type Unavailable = BrowserLiveUnavailable | "ended" | null;
 
 function Live({ agentId, handoffId }: { agentId: string; handoffId: string | null }) {
   const { t } = useTranslation();
@@ -72,23 +56,23 @@ function Live({ agentId, handoffId }: { agentId: string; handoffId: string | nul
   const toast = useToast();
   const sheet = useSheet();
   const actions = useBrowserHandoffActions(orgId);
-  const byId = useBrowserHandoff(orgId, handoffId ?? "");
+  const byId = useBrowserHandoff(orgId, handoffId);
   const byAgent = useAgentBrowserHandoff(orgId, agentId);
   const [statusHandoff, setStatusHandoff] = useState<{ controllerUserId: string | null } | null>(null);
   const handoff = (handoffId ? byId.data : byAgent.data) ?? null;
   const name = dir.agentById.get(agentId)?.name ?? "";
   const g = genderOf(name);
-  const live = useLiveConnection(orgId, agentId);
+  const live = useLiveConnection(agentId);
   const controller = statusHandoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
   const mine = Boolean(meId) && controller === meId;
-  const open = handoff ? isOpen(handoff.status) : false;
+  const open = handoff ? isOpenHandoff(handoff) : false;
 
   // Opening a request someone asked for takes the control (first one wins; the other sees who).
   const claimed = useRef(false);
   useEffect(() => {
     if (!handoff || claimed.current || handoff.status !== "pending") return;
     claimed.current = true;
-    void Promise.resolve(actions.takeControl(handoff.id)).catch(() => {});
+    actions.takeControl(handoff.id).catch(() => {});
   }, [handoff, actions]);
 
   useEffect(() => {
@@ -204,10 +188,10 @@ function Live({ agentId, handoffId }: { agentId: string; handoffId: string | nul
             ) : null}
           </View>
         ) : null}
-        {live.frame?.url ? (
+        {live.frame?.metadata.url ? (
           <View style={[styles.url, { backgroundColor: c.raised }]}>
             <Text variant="caption" tone="muted" numberOfLines={1}>
-              {hostOf(live.frame.url)}
+              {hostOf(live.frame.metadata.url)}
             </Text>
           </View>
         ) : null}
@@ -250,12 +234,12 @@ function FrameView({
   enabled,
   onInput,
 }: {
-  frame: Frame;
+  frame: BrowserFrame;
   enabled: boolean;
-  onInput: (events: LiveInput[]) => void;
+  onInput: (events: BrowserInputEvent[]) => void;
 }) {
   const { t } = useTranslation();
-  const [view, setView] = useState<Box>({ width: 0, height: 0 });
+  const [view, setView] = useState({ width: 0, height: 0 });
   const onLayout = (e: LayoutChangeEvent) =>
     setView({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height });
   return (
@@ -265,13 +249,16 @@ function FrameView({
       disabled={!enabled}
       accessibilityLabel={t("mobile.browser.live.page")}
       onPress={(e) => {
-        const p = pagePoint({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY }, view, {
-          width: frame.width,
-          height: frame.height,
-        });
+        // The picture is drawn "contain": a tap on the letterbox around it is ignored.
+        const fit = fitFrame(view, frame.metadata);
+        const p = framePoint(
+          { x: e.nativeEvent.locationX - fit.left, y: e.nativeEvent.locationY - fit.top },
+          fit,
+          frame.metadata,
+        );
         if (!p) return;
         tapHaptic();
-        onInput(clickAt(p));
+        onInput(clickEvents(p));
       }}
     >
       <Image
@@ -288,19 +275,20 @@ function FrameView({
  * "Digite aqui": the app's own field, whole text into the page's focused field (tap the field on the
  * page first). Senha hides it and makes it a password field, so the phone offers the saved passwords.
  */
-function TypeBar({ onInput }: { onInput: (events: LiveInput[]) => void }) {
+function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) => void }) {
   const { t } = useTranslation();
   const c = useColors();
   const [text, setText] = useState("");
   const [secret, setSecret] = useState(false);
   const send = () => {
-    if (!text) return;
-    onInput(textInput(text));
+    const event = textEvent(text);
+    if (!event) return;
+    onInput([event]);
     setText("");
   };
   const key = (k: LiveKey) => {
     tapHaptic();
-    onInput(keyPress(k));
+    onInput(keyEvents(k));
   };
   return (
     <View style={styles.typeWrap}>
@@ -350,125 +338,71 @@ function TypeBar({ onInput }: { onInput: (events: LiveInput[]) => void }) {
   );
 }
 
-// ── The socket ───────────────────────────────────────────────────────────────
+// ── The live connection ──────────────────────────────────────────────────────
 
 interface LiveState {
-  frame: Frame | null;
+  frame: BrowserFrame | null;
   unavailable: Unavailable;
   controllerUserId: string | null;
   /** The handoff the last status carried (undefined until a status arrives). */
   handoff: { controllerUserId: string | null } | null | undefined;
-  sendInput: (events: LiveInput[]) => void;
+  sendInput: (events: BrowserInputEvent[]) => void;
 }
 
 /**
- * Its own socket to `/api/ws` while the screen is open (frames stay off the conversation's socket and stop
- * when the screen closes). Reconnects with backoff, and watches again when the server says "reconnecting".
+ * Watches the agent's browser on the app's realtime socket while the screen is open (as the web's
+ * `useBrowserLive`): frames, who is in control, why it can't be shown. Watches again after the socket
+ * reconnects; the shared connection retries on its own while the computer is "reconnecting".
  */
-function useLiveConnection(orgId: string, agentId: string): LiveState {
-  const [frame, setFrame] = useState<Frame | null>(null);
+function useLiveConnection(agentId: string): LiveState {
+  const connection = useConnection();
+  const [frame, setFrame] = useState<BrowserFrame | null>(null);
   const [unavailable, setUnavailable] = useState<Unavailable>(null);
   const [controllerUserId, setControllerUserId] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
-  const sendRef = useRef<(events: LiveInput[]) => void>(() => {});
+  const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
 
   useEffect(() => {
-    let stopped = false;
-    let attempt = 0;
-    let socket: SocketLike | null = null;
-    let conn: ReturnType<typeof createBrowserLiveConnection> | null = null;
-    let retry: ReturnType<typeof setTimeout> | null = null;
-    const createSocket = createSocketFactory(lastCookie);
-
-    const again = () => {
-      if (stopped || retry) return;
-      retry = setTimeout(() => {
-        retry = null;
-        connect();
-      }, liveBackoff(attempt++));
-    };
-    const drop = () => {
-      conn?.close();
-      conn = null;
-      const s = socket;
-      socket = null;
-      if (s) {
-        s.onclose = null;
-        s.close();
-      }
-    };
-    const connect = () => {
-      if (stopped) return;
-      void readCookie().then(() => {
-        if (stopped) return;
-        const s = createSocket(realtimeUrl(API_URL, orgId));
-        socket = s;
-        s.onopen = () => {
-          if (stopped || socket !== s) return;
-          conn = createBrowserLiveConnection({
-            send: (frameOut: unknown) => {
-              if (socket === s) s.send(typeof frameOut === "string" ? frameOut : JSON.stringify(frameOut));
-            },
-            agentId,
-            onFrame: (f) => {
-              attempt = 0;
-              setUnavailable(null);
-              setFrame({
-                data: f.data,
-                width: f.metadata.deviceWidth,
-                height: f.metadata.deviceHeight,
-                url: f.metadata.url ?? "",
-              });
-            },
-            onStatus: (st) => {
-              setControllerUserId(st.controllerUserId ?? null);
-              setHandoff(st.handoff ? { controllerUserId: st.handoff.controllerUserId ?? null } : null);
-            },
-            onUnavailable: (u) => {
-              setUnavailable(u.reason);
-              if (u.reason === "reconnecting") {
-                drop();
-                again();
-              }
-            },
-            onEnded: () => setUnavailable("ended"),
-            onError: (e) => {
-              if (e.code === "forbidden" || e.code === "not_found") setUnavailable("forbidden");
-            },
-          });
-        };
-        s.onmessage = (ev) => {
-          if (socket !== s || typeof ev.data !== "string") return;
-          try {
-            conn?.handleMessage(JSON.parse(ev.data));
-          } catch {}
-        };
-        s.onclose = () => {
-          if (socket !== s) return;
-          drop();
-          setUnavailable((u) => (u === "ended" || u === "forbidden" ? u : "reconnecting"));
-          again();
-        };
-        s.onerror = () => {};
-      });
-    };
-    sendRef.current = (events) => conn?.sendInput(events);
-    connect();
+    if (!connection) return;
+    const live = createBrowserLiveConnection({
+      send: (frameOut) => connection.sendBrowserFrame(frameOut),
+      agentId,
+      onFrame: (f) => {
+        setUnavailable(null);
+        setFrame(f);
+      },
+      onStatus: (st) => {
+        setUnavailable(null);
+        setControllerUserId(st.controllerUserId);
+        setHandoff(st.handoff ? { controllerUserId: st.handoff.controllerUserId } : null);
+      },
+      onUnavailable: (reason) => setUnavailable(reason),
+      onEnded: () => setUnavailable("ended"),
+      onError: (code) => {
+        if (code === "forbidden" || code === "not_found") setUnavailable("forbidden");
+      },
+    });
+    liveRef.current = live;
+    const offFrames = connection.onBrowserFrame((m) => live.handleMessage(m));
+    // The server forgets the watch when the socket drops: watch again once it is back.
+    const offStatus = connection.onStatus((status) => {
+      if (status === "open") live.resume();
+      else if (status === "reconnecting")
+        setUnavailable((u) => (u === "ended" || u === "forbidden" ? u : "reconnecting"));
+    });
+    if (connection.isOpen) live.start();
     return () => {
-      stopped = true;
-      if (retry) clearTimeout(retry);
-      drop();
-      sendRef.current = () => {};
+      offFrames();
+      offStatus();
+      live.close();
+      liveRef.current = null;
     };
-  }, [orgId, agentId]);
+  }, [connection, agentId]);
 
-  return {
-    frame,
-    unavailable,
-    controllerUserId,
-    handoff,
-    sendInput: (events) => sendRef.current(events),
-  };
+  const sendInput = useCallback((events: BrowserInputEvent[]) => {
+    liveRef.current?.sendInput(events);
+  }, []);
+  return { frame, unavailable, controllerUserId, handoff, sendInput };
 }
 
 const styles = StyleSheet.create({

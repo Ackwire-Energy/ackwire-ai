@@ -101,9 +101,8 @@ function queryParam(query: string, name: string): string | undefined {
 export function notificationHref(n: Pick<AppNotification, "kind" | "source" | "actors">): AppHref | null {
   const s = n.source;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
-  // An agent's browser handoff (ADR 0040): the live view (the kind and `source.handoffId` are newer than the types).
-  const handoffId = (s as { handoffId?: unknown }).handoffId;
-  if ((n.kind as string) === "browser_handoff" && isSafeId(handoffId)) return `/handoff/${handoffId}`;
+  // An agent's browser handoff (ADR 0040): the live view.
+  if (n.kind === "browser_handoff" && isSafeId(s.handoffId)) return `/handoff/${s.handoffId}`;
   if ((n.kind === "mission_finished" || n.kind === "mission_stopped") && isSafeId(s.missionId))
     return `/mission/${s.missionId}`;
   if (s.topicId || s.issueId || s.issueNumber != null) return null;

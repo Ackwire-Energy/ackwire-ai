@@ -1,6 +1,7 @@
 import {
   type AgentQuestion,
   ApiError,
+  applyBrowserHandoff,
   applyChannelEvent,
   applyConsultEvent,
   type ChannelEvent,
@@ -177,6 +178,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "question.asked":
     case "question.answered":
       cacheQuestion(qc, orgId, channelId, event.question);
+      break;
+    case "browser.handoff.updated":
+      // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
+      applyBrowserHandoff(qc, orgId, event.handoff);
       break;
     case "machine.task":
       if (event.task.threadId) void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, event.task.threadId) });
