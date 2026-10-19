@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./chat";
 export * from "./connectors";
 export * from "./context";
+export * from "./databases";
 export * from "./forum";
 export * from "./machines";
 export * from "./mail";
