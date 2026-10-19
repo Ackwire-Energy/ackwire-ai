@@ -9,7 +9,7 @@ import {
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Card, Icon, Input, OptionList, SettingRow, Switch } from "@agenteschat/ui";
+import { Card, CardHeader, Icon, Input, OptionList, SettingRow, Switch } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -89,15 +89,12 @@ export function AgentBrowserCard({
   const reason = view.reason;
   return (
     <Card as="section" id="agp-sec-browser" className="agp-card agp-sec" aria-labelledby="agp-h-browser">
-      <div className="agp-ch">
-        <h2 id="agp-h-browser">
-          <Icon name="globe" size={16} />
-          {t("browser.title")}
-        </h2>
-      </div>
-      <p className="small muted" style={{ margin: 0 }}>
-        {t("browser.agent.description", g)}
-      </p>
+      <CardHeader
+        id="agp-h-browser"
+        icon="globe"
+        title={t("browser.title")}
+        subtitle={t("browser.agent.description", g)}
+      />
       <SettingRow
         title={t("browser.agent.use")}
         htmlFor={switchId}

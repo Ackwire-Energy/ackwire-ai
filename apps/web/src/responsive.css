@@ -414,8 +414,7 @@
     padding: 0;
   }
   .agp-card.ac-card {
-    padding: 16px;
-    border-radius: 18px;
+    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;

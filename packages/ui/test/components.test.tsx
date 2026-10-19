@@ -9,6 +9,9 @@ import {
   ApprovalCard,
   Avatar,
   Button,
+  Card,
+  CardFooter,
+  CardHeader,
   Chip,
   Composer,
   Icon,
@@ -169,6 +172,37 @@ describe("ApprovalCard", () => {
     expect(cards[0]?.querySelector(".ac-chip")?.className).toBe("ac-chip ac-chip--done");
     expect(cards[1]?.querySelector(".ac-chip")?.className).toBe("ac-chip");
     expect(container.querySelector(".ac-approval__actions")).toBeNull();
+  });
+});
+
+describe("Card", () => {
+  test("head: icon key, h2 with id, quiet line and action; foot: help text in the well", () => {
+    const { container } = render(
+      <Card aria-labelledby="c-title">
+        <CardHeader
+          id="c-title"
+          icon="document"
+          title="O que o Theo faz"
+          subtitle="Instruções"
+          action={<Button>Editar</Button>}
+        />
+        <CardFooter>O contexto entra antes</CardFooter>
+      </Card>,
+    );
+    const card = container.querySelector("section.ac-card");
+    expect(card?.getAttribute("aria-labelledby")).toBe("c-title");
+    expect(card?.querySelector("h2#c-title")?.textContent).toBe("O que o Theo faz");
+    expect(card?.querySelector(".ac-card__key svg")).not.toBeNull();
+    expect(card?.querySelector(".ac-card__sub")?.textContent).toBe("Instruções");
+    expect(card?.querySelector(".ac-card__action button")?.textContent).toBe("Editar");
+    expect(card?.querySelector(".ac-card__foot")?.textContent).toBe("O contexto entra antes");
+  });
+
+  test("no icon, subtitle or action: only the title", () => {
+    const { container } = render(<CardHeader title="Só título" />);
+    expect(container.querySelector(".ac-card__key")).toBeNull();
+    expect(container.querySelector(".ac-card__sub")).toBeNull();
+    expect(container.querySelector(".ac-card__action")).toBeNull();
   });
 });
 

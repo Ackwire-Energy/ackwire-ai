@@ -13,6 +13,46 @@ export function Card({
   return <Tag className={cx("ac-card", padded && "ac-card--padded", className)} {...rest} />;
 }
 
+/** A card's head: the icon on a key, the title (an `h2`, with `id` for `aria-labelledby`), a quiet line and an action. */
+export function CardHeader({
+  icon,
+  title,
+  subtitle,
+  action,
+  id,
+}: {
+  icon?: IconName;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+  id?: string;
+}) {
+  return (
+    <div className="ac-card__head">
+      {icon && (
+        <span className="ac-card__key" aria-hidden="true">
+          <Icon name={icon} size={16} />
+        </span>
+      )}
+      <div className="ac-card__heading">
+        <h2 id={id}>{title}</h2>
+        {subtitle && <p className="ac-card__sub">{subtitle}</p>}
+      </div>
+      {action && <span className="ac-card__action">{action}</span>}
+    </div>
+  );
+}
+
+/** Help text at the bottom of a card, in a well ("O contexto da org entra antes destas instruções"). */
+export function CardFooter({ children, icon = "info" }: { children: ReactNode; icon?: IconName | null }) {
+  return (
+    <p className="ac-card__foot">
+      {icon && <Icon name={icon} size={14} />}
+      <span>{children}</span>
+    </p>
+  );
+}
+
 /** How long the first-appearance stagger lasts; rows added later don't animate. */
 export const LIST_STAGGER_MS = 400;
 

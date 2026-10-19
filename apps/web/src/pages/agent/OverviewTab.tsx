@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
-import { Avatar, Button, Card, Chip, Icon, Meter } from "@agenteschat/ui";
+import { Avatar, Button, Card, CardFooter, Chip, Icon, Meter } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ResourceIcon, resourceName, useConnectedById } from "@/components/AccessLevels";
@@ -139,7 +139,7 @@ export function OverviewTab() {
             ) : (
               <p className="muted">{t("agent.noInstructions", g)}</p>
             )}
-            <span className="small muted">{t("agent.instructionsHelp", { org: org.name })}</span>
+            <CardFooter>{t("agent.instructionsHelp", { org: org.name })}</CardFooter>
           </Card>
 
           <Card as="section" className="agp-card" aria-labelledby="ov-recent">

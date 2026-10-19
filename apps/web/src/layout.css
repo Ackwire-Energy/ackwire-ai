@@ -8089,8 +8089,7 @@ a.machine-row__name:hover {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px;
-  border-radius: 20px;
+  --card-pad: 18px;
 }
 .newag__sect {
   display: flex;
@@ -9534,37 +9533,12 @@ a.machine-row__name:hover {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  padding: 18px;
-  border-radius: 20px;
+  --card-pad: 18px;
 }
 .agp-card[data-changed] {
   box-shadow:
     0 0 0 1.5px var(--ink),
-    var(--e1);
-}
-.agp-ch {
-  display: flex;
-  align-items: center;
-  gap: 8px 10px;
-}
-/* A long title wraps on its own line; the action stays on the right. */
-.agp-ch h2 {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  margin: 0;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-.agp-ch__act {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
+    var(--card-shadow);
 }
 .agp-changed {
   display: inline-flex;

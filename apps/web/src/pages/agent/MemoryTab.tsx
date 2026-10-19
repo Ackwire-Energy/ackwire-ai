@@ -5,6 +5,7 @@ import {
   Alert,
   Button,
   Card,
+  CardHeader,
   Chip,
   Diff,
   diffLines,
@@ -63,13 +64,12 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   const canDecide = proposal.canDecide && !proposal.stale;
   return (
     <Card as="article" className="agp-card agp-prop" aria-labelledby={`prop-${proposal.id}`}>
-      <div className="agp-ch">
-        <h2 id={`prop-${proposal.id}`}>
-          <Icon name="document" size={16} />
-          {proposalTitle(t, proposal, org.name, () => agent.name)}
-        </h2>
-        <span className="agp-ch__act">
-          {proposal.stale ? (
+      <CardHeader
+        id={`prop-${proposal.id}`}
+        icon="document"
+        title={proposalTitle(t, proposal, org.name, () => agent.name)}
+        action={
+          proposal.stale ? (
             <Chip icon="close">{t("proposals.stale")}</Chip>
           ) : (
             <Chip icon="waiting" tone="waiting">
@@ -79,9 +79,9 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
                   ? t("proposals.waitingFor", { name: proposal.decider.name })
                   : t("proposals.waitingAdmin")}
             </Chip>
-          )}
-        </span>
-      </div>
+          )
+        }
+      />
       <p className="agp-why">
         <b>{t("proposals.why")}:</b> {proposal.why}
       </p>

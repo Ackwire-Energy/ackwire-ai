@@ -219,6 +219,8 @@ export {
 export {
   Alert,
   Card,
+  CardFooter,
+  CardHeader,
   EmptyState,
   type EmptyStateProps,
   LIST_STAGGER_MS,

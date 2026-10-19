@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;650;700&display=swap">
+<script>
+  { const h = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = h.get("theme") || "light";
+    document.documentElement.dataset.v = h.get("v") || "a";
+    if (["f", "g", "h", "i"].includes(document.documentElement.dataset.v)) document.documentElement.setAttribute("data-v-tato", ""); }
+</script>
+<style>
+/*
+  Prototype (Cards): the root Card in packages/ui, redone so every screen gets it.
+  Problem today: the work area is white (--pane #fff) and the card is white too (--raised #fff) with only the
+  e1 hairline, so cards melt into the page. Inside, the head is a bare icon + title, help text floats at the
+  bottom of the body and list rows have no rhythm.
+  New anatomy (same for all options): head = icon tile + title + optional subtitle + action; body; optional
+  footer for help text. Rows inside a card share one shape (lead tile, title, meta, trailing).
+  Options only change how the card separates from the page:
+    A Elevação  — white page, the card gets a real ring + soft long shadow; head and footer split by hairlines.
+    B Mesa      — the page behind cards gets a paper tone; cards stay white with e1.
+    C Moldura   — a tray (bezel) holds the head and footer; the content sits in a white inner panel.
+    D Bloco     — the card is a solid neutral block on the white page; rows inside are white.
+  Cards stay neutral: no tint for state (chips with icon carry it).
+*/
+:root,[data-theme="light"]{
+  --pane:#ffffff;--bg:#fbfbfa;--raised:#ffffff;--sunken:#f3f3f0;--side:#f8f8f6;
+  --line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --agent:#0063d1;--ok:#1f7a45;--warn:#9a5b00;--warn-soft:#fbeed5;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  /* Option tokens */
+  --a-ring:rgba(23,23,22,.085);
+  --a-shadow:0 0 0 1px var(--a-ring),0 1px 2px rgba(23,23,22,.05),0 10px 28px -12px rgba(23,23,22,.16);
+  --a-shadow-hover:0 0 0 1px rgba(23,23,22,.11),0 2px 4px rgba(23,23,22,.05),0 16px 36px -14px rgba(23,23,22,.22);
+  --b-desk:#f5f5f2;
+  --c-tray:#f4f4f1;--c-tray-ring:rgba(23,23,22,.06);
+  --d-block:#f6f6f3;--d-row:#ffffff;
+  --f-face-top:#ffffff;--f-key-bottom:#f5f5f2;
+  --f-shadow:0 0 0 1px rgba(23,23,22,.08),inset 0 1px 0 #fff,inset 0 -1px 0 rgba(23,23,22,.06),0 1px 2px rgba(23,23,22,.06),0 12px 28px -14px rgba(23,23,22,.18);
+  --f-shadow-hover:0 0 0 1px rgba(23,23,22,.1),inset 0 1px 0 #fff,inset 0 -1px 0 rgba(23,23,22,.07),0 2px 4px rgba(23,23,22,.06),0 18px 36px -16px rgba(23,23,22,.24);
+  --f-key:0 0 0 1px rgba(23,23,22,.09),inset 0 1px 0 #fff,inset 0 -1px 0 rgba(23,23,22,.08),0 1px 2px rgba(23,23,22,.08);
+  --f-well:#f6f6f3;--f-well-shadow:inset 0 1px 2px rgba(23,23,22,.07),inset 0 0 0 1px rgba(23,23,22,.05),0 1px 0 #fff;
+  --g-tray-top:#f7f7f5;--g-tray:#f2f2ef;
+  --e-desk:#f6f6f3;--e-tray:#ecece8;--e-tray-ring:rgba(23,23,22,.05);
+}
+[data-theme="dark"]{
+  --pane:#0f0f0e;--bg:#0f0f0e;--raised:#1c1c1b;--sunken:#0a0a09;--side:#0a0a09;
+  --line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.15);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --agent:#5aa8ff;--ok:#5fc48a;--warn:#e0a84a;--warn-soft:#33260e;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);
+  --e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --top:inset 0 1px 0 rgba(255,255,255,.08);
+  --a-ring:rgba(255,255,255,.09);
+  --a-shadow:0 0 0 1px var(--a-ring),0 1px 2px rgba(0,0,0,.5),0 12px 30px -12px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06);
+  --a-shadow-hover:0 0 0 1px rgba(255,255,255,.13),0 2px 4px rgba(0,0,0,.5),0 18px 40px -14px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.07);
+  --b-desk:#0a0a09;
+  --c-tray:#161615;--c-tray-ring:rgba(255,255,255,.07);
+  --d-block:#191918;--d-row:#222221;
+  --f-face-top:#232322;--f-key-bottom:#1f1f1e;
+  --f-shadow:0 0 0 1px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.08),inset 0 -1px 0 rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.5),0 14px 30px -12px rgba(0,0,0,.75);
+  --f-shadow-hover:0 0 0 1px rgba(255,255,255,.12),inset 0 1px 0 rgba(255,255,255,.1),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 4px rgba(0,0,0,.5),0 20px 40px -14px rgba(0,0,0,.85);
+  --f-key:0 0 0 1px rgba(255,255,255,.09),inset 0 1px 0 rgba(255,255,255,.1),inset 0 -1px 0 rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.5);
+  --f-well:#121211;--f-well-shadow:inset 0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.04),0 1px 0 rgba(255,255,255,.05);
+  --g-tray-top:#1a1a19;--g-tray:#151514;
+  --e-desk:#090908;--e-tray:#151514;--e-tray-ring:rgba(255,255,255,.07);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--pane);color:var(--ink);font:400 14.5px/1.5 Onest,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+svg{display:block;flex:none}
+
+/* Prototype chrome */
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:12px 24px;background:color-mix(in srgb,var(--pane) 86%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.bar b{font-size:13px;font-weight:650}
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--sunken)}
+.seg button{height:30px;padding:0 12px;border:0;border-radius:9px;background:transparent;font-size:13px;font-weight:550;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line)}
+.note{flex-basis:100%;margin:0;color:var(--muted);font-size:13px}
+
+/* Page */
+.page{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
+.ph{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.ph__av{width:48px;height:48px;border-radius:30% 30% 30% 9%;background:linear-gradient(160deg,#3d8bff,#0063d1);display:grid;place-items:center;color:#fff;font-weight:700}
+.ph h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.025em}
+.ph p{margin:0;color:var(--muted);font-size:13.5px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.page{padding:20px 16px 48px}.bar{padding:10px 16px}}
+
+/* ---------- Shared anatomy (the new root Card) ---------- */
+.card{position:relative;display:flex;flex-direction:column;min-width:0;background:var(--raised);border-radius:20px}
+.card__head{display:flex;align-items:center;gap:12px;padding:16px 18px 0}
+.card__icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--plate-soft);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2)}
+.card__titles{flex:1;min-width:0}
+.card__titles h2{margin:0;font-size:15px;line-height:20px;font-weight:650;letter-spacing:-.01em}
+.card__sub{margin:1px 0 0;color:var(--muted);font-size:12.5px;line-height:17px}
+.card__body{display:flex;flex-direction:column;gap:12px;padding:14px 18px 18px;min-width:0}
+.card__foot{display:flex;align-items:center;gap:8px;padding:11px 18px;color:var(--muted);font-size:12.5px;line-height:17px}
+.card__foot svg{color:var(--faint)}
+
+.act{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:13px;font-weight:550;cursor:pointer;transition:background .15s,color .15s}
+.act:hover{background:var(--plate);color:var(--ink)}
+
+.prose{margin:0;color:var(--ink2);font-size:14.5px;line-height:1.6}
+.prose h3{margin:12px 0 4px;font-size:13px;font-weight:650;color:var(--ink)}
+.prose ul{margin:0;padding-left:18px}
+.eyebrow{margin:4px 0 0;color:var(--faint);font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase}
+
+/* Rows */
+.rows{display:flex;flex-direction:column;margin:0 -8px}
+.row{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px;border-radius:12px;cursor:pointer;transition:background .15s}
+.row:hover{background:var(--plate-soft)}
+.row + .row{position:relative}
+.row + .row::before{content:"";position:absolute;top:0;left:52px;right:8px;height:1px;background:var(--line)}
+.row:hover::before,.row:hover + .row::before{opacity:0}
+.row__lead{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--plate-soft);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2)}
+.row__lead--ok{color:var(--ok)}
+.row__text{flex:1;min-width:0;display:flex;flex-direction:column}
+.row__title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px;font-weight:550;line-height:20px}
+.row__meta{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;line-height:17px}
+.row__trail{color:var(--faint);font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Chips: icon, never a dot */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 8px;border-radius:999px;background:var(--plate);font-size:13px;font-weight:550;color:var(--ink2)}
+.chip--warn{background:var(--warn-soft);color:var(--warn)}
+
+.person{display:flex;align-items:center;gap:12px}
+.person__av{width:44px;height:44px;border-radius:30%;background:linear-gradient(135deg,#7b8a99,#3e4a56);display:grid;place-items:center;color:#fff;font-weight:650}
+.person b{display:block;font-size:14.5px;font-weight:650}
+.person span{color:var(--muted);font-size:12.5px;line-height:17px}
+
+.meter{height:6px;border-radius:999px;background:var(--plate);overflow:hidden}
+.meter i{display:block;height:100%;width:34%;border-radius:999px;background:var(--ink)}
+.kv{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.kv b{color:var(--ink);font-weight:600}
+
+/* ---------- Antes (today's app) ---------- */
+[data-v="antes"] .card{box-shadow:var(--e1),var(--top);border-radius:20px}
+[data-v="antes"] .card__head{padding:18px 18px 0;gap:8px}
+[data-v="antes"] .card__icon{width:auto;height:auto;background:none;box-shadow:none}
+[data-v="antes"] .card__sub{display:none}
+[data-v="antes"] .card__body{padding:12px 18px 18px}
+[data-v="antes"] .card__foot{padding:0 18px 18px;margin-top:-6px}
+[data-v="antes"] .card__foot svg{display:none}
+[data-v="antes"] .row + .row::before{left:8px}
+[data-v="antes"] .row__lead{background:var(--sunken);box-shadow:none;color:var(--ink)}
+
+/* ---------- A · Elevação ---------- */
+[data-v="a"] .card{box-shadow:var(--a-shadow);transition:box-shadow .2s}
+[data-v="a"] .card:hover{box-shadow:var(--a-shadow-hover)}
+[data-v="a"] .card__head{padding:14px 14px 14px 16px;border-bottom:1px solid var(--line)}
+[data-v="a"] .card__body{padding:16px 18px 18px}
+[data-v="a"] .card__foot{border-top:1px solid var(--line);background:color-mix(in srgb,var(--sunken) 45%,var(--raised));border-radius:0 0 20px 20px}
+
+/* ---------- B · Mesa ---------- */
+[data-v="b"] body,[data-v="b"] .page-wrap{background:var(--b-desk)}
+[data-v="b"] .card{box-shadow:var(--e1),var(--top)}
+[data-v="b"] .card__foot{padding:0 18px 16px;margin-top:-4px}
+
+/* ---------- C · Moldura ---------- */
+/* Tray 6px all around; head, body and footer share one left edge (6 + 16 = 22px) so nothing looks off. */
+:is([data-v="c"],[data-v="e"]) .card{background:var(--c-tray);box-shadow:0 0 0 1px var(--c-tray-ring);border-radius:24px;padding:6px}
+:is([data-v="c"],[data-v="e"]) .card__head{padding:8px 10px 12px 16px;gap:10px}
+:is([data-v="c"],[data-v="e"]) .card__icon{width:28px;height:28px;border-radius:9px;background:var(--raised);box-shadow:var(--e1)}
+:is([data-v="c"],[data-v="e"]) .card__body{background:var(--raised);border-radius:18px;box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(23,23,22,.04),var(--top);padding:16px}
+:is([data-v="c"],[data-v="e"]) .card__foot{padding:11px 16px 6px}
+:is([data-v="c"],[data-v="e"]) .rows{margin:-6px -8px}
+
+/* ---------- E · Moldura + Mesa ---------- */
+[data-v="e"] body,[data-v="e"] .page-wrap{background:var(--e-desk)}
+[data-v="e"] .card{background:var(--e-tray);box-shadow:0 0 0 1px var(--e-tray-ring)}
+
+/* ---------- F · Tato (our language: layered surface, top light, bottom edge, the agent's cut corner) ---------- */
+/* The card is an object like our buttons: a face with a faint vertical light, a lit top edge, a darker bottom
+   edge and a two-part shadow (contact + ambient). The page stays white. Head icon and row leads are small
+   keys; the footer is a well pressed into the card. Cards about an agent's own work get the cut corner. */
+[data-v-tato] .card{
+  background:linear-gradient(180deg,var(--f-face-top),var(--raised) 64px);
+  box-shadow:var(--f-shadow);border-radius:20px;transition:box-shadow .2s,transform .2s cubic-bezier(.34,1.4,.5,1)}
+[data-v-tato] .card:hover{box-shadow:var(--f-shadow-hover);transform:translateY(-1px)}
+[data-v-tato] .card--agent{border-bottom-left-radius:4px}
+[data-v-tato] .card__head{padding:16px 14px 0 16px}
+[data-v-tato] .card__icon{background:linear-gradient(180deg,var(--raised),var(--f-key-bottom));box-shadow:var(--f-key)}
+[data-v-tato] .row__lead{background:linear-gradient(180deg,var(--raised),var(--f-key-bottom));box-shadow:var(--f-key)}
+[data-v-tato] .card--agent .row__lead{border-bottom-left-radius:3px}
+[data-v-tato] .card__body{padding:14px 16px 16px}
+[data-v-tato] .card__foot{margin:0 8px 8px;padding:9px 10px;border-radius:12px 12px 12px 12px;background:var(--f-well);box-shadow:var(--f-well-shadow)}
+[data-v-tato] .chip{background:linear-gradient(180deg,var(--raised),var(--f-key-bottom));box-shadow:var(--f-key)}
+[data-v-tato] .chip--warn{background:var(--warn-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 18%,transparent)}
+[data-v-tato] .meter{background:var(--f-well);box-shadow:var(--f-well-shadow);height:8px}
+
+/* ---------- G · Tato + Moldura (middle ground) ---------- */
+/* Same F card everywhere; a card holding a list (recent work, routines) keeps the F outside but its content sits
+   in a white panel inside a tray, like C. */
+[data-v="g"] .card--list{padding:6px;background:linear-gradient(180deg,var(--g-tray-top),var(--g-tray));}
+[data-v="g"] .card--list .card__head{padding:10px 10px 12px 14px}
+[data-v="g"] .card--list .card__body{background:var(--raised);border-radius:15px;padding:8px 8px;box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(23,23,22,.05),var(--top)}
+[data-v="g"] .card--list .rows{margin:0}
+[data-v="g"] .card--list .chips,[data-v="g"] .card--list .eyebrow{padding:0 8px}
+[data-v="g"] .card--list .chips{padding-top:8px}
+[data-v="g"] .card--list.card--agent{border-bottom-left-radius:4px}
+[data-v="g"] .card--list.card--agent .card__body{border-bottom-left-radius:3px}
+
+/* ---------- H · Tato + Moldura em todos ---------- */
+/* G's list shape on every card: the F outside (top light, bottom edge, contact + ambient shadow), the head and
+   footer on the tray, the content in a white panel. A list panel hugs its rows (8px); other content gets 16px. */
+[data-v="h"] .card{padding:6px;background:linear-gradient(180deg,var(--g-tray-top),var(--g-tray))}
+[data-v="h"] .card__head{padding:10px 10px 12px 14px}
+[data-v="h"] .card__body{background:var(--raised);border-radius:15px;padding:14px 16px 16px;box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(23,23,22,.05),var(--top)}
+[data-v="h"] .card__foot{margin:0;padding:11px 14px 6px;background:none;box-shadow:none}
+[data-v="h"] .card--list .card__body{padding:8px}
+[data-v="h"] .card--list .rows{margin:0}
+[data-v="h"] .card--list .chips,[data-v="h"] .card--list .eyebrow{padding:0 8px}
+[data-v="h"] .card--list .chips{padding-top:8px}
+[data-v="h"] .card--agent .card__body{border-bottom-left-radius:3px}
+/* Dark: the panel steps up to raised-2 so it reads against the tray. */
+[data-theme="dark"][data-v="h"] .card__body{background:#222221}
+
+/* ---------- I · Tato com canto ---------- */
+/* F on every card, plus the cut corner (straight bottom-left, the rest rounded) on all of them, not only on agent
+   work. The head key and the footer well follow the same corner so the shape repeats inside. */
+[data-v="i"] .card{border-bottom-left-radius:4px}
+[data-v="i"] .card__icon{border-bottom-left-radius:3px}
+[data-v="i"] .card__foot{border-bottom-left-radius:3px}
+
+/* ---------- D · Bloco ---------- */
+[data-v="d"] .card{background:var(--d-block);box-shadow:none;border-radius:22px}
+[data-v="d"] .card__icon{background:var(--raised);box-shadow:var(--e1)}
+[data-v="d"] .card__foot{padding:0 18px 16px;margin-top:-4px}
+[data-v="d"] .rows{margin:0;gap:4px}
+[data-v="d"] .row{background:var(--d-row);box-shadow:var(--e1);padding:8px 12px 8px 8px}
+[data-v="d"] .row:hover{background:var(--d-row);box-shadow:var(--e2)}
+[data-v="d"] .row + .row::before{display:none}
+[data-v="d"] .row__lead{background:var(--plate-soft)}
+[data-v="d"] .chip{background:var(--raised);box-shadow:var(--e1)}
+[data-v="d"] .meter{background:var(--raised);box-shadow:inset 0 0 0 1px var(--line)}
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>Cards</b>
+  <div class="seg" id="v">
+    <button data-k="antes">Antes</button>
+    <button data-k="a">A · Elevação</button>
+    <button data-k="b">B · Mesa</button>
+    <button data-k="c">C · Moldura</button>
+    <button data-k="d">D · Bloco</button>
+    <button data-k="e">E · Moldura + Mesa</button>
+    <button data-k="f">F · Tato</button>
+    <button data-k="g">G · Tato + Moldura</button>
+    <button data-k="h">H · Moldura em todos</button>
+    <button data-k="i">I · Tato com canto</button>
+  </div>
+  <div class="seg" id="theme">
+    <button data-k="light">Claro</button>
+    <button data-k="dark">Escuro</button>
+  </div>
+  <p class="note" id="note"></p>
+</div>
+
+<div class="page-wrap">
+<main class="page">
+  <div class="ph">
+    <div class="ph__av">T</div>
+    <div><h1>Theo</h1><p>Gerente de projeto · Viajolo</p></div>
+  </div>
+
+  <div class="cols">
+    <div class="col">
+      <section class="card">
+        <header class="card__head">
+          <span class="card__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+          <div class="card__titles"><h2>O que o Theo faz</h2><p class="card__sub">Instruções que ele segue em toda conversa</p></div>
+          <button class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Editar</button>
+        </header>
+        <div class="card__body">
+          <div class="prose">
+            Organiza tarefas, resume discussões longas e mantém o roadmap em dia.
+            <h3>Aprendido</h3>
+            <ul><li>Resumos curtos, com o próximo passo no fim.</li><li>No Himetrica, olhar só os últimos 30 minutos.</li></ul>
+          </div>
+        </div>
+        <footer class="card__foot"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>O contexto da Viajolo entra antes destas instruções em toda conversa.</footer>
+      </section>
+
+      <section class="card card--agent card--list">
+        <header class="card__head">
+          <span class="card__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span>
+          <div class="card__titles"><h2>Trabalho recente</h2><p class="card__sub">12 tarefas hoje</p></div>
+          <button class="act">Ver tudo</button>
+        </header>
+        <div class="card__body">
+          <div class="rows" id="recent"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <header class="card__head">
+          <span class="card__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg></span>
+          <div class="card__titles"><h2>O que usa</h2><p class="card__sub">Conectores e o que pode fazer em cada um</p></div>
+          <button class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Mudar</button>
+        </header>
+        <div class="card__body">
+          <div class="chips">
+            <span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Himetrica · leitura</span>
+            <span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 3-12 5"/></svg>GitHub · leitura e PRs</span>
+            <span class="chip chip--warn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3 2 21h20zM12 10v4M12 17h.01"/></svg>Deploy pede aprovação</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card">
+        <header class="card__head">
+          <span class="card__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+          <div class="card__titles"><h2>Quem responde</h2></div>
+          <button class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Mudar</button>
+        </header>
+        <div class="card__body">
+          <div class="person"><div class="person__av">W</div><div><b>Walter (você)</b><span>Recebe aprovações e avisos de orçamento</span></div></div>
+          <p class="eyebrow">Quem pode falar</p>
+          <div class="chips"><span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></svg>Todos do workspace</span></div>
+        </div>
+      </section>
+
+      <section class="card card--list">
+        <header class="card__head">
+          <span class="card__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 9h15M4 15h15M10 3 8 21M16 3l-2 18"/></svg></span>
+          <div class="card__titles"><h2>Onde trabalha</h2></div>
+          <button class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Mudar</button>
+        </header>
+        <div class="card__body">
+          <div class="chips"><span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 9h15M4 15h15M10 3 8 21M16 3l-2 18"/></svg>general</span></div>
+          <p class="eyebrow">Rotinas</p>
+          <div class="rows" id="routines"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <header class="card__head">
+          <span class="card__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M16 12.5h2M3 10h18"/></svg></span>
+          <div class="card__titles"><h2>Orçamento</h2><p class="card__sub">Renova em 1º de novembro</p></div>
+        </header>
+        <div class="card__body">
+          <div class="kv"><span><b>US$ 6,80</b> de US$ 20</span><span>34%</span></div>
+          <div class="meter"><i></i></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+const check = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+const routine = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>';
+const pause = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+const hash = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9h15M4 15h15M10 3 8 21M16 3l-2 18"/></svg>';
+const row = (lead, title, meta, trail, ok) =>
+  `<div class="row"><span class="row__lead${ok ? " row__lead--ok" : ""}">${lead}</span><span class="row__text"><span class="row__title">${title}</span><span class="row__meta">${meta}</span></span>${trail ? `<span class="row__trail">${trail}</span>` : ""}</div>`;
+const t = "No Himetrica, projeto viajolo-app, verifique se nos últimos 30 minutos houve erro novo";
+document.getElementById("recent").innerHTML = ["15:30", "15:00", "14:30", "14:00"]
+  .map((h) => row(check, t, `${hash}general`, `hoje ${h}`, true)).join("");
+document.getElementById("routines").innerHTML = [
+  row(routine, "Review prompt: loved/negative", `${pause}pausada`),
+  row(routine, "Review prompts (loved/negative)", "próxima: agora"),
+  row(routine, "Destinos das viagens do dia anterior", "próxima: amanhã 08:00"),
+].join("");
+
+const notes = {
+  antes: "Hoje: card branco com só a linha fina (e1) sobre a área branca, então ele some. Ícone solto, texto de ajuda boiando no fim.",
+  a: "A · Elevação: página continua branca; o card ganha anel + sombra longa e suave, cabeçalho com ícone em placa e subtítulo, divisória sob o cabeçalho e rodapé para a ajuda. Sobe um pouco no hover.",
+  b: "B · Mesa: a área de trabalho volta a um papel bem claro e o card branco aparece por contraste. Mais simples, mas desfaz em parte o 'menos cinza' do RefinoUI.",
+  c: "C · Moldura (ajustada: cabeçalho, conteúdo e rodapé alinhados na mesma margem, moldura igual nos quatro lados): uma bandeja cinza clara segura o cabeçalho e o rodapé; o conteúdo fica num painel branco dentro. Destaca bem sem escurecer a página.",
+  e: "E · Moldura + Mesa: a página ganha o papel claro da Mesa, a moldura fica um tom abaixo e o conteúdo num painel branco. Três níveis: página, moldura, conteúdo.",
+  f: "F · Tato: o card vira objeto como nossos botões: luz no topo, borda escura embaixo, sombra de contato + ambiente. Ícones e chips são teclinhas, o rodapé é um poço afundado. Card sobre trabalho do agente ganha o canto cortado. Página continua branca.",
+  g: "G · Tato + Moldura: o card da F em todo lugar; só cards com lista (Trabalho recente, Onde trabalha) ganham a moldura com o conteúdo num painel branco dentro, como na C.",
+  h: "H · Moldura em todos: o formato da G em todo card. Lado de fora da F (luz no topo, borda embaixo, sombra), cabeçalho e rodapé na moldura, conteúdo sempre num painel branco. Uma regra só.",
+  i: "I · Tato com canto: a F com o canto cortado (reto embaixo à esquerda, o resto arredondado) em todos os cards; a tecla do ícone e o poço do rodapé repetem o mesmo canto.",
+  d: "D · Bloco: o card é um bloco neutro sólido sobre a página branca, e as linhas dentro dele são brancas, cada uma com sua elevação.",
+};
+const html = document.documentElement;
+function sync() {
+  if (["f", "g", "h", "i"].includes(html.dataset.v)) html.setAttribute("data-v-tato", ""); else html.removeAttribute("data-v-tato");
+  for (const [id, key] of [["v", "v"], ["theme", "theme"]])
+    for (const b of document.querySelectorAll(`#${id} button`)) b.setAttribute("aria-pressed", b.dataset.k === html.dataset[key]);
+  document.getElementById("note").textContent = notes[html.dataset.v];
+  location.hash = `v=${html.dataset.v}&theme=${html.dataset.theme}`;
+}
+document.getElementById("v").onclick = (e) => { const k = e.target.closest("button")?.dataset.k; if (k) { html.dataset.v = k; sync(); } };
+document.getElementById("theme").onclick = (e) => { const k = e.target.closest("button")?.dataset.k; if (k) { html.dataset.theme = k; sync(); } };
+sync();
+</script>
+</body>
+</html>

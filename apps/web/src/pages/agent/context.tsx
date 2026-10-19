@@ -2,7 +2,7 @@ import type { Agent, AgentAudience } from "@agenteschat/client";
 import type { AccessResource, Level, LevelState } from "@agenteschat/client/lib/access-levels";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { RepoChoice } from "@agenteschat/client/lib/repos";
-import { Button, Icon, type IconName } from "@agenteschat/ui";
+import { Button, CardHeader, Icon, type IconName } from "@agenteschat/ui";
 import { createContext, type ReactNode, useContext } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentSection, AgentTab, BrainChoice, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
@@ -144,6 +144,7 @@ export function CardHead({
   changeKeys = [],
   lock,
   action,
+  subtitle,
 }: {
   icon: IconName;
   title: ReactNode;
@@ -152,18 +153,17 @@ export function CardHead({
   /** Shown when nothing changed and the viewer can't edit. */
   lock?: Field;
   action?: ReactNode;
+  subtitle?: ReactNode;
 }) {
   const { changeOf, can } = useAgentEdit();
   const changed = changeKeys.find((k) => changeOf(k));
   return (
-    <div className="agp-ch">
-      <h2 id={id}>
-        <Icon name={icon} size={16} />
-        {title}
-      </h2>
-      <span className="agp-ch__act">
-        {changed ? <ChangedTag changeKey={changed} /> : lock && !can(lock) ? <LockNote field={lock} /> : action}
-      </span>
-    </div>
+    <CardHeader
+      id={id}
+      icon={icon}
+      title={title}
+      subtitle={subtitle}
+      action={changed ? <ChangedTag changeKey={changed} /> : lock && !can(lock) ? <LockNote field={lock} /> : action}
+    />
   );
 }

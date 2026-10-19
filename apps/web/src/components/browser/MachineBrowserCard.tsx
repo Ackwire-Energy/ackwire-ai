@@ -9,7 +9,7 @@ import {
   useBrowserHandoffMutations,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, Card, Chip, Icon } from "@agenteschat/ui";
+import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -99,20 +99,20 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
     });
   return (
     <Card aria-labelledby="sec-machine-browser">
-      <div className="agp-ch" style={{ alignItems: "flex-start" }}>
-        <span className="list-col" style={{ gap: 2, flex: 1, minWidth: 0 }}>
-          <h2 id="sec-machine-browser" className="ac-card__title row" style={{ gap: 8, alignItems: "center" }}>
-            <Icon name="globe" size={16} />
-            {t("browser.title")}
-          </h2>
-          <span className="small muted">{t("browser.machine.description")}</span>
-        </span>
-        {switchedOn && m.canManage && (
-          <Button size="sm" variant="ghost" aria-label={t("browser.machine.turnOffLabel")} onClick={onTurnOff}>
-            {t("browser.machine.turnOff")}
-          </Button>
-        )}
-      </div>
+      <CardHeader
+        id="sec-machine-browser"
+        icon="globe"
+        title={t("browser.title")}
+        subtitle={t("browser.machine.description")}
+        action={
+          switchedOn &&
+          m.canManage && (
+            <Button size="sm" variant="ghost" aria-label={t("browser.machine.turnOffLabel")} onClick={onTurnOff}>
+              {t("browser.machine.turnOff")}
+            </Button>
+          )
+        }
+      />
       <div className="brw-status">
         {ready ? (
           <Chip icon="check" tone="done">
