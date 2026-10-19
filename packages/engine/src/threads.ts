@@ -6,6 +6,7 @@ import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
+import { type PreviewMeta, previewMeta } from "./message-preview";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
 import { can, type Membership, requirePermission } from "./organizations";
@@ -91,7 +92,8 @@ export interface ThreadInfo {
   context: ThreadContextView | null;
   replyCount: number;
   lastActivityAt: string;
-  lastMessage: { author: Actor; excerpt: string; createdAt: string } | null;
+  /** `meta`: what the app needs to show a server-written body in the reader's language (null: plain). */
+  lastMessage: { author: Actor; excerpt: string; meta: PreviewMeta | null; createdAt: string } | null;
   /** Distinct authors of the root and the replies: people and agents. */
   participants: Actor[];
   /** An agent run is in progress (or waiting for approval or an answer) in this thread. */
@@ -1019,7 +1021,9 @@ async function queryThreads(
               and not (cx.id = any(t.context_excluded_message_ids))
           ) end as context_count,
           exists (select 1 from ${schema.agentRuns} ar where ar.org_id = ${orgId}::uuid
-            and ar.thread_root_id = root.id and ar.status in ${ACTIVE_RUN}) as working,
+            and ar.thread_root_id = root.id and ar.status in ${ACTIVE_RUN}
+            -- Waiting for its computer to come back isn't working.
+            and ar.waiting_machine_id is null) as working,
           (
             (exists (select 1 from ${schema.agentQuestions} aq where aq.org_id = ${orgId}::uuid
               and aq.channel_id = root.channel_id and aq.thread_id = root.id and aq.status = 'open'
@@ -1141,6 +1145,7 @@ function toView(
       ? {
           author: { type: last.authorType, id: last.authorType === "person" ? last.authorUserId : last.authorAgentId },
           excerpt: replyExcerpt(last.body),
+          meta: previewMeta(last.meta),
           createdAt: last.createdAt.toISOString(),
         }
       : null,

@@ -468,6 +468,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         if (event.status !== "running") return state;
         s = reopen(s, event.runId);
       }
+      // Waiting (an answer, or its computer to come back) isn't working: the row goes, the avatar rests.
+      if ((event.status as string) === "waiting_input") return s.runs[event.runId] ? finish(s, event.runId) : s;
       if (event.status === "done") {
         const settled = settleProvisional(s, event.agentId, event.threadId);
         return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
@@ -651,9 +653,19 @@ export function dropProvisional(state: StreamsState, threadIds: Set<string>): St
   return { ...state, runs };
 }
 
-/** The living avatar of one run: words arriving → writing; queued/thinking/running → thinking; else idle. */
+/**
+ * The living avatar of one run: words arriving → writing; queued/thinking/running → thinking; else idle.
+ * Waiting (an approval, an answer, or its computer to come back) is not working: idle.
+ */
 export function agentStateOfRun(r: LiveRun): "idle" | "thinking" | "writing" {
-  if (r.status === "failed" || r.status === "done" || r.status === "waiting_approval" || r.status === "canceled")
+  const status = r.status as string;
+  if (
+    status === "failed" ||
+    status === "done" ||
+    status === "waiting_approval" ||
+    status === "waiting_input" ||
+    status === "canceled"
+  )
     return "idle";
   if (r.text.length > 0 && r.status === "running") return "writing";
   if (r.status === "running" || r.status === "queued" || r.status === "thinking") return "thinking";

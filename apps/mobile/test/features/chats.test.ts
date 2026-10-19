@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Channel, DirectMessage } from "@agenteschat/client";
+import { previewBody } from "@agenteschat/client/lib/message-body";
+import { resources } from "@agenteschat/i18n";
+import i18next from "i18next";
 import {
   buildConversations,
   homeSections,
@@ -486,5 +489,54 @@ describe("the Threads tab", () => {
   test("its collapsed sections are remembered on their own keys", () => {
     expect(parseCollapsed('["threads","agents"]', THREAD_SECTIONS)).toEqual(["threads"]);
     expect(toggleCollapsed(["threads"], "missions", THREAD_SECTIONS)).toEqual(["missions", "threads"]);
+  });
+});
+
+describe("last-message previews in the reader's language", () => {
+  test("a body the server wrote reads like the message itself (pt-BR and en); plain text stays", async () => {
+    const away: DirectMessage = {
+      ...dm("d1", "Ada", 0, 1),
+      lastMessage: {
+        id: "m1",
+        body: "Claude Code on macbook air is offline. I'll answer when it's back.",
+        meta: { bodyCode: "brain_unavailable", bodyParams: { brain: "Claude Code" } },
+        createdAt: at(1),
+        authorType: "agent",
+      },
+    };
+    const [row] = buildConversations({ channels: [], dms: [away], threads: [] });
+    const last = row?.last;
+    expect(last?.meta).toMatchObject({ bodyCode: "brain_unavailable" });
+    const i18n = i18next.createInstance();
+    await i18n.init({ lng: "pt-BR", fallbackLng: "pt-BR", resources });
+    expect(previewBody(i18n.t, last?.text ?? "", last?.meta ?? null)).toBe(
+      "O Claude Code não está disponível agora; respondo quando ele voltar.",
+    );
+    await i18n.changeLanguage("en");
+    expect(previewBody(i18n.t, last?.text ?? "", last?.meta ?? null)).toBe(
+      "Claude Code can't answer right now. I'll answer when it's back.",
+    );
+    // A channel's preview carries it too; a plain message is shown as is.
+    const [ch] = buildConversations({
+      channels: [
+        channel("c1", "tech", true, {
+          lastMessage: {
+            id: "m2",
+            authorType: "agent",
+            authorId: "ada",
+            authorName: "Ada",
+            preview: "Claude Code on macbook air is offline.",
+            meta: { bodyCode: "brain_unavailable", bodyParams: { brain: "Claude Code" } },
+            createdAt: at(1),
+          },
+        }),
+      ],
+      dms: [],
+      threads: [],
+    });
+    expect(previewBody(i18n.t, ch?.last?.text ?? "", ch?.last?.meta ?? null)).toBe(
+      "Claude Code can't answer right now. I'll answer when it's back.",
+    );
+    expect(previewBody(i18n.t, "Feito! Já anotei.", null)).toBe("Feito! Já anotei.");
   });
 });

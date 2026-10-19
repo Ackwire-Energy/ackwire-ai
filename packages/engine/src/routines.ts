@@ -261,6 +261,7 @@ const RUN_SUMMARY = {
   "routine_run.delivered_drive": "File in the Drive",
   "routine_run.delivered_dm": "Sent in the DM",
   "routine_run.nothing_new": "Nothing new; nothing posted",
+  "routine_run.waiting_computer": "Skipped: the previous run is still waiting for the agent's computer",
 } as const;
 type RunSummaryCode = keyof typeof RUN_SUMMARY;
 
@@ -964,6 +965,24 @@ export async function fireRoutineEvent(
   return fired;
 }
 
+/** A run of this routine is waiting for the agent's computer (its brain, ADR 0032 §5). */
+async function waitsForComputer(db: Database, routineId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: routineRuns.id })
+    .from(routineRuns)
+    .innerJoin(agentRuns, eq(agentRuns.id, routineRuns.agentRunId))
+    .where(
+      and(
+        eq(routineRuns.routineId, routineId),
+        eq(routineRuns.status, "started"),
+        eq(agentRuns.status, "waiting_input"),
+        isNotNull(agentRuns.waitingMachineId),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 async function finishRun(db: Database, runId: string, status: "skipped" | "failed", summary: string) {
   await db.update(routineRuns).set({ status, summary }).where(eq(routineRuns.id, runId));
 }
@@ -1098,6 +1117,11 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
       await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
       await finishOnce();
       return;
+    }
+    // The agent's computer is away and the last run waits for it (it runs when the computer is back):
+    // no second run piling up behind it.
+    if (await waitsForComputer(db, routine.id)) {
+      return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.waiting_computer"]);
     }
     if (target.type === "channel" || target.type === "conversation") {
       channelId = target.channelId;

@@ -1,4 +1,5 @@
 import { useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
+import { previewBody } from "@agenteschat/client/lib/message-body";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
@@ -100,7 +101,7 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
       : t("mobile.intentAgents.waitingLine", { title: approval.title })
     : w
       ? workTitle(t, w)
-      : (plainRole(a.instructions) ?? l.preview ?? "");
+      : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
   return (
     <ListRow
       onPress={() => router.push(`/agent/${a.id}`)}

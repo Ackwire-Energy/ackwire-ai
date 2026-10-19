@@ -4,6 +4,7 @@ import { caches } from "./cache";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
+import { type PreviewMeta, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 
@@ -60,6 +61,8 @@ export interface ChannelLastMessage {
   authorName: string | null;
   /** Plain text, at most `CHANNEL_PREVIEW_LENGTH` chars. */
   preview: string;
+  /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
+  meta: PreviewMeta | null;
   createdAt: Date;
 }
 
@@ -94,6 +97,7 @@ interface ChannelListRow {
   unread_count: number | string | null;
   last_id: string | null;
   last_body: string | null;
+  last_meta: Record<string, unknown> | null;
   last_at: Date | string | null;
   last_author_type: "person" | "agent" | null;
   last_user_id: string | null;
@@ -113,14 +117,14 @@ export async function listChannels(db: Database, userId: string, orgId: string):
   const rows = rowsOf<ChannelListRow>(
     await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.created_by_user_id, c.created_at,
         (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count,
-        lm.id as last_id, lm.body as last_body, lm.created_at as last_at, lm.author_type as last_author_type,
+        lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
         lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
         coalesce(lu.name, la.name) as last_author_name
       from ${channels} c
       left join ${channelMembers} cm on cm.org_id = c.org_id and cm.channel_id = c.id and cm.user_id = ${userId}
       left join ${schema.channelReads} cr on cr.channel_id = c.id and cr.user_id = ${userId}
       left join lateral (
-        select m.id, m.body, m.created_at, m.author_type, m.author_user_id, m.author_agent_id
+        select m.id, m.body, m.meta, m.created_at, m.author_type, m.author_user_id, m.author_agent_id
         from ${schema.messages} m
         where cm.id is not null and m.org_id = ${orgId}::uuid and m.channel_id = c.id
           and m.thread_id is null and m.deleted_at is null
@@ -161,6 +165,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
             authorId: r.last_author_type === "person" ? r.last_user_id : r.last_agent_id,
             authorName: r.last_author_name,
             preview: notificationSnippet(r.last_body, CHANNEL_PREVIEW_LENGTH),
+            meta: previewMeta(typeof r.last_meta === "string" ? JSON.parse(r.last_meta) : r.last_meta),
             createdAt: asDate(r.last_at),
           }
         : null,

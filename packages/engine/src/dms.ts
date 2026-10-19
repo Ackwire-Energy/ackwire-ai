@@ -4,6 +4,7 @@ import { audienceError, canTalkTo } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
+import { type PreviewMeta, previewMeta } from "./message-preview";
 import { getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users } = schema;
@@ -133,7 +134,14 @@ export async function openAgentDm(db: Executor, orgId: string, a: string, b: str
 export interface DmSummary {
   channelId: string;
   with: { type: "person" | "agent"; id: string; name: string; handle: string | null };
-  lastMessage: { id: string; body: string; createdAt: Date; authorType: string } | null;
+  lastMessage: {
+    id: string;
+    body: string;
+    /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
+    meta: PreviewMeta | null;
+    createdAt: Date;
+    authorType: string;
+  } | null;
   unread: number;
 }
 
@@ -175,6 +183,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
         channelId: messages.channelId,
         id: messages.id,
         body: messages.body,
+        meta: messages.meta,
         createdAt: messages.createdAt,
         authorType: messages.authorType,
       })
@@ -214,7 +223,13 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
             ? { type: "agent" as const, id: o.agentId, name: o.agentName ?? "", handle: o.agentHandle }
             : { type: "person" as const, id: o.userId ?? "", name: o.userName ?? "", handle: null },
           lastMessage: m
-            ? { id: m.id, body: m.body.slice(0, 200), createdAt: m.createdAt, authorType: m.authorType }
+            ? {
+                id: m.id,
+                body: m.body.slice(0, 200),
+                meta: previewMeta(m.meta as Record<string, unknown> | null),
+                createdAt: m.createdAt,
+                authorType: m.authorType,
+              }
             : null,
           unread: unread.get(c.id) ?? 0,
           sortAt: m?.createdAt ?? c.createdAt,

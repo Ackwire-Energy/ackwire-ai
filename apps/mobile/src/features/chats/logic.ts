@@ -4,6 +4,7 @@ import type {
   DirectMessage,
   Mission,
   MissionStatus,
+  PreviewMeta,
   ThreadActor,
   ThreadInfo,
 } from "@agenteschat/client";
@@ -20,6 +21,8 @@ export interface LastLine {
   /** The author's name as the server sent it (channels), else looked up from `author`. */
   name?: string | null;
   text: string;
+  /** A body the server wrote: the row shows it in the reader's language (`previewBody`). */
+  meta?: PreviewMeta | null;
 }
 
 export type ConversationRow =
@@ -114,7 +117,13 @@ export function buildConversations(input: {
       working: t.working,
       needsYou: t.needsYou,
       face: t.lastMessage?.author ?? t.rootAuthor,
-      last: t.lastMessage ? { author: t.lastMessage.author, text: previewOf(t.lastMessage.excerpt) } : null,
+      last: t.lastMessage
+        ? {
+            author: t.lastMessage.author,
+            text: previewOf(t.lastMessage.excerpt),
+            ...(t.lastMessage.meta ? { meta: t.lastMessage.meta } : {}),
+          }
+        : null,
       at: t.lastActivityAt,
       unread: 0,
       mission: m
@@ -139,6 +148,7 @@ export function buildConversations(input: {
         ? {
             author: d.lastMessage.authorType === "agent" ? { type: "agent", id: d.with.id } : null,
             text: previewOf(d.lastMessage.body),
+            ...(d.lastMessage.meta ? { meta: d.lastMessage.meta } : {}),
           }
         : null,
       at: d.lastMessage?.createdAt ?? null,
@@ -160,6 +170,7 @@ export function buildConversations(input: {
             author: { type: last.authorType, id: last.authorId },
             name: last.authorName,
             text: previewOf(last.preview),
+            ...(last.meta ? { meta: last.meta } : {}),
           }
         : null,
       at: last?.createdAt ?? null,

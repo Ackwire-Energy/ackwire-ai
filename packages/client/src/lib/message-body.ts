@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import { previewOf } from "./consultations";
 
 type Meta = Record<string, unknown> | undefined;
 
@@ -42,4 +43,14 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
   const params =
     m.bodyParams && typeof m.bodyParams === "object" ? (m.bodyParams as Record<string, unknown>) : ({} as const);
   return t(`chat.body.${code}`, { ...params, defaultValue: body });
+}
+
+/**
+ * A conversation list's last-message line: a body the server wrote (`meta` from the list, same keys as
+ * the message's) in the reader's language, as the chat shows it, on one plain line; else the text as is.
+ */
+export function previewBody(t: TFunction, text: string, meta: Meta | null): string {
+  if (!meta) return text;
+  const shown = serverBody(t, text, meta);
+  return shown === text ? text : previewOf(shown);
 }

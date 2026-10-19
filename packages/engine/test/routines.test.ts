@@ -308,3 +308,37 @@ describe("routines", () => {
     expect(trigger?.body).toContain("Checkout lento");
   });
 });
+
+test("a routine doesn't pile up while its agent's computer is away: the next run is skipped", async () => {
+  f = await setup();
+  const deps = { db: f.db, pubsub: f.pubsub, context: f.context };
+  const routine = await createRoutine(deps, f.owner.id, f.org.id, {
+    name: "Hourly",
+    agentId: f.agent.id,
+    prompt: "Check the deploys.",
+    target: { type: "channel", channelId: f.general.id },
+    trigger: { type: "schedule", phrase: "todo dia às 8h" },
+  });
+  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+  // Its run now waits for the agent's computer (a computer brain offline, nothing to fall back on).
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "waiting_input", waitingMachineId: crypto.randomUUID() })
+    .where(eq(schema.agentRuns.agentId, f.agent.id));
+
+  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+  expect(await f.db.select().from(schema.agentRuns)).toHaveLength(1);
+  const [last] = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
+  expect(last).toMatchObject({ status: "skipped", summaryCode: "routine_run.waiting_computer" });
+
+  // Back (the run no longer waits for it): the routine runs again.
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "done", waitingMachineId: null })
+    .where(eq(schema.agentRuns.agentId, f.agent.id));
+  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+  expect(await f.db.select().from(schema.agentRuns)).toHaveLength(2);
+});

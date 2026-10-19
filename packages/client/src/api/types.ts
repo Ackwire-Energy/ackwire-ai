@@ -186,8 +186,16 @@ export interface ChannelLastMessage {
   authorName: string | null;
   /** Plain text, at most 140 characters. */
   preview: string;
+  /** A body the server wrote: show it in the reader's language (`previewBody`). Null for a plain message. */
+  meta?: PreviewMeta | null;
   createdAt: string;
 }
+
+/**
+ * A last-message preview's `meta` (channels, DMs, threads): the keys the chat reads to show a body the
+ * server wrote in the reader's language (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines).
+ */
+export type PreviewMeta = Record<string, unknown>;
 
 export type AuthorType = "person" | "agent";
 
@@ -1028,7 +1036,8 @@ export type DmTarget = { agentId: string } | { userId: string };
 export interface DirectMessage {
   channelId: string;
   with: { type: AuthorType; id: string; name: string; handle: string | null };
-  lastMessage: { id: string; body: string; createdAt: string; authorType: string } | null;
+  /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`). */
+  lastMessage: { id: string; body: string; meta?: PreviewMeta | null; createdAt: string; authorType: string } | null;
   unread: number;
 }
 
@@ -2323,7 +2332,8 @@ export interface ThreadInfo {
   context: ThreadContext | null;
   replyCount: number;
   lastActivityAt: string;
-  lastMessage: { author: ThreadActor; excerpt: string; createdAt: string } | null;
+  /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`). */
+  lastMessage: { author: ThreadActor; excerpt: string; meta?: PreviewMeta | null; createdAt: string } | null;
   participants: ThreadActor[];
   /** An agent run is in progress (or waiting) in this thread. */
   working: boolean;

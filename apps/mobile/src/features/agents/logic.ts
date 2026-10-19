@@ -7,6 +7,7 @@ import type {
   DirectMessage,
   Memory,
   Mission,
+  PreviewMeta,
   Role,
   WorkingRun,
 } from "@agenteschat/client";
@@ -109,6 +110,8 @@ export interface TeamLine {
   at: string | null;
   /** Free: the last message of its DM (one line), else null. */
   preview: string | null;
+  /** Free: that message's body was written by the server; show it in the reader's language (`previewBody`). */
+  previewMeta?: PreviewMeta | null;
 }
 
 /**
@@ -164,6 +167,7 @@ export function teamLines(
         waitingCount: 0,
         at: last?.createdAt ?? null,
         preview: last ? previewOf(last.body) || null : null,
+        ...(last?.meta ? { previewMeta: last.meta } : {}),
       };
     })
     .sort((a, b) => {

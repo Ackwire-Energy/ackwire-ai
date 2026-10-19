@@ -1,6 +1,7 @@
 import type { ThreadActor, ThreadInfo, ThreadTab } from "@agenteschat/client";
 import { useChannels, useMissionList, useThreadList } from "@agenteschat/client";
 import { formatFullDate, relativeTime } from "@agenteschat/client/lib/format";
+import { previewBody } from "@agenteschat/client/lib/message-body";
 import { threadMessageCount, threadTitle } from "@agenteschat/client/lib/threads";
 import {
   AvatarStack,
@@ -432,7 +433,10 @@ function ThreadRow({
             <>
               <span aria-hidden="true">·</span>
               <span className="thread-row__last">
-                {t("threads.lastLine", { name: actors.name(lastActor(last.author)), text: last.excerpt })}
+                {t("threads.lastLine", {
+                  name: actors.name(lastActor(last.author)),
+                  text: previewBody(t, last.excerpt, last.meta ?? null),
+                })}
               </span>
             </>
           )}

@@ -25,6 +25,7 @@ import {
   requireSession,
   security,
 } from "./context";
+import { PreviewMeta } from "./schemas";
 
 const tags = ["Threads"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string().nullable() });
@@ -59,9 +60,12 @@ const Thread = z
       .openapi({ description: "The range of a conversation this thread was made from." }),
     replyCount: z.number(),
     lastActivityAt: z.string(),
-    lastMessage: z.object({ author: Actor, excerpt: z.string(), createdAt: z.string() }).nullable(),
+    lastMessage: z.object({ author: Actor, excerpt: z.string(), meta: PreviewMeta, createdAt: z.string() }).nullable(),
     participants: z.array(Actor),
-    working: z.boolean().openapi({ description: "An agent run is in progress (or waiting) in this thread." }),
+    working: z.boolean().openapi({
+      description:
+        "An agent run is in progress (or waiting for an approval or an answer) in this thread; not one waiting for its computer.",
+    }),
     needsYou: z.boolean(),
     canManage: z.boolean().openapi({ description: "You may close, archive, rename or change the context." }),
     following: z.boolean().openapi({

@@ -1,4 +1,5 @@
 import { useApi, useChannels, useDms, useSearch } from "@agenteschat/client";
+import { previewBody } from "@agenteschat/client/lib/message-body";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -105,7 +106,9 @@ export function SearchResults({ q }: { q: string }) {
                   key: `d:${d.channelId}`,
                   leading: <Face who={{ type: d.with.type, id: d.with.id }} size={38} live={false} />,
                   label: d.with.name,
-                  ...(d.lastMessage ? { hint: previewOf(d.lastMessage.body) } : {}),
+                  ...(d.lastMessage
+                    ? { hint: previewBody(t, previewOf(d.lastMessage.body), d.lastMessage.meta ?? null) }
+                    : {}),
                   onPress: () => router.push(chatHref(d.channelId)),
                 })),
                 ...r.channels.map((ch) => ({

@@ -1,3 +1,4 @@
+import { previewBody } from "@agenteschat/client/lib/message-body";
 import { router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -45,7 +46,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   const lastText = (last: LastLine | null) => {
     if (!last) return { who: "", text: "" };
     const who = last.name || (last.author ? dir.nameOf(last.author) : "");
-    return { who, text: last.text };
+    return { who, text: previewBody(t, last.text, last.meta ?? null) };
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
   const agentState = agentDm ? (agent ?? null) : null;

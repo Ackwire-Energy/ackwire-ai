@@ -1,5 +1,11 @@
 import { z } from "@hono/zod-openapi";
 
+/** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
+export const PreviewMeta = z.record(z.string(), z.unknown()).nullable().openapi({
+  description:
+    "For a body the server wrote (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines): show it in the reader's language, like the message itself. Null for a plain message.",
+});
+
 export const Role = z.enum(["owner", "admin", "member"]).openapi("Role");
 
 export const Organization = z
@@ -142,6 +148,7 @@ export const Channel = z
         authorId: z.string().nullable(),
         authorName: z.string().nullable().openapi({ description: "Null when the author was deleted." }),
         preview: z.string().openapi({ description: "Plain text, at most 140 characters." }),
+        meta: PreviewMeta,
         createdAt: z.string(),
       })
       .nullable()

@@ -77,6 +77,8 @@ export function confirmFinished(ended: readonly WorkItem[], rows: readonly Conve
     if (!row?.last || !row.at) continue;
     const author = row.last.author;
     if (author?.type !== "agent" || author.id !== w.agentId) continue;
+    // It said its computer is away: it waits for it, it didn't finish.
+    if (row.last.meta?.bodyCode === "brain_unavailable") continue;
     if (!(time(row.at) >= time(w.since))) continue;
     if ((row.kind === "dm" || row.kind === "channel") && row.unread === 0) continue;
     out.push({

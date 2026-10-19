@@ -98,6 +98,9 @@ describe("what finished", () => {
     expect(confirmFinished([ended], [dm("d1", "theo", { at: at(60) })])).toEqual([]);
     // Already read: no news.
     expect(confirmFinished([ended], [dm("d1", "theo", { unread: 0 })])).toEqual([]);
+    // It said its computer is away: it waits for it, it didn't finish.
+    const away = { author: { type: "agent" as const, id: "theo" }, text: "x", meta: { bodyCode: "brain_unavailable" } };
+    expect(confirmFinished([ended], [dm("d1", "theo", { last: away })])).toEqual([]);
   });
 
   test("a run in a thread is confirmed by the thread's row and opens the thread", () => {

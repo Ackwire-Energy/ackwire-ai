@@ -2072,6 +2072,7 @@ export const ptBR = {
       delivered_drive: "Arquivo no Drive",
       delivered_dm: "Enviado na DM",
       nothing_new: "Sem novidades, nada postado",
+      waiting_computer: "Pulada: a execução anterior ainda espera o computador do agente",
       forum_opened: "Fórum aberto: {{title}}",
       failed: "Falhou: {{reason}}",
       audience: "Pausada: quem criou a rotina não pode mais falar com o agente",

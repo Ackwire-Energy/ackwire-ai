@@ -11,6 +11,7 @@ import {
   requireSession,
   security,
 } from "./context";
+import { PreviewMeta } from "./schemas";
 
 const tags = ["Chat"];
 
@@ -23,7 +24,9 @@ const Dm = z
       name: z.string(),
       handle: z.string().nullable(),
     }),
-    lastMessage: z.object({ id: z.uuid(), body: z.string(), createdAt: z.string(), authorType: z.string() }).nullable(),
+    lastMessage: z
+      .object({ id: z.uuid(), body: z.string(), meta: PreviewMeta, createdAt: z.string(), authorType: z.string() })
+      .nullable(),
     unread: z.number(),
   })
   .openapi("DirectMessage");

@@ -168,6 +168,11 @@ export interface Transcript {
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
   /**
+   * Where this outage's "unavailable" note is (posted by this run, or by another run of the agent waiting
+   * for the same computer): a later run of the agent there waits without saying it again.
+   */
+  brainNoticeIn?: { channelId: string; threadId: string | null };
+  /**
    * The computer dropped in the middle of a computer brain's turn: the turn is sent again to the same
    * computer once it is back (its session resumes), told which tools already ran so none is repeated.
    * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off.
@@ -854,7 +859,10 @@ async function executeRunInner(
     // Nothing can stand in (no model credential): the agent says so once, and the run waits for the computer.
     await deferred;
     const name = from === "codex" ? "Codex" : "Claude Code";
-    const say = t.brainNotice !== u.code;
+    // One note per outage and place: another run of this agent already waits for the same computer and
+    // said so here (an hourly routine, a second message): this one waits quietly with it.
+    const said = t.brainNotice === u.code || (await noticeAlreadyPosted(db, run, machineId, replyThreadId));
+    const say = !said;
     const note = say
       ? await db.transaction(async (tx) => {
           const m = await post(tx, replyThreadId, `${u.message} I'll answer when it's back.`, {
@@ -867,6 +875,7 @@ async function executeRunInner(
       : null;
     t.postedUpTo = t.messages.length;
     t.brainNotice = u.code;
+    t.brainNoticeIn = { channelId: run.channelId, threadId: replyThreadId };
     // `waitId`: one wait (its "computer is back" job is queued once per wait, `resumeRunsWaitingForMachine`).
     t.waitingForBrain = { kind: from, machineId, code: u.code, waitId: Bun.randomUUIDv7() };
     await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
@@ -1932,4 +1941,33 @@ function appendUserText(t: Transcript, text: string) {
   } else {
     t.messages.push({ role: "user", content: [{ type: "text", text }] });
   }
+}
+
+/**
+ * Another run of this agent waits for the same computer and its "unavailable" note is in this
+ * conversation (same channel, same thread or the main timeline): one note covers the outage there.
+ */
+async function noticeAlreadyPosted(
+  db: Database,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId">,
+  machineId: string,
+  threadId: string | null,
+): Promise<boolean> {
+  const rows = await db
+    .select({
+      channelId: sql<string | null>`${agentRuns.transcript}->'brainNoticeIn'->>'channelId'`,
+      threadId: sql<string | null>`${agentRuns.transcript}->'brainNoticeIn'->>'threadId'`,
+    })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, run.orgId),
+        eq(agentRuns.agentId, run.agentId),
+        eq(agentRuns.channelId, run.channelId),
+        eq(agentRuns.status, "waiting_input"),
+        eq(agentRuns.waitingMachineId, machineId),
+        sql`${agentRuns.id} <> ${run.id}`,
+      ),
+    );
+  return rows.some((r) => r.channelId === run.channelId && (r.threadId ?? null) === threadId);
 }

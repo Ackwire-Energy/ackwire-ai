@@ -3,6 +3,7 @@ import { channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
+  addChannelMember,
   type Brain,
   type BrainEvent,
   type BrainTurn,
@@ -13,6 +14,7 @@ import {
   COMPUTER_TOOLS_NOTE,
   clearPlanLimits,
   computerBrainUnavailable,
+  createChannel,
   createJobHandlers,
   createMissionEngine,
   decideApproval,
@@ -21,7 +23,10 @@ import {
   grantScopes,
   invokeToolForRun,
   listApprovals,
+  listChannels,
   listMessages,
+  listThreads,
+  listWorkingRuns,
   type MachineStatus,
   notePlanLimit,
   postPersonMessage,
@@ -933,4 +938,81 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const [third] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.toolUseId, "m-3"));
   expect(third?.status).toBe("canceled");
   expect(gh.executed).toEqual([]);
+});
+
+test("one 'computer away' note per outage and place: a second run waits quietly; another channel gets its own", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const { brain } = scriptedComputerBrain(() => [{ type: "done", text: "Voltei." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online: false }) },
+  });
+  // A routine's message (the main timeline, like an hourly routine), twice.
+  const routineCall = async (channelId: string) => {
+    const m = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, channelId, {
+      body: "@dev hourly check",
+    });
+    await f.db
+      .update(schema.messages)
+      .set({ meta: { routine: { id: crypto.randomUUID(), name: "Hourly" } } })
+      .where(eq(schema.messages.id, m.id));
+    await drainOutbox(f.db, handlers);
+    return m;
+  };
+  const notices = async () =>
+    (await f.db.select().from(schema.messages)).filter((m) => m.meta.bodyCode === "brain_unavailable");
+
+  await routineCall(f.general.id);
+  await routineCall(f.general.id);
+  let runs = await f.db.select().from(schema.agentRuns);
+  expect(runs.map((r) => r.status)).toEqual(["waiting_input", "waiting_input"]);
+  expect(runs.every((r) => r.waitingMachineId === machineId)).toBe(true);
+  expect(await notices()).toHaveLength(1);
+
+  // Another channel: its people didn't see the note, so it is said there once.
+  const other = await createChannel(f.db, f.owner.id, f.org.id, { name: "tech" });
+  await addChannelMember(f.db, f.owner.id, f.org.id, other.id, { agentId: f.agent.id });
+  await routineCall(other.id);
+  // The conversation list's last line carries the note's code (the app says it in the reader's language).
+  const tech = (await listChannels(f.db, f.owner.id, f.org.id)).find((c) => c.id === other.id);
+  expect(tech?.lastMessage?.meta).toMatchObject({
+    bodyCode: "brain_unavailable",
+    bodyParams: { brain: "Claude Code" },
+  });
+  await routineCall(other.id);
+  const all = await notices();
+  expect(all).toHaveLength(2);
+  expect(all.filter((m) => m.channelId === other.id)).toHaveLength(1);
+
+  // All of them still wait and come back together.
+  runs = await f.db.select().from(schema.agentRuns);
+  expect(runs.filter((r) => r.status === "waiting_input")).toHaveLength(4);
+  expect((await resumeRunsWaitingForMachine(f.db, machineId)).length).toBe(4);
+});
+
+test("waiting for its computer isn't working: left out of 'working now' and a thread's working flag", async () => {
+  f = await setup();
+  await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => scriptedComputerBrain(() => []).brain },
+    machines: { status: async (id) => statusOf(id, { online: false }) },
+  });
+  const question = await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  expect(await listWorkingRuns(f.db, f.owner.id, f.org.id)).toEqual([]);
+  const threads = await listThreads(f.db, f.owner.id, { orgId: f.org.id });
+  const thread = threads.threads.find((t) => t.id === question.id);
+  expect(thread?.working).toBe(false);
+  // The list's last line says it in the reader's language: the note's code comes with it.
+  expect(thread?.lastMessage?.meta).toMatchObject({
+    bodyCode: "brain_unavailable",
+    bodyParams: { brain: "Claude Code" },
+  });
 });

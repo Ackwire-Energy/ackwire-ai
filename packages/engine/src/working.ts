@@ -28,7 +28,8 @@ export interface WorkingRun {
 /**
  * "Trabalhando agora" for any member: agent runs in progress (queued,
  * running, waiting for an approval or an answer) in the channels and DMs
- * they are in, newest first. Only conversations they read: never someone
+ * they are in, newest first. A run waiting for its computer to come back (a computer brain
+ * offline, ADR 0032 §5) isn't working: it's left out. Only conversations they read: never someone
  * else's DM, a private channel they're not in, nor agents' own DMs. No
  * cost, no internals.
  */
@@ -61,6 +62,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
         limit 1
       ) root on true
       where r.org_id = ${orgId}::uuid and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+        and r.waiting_machine_id is null
       order by r.created_at desc, r.id desc
       limit ${MAX_WORKING_RUNS}`),
   );

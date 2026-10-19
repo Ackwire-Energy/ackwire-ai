@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ChannelEvent, Message } from "../src/index";
 import {
+  agentStateIn,
+  agentStateOfRun,
   applyChannelEvent,
   emptyStreams,
   expectReply,
@@ -151,6 +153,21 @@ describe("live agent runs (streaming)", () => {
     s = applyChannelEvent(s, delta(3, "x"));
     s = applyChannelEvent(s, { type: "agent.run", ...base, status: "done" });
     expect(runsInChannel(s, "c1")).toEqual([]);
+  });
+
+  test("waiting (for its computer, or an answer) isn't working: the row goes and the agent rests", () => {
+    let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
+    expect(agentStateIn(s, "atlas")).toBe("thinking");
+    s = applyChannelEvent(s, { type: "agent.run", ...base, status: "waiting_input" } as unknown as ChannelEvent);
+    expect(runsInChannel(s, "c1")).toEqual([]);
+    expect(runningAgents(s)).toEqual(new Set());
+    expect(agentStateIn(s, "atlas")).toBe("idle");
+    // A row that still says waiting_input (an older event order) rests too.
+    const row = { ...base, status: "waiting_input", text: "" } as unknown as Parameters<typeof agentStateOfRun>[0];
+    expect(agentStateOfRun(row)).toBe("idle");
+    // Back: the resumed run works again.
+    s = applyChannelEvent(s, { type: "agent.run", ...base, status: "running" });
+    expect(agentStateIn(s, "atlas")).toBe("thinking");
   });
 
   test("a delta before the run event still opens the stream; failures keep the reason", () => {

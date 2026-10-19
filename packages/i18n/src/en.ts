@@ -2059,6 +2059,7 @@ export const en: Translations = {
       delivered_drive: "File in Drive",
       delivered_dm: "Sent in the DM",
       nothing_new: "Nothing new, nothing posted",
+      waiting_computer: "Skipped: the last run is still waiting for the agent's computer",
       forum_opened: "Forum opened: {{title}}",
       failed: "Failed: {{reason}}",
       audience: "Paused: the routine's creator can no longer talk to the agent",
