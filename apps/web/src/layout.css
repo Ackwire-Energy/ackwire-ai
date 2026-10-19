@@ -5421,6 +5421,19 @@ button.live-call__head:hover {
     backdrop-filter: blur(14px) saturate(1.5);
   }
 }
+/* An agent in its browser: the whole pill opens the live view; "No navegador" says so. */
+.ac-typing[data-browser="true"] {
+  cursor: pointer;
+}
+.ac-typing__browser.ac-btn {
+  flex: none;
+  height: 24px;
+  margin-left: 2px;
+  padding-inline: 8px;
+  gap: 4px;
+  font-size: inherit;
+  color: var(--ink2);
+}
 .ac-typing[data-active="true"] .ac-typing__text {
   overflow: hidden;
   text-overflow: ellipsis;

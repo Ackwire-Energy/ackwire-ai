@@ -1,5 +1,6 @@
 import type { BrowserHandoff } from "../api/types";
 import { BACKOFF_MS, type Timers } from "../realtime/connection";
+import type { BrowserWatcher } from "./watches";
 
 /**
  * The agent browser's live view (ADR 0040 §7) over the realtime socket
@@ -81,6 +82,10 @@ export type BrowserLiveMessage =
 
 /** Most events in one `browser.input` frame (the server's limit). */
 export const BROWSER_INPUT_BATCH = 100;
+/** Moves while a button is down (a drag) or a finger moves go out at most once a frame, merged. */
+export const BROWSER_DRAG_FLUSH_MS = 16;
+/** A pointer just hovering sends its position at most about 15 times a second (the latest one). */
+export const BROWSER_HOVER_MS = 66;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
@@ -156,6 +161,14 @@ export interface BrowserLiveOptions {
   onError?(code: string): void;
   timers?: Pick<Timers, "setTimeout" | "clearTimeout">;
   backoffMs?: number[];
+  /**
+   * The socket's shared watches (`RealtimeConnection.browserWatcher`): views of the same agent
+   * share one `browser.watch`, and leaving unwatches only after a moment. Without it this
+   * connection sends `browser.watch` / `browser.unwatch` itself.
+   */
+  watcher?: BrowserWatcher;
+  /** The clock for hover throttling (tests). */
+  now?: () => number;
 }
 
 export interface BrowserLiveConnection {
@@ -163,7 +176,11 @@ export interface BrowserLiveConnection {
   start(): void;
   /** Feed every live-view frame from the socket; frames of other agents are ignored. */
   handleMessage(message: unknown): void;
-  /** Sends a person's input (in control only), in batches the server accepts. False when there was nothing to send. */
+  /**
+   * Sends a person's input (in control only). Clicks, keys and text go at once, in order; a drag's
+   * moves are merged and sent once a frame; hover moves at most ~15 a second. Batches fit the
+   * server's limit. False when there was nothing to send.
+   */
   sendInput(events: BrowserInputEvent[]): boolean;
   /** After the socket reconnected: watch again (the server forgot this socket). */
   resume(): void;
@@ -180,11 +197,13 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
     setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
     clearTimeout: (id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>),
   };
-  const { agentId } = options;
+  const clock = options.now ?? Date.now;
+  const { agentId, watcher } = options;
   let attempt = 0;
   let retry: unknown = null;
   let closed = false;
-  const watch = () => options.send({ type: "browser.watch", agentId });
+  let release: (() => void) | null = null;
+  const watch = () => (watcher ? watcher.rewatch(agentId) : options.send({ type: "browser.watch", agentId }));
   /** `browser.watch` again after a backoff (a repeated watch restarts the view on the server). */
   const retryLater = () => {
     clearRetry();
@@ -200,16 +219,58 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
     if (retry !== null) timers.clearTimeout(retry);
     retry = null;
   };
+
+  // Input: one `browser.input` per burst, not one per event.
+  let queue: BrowserInputEvent[] = [];
+  let flushTimer: unknown = null;
+  let hover: BrowserInputEvent | null = null;
+  let hoverTimer: unknown = null;
+  let hoverAt = Number.NEGATIVE_INFINITY;
+  const flush = () => {
+    if (flushTimer !== null) timers.clearTimeout(flushTimer);
+    flushTimer = null;
+    if (closed || queue.length === 0) return;
+    const out = queue;
+    queue = [];
+    for (let i = 0; i < out.length; i += BROWSER_INPUT_BATCH) {
+      options.send({ type: "browser.input", agentId, events: out.slice(i, i + BROWSER_INPUT_BATCH) });
+    }
+  };
+  const flushSoon = () => {
+    if (flushTimer === null) flushTimer = timers.setTimeout(flush, BROWSER_DRAG_FLUSH_MS);
+  };
+  const dropHover = () => {
+    hover = null;
+    if (hoverTimer !== null) timers.clearTimeout(hoverTimer);
+    hoverTimer = null;
+  };
+  const sendHover = () => {
+    hoverTimer = null;
+    if (!hover || closed) return;
+    queue.push(hover);
+    hover = null;
+    hoverAt = clock();
+    flush();
+  };
+  const hoverSoon = () => {
+    if (hoverTimer !== null) return;
+    const wait = BROWSER_HOVER_MS - (clock() - hoverAt);
+    if (wait <= 0) sendHover();
+    else hoverTimer = timers.setTimeout(sendHover, wait);
+  };
+
   return {
     start() {
       closed = false;
       attempt = 0;
-      watch();
+      if (!watcher) watch();
+      else if (!release) release = watcher.acquire(agentId);
     },
     resume() {
       if (closed) return;
       clearRetry();
-      watch();
+      // A shared watcher watches every agent again by itself when the socket is back.
+      if (!watcher) watch();
     },
     handleMessage(raw) {
       if (closed) return;
@@ -241,16 +302,62 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
     },
     sendInput(events) {
       if (closed || events.length === 0) return false;
-      for (let i = 0; i < events.length; i += BROWSER_INPUT_BATCH) {
-        options.send({ type: "browser.input", agentId, events: events.slice(i, i + BROWSER_INPUT_BATCH) });
+      let urgent = false;
+      for (const e of events) {
+        if (isHoverMove(e)) {
+          hover = e;
+          continue;
+        }
+        dropHover();
+        const last = queue.at(-1);
+        if (isDragMove(e)) {
+          if (last && sameMove(last, e)) queue[queue.length - 1] = e;
+          else queue.push(e);
+          continue;
+        }
+        if (isWheel(e)) {
+          // A scroll is many wheel ticks: one per frame, the deltas added up.
+          if (last && isWheel(last)) queue[queue.length - 1] = addWheel(last, e);
+          else queue.push(e);
+          continue;
+        }
+        queue.push(e);
+        urgent = true;
       }
+      if (urgent) flush();
+      else if (queue.length > 0) flushSoon();
+      if (hover) hoverSoon();
       return true;
     },
     close() {
       if (closed) return;
       closed = true;
       clearRetry();
-      options.send({ type: "browser.unwatch", agentId });
+      dropHover();
+      if (flushTimer !== null) timers.clearTimeout(flushTimer);
+      flushTimer = null;
+      queue = [];
+      if (!watcher) options.send({ type: "browser.unwatch", agentId });
+      else {
+        release?.();
+        release = null;
+      }
     },
   };
 }
+
+/** The pointer moving with no button down. */
+const isHoverMove = (e: BrowserInputEvent) =>
+  e.kind === "mouse" && e.type === "mouseMoved" && (!e.button || e.button === "none");
+/** A move after a press: a drag, or a finger moving. */
+const isDragMove = (e: BrowserInputEvent) =>
+  (e.kind === "mouse" && e.type === "mouseMoved") || (e.kind === "touch" && e.type === "touchMove");
+const isWheel = (e: BrowserInputEvent): e is Extract<BrowserInputEvent, { kind: "mouse" }> =>
+  e.kind === "mouse" && e.type === "mouseWheel";
+/** Two wheel ticks as one: the later position, both scrolls. */
+const addWheel = (a: BrowserInputEvent, b: BrowserInputEvent): BrowserInputEvent =>
+  isWheel(a) && isWheel(b)
+    ? { ...b, deltaX: (a.deltaX ?? 0) + (b.deltaX ?? 0), deltaY: (a.deltaY ?? 0) + (b.deltaY ?? 0) }
+    : b;
+/** Two moves of the same kind: the later replaces the earlier (only the latest position matters). */
+const sameMove = (a: BrowserInputEvent, b: BrowserInputEvent) => a.kind === b.kind && isDragMove(a) && isDragMove(b);

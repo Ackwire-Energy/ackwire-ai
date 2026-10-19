@@ -38,6 +38,7 @@ import {
   useModels,
   usePostMessage,
   useRoster,
+  usesBrowser,
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
@@ -1979,6 +1980,17 @@ function ActivityBar({
   const behind = runs.filter((r) => behindIds.includes(r.runId));
   // Agents running code (not writing yet): "Ver código" with the live code and output.
   const coding = runs.filter((r) => !isWriting(r) && r.code);
+  // An agent working in its browser: the bar says so, and a click opens its browser live (watching).
+  const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
+  const navigate = useNavigate();
+  const openBrowser = browsing
+    ? () =>
+        void navigate({
+          to: "/org/$orgId/browser/$agentId",
+          params: { orgId: org.id, agentId: browsing.agentId },
+          search: { watch: 1 },
+        })
+    : undefined;
   // What they said last between tool calls ("Theo: Go não está instalado; vou tentar…").
   const said = runs
     .filter((r) => !isWriting(r))
@@ -2020,7 +2032,23 @@ function ActivityBar({
           <strong>{n.name}:</strong> {n.text}
         </p>
       ))}
-      <div className="ac-typing" aria-live="polite" data-active={active}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: the "No navegador" button inside is the keyboard way; the pill is a bigger target */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: same */}
+      <div
+        className="ac-typing"
+        aria-live="polite"
+        data-active={active}
+        data-browser={active && openBrowser ? true : undefined}
+        onClick={
+          openBrowser
+            ? (e) => {
+                // Its own buttons (Parar) keep their job.
+                if ((e.target as HTMLElement).closest("button, [role=dialog]")) return;
+                openBrowser();
+              }
+            : undefined
+        }
+      >
         {active && (
           <>
             {skyAgent && <ActivitySky color={colorOf(dir.agentById.get(skyAgent.id))} />}
@@ -2032,6 +2060,18 @@ function ActivityBar({
               <WorkingWords entries={entries} />
             </span>
             <ConsultClock entries={entries} now={now} />
+            {openBrowser && (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="globe"
+                className="ac-typing__browser"
+                title={t("browser.watch.open")}
+                onClick={openBrowser}
+              >
+                {t("browser.watch.title")}
+              </Button>
+            )}
             {!firstAgent && (
               <span className="ac-typing__dots" aria-hidden="true">
                 <span />

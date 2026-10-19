@@ -6,6 +6,7 @@ import type { LiveWork } from "../realtime/streams";
 
 export * from "./input";
 export * from "./live";
+export * from "./watches";
 
 /**
  * The agent browser on connected computers (ADR 0040), shared by the web and
@@ -55,7 +56,22 @@ export function handoffFuse(h: Pick<BrowserHandoff, "createdAt" | "expiresAt">, 
 }
 
 /** A tool of the agent browser (`browser_open`, `browser_click`, …). */
-export const isBrowserTool = (tool: string | null | undefined) => Boolean(tool?.startsWith("browser_"));
+export const isBrowserTool = (tool: string | null | undefined) =>
+  Boolean(tool?.replace(/^mcp__agentes__/, "").startsWith("browser_"));
+
+/**
+ * The agent is in its browser now: its current tool, or its latest call, is a browser tool
+ * (the progress bar then says so and opens the live view).
+ */
+export function usesBrowser(run: { tool?: string | null; work?: LiveWork[] }): boolean {
+  if (isBrowserTool(run.tool)) return true;
+  const work = run.work ?? [];
+  for (let i = work.length - 1; i >= 0; i--) {
+    const w = work[i];
+    if (w?.kind === "call") return isBrowserTool(w.tool);
+  }
+  return false;
+}
 
 /** One line of "what the agent is doing in its browser", from its run's live work. */
 export interface BrowserStep {

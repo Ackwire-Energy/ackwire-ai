@@ -366,6 +366,8 @@ function useLiveConnection(agentId: string): LiveState {
     if (!connection) return;
     const live = createBrowserLiveConnection({
       send: (frameOut) => connection.sendBrowserFrame(frameOut),
+      // Shared per socket: one watch per agent however often the screen re-renders or remounts.
+      watcher: connection.browserWatcher,
       agentId,
       onFrame: (f) => {
         setUnavailable(null);

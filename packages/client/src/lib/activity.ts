@@ -27,6 +27,7 @@ export type ActivityKind =
   | "openingSkill"
   | "consultingSkill"
   | "runningCode"
+  | "browsing"
   | "pcFiles"
   | "exportingFile"
   | "importingFile"
@@ -204,6 +205,8 @@ export function toolActivity(
     return detail?.trim() ? { kind: "openingSkill", app: detail.trim() } : { kind: "consultingSkill" };
   const builtin = BUILTIN[name];
   if (builtin) return { kind: builtin };
+  // The agent's own browser (ADR 0040): not an app called "browser".
+  if (name.startsWith("browser_")) return { kind: "browsing" };
   const label = connector?.trim();
   if (label) {
     if (isDrive(label.toLowerCase().replace(/\s+/g, "_"))) return { kind: "readingDrive" };

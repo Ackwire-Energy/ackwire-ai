@@ -1,6 +1,7 @@
-import { elapsedClock, type LiveConsult, type LiveRun, narrationOf } from "@agenteschat/client";
+import { elapsedClock, type LiveConsult, type LiveRun, narrationOf, usesBrowser } from "@agenteschat/client";
 import { activitySentence, isWriting } from "@agenteschat/client/lib/activity";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
@@ -106,6 +107,9 @@ export function WorkingLine({
     ]);
   };
   const plate = [styles.tok, { backgroundColor: c.glassSolid }];
+  // An agent working in its browser: the line says so, and a tap opens its browser live (watching).
+  const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
+  const openBrowser = browsing ? () => router.push(`/browser/${browsing.agentId}`) : undefined;
   return (
     <View style={styles.dock}>
       {said.map((n) => (
@@ -146,12 +150,28 @@ export function WorkingLine({
             );
           })}
         </View>
-        {/* Keyed by the words: a new activity fades in. */}
-        <Animated.View key={sentence} entering={reduced ? undefined : FadeIn.duration(160)} style={styles.words}>
-          <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-            {words}
-          </Text>
-        </Animated.View>
+        {/* Keyed by the words: a new activity fades in. An agent in its browser: tapping opens it live. */}
+        <Pressable
+          disabled={!browsing}
+          onPress={openBrowser}
+          accessibilityRole={browsing ? "button" : undefined}
+          accessibilityLabel={browsing ? t("browser.watch.open") : undefined}
+          style={styles.wordsTap}
+        >
+          <Animated.View key={sentence} entering={reduced ? undefined : FadeIn.duration(160)} style={styles.words}>
+            <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+              {words}
+            </Text>
+          </Animated.View>
+          {browsing ? (
+            <View style={[styles.browser, { backgroundColor: c.raised }]}>
+              <Icon name="globe" size={12} color={c.ink2} />
+              <Text variant="caption" tone="ink2" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+                {t("browser.watch.title")}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
         {clock ? (
           <RNText
             accessibilityLabel={t("chat.consult.clock", { time: clock })}
@@ -225,6 +245,16 @@ const styles = StyleSheet.create({
   pair: { flexDirection: "row", alignItems: "center", gap: 1 },
   overlap: { marginLeft: -5 },
   words: { flexShrink: 1 },
+  wordsTap: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1, minWidth: 0 },
+  browser: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 0,
+    minHeight: 22,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+  },
   ink: { fontWeight: "600" },
   clock: { fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
   sep: { width: StyleSheet.hairlineWidth * 2, height: 16, marginLeft: 4, marginRight: 2 },
