@@ -57,19 +57,11 @@ import {
   truncateOutput,
   withSandbox,
 } from "./sandbox";
-import {
-  hasCloudSecrets,
-  MAX_PENDING_SECRETS,
-  REQUEST_SECRET_TOOL,
-  requesterOfRun,
-  SECRET_TTL_MS,
-  secretFilePaths,
-  secretOnComputer,
-  withSecretsCommand,
-} from "./secrets";
+import { requestSecretTool } from "./secret-request-tool";
+import { hasCloudSecrets, REQUEST_SECRET_TOOL, secretFilePaths, withSecretsCommand } from "./secrets";
 import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
-import { grantedScopeKeys, grantKey, toolAllowScope } from "./tools/scopes";
+import { grantedScopeKeys, grantKey, isAllowed, toolAccess, toolAllowScope } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { completeUpload, createUpload, failUpload, type UploadRow, uploadedFile, waitForUpload } from "./uploads";
 
@@ -98,15 +90,7 @@ const READ_ONLY_COMMANDS = new Set([
 ]);
 const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "branch", "rev-parse", "ls-files", "remote"]);
 
-/** A `request_secret` site as its origin (`https://host[:port]`), or null when it isn't a web address. */
-export function secretSite(raw: string): string | null {
-  try {
-    const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`);
-    return u.protocol === "https:" || u.protocol === "http:" ? u.origin : null;
-  } catch {
-    return null;
-  }
-}
+export { secretSite } from "./secret-request-tool";
 
 /**
  * A bash command that only reads (a proposed mission is planned read only,
@@ -712,102 +696,12 @@ export function createSandboxToolSource(
         }
       },
     },
-    {
-      name: REQUEST_SECRET_TOOL,
-      description:
-        "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it.",
+    requestSecretTool({
       scope: SANDBOX_SCOPE,
-      inputSchema: {
-        type: "object",
-        properties: {
-          name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
-          purpose: { type: "string", minLength: 1, maxLength: 300, description: "What it is for, shown to the person" },
-          target: { enum: ["env", "file"] },
-          path: { type: "string", maxLength: 300, description: "With target file: where it goes in your workspace" },
-          site: {
-            type: "string",
-            maxLength: 300,
-            description:
-              "For a password your browser types (browser_type_secret): the address of the page it goes into (https://…). It will only ever be typed on that site.",
-          },
-        },
-        required: ["name", "purpose", "target"],
-        additionalProperties: false,
-      },
-      describe: (input) => ({ title: `Ask for the secret ${str(input.name)}` }),
-      async execute(input, ctx) {
-        try {
-          const requester = await requesterOfRun(ctx);
-          if (!requester) {
-            return {
-              content: "Only a person's own request can ask them for a secret (not a routine or another agent).",
-              isError: true,
-            };
-          }
-          const name = str(input.name);
-          const file = input.target === "file";
-          const path = file ? toolPath(str(input.path), computerInfo) : "";
-          if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {
-            return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };
-          }
-          const rawSite = str(input.site).trim();
-          const site = rawSite ? secretSite(rawSite) : null;
-          if (rawSite && !site) {
-            return { content: "`site` must be a web address (https://example.com/login).", isError: true };
-          }
-          const open = await ctx.db
-            .select({ id: schema.secretRequests.id })
-            .from(schema.secretRequests)
-            .where(and(eq(schema.secretRequests.runId, ctx.runId), eq(schema.secretRequests.status, "pending")));
-          if (open.length >= MAX_PENDING_SECRETS) {
-            return { content: `At most ${MAX_PENDING_SECRETS} secret requests at a time.`, isError: true };
-          }
-          const row = await run(ctx, 60, async (computer) => {
-            const id = Bun.randomUUIDv7();
-            const { publicKey } = await secretOnComputer(computer, { action: "keypair", requestId: id });
-            if (!publicKey) throw new Error("the computer made no key");
-            const [inserted] = await ctx.db
-              .insert(schema.secretRequests)
-              .values({
-                id,
-                orgId: ctx.orgId,
-                runId: ctx.runId,
-                agentId: ctx.agentId,
-                channelId: ctx.channelId,
-                toolUseId: ctx.toolUseId ?? id,
-                requestedForUserId: requester,
-                name,
-                // The person sees the one site a browser password may be typed on.
-                purpose: site ? `${str(input.purpose).trim()} (${new URL(site).host})` : str(input.purpose).trim(),
-                site,
-                targetKind: file ? "file" : "env",
-                targetPath: file ? path : null,
-                machineId: computer.machineId ?? null,
-                publicKey,
-                expiresAt: new Date(Date.now() + SECRET_TTL_MS),
-              })
-              .returning();
-            if (!inserted) throw new Error("the request was not saved");
-            await recordAudit(ctx.db, {
-              orgId: ctx.orgId,
-              actor: { type: "agent", id: ctx.agentId },
-              action: "secret.requested",
-              target: { type: "agent", id: ctx.agentId },
-              details: {
-                requestId: id,
-                name,
-                target: file ? { kind: "file", path } : { kind: "env" },
-                requestedFor: requester,
-              },
-            });
-            return inserted;
-          });
-          return { content: "", waitForSecret: { requestId: row.id } };
-        } catch (error) {
-          return failed(error);
-        }
-      },
-    },
+      browserOnly: false,
+      toolPath: (raw) => toolPath(raw, computerInfo),
+      onComputer: (ctx, fn) => run(ctx, 60, fn),
+    }),
     {
       name: "computer_status",
       description: "Is your computer on? Which computer it is, disk used and its internet access.",
@@ -1436,7 +1330,11 @@ export function createSandboxToolSource(
           "cancel_task",
           "request_folder_access",
         ].some((n) => keys.has(grantKey(null, toolAllowScope(n))));
-      if (!granted) return withNotices(build(false, 60));
+      // `request_secret` only when it is this agent's to use here; otherwise the browser offers its own (ADR 0040).
+      const secretsHere = isAllowed(toolAccess(keys, { name: REQUEST_SECRET_TOOL, scope: SANDBOX_SCOPE }));
+      const keep = (tools: ToolDefinition[]) =>
+        secretsHere ? tools : tools.filter((t) => t.name !== REQUEST_SECRET_TOOL);
+      if (!granted) return keep(withNotices(build(false, 60)));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);
       if (!settings.enabled) return [];
       // A mission's thread: its computer, and its rules (ADR 0029).
@@ -1451,8 +1349,8 @@ export function createSandboxToolSource(
         computer.kind === "machine"
           ? { mode: "machine", domains: [] }
           : { mode: settings.network, domains: settings.allowDomains };
-      const tools = withNotices(
-        build(settings.requireApproval, settings.execTimeoutSeconds, network, computer, ctx.threadRootId),
+      const tools = keep(
+        withNotices(build(settings.requireApproval, settings.execTimeoutSeconds, network, computer, ctx.threadRootId)),
       );
       if (!mission) return tools;
       return tools.map((t) => ({

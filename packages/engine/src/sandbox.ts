@@ -593,7 +593,21 @@ async function withMachine<T>(
     throw new SandboxUnavailableError("The agents' computers are turned off for this organization.");
   const machines = deps.machines;
   if (!machines) throw new SandboxUnavailableError("Connected computers are not available on this server.");
-  const status = await machines.hub.status(machineId);
+  return withConnectedMachine(machines.hub, ctx, { machineId, handle, ...(name ? { name } : {}) }, fn);
+}
+
+/**
+ * One connected machine as a computer handle, without the org's computer
+ * switch: the agent browser (ADR 0040) works on a connected machine whether
+ * or not the org runs code there, and its site-bound secrets go to that machine.
+ */
+export async function withConnectedMachine<T>(
+  hub: MachineCaller,
+  ctx: Pick<ToolContext, "orgId" | "agentId">,
+  { machineId, handle, name }: { machineId: string; handle: string; name?: string },
+  fn: (computer: ComputerHandle) => Promise<T>,
+): Promise<T> {
+  const status = await hub.status(machineId);
   if (!status || status.orgId !== ctx.orgId) {
     throw new SandboxUnavailableError(
       "Your connected computer was removed; ask an admin or your owner to choose another one.",
@@ -608,7 +622,7 @@ async function withMachine<T>(
       `The runner on the computer ${status.name} is out of date (it can't give each agent its own folder). Tell the person: its owner should update it with \`agentes-runner update\`.`,
     );
   }
-  const provider = createMachineSandboxProvider(machines.hub, { id: ctx.agentId, handle, ...(name ? { name } : {}) });
+  const provider = createMachineSandboxProvider(hub, { id: ctx.agentId, handle, ...(name ? { name } : {}) });
   return fn({ id: machineId, provider, ref: `machine:${machineId}`, machineId });
 }
 

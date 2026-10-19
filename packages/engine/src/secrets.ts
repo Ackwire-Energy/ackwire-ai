@@ -1,11 +1,18 @@
 import type { PubSub, SecretRequest } from "@agenteschat/adapters";
 import { parseSecretBox, SECRET_NAME, type SecretTarget, secretAad } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, lt, schema, sql } from "@agenteschat/db";
+import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { enqueue } from "./outbox";
-import { type ComputerHandle, requireComputerManager, type SandboxDeps, withSandbox } from "./sandbox";
+import {
+  type ComputerHandle,
+  requireComputerManager,
+  type SandboxDeps,
+  withConnectedMachine,
+  withSandbox,
+} from "./sandbox";
 import { SECRET_HELPER_DIR, SECRET_HELPER_PATH, SECRET_HELPER_SOURCE } from "./secret-helper";
 import type { ToolContext } from "./tools/types";
 
@@ -244,7 +251,20 @@ async function onRequestComputer<T>(
   row: SecretRequestRow,
   fn: (computer: ComputerHandle) => Promise<T>,
 ): Promise<T> {
-  return withSandbox(deps, await runContext(deps.db, row), 60, async (computer) => {
+  const ctx = await runContext(deps.db, row);
+  // A browser password (ADR 0040) lives on the machine its browser runs on, whether or not the org runs code there.
+  if (row.site && row.machineId) {
+    if (!deps.machines)
+      throw new ConflictError("Connected computers are not available on this server", "secret.computer_changed");
+    const agent = await getAgentCached(deps.db, row.orgId, row.agentId);
+    return withConnectedMachine(
+      deps.machines.hub,
+      ctx,
+      { machineId: row.machineId, handle: agent?.handle ?? "agent", ...(agent?.name ? { name: agent.name } : {}) },
+      fn,
+    );
+  }
+  return withSandbox(deps, ctx, 60, async (computer) => {
     if ((computer.machineId ?? null) !== row.machineId) {
       throw new ConflictError("The agent changed computers since it asked; ask it again", "secret.computer_changed");
     }

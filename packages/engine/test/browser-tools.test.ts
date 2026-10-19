@@ -334,3 +334,72 @@ test("helpers: refs, folder paths, page wrapping, errors, domains", () => {
   expect(cleanBrowserDomains(["*.Stripe.com", "stripe.com", " "])).toEqual(["*.stripe.com", "stripe.com"]);
   expect(() => cleanBrowserDomains(Array.from({ length: 51 }, (_, i) => `s${i}.example.com`))).toThrow();
 });
+
+test("an agent with only the browser asks for a password bound to one site, made on the browser's computer", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const tools = f.tools as NonNullable<Fixture["tools"]>;
+  const secret = (await tools.list(b.ctx)).filter((t) => t.name === "request_secret");
+  expect(secret).toHaveLength(1);
+  expect((secret[0]?.inputSchema as { required?: string[] } | undefined)?.required).toContain("site");
+
+  const noSite = await b.call("request_secret", {
+    name: "STRIPE_PASSWORD",
+    purpose: "Stripe login",
+    site: "not a site",
+  });
+  expect(noSite.isError).toBe(true);
+  expect(b.calls).toHaveLength(0);
+
+  b.s.reply = { publicKey: "pk-browser" } as never;
+  const r = await tools.invoke(b.ctx, {
+    toolUseId: "tu_secret_browser",
+    name: "request_secret",
+    input: { name: "STRIPE_PASSWORD", purpose: "Stripe login", site: "https://dashboard.stripe.com/login" },
+  });
+  expect(r.type).toBe("secret");
+  expect(b.calls.map((c) => c.op)).toEqual(["secret"]);
+  const [row] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.runId, b.ctx.runId));
+  expect(row).toMatchObject({
+    site: "https://dashboard.stripe.com",
+    machineId: b.machineId,
+    targetKind: "env",
+    publicKey: "pk-browser",
+  });
+  expect(row?.purpose).toContain("dashboard.stripe.com");
+});
+
+test("with the computer and the browser, there is exactly one request_secret (the computer's)", async () => {
+  const holder: { hub?: MachineCaller } = {};
+  f = await setup({
+    machines: true,
+    toolSources: [
+      createBrowserToolSource({
+        machines: {
+          hub: {
+            status: (id) => (holder.hub as MachineCaller).status(id),
+            call: (id, request, options) => (holder.hub as MachineCaller).call(id, request, options),
+          },
+        },
+      }),
+    ],
+  });
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+  await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, f.agent.id));
+  holder.hub = fakeHub({ machineId: paired.machineId, orgId: f.org.id }).hub;
+  const ctx = await runContext(f);
+  const tools = f.tools as NonNullable<Fixture["tools"]>;
+  const secretTools = async () => (await tools.list(ctx)).filter((t) => t.name === "request_secret");
+
+  // Only the browser: the browser's own, with `site` required.
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const browserOnly = await secretTools();
+  expect(browserOnly).toHaveLength(1);
+  expect(browserOnly[0]?.scope).toBe("browser:use");
+
+  // Both: one, the computer's.
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "sandbox:run" }]);
+  const both = await secretTools();
+  expect(both).toHaveLength(1);
+  expect(both[0]?.scope).toBe("sandbox:run");
+});

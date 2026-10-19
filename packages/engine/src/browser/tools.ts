@@ -4,6 +4,9 @@ import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError } from "../machines";
 import { missionOfRun } from "../mission-context";
+import { getSandboxSettings, SANDBOX_SCOPE, withConnectedMachine } from "../sandbox";
+import { requestSecretTool } from "../secret-request-tool";
+import { REQUEST_SECRET_TOOL } from "../secrets";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
@@ -280,6 +283,24 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
 
   const changed = (what: string) => () =>
     `${what} Read the page (browser_read) to see the result before the next step.`;
+
+  /** `request_secret` for an agent that may only use the browser: a password bound to one site, made on the browser's computer. */
+  const requestBrowserSecret = requestSecretTool({
+    scope: BROWSER_SCOPE,
+    browserOnly: true,
+    async onComputer(ctx, fn) {
+      const status = await machineOf(ctx);
+      if (!status.available) throw new Error(browserUnavailableText(status));
+      if (!hub) throw new Error("Connected computers are not available on this server.");
+      const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+      return withConnectedMachine(
+        hub,
+        ctx,
+        { machineId: status.machineId, handle: agent?.handle ?? "agent", ...(agent?.name ? { name: agent.name } : {}) },
+        fn,
+      );
+    },
+  });
 
   const definitions: ToolDefinition[] = [
     tool(
@@ -625,7 +646,13 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
       if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return [];
       const status = await machineOf(ctx);
-      return status.available ? definitions : [];
+      if (!status.available) return [];
+      // A browser password needs `request_secret`: the computer's tools offer it when the agent may run code
+      // there; otherwise this source does, bound to one site (one tool by that name either way).
+      const sandboxOffers =
+        isAllowed(toolAccess(granted, { name: REQUEST_SECRET_TOOL, scope: SANDBOX_SCOPE })) &&
+        (await getSandboxSettings(ctx.db, ctx.orgId)).enabled;
+      return sandboxOffers ? definitions : [...definitions, requestBrowserSecret];
     },
   };
 }
