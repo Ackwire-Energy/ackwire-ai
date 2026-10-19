@@ -7,8 +7,7 @@
  * (all caught up).
  */
 .nt {
-  gap: 0;
-  padding: 26px 28px 120px;
+  padding-bottom: 120px;
 }
 .nt-grow {
   flex: 1;
@@ -19,9 +18,9 @@
   width: 40px;
   height: 40px;
 }
-.nt-av32 {
-  width: 32px;
-  height: 32px;
+.nt-av28 {
+  width: 28px;
+  height: 28px;
 }
 .nt-av30 {
   width: 30px;
@@ -42,40 +41,13 @@
   font-size: 8px;
 }
 
-/* ── Header and toolbar ─────────────────────────────────────────────────── */
-.nt-hd {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 16px;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-.nt-hd h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: clamp(30px, 4vw, 40px);
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-}
-.nt-hd p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  max-width: 60ch;
-}
-.nt-hd__acts {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
+/* ── Toolbar (the header is the shared .list-head) ──────────────────────── */
 .nt-tb {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 16px;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
 }
 .nt-segwrap {
   max-width: 100%;
@@ -93,19 +65,7 @@
   }
 }
 
-/* ── Section heads ──────────────────────────────────────────────────────── */
-.nt-sh {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 4px 10px;
-}
-.nt-sh h2 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ink2);
-}
+/* ── Counts in the "Esperando você" head ────────────────────────────────── */
 .nt-n {
   font-size: 12.5px;
   font-weight: 500;
@@ -118,10 +78,10 @@
 /* ── "Esperando você": what blocks an agent or a decision ───────────────── */
 .nt-wait {
   position: relative;
-  border-radius: 20px;
+  border-radius: var(--radius-section);
   background: var(--raised);
-  box-shadow: var(--e2), var(--top);
-  margin-bottom: 28px;
+  box-shadow: var(--e1), var(--top);
+  margin-bottom: 4px;
 }
 .nt-wh {
   display: flex;
@@ -185,17 +145,6 @@
 .nt-wi:focus-visible,
 .nt-item:focus-visible {
   box-shadow: inset 0 0 0 2px var(--ink);
-}
-.nt-wi.is-unread::before,
-.nt-item.is-unread::before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 16px;
-  width: 3px;
-  height: 20px;
-  border-radius: 3px;
-  background: var(--ink);
 }
 .nt-face {
   grid-row: 1 / span 3;
@@ -337,19 +286,18 @@
 
 /* ── Day groups and items ───────────────────────────────────────────────── */
 .nt-day {
-  margin-bottom: 22px;
+  margin-bottom: 4px;
 }
+/* The shared list card, but tooltips under the last row must not be clipped. */
 .nt-list {
-  border-radius: 20px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  overflow: visible;
 }
 .nt-item {
   position: relative;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 0 14px;
-  padding: 16px 20px 18px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 0 12px;
+  padding: 12px 16px 14px;
   border-top: 1px solid var(--line);
   outline: none;
   cursor: pointer;
@@ -395,8 +343,9 @@
   color: var(--ink);
   font-weight: 600;
 }
+/* Unread is the weight of the headline (no bar on the side, like Threads). */
 .nt-item:not(.is-unread) .nt-what b {
-  font-weight: 550;
+  font-weight: 500;
 }
 .nt-tm {
   margin-left: auto;
@@ -468,8 +417,8 @@
 /* A group: two stacked faces. */
 .nt-stk {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: block;
 }
 .nt-stk > *:first-child {
@@ -564,8 +513,8 @@
 .nt-emo {
   position: relative;
   display: block;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex: none;
 }
 .nt-emo span {
@@ -584,8 +533,8 @@
   line-height: 1;
 }
 .nt-emo span:nth-child(2) {
-  left: 10px;
-  top: 10px;
+  left: 6px;
+  top: 6px;
 }
 .nt-item--rx .nt-quote {
   margin-top: 4px;
@@ -869,13 +818,7 @@
 
 /* ── Phones ─────────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
-  .nt {
-    padding: 18px 16px 120px;
-  }
-  .nt-hd {
-    align-items: flex-start;
-  }
-  .nt-hd__acts {
+  .nt .list-head__acts {
     width: 100%;
   }
   .nt-tb {
@@ -920,15 +863,6 @@
     grid-template-columns: 28px minmax(0, 1fr);
     gap: 0 10px;
     padding: 12px 14px;
-  }
-  .nt-av32 {
-    width: 28px;
-    height: 28px;
-  }
-  .nt-stk,
-  .nt-emo {
-    width: 28px;
-    height: 28px;
   }
   /* The actions: a row under the tapped item. */
   .nt-acts {

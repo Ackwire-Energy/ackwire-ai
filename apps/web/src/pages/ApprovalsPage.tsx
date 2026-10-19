@@ -247,28 +247,30 @@ export function ApprovalsPage() {
   const waiters = [...new Set(mine.map((a) => a.agentId))];
 
   return (
-    <div className="page ap">
+    <div className="page page--list ap">
       <div className="ap__main">
-        <header className="ap-head">
-          <h1>{t("approvals.title")}</h1>
-          <p className="ap-head__sub">
-            {waitingYou > 0 ? (
-              <>
-                {t("approvals.summary", { count: waitingYou })}
-                {urgentLeft && urgentLeft <= 2 * URGENT_MS
-                  ? ` · ${t("approvals.urgent", { time: timeLeft(t, urgent.expiresAt) ?? "" })}`
-                  : ""}
-              </>
-            ) : (
-              t("approvals.nothing")
-            )}
-          </p>
-          <p className="ap-head__guard">
-            <span aria-hidden="true" className="ap-head__guard-icon">
-              <Icon name="shield" size={14} />
-            </span>
-            {t("approvals.guard")}
-          </p>
+        <header className="list-head">
+          <div>
+            <h1>{t("approvals.title")}</h1>
+            <p className="list-head__sub">
+              {waitingYou > 0 ? (
+                <>
+                  {t("approvals.summary", { count: waitingYou })}
+                  {urgentLeft && urgentLeft <= 2 * URGENT_MS
+                    ? ` · ${t("approvals.urgent", { time: timeLeft(t, urgent.expiresAt) ?? "" })}`
+                    : ""}
+                </>
+              ) : (
+                t("approvals.nothing")
+              )}
+            </p>
+            <p className="ap-head__guard">
+              <span aria-hidden="true" className="ap-head__guard-icon">
+                <Icon name="shield" size={14} />
+              </span>
+              {t("approvals.guard")}
+            </p>
+          </div>
         </header>
         <Toolbar
           label={t("approvals.filters")}
@@ -355,14 +357,14 @@ export function ApprovalsPage() {
         {filter === "pending"
           ? shownDecided.length > 0 && (
               <section className="ap-history">
-                <div className="ap-section-head">
+                <div className="list-group-head">
                   <h2>{t("approvals.recent")}</h2>
                   <span className="ap-grow" />
                   <Button variant="ghost" size="sm" onClick={() => setFilter("all")}>
                     {t("approvals.seeHistory")}
                   </Button>
                 </div>
-                <div className="ap-list">
+                <div className="list-card">
                   {shownDecided.slice(0, 3).map((a) => (
                     <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => setOpenId(a.id)} />
                   ))}
@@ -371,11 +373,11 @@ export function ApprovalsPage() {
             )
           : groups(shownDecided).map(([key, list]) => (
               <section key={key} className="ap-history">
-                <div className="ap-section-head">
+                <div className="list-group-head">
                   <h2>{t(`approvals.groups.${key}`)}</h2>
-                  <span className="ap-section-head__count ac-num">{list.length}</span>
+                  <span className="list-group-head__count">{list.length}</span>
                 </div>
-                <div className="ap-list">
+                <div className="list-card">
                   {list.map((a) => (
                     <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => setOpenId(a.id)} />
                   ))}

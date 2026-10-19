@@ -44,9 +44,9 @@ export function MissionCommandsPending({ missions, query = "" }: { missions: Mis
   if (asking.length === 0) return null;
   return (
     <section className="ap-mi" aria-label={t("approvals.missions.commands")}>
-      <div className="ap-section-head">
+      <div className="list-group-head">
         <h2>{t("approvals.missions.commands")}</h2>
-        <span className="ap-section-head__count ac-num">{pendingCommandCount(asking)}</span>
+        <span className="list-group-head__count">{pendingCommandCount(asking)}</span>
       </div>
       <div className="ap-cards">
         {asking.map((m) => (
@@ -106,10 +106,10 @@ export function MissionsWaitingList({ missions, query = "" }: { missions: Missio
   if (waiting.length === 0) return null;
   return (
     <section className="ap-mi" aria-label={t("approvals.missions.waiting")}>
-      <div className="ap-section-head">
+      <div className="list-group-head">
         <h2>{t("approvals.missions.waiting")}</h2>
       </div>
-      <ul className="ap-list ap-mi__list">
+      <ul className="list-card ap-mi__list">
         {waiting.map((m) => (
           <MissionWaitingRows key={m.id} mission={m} query={query} />
         ))}

@@ -135,12 +135,12 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
   };
 
   return (
-    <div className="page threads">
+    <div className="page page--list threads">
       <div className="threads__main">
-        <header className="threads-head">
+        <header className="list-head">
           <div>
             <h1>{missions ? t("missions.title") : t("threads.title")}</h1>
-            <p className="threads-head__sub">{missions ? t("missions.subtitle") : t("threads.subtitle")}</p>
+            <p className="list-head__sub">{missions ? t("missions.subtitle") : t("threads.subtitle")}</p>
           </div>
           <Button
             size="sm"
@@ -284,16 +284,16 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
               const label = group.dm ? t("threads.dms") : `#${group.name}`;
               return (
                 <section key={group.key} className="threads-group" aria-label={label}>
-                  <h2 className="threads-group__head">
+                  <h2 className="list-group-head threads-group__head">
                     <button type="button" aria-expanded={!shut} onClick={() => toggleGroup(group.key)}>
                       <Icon name="chevronDown" size={14} className="threads-group__chev" />
                       <Icon name={group.dm ? "person" : "channel"} size={14} />
                       {group.dm ? label : group.name}
                     </button>
-                    <span className="threads-group__count">{group.threads.length}</span>
+                    <span className="list-group-head__count">{group.threads.length}</span>
                   </h2>
                   {!shut && (
-                    <div className="threads-list">
+                    <div className="list-card">
                       {group.threads.map((thread) => (
                         <ThreadRow
                           key={thread.id}

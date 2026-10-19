@@ -558,7 +558,7 @@ function Row({
       <Face actor={other} dir={dir} size="sm" className="nt-av17" />
     </span>
   ) : (
-    <Face actor={first} dir={dir} className="nt-av32" />
+    <Face actor={first} dir={dir} className="nt-av28" />
   );
   const l = n.latest;
   const lead =
@@ -1482,13 +1482,13 @@ export function NotificationsPage() {
   const calmAgent = dir.agents[0];
 
   return (
-    <div className="page page--mid nt">
-      <header className="nt-hd">
+    <div className="page page--list nt">
+      <header className="list-head">
         <div>
           <h1>{t("notifications.title")}</h1>
-          {list.isSuccess && <p>{summary}</p>}
+          {list.isSuccess && <p className="list-head__sub">{summary}</p>}
         </div>
-        <div className="nt-hd__acts">
+        <div className="list-head__acts">
           <Menu
             align="end"
             label={t("notifications.keys.title")}
@@ -1616,11 +1616,13 @@ export function NotificationsPage() {
         const unread = rows.filter((n) => n.readAt === null).length;
         return (
           <section key={day} className="nt-day" aria-label={t(`notifications.day.${day}`)}>
-            <div className="nt-sh">
+            <div className="list-group-head">
               <h2>{t(`notifications.day.${day}`)}</h2>
-              <span className="nt-n">{unread ? t("notifications.dayUnread", { count: unread }) : rows.length}</span>
+              <span className="list-group-head__count">
+                {unread ? t("notifications.dayUnread", { count: unread }) : rows.length}
+              </span>
             </div>
-            <div className="nt-list">
+            <div className="list-card nt-list">
               {rows.map((n) => (
                 <Row key={n.id} n={n} s={stateOf(n)} h={handlers} dir={dir} mine={mine} channelName={channelName} />
               ))}

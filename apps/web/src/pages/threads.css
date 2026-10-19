@@ -5,12 +5,9 @@
  * Neutral selection (ink and gray); brand blue only on agents' avatars.
  */
 .threads {
-  max-width: 1120px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 0 20px;
-  padding-bottom: 96px;
 }
 .threads__main {
   min-width: 0;
@@ -20,26 +17,6 @@
   container: threads / inline-size;
 }
 
-.threads-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.threads-head h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-.threads-head__sub {
-  margin: 6px 0 0;
-  max-width: 62ch;
-  color: var(--muted);
-}
 .threads-tabs {
   overflow-x: auto;
   scrollbar-width: none;
@@ -76,16 +53,6 @@
   flex-direction: column;
   gap: 18px;
 }
-.threads-group__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
-  padding: 0 4px;
-  font-size: 12.5px;
-  font-weight: 650;
-  color: var(--muted);
-}
 .threads-group__head button {
   display: inline-flex;
   align-items: center;
@@ -113,16 +80,6 @@
 }
 .threads-group__head [aria-expanded="false"] .threads-group__chev {
   transform: rotate(-90deg);
-}
-.threads-group__count {
-  font-weight: 500;
-  color: var(--faint);
-}
-.threads-list {
-  border-radius: var(--radius-section);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  overflow: hidden;
 }
 .thread-row {
   position: relative;
