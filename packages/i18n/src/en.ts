@@ -317,9 +317,9 @@ export const en: Translations = {
     skip: "Skip for now",
   },
   shell: {
-    inbox: "Inbox",
-    work: "Work",
-    knowledge: "Knowledge",
+    inbox: "For you",
+    work: "Schedule",
+    knowledge: "Library",
     waitingInSection_one: "{{count}} waiting for you",
     waitingInSection_other: "{{count}} waiting for you",
     inviteHint: "By email or link",

@@ -323,9 +323,9 @@ export const ptBR = {
     skip: "Pular por agora",
   },
   shell: {
-    inbox: "Caixa de entrada",
-    work: "Trabalho",
-    knowledge: "Conhecimento",
+    inbox: "Para você",
+    work: "Agenda",
+    knowledge: "Biblioteca",
     waitingInSection_one: "{{count}} esperando você",
     waitingInSection_other: "{{count}} esperando você",
     inviteHint: "Por email ou link",
