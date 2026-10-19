@@ -541,7 +541,7 @@ function describeOp(req: MachineRequest): string {
     case "browser.stream.start":
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
-      return `browser.input (${Array.isArray(req.events) ? req.events.length : 0} events)`;
+      return `browser.input ${Array.isArray(req.events) ? req.events.length : 0} events`;
     case "access.reduce":
       return `access.reduce${req.removeFolder ? ` folder ${String(req.removeFolder.path ?? "")}` : ""}${req.disableTool ? ` tool ${String(req.disableTool)}` : ""}`;
     default:
@@ -597,7 +597,7 @@ export class RequestRunner {
     const controller = new AbortController();
     this.inflight.set(id, controller);
     // A browser command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
-    const timed = req.op === "browser.act";
+    const timed = req.op === "browser.act" || req.op === "browser.input";
     const startedAt = Date.now();
     if (!timed) this.log(describeRequest(req));
     this.observe(() => this.observer?.started(id, req));
@@ -629,8 +629,12 @@ export class RequestRunner {
       })
       .then((outcome) => {
         if (timed) {
-          const failed = !outcome.ok || (isRecordLike(outcome.data) && outcome.data.success === false);
-          this.log(`${describeRequest(req)} ${Date.now() - startedAt}ms${failed ? " (failed)" : ""}`);
+          const data = outcome.ok && isRecordLike(outcome.data) ? outcome.data : null;
+          // An input batch says how many events the browser didn't confirm.
+          const unconfirmed = typeof data?.failed === "number" && data.failed > 0 ? data.failed : 0;
+          const failed = !outcome.ok || data?.success === false;
+          const note = failed ? " (failed)" : unconfirmed ? ` (failed: ${unconfirmed})` : "";
+          this.log(`${describeRequest(req)} ${Date.now() - startedAt}ms${note}`);
         }
         this.observe(() => this.observer?.finished(id, req, outcome));
         this.reply(id, outcome);

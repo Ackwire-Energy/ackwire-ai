@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -66,6 +66,8 @@ const MAX_STDOUT = 8 * 1024 * 1024;
 const INSTALL_TIMEOUT_MS = 10 * 60_000;
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 const QUICK_TIMEOUT_MS = 15_000;
+/** One input command on the relay: a click or a key answers in milliseconds. */
+const INPUT_TIMEOUT_MS = 5_000;
 /** After a failed download or install, wait this long before trying again. */
 const RETRY_FAILURE_MS = 10 * 60_000;
 const STREAM_OPEN_MS = 5000;
@@ -319,69 +321,99 @@ export function chromeLabel(found: string, home: string = os.homedir()): string 
   return names[base] ?? base;
 }
 
-/** Virtual key codes and text the stream's `input_keyboard` needs (it sends none of its own). */
-const SPECIAL_KEYS: Record<string, { code: number; text?: string }> = {
-  Enter: { code: 13, text: "\r" },
-  Tab: { code: 9 },
-  Backspace: { code: 8 },
-  Escape: { code: 27 },
-  Delete: { code: 46 },
-  ArrowLeft: { code: 37 },
-  ArrowUp: { code: 38 },
-  ArrowRight: { code: 39 },
-  ArrowDown: { code: 40 },
-  Home: { code: 36 },
-  End: { code: 35 },
-  PageUp: { code: 33 },
-  PageDown: { code: 34 },
-  " ": { code: 32, text: " " },
-  Shift: { code: 16 },
-  Control: { code: 17 },
-  Alt: { code: 18 },
-  Meta: { code: 91 },
-};
+/** Keys pressed and released at once: `press` fills in their codes and text. */
+const DISCRETE_KEYS = new Set([
+  "Enter",
+  "Tab",
+  "Backspace",
+  "Escape",
+  "Delete",
+  "ArrowLeft",
+  "ArrowUp",
+  "ArrowRight",
+  "ArrowDown",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+  " ",
+]);
+const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
+/** CDP's modifier bits, as `press` spells a chord (`Control+a`). */
+const CHORD = [
+  [1, "Alt"],
+  [2, "Control"],
+  [4, "Meta"],
+  [8, "Shift"],
+] as const;
+
+/** Where a person's pointer is and which modifier keys they hold, per stream. */
+export interface InputState {
+  pointer?: { x: number; y: number };
+  held: Set<string>;
+}
 
 /**
- * One person's input event as the stream's WebSocket message. Keys get the
- * virtual key code and text CDP needs (Enter would otherwise submit nothing,
- * a letter would type nothing); text goes through a command instead (null).
+ * One person's input event as commands for `agent-browser`'s relay
+ * (`POST /api/command` on the stream port). The daemon runs each on the
+ * active tab and answers once Chrome has it, unlike the stream socket, whose
+ * input goes to the tab it attached to and is never confirmed. Keys go
+ * through `press` (it fills in codes and text); a modifier held on its own is
+ * a raw key-down/up pair; a tap from the phone is a left click.
  */
-export function streamMessage(e: BrowserInputEvent): Record<string, unknown> | null {
+export function relayCommands(e: BrowserInputEvent, state: InputState): Record<string, unknown>[] {
   switch (e.kind) {
     case "mouse":
-      return {
-        type: "input_mouse",
-        eventType: e.type,
-        x: e.x,
-        y: e.y,
-        button: e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left"),
-        clickCount: e.clickCount ?? (e.type === "mousePressed" || e.type === "mouseReleased" ? 1 : 0),
-        deltaX: e.deltaX ?? 0,
-        deltaY: e.deltaY ?? 0,
+      state.pointer = { x: e.x, y: e.y };
+      return [
+        {
+          action: "input_mouse",
+          type: e.type,
+          x: e.x,
+          y: e.y,
+          button: e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left"),
+          clickCount: e.clickCount ?? (e.type === "mousePressed" || e.type === "mouseReleased" ? 1 : 0),
+          deltaX: e.deltaX ?? 0,
+          deltaY: e.deltaY ?? 0,
+          modifiers: e.modifiers ?? 0,
+        },
+      ];
+    case "touch": {
+      const at = e.touchPoints[0] ?? state.pointer;
+      if (!at) return [];
+      state.pointer = { x: at.x, y: at.y };
+      const mouse = (type: string, button: string, clickCount: number) => ({
+        action: "input_mouse",
+        type,
+        x: at.x,
+        y: at.y,
+        button,
+        clickCount,
+        deltaX: 0,
+        deltaY: 0,
         modifiers: e.modifiers ?? 0,
-      };
-    case "touch":
-      return { type: "input_touch", eventType: e.type, touchPoints: e.touchPoints, modifiers: e.modifiers ?? 0 };
+      });
+      if (e.type === "touchStart") return [mouse("mouseMoved", "none", 0), mouse("mousePressed", "left", 1)];
+      if (e.type === "touchMove") return [mouse("mouseMoved", "left", 0)];
+      return [mouse("mouseReleased", "left", 1)];
+    }
     case "key": {
-      const special = SPECIAL_KEYS[e.key];
-      const printable = !special && [...e.key].length === 1;
-      const code = special?.code ?? (printable ? e.key.toUpperCase().charCodeAt(0) : 0);
-      // Text only on the press of a key that types, never with Control/Meta (shortcuts).
-      const shortcut = ((e.modifiers ?? 0) & (2 | 4)) !== 0;
-      const text =
-        e.type === "keyUp" || shortcut ? undefined : (e.text ?? special?.text ?? (printable ? e.key : undefined));
-      return {
-        type: "input_keyboard",
-        eventType: e.type,
-        key: e.key,
-        ...(e.code ? { code: e.code } : {}),
-        ...(text !== undefined ? { text } : {}),
-        windowsVirtualKeyCode: code,
-        modifiers: e.modifiers ?? 0,
-      };
+      if (e.type === "char") return e.text ? [{ action: "keyboard", subaction: "insertText", text: e.text }] : [];
+      if (MODIFIER_KEYS.has(e.key)) {
+        if (e.type === "keyDown") state.held.add(e.key);
+        else if (!state.held.delete(e.key)) return [];
+        return [{ action: "input_keyboard", type: e.type, key: e.key, ...(e.code ? { code: e.code } : {}) }];
+      }
+      // `press` sends the whole key-down/up pair: the key-up has nothing left to do.
+      if (e.type === "keyUp") return [];
+      if (!DISCRETE_KEYS.has(e.key) && [...e.key].length !== 1) return [];
+      const mods = e.modifiers ?? 0;
+      // Shift with one character is that character, already in its shifted form.
+      const chord = mods === 8 && [...e.key].length === 1 ? [] : CHORD.filter(([bit]) => mods & bit).map(([, n]) => n);
+      return [{ action: "press", key: [...chord, e.key].join("+") }];
     }
     case "text":
-      return null;
+      return [{ action: "keyboard", subaction: "insertText", text: e.text }];
   }
 }
 
@@ -421,7 +453,12 @@ export interface BrowserManagerOptions {
 
 interface Stream {
   socket: StreamSocket;
+  /** The daemon's stream port: frames on its socket, a person's input on its command relay. */
+  port: number;
   mode: BrowserStreamMode;
+  input: InputState;
+  /** Input batches run one after another, in order. */
+  inputQueue: Promise<unknown>;
   url?: string;
   /** Closed by us (stop, mode off): no `ended` frame for an expected close. */
   closing: boolean;
@@ -1005,7 +1042,14 @@ export class BrowserManager {
     if (port === null) throw new RunnerError("bad_request", "The agent's browser isn't open");
     const url = `ws://127.0.0.1:${port}/?maxFps=${STREAM_FPS[mode]}`;
     const socket = (this.opts.connectStream ?? ((u: string) => new WebSocket(u) as unknown as StreamSocket))(url);
-    const stream: Stream = { socket, mode, closing: false };
+    const stream: Stream = {
+      socket,
+      port,
+      mode,
+      input: { held: new Set() },
+      inputQueue: Promise.resolve(),
+      closing: false,
+    };
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         socket.onopen = null;
@@ -1113,33 +1157,60 @@ export class BrowserManager {
     this.opts.send({ type: "browser.stream.ended", agentId: session.agentId, reason });
   }
 
-  /** `browser.input`: a person's input during a take over, in order (text through `keyboard inserttext`). */
+  /**
+   * `browser.input`: a person's input during a take over, in order, through
+   * the daemon's command relay (the active tab, each one confirmed before the
+   * next). The stream socket only carries frames.
+   */
   async input(agent: AgentScope, events: unknown[]): Promise<MachineReplies["browser.input"]> {
     const session = this.sessions.get(String(agent.id ?? ""));
-    if (!session?.stream) throw new RunnerError("bad_request", "Nobody is viewing this agent's browser");
+    const stream = session?.stream;
+    if (!session || !stream) throw new RunnerError("bad_request", "Nobody is viewing this agent's browser");
     if (!Array.isArray(events) || events.length > BROWSER_LIMITS.inputEvents) {
       throw new RunnerError("bad_request", `At most ${BROWSER_LIMITS.inputEvents} events at once`);
     }
     session.lastUsed = this.now();
-    let accepted = 0;
-    for (const raw of events) {
-      const e = parseBrowserInputEvent(raw);
-      if (!e) continue;
-      const message = streamMessage(e);
-      if (message) {
-        session.stream?.socket.send(JSON.stringify(message));
-      } else if (e.kind === "text") {
-        // Whole text at once (accents, paste, the app's own field), on stdin: it may be a password.
-        await this.enqueue(session, () =>
-          this.run(session, ["batch"], {
-            timeoutMs: QUICK_TIMEOUT_MS,
-            stdin: JSON.stringify([["keyboard", "inserttext", e.text]]),
-          }),
-        );
+    const parsed = events.map((raw) => parseBrowserInputEvent(raw)).filter((e) => e !== null);
+    const run = stream.inputQueue.then(async () => {
+      let accepted = 0;
+      let failed = 0;
+      for (const e of parsed) {
+        // The stream ended (the browser closed under it): nothing is sent to a browser that isn't there.
+        if (session.stream !== stream) {
+          failed += 1;
+          continue;
+        }
+        let ok = true;
+        for (const command of relayCommands(e, stream.input)) {
+          if (!(await this.relay(stream.port, command))) ok = false;
+        }
+        if (ok) accepted += 1;
+        else failed += 1;
       }
-      accepted += 1;
+      return failed > 0 ? { accepted, failed } : { accepted };
+    });
+    stream.inputQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  /** One command on the daemon's relay (`POST /api/command` on the stream port); true when it ran. */
+  private async relay(port: number, command: Record<string, unknown>): Promise<boolean> {
+    const origin = `http://127.0.0.1:${port}`;
+    try {
+      const res = await (this.opts.fetch ?? fetch)(`${origin}/api/command`, {
+        method: "POST",
+        redirect: "error",
+        signal: AbortSignal.timeout(INPUT_TIMEOUT_MS),
+        // The relay only takes a same-origin request.
+        headers: { "Content-Type": "application/json", Origin: origin },
+        body: JSON.stringify({ id: randomUUID(), ...command }),
+      });
+      const body = (await res.json().catch(() => null)) as unknown;
+      return res.ok && isRecord(body) && body.success !== false && !body.error;
+    } catch {
+      // Timed out (the command may still be queued in the daemon) or the port closed.
+      return false;
     }
-    return { accepted };
   }
 
   // ── Processes ──────────────────────────────────────────────────────────────

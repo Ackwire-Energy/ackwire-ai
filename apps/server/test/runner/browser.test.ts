@@ -19,9 +19,10 @@ import {
   defaultMaxSessions,
   domainAllowed,
   findChrome,
+  type InputState,
   isWebPage,
+  relayCommands,
   type StreamSocket,
-  streamMessage,
 } from "../../runner/browser";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
@@ -206,37 +207,52 @@ test("only web pages: local files, view-source, browser pages and scripts are re
   }
 });
 
-test("stream input: keys get the codes and text CDP needs, shortcuts and key-ups type nothing", () => {
-  expect(streamMessage({ kind: "key", type: "keyDown", key: "Enter" })).toMatchObject({
-    type: "input_keyboard",
-    eventType: "keyDown",
-    key: "Enter",
-    text: "\r",
-    windowsVirtualKeyCode: 13,
-  });
-  expect(streamMessage({ kind: "key", type: "keyDown", key: "Tab" })).not.toHaveProperty("text");
-  expect(streamMessage({ kind: "key", type: "keyDown", key: "a" })).toMatchObject({
-    text: "a",
-    windowsVirtualKeyCode: 65,
-  });
-  expect(streamMessage({ kind: "key", type: "keyDown", key: "a", modifiers: 2 })).not.toHaveProperty("text");
-  expect(streamMessage({ kind: "key", type: "keyUp", key: "a" })).not.toHaveProperty("text");
-  expect(streamMessage({ kind: "mouse", type: "mousePressed", x: 10, y: 20 })).toEqual({
-    type: "input_mouse",
-    eventType: "mousePressed",
-    x: 10,
-    y: 20,
-    button: "left",
-    clickCount: 1,
-    deltaX: 0,
-    deltaY: 0,
-    modifiers: 0,
-  });
-  expect(streamMessage({ kind: "touch", type: "touchStart", touchPoints: [{ x: 1, y: 2 }] })).toMatchObject({
-    type: "input_touch",
-    eventType: "touchStart",
-  });
-  expect(streamMessage({ kind: "text", text: "olá" })).toBeNull();
+test("relay input: clicks as input_mouse, keys through press (chords), text inserted, taps as clicks", () => {
+  const state: InputState = { held: new Set() };
+  expect(relayCommands({ kind: "mouse", type: "mousePressed", x: 10, y: 20 }, state)).toEqual([
+    {
+      action: "input_mouse",
+      type: "mousePressed",
+      x: 10,
+      y: 20,
+      button: "left",
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    },
+  ]);
+  expect(relayCommands({ kind: "key", type: "keyDown", key: "Enter" }, state)).toEqual([
+    { action: "press", key: "Enter" },
+  ]);
+  // press already released it.
+  expect(relayCommands({ kind: "key", type: "keyUp", key: "Enter" }, state)).toEqual([]);
+  expect(relayCommands({ kind: "key", type: "keyDown", key: "a", modifiers: 2 }, state)).toEqual([
+    { action: "press", key: "Control+a" },
+  ]);
+  expect(relayCommands({ kind: "key", type: "keyDown", key: "A", modifiers: 8 }, state)).toEqual([
+    { action: "press", key: "A" },
+  ]);
+  // A modifier on its own is held and released as raw keys; an unmatched release sends nothing.
+  expect(relayCommands({ kind: "key", type: "keyDown", key: "Shift", code: "ShiftLeft" }, state)).toEqual([
+    { action: "input_keyboard", type: "keyDown", key: "Shift", code: "ShiftLeft" },
+  ]);
+  expect(relayCommands({ kind: "key", type: "keyUp", key: "Shift" }, state)).toEqual([
+    { action: "input_keyboard", type: "keyUp", key: "Shift" },
+  ]);
+  expect(relayCommands({ kind: "key", type: "keyUp", key: "Shift" }, state)).toEqual([]);
+  expect(relayCommands({ kind: "text", text: "olá" }, state)).toEqual([
+    { action: "keyboard", subaction: "insertText", text: "olá" },
+  ]);
+  const tap = relayCommands({ kind: "touch", type: "touchStart", touchPoints: [{ x: 1, y: 2 }] }, state);
+  expect(tap.map((c) => [c.type, c.x, c.y, c.button])).toEqual([
+    ["mouseMoved", 1, 2, "none"],
+    ["mousePressed", 1, 2, "left"],
+  ]);
+  // The release has no points: it lands where the touch was.
+  expect(relayCommands({ kind: "touch", type: "touchEnd", touchPoints: [] }, state)).toMatchObject([
+    { action: "input_mouse", type: "mouseReleased", x: 1, y: 2, button: "left" },
+  ]);
 });
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -476,23 +492,99 @@ test.if(posix)("a stream that closes on the machine says so; one dropped with th
   expect(t.frames).toHaveLength(count);
 });
 
-test.if(posix)("a person's input goes over the stream; whole text goes through stdin", async () => {
+/** agent-browser's command relay on the stream port: records each command and answers like the daemon. */
+function fakeRelay(answer: (body: Record<string, unknown>) => Record<string, unknown> = () => ({ success: true })) {
+  const received: { body: Record<string, unknown>; origin: string | null; type: string | null; path: string }[] = [];
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    async fetch(req) {
+      const body = (await req.json()) as Record<string, unknown>;
+      received.push({
+        body,
+        origin: req.headers.get("origin"),
+        type: req.headers.get("content-type"),
+        path: new URL(req.url).pathname,
+      });
+      // A little delay so out-of-order sends would show.
+      await Bun.sleep(body.type === "mousePressed" ? 15 : 1);
+      return Response.json({ data: { dispatched: body.type ?? body.action }, ...answer(body) });
+    },
+  });
+  return { server, received, port: server.port as number };
+}
+
+test.if(posix)("a person's input goes through the daemon's command relay, in order, confirmed", async () => {
   const t = setup();
-  await t.act("open", ["https://shop.example.com"]);
-  expect(await errorCode(() => t.manager.input(dev, [{ kind: "text", text: "x" }]))).toBe("bad_request");
-  await t.manager.streamStart(dev, "control");
-  const socket = t.sockets[0] as FakeSocket;
-  const res = await t.manager.input(dev, [
-    { kind: "mouse", type: "mousePressed", x: 5, y: 6, button: "left", clickCount: 1 },
-    { kind: "key", type: "keyDown", key: "Enter" },
-    { kind: "text", text: "senha-ção" },
-    { kind: "nonsense" },
-  ]);
-  expect(res).toEqual({ accepted: 3 });
-  expect(socket.sent.map((m) => m.type)).toEqual(["input_mouse", "input_keyboard"]);
-  const typed = t.logged().find((c) => c.args.includes("batch"));
-  expect(JSON.parse(typed?.stdin ?? "[]")).toEqual([["keyboard", "inserttext", "senha-ção"]]);
-  expect(typed?.args.join(" ")).not.toContain("senha");
+  const relay = fakeRelay();
+  try {
+    await t.act("open", ["https://shop.example.com"]);
+    t.page({ port: relay.port });
+    expect(await errorCode(() => t.manager.input(dev, [{ kind: "text", text: "x" }]))).toBe("bad_request");
+    await t.manager.streamStart(dev, "control");
+    const socket = t.sockets[0] as FakeSocket;
+    const res = await t.manager.input(dev, [
+      { kind: "mouse", type: "mouseMoved", x: 5, y: 6 },
+      { kind: "mouse", type: "mousePressed", x: 5, y: 6, button: "left", clickCount: 1 },
+      { kind: "mouse", type: "mouseReleased", x: 5, y: 6, button: "left", clickCount: 1 },
+      { kind: "key", type: "keyDown", key: "Enter" },
+      { kind: "key", type: "keyUp", key: "Enter" },
+      { kind: "text", text: "senha-ção" },
+      { kind: "nonsense" },
+    ]);
+    expect(res).toEqual({ accepted: 6 });
+    // Nothing goes over the stream socket but the frame rate.
+    expect(socket.sent).toEqual([]);
+    expect(relay.received.map((r) => r.path)).toEqual(Array(5).fill("/api/command"));
+    expect(relay.received.map((r) => r.origin)).toEqual(Array(5).fill(`http://127.0.0.1:${relay.port}`));
+    expect(relay.received.every((r) => r.type === "application/json")).toBe(true);
+    expect(relay.received.map((r) => r.body.type ?? r.body.action)).toEqual([
+      "mouseMoved",
+      "mousePressed",
+      "mouseReleased",
+      "press",
+      "keyboard",
+    ]);
+    expect(relay.received[1]?.body).toMatchObject({ action: "input_mouse", x: 5, y: 6, button: "left", clickCount: 1 });
+    expect(relay.received[3]?.body).toMatchObject({ action: "press", key: "Enter" });
+    expect(relay.received[4]?.body).toMatchObject({ subaction: "insertText", text: "senha-ção" });
+    expect(new Set(relay.received.map((r) => r.body.id)).size).toBe(5);
+    // Never typed text on a command line.
+    expect(t.logged().some((c) => c.args.join(" ").includes("senha") || c.stdin.includes("senha"))).toBe(false);
+    // Two batches sent at once still reach the browser in the order they came.
+    relay.received.length = 0;
+    await Promise.all([
+      t.manager.input(dev, [{ kind: "mouse", type: "mousePressed", x: 1, y: 1 }]),
+      t.manager.input(dev, [{ kind: "mouse", type: "mouseReleased", x: 1, y: 1 }]),
+    ]);
+    expect(relay.received.map((r) => r.body.type)).toEqual(["mousePressed", "mouseReleased"]);
+  } finally {
+    relay.server.stop(true);
+  }
+});
+
+test.if(posix)("input the browser doesn't confirm is counted as failed", async () => {
+  const t = setup();
+  const relay = fakeRelay((body) =>
+    body.type === "mousePressed" ? { success: false, error: "Browser not launched" } : {},
+  );
+  try {
+    await t.act("open", ["https://shop.example.com"]);
+    t.page({ port: relay.port });
+    await t.manager.streamStart(dev, "control");
+    const res = await t.manager.input(dev, [
+      { kind: "mouse", type: "mousePressed", x: 1, y: 1 },
+      { kind: "mouse", type: "mouseReleased", x: 1, y: 1 },
+    ]);
+    expect(res).toEqual({ accepted: 1, failed: 1 });
+    // The stream ended: the rest of a batch is not sent to a browser that isn't there.
+    (t.sockets[0] as FakeSocket).close();
+    relay.received.length = 0;
+    expect(await errorCode(() => t.manager.input(dev, [{ kind: "text", text: "x" }]))).toBe("bad_request");
+    expect(relay.received).toEqual([]);
+  } finally {
+    relay.server.stop(true);
+  }
 });
 
 // ── Readiness ────────────────────────────────────────────────────────────────

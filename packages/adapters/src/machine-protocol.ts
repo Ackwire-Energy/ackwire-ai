@@ -677,7 +677,8 @@ export interface MachineReplies {
   "browser.stream.start": { mode: BrowserStreamMode };
   "browser.stream.stop": { stopped: boolean };
   /** Events sent to the page. */
-  "browser.input": { accepted: number };
+  /** `failed`: events the browser didn't confirm (absent when all went through). */
+  "browser.input": { accepted: number; failed?: number };
 }
 
 /** Error codes the runner reports; the message is for people. */
