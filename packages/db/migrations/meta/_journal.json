@@ -547,6 +547,13 @@
       "when": 1792460000000,
       "tag": "0077_thread_assessment",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1792470000000,
+      "tag": "0078_brain_session_on_runs",
+      "breakpoints": true
     }
   ]
 }

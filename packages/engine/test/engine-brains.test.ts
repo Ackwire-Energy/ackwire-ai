@@ -30,8 +30,11 @@ import {
   type MachineStatus,
   notePlanLimit,
   postPersonMessage,
+  resolveBrain,
   resumeRunsWaitingForMachine,
   runWhere,
+  SESSION_IDLE_MS,
+  SESSION_MAX_INPUT_TOKENS,
   type ToolSource,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -191,13 +194,15 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
   expect(system).toContain(COMPUTER_TOOLS_NOTE);
   expect(system).not.toContain("Beyond this, you can't.");
   expect(seen[0]?.model).toBe("sonnet");
+  const [run] = await f.db.select().from(schema.agentRuns);
+  // A new session for this run, kept on it (a pause resumes the same one).
   expect(seen[0]?.session).toEqual({
-    id: brainSessionId(f.agent.id, question.id, "claude_code"),
+    id: brainSessionId(f.agent.id, `${question.id}:${run?.id}`, "claude_code"),
     resume: false,
     machineId,
     cwd: "",
   });
-  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.brainSessionId).toBe(seen[0]?.session?.id ?? "");
   expect(run?.status).toBe("done");
   const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
   expect(thread.map((m) => m.body)).toEqual(["@dev roda os testes", "Rodei os testes: tudo verde."]);
@@ -217,6 +222,62 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
     .where(eq(schema.runToolTokens.runId, run?.id ?? ""));
   expect(tokens.length).toBe(1);
   expect(tokens[0]?.revokedAt).not.toBeNull();
+});
+
+test("computer sessions: the conversation's session goes on while recent and small; a big, idle or routine one starts fresh", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  let input = 40;
+  const { brain, seen } = scriptedComputerBrain(() => [
+    { type: "usage", input, output: 5, source: "plan", model: "claude-sonnet-5-5" },
+    { type: "done", text: "ok" },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const question = await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const reply = (body: string) =>
+    postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body,
+      threadId: question.id,
+    });
+
+  // Small and recent: the next turn in the thread resumes it.
+  await reply("@dev e agora?");
+  await drainOutbox(f.db, handlers);
+  expect(seen[1]?.session).toMatchObject({ id: seen[0]?.session?.id, resume: true });
+
+  // That turn read too much: a fresh session.
+  input = SESSION_MAX_INPUT_TOKENS;
+  await reply("@dev mais uma");
+  await drainOutbox(f.db, handlers);
+  input = 40;
+  await reply("@dev e essa?");
+  await drainOutbox(f.db, handlers);
+  expect(seen[3]?.session?.resume).toBe(false);
+  expect(seen[3]?.session?.id).not.toBe(seen[2]?.session?.id);
+
+  // Idle past the cache: a fresh one too.
+  const stale = new Date(Date.now() - SESSION_IDLE_MS - 1000);
+  await f.db.update(schema.agentRuns).set({ finishedAt: stale, updatedAt: stale });
+  await reply("@dev voltei");
+  await drainOutbox(f.db, handlers);
+  expect(seen[4]?.session?.resume).toBe(false);
+  expect(seen[4]?.session?.id).not.toBe(seen[3]?.session?.id);
+
+  // A routine run never picks up the conversation's session.
+  const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+  const runs = await f.db.select().from(schema.agentRuns);
+  const last = runs.find((r) => r.brainSessionId === seen[4]?.session?.id);
+  if (!agent || !last) throw new Error("missing rows");
+  const routineRun = { ...last, id: Bun.randomUUIDv7(), brainSessionId: null };
+  await f.db.insert(schema.agentRuns).values({ ...routineRun, triggerMessageId: Bun.randomUUIDv7() });
+  const plan = await resolveBrain({ db: f.db }, agent, routineRun, question.id, { fresh: true });
+  expect(plan.session).toMatchObject({ resume: false, machineId });
+  expect(plan.session?.id).not.toBe(seen[4]?.session?.id);
 });
 
 test("a gated call through the bridge leaves the run waiting; the decision resumes the session with the result", async () => {

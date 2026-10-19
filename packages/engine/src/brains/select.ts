@@ -1,5 +1,5 @@
 import { BRAIN_PROTOCOL } from "@agenteschat/adapters";
-import { and, type Executor, eq, schema } from "@agenteschat/db";
+import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
@@ -154,12 +154,17 @@ export function brainModelFor(
   return mission?.model ?? agentModel ?? DEFAULT_MODELS[kind];
 }
 
+/** A conversation's session is picked up again only this soon after its last turn (its prompt cache is gone after). */
+export const SESSION_IDLE_MS = 60 * 60_000;
 /**
- * Whether this agent already thought with this brain in this conversation
- * (plan usage is recorded per run): then the session exists on the machine
- * and the turn resumes it. A hint: the runner checks its own disk.
+ * …and only while its last turn read less than this (input + cache, summed
+ * over the turn's model calls): past it every turn re-reads a huge history,
+ * so a fresh session starts with the recent messages instead.
  */
-async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, conversation: string) {
+export const SESSION_MAX_INPUT_TOKENS = 150_000;
+
+/** Whether a session already ran on the machine (plan usage recorded for one of its runs): resume it. A hint: the runner checks its own disk. */
+async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, sessionId: string) {
   const { agentRuns, usageRecords } = schema;
   const [row] = await db
     .select({ id: usageRecords.id })
@@ -170,13 +175,70 @@ async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, convers
         eq(usageRecords.orgId, run.orgId),
         eq(usageRecords.agentId, run.agentId),
         eq(usageRecords.provider, kind),
-        eq(agentRuns.channelId, run.channelId),
-        // A flat conversation (a DM) is the channel itself; a thread is its root.
-        ...(conversation === run.channelId ? [] : [eq(agentRuns.threadRootId, conversation)]),
+        eq(agentRuns.brainSessionId, sessionId),
       ),
     )
     .limit(1);
   return Boolean(row);
+}
+
+/**
+ * The computer brain's session for a run (stored on the run, so a pause
+ * resumes the same one): the conversation's previous session while it is
+ * recent and small, else a fresh one. A routine run always starts fresh
+ * (each firing is its own task; resuming made one routine re-read 700k tokens).
+ */
+async function sessionFor(
+  db: Executor,
+  agent: Agent,
+  run: AgentRun,
+  kind: BrainKind,
+  conversation: string,
+  options: { fresh?: boolean },
+  now: Date,
+): Promise<{ id: string; resume: boolean }> {
+  if (run.brainSessionId) {
+    return { id: run.brainSessionId, resume: await sessionUsed(db, run, kind, run.brainSessionId) };
+  }
+  let id: string | null = null;
+  if (!options.fresh) {
+    const { agentRuns, usageRecords } = schema;
+    const [last] = await db
+      .select({
+        id: agentRuns.id,
+        sessionId: agentRuns.brainSessionId,
+        at: sql<Date>`coalesce(${agentRuns.finishedAt}, ${agentRuns.updatedAt})`.mapWith(
+          (v: string | Date) => new Date(v),
+        ),
+        // Qualified by hand: inside the subquery a bare "id" would be usage_records.id.
+        input: sql<number>`coalesce((select max(u.input_tokens) from ${usageRecords} u
+          where u.run_id = "agent_runs"."id" and u.provider = ${kind}), 0)`.mapWith(Number),
+      })
+      .from(agentRuns)
+      .where(
+        and(
+          eq(agentRuns.orgId, run.orgId),
+          eq(agentRuns.agentId, run.agentId),
+          eq(agentRuns.channelId, run.channelId),
+          // A flat conversation (a DM) is the channel itself; a thread is its root.
+          ...(conversation === run.channelId ? [] : [eq(agentRuns.threadRootId, conversation)]),
+          isNotNull(agentRuns.brainSessionId),
+          ne(agentRuns.id, run.id),
+        ),
+      )
+      .orderBy(desc(agentRuns.createdAt))
+      .limit(1);
+    if (
+      last?.sessionId &&
+      now.getTime() - last.at.getTime() < SESSION_IDLE_MS &&
+      last.input < SESSION_MAX_INPUT_TOKENS
+    ) {
+      id = last.sessionId;
+    }
+  }
+  const sessionId = id ?? brainSessionId(agent.id, `${conversation}:${run.id}`, kind);
+  await db.update(schema.agentRuns).set({ brainSessionId: sessionId }).where(eq(schema.agentRuns.id, run.id));
+  return { id: sessionId, resume: id ? await sessionUsed(db, run, kind, sessionId) : false };
 }
 
 /**
@@ -194,6 +256,8 @@ export async function resolveBrain(
   agent: Agent,
   run: AgentRun,
   conversation: string,
+  /** `fresh`: a new computer session whatever the conversation had (routine runs). */
+  options: { fresh?: boolean; now?: Date } = {},
 ): Promise<BrainPlan> {
   const mission: MissionTurn | null = await missionTurnFor(deps.db, run).catch(() => null);
   const kind = brainFor(agent, run, mission);
@@ -207,8 +271,7 @@ export async function resolveBrain(
     mission?.session ??
     (machineId
       ? {
-          id: brainSessionId(agent.id, conversation, kind),
-          resume: await sessionUsed(deps.db, run, kind, conversation).catch(() => false),
+          ...(await sessionFor(deps.db, agent, run, kind, conversation, options, options.now ?? new Date())),
           machineId,
           cwd: "",
         }

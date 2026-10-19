@@ -124,6 +124,13 @@ export const agentRuns = pgTable(
      * back (`resumeRunsWaitingForMachine`). Null otherwise.
      */
     waitingMachineId: uuid(),
+    /**
+     * The computer brain's session this run thinks in (Claude Code/Codex):
+     * kept for the whole run (a pause resumes it), carried to the next run in
+     * the conversation while it is recent and small, else a fresh one
+     * (`resolveBrain`). Null for the model brain.
+     */
+    brainSessionId: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),

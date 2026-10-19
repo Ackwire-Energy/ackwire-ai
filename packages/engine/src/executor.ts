@@ -819,7 +819,7 @@ async function executeRunInner(
   // Who (§5): the mission's brain in its thread, else the agent's; a computer brain that can't answer now
   // falls back to the model brain when a model credential exists, else the message waits for the computer.
   const turnToken = { current: "" };
-  brainPlan = await resolveBrain(deps, agent, run, replyThreadId ?? run.channelId);
+  brainPlan = await resolveBrain(deps, agent, run, replyThreadId ?? run.channelId, { fresh: Boolean(viaRoutine) });
   let plan: BrainPlan = brainPlan;
   let brain = createBrain(deps, agent, run, plan.kind, turnToken, () => transcript as Transcript);
   let triggerText = trigger?.body ?? topTrigger?.body ?? "";
