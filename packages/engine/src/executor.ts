@@ -867,7 +867,14 @@ async function executeRunInner(
       ? await db.transaction(async (tx) => {
           const m = await post(tx, replyThreadId, `${u.message} I'll answer when it's back.`, {
             ...bodyCode("brain_unavailable", { brain: name }),
-            brainUnavailable: { brain: from, code: u.code, ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}) },
+            // `machineId` and `agentId`: the app shows the note as a live "waiting" card tied to the computer's outage.
+            brainUnavailable: {
+              brain: from,
+              code: u.code,
+              machineId,
+              agentId: agent.id,
+              ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}),
+            },
           });
           t.postedCount++;
           return m;

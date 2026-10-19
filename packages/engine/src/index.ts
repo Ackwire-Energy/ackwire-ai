@@ -77,6 +77,7 @@ export * from "./judge";
 export * from "./machine-access";
 export * from "./machine-device";
 export * from "./machine-hub";
+export * from "./machine-outages";
 export * from "./machine-provider";
 export * from "./machine-tasks";
 export * from "./machines";

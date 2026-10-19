@@ -6,8 +6,10 @@ import {
   deleteMachine,
   denyDeviceCode,
   getDeviceCode,
+  listMachineOutages,
   listMachines,
   machineOrgLogo,
+  moveAgentsFromMachine,
   pollDeviceToken,
   receiveMachineUpload,
   reduceMachineAccess,
@@ -106,6 +108,74 @@ const DeviceCode = z
   .openapi("MachineDeviceCode");
 
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
+
+const ComputerBrain = z.enum(["claude_code", "codex"]);
+const Platform = z
+  .string()
+  .openapi({ description: "`mac`, `windows`, `linux`, `cloud`, or the runner's `os` as reported." });
+
+const MachineOutage = z
+  .object({
+    machineId: z.uuid(),
+    name: z.string(),
+    platform: Platform,
+    offlineSince: z.string().openapi({ description: "ISO time of its last sign of life." }),
+    agents: z.array(
+      z.object({
+        agentId: z.uuid(),
+        name: z.string(),
+        brain: ComputerBrain,
+        waiting: z.object({
+          routines: z.number().int().openapi({ description: "Routine runs waiting for this computer." }),
+          conversations: z.number().int().openapi({ description: "Other runs (messages) waiting for it." }),
+        }),
+      }),
+    ),
+    waitingRuns: z.number().int().openapi({ description: "Runs of these agents waiting for this computer." }),
+  })
+  .openapi("MachineOutage");
+
+const OutageTarget = z
+  .union([
+    z.object({
+      kind: z.literal("machine"),
+      machineId: z.uuid(),
+      name: z.string(),
+      platform: Platform,
+      online: z.boolean(),
+      brains: z.array(ComputerBrain).openapi({ description: "Computer brains it can run (`brainOptions`)." }),
+      reasonOff: z
+        .string()
+        .nullable()
+        .openapi({ description: "Why it can't take agents now: `offline`, `paused`; null when it can." }),
+    }),
+    z.object({
+      kind: z.literal("cloud"),
+      available: z.boolean().openapi({ description: "A cloud sandbox provider is configured on this server." }),
+      brains: z
+        .array(ComputerBrain)
+        .openapi({ description: "Always empty: Claude Code and Codex agents need a connected computer." }),
+    }),
+  ])
+  .openapi("OutageTarget");
+
+const MoveTarget = z.union([
+  z.object({ kind: z.literal("machine"), machineId: z.uuid() }),
+  z.object({ kind: z.literal("cloud") }),
+]);
+
+const MoveAgentsResult = z
+  .object({
+    moved: z.array(z.uuid()),
+    skipped: z.array(
+      z.object({ agentId: z.string(), reason: z.enum(["brain_unavailable", "forbidden", "not_found"]) }),
+    ),
+    resumed: z.number().int().openapi({ description: "Waiting runs queued again on the new computer." }),
+    stillWaiting: z.number().int().openapi({
+      description: "Waiting runs that stay with the old computer (their cut-off turn already ran tools there).",
+    }),
+  })
+  .openapi("MoveAgentsResult");
 
 /**
  * Connected computers in the web app (ADR 0025, ADR 0036): list, confirm or
@@ -265,6 +335,51 @@ export function machineAppRoutes(deps: AppDeps) {
       const { orgId, machineId } = c.req.valid("param");
       await deleteMachine({ db, pubsub }, c.get("user").id, orgId, machineId);
       return c.body(null, 204);
+    },
+  );
+
+  const outageDeps = () => ({ db, pubsub, cloudAvailable: Boolean(deps.extras?.sandbox?.provider) });
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/machines/outages",
+      tags,
+      security,
+      summary:
+        "Offline computers that some agents think on, with the agents this person may move, and where they could go",
+      description:
+        "Changes come as `machine.status` and `machine.agents_moved` org events; clients also poll while an outage is shown.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(z.object({ outages: z.array(MachineOutage), targets: z.array(OutageTarget) })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await listMachineOutages(outageDeps(), c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/machines/{machineId}/move-agents",
+      tags,
+      security,
+      summary:
+        'Move agents off this computer ("Trocar computador"): admins any agent, others their own; waiting runs go on there',
+      request: {
+        params: MachineParams,
+        body: body(z.object({ agentIds: z.array(z.uuid()).min(1).max(100), target: MoveTarget })),
+      },
+      responses: { 200: json(MoveAgentsResult), ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId } = c.req.valid("param");
+      const result = await moveAgentsFromMachine(outageDeps(), c.get("user").id, orgId, machineId, c.req.valid("json"));
+      return c.json(result, 200);
     },
   );
 
