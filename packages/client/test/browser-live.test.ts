@@ -11,9 +11,11 @@ import {
   createBrowserLiveConnection,
   createBrowserWatches,
   fitFrame,
+  frameMetadata,
   framePoint,
   handoffFuse,
   handoffMinutesLeft,
+  jpegSize,
   keyboardEvents,
   keyEvents,
   modifiersOf,
@@ -440,5 +442,44 @@ describe("the agent's site for the card", () => {
     expect(browserSiteUrl("about:blank", steps)).toBe("viajolo.example");
     expect(browserSiteUrl("https://www.viajolo.example/pt", steps)).toBe("https://www.viajolo.example/pt");
     expect(browserSiteUrl(null, [])).toBeNull();
+  });
+});
+
+describe("the frame's real size", () => {
+  // A JPEG's start: SOI, then a start-of-frame segment with height 577 and width 1280.
+  const jpeg = (width: number, height: number) =>
+    btoa(
+      String.fromCharCode(
+        0xff,
+        0xd8,
+        0xff,
+        0xc0,
+        0x00,
+        0x11,
+        0x08,
+        height >> 8,
+        height & 255,
+        width >> 8,
+        width & 255,
+        3,
+        0,
+        0,
+        0,
+      ),
+    );
+
+  test("reads the size from the picture", () => {
+    expect(jpegSize(jpeg(1280, 577))).toEqual({ width: 1280, height: 577 });
+    expect(jpegSize("not a jpeg")).toBeNull();
+  });
+
+  test("a stream that reports 720 for a 577-high page maps clicks to the page, not a quarter lower", () => {
+    const meta = frameMetadata({ data: jpeg(1280, 577), metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+    expect(meta.deviceHeight).toBe(577);
+    // The middle of a 640×288.5 picture is the middle of the page.
+    expect(pagePoint({ x: 320, y: 144 }, { left: 0, top: 0, width: 640, height: 288.5 }, meta)).toEqual({
+      x: 640,
+      y: 288,
+    });
   });
 });

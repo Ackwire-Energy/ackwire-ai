@@ -7185,6 +7185,7 @@ export const en: Translations = {
       done: "Done",
       handBack: "Hand back",
       couldnt: "I couldn't",
+      giveUp: "Give up",
       otherHelp: "{{person}} is in control. You're watching.",
       helpingHere: "You're helping · in this card",
       helpingOther: "{{person}} is helping · in this card",

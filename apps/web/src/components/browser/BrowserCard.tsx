@@ -3,6 +3,7 @@ import {
   browserSiteUrl,
   browserSteps,
   clickEvents,
+  frameMetadata,
   isOpenHandoff,
   keyboardEvents,
   keyEvents,
@@ -189,7 +190,7 @@ export function BrowserCard({
 
   const onPageClick = (e: MouseEvent<HTMLImageElement>) => {
     const img = imgRef.current;
-    const meta = live.frame?.metadata;
+    const meta = live.frame ? frameMetadata(live.frame) : undefined;
     if (!inControl || !img || !meta) return;
     const box = img.getBoundingClientRect();
     const at = pagePoint({ x: e.clientX, y: e.clientY }, box, meta);
@@ -200,7 +201,7 @@ export function BrowserCard({
 
   const onPageWheel = (e: WheelEvent<HTMLImageElement>) => {
     const img = imgRef.current;
-    const meta = live.frame?.metadata;
+    const meta = live.frame ? frameMetadata(live.frame) : undefined;
     if (!inControl || !img || !meta) return;
     const at = pagePoint({ x: e.clientX, y: e.clientY }, img.getBoundingClientRect(), meta);
     if (at) send([wheelEvent(at, e.deltaX, e.deltaY)]);
@@ -379,6 +380,18 @@ export function BrowserCard({
         <span className="brw-ac__acts">
           {inControl ? (
             <>
+              {ask && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setOpen(true);
+                    setFailing(true);
+                  }}
+                >
+                  {t("browser.inCard.giveUp")}
+                </Button>
+              )}
               <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
                 {ask ? t("browser.inCard.done") : t("browser.inCard.handBack")}
               </Button>

@@ -7205,6 +7205,7 @@ export const ptBR = {
       done: "Pronto",
       handBack: "Devolver",
       couldnt: "Não consegui",
+      giveUp: "Desistir",
       otherHelp: "{{person}} está no controle. Você só assiste.",
       helpingHere: "Você está ajudando · neste card",
       helpingOther: "{{person}} está ajudando · neste card",

@@ -5,6 +5,7 @@ import {
   clickEvents,
   createBrowserLiveConnection,
   fitFrame,
+  frameMetadata,
   framePoint,
   keyEvents,
   textEvent,
@@ -42,11 +43,12 @@ export function FrameView({
       accessibilityLabel={t("mobile.browser.live.page")}
       onPress={(e) => {
         // The picture is drawn "contain": a tap on the letterbox around it is ignored.
-        const fit = fitFrame(view, frame.metadata);
+        const meta = frameMetadata(frame);
+        const fit = fitFrame(view, meta);
         const p = framePoint(
           { x: e.nativeEvent.locationX - fit.left, y: e.nativeEvent.locationY - fit.top },
           fit,
-          frame.metadata,
+          meta,
         );
         if (!p) return;
         tapHaptic();

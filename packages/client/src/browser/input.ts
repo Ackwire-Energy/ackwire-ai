@@ -10,6 +10,49 @@ import type { BrowserFrameMetadata, BrowserInputEvent, BrowserModifiers } from "
  * → page coordinates (CSS pixels of the viewport the frame was taken at).
  * Null when the point is outside the frame or the frame has no size.
  */
+/** A JPEG's pixel size from its base64 data (the start of the file is enough), or null. */
+export function jpegSize(base64: string): { width: number; height: number } | null {
+  let bytes: Uint8Array;
+  try {
+    const head = atob(base64.slice(0, 65536 - (65536 % 4)));
+    bytes = Uint8Array.from(head, (c) => c.charCodeAt(0));
+  } catch {
+    return null;
+  }
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  let i = 2;
+  while (i + 9 < bytes.length) {
+    if (bytes[i] !== 0xff) {
+      i += 1;
+      continue;
+    }
+    const marker = bytes[i + 1] ?? 0;
+    const length = ((bytes[i + 2] ?? 0) << 8) | (bytes[i + 3] ?? 0);
+    // Start of frame (baseline, extended, progressive, lossless): height then width.
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      const height = ((bytes[i + 5] ?? 0) << 8) | (bytes[i + 6] ?? 0);
+      const width = ((bytes[i + 7] ?? 0) << 8) | (bytes[i + 8] ?? 0);
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    i += 2 + length;
+  }
+  return null;
+}
+
+/**
+ * The page size a frame shows, for mapping clicks. The stream's `deviceHeight` can be the
+ * window's height while the page area is shorter (1280×720 reported, 1280×577 drawn), which
+ * put every click a quarter lower than aimed; the picture's own aspect is the truth.
+ */
+export function frameMetadata(frame: { data: string; metadata: BrowserFrameMetadata }): BrowserFrameMetadata {
+  const size = jpegSize(frame.data);
+  if (!size || frame.metadata.deviceWidth <= 0) return frame.metadata;
+  return {
+    ...frame.metadata,
+    deviceHeight: Math.round((frame.metadata.deviceWidth * size.height) / size.width),
+  };
+}
+
 export function framePoint(
   point: { x: number; y: number },
   shown: { width: number; height: number },
