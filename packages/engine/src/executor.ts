@@ -583,6 +583,7 @@ async function executeRunInner(
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),
         trigger,
+        routine: Boolean(viaRoutine),
       }),
       contextDeps
         ? retrieveForRun(contextDeps, {
@@ -590,9 +591,11 @@ async function executeRunInner(
             agentId: agent.id,
             channelId: run.channelId,
             text: trigger?.body ?? "",
+            known: agent.instructions,
           }).catch(() => ({ text: "", itemIds: [] as string[] }))
         : Promise.resolve({ text: "", itemIds: [] as string[] }),
-      readsWiki
+      // A routine's instructions name what it checks; the wiki stays one `read_wiki_page` away.
+      readsWiki && !viaRoutine
         ? retrieveWikiForRun(
             { db, search: contextDeps },
             { orgId: run.orgId, agentId: agent.id, text: trigger?.body ?? "" },
@@ -1105,6 +1108,8 @@ async function executeRunInner(
                   ...(u.model ? { model: u.model } : {}),
                   inputTokens: u.input,
                   outputTokens: u.output,
+                  cacheReadTokens: u.cacheRead ?? 0,
+                  cacheWriteTokens: u.cacheWrite ?? 0,
                 }),
               ),
             onLimit: (resetsAt) => {
@@ -1647,7 +1652,7 @@ async function thinkOnce(
   onDelta: (text: string) => void,
   hooks: {
     /** Usage on a person's plan (computer brains): recorded with cost zero (`recordPlanUsage`). */
-    onUsage?(usage: { input: number; output: number; model?: string }): void;
+    onUsage?(usage: { input: number; output: number; model?: string; cacheRead?: number; cacheWrite?: number }): void;
     onLimit?(resetsAt?: string): void;
     /** A call the brain already ran (through the bridge, or its own tools). */
     onExecuted?(call: { id: string; name: string }): void;

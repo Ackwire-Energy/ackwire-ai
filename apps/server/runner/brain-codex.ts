@@ -54,7 +54,16 @@ export type CodexBrainEvent =
       input: unknown;
       executed?: { content: string; isError?: boolean };
     }
-  | { type: "usage"; input: number; output: number; source: "api" | "plan"; model?: string }
+  | {
+      type: "usage";
+      /** Every input token the turn read (cache included); `cacheRead`/`cacheWrite` say how much of it was cache. */
+      input: number;
+      output: number;
+      source: "api" | "plan";
+      model?: string;
+      cacheRead?: number;
+      cacheWrite?: number;
+    }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
   | { type: "error"; code: string; message: string; retryable?: boolean };
@@ -258,6 +267,8 @@ export class CodexEventMapper {
             output: num(u.output_tokens),
             source: "plan",
             ...(this.opts.model ? { model: this.opts.model } : {}),
+            // Codex counts cached input inside `input_tokens`.
+            ...(num(u.cached_input_tokens) > 0 ? { cacheRead: num(u.cached_input_tokens) } : {}),
           },
         ];
       }

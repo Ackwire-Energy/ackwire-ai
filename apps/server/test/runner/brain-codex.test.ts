@@ -232,7 +232,7 @@ test.skipIf(!posix)(
     try {
       await handleCodexBrainTurn(ctx, req, { signal, emit: (e) => events.push(e) });
       expect(events).toEqual([
-        { type: "usage", input: 17806, output: 5, source: "plan" },
+        { type: "usage", input: 17806, output: 5, source: "plan", cacheRead: 6912 },
         { type: "text_delta", text: "pong" },
         { type: "done", text: "pong", session: { id: SESSION } },
       ]);

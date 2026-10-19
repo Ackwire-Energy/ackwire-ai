@@ -1,5 +1,5 @@
 import type { PubSub, SearchIndexResolver } from "@agenteschat/adapters";
-import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema } from "@agenteschat/db";
+import { and, type Database, desc, eq, gte, inArray, isNull, lt, schema } from "@agenteschat/db";
 import type { ModelGateway } from "../gateway";
 import { createLlmJudge, type Judge } from "../judge";
 import type { Message } from "../messages";
@@ -72,7 +72,7 @@ export interface ThreadView {
   agentHandles: Map<string, string>;
 }
 
-/** A thread (root + replies, oldest first) with author names. */
+/** A thread (root + its newest `limit` replies, oldest first) with author names. */
 export async function loadThread(
   db: Database,
   orgId: string,
@@ -88,8 +88,11 @@ export async function loadThread(
     .select()
     .from(messages)
     .where(and(eq(messages.orgId, orgId), eq(messages.threadId, threadRootId), isNull(messages.deletedAt)))
-    .orderBy(asc(messages.createdAt), asc(messages.id))
+    // The newest replies: past `limit` a long thread (a routine posting for days) must still end at its last message,
+    // or its summary would stay frozen on the oldest ones.
+    .orderBy(desc(messages.createdAt), desc(messages.id))
     .limit(limit);
+  replies.reverse();
   const all = [root, ...replies];
   const userIds = [...new Set(all.flatMap((m) => (m.authorUserId ? [m.authorUserId] : [])))];
   const agentIds = [...new Set(all.flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])))];
@@ -194,7 +197,11 @@ export async function ensureThreadSummary(
   return deps.db.transaction((tx) => (current ? supersede(tx, current, item) : insertContextItem(tx, item)));
 }
 
-/** A channel's summary for a period (e.g. last week), generated when that period had enough messages. */
+/**
+ * A channel's summary for a period (the last 7 days, refreshed nightly),
+ * generated when that period had enough messages. One per channel: each
+ * refresh supersedes the last, so overlapping weeks never pile up.
+ */
 export async function ensurePeriodSummary(
   deps: ContextDeps,
   orgId: string,
@@ -202,7 +209,7 @@ export async function ensurePeriodSummary(
   period: { from: Date; to: Date },
   options: { minMessages?: number } = {},
 ): Promise<ContextItem | null> {
-  const scopeId = `${channelId}:${period.from.toISOString().slice(0, 10)}`;
+  const scopeId = channelId;
   const [existing] = await deps.db
     .select()
     .from(contextItems)
@@ -226,8 +233,10 @@ export async function ensurePeriodSummary(
         lt(messages.createdAt, period.to),
       ),
     )
-    .orderBy(asc(messages.createdAt))
+    // The newest 500 of the period, oldest first (a busy week keeps its latest days).
+    .orderBy(desc(messages.createdAt))
     .limit(500);
+  rows.reverse();
   const last = rows.at(-1);
   if (!last || rows.length < (options.minMessages ?? 30)) return existing ?? null;
   if (existing?.coversUntil && existing.coversUntil >= last.createdAt) return existing;
@@ -253,7 +262,7 @@ export async function ensurePeriodSummary(
     kind: "period_summary" as const,
     scopeType: "channel" as const,
     scopeId,
-    subject: `period ${scopeId}`,
+    subject: `period ${channelId}`,
     title: `${period.from.toISOString().slice(0, 10)} → ${period.to.toISOString().slice(0, 10)}`,
     content: result.text.trim(),
     sourceIds: rows.map((m) => m.id).slice(-200),

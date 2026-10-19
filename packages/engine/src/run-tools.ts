@@ -19,6 +19,7 @@ import type { BridgeIdentity } from "./run-tool-tokens";
 import type { AgentRun } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
+import { directoryRole, resolveDirectoryTool } from "./tools/directory";
 import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
@@ -250,7 +251,18 @@ export async function invokeWithChip(
   use: { id: string; name: string; input: unknown },
 ): Promise<InvokeResult> {
   const { deps, ctx, where } = scope;
-  const def = scope.turnTools?.find((t) => t.name === use.name);
+  const listed = scope.turnTools?.find((t) => t.name === use.name);
+  // Through a big connector's directory: the chip shows the real tool (`use_tool` only points at it).
+  const role = directoryRole(listed);
+  const target =
+    role?.kind === "use" && typeof (use.input as { tool?: unknown } | undefined)?.tool === "string"
+      ? resolveDirectoryTool(role, String((use.input as { tool: string }).tool))
+      : undefined;
+  const def = target ?? listed;
+  // The bridge has no turn list (`turnTools: null`): the name the model gave is the best label there.
+  const givenTool = (use.input as { tool?: unknown } | undefined)?.tool;
+  const shownName =
+    target?.name ?? (!listed && use.name.endsWith("_use_tool") && typeof givenTool === "string" ? givenTool : use.name);
   const connector = def?.connectorLabel;
   // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
   const input = use.input as Record<string, unknown> | undefined;
@@ -263,7 +275,7 @@ export async function invokeWithChip(
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,
-    tool: use.name,
+    tool: shownName,
     ...(connector ? { connector } : {}),
     ...(detail ? { detail } : {}),
     toolUseId: use.id,

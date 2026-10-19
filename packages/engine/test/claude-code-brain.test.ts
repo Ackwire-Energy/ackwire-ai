@@ -483,3 +483,41 @@ test("restatesReaction: empty, NO_REPLY or only emoji and punctuation; any lette
     expect(restatesReaction(t)).toBe(true);
   for (const t of ["ok", "👍 feito", "Pronto!", "42", "valeu"]) expect(restatesReaction(t)).toBe(false);
 });
+
+test("plan usage is stored like API usage: uncached input apart from cache reads and writes, same total", async () => {
+  f = await setup();
+  const fx = f;
+  const msg = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+    body: "hi",
+  });
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId: msg.id,
+      triggerMessageId: msg.id,
+      trigger: "mention",
+      hop: 1,
+    })
+    .returning();
+  const base = { orgId: fx.org.id, agentId: fx.agent.id, runId: run?.id ?? "", provider: "claude_code" };
+  const id = await recordPlanUsage(fx.db, {
+    ...base,
+    inputTokens: 100_000,
+    outputTokens: 300,
+    cacheReadTokens: 90_000,
+    cacheWriteTokens: 8_000,
+  });
+  // An older runner sends only the total.
+  const old = await recordPlanUsage(fx.db, { ...base, inputTokens: 5_000, outputTokens: 10 });
+  const rows = await fx.db.select().from(schema.usageRecords);
+  expect(rows.find((r) => r.id === id)).toMatchObject({
+    inputTokens: 2_000,
+    cacheReadTokens: 90_000,
+    cacheWriteTokens: 8_000,
+    costNanoUsd: 0,
+  });
+  expect(rows.find((r) => r.id === old)).toMatchObject({ inputTokens: 5_000, cacheReadTokens: 0 });
+});

@@ -69,6 +69,27 @@ type ActionRow = {
 };
 
 /** Reads that would crowd "your recent work" (the actions themselves are what matters). */
+/** At most this many lines of "Recent actions" and of "Your recent work", after repeats are folded. */
+const RECENT_ACTIONS_MAX = 12;
+const WORK_ELSEWHERE_MAX = 10;
+
+/**
+ * The same call with the same result, repeated (a routine checking every 30
+ * minutes), as one line: "(12 times)" at the place of its latest occurrence.
+ * `entries` are oldest first; the newest `max` lines are kept.
+ */
+export function collapseRepeats(entries: { key: string; line: string }[], max: number): string[] {
+  const latest = new Map<string, { line: string; count: number; at: number }>();
+  entries.forEach((e, i) => {
+    const seen = latest.get(e.key);
+    latest.set(e.key, { line: e.line, count: (seen?.count ?? 0) + 1, at: i });
+  });
+  return [...latest.values()]
+    .sort((a, b) => a.at - b.at)
+    .slice(-max)
+    .map((e) => (e.count > 1 ? `${e.line} (${e.count} times)` : e.line));
+}
+
 const QUIET_TOOLS = [
   "ask_user",
   "react",
@@ -126,6 +147,8 @@ export async function buildRunContext(
     /** `find_agent` is available: name the other agents in "# Your team" (D54). */
     team?: boolean;
     trigger?: Message;
+    /** A routine started the run: its own task, so no "Your recent work" from other conversations. */
+    routine?: boolean;
   },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
@@ -281,7 +304,7 @@ export async function buildRunContext(
                 : sql`and r.thread_root_id = ${run.threadRootId}::uuid`
           }
           and r.id <> ${run.id}::uuid and s.kind = 'tool_result'
-        order by s.created_at desc limit 12)
+        order by s.created_at desc limit 40)
       union all
       (select s.data, s.created_at, null as handle, true as elsewhere, c.kind, c.name
         from agent_run_steps s
@@ -289,7 +312,7 @@ export async function buildRunContext(
         join channels c on c.id = r.channel_id
         where r.org_id = ${run.orgId}::uuid and r.agent_id = ${agent.id}::uuid
           and r.created_at > now() - interval '14 days'
-          and ${requester ? sql`true` : sql`false`}
+          and ${requester && !options.routine ? sql`true` : sql`false`}
           and s.kind = 'tool_result'
           and coalesce(s.data->>'name', '') not in (${sql.join(
             QUIET_TOOLS.map((n) => sql`${n}`),
@@ -300,7 +323,7 @@ export async function buildRunContext(
             ${channel.kind !== "channel" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`})
           and exists (select 1 from channel_members m
             where m.channel_id = r.channel_id and m.user_id = ${requester ?? ""})
-        order by s.created_at desc limit 10)`),
+        order by s.created_at desc limit 30)`),
   );
   const firstLine = (d: { content?: unknown }) =>
     String(d.content ?? "")
@@ -310,20 +333,31 @@ export async function buildRunContext(
   // Oldest first in each block (a union keeps no order of its own).
   const time = (r: ActionRow) => new Date(r.created_at).getTime();
   actionRows.sort((x, y) => time(x) - time(y));
-  const recentActions = actionRows
-    .filter((r) => !r.elsewhere)
-    .map((a) => {
-      const d = a.data as { name?: string; content?: string; isError?: boolean };
-      return `- @${a.handle} ${d.name ?? "?"} → ${firstLine(d)} (${d.isError ? "error" : "ok"})`;
-    });
+  const recentActions = collapseRepeats(
+    actionRows
+      .filter((r) => !r.elsewhere)
+      .map((a) => {
+        const d = a.data as { name?: string; content?: string; isError?: boolean };
+        const line = `- @${a.handle} ${d.name ?? "?"} → ${firstLine(d)} (${d.isError ? "error" : "ok"})`;
+        return { key: line, line };
+      }),
+    RECENT_ACTIONS_MAX,
+  );
   const requesterName = requester ? (names.get(requester) ?? "this person") : "this person";
-  const workElsewhere = actionRows
-    .filter((r) => r.elsewhere)
-    .map((a) => {
-      const d = a.data as { name?: string; content?: string };
-      const where = a.kind === "dm" ? `DM with ${requesterName}` : `#${a.name}`;
-      return `- ${where}, ${ago(new Date(a.created_at))}: ${d.name ?? "?"} → ${firstLine(d)}`;
-    });
+  const workElsewhere = collapseRepeats(
+    actionRows
+      .filter((r) => r.elsewhere)
+      .map((a) => {
+        const d = a.data as { name?: string; content?: string };
+        const where = a.kind === "dm" ? `DM with ${requesterName}` : `#${a.name}`;
+        // Keyed without the time: the same call repeated shows once, with its latest time.
+        return {
+          key: `${where}|${d.name}|${firstLine(d)}`,
+          line: `- ${where}, ${ago(new Date(a.created_at))}: ${d.name ?? "?"} → ${firstLine(d)}`,
+        };
+      }),
+    WORK_ELSEWHERE_MAX,
+  );
   // What the other agents here can do, so this one never answers for them.
   const others = members.filter((m) => m.agentId && m.agentId !== agent.id);
   const otherScopes = await agentScopeNames(

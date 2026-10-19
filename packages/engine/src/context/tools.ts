@@ -7,6 +7,7 @@ import { can, getMembership } from "../organizations";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
+import { kindFamily, overlap } from "./judgments";
 import { proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary, judgeOf, memoryJudging } from "./summaries";
 
@@ -491,7 +492,15 @@ async function withLinked(db: Database, base: SQL | undefined, hits: ContextItem
  */
 export async function retrieveForRun(
   deps: ContextDeps,
-  input: { orgId: string; agentId: string; channelId: string; text: string; budgetChars?: number },
+  input: {
+    orgId: string;
+    agentId: string;
+    channelId: string;
+    text: string;
+    budgetChars?: number;
+    /** What the prompt already says (the agent's instructions, the org context): an item repeating it stays out. */
+    known?: string;
+  },
 ): Promise<{ text: string; itemIds: string[] }> {
   const { db } = deps;
   // An org with no memory yet (most early ones) costs one cached lookup, not five queries.
@@ -556,11 +565,11 @@ export async function retrieveForRun(
     searched = await withLinked(db, base, searched);
   }
   const budget = input.budgetChars ?? 6000;
+  const picked = pickDistinct([...pinned, ...own, ...shared, ...searched], input.known ?? "");
   const seen = new Set<string>();
   const lines: string[] = [];
   let used = 0;
-  for (const item of [...pinned, ...own, ...shared, ...searched]) {
-    if (seen.has(item.id)) continue;
+  for (const item of picked) {
     const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${item.content.replace(/\s+/g, " ").slice(0, 600)} (id ${item.id})`;
     if (used + line.length > budget && !item.pinned) continue;
     seen.add(item.id);
@@ -568,4 +577,45 @@ export async function retrieveForRun(
     used += line.length;
   }
   return { text: lines.join("\n"), itemIds: [...seen] };
+}
+
+/** Two items of the same family that share this much (`overlap`) say the same thing: only the newest goes in. */
+const SAME_ITEM = 0.7;
+/** Kinds compared by what they say (a profile or a summary is one per entity, thread or channel). */
+const CLAIM_KINDS = new Set(["decision", "fact", "preference", "open_question", "note", "lesson"]);
+
+/** A period summary's channel (its scope was once `channel:date`, now the channel). */
+const channelOf = (item: ContextItem) => (item.scopeId ?? "").split(":")[0];
+const flat = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+const newer = (a: ContextItem, b: ContextItem) => a.updatedAt.getTime() > b.updatedAt.getTime();
+
+/**
+ * The candidates in priority order, without repeats: each id once; one
+ * period summary per channel (the newest); of two items of the same family
+ * that say nearly the same (a fact and a preference restating it), the newest
+ * in the place of the first; and nothing the prompt already says (a lesson
+ * promoted to the instructions). Pinned items are never dropped.
+ */
+export function pickDistinct(candidates: ContextItem[], known: string): ContextItem[] {
+  const knownText = flat(known);
+  const out: ContextItem[] = [];
+  const ids = new Set<string>();
+  for (const item of candidates) {
+    if (ids.has(item.id)) continue;
+    ids.add(item.id);
+    if (!item.pinned && knownText && item.content.trim().length >= 20 && knownText.includes(flat(item.content)))
+      continue;
+    const family = kindFamily(item.kind);
+    const twin = out.findIndex((kept) => {
+      if (kept.pinned) return false;
+      if (item.kind === "period_summary" || kept.kind === "period_summary")
+        return item.kind === kept.kind && channelOf(item) === channelOf(kept);
+      return (
+        CLAIM_KINDS.has(item.kind) && family.includes(kept.kind) && overlap(kept.content, item.content) >= SAME_ITEM
+      );
+    });
+    if (twin < 0 || item.pinned) out.push(item);
+    else if (newer(item, out[twin] as ContextItem)) out[twin] = item;
+  }
+  return out;
 }

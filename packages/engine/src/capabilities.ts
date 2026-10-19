@@ -1,4 +1,5 @@
 import { UNDOABLE_TOOLS } from "./agent-actions";
+import { type DirectoryRole, directoryRole } from "./tools/directory";
 import { isSensitive } from "./tools/gateway";
 import type { ToolDefinition } from "./tools/types";
 
@@ -58,7 +59,7 @@ export function summarizeScopes(scopes: string[]) {
  * and how to behave about anything else.
  */
 export function describeCapabilities(
-  tools: Pick<ToolDefinition, "name" | "description" | "scope" | "sensitive">[],
+  tools: Pick<ToolDefinition, "name" | "description" | "scope" | "sensitive" | "connectionId" | "connectorLabel">[],
   pending: { label: string; reason: string }[] = [],
 ) {
   const lines = ["# What you can do"];
@@ -69,13 +70,36 @@ export function describeCapabilities(
   } else {
     lines.push("You can:");
     const groups = new Map<string, string[]>();
+    // A connector's tools carry their own descriptions: here one line per connector, by name only,
+    // and a big one (a directory, tools/directory.ts) says how to find its tools instead of listing them.
+    const connectors = new Map<string, { label: string; names: string[]; directory: DirectoryRole | null }>();
     for (const t of [...tools].sort((a, b) => a.name.localeCompare(b.name))) {
+      if (t.connectionId) {
+        const entry = connectors.get(t.connectionId) ?? {
+          label: t.connectorLabel ?? groupOf(t),
+          names: [],
+          directory: null,
+        };
+        const role = directoryRole(t as ToolDefinition);
+        if (role) entry.directory = role;
+        else entry.names.push(`\`${t.name}\``);
+        connectors.set(t.connectionId, entry);
+        continue;
+      }
       const group = groupOf(t);
       const items = groups.get(group) ?? [];
       items.push(`\`${t.name}\` (${firstSentence(t.description)})`);
       groups.set(group, items);
     }
     for (const [group, items] of groups) lines.push(`- ${group}: ${items.join("; ")}`);
+    for (const c of connectors.values()) {
+      const d = c.directory;
+      lines.push(
+        d
+          ? `- ${c.label} (${d.tools.length} tools): find the one you need with \`${d.prefix}_find_tools\`, then run it with \`${d.prefix}_use_tool\`.`
+          : `- ${c.label}: ${c.names.join(", ")}`,
+      );
+    }
     const names = new Set(tools.map((t) => t.name));
     if (names.has("create_artifact")) {
       lines.push(
@@ -107,6 +131,11 @@ export function describeCapabilities(
       );
     }
     const approval = tools.filter((t) => isSensitive(t)).map((t) => `\`${t.name}\``);
+    // A big connector's approvals are marked by its search ("asks a person's approval"), not named one by one.
+    for (const c of connectors.values()) {
+      const n = c.directory ? c.directory.tools.filter((t) => isSensitive(t)).length : 0;
+      if (n > 0) approval.push(`${n} ${c.label} tools (its search marks them)`);
+    }
     if (approval.length > 0) {
       lines.push(
         `Need a person's approval (you ask, someone approves in the chat): ${approval.join(", ")}. Calling one posts the request with only the text of that turn: write there what you found and why.`,

@@ -54,7 +54,16 @@ export type BrainEvent =
   | { type: "text_delta"; text: string }
   /** `executed` present = already executed elsewhere (computer brains via the MCP bridge): the engine only records/displays it. */
   | { type: "tool_call"; id: string; name: string; input: unknown; executed?: ToolResult }
-  | { type: "usage"; input: number; output: number; source: "api" | "plan"; model?: string }
+  | {
+      type: "usage";
+      /** Every input token the turn read (cache included); `cacheRead`/`cacheWrite` say how much of it was cache. */
+      input: number;
+      output: number;
+      source: "api" | "plan";
+      model?: string;
+      cacheRead?: number;
+      cacheWrite?: number;
+    }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
   | { type: "error"; code: string; message: string; retryable?: boolean };

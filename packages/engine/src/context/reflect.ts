@@ -10,6 +10,7 @@ import {
   normalizeSubject,
   supersede,
 } from "./items";
+import { overlap } from "./judgments";
 import { type Outcome, outcomesForThread } from "./outcomes";
 import { proposeFromItem } from "./proposals";
 import {
@@ -308,7 +309,25 @@ export async function reflectThread(
   return out;
 }
 
-/** Entity profiles grow incrementally: the newest notes kept, a new version each time. */
+/** An entity profile keeps at most this many notes (the newest). */
+const PROFILE_MAX_LINES = 8;
+/** A new note replaces an older one that says nearly the same (shared words, `overlap`). */
+const PROFILE_SAME_NOTE = 0.6;
+
+/** A profile's notes with a new one added last: older notes that restate it leave, the newest few stay. */
+export function mergeProfileNote(content: string, newNote: string) {
+  const note = `- ${newNote.trim()}`;
+  const older = content
+    .split("\n")
+    .filter((line) => line.trim() && line !== note && overlap(line, note) < PROFILE_SAME_NOTE);
+  return [...older, note].slice(-PROFILE_MAX_LINES).join("\n");
+}
+
+/**
+ * Entity profiles grow incrementally: a new version each time, the newest
+ * notes kept. A note that restates an older one replaces it, so a stale claim
+ * ("currently unavailable") gives way to the newer one instead of piling up.
+ */
 async function refreshEntityProfile(
   db: Database,
   input: { orgId: string; name: string; type: string; note: string; channelIds: string[]; trusted: boolean },
@@ -328,8 +347,7 @@ async function refreshEntityProfile(
     )
     .orderBy(desc(contextItems.createdAt))
     .limit(1);
-  const lines = [...new Set([...(current?.content.split("\n") ?? []), `- ${input.note.trim()}`])].slice(-20);
-  const content = lines.join("\n");
+  const content = mergeProfileNote(current?.content ?? "", input.note);
   if (current && current.content === content) return;
   const item = {
     orgId: input.orgId,

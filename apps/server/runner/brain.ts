@@ -220,11 +220,21 @@ export class ClaudeStreamParser {
   private result(ev: Record<string, unknown>): ParsedBrainLine {
     const events: WireBrainEvent[] = [];
     const usage = isObj(ev.usage) ? ev.usage : {};
-    const input = num(usage.input_tokens) + num(usage.cache_read_input_tokens) + num(usage.cache_creation_input_tokens);
+    const cacheRead = num(usage.cache_read_input_tokens);
+    const cacheWrite = num(usage.cache_creation_input_tokens);
+    const input = num(usage.input_tokens) + cacheRead + cacheWrite;
     const output = num(usage.output_tokens);
     const models = isObj(ev.modelUsage) ? Object.keys(ev.modelUsage) : [];
     if (input > 0 || output > 0) {
-      events.push({ type: "usage", input, output, source: "plan", ...(models[0] ? { model: models[0] } : {}) });
+      events.push({
+        type: "usage",
+        input,
+        output,
+        source: "plan",
+        ...(models[0] ? { model: models[0] } : {}),
+        ...(cacheRead > 0 ? { cacheRead } : {}),
+        ...(cacheWrite > 0 ? { cacheWrite } : {}),
+      });
     }
     this.tools.clear();
     const session = str(ev.session_id) || this.session;

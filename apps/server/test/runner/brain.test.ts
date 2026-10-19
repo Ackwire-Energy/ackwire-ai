@@ -161,7 +161,10 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
       modelUsage: { "claude-opus-5-5": {} },
     }),
   );
-  expect(end.events).toEqual([{ type: "usage", input: 35, output: 7, source: "plan", model: "claude-opus-5-5" }]);
+  // Every input token, and how much of it was cache.
+  expect(end.events).toEqual([
+    { type: "usage", input: 35, output: 7, source: "plan", model: "claude-opus-5-5", cacheRead: 20, cacheWrite: 5 },
+  ]);
   expect(end.final).toEqual({ type: "done", text: "Hello", session: { id: SESSION(1) } });
   expect(p.session).toBe(SESSION(1));
 });
@@ -305,7 +308,15 @@ test.if(posix)(
         .map((e) => (e as { text: string }).text)
         .join(""),
     ).toBe("Hello world");
-    expect(a.events).toContainEqual({ type: "usage", input: 16, output: 7, source: "plan", model: "claude-sonnet" });
+    expect(a.events).toContainEqual({
+      type: "usage",
+      input: 16,
+      output: 7,
+      source: "plan",
+      model: "claude-sonnet",
+      cacheRead: 5,
+      cacheWrite: 1,
+    });
     const b = await turn(2, "second");
     expect(b.final).toMatchObject({ type: "done", text: "echo 2: second" });
     expect(spawns()).toHaveLength(1);

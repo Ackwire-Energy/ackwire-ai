@@ -352,7 +352,16 @@ export type WireBrainEvent =
       input: unknown;
       executed?: { content: string; isError?: boolean };
     }
-  | { type: "usage"; input: number; output: number; source: "api" | "plan"; model?: string }
+  | {
+      type: "usage";
+      /** Every input token the turn read (cache included); `cacheRead`/`cacheWrite` say how much of it was cache. */
+      input: number;
+      output: number;
+      source: "api" | "plan";
+      model?: string;
+      cacheRead?: number;
+      cacheWrite?: number;
+    }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
   | { type: "error"; code: string; message: string; retryable?: boolean };
@@ -870,6 +879,8 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         output: num(v.output),
         source: v.source === "api" ? "api" : "plan",
         ...(isString(v.model) ? { model: v.model.slice(0, 100) } : {}),
+        ...(num(v.cacheRead) > 0 ? { cacheRead: num(v.cacheRead) } : {}),
+        ...(num(v.cacheWrite) > 0 ? { cacheWrite: num(v.cacheWrite) } : {}),
       };
     case "limit":
       return { type: "limit", ...(isString(v.resetsAt) ? { resetsAt: v.resetsAt.slice(0, 40) } : {}) };

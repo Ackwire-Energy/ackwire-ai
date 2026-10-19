@@ -7,6 +7,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { publishUserEvent } from "../events";
 import type { Judge } from "../judge";
 import { can, requirePermission } from "../organizations";
+import { enqueue } from "../outbox";
 import { type ContextItem, checkContent, checkPermissionText, consolidateItem } from "./items";
 
 const { contextProposals, contextItems, agents, organizations, organizationMembers } = schema;
@@ -229,6 +230,19 @@ export async function decideProposal(
       .where(eq(contextProposals.id, proposalId))
       .returning();
     if (!row) throw new Error("proposal update returned nothing");
+    // The lesson now lives in the instructions (or the org context): its memory item leaves memory,
+    // or the prompt would carry it twice.
+    if (status === "accepted" && p.itemIds.length > 0) {
+      const promoted = await tx
+        .update(contextItems)
+        .set({ status: "archived", updatedAt: new Date() })
+        .where(
+          and(eq(contextItems.orgId, orgId), inArray(contextItems.id, p.itemIds), eq(contextItems.status, "active")),
+        )
+        .returning({ id: contextItems.id });
+      for (const item of promoted)
+        await enqueue(tx, { orgId, kind: "search.index", payload: { kind: "context_item", sourceId: item.id } });
+    }
     return row;
   });
   if (decided.agentId) caches.agents.delete(`${orgId}:${decided.agentId}`);

@@ -4,6 +4,7 @@ import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
 import { checkToolCall } from "./checks";
+import { compactSchema, directoryRole, presentTools, resolveDirectoryTool } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
@@ -63,12 +64,19 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     return byName;
   }
 
-  /** Tools this agent may call now: every source, filtered by granted scopes. */
+  /**
+   * Tools this agent may call now: every source, filtered by granted scopes,
+   * with each big connector listed as its directory (`find_tools` /
+   * `use_tool`, tools/directory.ts).
+   */
   async function list(ctx: ToolContext): Promise<ToolDefinition[]> {
     const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-    return [...(await allTools(ctx)).values()]
-      .filter((t) => isAllowed(toolAccess(granted, t)))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return presentTools(
+      [...(await allTools(ctx)).values()]
+        .filter((t) => isAllowed(toolAccess(granted, t)))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      isSensitive,
+    );
   }
 
   async function run(tool: ToolDefinition, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
@@ -96,7 +104,33 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
   return {
     list,
 
-    async invoke(ctx: ToolContext, call: ToolCall): Promise<InvokeResult> {
+    async invoke(ctx: ToolContext, requested: ToolCall): Promise<InvokeResult> {
+      const all = await allTools(ctx);
+      // A big connector's directory (tools/directory.ts): `use_tool` runs the real tool by its own name, so
+      // everything below (steps, scope, schema, checks, approval) is that tool's; `find_tools` runs as is.
+      let call = requested;
+      let directoryTool: ToolDefinition | undefined;
+      let unknownInDirectory: string | null = null;
+      if (!all.has(call.name)) {
+        const listed = (await list(ctx)).find((t) => t.name === call.name);
+        const role = directoryRole(listed);
+        if (role?.kind === "find") directoryTool = listed;
+        else if (role?.kind === "use") {
+          const name = typeof call.input.tool === "string" ? call.input.tool : "";
+          const real = resolveDirectoryTool(role, name);
+          const args = call.input.arguments;
+          if (real) {
+            call = {
+              ...call,
+              name: real.name,
+              input: args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {},
+            };
+          } else {
+            unknownInDirectory = `No ${role.label} tool named "${name}". Find the exact name with ${role.prefix}_find_tools.`;
+          }
+        }
+      }
+      const viaDirectory = call !== requested;
       const step = { id: ctx.runId, orgId: ctx.orgId };
       // A mission task's call through the bridge has no run (ADR 0032): nothing to record steps on.
       const record: typeof addRunStep = (db, run, kind, data) =>
@@ -113,17 +147,25 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         return { type: "result" as const, output };
       };
 
-      const tool = (await allTools(ctx)).get(call.name);
+      if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
+      const tool = all.get(call.name) ?? directoryTool;
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
       const builtIn = tool.scope === "" && !tool.connectionId;
-      const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
-      if (!isAllowed(access)) {
-        const reason =
-          access === "denied" ? "this tool is turned off for this agent" : `this agent lacks the scope ${tool.scope}`;
-        return finish({ content: `Not allowed: ${reason}`, isError: true });
+      // A directory's search lists only tools the agent already holds; each real tool is checked on its own.
+      if (tool !== directoryTool) {
+        const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
+        if (!isAllowed(access)) {
+          const reason =
+            access === "denied" ? "this tool is turned off for this agent" : `this agent lacks the scope ${tool.scope}`;
+          return finish({ content: `Not allowed: ${reason}`, isError: true });
+        }
       }
       const problems = validateJson(tool.inputSchema, call.input);
-      if (problems.length > 0) return finish({ content: `Invalid input: ${problems.join("; ")}`, isError: true });
+      if (problems.length > 0) {
+        // Through a directory the model never saw the schema up front: show it, so the next call can be right.
+        const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}` : "";
+        return finish({ content: `Invalid input: ${problems.join("; ")}${schemaHint}`, isError: true });
+      }
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
       const check = await checkToolCall(tool, call.input, ctx);
       if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} });

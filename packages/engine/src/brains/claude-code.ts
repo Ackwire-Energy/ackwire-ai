@@ -309,10 +309,16 @@ export async function recordPlanUsage(
     /** `claude_code` or `codex`. */
     provider: string;
     model?: string;
+    /** Every input token the turn read, cache included. */
     inputTokens: number;
     outputTokens: number;
+    /** How much of `inputTokens` was read from, or written to, the cache (older runners: unknown, 0). */
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
   },
 ): Promise<string | null> {
+  const cacheRead = Math.max(0, Math.round(input.cacheReadTokens ?? 0));
+  const cacheWrite = Math.max(0, Math.round(input.cacheWriteTokens ?? 0));
   const [row] = await db
     .insert(schema.usageRecords)
     .values({
@@ -324,8 +330,11 @@ export async function recordPlanUsage(
       provider: input.provider,
       model: input.model ?? input.provider,
       requestedModel: input.model ?? input.provider,
-      inputTokens: Math.max(0, Math.round(input.inputTokens)),
+      // Stored like API usage: uncached input apart from cache reads and writes (the totals are the same).
+      inputTokens: Math.max(0, Math.round(input.inputTokens) - cacheRead - cacheWrite),
       outputTokens: Math.max(0, Math.round(input.outputTokens)),
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
       costNanoUsd: 0,
       billedTo: "plan",
     })
