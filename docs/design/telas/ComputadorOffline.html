@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Computador desconectado</title>
+<!-- The app's own fonts, tokens and components. -->
+<link rel="stylesheet" href="../../../apps/web/node_modules/@fontsource-variable/onest/index.css">
+<link rel="stylesheet" href="../../../apps/web/src/fonts.css">
+<link rel="stylesheet" href="../../../packages/ui/src/styles/index.css">
+<script>
+  { const h = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = h.get("theme") || "light"; }
+</script>
+<style>
+/*
+  Prototype (ComputadorOffline): when the computer that runs some agents' brain (Claude Code / Codex) goes
+  offline. Today each waiting run posts "O Claude Code não está disponível agora; respondo quando ele voltar."
+  (once per routine run, so it repeats) and the agents look "working". Proposal:
+  1. A notice at the top of the app (web) / under the greeting (phone), for whoever can manage the agents:
+     which computer, since when, who is waiting and how many tasks; "Trocar computador" and "Ver computador".
+  2. In the conversation, one card per agent and computer instead of repeated messages; it updates its count
+     and turns into "voltou" (or "trocado") by itself.
+  3. "Trocar computador": pick another connected computer (or the cloud one) for the waiting agents. Only
+     computers that can run their brain are offered; tasks that already changed files on the old computer keep
+     waiting for it (said plainly). Backend exists: setAgentComputerTarget + brainOptions.
+  Built from the design system: fonts, tokens, buttons, our option rows, checkboxes, menu surface, icons; agents
+  from packages/ui engine.js (sleeping face while waiting).
+  Deep links: #view=web|phone&dialog=1&theme=light|dark
+*/
+:root{--font-sans:"Onest Variable",Onest,"Segoe UI",system-ui,sans-serif;--font-display:"Funnel Display",var(--font-sans);--font-dot:"Doto",var(--font-mono)}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+.ac-icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.agw{display:inline-grid;place-items:center;flex:none}
+
+.proto{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink-muted);position:sticky;top:0;z-index:300;background:var(--bg)}
+.proto b{color:var(--ink)}
+.proto .grow{flex:1}
+.stage{padding:24px;display:flex;justify-content:center;gap:32px;flex-wrap:wrap}
+
+/* ---------- web ---------- */
+.web{width:min(1180px,100%);height:760px;display:flex;gap:12px;padding:12px;border-radius:var(--radius-section);background:var(--surface);box-shadow:var(--e2),var(--top);overflow:hidden;position:relative}
+.wside{width:250px;flex:none;display:flex;flex-direction:column;gap:6px;padding:4px}
+.wside .org{display:flex;align-items:center;gap:10px;padding:8px;font-weight:650}
+.mark{width:32px;height:32px;border-radius:var(--radius-sm);display:grid;place-items:center;color:#fff;font-weight:700;background:#4f9a74}
+.wside .row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--radius-sm);color:var(--ink-muted)}
+.wside .row b{color:var(--ink);font-weight:500;flex:1}
+.wside .row .wait{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--ink-muted)}
+.wside .h{font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);padding:12px 10px 4px}
+.wmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+
+/* the notice: a neutral bar on the page, our attention color only on its icon */
+.notice{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 14px;border-radius:var(--radius-lg);background:var(--surface-raised);box-shadow:var(--e1),var(--top)}
+.notice>.ac-icon{color:var(--attention)}
+.notice .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.notice .tx b{font-weight:600}
+.notice .tx span{font-size:13px;color:var(--ink-muted)}
+.notice .crew{display:inline-flex;gap:2px}
+.notice .acts{display:flex;align-items:center;gap:6px}
+
+.chan{flex:1;min-height:0;border-radius:var(--radius-section);background:var(--surface-raised);box-shadow:var(--e1),var(--top);padding:18px 24px;display:flex;flex-direction:column;gap:18px;overflow:auto}
+.chan h2{font-size:16px;font-weight:650}
+.msg{display:flex;gap:12px;max-width:640px}
+.msg .b{display:flex;flex-direction:column;gap:4px;min-width:0}
+.msg .w{font-weight:650;display:flex;align-items:center;gap:8px}
+.msg .w time{font-weight:400;font-size:12px;color:var(--ink-muted)}
+.msg .t{color:var(--ink2)}
+
+/* the agent's one card while it waits (replaces the repeated messages) */
+.waitcard{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:var(--radius-md);background:var(--surface-sunken);max-width:520px}
+.waitcard .top{display:flex;align-items:center;gap:8px;font-weight:600}
+.waitcard .top .ac-icon{color:var(--attention);width:16px;height:16px}
+.waitcard p{color:var(--ink-muted);font-size:13.5px}
+.waitcard .acts{display:flex;gap:6px;flex-wrap:wrap}
+.waitcard[data-done] .top .ac-icon{color:var(--success)}
+
+/* ---------- the dialog (our Dialog, our option rows) ---------- */
+.dlg-scrim{position:fixed;inset:0;background:var(--scrim);z-index:200;display:none}
+.dlg{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:201;display:none}
+body[data-dialog] .dlg-scrim,body[data-dialog] .dlg{display:flex}
+.dlg.ac-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 64px);flex-direction:column}
+.who{display:flex;flex-direction:column;gap:4px}
+.who label{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer}
+.who label:hover{background:var(--surface-sunken)}
+.who label span.n{flex:1}
+.who small{color:var(--ink-muted);font-size:12.5px}
+.sect-h{font-size:12px;font-weight:600;color:var(--ink-muted);margin:4px 0 6px}
+.hint{display:flex;gap:8px;font-size:13px;color:var(--ink-muted);padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface-sunken)}
+.hint .ac-icon{width:16px;height:16px;margin-top:2px}
+
+/* ---------- phone ---------- */
+.phone{width:390px;height:844px;border-radius:52px;padding:10px;background:#111;box-shadow:var(--e3);flex:none}
+.screen{position:relative;width:100%;height:100%;border-radius:44px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column}
+.sbar{height:50px;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0;font-weight:600;font-size:15px}
+.pbody{padding:6px 16px;display:flex;flex-direction:column;gap:12px;overflow:auto;flex:1}
+.greet{font-weight:650;font-size:17px}
+.ptitle{font-family:var(--font-display);font-weight:300;font-size:36px;line-height:40px}
+.pnotice{flex-direction:column;align-items:stretch;gap:10px;padding:12px 14px}
+.pnotice .line{display:flex;align-items:center;gap:10px}
+.pnotice .acts{display:flex;gap:6px}
+.pnotice .acts .ac-btn{flex:1}
+.prow{display:flex;align-items:center;gap:12px;padding:8px 0}
+.prow .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.prow .tx b{font-weight:600}
+.prow .tx span{font-size:13px;color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet{position:absolute;left:0;right:0;bottom:0;border-radius:28px 28px 0 0;background:var(--surface-raised);box-shadow:var(--e3);padding:10px 16px 28px;display:none;flex-direction:column;gap:12px;max-height:78%;overflow:auto;z-index:5}
+.sheet .grab{width:36px;height:5px;border-radius:3px;background:var(--line-strong);align-self:center}
+.sheet h3{font-size:17px;font-weight:650}
+.screen[data-sheet] .sheet{display:flex}
+.screen[data-sheet]::after{content:"";position:absolute;inset:0;background:var(--scrim);z-index:4}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="proto" role="region" aria-label="Controles do protótipo (não é produto)">
+  <b>Computador desconectado</b>
+  <span>O MacBook Air saiu; Ada e Theo usam o Claude Code dele.</span>
+  <span class="grow"></span>
+  <div class="ac-seg ac-seg--sm" id="view" role="radiogroup" aria-label="Onde"><span class="ac-seg__pill" aria-hidden="true"></span><button class="ac-seg__item" role="radio" data-v="web">Web</button><button class="ac-seg__item" role="radio" data-v="phone">Celular</button></div>
+  <div class="ac-seg ac-seg--sm" id="theme" role="radiogroup" aria-label="Tema"><span class="ac-seg__pill" aria-hidden="true"></span><button class="ac-seg__item" role="radio" data-v="light">Claro</button><button class="ac-seg__item" role="radio" data-v="dark">Escuro</button></div>
+  <button class="ac-btn ac-btn--sm ac-btn--ghost" id="back">Simular: o computador voltou</button>
+</div>
+
+<div class="stage">
+  <!-- WEB -->
+  <section class="web" id="web" aria-label="Web">
+    <aside class="wside">
+      <div class="org"><span class="mark">T</span>Viajolo</div>
+      <span class="h">Agentes</span>
+      <div class="row"><span class="avs" data-a="ada" data-s="22" data-m="wait"></span><b>Ada</b><span class="wait" title="Esperando o MacBook Air"><span data-icon="waiting"></span>esperando</span></div>
+      <div class="row"><span class="avs" data-a="theo" data-s="22" data-m="wait"></span><b>Theo</b><span class="wait" title="Esperando o MacBook Air"><span data-icon="waiting"></span>esperando</span></div>
+      <div class="row"><span class="avs" data-a="atlas" data-s="22"></span><b>Atlas</b></div>
+      <div class="row"><span class="avs" data-a="lisa" data-s="22"></span><b>Lisa</b></div>
+      <span class="h">Canais</span>
+      <div class="row"><span data-icon="channel"></span><b>tech</b></div>
+      <div class="row"><span data-icon="channel"></span><b>general</b></div>
+    </aside>
+    <div class="wmain">
+      <div class="notice" id="notice" role="status">
+        <span data-icon="computerMac"></span>
+        <span class="tx">
+          <b class="nt">O MacBook Air desconectou há 12 min</b>
+          <span class="ns">Ada e Theo esperam por ele · 3 tarefas paradas</span>
+        </span>
+        <span class="crew"><span class="avs" data-a="ada" data-s="24" data-m="wait"></span><span class="avs" data-a="theo" data-s="24" data-m="wait"></span></span>
+        <span class="acts">
+          <button class="ac-btn ac-btn--sm ac-btn--ghost">Ver computador</button>
+          <button class="ac-btn ac-btn--sm ac-btn--primary" data-open>Trocar computador</button>
+          <button class="ac-btn ac-btn--sm ac-btn--ghost ac-btn--icon" aria-label="Fechar aviso"><span data-icon="close"></span></button>
+        </span>
+      </div>
+      <section class="chan" aria-label="Canal tech">
+        <h2># tech</h2>
+        <div class="msg"><span class="avs" data-a="ada" data-s="36"></span><span class="b"><span class="w">Ada <time>20:00</time></span><span class="t">Criei as issues #26 e #27 (N+1 em GET /api/travels). Análise curta no #26, apontando para a do #2.</span></span></div>
+        <div class="msg"><span class="avs" data-a="ada" data-s="36" data-m="wait"></span><span class="b"><span class="w">Ada <time>21:00</time></span>
+          <div class="waitcard" id="card">
+            <span class="top"><span data-icon="waiting"></span><span class="ct">Esperando o MacBook Air voltar</span></span>
+            <p class="cp">O Claude Code roda nele. Sigo daqui assim que ele voltar · 2 rotinas esperando</p>
+            <span class="acts"><button class="ac-btn ac-btn--sm" data-open>Trocar computador</button></span>
+          </div>
+        </span></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- PHONE -->
+  <section class="phone" id="phone" aria-label="Celular" hidden>
+    <div class="screen" id="screen">
+      <div class="sbar"><span>21:37</span><span>4G</span></div>
+      <div class="pbody">
+        <span class="greet">Boa noite, Walter</span>
+        <h1 class="ptitle">Conversas</h1>
+        <div class="notice pnotice" role="status">
+          <span class="line"><span data-icon="computerMac"></span><span class="tx"><b class="nt">O MacBook Air desconectou</b><span class="ns">Ada e Theo esperam por ele · 3 tarefas</span></span></span>
+          <span class="acts"><button class="ac-btn ac-btn--sm">Ver computador</button><button class="ac-btn ac-btn--sm ac-btn--primary" data-sheet>Trocar computador</button></span>
+        </div>
+        <div class="prow"><span class="avs" data-a="ada" data-s="44" data-m="wait"></span><span class="tx"><b>Ada</b><span>Esperando o MacBook Air</span></span></div>
+        <div class="prow"><span class="avs" data-a="theo" data-s="44" data-m="wait"></span><span class="tx"><b>Theo</b><span>Esperando o MacBook Air</span></span></div>
+        <div class="prow"><span class="avs" data-a="atlas" data-s="44"></span><span class="tx"><b>Atlas</b><span>Oi, Walter! Qualquer coisa do Sentry, é só chamar.</span></span></div>
+      </div>
+      <div class="sheet" role="dialog" aria-label="Trocar computador">
+        <span class="grab"></span>
+        <h3>Trocar o computador</h3>
+        <div class="slot-phone"></div>
+        <button class="ac-btn ac-btn--primary" data-close>Trocar 2 agentes</button>
+        <button class="ac-btn ac-btn--ghost" data-close>Agora não</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- the dialog: our Dialog -->
+<div class="dlg-scrim" data-close></div>
+<div class="dlg ac-dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="ac-dialog__head"><h2 class="ac-dialog__title" id="dlgTitle">Trocar o computador</h2><button class="ac-btn ac-btn--ghost ac-btn--icon" data-close aria-label="Fechar"><span data-icon="close"></span></button></div>
+  <p class="ac-dialog__desc">O MacBook Air está desconectado. Escolha onde Ada e Theo passam a trabalhar.</p>
+  <div class="ac-dialog__body slot-web"></div>
+  <div class="ac-dialog__foot ac-dialog__foot--bar"><span class="ac-dialog__foot-note">Dá para voltar ao MacBook Air depois.</span><button class="ac-btn" data-close>Agora não</button><button class="ac-btn ac-btn--primary" data-close>Trocar 2 agentes</button></div>
+</div>
+
+<template id="choose">
+  <div class="sect-h">Para onde</div>
+  <div class="ac-optlist" role="radiogroup" aria-label="Novo computador">
+    <button class="ac-optrow ac-optrow--lead" role="radio" data-state="checked" aria-checked="true"><span class="ac-optrow__lead"><span data-icon="computerMac"></span></span><span class="ac-optrow__text"><span class="ac-optrow__title">MacBook Pro do Walter<span class="ac-optrow__tag">Ligado</span></span><span class="ac-optrow__desc">Tem o Claude Code · as pastas do viajolo-v5</span></span></button>
+    <button class="ac-optrow ac-optrow--lead" role="radio" data-state="unchecked" aria-checked="false"><span class="ac-optrow__lead"><span data-icon="computerCloud"></span></span><span class="ac-optrow__text"><span class="ac-optrow__title">Computador na nuvem<span class="ac-optrow__tag">Sempre ligado</span></span><span class="ac-optrow__desc">Sem as pastas do seu computador; o repositório vem pelo GitHub</span></span></button>
+    <button class="ac-optrow ac-optrow--lead" role="radio" data-state="unchecked" aria-checked="false" data-disabled="" disabled><span class="ac-optrow__lead"><span data-icon="computerWindows"></span></span><span class="ac-optrow__text"><span class="ac-optrow__title">PC do escritório</span><span class="ac-optrow__desc">Desconectado desde ontem</span></span></button>
+  </div>
+  <div class="sect-h" style="margin-top:14px">Quem troca</div>
+  <div class="who">
+    <label><button class="ac-check" role="checkbox" data-state="checked" aria-checked="true"><span class="ac-check__mark"><svg viewBox="0 0 12 12" fill="none" class="ac-check__svg" aria-hidden="true"><path class="ac-check__tick" d="m2.5 6.2 2.3 2.3 4.7-5"/></svg></span></button><span class="avs" data-a="ada" data-s="26" data-m="wait"></span><span class="n">Ada</span><small>2 rotinas esperando</small></label>
+    <label><button class="ac-check" role="checkbox" data-state="checked" aria-checked="true"><span class="ac-check__mark"><svg viewBox="0 0 12 12" fill="none" class="ac-check__svg" aria-hidden="true"><path class="ac-check__tick" d="m2.5 6.2 2.3 2.3 4.7-5"/></svg></span></button><span class="avs" data-a="theo" data-s="26" data-m="wait"></span><span class="n">Theo</span><small>1 conversa esperando</small></label>
+  </div>
+  <div class="hint" style="margin-top:12px"><span data-icon="info"></span><span>O que estava esperando continua no novo computador. Uma tarefa que já mexeu em arquivos no MacBook Air espera por ele.</span></div>
+</template>
+
+<script type="module">
+import { drawAgent, idlePose, drawAccessory } from "../../../packages/ui/src/agent/engine.js";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const root = document.documentElement;
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const ICONS = {"settings": "<path d=\"M3.5 6h7M15.5 6h1M3.5 14h1M9.5 14h7\"/><circle cx=\"13\" cy=\"6\" r=\"2\"/><circle cx=\"7\" cy=\"14\" r=\"2\"/>", "plug": "<path d=\"M7.5 3v4M12.5 3v4M5 7h10v2.5a5 5 0 0 1-10 0zM10 14.5V17\"/>", "link": "<path d=\"M8.5 11.5a3 3 0 0 0 4.2 0l2.3-2.3a3 3 0 0 0-4.2-4.2l-1 1M11.5 8.5a3 3 0 0 0-4.2 0L5 10.8A3 3 0 0 0 9.2 15l1-1\"/>", "members": "<circle cx=\"8\" cy=\"7\" r=\"2.8\"/><path d=\"M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4M13.5 4.5a2.6 2.6 0 0 1 0 5M15 12.3c1.1.6 1.8 1.9 2 3.7\"/>", "person": "<circle cx=\"10\" cy=\"7\" r=\"3.2\"/><path d=\"M4.2 17c.7-3 3-4.6 5.8-4.6s5.1 1.6 5.8 4.6\"/>", "plus": "<path d=\"M10 4.5v11M4.5 10h11\"/>", "agent": "<path d=\"M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z\"/><path d=\"M8 8.5v2M12 8.5v2\"/>", "book": "<path d=\"M4 4.5h4.5A2.5 2.5 0 0 1 10 6v10a2 2 0 0 0-2-2H4zM16 4.5h-4.5A2.5 2.5 0 0 0 10 6v10a2 2 0 0 1 2-2h4z\"/>", "document": "<path d=\"M6 3h6l3.5 3.5V17H6zM12 3v3.5h3.5M8.5 10h4M8.5 12.5h4M8.5 15h2.5\"/>", "waiting": "<circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"M10 6v4l2.6 1.8\"/>", "clock": "<circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"M10 6.5V10l2.5 1.7\"/>", "globe": "<circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"M3 10h14M10 3a10.5 10.5 0 0 1 0 14M10 3a10.5 10.5 0 0 0 0 14\"/>", "chevronDown": "<path d=\"m6 8 4 4 4-4\"/>", "chevronRight": "<path d=\"m8 5 5 5-5 5\"/>", "search": "<circle cx=\"8.8\" cy=\"8.8\" r=\"5.3\"/><path d=\"m12.8 12.8 4.2 4.2\"/>", "preference": "<circle cx=\"8\" cy=\"7\" r=\"2.8\"/><path d=\"M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4\"/>", "close": "<path d=\"m6 6 8 8M14 6l-8 8\"/>", "wallet": "<path d=\"M3.5 6.5a2 2 0 0 1 2-2H15v3\"/><rect x=\"3.5\" y=\"7.5\" width=\"13\" height=\"9\" rx=\"2\"/><path d=\"M13.5 12h.01\"/>", "arrowRight": "<path d=\"M4 10h12M11 5l5 5-5 5\"/>", "shield": "<path d=\"M10 3 4 5.5v4.5c0 3.6 2.6 6.4 6 7 3.4-.6 6-3.4 6-7V5.5z\"/>", "channel": "<path d=\"M8.2 3 6.6 17M13.4 3l-1.6 14M3.5 7.5h13M3 12.5h13\"/>", "drive": "<path d=\"M3 6.5A2.5 2.5 0 0 1 5.5 4H8l2 2h4.5A2.5 2.5 0 0 1 17 8.5v5a2.5 2.5 0 0 1-2.5 2.5H3z\"/>", "issues": "<path d=\"M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z\"/><path d=\"M7 8h6M7 12h4\"/>", "bell": "<path d=\"M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.2 1.5H4.3zM8.5 17h3\"/>", "routines": "<path d=\"M16 10a6 6 0 1 1-1.8-4.3\"/><path d=\"M16 4v3h-3\"/><path d=\"M10 7v3l2 1.5\"/>", "approve": "<path d=\"M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z\"/><path d=\"m7 10.2 2 2 4-4.4\"/>", "check": "<path d=\"m5.5 10.5 3 3 6-7\"/>", "mail": "<rect x=\"2.75\" y=\"4.5\" width=\"14.5\" height=\"11\" rx=\"2.25\"/><path d=\"m3.5 6 6.5 5 6.5-5\"/>", "undo": "<path d=\"M7.5 11.5 3.5 7.5l4-4M3.5 7.5h8a5 5 0 0 1 0 10H9\"/>", "external": "<path d=\"M11.5 3.5h5v5M16.5 3.5 9.5 10.5M15 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4\"/>", "computer": "<rect x=\"3\" y=\"4\" width=\"14\" height=\"9.5\" rx=\"2\"/><path d=\"M7.5 16.5h5M10 13.5v3\"/>", "computerMac": "<rect x=\"3.33\" y=\"3.75\" width=\"13.33\" height=\"9.17\" rx=\"1.67\"/><path d=\"M8.67 3.75h2.67v.58a.75 .75 0 0 1-.75 .75h-1.17a.75 .75 0 0 1-.75-.75Z\"/><path d=\"M2.08 15.17h15.83l-.75 .92a1.33 1.33 0 0 1-1 .5H3.83a1.33 1.33 0 0 1-1-.5Z\"/>", "computerWindows": "<rect x=\"2.5\" y=\"3.17\" width=\"15\" height=\"10.58\" rx=\"1.67\"/><path d=\"M7.5 16.83h5M10 13.75v3.08\"/><rect x=\"6.83\" y=\"6\" width=\"2.75\" height=\"2.17\" rx=\".33\"/><rect x=\"10.42\" y=\"6\" width=\"2.75\" height=\"2.17\" rx=\".33\"/><rect x=\"6.83\" y=\"8.83\" width=\"2.75\" height=\"2.17\" rx=\".33\"/><rect x=\"10.42\" y=\"8.83\" width=\"2.75\" height=\"2.17\" rx=\".33\"/>", "computerCloud": "<path d=\"M5.83 15.42h8.75a3.33 3.33 0 0 0 .5-6.62A4.58 4.58 0 0 0 6.25 8 3.75 3.75 0 0 0 5.83 15.42Z\"/><rect x=\"7.92\" y=\"9.67\" width=\"5\" height=\"3.33\" rx=\".67\"/>", "cloud": "<path d=\"M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z\"/>", "alert": "<circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"M10 6.5v4M10 13.5v.01\"/>", "shuffle": "<rect x=\"3.5\" y=\"3.5\" width=\"13\" height=\"13\" rx=\"3.5\"/><path d=\"M7.5 7.5h.01M12.5 12.5h.01M12.5 7.5h.01M7.5 12.5h.01\"/>", "info": "<circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"M10 9v4.5M10 6.5v.01\"/>", "refresh": "<path d=\"M16.5 10a6.5 6.5 0 1 1-1.9-4.6M16.5 3.5v3.8h-3.8\"/>"};
+const paint = (r = document) => { for (const el of $$("[data-icon]", r)) el.outerHTML = `<svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true">${ICONS[el.dataset.icon] || ""}</svg>`; };
+
+/* agents: the shared engine; while waiting for their computer they doze (closed eyes, slow breath) */
+const AGENTS = { ada: { name: "Ada", color: "rose", eyes: "round", acc: "headphones" }, theo: { name: "Theo", color: "amber", eyes: "round", acc: "beanie" }, atlas: { name: "Atlas", color: "violet", eyes: "round", acc: "antenna" }, lisa: { name: "Lisa", color: "rose", eyes: "dots", acc: "headset" } };
+const live = [];
+function hydrate(r = document) {
+  for (const el of $$(".avs", r)) {
+    const a = AGENTS[el.dataset.a], size = +el.dataset.s, w = document.createElement("span");
+    w.className = "agw";
+    const cv = document.createElement("canvas"), dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = cv.height = Math.round(size * dpr); cv.style.width = cv.style.height = size + "px";
+    cv.setAttribute("role", "img"); cv.setAttribute("aria-label", a.name + (el.dataset.m === "wait" ? ", esperando o computador" : ""));
+    w.append(cv); el.replaceWith(w);
+    live.push({ cv, a, size, mode: el.dataset.m, seed: Math.random() * 7 });
+  }
+}
+function draw(t) {
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i]; if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const ctx = it.cv.getContext("2d"), s = it.cv.width; ctx.clearRect(0, 0, s, s);
+    const acc = it.size >= 26 && it.a.acc, inner = s * (acc ? 0.74 : 0.86);
+    const pose = it.mode === "wait" ? { expression: "closed", turn: [0, 0.15], squash: REDUCED ? 0 : Math.sin(t * 1.1 + it.seed) * 0.3 } : idlePose(t, it.seed, { every: 10, expressions: ["happy"] });
+    drawAgent(ctx, (s - inner) / 2, s - inner, inner, { color: it.a.color, eyes: it.a.eyes, cells: 12, pose, after: acc ? (g, side, f) => drawAccessory(g, side, it.a.acc, f, t, false) : undefined });
+  }
+}
+(function loop(now) { draw(REDUCED ? 2 : now / 1000); setTimeout(() => requestAnimationFrame(loop), 40); })(0);
+
+/* fill both dialog slots from one template */
+for (const slot of $$(".slot-web,.slot-phone")) slot.append($("#choose").content.cloneNode(true));
+paint(); hydrate();
+
+/* option rows and checkboxes behave like ours */
+document.addEventListener("click", (e) => {
+  const r = e.target.closest(".ac-optrow");
+  if (r && !r.disabled) { for (const x of $$(".ac-optrow", r.parentElement)) { const on = x === r; x.dataset.state = on ? "checked" : "unchecked"; x.setAttribute("aria-checked", on); } }
+  const c = e.target.closest("label")?.querySelector(".ac-check");
+  if (c && e.target.closest(".who")) { e.preventDefault(); const on = c.dataset.state !== "checked"; c.dataset.state = on ? "checked" : "unchecked"; c.setAttribute("aria-checked", on); }
+  if (e.target.closest("[data-open]")) document.body.dataset.dialog = "1";
+  if (e.target.closest("[data-sheet]")) $("#screen").dataset.sheet = "1";
+  if (e.target.closest("[data-close]")) { delete document.body.dataset.dialog; delete $("#screen").dataset.sheet; }
+  const seg = e.target.closest(".ac-seg__item");
+  if (seg) { const s = seg.closest(".ac-seg"); pick(s, seg.dataset.v); if (s.id === "theme") { root.dataset.theme = seg.dataset.v; } if (s.id === "view") show(seg.dataset.v); }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { delete document.body.dataset.dialog; delete $("#screen").dataset.sheet; } });
+function pick(s, v) {
+  for (const x of $$(".ac-seg__item", s)) { const on = x.dataset.v === v; x.toggleAttribute("data-on", on); x.setAttribute("aria-checked", on); }
+  const on = $(".ac-seg__item[data-on]", s), p = $(".ac-seg__pill", s);
+  if (on && p) { p.style.setProperty("--x", on.offsetLeft + "px"); p.style.setProperty("--w", on.offsetWidth + "px"); }
+}
+function show(v) { $("#web").hidden = v !== "web"; $("#phone").hidden = v !== "phone"; }
+
+/* the computer comes back: the notice and the card turn into "voltou" by themselves */
+$("#back").addEventListener("click", () => {
+  for (const n of $$(".nt")) n.textContent = "O MacBook Air voltou";
+  for (const n of $$(".ns")) n.textContent = "Ada e Theo retomaram as 3 tarefas";
+  $("#card").dataset.done = "1"; $(".ct", $("#card")).textContent = "O MacBook Air voltou"; $(".cp", $("#card")).textContent = "Retomei as 2 rotinas.";
+  $(".acts", $("#card")).remove();
+  for (const l of live) l.mode = undefined;
+});
+
+const h = new URLSearchParams(location.hash.slice(1));
+const view = h.get("view") || "web";
+document.fonts?.ready.then(() => { pick($("#view"), view); pick($("#theme"), root.dataset.theme); });
+show(view);
+if (h.get("dialog")) { if (view === "phone") $("#screen").dataset.sheet = "1"; else document.body.dataset.dialog = "1"; }
+</script>
+</body>
+</html>
