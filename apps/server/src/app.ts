@@ -11,6 +11,7 @@ import { agentImportRoutes } from "./routes/app/agent-imports";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
 import { artifactRoutes } from "./routes/app/artifacts";
+import { browserRoutes } from "./routes/app/browser";
 import { calendarRoutes } from "./routes/app/calendar";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
@@ -115,6 +116,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", memoryRoutes(deps));
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
+    api.route("/app", browserRoutes(deps));
     api.route("/app", notificationRoutes(deps));
     api.route("/app", pushRoutes(deps));
     api.route("/app", secretRoutes(deps));

@@ -35,6 +35,7 @@ const Notification = z
       missionId: z.string().optional(),
       routineId: z.string().optional(),
       machineId: z.string().optional(),
+      handoffId: z.string().optional(),
       label: z.string().optional(),
     }),
     latest: z.object({

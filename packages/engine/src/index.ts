@@ -18,6 +18,8 @@ export * from "./brains/model";
 export * from "./brains/prompt";
 export * from "./brains/select";
 export * from "./brains/types";
+export * from "./browser/handoff";
+export * from "./browser/live";
 export * from "./browser/settings";
 export * from "./browser/tools";
 export * from "./browser/types";

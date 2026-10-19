@@ -62,7 +62,11 @@ async function inChannel(deps: NotificationDeps, channelId: string, userIds: str
 }
 
 /** The person behind a run: the author of its trigger, following agent hand-offs (at most 6 hops). */
-async function requesterOfRun(deps: NotificationDeps, orgId: string, runId: string | null): Promise<string | null> {
+async function requesterOfRun(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  runId: string | null,
+): Promise<string | null> {
   let current = runId;
   for (let hop = 0; current && hop < 6; hop++) {
     const [run] = await deps.db
@@ -81,7 +85,7 @@ async function requesterOfRun(deps: NotificationDeps, orgId: string, runId: stri
   return null;
 }
 
-async function agentOwner(deps: NotificationDeps, agentId: string) {
+async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
   const [a] = await deps.db.select({ owner: agents.ownerUserId }).from(agents).where(eq(agents.id, agentId));
   return a?.owner ?? null;
 }
@@ -604,4 +608,51 @@ export async function notifyMachineConnected(
     source: { machineId: machine.id, label: machine.name },
     latest: { title: machine.name, ...(machine.hostname ? { text: notificationSnippet(machine.hostname) } : {}) },
   });
+}
+
+// ── Agent browser (ADR 0040) ──────────────────────────────────────────────────
+
+/** Who an agent's browser handoff is asked of: the person behind the run, else the agent's owner. */
+export async function browserHandoffRecipient(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  runId: string | null,
+  agentId: string,
+) {
+  return (await requesterOfRun(deps, orgId, runId)) ?? (await agentOwner(deps, agentId));
+}
+
+/** An agent needs a person in its browser (`browser_ask_person`): in their "Waiting for you", with a push. */
+export async function notifyBrowserHandoff(
+  deps: NotificationDeps,
+  h: typeof schema.browserHandoffs.$inferSelect,
+  where: { channelId: string; threadId: string | null },
+) {
+  if (!h.requestedForUserId) return;
+  const [channel] = await deps.db
+    .select({ kind: channels.kind, name: channels.name })
+    .from(channels)
+    .where(eq(channels.id, where.channelId));
+  await notify(deps, {
+    orgId: h.orgId,
+    userIds: [h.requestedForUserId],
+    kind: "browser_handoff",
+    groupKey: `browser_handoff:${h.id}`,
+    waiting: true,
+    actor: agent(h.agentId),
+    source: {
+      channelId: where.channelId,
+      ...(where.threadId ? { threadId: where.threadId } : {}),
+      messageId: h.id,
+      ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
+      ...(channel?.kind === "channel" ? { label: channel.name } : {}),
+      handoffId: h.id,
+    },
+    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
+  });
+}
+
+/** Done, couldn't, canceled or expired: out of everyone's inbox. */
+export async function resolveBrowserHandoffNotifications(deps: NotificationDeps, orgId: string, handoffId: string) {
+  await resolveNotifications(deps, orgId, { groupKey: `browser_handoff:${handoffId}` });
 }

@@ -149,6 +149,7 @@ export async function createTestServer(
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: options.appleRevoke,
         desktopFetch: options.desktopFetch,
+        browserLive: engine.browserLive,
       },
     },
     log,
@@ -160,6 +161,7 @@ export async function createTestServer(
     log,
     ...adapters,
     machines: createMachineSockets(engine.machineHub),
+    browserLive: engine.browserLive,
   });
   return {
     db,

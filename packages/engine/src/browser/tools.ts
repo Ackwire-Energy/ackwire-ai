@@ -7,6 +7,7 @@ import { missionOfRun } from "../mission-context";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import { waitIfPersonInControl } from "./handoff";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserToolName } from "./types";
 
 const { secretRequests } = schema;
@@ -261,7 +262,15 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     inputSchema: JsonSchema,
     execute: (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolOutput>,
     extra: Partial<Pick<ToolDefinition, "checkCall" | "describe">> = {},
-  ): ToolDefinition => ({ name, description, inputSchema, scope: BROWSER_SCOPE, execute, ...extra });
+  ): ToolDefinition => ({
+    name,
+    description,
+    inputSchema,
+    scope: BROWSER_SCOPE,
+    // A person in control of this browser (a handoff or a take over) makes the agent wait.
+    execute: async (input, ctx) => (await waitIfPersonInControl(ctx.db, ctx)) ?? execute(input, ctx),
+    ...extra,
+  });
 
   const changed = (what: string) => () =>
     `${what} Read the page (browser_read) to see the result before the next step.`;
