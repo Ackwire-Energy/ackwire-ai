@@ -311,6 +311,8 @@ export interface ApiClient {
         replyTo?: string;
         /** Uploaded files (artifact ids): the server stores `meta.artifacts`. */
         attachments?: string[];
+        /** Sent from the thread panel ("Responder"), with `threadId`: the thread gets `openedByReplyAt`. */
+        openThread?: boolean;
       },
     ): Promise<Message>;
     reactions(orgId: string, messageId: string): Promise<ReactionCount[]>;

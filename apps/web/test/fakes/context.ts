@@ -3,7 +3,7 @@
  * the newer endpoints: artifacts, storage, issues/routines/calendar and custom
  * MCP servers. Same shapes as apps/server/src/routes/app/*; nothing here ships.
  */
-import type { Agent, Channel, Me, Member } from "@agenteschat/client";
+import type { Agent, Channel, Me, Member, Message } from "@agenteschat/client";
 
 export interface MockContext {
   seed: boolean;
@@ -14,6 +14,8 @@ export interface MockContext {
     agents(orgId: string): Promise<Agent[]>;
     channels(orgId: string): Promise<Channel[]>;
     members(orgId: string): Promise<Member[]>;
+    /** Every message (any channel), as the chat fake holds them. */
+    messages?(orgId: string): Promise<Message[]>;
   };
 }
 

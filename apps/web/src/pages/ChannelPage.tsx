@@ -20,6 +20,7 @@ import {
   type LiveRun,
   MESSAGES_PAGE,
   narrationOf,
+  OPEN_THREAD,
   runsInChannel,
   type StreamsState,
   sendHelpers,
@@ -31,7 +32,6 @@ import {
   useChannels,
   useChannelThreads,
   useCreateMission,
-  useCreateThread,
   useJoinChannel,
   useMessages,
   useMissionControl,
@@ -76,15 +76,9 @@ import {
 } from "@agenteschat/client/lib/missions";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
-import { localMeta, quoteExcerpt, replyOf } from "@agenteschat/client/lib/reply";
+import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
-import {
-  contextMarks,
-  hiddenByThreads,
-  rangeCandidates,
-  suggestRange,
-  threadStartOf,
-} from "@agenteschat/client/lib/threads";
+import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem, threadRootsToLoad } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
@@ -143,7 +137,7 @@ import { WaitingCard } from "@/components/MachineOutages";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
-import { MessageMoreMenu, PersonMessageActions, QuoteReplyButton } from "@/components/MessageMore";
+import { MessageMoreMenu, PersonMessageActions, ReplyButton } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
@@ -171,13 +165,13 @@ import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { askToStop, isStoppable, StopButton, useStopRun } from "@/components/StopRun";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
-import { useThreadFlows } from "@/components/threads/ThreadBits";
 import {
   ArchivedThreadsNote,
   ChannelThreadsButton,
   ChannelThreadsContext,
   type ChannelThreadsView,
   ClosedThreadLine,
+  ThreadReplyLine,
   ThreadStartLine,
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
@@ -198,6 +192,7 @@ import {
   useStreams,
   useTypingSender,
 } from "@/realtime/context";
+import { ThreadPage } from "./ThreadPage";
 
 /** Header and empty state of a channel, or of a DM (same layout). */
 export interface ChannelChrome {
@@ -221,6 +216,10 @@ export interface ChannelChrome {
   composerReplacement?: ReactNode;
   /** Under the composer (a mission someone only reads: "para pedir algo, peça para participar"). */
   composerNote?: ReactNode;
+  /** A thread in the panel beside its channel (telas/ThreadPainel.html): a section, not the page's main. */
+  panel?: boolean;
+  /** A thread view where a person's reply makes it a "Responder" thread (`openThread` on the post). */
+  openThread?: boolean;
 }
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
@@ -261,23 +260,6 @@ function highlightMessage(scroller: HTMLElement | null, messageId: string) {
   el.classList.add("ac-msg--focus");
   setTimeout(() => el.classList.remove("ac-msg--focus"), HIGHLIGHT_MS);
   return true;
-}
-
-/** "Respondendo a Ana" above the text: the quoted line and a cancel (Esc does it too). */
-function QuoteBar({ name, excerpt, onCancel }: { name: string; excerpt: string; onCancel: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="composer-quote">
-      <Icon name="reply" size={16} />
-      <span className="composer-quote__text">
-        <span className="composer-quote__who">{t("channel.replyingTo", { name })}</span>
-        <span className="composer-quote__excerpt">{excerpt}</span>
-      </span>
-      <button type="button" className="composer-reply__close" aria-label={t("channel.cancelQuote")} onClick={onCancel}>
-        <Icon name="close" size={14} />
-      </button>
-    </div>
-  );
 }
 
 /** The quote above a reply: who and one line; opens the original. */
@@ -363,10 +345,11 @@ export function ChannelPage({
  * The whole conversation loading (header, messages, composer) with the real
  * layout, so nothing jumps when it arrives.
  */
-export function ChannelSkeleton() {
+export function ChannelSkeleton({ panel }: { panel?: boolean } = {}) {
   const { t } = useTranslation();
+  const Tag = panel ? "section" : "main";
   return (
-    <main className="shell__main shell__main--chat">
+    <Tag className={cx("shell__main shell__main--chat", panel && "thread-panel__chat")}>
       <SkeletonGroup label={t("common.loadingMessages")} className="channel__skeleton">
         <header className="channel__header">
           <NavToggle />
@@ -393,7 +376,7 @@ export function ChannelSkeleton() {
           <p className="ac-composer__hint">&nbsp;</p>
         </div>
       </SkeletonGroup>
-    </main>
+    </Tag>
   );
 }
 
@@ -430,11 +413,12 @@ function ChannelView({
     [openThreads.data, archivedThreads.data],
   );
   // Live runs shown here: a thread view shows its own; the channel hides those of threads it draws as
-  // one line (closed) or a marker (made from a range): their replies don't land in the channel.
+  // one line (closed, or answered with "Responder") or a marker (made from a range): their replies
+  // don't land in the channel.
   const hiddenRunThreads = useMemo(
     () =>
       new Set([
-        ...threadList.filter((x) => x.state !== "open").map((x) => x.id),
+        ...threadList.filter((x) => x.state !== "open" || x.openedByReplyAt).map((x) => x.id),
         ...(channelMessages.data ?? []).filter((m) => threadStartOf(m.meta) || m.meta?.missionStart).map((m) => m.id),
       ]),
     [threadList, channelMessages.data],
@@ -467,10 +451,8 @@ function ChannelView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  // "Responder em thread": the next message goes to that thread.
-  const [replyTo, setReplyTo] = useState<MessageType | null>(null);
-  // "Responder": the next message quotes this one (`meta.replyTo`), in the same conversation.
-  const [quote, setQuote] = useState<MessageType | null>(null);
+  // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
+  const [panel, setPanel] = useState<{ id: string; reply: boolean } | null>(null);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
   // `/summary` and `/plan`: a card only I see, under the conversation.
@@ -608,14 +590,48 @@ function ChannelView({
     el.scrollTop = el.scrollHeight - a.height + a.top;
   }, [older]);
 
+  // The channel's messages with the thread replies it shows: "Responder" threads keep in the channel only
+  // what was said before someone answered from the panel (from then on, one line where the thread left).
+  const channelList = useMemo(() => {
+    if (thread) return null;
+    const merged = mergeTimeline(
+      [...older, ...(channelMessages.data ?? [])],
+      threads.map((q) => q.data),
+    );
+    const hidden = hiddenByThreads(threadList, merged);
+    const opened = new Map(
+      threadList.flatMap((x) => (x.state === "open" && x.openedByReplyAt ? [[x.id, x] as const] : [])),
+    );
+    const inPanel = (m: MessageType) => {
+      if (!m.threadId) return false;
+      // My reply on its way from the panel (before the thread says it was opened).
+      if (m.local && m.meta?.[OPEN_THREAD] === true) return true;
+      const at = opened.get(m.threadId)?.openedByReplyAt;
+      return Boolean(at && m.createdAt >= at);
+    };
+    const visible = merged.filter((m) => !hidden(m) && !inPanel(m));
+    // Each "Responder" thread's line sits under its last message still in the channel (its root, or the
+    // reply someone answered); its count is what went to the panel.
+    const lines = new Map<string, { thread: ThreadInfo; count: number }>();
+    for (const x of opened.values()) {
+      const own = visible.filter((m) => m.id === x.id || m.threadId === x.id);
+      const last = own.at(-1);
+      if (!last) continue;
+      const before = own.filter((m) => m.threadId === x.id).length;
+      lines.set(last.id, { thread: x, count: Math.max(1, x.replyCount - before) });
+    }
+    return { visible, lines };
+  }, [thread, older, channelMessages.data, threads, threadList]);
   // The channel's threads as the timeline draws them (none in a thread view).
   const threadsView = useMemo<ChannelThreadsView | null>(() => {
-    if (thread) return null;
+    if (thread || !channelList) return null;
     return {
       byId: new Map(threadList.filter((x) => x.state !== "archived").map((x) => [x.id, x])),
       marks: contextMarks(threadList, [...older, ...(channelMessages.data ?? [])], channel.id),
+      open: panel?.id ?? null,
+      lines: channelList.lines,
     };
-  }, [thread, threadList, older, channelMessages.data, channel.id]);
+  }, [thread, channelList, threadList, older, channelMessages.data, channel.id, panel?.id]);
   const timeline = useMemo(() => {
     if (thread) {
       // The thread's conversation. One made from a range: not its root (the channel's marker) nor the
@@ -626,27 +642,22 @@ function ChannelView({
       );
       return buildTimeline(list, [], []);
     }
-    const merged = mergeTimeline(
-      [...older, ...(channelMessages.data ?? [])],
-      threads.map((q) => q.data),
-    );
-    const hidden = hiddenByThreads(threadList, merged);
-    const items = buildTimeline(
-      merged.filter((m) => !hidden(m)),
-      [],
-      [],
-    );
-    // A marker or a closed line is not a message: nothing groups under it.
+    const items = buildTimeline(channelList?.visible ?? [], [], []);
+    // A marker, a closed line or a thread's line is not a message: nothing groups under it.
     const special = (m: MessageType) =>
-      Boolean(threadStartOf(m.meta)) || threadsView?.byId.get(m.id)?.state === "closed";
+      Boolean(threadStartOf(m.meta)) ||
+      threadsView?.byId.get(m.id)?.state === "closed" ||
+      Boolean(channelList?.lines.has(m.id));
     return ungroupAfter(items, special);
-  }, [thread, older, channelMessages.data, threadMessages.data, threads, threadList, threadsView]);
+  }, [thread, channelList, channelMessages.data, threadMessages.data, threadsView]);
 
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
   const scroller = useRef<HTMLElement>(null);
   // Coming back to a channel scrolled up: restore that position (else the bottom).
-  const savedScroll = useRef(scrollPositions.get(channel.id));
+  // A thread view (page or panel) keeps its own place, apart from its channel's.
+  const scrollKey = thread ? `${channel.id}:${thread.id}` : channel.id;
+  const savedScroll = useRef(scrollPositions.get(scrollKey));
   // Opened at a message: not pinned to the bottom until the person scrolls down.
   const stick = useRef(savedScroll.current === undefined && !focusMessageId);
   const lastScrollTop = useRef<number | null>(null);
@@ -800,10 +811,10 @@ function ChannelView({
   // Leaving: remember where they were (only when scrolled up).
   useEffect(
     () => () => {
-      if (stick.current || lastScrollTop.current === null) scrollPositions.delete(channel.id);
-      else scrollPositions.set(channel.id, lastScrollTop.current);
+      if (stick.current || lastScrollTop.current === null) scrollPositions.delete(scrollKey);
+      else scrollPositions.set(scrollKey, lastScrollTop.current);
     },
-    [channel.id],
+    [scrollKey],
   );
   // Dev only: "click → first paint of messages".
   const fromCache = useRef(messages.data !== undefined);
@@ -831,7 +842,7 @@ function ChannelView({
   );
   const pillAgents = dmAgent ? [dmAgent] : draftAgents;
   const composerPills =
-    pillAgents.length > 0 || replyTo || missionReply ? (
+    pillAgents.length > 0 || missionReply ? (
       <>
         {missionReply && (
           <span className="ac-composer__pill composer-reply">
@@ -842,20 +853,6 @@ function ChannelView({
               className="composer-reply__close"
               aria-label={t("missions.reply.cancel")}
               onClick={() => setMissionReply(null)}
-            >
-              <Icon name="close" size={14} />
-            </button>
-          </span>
-        )}
-        {replyTo && (
-          <span className="ac-composer__pill composer-reply">
-            <Icon name="message" size={14} />
-            {t("channel.inThreadOf", { name: dir.authorName(replyTo.author) })}
-            <button
-              type="button"
-              className="composer-reply__close"
-              aria-label={t("channel.cancelReply")}
-              onClick={() => setReplyTo(null)}
             >
               <Icon name="close" size={14} />
             </button>
@@ -1104,10 +1101,10 @@ function ChannelView({
     }
     toBottom(true);
     setDraft("");
-    const meta = localMeta(quote, quote ? dir.authorName(quote.author) : "", attached);
-    send(text, thread ? thread.id : replyTo ? (replyTo.threadId ?? replyTo.id) : null, meta);
-    setReplyTo(null);
-    setQuote(null);
+    const meta = localMeta(null, "", attached);
+    // From the thread panel or page: the reply makes it a "Responder" thread (out of the channel's timeline).
+    if (thread && chrome?.openThread) meta[OPEN_THREAD] = true;
+    send(text, thread ? thread.id : null, meta);
     dropFiles(() => false);
   };
   // Live rows sit by time: right after the message that started them (never at the bottom glued
@@ -1124,17 +1121,6 @@ function ChannelView({
     const first = channelAgents[0];
     return first ? greetingSuggestions(t, first.role).map((s) => `@${first.handle} ${s}`) : [];
   }, [chrome?.suggestions, channelAgents, t]);
-
-  const createThread = useCreateThread(org.id);
-  const flows = useThreadFlows();
-  function createThreadFrom(message: MessageType) {
-    const range = suggestRange([...older, ...(channelMessages.data ?? [])], message.id);
-    if (!range || createThread.isPending) return;
-    createThread.mutate(
-      { channelId: channel.id, firstMessageId: range.firstId, lastMessageId: range.lastId },
-      { onSuccess: flows.created, onError: (error) => toast.show(errorText(t, error), "error") },
-    );
-  }
 
   // "Ajustar trecho": the channel's messages that can be in the range (and the moved ones, back in
   // their place), with the selection band in place of the timeline and its bar in place of the composer.
@@ -1195,17 +1181,12 @@ function ChannelView({
       if (stick.current && Date.now() >= autoScrollUntil.current) follow();
     },
     channelAgents,
-    // In a thread view everything already goes to the thread.
-    replyInThread: thread
-      ? undefined
-      : (message) => {
-          setReplyTo(message);
-          composer.current?.focus();
-        },
-    quoteReply: (message) => {
-      setQuote(message);
-      composer.current?.focus();
-    },
+    // "Responder": in a thread view everything already goes to the thread; in a channel, the message's
+    // thread opens in the panel (a reply there starts it).
+    reply: thread
+      ? () => composer.current?.focus()
+      : (message) => setPanel({ id: message.threadId ?? message.id, reply: true }),
+    openThread: thread ? undefined : (id) => setPanel({ id, reply: false }),
     requestCorrection: (message, text) => {
       const handle = message.author.type === "agent" ? dir.agentById.get(message.author.id ?? "")?.handle : undefined;
       toBottom(true);
@@ -1216,17 +1197,15 @@ function ChannelView({
       );
     },
     jumpTo,
-    // "Criar thread a partir daqui": the suggested range becomes a thread's context (not in a thread view).
-    createThreadFrom: thread || adjustThreadId ? undefined : createThreadFrom,
     replyToMission: (missionId, label) => {
       setMissionReply({ missionId, label });
-      setReplyTo(null);
       composer.current?.focus();
     },
   };
 
   // A DM with an agent: the agent's chip sits in the composer's toolbar row.
   const agentDm = Boolean(chrome?.dmAgentId) && !thread;
+  const Tag = chrome?.panel ? "section" : "main";
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
     t("newAgent.and"),
@@ -1243,7 +1222,7 @@ function ChannelView({
       <ChannelThreadsContext.Provider value={threadsView}>
         {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
             are a left-aligned team chat (telas/RefinoUI.html, "Conversa: Nova leitura"). */}
-        <main className="shell__main shell__main--chat">
+        <Tag className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}>
           {chrome?.header ?? (
             <header className="channel__header">
               <NavToggle />
@@ -1422,16 +1401,7 @@ function ChannelView({
                   {t("channel.reconnecting")}
                 </p>
               )}
-              {/* Esc in the box (nothing else open) drops the quote first. */}
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: Esc from the composer's controls bubbles here */}
-              <div
-                className="channel__composer"
-                onKeyDown={(e) => {
-                  if (e.key !== "Escape" || !quote || e.defaultPrevented) return;
-                  e.preventDefault();
-                  setQuote(null);
-                }}
-              >
+              <div className="channel__composer">
                 <ActivityBar channelId={channel.id} visible={runVisible} />
                 {adjustThreadId ? (
                   <RangeBar adjust={adjust} />
@@ -1440,18 +1410,6 @@ function ChannelView({
                 ) : (
                   <>
                     <Composer
-                      header={
-                        quote ? (
-                          <QuoteBar
-                            name={dir.authorName(quote.author)}
-                            excerpt={quoteExcerpt(quote.body)}
-                            onCancel={() => {
-                              setQuote(null);
-                              composer.current?.focus();
-                            }}
-                          />
-                        ) : undefined
-                      }
                       attachments={
                         files.length > 0
                           ? files.map((f) => (
@@ -1480,7 +1438,7 @@ function ChannelView({
                       sendBlocked={uploading}
                       format={formatLabels}
                       emoji={emojiLabels}
-                      id={`composer-${channel.id}`}
+                      id={`composer-${thread?.id ?? channel.id}`}
                       textareaRef={composer}
                       value={draft}
                       onChange={(v) => {
@@ -1553,7 +1511,12 @@ function ChannelView({
               initialAgentId={channelAgents[0]?.id}
             />
           )}
-        </main>
+        </Tag>
+        {panel && (
+          <aside className="thread-panel" aria-label={t("threads.side.label")}>
+            <ThreadPage key={panel.id} threadId={panel.id} reply={panel.reply} onClose={() => setPanel(null)} />
+          </aside>
+        )}
       </ChannelThreadsContext.Provider>
     </ChannelActionsContext.Provider>
   );
@@ -2111,6 +2074,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const replacesLive = useStreams((s) => Boolean(m.agentRunId && s.finished[m.agentRunId]));
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
+  const threadLine = useChannelThreadsView()?.lines.get(m.id);
   const [active, setActive] = useState(false);
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
@@ -2195,7 +2159,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionLink = m.author.type === "agent" ? missionLinkOf(meta) : null;
   const missionCard = Boolean(missionPlan || missionDecision || missionReview || missionDelivery || missionCommand);
   // The root of a mission in the channel: its work lives in its thread.
-  const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
+  const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.openThread !== undefined;
   // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
   const forumSuggestion = m.author.type === "agent" ? forumSuggestionOf(meta) : null;
   // It asked other agents before answering (`meta.consulted`): one card per agent, on top of the reply.
@@ -2395,13 +2359,15 @@ export const TimelineMessage = memo(function TimelineMessage({
           extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
         />
       )}
+      {/* A "Responder" thread went on from here: its line (opens the panel). */}
+      {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
       {feedback && (
         <MessageFeedback
           messageId={m.id}
           agentName={agent?.name ?? t("channel.unknownAgent")}
           active={active}
           initial={m.reactions}
-          quick={<QuoteReplyButton message={m} />}
+          quick={<ReplyButton message={m} />}
           more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
         />
       )}

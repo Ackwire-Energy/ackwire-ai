@@ -125,8 +125,11 @@ function ThreadTitle({ thread }: { thread: ThreadInfo }) {
   );
 }
 
-/** The thread's header: back to the channel, the title, who is in it, its state and ⋯. */
-export function ThreadHeader({ thread }: { thread: ThreadInfo }) {
+/**
+ * The thread's header: back to the channel, the title, who is in it, its state and ⋯. In the panel
+ * beside a channel (`onClose`): no way back (the channel is right there), "Abrir em tela cheia" and close.
+ */
+export function ThreadHeader({ thread, onClose }: { thread: ThreadInfo; onClose?: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -139,17 +142,21 @@ export function ThreadHeader({ thread }: { thread: ThreadInfo }) {
   const archived = thread.state === "archived";
   const more = t("threads.view.more");
   return (
-    <header className="channel__header thread-head">
-      <NavToggle />
-      <Button
-        size="sm"
-        variant="ghost"
-        iconOnly
-        icon="chevronLeft"
-        aria-label={t("threads.view.backTo", { where })}
-        title={t("threads.view.backTo", { where })}
-        onClick={() => void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams })}
-      />
+    <header className={onClose ? "channel__header thread-head thread-head--panel" : "channel__header thread-head"}>
+      {!onClose && (
+        <>
+          <NavToggle />
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="chevronLeft"
+            aria-label={t("threads.view.backTo", { where })}
+            title={t("threads.view.backTo", { where })}
+            onClick={() => void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams })}
+          />
+        </>
+      )}
       <div className="thread-head__text">
         <h1 className="channel__title thread-title">
           <Icon name="thread" size={18} />
@@ -215,6 +222,30 @@ export function ThreadHeader({ thread }: { thread: ThreadInfo }) {
           </>
         )}
       </Menu>
+      {onClose && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="external"
+            aria-label={t("threads.side.expand")}
+            title={t("threads.side.expand")}
+            onClick={() =>
+              void navigate({ to: "/org/$orgId/threads/$threadId", params: { orgId: org.id, threadId: thread.id } })
+            }
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="close"
+            aria-label={t("threads.side.close")}
+            title={t("threads.side.close")}
+            onClick={onClose}
+          />
+        </>
+      )}
       {controls.dialog}
     </header>
   );

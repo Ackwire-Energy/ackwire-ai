@@ -84,6 +84,11 @@ export interface ThreadInfo {
   rootText: string;
   rootAuthor: Actor;
   state: ThreadState;
+  /**
+   * When "Responder" opened it (its first reply from the thread panel): replies from then on live in
+   * the panel and the channel shows one line. Null: the channel shows its replies in the timeline.
+   */
+  openedByReplyAt: string | null;
   createdBy: string | null;
   closedBy: string | null;
   closedAt: string | null;
@@ -908,6 +913,7 @@ interface ThreadSqlRow {
   last_at: Date | string;
   title: string | null;
   state: ThreadState | null;
+  opened_by_reply_at?: Date | string | null;
   created_by: string | null;
   closed_by: string | null;
   closed_at: Date | string | null;
@@ -1022,7 +1028,7 @@ async function queryThreads(
         select root.id, root.channel_id, v.name as channel_name, v.kind as channel_kind, root.created_at,
           root.body, root.author_type, root.author_user_id, root.author_agent_id,
           coalesce(r.reply_count, 0) as reply_count, coalesce(r.last_at, root.created_at) as last_at,
-          t.title, coalesce(t.state, 'open') as state, t.created_by, t.closed_by, t.closed_at,
+          t.title, coalesce(t.state, 'open') as state, t.opened_by_reply_at, t.created_by, t.closed_by, t.closed_at,
           t.archived_by, t.archived_at, t.context_channel_id, t.context_first_message_id,
           t.context_last_message_id, t.context_excluded_message_ids, t.context_moved,
           case when t.context_first_at is null then null else (
@@ -1139,6 +1145,7 @@ function toView(
     rootText: replyExcerpt(r.body),
     rootAuthor: { type: r.author_type, id: r.author_type === "person" ? r.author_user_id : r.author_agent_id },
     state: r.state ?? "open",
+    openedByReplyAt: isoOrNull(r.opened_by_reply_at ?? null),
     createdBy: r.created_by,
     closedBy: r.closed_by,
     closedAt: isoOrNull(r.closed_at),

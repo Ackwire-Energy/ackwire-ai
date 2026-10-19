@@ -569,6 +569,31 @@ export async function insertMessageWithRuns(
 }
 
 /**
+ * "Responder" opened this thread at this reply: its row says when (made here when the thread had
+ * none); replies from then on leave the channel's timeline. True when it wasn't marked before, so
+ * the channel hears about it once.
+ */
+async function markOpenedByReply(db: Database, reply: Message, userId: string): Promise<boolean> {
+  if (!reply.threadId) return false;
+  const marked = await db
+    .insert(threads)
+    .values({
+      orgId: reply.orgId,
+      channelId: reply.channelId,
+      rootMessageId: reply.threadId,
+      openedByReplyAt: reply.createdAt,
+      createdBy: userId,
+    })
+    .onConflictDoUpdate({
+      target: [threads.orgId, threads.rootMessageId],
+      set: { openedByReplyAt: reply.createdAt, updatedAt: new Date() },
+      setWhere: isNull(threads.openedByReplyAt),
+    })
+    .returning({ id: threads.id });
+  return marked.length > 0;
+}
+
+/**
  * A person posts in a channel: org membership, channel membership and the
  * `post` permission are checked, then message + outbox event commit together,
  * then the message is published to real-time subscribers.
@@ -589,6 +614,11 @@ export async function postPersonMessage(
     replyTo?: string | null;
     /** Files (artifact ids) uploaded for this message, or files of this channel. Stored as `meta.artifacts`. */
     attachments?: string[];
+    /**
+     * Sent from the thread panel ("Responder"): from this reply on, the thread's replies live in the
+     * panel and the channel shows one line (`threads.opened_by_reply_at`). Needs `threadId`.
+     */
+    openThread?: boolean;
   },
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
@@ -642,6 +672,14 @@ export async function postPersonMessage(
       messageId: message.id,
       threadId: message.threadId,
       byUserId: userId,
+    });
+  }
+  if (input.openThread && message.threadId && (await markOpenedByReply(deps.db, message, userId))) {
+    await publishChannelEvent(deps.pubsub, {
+      type: "thread.updated",
+      channelId,
+      threadId: message.threadId,
+      change: "created",
     });
   }
   if (reopened && message.threadId) {

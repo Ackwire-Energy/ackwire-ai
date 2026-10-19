@@ -2473,6 +2473,11 @@ export interface ThreadInfo {
   working: boolean;
   needsYou: boolean;
   /** Open, and a model judged its matter done after its last message: offer one-click close. Never closes by itself. */
+  /**
+   * When "Responder" opened it (its first reply from the thread panel): replies from then on live in
+   * the panel and the channel shows one line. Null: the channel shows its replies in the timeline.
+   */
+  openedByReplyAt: string | null;
   suggestedResolved: boolean;
   /** You may close, archive, rename or change the context. */
   canManage: boolean;

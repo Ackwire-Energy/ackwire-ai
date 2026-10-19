@@ -468,3 +468,36 @@ test("a model's title is plain text on one line", () => {
   expect(cleanAssessedTitle("  ")).toBeNull();
   expect(cleanAssessedTitle(3)).toBeNull();
 });
+
+test("'Responder' marks when the thread was opened by reply, once; a plain reply doesn't", async () => {
+  const root = await post(f.owner.id, f.general.id, "Who owns the onboarding copy?");
+  await post(f.owner.id, f.general.id, "a reply that isn't from the panel", root.id);
+  expect((await getThread(f.db, f.owner.id, f.org.id, root.id)).openedByReplyAt).toBeNull();
+
+  const events = f.listen(f.general.id);
+  const first = await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, {
+    body: "I do",
+    threadId: root.id,
+    openThread: true,
+  });
+  await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, {
+    body: "and the screenshots",
+    threadId: root.id,
+    openThread: true,
+  });
+  const view = await getThread(f.db, f.owner.id, f.org.id, root.id);
+  // From the first panel reply on (the one before it stays in the channel's timeline).
+  expect(view).toMatchObject({ openedByReplyAt: first.createdAt, state: "open", replyCount: 3 });
+  const listedView = (await listThreads(f.db, f.owner.id, { orgId: f.org.id, channelId: f.general.id })).threads;
+  expect(listedView.find((x) => x.id === root.id)?.openedByReplyAt).toBe(first.createdAt);
+  // The channel hears it once (the second reply finds it marked).
+  const created = events.filter((e) => e.type === "thread.updated" && e.change === "created" && e.threadId === root.id);
+  expect(created).toHaveLength(1);
+});
+
+test("openThread without a threadId is a plain top-level message", async () => {
+  const m = await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "hi", openThread: true });
+  expect(m.threadId).toBeNull();
+  const rows = await f.db.select().from(schema.threads).where(eq(schema.threads.rootMessageId, m.id));
+  expect(rows).toHaveLength(0);
+});

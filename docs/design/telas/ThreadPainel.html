@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thread no painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;650;700&display=swap">
+<script>
+  { const h = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = h.get("theme") || "light";
+    document.documentElement.dataset.v = h.get("v") || "a"; }
+</script>
+<style>
+/*
+  Prototype (ThreadPainel): threads open in a panel on the right of the chat, not on a page of their own.
+  - Replying to a message IS the thread: "Responder" on any message opens the panel with that message on top.
+    "Criar thread a partir daqui" (a range of messages as context) goes away, and so does the quote reply
+    that stayed in the channel. Replies live in the panel; the channel shows one card under the message.
+  - The card under the message replaces "Este trecho virou contexto da thread … · Abrir thread": who is in it
+    (avatars), how many replies, the last reply in plain words, and what it needs (Esperando você / Trabalhando).
+  Three cards to choose from: A Resumo · B Conversa · C Linha. The panel is the same in all three.
+  Cards follow telas/Cards.html "I · Tato com canto". Agents come from packages/ui/src/agent/engine.js
+  (serve the repo root over http).
+*/
+:root,[data-theme="light"]{
+  --side:#f8f8f6;--pane:#ffffff;--raised:#ffffff;--sunken:#f3f3f0;
+  --line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --agent:#0063d1;--agent-soft:#e3eefd;--ok:#1f7a45;--warn:#9a5b00;--warn-soft:#fbeed5;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --card-face-top:#fff;
+  --card-shadow:0 0 0 1px rgba(23,23,22,.08),inset 0 1px 0 #fff,inset 0 -1px 0 rgba(23,23,22,.06),0 1px 2px rgba(23,23,22,.06),0 12px 28px -14px rgba(23,23,22,.18);
+  --card-shadow-hover:0 0 0 1px rgba(23,23,22,.1),inset 0 1px 0 #fff,inset 0 -1px 0 rgba(23,23,22,.07),0 2px 4px rgba(23,23,22,.06),0 18px 36px -16px rgba(23,23,22,.24);
+  --card-well:#f6f6f3;--card-well-shadow:inset 0 1px 2px rgba(23,23,22,.07),inset 0 0 0 1px rgba(23,23,22,.05),0 1px 0 #fff;
+  --chosen-shadow:inset 0 2px 5px rgba(23,23,22,.16),inset 0 1px 1.5px rgba(23,23,22,.12),inset 0 0 0 1px var(--line),0 1px 0 rgba(255,255,255,.7);
+  --person-a:#e9e9e5;--person-b:#d9d9d4;
+  --panel-shadow:-1px 0 0 var(--line),-24px 0 48px -32px rgba(23,23,22,.25);
+}
+[data-theme="dark"]{
+  --side:#0a0a09;--pane:#0f0f0e;--raised:#1c1c1b;--sunken:#0a0a09;
+  --line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.15);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --agent:#5aa8ff;--agent-soft:#11253f;--ok:#5fc48a;--warn:#e0a84a;--warn-soft:#33260e;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);
+  --card-face-top:#232322;
+  --card-shadow:0 0 0 1px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.08),inset 0 -1px 0 rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.5),0 14px 30px -12px rgba(0,0,0,.75);
+  --card-shadow-hover:0 0 0 1px rgba(255,255,255,.12),inset 0 1px 0 rgba(255,255,255,.1),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 4px rgba(0,0,0,.5),0 20px 40px -14px rgba(0,0,0,.85);
+  --card-well:#121211;--card-well-shadow:inset 0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.04),0 1px 0 rgba(255,255,255,.05);
+  --chosen-shadow:0 0 0 1px rgba(255,255,255,.1),0 14px 28px -8px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.12);
+  --person-a:#3a3a37;--person-b:#2a2a28;
+  --panel-shadow:-1px 0 0 var(--line),-24px 0 48px -32px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--side);color:var(--ink);font:400 14.5px/1.5 Onest,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+button{font:inherit;color:inherit;cursor:pointer}
+.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.i.sm{width:15px;height:15px}
+.i.xs{width:13px;height:13px}
+
+/* Prototype chrome */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--pane)}
+.bar b{font-size:13px;font-weight:650}
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--sunken)}
+.seg button{height:30px;padding:0 12px;border:0;border-radius:9px;background:transparent;font-size:13px;font-weight:550;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line)}
+.note{flex-basis:100%;margin:0;color:var(--muted);font-size:12.5px;line-height:1.45}
+
+/* App shell */
+.app{flex:1;min-height:0;display:flex}
+.side{width:220px;flex:none;padding:14px 10px;background:var(--side);display:flex;flex-direction:column;gap:2px}
+.side .org{display:flex;align-items:center;gap:8px;padding:4px 8px 14px;font-weight:650}
+.side .org span{width:24px;height:24px;border-radius:30% 30% 30% 9%;background:linear-gradient(160deg,#3d8bff,#0063d1)}
+.side a{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-radius:10px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:550}
+.side a[aria-current]{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+.side h6{margin:14px 10px 4px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+@media (max-width:1100px){.side{display:none}}
+
+.work{flex:1;min-width:0;display:flex;background:var(--pane);border-radius:16px 0 0 0;box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line)}
+.chat{flex:1;min-width:0;display:flex;flex-direction:column}
+.chead{display:flex;align-items:center;gap:10px;height:56px;padding:0 20px;border-bottom:1px solid var(--line)}
+.chead h1{margin:0;display:flex;align-items:center;gap:6px;font-size:16px;font-weight:650;letter-spacing:-.01em}
+.chead .sp{flex:1}
+.hbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:13px;font-weight:550}
+.hbtn:hover{background:var(--plate);color:var(--ink)}
+.stream{flex:1;overflow-y:auto;padding:12px 0 8px}
+.day{display:flex;align-items:center;gap:12px;margin:10px 20px;color:var(--faint);font-size:12px;font-weight:600}
+.day::before,.day::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* Messages */
+.msg{position:relative;display:grid;grid-template-columns:36px minmax(0,1fr);gap:0 12px;padding:8px 20px;max-width:880px}
+.msg:hover{background:var(--plate-soft)}
+.msg[data-open]{background:color-mix(in srgb,var(--agent-soft) 55%,transparent)}
+.msg__av{grid-row:span 3}
+.msg__who{display:flex;align-items:baseline;gap:8px}
+.msg__who b{font-size:14.5px;font-weight:650}
+.msg__who .tag{font-size:11px;font-weight:650;color:var(--agent);background:var(--agent-soft);padding:1px 6px;border-radius:999px}
+.msg__who time{color:var(--faint);font-size:12px}
+.msg__text{margin:1px 0 0;color:var(--ink2);line-height:1.55}
+.msg__text .mention{color:var(--agent);font-weight:600}
+.hover{position:absolute;top:-14px;right:20px;display:none;gap:2px;padding:3px;border-radius:12px 12px 12px 4px;background:var(--raised);box-shadow:var(--card-shadow)}
+.msg:hover .hover{display:flex}
+.hover button{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 9px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:13px;font-weight:550}
+.hover button:hover{background:var(--plate);color:var(--ink)}
+.hover .reply{color:var(--ink)}
+
+/* Avatars: one tile shape for agents and people */
+.av{position:relative;display:inline-grid;place-items:center;flex:none;border-radius:30% 30% 30% 9%;background:var(--sunken);overflow:hidden}
+.av canvas{display:block}
+.av--p{background:linear-gradient(160deg,var(--person-a),var(--person-b));color:var(--ink2);font-weight:650}
+.stack{display:inline-flex;align-items:center}
+.stack .av{box-shadow:0 0 0 2px var(--raised)}
+.stack .av + .av{margin-left:-3px}
+
+/* Chips: icon, never a dot */
+.chip{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px 0 7px;border-radius:999px;background:var(--plate);font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.chip--wait{background:var(--warn-soft);color:var(--warn)}
+.chip--work{background:var(--agent-soft);color:var(--agent)}
+
+/* ---------- Thread card under the message (3 options) ---------- */
+.tc{grid-column:2;margin-top:8px;max-width:560px;border:0;text-align:left;width:100%;display:flex;flex-direction:column;gap:0;padding:0;
+  background:linear-gradient(180deg,var(--card-face-top),var(--raised) 48px);border-radius:16px 16px 16px 4px;box-shadow:var(--card-shadow);
+  transition:box-shadow .2s,transform .2s cubic-bezier(.34,1.4,.5,1)}
+.tc:hover{box-shadow:var(--card-shadow-hover);transform:translateY(-1px)}
+.tc[aria-pressed="true"]{background:var(--sunken);box-shadow:var(--chosen-shadow);transform:none}
+.tc__top{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.tc__who{flex:1;min-width:0;display:flex;flex-direction:column}
+.tc__who b{font-size:13.5px;font-weight:650;line-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tc__who span{color:var(--muted);font-size:12.5px;line-height:17px}
+.tc__go{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:12.5px;font-weight:600;white-space:nowrap}
+.tc__last{display:flex;gap:8px;margin:0 8px 8px;padding:8px 10px;border-radius:11px 11px 11px 3px;background:var(--card-well);box-shadow:var(--card-well-shadow)}
+.tc__last p{margin:0;min-width:0;font-size:13px;line-height:18px;color:var(--ink2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tc__last p b{font-weight:650;color:var(--ink)}
+.tc__last time{margin-left:auto;padding-left:6px;color:var(--faint);font-size:12px;white-space:nowrap}
+
+/* A · Resumo: who + count + state on top; the last reply in a well. (default rules above) */
+
+/* B · Conversa: the thread title on top, the last two replies as a mini conversation, then a footer. */
+[data-v="b"] .tc__last{display:none}
+.tc__convo{display:none}
+[data-v="b"] .tc__convo{display:flex;flex-direction:column;gap:8px;padding:2px 12px 10px}
+.tc__line{display:flex;gap:8px;align-items:flex-start}
+.tc__line p{margin:0;min-width:0;font-size:13px;line-height:18px;color:var(--ink2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tc__line p b{font-weight:650;color:var(--ink)}
+.tc__foot{display:none}
+[data-v="b"] .tc__foot{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;font-weight:550}
+[data-v="b"] .tc__foot .sp{flex:1}
+[data-v="b"] .tc__top .stack{display:none}
+[data-v="b"] .tc__go{display:none}
+
+/* C · Linha: one slim line, the avatars, count, the last reply cut, when; the state chip at the end. */
+[data-v="c"] .tc{flex-direction:row;align-items:center;gap:10px;padding:6px 10px 6px 6px;max-width:640px;border-radius:12px 12px 12px 4px}
+[data-v="c"] .tc__top{padding:0;display:contents}
+[data-v="c"] .tc__who{flex:none}
+[data-v="c"] .tc__who b{display:none}
+[data-v="c"] .tc__who span{color:var(--ink);font-weight:650;font-size:13px}
+[data-v="c"] .tc__last{flex:1;min-width:0;margin:0;padding:0;background:none;box-shadow:none;align-items:center}
+[data-v="c"] .tc__last .av{display:none}
+[data-v="c"] .tc__last p{-webkit-line-clamp:1;color:var(--muted)}
+[data-v="c"] .tc__last p b{color:var(--muted);font-weight:550}
+[data-v="c"] .tc__go{display:none}
+
+/* D · Linha simples / E · Linha simples + fala: no card chrome, just a line under the message that lights on
+   hover. Small avatars, "N respostas" in ink, the state as icon + word (no pill), the time. E adds the last reply,
+   cut, after a dot. */
+.tc__simple{display:none}
+:is([data-v="d"],[data-v="e"]) .tc{flex-direction:row;align-items:center;gap:8px;width:auto;justify-self:start;max-width:640px;margin-top:4px;margin-left:-8px;padding:4px 10px 4px 6px;
+  background:none;box-shadow:none;border-radius:10px 10px 10px 3px;transition:background .15s}
+:is([data-v="d"],[data-v="e"]) .tc:hover{background:var(--plate-soft);transform:none;box-shadow:none}
+:is([data-v="d"],[data-v="e"]) .tc[aria-pressed="true"]{background:var(--plate)}
+:is([data-v="d"],[data-v="e"]) :is(.tc__top,.tc__last,.tc__convo,.tc__foot){display:none}
+:is([data-v="d"],[data-v="e"]) .tc__simple{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;color:var(--muted);white-space:nowrap}
+.tc__simple .stack .av{box-shadow:0 0 0 2px var(--pane)}
+.tc__simple b{color:var(--ink);font-weight:650}
+.tc__state{display:inline-flex;align-items:center;gap:4px;font-weight:600}
+.tc__state--wait{color:var(--warn)}
+.tc__state--work{color:var(--agent)}
+.tc__said{display:none;min-width:0;overflow:hidden;text-overflow:ellipsis}
+[data-v="e"] .tc__said{display:inline}
+.tc__dot{color:var(--faint)}
+
+/* Composer */
+.composer{margin:8px 20px 16px;max-width:880px;display:flex;align-items:center;gap:8px;min-height:48px;padding:6px 6px 6px 14px;border-radius:16px 16px 16px 4px;background:var(--raised);box-shadow:var(--card-shadow);color:var(--faint);font-size:14px}
+.composer .sp{flex:1}
+.send{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:11px 11px 11px 4px;background:var(--ink);color:var(--pane)}
+
+/* ---------- Panel ---------- */
+.panel{width:440px;flex:none;display:none;flex-direction:column;background:var(--pane);box-shadow:var(--panel-shadow);min-height:0;position:relative;z-index:2}
+.work[data-panel] .panel{display:flex;animation:pin .24s cubic-bezier(.2,.8,.2,1)}
+@keyframes pin{from{opacity:0;transform:translateX(16px)}}
+.phead{display:flex;align-items:flex-start;gap:10px;padding:14px 12px 12px 18px;border-bottom:1px solid var(--line)}
+.phead__t{flex:1;min-width:0}
+.phead__t h2{margin:0;font-size:15px;line-height:20px;font-weight:650;letter-spacing:-.01em}
+.phead__t p{margin:2px 0 0;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px}
+.ibtn{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:10px;background:transparent;color:var(--muted)}
+.ibtn:hover{background:var(--plate);color:var(--ink)}
+.pmeta{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line)}
+.pmeta .sp{flex:1}
+.pmeta__who{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted);font-size:12.5px}
+.pbody{flex:1;overflow-y:auto;padding:8px 0}
+.panel .msg{padding:8px 18px;grid-template-columns:32px minmax(0,1fr);max-width:none}
+.panel .msg .hover{right:14px}
+.root{margin:6px 10px 4px;padding:4px 0;border-radius:16px 16px 16px 4px;background:linear-gradient(180deg,var(--card-face-top),var(--raised) 48px);box-shadow:var(--card-shadow)}
+.root .msg{padding:8px 12px}
+.root .msg:hover{background:none}
+.root__from{display:flex;align-items:center;gap:6px;padding:4px 12px 6px;color:var(--faint);font-size:12px}
+.count{display:flex;align-items:center;gap:10px;margin:12px 18px 4px;color:var(--faint);font-size:12px;font-weight:600}
+.count::after{content:"";flex:1;height:1px;background:var(--line)}
+.panel .composer{margin:8px 12px 12px}
+.empty{margin:18px;padding:16px;border-radius:14px 14px 14px 4px;background:var(--card-well);box-shadow:var(--card-well-shadow);color:var(--muted);font-size:13px;line-height:1.5}
+@media (max-width:900px){
+  .panel{position:fixed;inset:0;width:auto;z-index:20;box-shadow:none}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>Thread no painel</b>
+  <div class="seg" id="v">
+    <button data-k="a">A · Resumo</button>
+    <button data-k="b">B · Conversa</button>
+    <button data-k="c">C · Linha</button>
+    <button data-k="d">D · Linha simples</button>
+    <button data-k="e">E · Simples + fala</button>
+  </div>
+  <div class="seg" id="theme">
+    <button data-k="light">Claro</button>
+    <button data-k="dark">Escuro</button>
+  </div>
+  <p class="note" id="note"></p>
+</div>
+
+<div class="app">
+  <nav class="side">
+    <div class="org"><span></span>Viajolo</div>
+    <a href="#">Início</a>
+    <a href="#">Tarefas</a>
+    <a href="#">Threads</a>
+    <h6>Canais</h6>
+    <a href="#" aria-current="page"># general</a>
+    <a href="#"># tech</a>
+    <h6>Agentes</h6>
+    <a href="#">Theo</a>
+    <a href="#">Ada</a>
+  </nav>
+
+  <div class="work" id="work">
+    <section class="chat">
+      <header class="chead">
+        <h1><svg class="i sm" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/></svg>general</h1>
+        <span class="sp"></span>
+        <button class="hbtn"><svg class="i sm" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>Threads (3)</button>
+        <button class="hbtn">Detalhes</button>
+      </header>
+      <div class="stream" id="stream"></div>
+      <div class="composer">Mensagem em #general<span class="sp"></span><button class="send" aria-label="Enviar"><svg class="i sm" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>
+    </section>
+
+    <aside class="panel" id="panel" aria-label="Thread"></aside>
+  </div>
+</div>
+
+<script type="module">
+import { drawAgent, idlePose } from "../../../packages/ui/src/agent/engine.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const sv = (d, c = "i sm") => `<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  reply: sv('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+  emoji: sv('<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>'),
+  more: sv('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
+  x: sv('<path d="M6 6l12 12M18 6 6 18"/>'),
+  expand: sv('<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>'),
+  hash: sv('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>', "i xs"),
+  chev: sv('<path d="m9 6 6 6-6 6"/>', "i xs"),
+  wait: sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', "i xs"),
+  bolt: sv('<path d="M13 3 5 13.5h6L10 21l8-10.5h-6Z"/>', "i xs"),
+  check: sv('<path d="m5 12.5 4.5 4.5L19 7.5"/>', "i xs"),
+  bell: sv('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 20a2 2 0 0 0 4 0"/>', "i xs"),
+  send: sv('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+};
+
+const AG = { theo: { name: "Theo", color: "amber" }, ada: { name: "Ada", color: "rose" }, atlas: { name: "Atlas", color: "violet" } };
+const PP = { walter: { name: "Walter" } };
+const nm = (w) => (AG[w] ? AG[w].name : PP[w].name);
+const isAgent = (w) => !!AG[w];
+const av = (w, s) => isAgent(w)
+  ? `<span class="av" style="width:${s}px;height:${s}px" data-a="${w}" data-s="${s}"></span>`
+  : `<span class="av av--p" style="width:${s}px;height:${s}px;font-size:${Math.round(s * .42)}px">${nm(w)[0]}</span>`;
+const people = (ws) => {
+  const names = ws.map((w) => (w === "walter" ? "você" : nm(w)));
+  return names.length <= 2 ? names.join(" e ") : `${names.slice(0, -1).join(", ")} e ${names.at(-1)}`;
+};
+
+const THREADS = {
+  t1: {
+    title: "Destinos das viagens de ontem", state: "wait",
+    root: { who: "theo", at: "08:02", text: '<span class="mention">@Walter</span>, aqui vão os destinos das viagens de ontem (17/10): Lisboa 34%, Porto 21%, Madri 12%, Paris 9%. Lisboa subiu 6 pontos na semana.' },
+    replies: [
+      { who: "walter", at: "08:15", text: "Lisboa subiu por causa da campanha do Instagram? Consegue cruzar com a origem do tráfego?" },
+      { who: "theo", at: "08:16", text: "Cruzei com o Himetrica: 58% das buscas por Lisboa vieram do Instagram desde terça, quando a campanha entrou." },
+      { who: "ada", at: "08:20", text: "Se for manter a campanha, dá para eu deixar a página de Lisboa mais leve. Hoje ela leva 3,1 s no celular." },
+      { who: "theo", at: "08:21", text: '<span class="mention">@Walter</span>, quer que eu deixe isso no relatório diário a partir de amanhã?' },
+    ],
+  },
+  t2: {
+    title: "Erro novo no checkout do iOS", state: "work",
+    root: { who: "atlas", at: "09:30", text: "Sentry: 14 ocorrências de <b>App Hang</b> no checkout do iOS nos últimos 30 minutos (VIAJOLO-15T)." },
+    replies: [
+      { who: "ada", at: "09:31", text: "Peguei. É o mesmo travamento do 15Q: a tela espera o Stripe responder na thread principal." },
+      { who: "ada", at: "09:34", text: "Estou escrevendo a correção e o teste. Abro o PR em uns 10 minutos." },
+    ],
+  },
+};
+const STREAM = [
+  { day: "Hoje" },
+  { msg: THREADS.t1.root, thread: "t1" },
+  { msg: { who: "walter", at: "08:40", text: "Bom dia! Hoje à tarde revisamos o roadmap do app, tragam o que estiver travado." } },
+  { msg: THREADS.t2.root, thread: "t2" },
+  { msg: { who: "theo", at: "09:45", text: "Rotina de reviews rodou: 2 negativos novos, os dois logo depois da compra. Deixei no fórum." } },
+];
+
+let open = null;
+const stateChip = (s) => s === "wait" ? `<span class="chip chip--wait">${I.wait}Esperando você</span>`
+  : s === "work" ? `<span class="chip chip--work">${I.bolt}Trabalhando</span>` : "";
+
+function card(id) {
+  const t = THREADS[id];
+  const who = [...new Set([t.root.who, ...t.replies.map((r) => r.who)])];
+  const last = t.replies.at(-1);
+  const n = t.replies.length;
+  const plain = (h) => h.replace(/<[^>]+>/g, "");
+  return `<button class="tc" data-t="${id}" aria-pressed="${open === id}" aria-label="Abrir thread: ${t.title}">
+    <span class="tc__top">
+      <span class="stack">${who.slice(0, 4).map((w) => av(w, 24)).join("")}</span>
+      <span class="tc__who"><b>${t.title}</b><span>${n} respostas · ${people(who)}</span></span>
+      ${stateChip(t.state)}
+      <span class="tc__go">Abrir${I.chev}</span>
+    </span>
+    <span class="tc__last">${av(last.who, 20)}<p><b>${nm(last.who)}:</b> ${plain(last.text)}</p><time>${last.at}</time></span>
+    <span class="tc__convo">${t.replies.slice(-2).map((r) => `<span class="tc__line">${av(r.who, 20)}<p><b>${nm(r.who)}</b> ${plain(r.text)}</p></span>`).join("")}</span>
+    <span class="tc__simple"><span class="stack">${who.slice(0, 3).map((w) => av(w, 20)).join("")}</span><b>${n} respostas</b>${t.state === "wait" ? `<span class="tc__state tc__state--wait">${I.wait}Esperando você</span>` : t.state === "work" ? `<span class="tc__state tc__state--work">${I.bolt}Trabalhando</span>` : ""}<span class="tc__dot">·</span><span class="tc__said">${plain(last.text)}</span><span class="tc__dot tc__said">·</span><span>${last.at}</span></span>
+    <span class="tc__foot"><span class="stack">${who.slice(0, 4).map((w) => av(w, 20)).join("")}</span>${n} respostas<span class="sp"></span>Responder${I.chev}</span>
+  </button>`;
+}
+
+function msg(m, extra = "", hover = true) {
+  return `<article class="msg" ${extra}>
+    <span class="msg__av">${av(m.who, 36)}</span>
+    <div class="msg__who"><b>${nm(m.who)}</b>${isAgent(m.who) ? '<span class="tag">agente</span>' : ""}<time>${m.at}</time></div>
+    <p class="msg__text">${m.text}</p>
+    ${hover ? `<div class="hover"><button aria-label="Reagir">${I.emoji}</button><button class="reply" data-reply>${I.reply}Responder</button><button aria-label="Mais">${I.more}</button></div>` : ""}
+  </article>`;
+}
+
+function renderStream() {
+  $("#stream").innerHTML = STREAM.map((it, i) => {
+    if (it.day) return `<div class="day">${it.day}</div>`;
+    const tid = it.thread;
+    const html = msg(it.msg, `data-i="${i}" ${open && (open === tid || open === `new${i}`) ? "data-open" : ""}`);
+    return tid ? html.replace(/<\/article>$/, `${card(tid)}</article>`) : html;
+  }).join("");
+  hydrate($("#stream"));
+}
+
+function renderPanel() {
+  const work = $("#work");
+  if (!open) { work.removeAttribute("data-panel"); $("#panel").innerHTML = ""; return; }
+  work.setAttribute("data-panel", "");
+  const isNew = open.startsWith("new");
+  const t = isNew ? { title: "Nova thread", root: STREAM[+open.slice(3)].msg, replies: [] } : THREADS[open];
+  const who = [...new Set([t.root.who, ...t.replies.map((r) => r.who)])];
+  $("#panel").innerHTML = `
+    <header class="phead">
+      <div class="phead__t"><h2>${t.title}</h2><p>${I.hash}general${isNew ? "" : ` · ${t.replies.length} respostas`}</p></div>
+      <button class="ibtn" aria-label="Abrir em tela cheia">${I.expand}</button>
+      <button class="ibtn" data-close aria-label="Fechar painel">${I.x}</button>
+    </header>
+    ${isNew ? "" : `<div class="pmeta"><span class="stack">${who.map((w) => av(w, 24)).join("")}</span><span class="pmeta__who">${people(who)}</span><span class="sp"></span>${stateChip(t.state)}<button class="hbtn" style="height:28px">${I.bell}Seguindo</button></div>`}
+    <div class="pbody">
+      <div class="root"><div class="root__from">${I.hash}Mensagem em #general</div>${msg(t.root, "", false)}</div>
+      ${isNew ? `<div class="empty">Sua resposta começa uma thread nesta mensagem. Quem está no canal vê um card com as respostas, sem encher a conversa.</div>`
+        : `<div class="count">${t.replies.length} respostas</div>${t.replies.map((r) => msg(r)).join("")}`}
+    </div>
+    <div class="composer">${isNew ? "Responder a " + nm(t.root.who) + "…" : "Responder na thread…"}<span class="sp"></span><button class="send" aria-label="Enviar">${I.send}</button></div>`;
+  hydrate($("#panel"));
+}
+
+/* Agents drawn by the shared engine */
+const live = [];
+function hydrate(root) {
+  for (const el of $$(".av[data-a]", root)) {
+    const s = +el.dataset.s, dpr = Math.min(2, devicePixelRatio || 1), cv = document.createElement("canvas");
+    cv.width = cv.height = Math.round(s * dpr); cv.style.width = cv.style.height = s + "px";
+    el.replaceChildren(cv);
+    live.push({ cv, a: AG[el.dataset.a], seed: Math.random() * 9, s });
+  }
+}
+function frame(t) {
+  t /= 1000;
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i];
+    if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const ctx = it.cv.getContext("2d"), s = it.cv.width, inner = s * .84;
+    ctx.clearRect(0, 0, s, s);
+    drawAgent(ctx, (s - inner) / 2, s - inner + s * .04, inner, { color: it.a.color, eyes: "round", cells: it.s <= 24 ? 10 : 12, pose: idlePose(t, it.seed, { every: 12 }) });
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+document.addEventListener("click", (e) => {
+  const tc = e.target.closest(".tc");
+  if (tc) { open = open === tc.dataset.t ? null : tc.dataset.t; render(); return; }
+  if (e.target.closest("[data-close]")) { open = null; render(); return; }
+  const rep = e.target.closest("[data-reply]");
+  if (rep) {
+    const m = rep.closest(".msg"); if (!m || !m.dataset.i) return;
+    const i = +m.dataset.i;
+    open = STREAM[i].thread || `new${i}`; render();
+  }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) { open = null; render(); } });
+
+const NOTES = {
+  a: "A · Resumo: embaixo da mensagem, um card com quem está na thread (avatares), quantas respostas e o que ela pede (Esperando você / Trabalhando). A última resposta aparece num poço, em até 2 linhas. Clicar abre a thread no painel à direita; o card fica 'apertado' enquanto ela está aberta.",
+  b: "B · Conversa: o card mostra o título que o agente deu e as duas últimas falas como uma mini conversa, com 'N respostas · Responder' no rodapé. Mostra mais do assunto, mas ocupa mais altura no canal.",
+  d: "D · Linha simples: sem card, só uma linha embaixo da mensagem que acende no hover: avatares pequenos, 'N respostas', o estado como ícone + palavra (sem pílula) e a hora da última resposta.",
+  e: "E · Simples + fala: a D com a última resposta cortada depois do número, sem o nome de quem falou.",
+  c: "C · Linha: uma linha fina com avatares, 'N respostas', a última fala cortada, hora e o estado. O mais discreto; parece com Slack, só que dizendo o que a thread pede.",
+};
+const html = document.documentElement;
+function render() { renderStream(); renderPanel(); }
+function sync() {
+  for (const [id, key] of [["v", "v"], ["theme", "theme"]])
+    for (const b of $$(`#${id} button`)) b.setAttribute("aria-pressed", b.dataset.k === html.dataset[key]);
+  $("#note").textContent = NOTES[html.dataset.v] + " Em qualquer mensagem, 'Responder' abre o painel: se ainda não há thread, a sua resposta começa uma. 'Criar thread a partir daqui' sai do menu.";
+  history.replaceState(null, "", `#v=${html.dataset.v}&theme=${html.dataset.theme}`);
+}
+$("#v").onclick = (e) => { const k = e.target.closest("button")?.dataset.k; if (k) { html.dataset.v = k; sync(); } };
+$("#theme").onclick = (e) => { const k = e.target.closest("button")?.dataset.k; if (k) { html.dataset.theme = k; sync(); } };
+open = "t1";
+sync(); render();
+</script>
+</body>
+</html>

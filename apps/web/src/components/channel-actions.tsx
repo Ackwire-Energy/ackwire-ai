@@ -13,16 +13,17 @@ export interface ChannelActions {
   /** A streaming reply grew: stay at the bottom if the person is there. */
   followBottom?: () => void;
   channelAgents: Agent[];
-  /** "Responder em thread": the composer replies in that message's thread. */
-  replyInThread?: (message: MessageType) => void;
-  /** "Responder": the next message quotes this one (same conversation, `meta.replyTo`). */
-  quoteReply?: (message: MessageType) => void;
+  /**
+   * "Responder": in a channel, that message's thread opens in the panel beside it (a reply there
+   * starts the thread); in a thread view, the composer.
+   */
+  reply?: (message: MessageType) => void;
+  /** A thread's line or link: the panel beside the channel (absent in a thread view: links go to its page). */
+  openThread?: (threadId: string) => void;
   /** "Pedir correção" after my 👎: my reply in the same conversation, quoting that message and mentioning its agent. */
   requestCorrection?: (message: MessageType, text: string) => void;
   /** A quote was clicked: scroll to the original and highlight it (paging back if needed). */
   jumpTo?: (messageId: string) => void;
-  /** "Criar thread a partir daqui": a thread whose context is the conversation from this message on. */
-  createThreadFrom?: (message: MessageType) => void;
   /** "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano"). */
   replyToMission?: (missionId: string, label: string) => void;
 }

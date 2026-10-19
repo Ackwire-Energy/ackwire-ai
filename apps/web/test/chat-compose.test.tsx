@@ -112,57 +112,9 @@ describe("reactions on any message", () => {
   });
 });
 
-describe("quote reply", () => {
-  test("Responder: the bar says who, Enter sends meta.replyTo, the message shows the quote", async () => {
-    const { state } = await open();
-    const bar = within(article("o login está devolvendo 401")).getByRole("toolbar", {
-      name: "Ações da mensagem de João",
-    });
-    await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Responder" })));
-    const quote = document.querySelector(".composer-quote") as HTMLElement;
-    expect(quote.textContent).toContain("Respondendo a João");
-    expect(quote.textContent).toContain("o login está devolvendo 401");
-    await act(async () => fireEvent.change(composer(), { target: { value: "vou olhar" } }));
-    await act(async () => fireEvent.keyDown(composer(), { key: "Enter" }));
-    await settle(4);
-    const post = state.calls.find((c) => c.method === "chat.post")?.args[2] as Record<string, unknown>;
-    expect(post).toMatchObject({ body: "vou olhar", replyTo: "m-1" });
-    // The quote goes in the same conversation (not into the thread).
-    expect(post.threadId).toBeUndefined();
-    expect(document.querySelector(".composer-quote")).toBeNull();
-    const sent = article("vou olhar");
-    const link = within(sent).getByRole("button", { name: /^Resposta a João: @ada o login está devolvendo 401/ });
-    expect(link.className).toBe("msg-quote");
-  });
-
-  test("Esc drops the quote; Responder is also in the '…' menu", async () => {
-    await open();
-    const bar = within(article("o login está devolvendo 401")).getByRole("toolbar", {
-      name: "Ações da mensagem de João",
-    });
-    await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Responder" })));
-    expect(document.querySelector(".composer-quote")).not.toBeNull();
-    await act(async () => fireEvent.keyDown(composer(), { key: "Escape" }));
-    expect(document.querySelector(".composer-quote")).toBeNull();
-    const more = within(bar).getByRole("button", { name: "Mais ações da mensagem" });
-    more.focus();
-    await act(async () => {
-      fireEvent.keyDown(more, { key: "Enter" });
-      fireEvent.keyUp(more, { key: "Enter" });
-    });
-    await settle(1);
-    const items = within(screen().getByRole("menu"))
-      .getAllByRole("menuitem")
-      .map((i) => i.textContent);
-    expect(items).toEqual([
-      "Salvar na wiki",
-      "Copiar link",
-      "Responder",
-      "Criar thread a partir daqui",
-      "Responder em thread",
-    ]);
-  });
-
+// "Responder" opens the thread panel now (message-actions.test.tsx); a quote stays only for
+// "Pedir correção" (agent-reactions.test.tsx) and the messages that already carry one.
+describe("quotes", () => {
   test("quote helpers: one-line excerpt, meta read back safely", () => {
     expect(quoteExcerpt("a\n\nb   c")).toBe("a b c");
     expect(quoteExcerpt("x".repeat(300))).toHaveLength(200);

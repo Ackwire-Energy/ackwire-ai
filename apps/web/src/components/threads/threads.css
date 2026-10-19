@@ -748,3 +748,110 @@
     transition: none;
   }
 }
+
+/*
+ * A "Responder" thread under its message (telas/ThreadPainel.html, "D · Linha simples"): no card, one
+ * line that lights on hover: who is in it, "N respostas", what it needs, when. Pressed while the
+ * thread is open in the panel.
+ */
+.thread-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin: 4px 0 0 -8px;
+  padding: 4px 10px 4px 6px;
+  border: 0;
+  border-radius: 10px 10px 10px 3px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.thread-line:hover {
+  background: var(--plate-soft);
+}
+.thread-line[aria-pressed="true"] {
+  background: var(--plate);
+}
+.thread-line:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.thread-line b {
+  color: var(--ink);
+  font-weight: 650;
+}
+.thread-line__who {
+  display: inline-flex;
+  flex: none;
+}
+.thread-line__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+.thread-line__state--needsYou {
+  color: var(--warn);
+}
+.thread-line__state--working {
+  color: var(--agent);
+}
+.thread-line__dot {
+  color: var(--faint);
+}
+
+/*
+ * The thread panel beside a channel (telas/ThreadPainel.html): the channel keeps its width minus the
+ * panel; the thread view inside is the same as its page (header, messages, composer). Phones: on top.
+ */
+.thread-panel {
+  flex: 0 0 440px;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--pane);
+  box-shadow: -1px 0 0 var(--line);
+  animation: thread-panel-in 0.24s var(--out);
+}
+@keyframes thread-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread-panel {
+    animation: none;
+  }
+}
+.thread-panel > .thread-panel__chat {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+.thread-head--panel {
+  padding-left: 18px;
+}
+.thread-panel__missing {
+  flex: 1;
+  overflow-y: auto;
+}
+@media (max-width: 1100px) {
+  .thread-panel {
+    flex-basis: 380px;
+  }
+}
+@media (max-width: 860px) {
+  .thread-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    box-shadow: none;
+  }
+}

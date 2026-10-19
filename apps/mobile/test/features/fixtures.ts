@@ -47,6 +47,7 @@ export function thread(over: Partial<ThreadInfo> & { id: string }): ThreadInfo {
     participants: [{ type: "person", id: "u1" }],
     working: false,
     needsYou: false,
+    openedByReplyAt: null,
     suggestedResolved: false,
     canManage: true,
     createdAt: at(30),

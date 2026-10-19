@@ -15,16 +15,19 @@ import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
  * context block on top, then its conversation with the channel's own rows,
  * live runs and composer (ChannelPage in thread mode). Archived: read only.
  * A mission's thread has the mission as its header (plan strip, what runs, sessions).
+ * `onClose`: shown in the panel beside its channel (telas/ThreadPainel.html), not as a page.
  */
 export function ThreadPage({
   threadId,
   reply,
   focusMessageId,
+  onClose,
 }: {
   threadId: string;
   reply?: boolean;
   /** Open at this message (a card someone was sent to). */
   focusMessageId?: string;
+  onClose?: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -32,31 +35,26 @@ export function ThreadPage({
   const thread = info.data;
   // A thread with a mission (ADR 0029): the mission header; who only reads gets a note.
   const mission = useThreadMission(org.id, threadId).data ?? null;
-  const channelId = thread?.channelId;
-  // "Responder" on a closed thread's line: straight to the composer.
+  const loaded = Boolean(thread);
+  // "Responder" (a closed thread's line, a message in the channel): straight to the composer.
   useEffect(() => {
-    if (!reply || !channelId) return;
-    const timer = setTimeout(() => document.getElementById(`composer-${channelId}`)?.focus(), 80);
+    if (!reply || !loaded) return;
+    const timer = setTimeout(() => document.getElementById(`composer-${threadId}`)?.focus(), 80);
     return () => clearTimeout(timer);
-  }, [reply, channelId]);
-  if (info.isPending) return <ChannelSkeleton />;
+  }, [reply, loaded, threadId]);
+  if (info.isPending) return onClose ? <ChannelSkeleton panel /> : <ChannelSkeleton />;
   if (!thread) {
-    if (info.error instanceof ApiError && (info.error.status === 404 || info.error.status === 403)) {
-      return (
-        <Main>
-          <div className="page page--mid">
-            <EmptyState icon="thread" title={t("threads.view.notFoundTitle")}>
-              {t("threads.view.notFound")}
-            </EmptyState>
-          </div>
-        </Main>
-      );
-    }
-    return (
-      <Main>
+    const body =
+      info.error instanceof ApiError && (info.error.status === 404 || info.error.status === 403) ? (
+        <div className="page page--mid">
+          <EmptyState icon="thread" title={t("threads.view.notFoundTitle")}>
+            {t("threads.view.notFound")}
+          </EmptyState>
+        </div>
+      ) : (
         <ErrorState error={info.error} onRetry={() => void info.refetch()} />
-      </Main>
-    );
+      );
+    return onClose ? <section className="thread-panel__missing">{body}</section> : <Main>{body}</Main>;
   }
   const archived = thread.state === "archived";
   return (
@@ -75,7 +73,12 @@ export function ThreadPage({
       }}
       chrome={{
         // A mission's thread: its header is the mission's (no card floating over the messages).
-        header: mission ? <MissionThreadHeader thread={thread} mission={mission} /> : <ThreadHeader thread={thread} />,
+        header:
+          mission && !onClose ? (
+            <MissionThreadHeader thread={thread} mission={mission} />
+          ) : (
+            <ThreadHeader thread={thread} onClose={onClose} />
+          ),
         top: (
           <>
             <ThreadOrigin thread={thread} />
@@ -88,6 +91,10 @@ export function ThreadPage({
           ) : undefined,
         composerLabel: t("threads.view.composer"),
         composerReplacement: archived ? <ArchivedNote thread={thread} /> : undefined,
+        panel: Boolean(onClose),
+        // A person's reply here makes it a "Responder" thread (its replies leave the channel's timeline),
+        // except a mission's or a range's, which the channel already shows as their own card or marker.
+        openThread: !thread.mission && !thread.context,
       }}
     />
   );

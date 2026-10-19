@@ -575,6 +575,13 @@
       "when": 1792500000000,
       "tag": "0081_browser_review",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1792510000000,
+      "tag": "0082_thread_opened_by_reply",
+      "breakpoints": true
     }
   ]
 }

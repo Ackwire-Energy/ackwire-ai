@@ -99,6 +99,8 @@ export interface FakeState {
   notifications?: AppNotification[];
   /** `actions.undo`/`redo`/`undoMessage` fail for these receipt ids with this error (`action.changed_since`…). */
   actionErrors?: Record<string, ApiError>;
+  /** Set by `createFakeApi`: `chat.post` with `openThread` marks the thread (the threads fake). */
+  openThread?: (orgId: string, threadId: string, at: string) => Promise<void>;
   /** Make `chat.post` fail (optimistic send tests). */
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
@@ -1179,6 +1181,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           .filter((a) => (state.channelMembers[channelId] ?? []).some((m) => m.type === "agent" && m.id === a.id))
           .map((a) => a.id);
         state.messages.push(message);
+        // Like the server: a reply from the thread panel marks when "Responder" opened the thread.
+        if (input.openThread && input.threadId) await state.openThread?.(orgId, input.threadId, message.createdAt);
         return message;
       },
     },
@@ -1530,8 +1534,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       agents: (orgId) => http.agents.list(orgId),
       channels: (orgId) => http.chat.channels(orgId),
       members: (orgId) => http.orgs.members(orgId),
+      messages: async () => state.messages,
     },
   };
+  const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));
+  state.openThread = threads.openByReply;
   const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
   const customConnectors = createMockCustomConnectors(ctx, (method, ...args) => state.calls.push({ method, args }));
   const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
@@ -1552,7 +1559,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       (method, ...args) => state.calls.push({ method, args }),
     ),
     wiki: createFakeWiki(ctx, (method, ...args) => state.calls.push({ method, args })),
-    threads: createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args })),
+    threads,
     missions: createFakeMissions(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
     access: createFakeAccess(

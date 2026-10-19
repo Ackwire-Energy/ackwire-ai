@@ -394,6 +394,7 @@ export function usePostMessage(
         ...(threadId ? { threadId } : {}),
         ...(replyTo ? { replyTo } : {}),
         ...(attachments.length > 0 ? { attachments } : {}),
+        ...(threadId && meta?.[OPEN_THREAD] === true ? { openThread: true } : {}),
       });
     },
     onMutate: ({ body, clientId, threadId, meta }) => {
@@ -432,6 +433,12 @@ export function usePostMessage(
     },
   });
 }
+
+/**
+ * Client-only key on a reply's optimistic meta: written in the thread panel ("Responder"), so the
+ * server marks the thread `openedByReplyAt` (a retry sends it again).
+ */
+export const OPEN_THREAD = "openThread";
 
 /**
  * A message to post. `meta` is the optimistic copy's (`replyTo`, `artifacts`): only the quoted

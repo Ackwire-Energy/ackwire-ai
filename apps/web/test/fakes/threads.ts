@@ -10,12 +10,53 @@ import { clone, type MockContext, mockId, perOrg } from "./context";
 export function createFakeThreads(
   ctx: MockContext,
   log: (method: string, ...args: unknown[]) => void,
-): ApiClient["threads"] {
+): ApiClient["threads"] & {
+  /** `chat.post` with `openThread`: the thread's row says when (made here when it had none). */
+  openByReply(orgId: string, threadId: string, at: string): Promise<void>;
+} {
   const store = perOrg(async () => [] as ThreadInfo[]);
   const find = async (orgId: string, threadId: string) => {
     const thread = (await store(orgId)).find((t) => t.id === threadId);
     if (!thread) throw new ApiError(404, "not_found", "Thread not found");
     return thread;
+  };
+  /** Like the server: any top-level message is a thread, empty until someone replies. */
+  const fromMessage = async (orgId: string, rootId: string): Promise<ThreadInfo | null> => {
+    const all = (await ctx.lookup.messages?.(orgId)) ?? [];
+    const root = all.find((m) => m.id === rootId && !m.threadId);
+    if (!root) return null;
+    const channel = (await ctx.lookup.channels(orgId)).find((c) => c.id === root.channelId);
+    const replies = all.filter((m) => m.threadId === rootId);
+    const last = replies.at(-1);
+    const people = [root, ...replies].map((m) => m.author);
+    return {
+      id: root.id,
+      channelId: root.channelId,
+      channelName: channel?.name ?? "",
+      channelKind: "channel",
+      title: null,
+      rootText: root.body,
+      rootAuthor: root.author,
+      state: "open",
+      openedByReplyAt: null,
+      createdBy: null,
+      closedBy: null,
+      closedAt: null,
+      archivedBy: null,
+      archivedAt: null,
+      context: null,
+      replyCount: replies.length,
+      lastActivityAt: last?.createdAt ?? root.createdAt,
+      lastMessage: last ? { author: last.author, excerpt: last.body, meta: null, createdAt: last.createdAt } : null,
+      participants: people.filter((a, i) => people.findIndex((b) => b.type === a.type && b.id === a.id) === i),
+      working: false,
+      needsYou: false,
+      suggestedResolved: false,
+      canManage: true,
+      following: false,
+      mission: null,
+      createdAt: root.createdAt,
+    };
   };
   const list = async (orgId: string, f: ThreadFilters = {}) => {
     const tab = f.tab ?? "all";
@@ -39,7 +80,22 @@ export function createFakeThreads(
   return {
     list,
     inChannel: (orgId, channelId, filters = {}) => list(orgId, { ...filters, channelId }),
-    get: async (orgId, threadId) => clone(await find(orgId, threadId)),
+    get: async (orgId, threadId) => {
+      const kept = (await store(orgId)).find((t) => t.id === threadId);
+      const view = kept ?? (await fromMessage(orgId, threadId));
+      if (!view) throw new ApiError(404, "not_found", "Thread not found");
+      return clone(view);
+    },
+    openByReply: async (orgId, threadId, at) => {
+      const all = await store(orgId);
+      const kept = all.find((t) => t.id === threadId);
+      if (kept) {
+        kept.openedByReplyAt ??= at;
+        return;
+      }
+      const view = await fromMessage(orgId, threadId);
+      if (view) all.push({ ...view, openedByReplyAt: at });
+    },
     create: async (orgId, input) => {
       log("threads.create", orgId, input);
       const me = await ctx.lookup.me();
@@ -55,6 +111,8 @@ export function createFakeThreads(
         rootText: input.title ?? "Thread",
         rootAuthor: { type: "person", id: me?.user.id ?? null },
         state: "open",
+        // Tests may say when "Responder" opened it (replies from then on live in the thread panel).
+        openedByReplyAt: (input as { openedByReplyAt?: string }).openedByReplyAt ?? null,
         createdBy: me?.user.id ?? null,
         closedBy: null,
         closedAt: null,

@@ -637,6 +637,10 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (event.message && !event.message.threadId) {
           qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
         }
+        // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines.
+        if (event.message?.threadId) {
+          void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+        }
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams]);

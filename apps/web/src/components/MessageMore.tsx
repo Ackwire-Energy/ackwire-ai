@@ -1,5 +1,4 @@
 import type { Message } from "@agenteschat/client";
-import { threadStartOf } from "@agenteschat/client/lib/threads";
 import { Button, Menu, MenuItem } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,7 +12,7 @@ import { SaveToWikiDialog } from "./SaveToWiki";
 export const messageLink = (origin: string, orgId: string, m: Pick<Message, "id" | "channelId">) =>
   `${origin}/org/${orgId}/c/${m.channelId}?m=${m.id}`;
 
-/** "…" on any message: Salvar na wiki, Copiar link, Responder, Responder em thread. */
+/** "…" on any message: Salvar na wiki, Copiar link, Responder. */
 export function MessageMoreMenu({ message, channelName }: { message: Message; channelName: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -39,19 +38,9 @@ export function MessageMoreMenu({ message, channelName }: { message: Message; ch
         >
           {t("channel.copyLink")}
         </MenuItem>
-        {actions?.quoteReply && (
-          <MenuItem icon="reply" onSelect={() => actions.quoteReply?.(message)}>
-            {t("channel.quoteReply")}
-          </MenuItem>
-        )}
-        {actions?.createThreadFrom && !message.threadId && !message.local && !threadStartOf(message.meta) && (
-          <MenuItem icon="thread" onSelect={() => actions.createThreadFrom?.(message)}>
-            {t("threads.createFromHere")}
-          </MenuItem>
-        )}
-        {actions?.replyInThread && (
-          <MenuItem icon="message" onSelect={() => actions.replyInThread?.(message)}>
-            {t("channel.replyInThread")}
+        {actions?.reply && !message.local && (
+          <MenuItem icon="reply" onSelect={() => actions.reply?.(message)}>
+            {t("channel.reply")}
           </MenuItem>
         )}
       </Menu>
@@ -66,19 +55,20 @@ export function MessageMoreMenu({ message, channelName }: { message: Message; ch
   );
 }
 
-/** "Responder" on the hover bar: the next message quotes this one. */
-export function QuoteReplyButton({ message }: { message: Message }) {
+/** "Responder" on the hover bar: the message's thread in the panel (a thread view: the composer). */
+export function ReplyButton({ message }: { message: Message }) {
   const { t } = useTranslation();
   const actions = useChannelActions();
-  if (!actions?.quoteReply) return null;
+  if (!actions?.reply || message.local) return null;
   return (
     <Button
       variant="ghost"
       size="sm"
       iconOnly
       icon="reply"
-      aria-label={t("channel.quoteReply")}
-      onClick={() => actions.quoteReply?.(message)}
+      aria-label={t("channel.reply")}
+      title={t("channel.reply")}
+      onClick={() => actions.reply?.(message)}
     />
   );
 }
@@ -98,7 +88,7 @@ export function PersonMessageActions({
   return (
     <div className="ac-msg__actions" role="toolbar" aria-label={t("channel.actions", { name: authorName })}>
       <ReactButton onPick={(emoji) => reactions.toggle(reactionOf(emoji))} />
-      <QuoteReplyButton message={message} />
+      <ReplyButton message={message} />
       <MessageMoreMenu message={message} channelName={channelName} />
     </div>
   );

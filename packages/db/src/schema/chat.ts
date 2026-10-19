@@ -179,6 +179,12 @@ export const threads = pgTable(
      */
     resolvedSuggestedAt: timestamp({ withTimezone: true }),
     state: threadStateEnum().notNull().default("open"),
+    /**
+     * When someone first answered in it with "Responder" (the web's thread panel): replies from then
+     * on live in the panel, and the channel shows one line where the thread left it. Null (an agent
+     * answering the message that called it): the channel shows the replies in its own timeline.
+     */
+    openedByReplyAt: timestamp({ withTimezone: true }),
     createdBy: text().references(() => users.id, { onDelete: "set null" }),
     closedBy: text().references(() => users.id, { onDelete: "set null" }),
     closedAt: timestamp({ withTimezone: true }),

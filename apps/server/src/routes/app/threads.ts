@@ -67,6 +67,10 @@ const Thread = z
         "An agent run is in progress (or waiting for an approval or an answer) in this thread; not one waiting for its computer.",
     }),
     needsYou: z.boolean(),
+    openedByReplyAt: z.string().nullable().openapi({
+      description:
+        "When someone first replied from the thread panel (`openThread` on the reply): replies from then on live in the panel and the channel shows one line. Null: the channel shows its replies in the timeline.",
+    }),
     suggestedResolved: z.boolean().openapi({
       description:
         "Open, and a model judged its matter done after its last message: offer to close it. Cleared by a new message, closing or reopening; never closes by itself.",

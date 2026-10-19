@@ -319,6 +319,10 @@ export function chatRoutes(deps: AppDeps) {
               description:
                 "Files (artifact ids) you uploaded or files of this channel. Stored as `meta.artifacts` ({ id, version, title }).",
             }),
+            openThread: z.boolean().optional().openapi({
+              description:
+                'Sent from the thread panel ("Responder"), with `threadId`: the thread gets `openedByReplyAt`, so from this reply on the channel shows one line instead of its replies.',
+            }),
             clientId: z
               .string()
               .max(64)
