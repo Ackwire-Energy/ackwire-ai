@@ -58,3 +58,32 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   const list = (await (await api("/issues")).json()) as { issues: { number: number }[] };
   expect(list.issues.map((i) => i.number).sort()).toEqual([1, 2]);
 });
+
+test("board columns API: list, add, rename, move a task, delete with a destination", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  type Columns = { columns: { id: string; stage: string; name: string | null }[] };
+
+  const start = (await (await api("/issue-columns")).json()) as Columns;
+  expect(start.columns.map((c) => c.stage)).toEqual(["todo", "in_progress", "in_review", "done", "canceled"]);
+  const added = await api("/issue-columns", { json: { name: "QA", stage: "in_review" } });
+  expect(added.status).toBe(201);
+  const qa = ((await added.json()) as Columns).columns.find((c) => c.name === "QA");
+  if (!qa) throw new Error("QA column missing");
+  const renamed = (await (
+    await api(`/issue-columns/${qa.id}`, { method: "PATCH", json: { name: "Conferir" } })
+  ).json()) as Columns;
+  expect(renamed.columns.find((c) => c.id === qa.id)?.name).toBe("Conferir");
+
+  const issue = (await (await api("/issues", { json: { title: "Relatório" } })).json()) as { id: string };
+  const moved = await api(`/issues/${issue.id}`, { method: "PATCH", json: { columnId: qa.id } });
+  expect(await moved.json()).toMatchObject({ status: "in_review", columnId: qa.id });
+
+  const done = start.columns.find((c) => c.stage === "done");
+  const deleted = await api(`/issue-columns/${qa.id}?moveTo=${done?.id}`, { method: "DELETE" });
+  expect(deleted.status).toBe(200);
+  expect(await (await api(`/issues/${issue.id}`)).json()).toMatchObject({ status: "done", columnId: done?.id });
+});

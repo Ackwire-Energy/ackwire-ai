@@ -1,7 +1,8 @@
 /*
- * Issues (telas/Issues.html): agents working now, the board by status (drag
- * between columns) or a list, and the details (the shared details dialog,
- * or the issue's own page). Pixel pieces: CriteriaPixels and WorkSweep from
+ * Tarefas (telas/Tarefas.html; issues in the code): agents working now, the
+ * org's board (custom columns inside fixed stages; drag between and inside
+ * columns) or a list, and the details (the shared details dialog, or the
+ * task's own page). Pixel pieces: CriteriaPixels and WorkSweep from
  * @agenteschat/ui (their holders are `position: relative`).
  */
 .issues {
@@ -150,21 +151,76 @@
   color: var(--ink);
 }
 
+/* ── Toolbar end: Quadro/Lista and "Mais opções" ─────────────────────────── */
+.issues-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ── Board ──────────────────────────────────────────────────────────────── */
-.issues-board {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(240px, 1fr));
-  gap: 12px;
-  align-items: start;
+/* The board scrolls sideways inside its own box; the page never does. */
+.issues-boardwrap {
   overflow-x: auto;
-  padding-bottom: 6px;
+  overscroll-behavior-x: contain;
+  margin: 0 -6px;
+  padding: 2px 6px 10px;
+  scrollbar-width: thin;
+}
+.issues-board {
+  --cw: 248px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: min-content;
+}
+.issues-board.is-grouped {
+  gap: 20px;
+}
+/* A stage holds its columns side by side; it grows with how many it has. */
+.issues-stage {
+  --n: 1;
+  flex: var(--n) 1 0;
+  min-width: calc(var(--n) * var(--cw) + (var(--n) - 1) * 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Stage header: neutral and quiet, only on a customized board. */
+.issues-stage__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--muted);
+}
+.issues-stage__head h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.issues-stage__head span {
+  font-size: 12px;
+  color: var(--faint);
+}
+.issues-stage__cols {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 }
 .issues-col {
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: var(--cw);
   min-height: 180px;
   padding: 8px;
   border-radius: var(--radius-section);
   background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
   transition:
     background 0.15s,
     box-shadow 0.15s;
@@ -173,27 +229,59 @@
   background: color-mix(in srgb, var(--sunken) 86%, var(--ink) 6%);
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
+.issues-col.is-canceled {
+  opacity: 0.8;
+}
 .issues-col__head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 10px;
+  min-height: 40px;
+  padding: 2px 2px 8px 6px;
   color: var(--muted);
 }
 .issues-col__head h2 {
   margin: 0;
+  min-width: 0;
   font-size: 13px;
   font-weight: 650;
   color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.issues-col__head span {
+.issues-col__head > span {
   font-size: 12.5px;
   color: var(--faint);
+}
+.issues-col__head .issues-col__grow {
+  flex: 1;
+}
+.issues-col__rename.ac-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-h-sm);
+  border-radius: var(--control-r-sm);
+  font-size: 13px;
+  font-weight: 650;
 }
 .issues-col__cards {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 24px;
+}
+.issues-col__slot {
+  display: flex;
+  flex-direction: column;
+}
+/* Where a dragged card lands. */
+.issues-col__line {
+  height: 3px;
+  margin: -3px 4px;
+  border-radius: 2px;
+  background: var(--ink);
+  opacity: 0.55;
 }
 .issues-col__empty {
   margin: 0;
@@ -201,6 +289,14 @@
   text-align: center;
   font-size: 12.5px;
   color: var(--faint);
+}
+.issues-col__add.ac-btn {
+  margin-top: 6px;
+  justify-content: flex-start;
+  color: var(--faint);
+}
+.issues-col__add.ac-btn:hover {
+  color: var(--ink);
 }
 .issue-card {
   position: relative;
@@ -222,6 +318,9 @@
 .issue-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--e2), var(--top);
+}
+.issue-card.is-dragging {
+  opacity: 0.4;
 }
 .issue-card:focus-visible {
   outline: none;
@@ -253,7 +352,8 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.issue-card[data-status="done"] .issue-card__title {
+.issue-card[data-status="done"] .issue-card__title,
+.issue-card[data-status="canceled"] .issue-card__title {
   color: var(--muted);
 }
 .issue-card__foot {
@@ -315,6 +415,28 @@
 .issues-group__title span {
   font-weight: 500;
   font-size: 12.5px;
+  color: var(--faint);
+}
+.issues-group__col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.issues-group__col + .issues-group__col {
+  margin-top: 6px;
+}
+/* A column's name inside its stage (customized board only). */
+.issues-group__sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.issues-group__sub span {
+  font-weight: 500;
   color: var(--faint);
 }
 .issue-list {
@@ -426,7 +548,75 @@
   color: var(--muted);
 }
 
-/* ── Details: the details dialog, or the issue's page ──────────────────── */
+/* ── Columns: "Nova coluna" and "Excluir a coluna" ─────────────────────── */
+.issues-stagepick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.issues-explain {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--control-r-md);
+  background: var(--sunken);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink2);
+}
+.issues-explain .ac-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--muted);
+}
+.issues-dests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.issues-dests__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.issues-dests__stage > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.issues-dests__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.issues-dest {
+  height: var(--control-h-sm);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--control-r-sm);
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.issues-dest[aria-checked="true"] {
+  box-shadow: inset 0 0 0 2px var(--ink);
+  color: var(--ink);
+}
+.issues-dest:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ── Details: the details dialog, or the task's page ───────────────────── */
 .issue-details {
   min-width: 0;
   display: flex;
@@ -480,7 +670,14 @@
   font-size: 11.5px;
   color: var(--faint);
 }
-/* Status, who, priority, due: two columns at the top of the details dialog. */
+/* How a task moves on its own, under its fields. */
+.issue-flow-hint {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+/* Column, who, priority, due: two columns at the top of the details dialog. */
 .issue-props {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -719,9 +916,17 @@
   .issues-head > .ac-btn {
     width: 100%;
   }
+  .issues-head > .ac-btn .ac-btn__kbd {
+    display: none;
+  }
   .issues-board {
-    grid-template-columns: repeat(4, minmax(min(280px, 82vw), 1fr));
+    --cw: 78vw;
+  }
+  .issues-boardwrap {
+    margin: 0 -16px;
+    padding: 2px 16px 10px;
     scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
   }
   .issues-col {
     scroll-snap-align: start;

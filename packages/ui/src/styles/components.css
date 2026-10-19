@@ -1054,6 +1054,17 @@ textarea.ac-input {
 }
 .ac-menu--dropdown {
   min-width: 200px;
+  /* A dropdown shows all its actions; it scrolls only when the screen is short. */
+  max-height: min(520px, var(--radix-dropdown-menu-content-available-height, 520px));
+}
+.ac-menu__note {
+  margin: 0;
+  max-width: 260px;
+  padding: 2px 10px 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--faint);
+  white-space: normal;
 }
 .ac-menu__item {
   display: flex;
@@ -5404,6 +5415,37 @@ a.ac-list__row:focus-visible {
 }
 .ac-optlist--locked .ac-optrow[data-state="checked"]:hover {
   box-shadow: var(--chosen-shadow);
+}
+/* Tiles (layout="tiles"; telas/Tarefas.html "Em que etapa?"): two per row, the icon on the title's line. */
+.ac-optlist--tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ac-optlist--tiles .ac-optrow {
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  padding: 12px 14px;
+}
+.ac-optlist--tiles .ac-optrow__lead {
+  height: 20px;
+  align-items: center;
+  color: var(--muted);
+}
+.ac-optlist--tiles .ac-optrow__title {
+  line-height: 20px;
+  font-weight: 600;
+}
+.ac-optlist--tiles .ac-optrow__desc {
+  font-size: 12.5px;
+  line-height: 18px;
+  margin-top: 2px;
+}
+@media (max-width: 440px) {
+  .ac-optlist--tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 /* Cards (layout="cards"; telas/IconesMotor.html "Motor"): side by side, illustration on top, radio in the corner. */
 .ac-optlist__cards {

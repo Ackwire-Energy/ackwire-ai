@@ -256,7 +256,7 @@ describe("Criar agente", () => {
     expect(screen().getByText("Mencione @iris para chamar.")).toBeTruthy();
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toStartWith(
-      "Investiga primeiro: lê o código e as issues e erros relacionados antes de responder",
+      "Investiga primeiro: lê o código e as tarefas e erros relacionados antes de responder",
     );
     for (let i = 0; i < 3; i++) await click(screen().getByRole("button", { name: "Continuar" }));
     await type(screen().getByLabelText("Orçamento mensal (US$)"), "0");

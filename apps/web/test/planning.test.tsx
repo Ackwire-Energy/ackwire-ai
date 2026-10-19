@@ -39,7 +39,7 @@ const cardTitles = (el: HTMLElement) => Array.from(el.querySelectorAll(".issue-c
 describe("Issues (board and list)", () => {
   test("board by status with counts, summary, PR, priority and due date", async () => {
     await go("issues");
-    expect(screen().getByRole("heading", { level: 1, name: "Issues" })).toBeTruthy();
+    expect(screen().getByRole("heading", { level: 1, name: "Tarefas" })).toBeTruthy();
     expect(screen().getByText("5 abertas · 3 com agentes")).toBeTruthy();
     expect(cardTitles(column("A fazer"))).toEqual([
       "Tabela de concorrentes atualizada",
@@ -56,7 +56,7 @@ describe("Issues (board and list)", () => {
     // An agent with a live run: "working now", its step on the card, criteria in pixels.
     const now = screen().getByRole("region", { name: "Agentes trabalhando agora" });
     expect(now.textContent).toContain("Timeout no agendamento em horários de pico");
-    expect(now.textContent).toContain("Atualizou uma issue · #129");
+    expect(now.textContent).toContain("Atualizou uma tarefa · #129");
     const timeout = screen().getByRole("link", { name: "#129 Timeout no agendamento em horários de pico" });
     expect(within(timeout).getByRole("img", { name: "1 de 2 critérios de aceite" })).toBeTruthy();
   });
@@ -68,8 +68,8 @@ describe("Issues (board and list)", () => {
     const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
     expect(dialog.textContent).toContain("#131");
     expect(within(dialog).getByRole("region", { name: "Pedir a um agente" })).toBeTruthy();
-    expect(within(dialog).getByRole("complementary", { name: "Detalhes da issue" })).toBeTruthy();
-    expect(within(dialog).getByRole("link", { name: "Abrir página da issue" }).getAttribute("href")).toBe(
+    expect(within(dialog).getByRole("complementary", { name: "Detalhes da tarefa" })).toBeTruthy();
+    expect(within(dialog).getByRole("link", { name: "Abrir página da tarefa" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/issues/131`,
     );
     expect(router.state.location.href).toContain("?open=131");
@@ -90,12 +90,12 @@ describe("Issues (board and list)", () => {
     expect(screen().getByRole("button", { name: "Com agentes" }).getAttribute("aria-pressed")).toBe("true");
     expect(cardTitles(column("Em andamento"))).toEqual(["Timeout no agendamento em horários de pico"]);
     await click(screen().getByRole("button", { name: "Minhas" }));
-    expect(screen().getByText("Nenhuma issue com esses filtros.")).toBeTruthy();
+    expect(screen().getByText("Nenhuma tarefa com esses filtros.")).toBeTruthy();
     await click(screen().getByRole("button", { name: "Todas" }));
-    await type(screen().getByRole("searchbox", { name: "Buscar issues" }), "#128");
+    await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "#128");
     await settle(4);
     expect(screen().getAllByRole("link", { name: /^#\d+/ })).toHaveLength(1);
-    await type(screen().getByRole("searchbox", { name: "Buscar issues" }), "");
+    await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "");
     await settle(4);
     await click(screen().getByRole("radio", { name: "Lista" }));
     const rows = screen().getAllByRole("listitem");
@@ -106,9 +106,9 @@ describe("Issues (board and list)", () => {
 
   test("Nova issue: title, criteria from '-' lines, assignee and priority", async () => {
     const { api } = await go("issues");
-    await click(screen().getByRole("button", { name: "Nova issue" }));
-    const dialog = screen().getByRole("dialog", { name: "Nova issue" });
-    const create = within(dialog).getByRole("button", { name: "Criar issue" });
+    await click(screen().getByRole("button", { name: "Nova tarefa" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova tarefa" });
+    const create = within(dialog).getByRole("button", { name: "Criar tarefa" });
     expect(create.hasAttribute("disabled")).toBe(true);
     await type(within(dialog).getByLabelText("Título"), "Exportar agenda em PDF");
     await type(
@@ -122,7 +122,7 @@ describe("Issues (board and list)", () => {
     await type(within(dialog).getByLabelText("Prazo (opcional)"), "");
     await click(create);
     await settle(5);
-    expect(screen().getByText("Issue #133 criada.")).toBeTruthy();
+    expect(screen().getByText("Tarefa #133 criada.")).toBeTruthy();
     // An agent picked at creation starts right away ("Pedir"): in progress.
     expect(cardTitles(column("Em andamento"))).toContain("Exportar agenda em PDF");
     const created = await api.issues.get(ORG_ID, 133);
@@ -132,6 +132,61 @@ describe("Issues (board and list)", () => {
       assignee: { type: "agent" },
     });
     expect(created.criteria.map((c) => c.text)).toEqual(["Botão na agenda", "PDF com o logo da clínica"]);
+  });
+});
+
+describe("Tarefas: custom board columns (D55)", () => {
+  const openMenu = async (name: string) => {
+    const trigger = screen().getByRole("button", { name });
+    trigger.focus();
+    await key(trigger, "Enter");
+    return screen().getByRole("menu");
+  };
+
+  test("Mais opções → Adicionar coluna: a name and the stage; the board then groups columns under stages", async () => {
+    const { api } = await go("issues");
+    // The default board: one column per stage, no stage headers.
+    expect(screen().queryByRole("region", { name: "Ideias" })).toBeNull();
+    await click(within(await openMenu("Mais opções")).getByRole("menuitem", { name: "Adicionar coluna" }));
+    await settle(3);
+    const dialog = screen().getByRole("dialog", { name: "Nova coluna" });
+    const add = within(dialog).getByRole("button", { name: "Adicionar coluna" });
+    expect(add.hasAttribute("disabled")).toBe(true);
+    await type(within(dialog).getByLabelText("Nome"), "Ideias");
+    await click(within(dialog).getByRole("radio", { name: /Em revisão/ }));
+    expect(dialog.textContent).toContain("Fica no fim de Em revisão.");
+    expect(dialog.textContent).toContain("primeira coluna de Em revisão");
+    await click(add);
+    await settle(5);
+    expect(screen().getByText("Coluna Ideias criada")).toBeTruthy();
+    const columns = await api.issues.columns(ORG_ID);
+    expect(columns.filter((c) => c.stage === "in_review").map((c) => c.name)).toEqual([null, "Ideias"]);
+    // Customized: the stage groups its two columns under a header.
+    // (The stage comes first; its unnamed column carries the same name.)
+    const stage = screen().getAllByRole("region", { name: "Em revisão" })[0] as HTMLElement;
+    expect(within(stage).getByRole("region", { name: "Ideias" })).toBeTruthy();
+  });
+
+  test("a column's menu: the first one says what lands there; the only one can't be deleted", async () => {
+    await go("issues");
+    const menu = await openMenu("Opções da coluna A fazer");
+    expect(menu.textContent).toContain("Tarefas novas entram aqui.");
+    expect(within(menu).getByRole("menuitem", { name: "Excluir coluna" }).getAttribute("aria-disabled")).toBe("true");
+    expect(menu.textContent).toContain("Cada etapa precisa de pelo menos uma coluna.");
+  });
+
+  test("the task's column picker moves it (keyboard way); grouped by stage", async () => {
+    const { api } = await go("issues");
+    await api.issues.addColumn(ORG_ID, { name: "Esta semana", stage: "todo" });
+    await click(screen().getByRole("link", { name: "#131 Confirmação do agendamento por WhatsApp" }));
+    await settle(6);
+    const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
+    await pick(within(dialog).getByRole("combobox", { name: "Coluna" }), "Esta semana");
+    await settle(4);
+    const moved = await api.issues.get(ORG_ID, 131);
+    const week = (await api.issues.columns(ORG_ID)).find((c) => c.name === "Esta semana");
+    expect(moved.columnId).toBe(week?.id ?? "");
+    expect(moved.status).toBe("todo");
   });
 });
 
@@ -146,8 +201,8 @@ describe("Issue detail", () => {
     await click(within(criteria).getByLabelText("Paciente sem WhatsApp recebe SMS"));
     await settle(4);
     expect(screen().getByRole("region", { name: "Critérios de aceite" }).textContent).toContain("1 de 4");
-    const aside = screen().getByRole("complementary", { name: "Detalhes da issue" });
-    expect(within(aside).getByRole("combobox", { name: "Status" }).textContent).toContain("A fazer");
+    const aside = screen().getByRole("complementary", { name: "Detalhes da tarefa" });
+    expect(within(aside).getByRole("combobox", { name: "Coluna" }).textContent).toContain("A fazer");
     expect(within(aside).getByRole("combobox", { name: "Prioridade" }).textContent).toContain("Alta");
     expect(within(aside).getByRole("link", { name: "ver no calendário" })).toBeTruthy();
     expect(aside.textContent).toContain("agendamento");
@@ -156,36 +211,36 @@ describe("Issue detail", () => {
   test("Pedir à Ada: assigns the agent, moves to Em andamento and logs it", async () => {
     await go("issues/131");
     const ask = screen().getByRole("region", { name: "Pedir a um agente" });
-    expect(ask.textContent).toContain("Pedir à Ada para implementar");
-    expect(ask.textContent).toContain("A Ada lê o código, comenta o plano aqui e abre um PR.");
+    expect(ask.textContent).toContain("Pedir à Ada para fazer esta tarefa");
+    expect(ask.textContent).toContain("A Ada lê o que precisa, comenta o plano aqui e faz.");
     await click(within(ask).getByRole("button", { name: "Pedir à Ada" }));
     await settle(6);
     expect(screen().queryByRole("region", { name: "Pedir a um agente" })).toBeNull();
-    const aside = screen().getByRole("complementary", { name: "Detalhes da issue" });
-    expect(within(aside).getByRole("combobox", { name: "Status" }).textContent).toContain("Em andamento");
+    const aside = screen().getByRole("complementary", { name: "Detalhes da tarefa" });
+    expect(within(aside).getByRole("combobox", { name: "Coluna" }).textContent).toContain("Em andamento");
     expect(within(aside).getByRole("combobox", { name: "Responsável" }).textContent).toContain("Ada");
     const activity = screen().getByRole("region", { name: "Atividade" });
-    expect(activity.textContent).toContain("Walter pediu a Ada para implementar");
+    expect(activity.textContent).toContain("Walter pediu a Ada para fazer");
   });
 
   test("comment and change the status", async () => {
     await go("issues/131");
-    await type(screen().getByRole("combobox", { name: "Comentar na issue" }), "Começo amanhã.");
+    await type(screen().getByRole("combobox", { name: "Comentar na tarefa" }), "Começo amanhã.");
     await act(async () =>
-      fireEvent.keyDown(screen().getByRole("combobox", { name: "Comentar na issue" }), { key: "Enter" }),
+      fireEvent.keyDown(screen().getByRole("combobox", { name: "Comentar na tarefa" }), { key: "Enter" }),
     );
     await settle(5);
     const activity = screen().getByRole("region", { name: "Atividade" });
     expect(activity.textContent).toContain("Começo amanhã.");
-    const aside = screen().getByRole("complementary", { name: "Detalhes da issue" });
-    await pick(within(aside).getByRole("combobox", { name: "Status" }), "Em revisão");
+    const aside = screen().getByRole("complementary", { name: "Detalhes da tarefa" });
+    await pick(within(aside).getByRole("combobox", { name: "Coluna" }), "Em revisão");
     await settle(4);
     expect(screen().getByRole("region", { name: "Atividade" }).textContent).toContain("mudou o status para Em revisão");
   });
 
   test("a missing issue says so", async () => {
     await go("issues/999");
-    expect(screen().getByText("Esta issue não existe ou você não tem acesso.")).toBeTruthy();
+    expect(screen().getByText("Esta tarefa não existe ou você não tem acesso.")).toBeTruthy();
   });
 });
 
@@ -323,7 +378,7 @@ describe("Calendário", () => {
     const filters = screen().getByRole("group", { name: "Filtros" });
     await click(within(filters).getByRole("button", { name: /^Rotinas/ }));
     expect(screen().queryByRole("button", { name: /Resumo da semana/ })).toBeNull();
-    await click(within(filters).getByRole("button", { name: /^Prazos de issues/ }));
+    await click(within(filters).getByRole("button", { name: /^Prazos de tarefas/ }));
     expect(screen().queryByRole("button", { name: /Fechar a release/ })).toBeNull();
     expect(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" })).toBeTruthy();
     // "Dias úteis": Monday to Friday only.
@@ -359,7 +414,7 @@ describe("sidebar", () => {
     await go("issues");
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     for (const [name, path] of [
-      ["Issues", "issues"],
+      ["Tarefas", "issues"],
       ["Rotinas", "routines"],
       ["Calendário", "calendar"],
     ]) {

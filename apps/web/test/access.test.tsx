@@ -209,7 +209,7 @@ describe("Configurações → Agentes e acesso: the matrix", () => {
       "Agente",
       "Contexto e memória",
       "Drive",
-      "Issues",
+      "Tarefas",
       "Agenda",
       "Skills",
     ]);

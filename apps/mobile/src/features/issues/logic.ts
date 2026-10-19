@@ -1,10 +1,11 @@
-import type { Issue, IssueWork } from "@agenteschat/client";
+import type { Issue, IssueColumn, IssueStatus, IssueWork } from "@agenteschat/client";
 import { toYmd } from "@agenteschat/client/lib/format";
-import { isOpen } from "@agenteschat/client/lib/issues";
+import { isOpen, STATUSES } from "@agenteschat/client/lib/issues";
 
 /**
- * Issues on the phone (MobileDriveIssues.html): the list by state, its filters and counts, the row's state
- * line, and the new issue's due date choices. The status follows the web's rules: nobody marks an issue
+ * Tasks ("Tarefas", internally issues) on the phone (MobileDriveIssues.html, Tarefas.html): the list by stage
+ * and board column, its filters and counts, the row's state line, the column picker, and the new task's due
+ * date choices. The status follows the web's rules: nobody marks an issue
  * "committed"; it moves by itself (in progress when an agent starts, in review when it links a PR),
  * "trabalhando" comes from the agent's live run, and in progress with no run alive is stalled.
  */
@@ -55,51 +56,78 @@ export function filterCounts(list: Pick<Issue, "status" | "work" | "assignee">[]
   };
 }
 
-export type IssueSectionKey = "working" | "review" | "todo" | "done";
+/** The list's stages: what is moving first, then what waits to start; closed ones under "Concluídas". */
+const OPEN_STAGES: IssueStatus[] = ["in_progress", "in_review", "todo"];
+const CLOSED_STAGES: IssueStatus[] = ["done", "canceled"];
 
-export interface IssueSection<T> {
-  key: IssueSectionKey;
+/** A column's tasks inside a stage; `column` null when the board's columns aren't known yet. */
+export interface IssueColumnGroup<T> {
+  key: string;
+  column: IssueColumn | null;
   items: T[];
 }
 
-const PRIORITY_RANK = { high: 0, normal: 1, low: 2 } as const;
-
-/** Waiting on you first, then high priority, the nearest due date, the newest number. */
-function byUrgency(a: Issue, b: Issue) {
-  return (
-    Number(waitsOnYou(b)) - Number(waitsOnYou(a)) ||
-    PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
-    (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") ||
-    b.number - a.number
-  );
+export interface IssueSection<T> {
+  /** The stage (the issue status). */
+  key: IssueStatus;
+  count: number;
+  /** Show each column's name: the stage has more than one column, or a named one. */
+  showColumns: boolean;
+  groups: IssueColumnGroup<T>[];
 }
 
+/** The stage's columns, in board order. */
+export const stageColumns = (columns: IssueColumn[], stage: IssueStatus) => columns.filter((c) => c.stage === stage);
+
+/** The board is customized in this stage: more than one column, or a column with its own name. */
+export const stageCustomized = (columns: IssueColumn[]) => columns.length > 1 || columns.some((c) => c.name !== null);
+
+/** The column an issue sits in: its own when it belongs to its stage, else the stage's first. */
+export function columnOfIssue(i: Pick<Issue, "columnId" | "status">, columns: IssueColumn[]): IssueColumn | null {
+  const own = i.columnId ? columns.find((c) => c.id === i.columnId && c.stage === i.status) : undefined;
+  return own ?? columns.find((c) => c.stage === i.status) ?? null;
+}
+
+/** Inside a column: the board's order (lowest rank first), then the newest number. */
+const byBoard = (a: Issue, b: Issue) => a.boardRank - b.boardRank || b.number - a.number;
+
 /**
- * The list's sections: "Trabalhando agora" (a live run), "Em revisão" (a PR open), "A fazer" (the rest that
- * is open: waiting on you first, stalled, in progress by a person, to do). Closed issues ("Concluídas")
- * come newest first in one section. Empty sections are left out.
+ * The list's sections, one per stage (Em andamento, Em revisão, A fazer; Feitas and Canceladas under the
+ * "Concluídas" filter), and inside each stage its columns in board order, each in the board's order.
+ * Column names show only where the board is customized. Empty stages and columns are left out.
  */
-export function issueSections(list: Issue[], filter: IssueFilter, meId: string | null): IssueSection<Issue>[] {
+export function issueSections(
+  list: Issue[],
+  filter: IssueFilter,
+  meId: string | null,
+  columns: IssueColumn[] = [],
+): IssueSection<Issue>[] {
   const shown = list.filter((i) => passesFilter(i, filter, meId));
-  if (filter === "done")
-    return shown.length
-      ? [{ key: "done", items: [...shown].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) }]
-      : [];
-  const working: Issue[] = [];
-  const review: Issue[] = [];
-  const todo: Issue[] = [];
-  for (const i of shown) {
-    const s = issueState(i);
-    if (s === "running") working.push(i);
-    else if (s === "review") review.push(i);
-    else todo.push(i);
+  const out: IssueSection<Issue>[] = [];
+  for (const stage of filter === "done" ? CLOSED_STAGES : OPEN_STAGES) {
+    const items = shown.filter((i) => i.status === stage);
+    if (items.length === 0) continue;
+    const cols = stageColumns(columns, stage);
+    const byColumn = new Map<string | null, Issue[]>();
+    for (const i of items) {
+      const id = columnOfIssue(i, cols)?.id ?? null;
+      byColumn.set(id, [...(byColumn.get(id) ?? []), i]);
+    }
+    const groups: IssueColumnGroup<Issue>[] = [];
+    const loose = byColumn.get(null);
+    if (loose) groups.push({ key: `${stage}:none`, column: null, items: loose.sort(byBoard) });
+    for (const c of cols) {
+      const inColumn = byColumn.get(c.id);
+      if (inColumn) groups.push({ key: c.id, column: c, items: inColumn.sort(byBoard) });
+    }
+    out.push({ key: stage, count: items.length, showColumns: stageCustomized(cols), groups });
   }
-  const out: IssueSection<Issue>[] = [
-    { key: "working", items: working.sort(byUrgency) },
-    { key: "review", items: review.sort(byUrgency) },
-    { key: "todo", items: todo.sort(byUrgency) },
-  ];
-  return out.filter((s) => s.items.length > 0);
+  return out;
+}
+
+/** The column picker: the stages in board order, each with its columns (stages without columns left out). */
+export function columnChoices(columns: IssueColumn[]): { stage: IssueStatus; columns: IssueColumn[] }[] {
+  return STATUSES.map((stage) => ({ stage, columns: stageColumns(columns, stage) })).filter((s) => s.columns.length);
 }
 
 /** Criteria checked and in all ("2/4"); null without criteria. */

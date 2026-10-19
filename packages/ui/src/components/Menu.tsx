@@ -98,6 +98,40 @@ export function MenuRadioGroup({
   );
 }
 
+/** An on/off item ("Mostrar canceladas"): a check when on; the menu stays open. */
+export function MenuCheckboxItem({
+  checked,
+  onCheckedChange,
+  children,
+  hint,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  children: ReactNode;
+  /** Quiet text on the right (how many it shows). */
+  hint?: ReactNode;
+}) {
+  return (
+    <DropdownMenu.CheckboxItem
+      className="ac-menu__item"
+      checked={checked}
+      onCheckedChange={(v) => onCheckedChange(v === true)}
+      onSelect={(e) => e.preventDefault()}
+    >
+      <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="m5.5 10.5 3 3 6-7" />
+      </svg>
+      <span className="ac-menu__label">{children}</span>
+      {hint && <span className="ac-menu__hint">{hint}</span>}
+    </DropdownMenu.CheckboxItem>
+  );
+}
+
+/** A quiet line of explanation inside a menu ("Tarefas novas entram aqui."); not focusable. */
+export function MenuNote({ children }: { children: ReactNode }) {
+  return <p className="ac-menu__note">{children}</p>;
+}
+
 /** A small uppercase heading over a group of items ("Lembrar de novo"). */
 export function MenuHeading({ children }: { children: ReactNode }) {
   return <DropdownMenu.Label className="ac-menu__heading">{children}</DropdownMenu.Label>;

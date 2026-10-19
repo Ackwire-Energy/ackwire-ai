@@ -2,13 +2,17 @@ import {
   askAgentToImplement,
   commentIssue,
   createIssue,
+  createIssueColumn,
+  deleteIssueColumn,
   getIssueDetail,
   type IssueDeps,
   issueFromMessage,
   listIssueActivity,
+  listIssueColumns,
   listIssues,
   setCriterion,
   updateIssue,
+  updateIssueColumn,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -29,6 +33,8 @@ const Issue = z
     title: z.string(),
     description: z.string(),
     status: Status,
+    columnId: z.uuid().nullable().openapi({ description: "Its board column (D55), always one of its stage." }),
+    boardRank: z.number().openapi({ description: "Order inside the column, lowest first." }),
     priority: Priority,
     assignee: Actor.nullable(),
     labels: z.array(z.string()),
@@ -89,6 +95,19 @@ const Activity = z
   .openapi("IssueActivity");
 
 const IssueParams = OrgParams.extend({ issueId: z.uuid() });
+
+const Column = z
+  .object({
+    id: z.uuid(),
+    stage: Status,
+    name: z.string().nullable().openapi({ description: "Null: the stage's own name, in the reader's language." }),
+    position: z.number(),
+  })
+  .openapi("IssueColumn");
+const Columns = z.object({
+  columns: z.array(Column).openapi({ description: "Board order: by stage, then position." }),
+});
+const ColumnParams = OrgParams.extend({ columnId: z.uuid() });
 
 /** Native issues (D28): numbers per org, acceptance criteria, activity, "ask an agent to implement". */
 export function issueRoutes(deps: AppDeps) {
@@ -208,6 +227,11 @@ export function issueRoutes(deps: AppDeps) {
             title: z.string().min(1).max(300).optional(),
             description: z.string().max(50_000).optional(),
             status: Status.optional(),
+            columnId: z
+              .uuid()
+              .optional()
+              .openapi({ description: "Move to a board column; the issue takes that column's stage." }),
+            boardRank: z.number().optional().openapi({ description: "Its order inside the column (lowest first)." }),
             priority: Priority.optional(),
             assignee: Actor.nullable().optional(),
             dueDate: DueDate.optional(),
@@ -220,6 +244,80 @@ export function issueRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, issueId } = c.req.valid("param");
       return c.json(await updateIssue(issues, person(c.get("user").id), orgId, issueId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/issue-columns",
+      tags,
+      security,
+      summary: "The board's columns, each in a fixed stage (D55)",
+      request: { params: OrgParams },
+      responses: { 200: json(Columns), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ columns: await listIssueColumns(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/issue-columns",
+      tags,
+      security,
+      summary: "Add a column to a stage (after `afterId` when it is in the same stage, else at the stage's end)",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({ name: z.string().min(1).max(40), stage: Status, afterId: z.uuid().nullable().optional() }),
+        ),
+      },
+      responses: { 201: json(Columns, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ columns: await createIssueColumn(issues, c.get("user").id, orgId, c.req.valid("json")) }, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/issue-columns/{columnId}",
+      tags,
+      security,
+      summary: "Rename a column, or move it inside its stage (`index`)",
+      request: {
+        params: ColumnParams,
+        body: body(z.object({ name: z.string().min(1).max(40).optional(), index: z.number().int().min(0).optional() })),
+      },
+      responses: { 200: json(Columns), ...errors },
+    }),
+    async (c) => {
+      const { orgId, columnId } = c.req.valid("param");
+      const columns = await updateIssueColumn(issues, c.get("user").id, orgId, columnId, c.req.valid("json"));
+      return c.json({ columns }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/issue-columns/{columnId}",
+      tags,
+      security,
+      summary: "Delete a column; its issues go to `moveTo` (a stage keeps at least one column)",
+      request: { params: ColumnParams, query: z.object({ moveTo: z.uuid() }) },
+      responses: { 200: json(Columns), ...errors },
+    }),
+    async (c) => {
+      const { orgId, columnId } = c.req.valid("param");
+      const { moveTo } = c.req.valid("query");
+      return c.json({ columns: await deleteIssueColumn(issues, c.get("user").id, orgId, columnId, moveTo) }, 200);
     },
   );
 

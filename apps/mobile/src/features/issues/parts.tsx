@@ -1,4 +1,4 @@
-import type { Issue } from "@agenteschat/client";
+import type { Issue, IssueColumn } from "@agenteschat/client";
 import { toolActivity } from "@agenteschat/client/lib/activity";
 import { dueLabel } from "@agenteschat/client/lib/format";
 import { toolLabel } from "@agenteschat/client/lib/work";
@@ -28,6 +28,26 @@ export function useStepText() {
       return step.detail ? `${label} · ${step.detail}` : label;
     },
     [t],
+  );
+}
+
+/** A column's name as people read it: its own, or the stage's when it has none ("A fazer"). */
+export function useColumnLabel() {
+  const { t } = useTranslation();
+  return useCallback((c: Pick<IssueColumn, "name" | "stage">) => c.name ?? t(`issues.status.${c.stage}`), [t]);
+}
+
+/** A board column inside a stage of the list (only where the board is customized): its name and count. */
+export function ColumnHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <View style={styles.column} accessibilityRole="header">
+      <Text variant="small" tone="muted" numberOfLines={1} style={styles.columnName}>
+        {label}
+      </Text>
+      <Text variant="small" tone="faint">
+        {count}
+      </Text>
+    </View>
   );
 }
 
@@ -110,7 +130,7 @@ export function AssigneeFace({ issue, size, live }: { issue: Issue; size: number
 }
 
 /**
- * One issue in the list (MobileDriveIssues.html `.irow`): who has it, "#134 · Alta · até sex", the title in
+ * One task in the list (MobileDriveIssues.html `.irow`): who has it, "#134 · Alta · até sex", the title in
  * two lines, then its state, the agent's current step while it works, and the criteria.
  */
 export const IssueRow = memo(function IssueRow({
@@ -185,4 +205,13 @@ const styles = StyleSheet.create({
   title: { fontWeight: "600" },
   meta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, minWidth: 0 },
   step: { flexShrink: 1 },
+  column: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 6,
+    paddingBottom: 4,
+    paddingHorizontal: 20,
+  },
+  columnName: { fontWeight: "600", flexShrink: 1 },
 });

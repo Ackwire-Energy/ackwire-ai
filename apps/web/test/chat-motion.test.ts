@@ -125,7 +125,7 @@ describe("humanized activity", () => {
     expect(activityText(t, [entry("Theo", toolActivity("himetrica_get_events"))])).toBe(
       "Theo está consultando o himetrica…",
     );
-    expect(activityText(t, [entry("Theo", toolActivity("create_issue"))])).toBe("Theo está criando uma issue…");
+    expect(activityText(t, [entry("Theo", toolActivity("create_issue"))])).toBe("Theo está criando uma tarefa…");
     expect(activityText(t, [entry("Theo", toolActivity("list_artifacts"))])).toBe("Theo está lendo o Drive…");
     expect(activityText(t, [entry("Theo", toolActivity("send_email"))])).toBe("Theo está usando uma ferramenta…");
     expect(

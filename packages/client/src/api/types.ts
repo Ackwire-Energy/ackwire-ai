@@ -1315,6 +1315,10 @@ export interface Issue {
   title: string;
   description: string;
   status: IssueStatus;
+  /** Its board column (D55), always one of its stage. */
+  columnId: string | null;
+  /** Order inside the column, lowest first. */
+  boardRank: number;
   priority: IssuePriority;
   assignee: Actor | null;
   labels: string[];
@@ -1373,8 +1377,19 @@ export interface IssueInput {
 }
 
 export type IssuePatch = Partial<
-  Pick<Issue, "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "labels">
->;
+  Pick<Issue, "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "labels" | "boardRank">
+> & {
+  /** Move to a board column: the issue takes that column's stage. */
+  columnId?: string;
+};
+
+/** A board column (D55): it sits in a fixed stage; `name` null shows the stage's own name. */
+export interface IssueColumn {
+  id: string;
+  stage: IssueStatus;
+  name: string | null;
+  position: number;
+}
 
 export type RoutineEvent = "sentry.issue_created" | "github.pr_opened" | "issue.created" | "deploy.succeeded";
 

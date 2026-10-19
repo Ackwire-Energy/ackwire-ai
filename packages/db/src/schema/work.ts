@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   boolean,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -28,6 +29,31 @@ export const issueCounters = pgTable("issue_counters", {
 });
 
 /**
+ * The board's columns (D55). Each one sits in a fixed stage (the issue
+ * status), so the status still moves on its own; an issue moved by the
+ * system lands in the first column of its stage. `name` null: the stage's
+ * own name, in the reader's language. Created on first use with one column
+ * per stage.
+ */
+export const issueColumns = pgTable(
+  "issue_columns",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    stage: issueStatusEnum().notNull(),
+    name: text(),
+    /** Order inside its stage. */
+    position: doublePrecision().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId, t.stage, t.position)],
+);
+
+/**
  * Native issues (D28). Visible to the whole org, or like the channel they
  * came from (`channel_id`, e.g. "Transformar em issue" in a private
  * channel). Acceptance criteria are a checklist; assignee is a person or an
@@ -46,6 +72,10 @@ export const issues = pgTable(
     title: text().notNull(),
     description: text().notNull().default(""),
     status: issueStatusEnum().notNull().default("todo"),
+    /** Its board column (D55); null: the first column of its stage. Cleared when the status changes. */
+    columnId: uuid().references(() => issueColumns.id, { onDelete: "set null" }),
+    /** Order inside its column, lowest first; a move by the system puts it on top (minus the time). */
+    boardRank: doublePrecision().notNull().default(0),
     priority: issuePriorityEnum().notNull().default("normal"),
     /** `person` or `agent`. */
     assigneeType: text(),

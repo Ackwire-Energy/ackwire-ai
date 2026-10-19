@@ -62,8 +62,10 @@ import type {
   InvitationWithStatus,
   Issue,
   IssueActivity,
+  IssueColumn,
   IssueInput,
   IssuePatch,
+  IssueStatus,
   Machine,
   MachineAccess,
   MachineAccessReduce,
@@ -474,6 +476,17 @@ export interface ApiClient {
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
     askAgent(orgId: string, id: string, agentId: string): Promise<Issue>;
+    /** The board's columns (D55), board order: by stage, then position. */
+    columns(orgId: string): Promise<IssueColumn[]>;
+    /** Adds a column to a stage (after `afterId` when it is in the same stage, else at the stage's end). */
+    addColumn(
+      orgId: string,
+      input: { name: string; stage: IssueStatus; afterId?: string | null },
+    ): Promise<IssueColumn[]>;
+    /** Renames a column, or moves it inside its stage (`index`). */
+    updateColumn(orgId: string, columnId: string, patch: { name?: string; index?: number }): Promise<IssueColumn[]>;
+    /** Deletes a column; its tasks go to `moveTo`. A stage keeps at least one column. */
+    deleteColumn(orgId: string, columnId: string, moveTo: string): Promise<IssueColumn[]>;
   };
   /** Threads (ADR 0029): the Threads page, a thread from a range, moving it, closing and archiving. */
   threads: {

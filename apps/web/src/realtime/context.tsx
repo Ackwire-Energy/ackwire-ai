@@ -6,6 +6,7 @@ import type {
   BudgetEvent,
   ChannelEvent,
   ForumUserEvent,
+  IssueColumn,
   MachineTask,
   MemoryUpdate,
   Message,
@@ -373,6 +374,11 @@ export function RealtimeProvider({
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
         void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+      }
+      // The board's columns changed (org broadcast): set them; a deleted column moved its tasks.
+      if (event.type === "issue.columns" && "columns" in event && Array.isArray(event.columns)) {
+        qc.setQueryData(keys.issueColumns(orgId), event.columns as IssueColumn[]);
+        void qc.invalidateQueries({ queryKey: keys.issues(orgId), predicate: (q) => q.queryKey[3] === "list" });
       }
       // The forum (org broadcasts): the list and the open topic refresh.
       if ((event.type === "forum.topic.updated" || event.type === "forum.post.created") && "topicId" in event) {

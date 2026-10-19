@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { Artifact, Issue } from "@agenteschat/client";
+import type { Artifact, Issue, IssueColumn } from "@agenteschat/client";
 import { cardPreview, cardShape, driveSections, gridRows, kindKey, matchesType } from "../../src/features/drive/logic";
 import {
+  columnChoices,
+  columnOfIssue,
   conversationOf,
   criteriaProgress,
   currentStep,
@@ -37,6 +39,8 @@ function issue(over: Partial<Issue> & { number: number }): Issue {
     pullRequests: [],
     artifacts: [],
     work: null,
+    columnId: null,
+    boardRank: 0,
     createdAt: at(60, NOW),
     updatedAt: at(30, NOW),
     ...over,
@@ -106,28 +110,90 @@ describe("issue filters and sections", () => {
     expect(filterCounts(list, null).mine).toBe(1);
   });
 
-  test("open issues: working, in review, to do (waiting first)", () => {
-    const sections = issueSections(list, "open", "me").map((s) => [s.key, s.items.map((i) => i.number)]);
-    expect(sections).toEqual([
-      ["working", [134]],
-      ["review", [131]],
-      ["todo", [129, 127, 126]],
+  const shape = (sections: ReturnType<typeof issueSections>) =>
+    sections.map((s) => [
+      s.key,
+      s.count,
+      s.showColumns,
+      s.groups.map((g) => [g.column?.id ?? null, g.items.map((i) => i.number)]),
+    ]);
+
+  test("open tasks by stage: in progress, in review, to do; columns not loaded yet", () => {
+    expect(shape(issueSections(list, "open", "me"))).toEqual([
+      ["in_progress", 2, false, [[null, [134, 129]]]],
+      ["in_review", 1, false, [[null, [131]]]],
+      ["todo", 2, false, [[null, [127, 126]]]],
     ]);
   });
 
-  test("to do is ordered by priority and due date after what waits", () => {
-    const todo = [
-      issue({ number: 1 }),
-      issue({ number: 2, priority: "high" }),
-      issue({ number: 3, dueDate: "2026-10-20" }),
-      issue({ number: 4, priority: "low" }),
-    ];
-    expect(issueSections(todo, "open", null)[0]?.items.map((i) => i.number)).toEqual([2, 3, 1, 4]);
+  test("closed ones: done, then canceled; empty stages are left out", () => {
+    expect(shape(issueSections(list, "done", "me"))).toEqual([
+      ["done", 1, false, [[null, [120]]]],
+      ["canceled", 1, false, [[null, [119]]]],
+    ]);
+    expect(issueSections([], "open", "me")).toEqual([]);
   });
 
-  test("closed ones newest first; empty sections are left out", () => {
-    expect(issueSections(list, "done", "me")).toEqual([{ key: "done", items: [list[5] as Issue, list[6] as Issue] }]);
-    expect(issueSections([], "open", "me")).toEqual([]);
+  const col = (id: string, stage: IssueColumn["stage"], position: number, name: string | null = null): IssueColumn => ({
+    id,
+    stage,
+    name,
+    position,
+  });
+  const plain = [col("c1", "todo", 0), col("c2", "in_progress", 1), col("c3", "in_review", 2), col("c4", "done", 3)];
+
+  test("one default column per stage: no column names, the board's order inside", () => {
+    const tasks = [
+      issue({ number: 1, columnId: "c1", boardRank: 3 }),
+      issue({ number: 2, columnId: "c1", boardRank: 1 }),
+      issue({ number: 3, columnId: "c1", boardRank: 2 }),
+    ];
+    expect(shape(issueSections(tasks, "open", null, plain))).toEqual([["todo", 3, false, [["c1", [2, 3, 1]]]]]);
+  });
+
+  test("a customized stage shows its columns in board order; empty columns are left out", () => {
+    const board = [
+      col("backlog", "todo", 0, "Backlog"),
+      col("week", "todo", 1, "Esta semana"),
+      col("idle", "todo", 2, "Algum dia"),
+      col("doing", "in_progress", 3),
+    ];
+    const tasks = [
+      issue({ number: 1, columnId: "week", boardRank: 2 }),
+      issue({ number: 2, columnId: "backlog" }),
+      issue({ number: 3, columnId: "week", boardRank: 1 }),
+      // No column, or one of another stage: the stage's first column.
+      issue({ number: 4, columnId: null, boardRank: 5 }),
+      issue({ number: 5, status: "in_progress", columnId: "backlog" }),
+    ];
+    expect(shape(issueSections(tasks, "open", null, board))).toEqual([
+      ["in_progress", 1, false, [["doing", [5]]]],
+      [
+        "todo",
+        4,
+        true,
+        [
+          ["backlog", [2, 4]],
+          ["week", [3, 1]],
+        ],
+      ],
+    ]);
+  });
+
+  test("a single column with its own name counts as customized", () => {
+    const board = [col("triage", "todo", 0, "Triagem")];
+    expect(issueSections([issue({ number: 1, columnId: "triage" })], "open", null, board)[0]?.showColumns).toBe(true);
+  });
+
+  test("the column a task sits in, and the picker's stages", () => {
+    const board = [col("a", "todo", 0), col("b", "todo", 1, "Depois"), col("c", "done", 2)];
+    expect(columnOfIssue({ columnId: "b", status: "todo" }, board)?.id).toBe("b");
+    expect(columnOfIssue({ columnId: "c", status: "todo" }, board)?.id).toBe("a");
+    expect(columnOfIssue({ columnId: null, status: "in_review" }, board)).toBeNull();
+    expect(columnChoices(board).map((s) => [s.stage, s.columns.map((c) => c.id)])).toEqual([
+      ["todo", ["a", "b"]],
+      ["done", ["c"]],
+    ]);
   });
 });
 

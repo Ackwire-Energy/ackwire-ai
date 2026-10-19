@@ -526,6 +526,13 @@
       "when": 1792430000000,
       "tag": "0074_machine_reconnect",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1792375660208,
+      "tag": "0075_issue_board_columns",
+      "breakpoints": true
     }
   ]
 }

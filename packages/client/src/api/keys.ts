@@ -69,6 +69,7 @@ export const keys = {
   issueList: (orgId: string, q: string) => ["org", orgId, "issues", "list", q] as const,
   issue: (orgId: string, number: number) => ["org", orgId, "issues", "one", number] as const,
   issueActivity: (orgId: string, id: string) => ["org", orgId, "issues", "activity", id] as const,
+  issueColumns: (orgId: string) => ["org", orgId, "issues", "columns"] as const,
   /** Every thread view and list (prefix): a `thread.updated` refreshes them all. */
   threads: (orgId: string) => ["org", orgId, "threads"] as const,
   threadList: (orgId: string, filters: object) => ["org", orgId, "threads", "list", filters] as const,

@@ -1,4 +1,4 @@
-import { type Issue, useIssues } from "@agenteschat/client";
+import { type Issue, useIssueColumns, useIssues } from "@agenteschat/client";
 import { router } from "expo-router";
 import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,12 +9,12 @@ import type { WaitingItem } from "../chats/waiting";
 import { useColors, useMeId, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { filterCounts, ISSUE_FILTERS, type IssueFilter, issueSections, waitsOnYou } from "./logic";
-import { IssueRow } from "./parts";
+import { ColumnHeader, IssueRow, useColumnLabel } from "./parts";
 
 /** Rows whose agent moves (a long list stays light). */
 const LIVE_ROWS = 8;
 
-/** What waits on you in issues, as the strip's items (it opens the issue). */
+/** What waits on you in tasks, as the strip's items (it opens the issue). */
 function waitingFromIssues(list: Issue[]): WaitingItem[] {
   return list.filter(waitsOnYou).map((i) => ({
     key: `i:${i.id}`,
@@ -32,8 +32,9 @@ function waitingFromIssues(list: Issue[]): WaitingItem[] {
 
 /**
  * Issues (MobileDriveIssues.html, "Lista"), pushed from Você: the filters (Abertas and Com você with their
- * counts, Dos agentes, Concluídas), what waits on you as the dark strip, then the sections by state:
- * Trabalhando agora, Em revisão, A fazer. "+" opens "Nova issue".
+ * counts, Dos agentes, Concluídas), what waits on you as the dark strip, then the sections by stage
+ * (Em andamento, Em revisão, A fazer), each with its board columns named where the board is customized.
+ * "+" opens "Nova tarefa". Columns are edited on the web only.
  */
 export function IssuesScreen() {
   const { t } = useTranslation();
@@ -41,12 +42,17 @@ export function IssuesScreen() {
   const orgId = useOrgId();
   const meId = useMeId();
   const issues = useIssues(orgId);
+  const columns = useIssueColumns(orgId);
+  const columnLabel = useColumnLabel();
   const pull = usePullRefresh(issues.refetch);
   const [filter, setFilter] = useState<IssueFilter>("open");
   const [stripOpen, setStripOpen] = useState(false);
   const all = issues.data ?? [];
   const counts = filterCounts(all, meId);
-  const sections = useMemo(() => issueSections(issues.data ?? [], filter, meId), [issues.data, filter, meId]);
+  const sections = useMemo(
+    () => issueSections(issues.data ?? [], filter, meId, columns.data ?? []),
+    [issues.data, filter, meId, columns.data],
+  );
   const waiting = useMemo(() => waitingFromIssues(issues.data ?? []), [issues.data]);
   const openNew = () => router.push("/issues/new");
   let row = 0;
@@ -100,11 +106,18 @@ export function IssuesScreen() {
       ) : (
         sections.map((s) => (
           <Fragment key={s.key}>
-            <SectionHeader title={t(`mobile.issues.section.${s.key}`)} count={s.items.length} />
-            {s.items.map((i, k) => {
-              row += 1;
-              return <IssueRow key={i.id} issue={i} divider={k > 0} live={row <= LIVE_ROWS} />;
-            })}
+            <SectionHeader title={t(`mobile.issues.section.${s.key}`)} count={s.count} />
+            {s.groups.map((g) => (
+              <Fragment key={g.key}>
+                {s.showColumns && g.column ? (
+                  <ColumnHeader label={columnLabel(g.column)} count={g.items.length} />
+                ) : null}
+                {g.items.map((i, k) => {
+                  row += 1;
+                  return <IssueRow key={i.id} issue={i} divider={k > 0} live={row <= LIVE_ROWS} />;
+                })}
+              </Fragment>
+            ))}
           </Fragment>
         ))
       )}

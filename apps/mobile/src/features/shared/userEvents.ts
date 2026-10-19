@@ -49,6 +49,9 @@ export function useUserEvents() {
       }
       // Org events: a computer went offline or came back, agents moved off one ("Computador desconectado").
       if (isOutageEvent(event)) void qc.invalidateQueries({ queryKey: outagesKey(orgId) });
+      // Org event: someone changed the task board's columns (D55). Deleting one moves its tasks, so the
+      // tasks refresh too (the columns live under the same key).
+      if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")
         refreshMission(qc, orgId, event.missionId);
     });

@@ -148,7 +148,15 @@ export { Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
-export { Menu, MenuHeading, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
+export {
+  Menu,
+  MenuCheckboxItem,
+  MenuHeading,
+  MenuItem,
+  MenuNote,
+  MenuRadioGroup,
+  MenuSeparator,
+} from "./components/Menu";
 export {
   MenuOverlay,
   MenuOverlayGroup,

@@ -25,7 +25,7 @@ describe("Fórum: the list", () => {
     expect(screen().getByRole("heading", { name: "Discutindo agora" })).toBeTruthy();
     expect(screen().getByRole("heading", { name: "Precisa de você" })).toBeTruthy();
     // The concluded topic of mine waits for its issues to be approved.
-    expect(document.body.textContent).toContain("A síntese sugere 2 issues");
+    expect(document.body.textContent).toContain("A síntese sugere 2 tarefas");
     const row = screen().getByRole("link", { name: "Plano de preços do Q1" });
     expect(row.textContent).toContain("Em discussão");
     expect(row.textContent).toContain("Decidir se mudamos o plano de entrada");
@@ -108,16 +108,16 @@ describe("a topic", () => {
     expect(synthesis.textContent).toContain("Cortar a escolha de chave");
     expect(synthesis.textContent).toContain("Prós e contras de cada um");
     expect(synthesis.querySelector(".artifact-card")).not.toBeNull();
-    const issues = within(synthesis).getByRole("region", { name: "Issues sugeridas" });
+    const issues = within(synthesis).getByRole("region", { name: "Tarefas sugeridas" });
     const boxes = within(issues).getAllByRole("checkbox");
     expect(boxes.map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "true"]);
     await click(boxes[1] as HTMLElement);
-    await click(within(issues).getByRole("button", { name: "Criar 1 issue" }));
+    await click(within(issues).getByRole("button", { name: "Criar 1 tarefa" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "forum.createIssues")?.args[2]).toEqual([
       { title: "Pular a escolha de chave no onboarding", description: "Usar a chave da plataforma por padrão." },
     ]);
-    expect(document.body.textContent).toContain("1 issue criada.");
+    expect(document.body.textContent).toContain("1 tarefa criada.");
   });
 
   test("participants: 'Editar participantes' → Editar sends only the difference", async () => {

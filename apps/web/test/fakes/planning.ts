@@ -3,7 +3,8 @@
  * Mirrors these endpoints (shapes in `api/types.ts`):
  * - Issues: `GET …/issues?q`, `GET …/issues/{number}`, `POST …/issues`, `PATCH …/issues/{id}`,
  *   `PUT …/issues/{id}/criteria/{criterionId} { done }`, `GET|POST …/issues/{id}/activity`,
- *   `POST …/issues/{id}/ask-agent { agentId }` (assigns, moves to "Em andamento", starts the run).
+ *   `POST …/issues/{id}/ask-agent { agentId }` (assigns, moves to "Em andamento", starts the run);
+ *   board columns (D55): `GET|POST …/issue-columns`, `PATCH|DELETE …/issue-columns/{id}`.
  * - Routines: `GET|POST …/routines`, `POST …/routines/parse-schedule|parse-rule { phrase }` → cron, rule and
  *   description in the workspace time zone (phrases looked up in a table, standing in for the model),
  *   `PATCH …/routines/{id} { active }`, `POST …/routines/{id}/run`, `GET …/routines/{id}/runs`.
@@ -20,6 +21,9 @@ import type {
   CalendarProposal,
   Issue,
   IssueActivity,
+  IssueColumn,
+  IssuePatch,
+  IssueStatus,
   Routine,
   RoutineRun,
   RuleInfo,
@@ -109,8 +113,17 @@ export function startOfWeek(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
 }
 
+const STAGES: IssueStatus[] = ["todo", "in_progress", "in_review", "done", "canceled"];
+/** Every org starts with one unnamed column per stage (ids `col-<stage>`). */
+const defaultColumns = (): IssueColumn[] =>
+  STAGES.map((stage) => ({ id: `col-${stage}`, stage, name: null, position: 0 }));
+/** Board order: by stage, then position. */
+const boardOrder = (cols: IssueColumn[]) =>
+  [...cols].sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || a.position - b.position);
+
 interface Store {
   issues: Issue[];
+  columns: IssueColumn[];
   activity: Map<string, IssueActivity[]>;
   routines: Routine[];
   runs: Map<string, RoutineRun[]>;
@@ -124,7 +137,15 @@ export function createMockPlanning(
 ): Pick<ApiClient, "issues" | "routines" | "calendar"> {
   const me = async (): Promise<Actor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
   const store = perOrg<Store>(async (orgId) => {
-    const s: Store = { issues: [], activity: new Map(), routines: [], runs: new Map(), events: [], proposals: [] };
+    const s: Store = {
+      issues: [],
+      columns: defaultColumns(),
+      activity: new Map(),
+      routines: [],
+      runs: new Map(),
+      events: [],
+      proposals: [],
+    };
     if (!ctx.seed) return s;
     const [agents, members, channels] = await Promise.all([
       ctx.lookup.agents(orgId),
@@ -146,6 +167,8 @@ export function createMockPlanning(
     const issue = (over: Partial<Issue> & Pick<Issue, "title" | "status">): Issue => ({
       id: mockId("iss"),
       number: ++n,
+      columnId: `col-${over.status}`,
+      boardRank: -n,
       description: "",
       priority: "normal",
       assignee: null,
@@ -370,6 +393,19 @@ export function createMockPlanning(
     issue.updatedAt = a.createdAt;
     return a;
   };
+  /** Renumbers a stage's columns in their current order (positions 0, 1, 2…). */
+  const renumber = (cols: IssueColumn[], stage: IssueStatus) => {
+    cols
+      .filter((c) => c.stage === stage)
+      .forEach((c, k) => {
+        c.position = k;
+      });
+  };
+  const columnsOf = async (orgId: string) => {
+    const s = await store(orgId);
+    s.columns = boardOrder(s.columns);
+    return s;
+  };
   const findRoutine = async (orgId: string, id: string) => {
     const r = (await store(orgId)).routines.find((x) => x.id === id);
     if (!r) throw new MockNotFoundError("Rotina não encontrada.");
@@ -400,6 +436,8 @@ export function createMockPlanning(
           title: input.title.trim(),
           description: input.description?.trim() ?? "",
           status: "todo",
+          columnId: boardOrder(s.columns).find((c) => c.stage === "todo")?.id ?? null,
+          boardRank: -ctx.now().getTime(),
           priority: input.priority ?? "normal",
           assignee: input.assignee ?? null,
           labels: input.labels ?? [],
@@ -419,7 +457,20 @@ export function createMockPlanning(
       update: async (orgId, id, patch) => {
         const i = await findIssue(orgId, id);
         const author = await me();
-        if (patch.status && patch.status !== i.status) {
+        const s = await columnsOf(orgId);
+        const { columnId, ...rest } = patch;
+        let change: Omit<IssuePatch, "columnId"> = rest;
+        // A column carries its stage; a bare status lands on top of that stage's first column.
+        const column = columnId ? s.columns.find((c) => c.id === columnId) : undefined;
+        if (columnId && !column) throw new MockNotFoundError("Coluna não encontrada.");
+        if (column) {
+          change = { ...change, status: column.stage };
+          i.columnId = column.id;
+        } else if (change.status && change.status !== i.status) {
+          i.columnId = s.columns.find((c) => c.stage === change.status)?.id ?? null;
+          if (change.boardRank === undefined) i.boardRank = -ctx.now().getTime();
+        }
+        if (change.status && change.status !== i.status) {
           // Same words as the backend (packages/engine/src/issues.ts).
           const words = {
             todo: "A fazer",
@@ -432,10 +483,10 @@ export function createMockPlanning(
             kind: "event",
             author,
             event: "status_changed",
-            text: `mudou o status para ${words[patch.status]}`,
+            text: `mudou o status para ${words[change.status]}`,
           });
         }
-        Object.assign(i, patch, { updatedAt: ctx.now().toISOString() });
+        Object.assign(i, change, { updatedAt: ctx.now().toISOString() });
         return clone(i);
       },
       setCriterion: async (orgId, id, criterionId, done) => {
@@ -451,15 +502,66 @@ export function createMockPlanning(
       askAgent: async (orgId, id, agentId) => {
         const i = await findIssue(orgId, id);
         i.assignee = { type: "agent", id: agentId };
-        i.status = "in_progress";
+        if (i.status !== "in_progress") {
+          i.status = "in_progress";
+          i.columnId = (await columnsOf(orgId)).columns.find((c) => c.stage === "in_progress")?.id ?? null;
+          i.boardRank = -ctx.now().getTime();
+        }
         const agentName = (await ctx.lookup.agents(orgId)).find((a) => a.id === agentId)?.name ?? "o agente";
         await log(orgId, i, {
           kind: "event",
           author: await me(),
           event: "agent_asked",
-          text: `pediu a ${agentName} para implementar`,
+          text: `pediu a ${agentName} para fazer`,
         });
         return clone(i);
+      },
+      columns: async (orgId) => clone((await columnsOf(orgId)).columns),
+      addColumn: async (orgId, input) => {
+        record("issues.addColumn", input);
+        const s = await columnsOf(orgId);
+        const col: IssueColumn = { id: mockId("col"), stage: input.stage, name: input.name.trim(), position: 0 };
+        const after = input.afterId ? s.columns.find((c) => c.id === input.afterId) : undefined;
+        const at =
+          after && after.stage === input.stage
+            ? s.columns.indexOf(after) + 1
+            : s.columns.reduce((k, c, j) => (c.stage === input.stage ? j + 1 : k), 0);
+        s.columns.splice(at, 0, col);
+        renumber(s.columns, input.stage);
+        return clone(s.columns);
+      },
+      updateColumn: async (orgId, columnId, patch) => {
+        record("issues.updateColumn", columnId, patch);
+        const s = await columnsOf(orgId);
+        const col = s.columns.find((c) => c.id === columnId);
+        if (!col) throw new MockNotFoundError("Coluna não encontrada.");
+        if (patch.name !== undefined) col.name = patch.name.trim() || null;
+        if (patch.index !== undefined) {
+          const sib = s.columns.filter((c) => c.stage === col.stage && c !== col);
+          sib.splice(Math.max(0, Math.min(patch.index, sib.length)), 0, col);
+          sib.forEach((c, k) => {
+            c.position = k;
+          });
+          s.columns = boardOrder(s.columns);
+        }
+        return clone(s.columns);
+      },
+      deleteColumn: async (orgId, columnId, moveTo) => {
+        record("issues.deleteColumn", columnId, moveTo);
+        const s = await columnsOf(orgId);
+        const col = s.columns.find((c) => c.id === columnId);
+        const dest = s.columns.find((c) => c.id === moveTo && c.id !== columnId);
+        if (!col || !dest) throw new MockNotFoundError("Coluna não encontrada.");
+        if (s.columns.filter((c) => c.stage === col.stage).length === 1)
+          throw new Error("Cada etapa precisa de pelo menos uma coluna.");
+        for (const i of s.issues)
+          if (i.columnId === columnId) {
+            i.columnId = dest.id;
+            i.status = dest.stage;
+          }
+        s.columns = s.columns.filter((c) => c !== col);
+        renumber(s.columns, col.stage);
+        return clone(s.columns);
       },
     },
     routines: {

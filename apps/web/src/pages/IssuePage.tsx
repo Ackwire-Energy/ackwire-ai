@@ -1,5 +1,13 @@
-import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@agenteschat/client";
-import { keys, useChannels, useIssue, useIssueAction, useIssueActivity, useWikiTree } from "@agenteschat/client";
+import type { Issue, IssueActivity, IssuePriority } from "@agenteschat/client";
+import {
+  keys,
+  useChannels,
+  useIssue,
+  useIssueAction,
+  useIssueActivity,
+  useIssueColumns,
+  useWikiTree,
+} from "@agenteschat/client";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -37,7 +45,18 @@ import { useEmojiLabels } from "@/components/Reactions";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useComposerFiles } from "@/hooks/useComposerFiles";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
-import { isOpen, PRIORITIES, STATUS_ICON, STATUSES, useAssigneeColor, useStepText } from "@/lib/issues";
+import {
+  columnIdOf,
+  columnsOf,
+  isOpen,
+  PRIORITIES,
+  STATUS_ICON,
+  STATUSES,
+  useAssigneeColor,
+  useColumnTitle,
+  useStageName,
+  useStepText,
+} from "@/lib/issues";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import "./issues.css";
@@ -596,18 +615,28 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
   const { org } = useOrg();
   const actors = useActors();
   const action = useIssueAction(org.id);
+  const columns = useIssueColumns(org.id).data ?? [];
+  const title = useColumnTitle();
+  const stageName = useStageName();
+  // The column picker: every column, grouped by stage (also the keyboard way to move a card).
+  const columnOptions = STATUSES.flatMap((s) =>
+    columnsOf(columns, s).map((c) => ({
+      value: c.id,
+      label: title(c),
+      group: stageName(s),
+      leading: <Icon name={STATUS_ICON[s]} size={16} />,
+    })),
+  );
   const fields = (
     <>
-      <Field label={t("issues.statusLabel")} id={`is-status-${i.id}`}>
+      <Field label={t("issues.column")} id={`is-col-${i.id}`}>
         <Select
           size="sm"
-          value={i.status}
-          onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { status: v as IssueStatus } })}
-          options={STATUSES.map((s) => ({
-            value: s,
-            label: t(`issues.status.${s}`),
-            leading: <Icon name={STATUS_ICON[s]} size={16} />,
-          }))}
+          value={columnIdOf(i, columns) ?? undefined}
+          onValueChange={(v) =>
+            action.mutate({ type: "update", id: i.id, patch: { columnId: v, boardRank: -Date.now() } })
+          }
+          options={columnOptions}
         />
       </Field>
       <Field label={t("issues.form.assignee")} id={`is-who-${i.id}`}>
@@ -647,6 +676,7 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
           </Link>
         )}
       </Field>
+      <p className="issue-flow-hint">{t("issues.flowHint")}</p>
     </>
   );
   if (bare) return fields;

@@ -44,8 +44,10 @@ import type {
   ForumSuggestionOverrides,
   ForumTopicDetail,
   ForumTopicInput,
+  IssueColumn,
   IssueInput,
   IssuePatch,
+  IssueStatus,
   Machine,
   MachineAccessReduce,
   MailActionName,
@@ -1289,6 +1291,37 @@ export function useIssueAction(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
       void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
     },
+  });
+}
+
+/** The board's columns (D55); they live under the issues key, so any issue change refreshes them too. */
+export const useIssueColumns = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.issueColumns(orgId), queryFn: () => api.issues.columns(orgId) });
+};
+
+export function useIssueColumnAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action:
+        | { type: "add"; name: string; stage: IssueStatus; afterId?: string | null }
+        | { type: "update"; columnId: string; name?: string; index?: number }
+        | { type: "delete"; columnId: string; moveTo: string },
+    ): Promise<IssueColumn[]> => {
+      switch (action.type) {
+        case "add":
+          return api.issues.addColumn(orgId, { name: action.name, stage: action.stage, afterId: action.afterId });
+        case "update":
+          return api.issues.updateColumn(orgId, action.columnId, { name: action.name, index: action.index });
+        case "delete":
+          return api.issues.deleteColumn(orgId, action.columnId, action.moveTo);
+      }
+    },
+    onSuccess: (columns) => qc.setQueryData(keys.issueColumns(orgId), columns),
+    // Deleting a column moves its tasks.
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }),
   });
 }
 

@@ -92,7 +92,7 @@ describe("@mention autocomplete", () => {
 
   test("works in the issue comment box too", async () => {
     await go("issues/131");
-    const box = screen().getByRole("combobox", { name: "Comentar na issue" }) as HTMLTextAreaElement;
+    const box = screen().getByRole("combobox", { name: "Comentar na tarefa" }) as HTMLTextAreaElement;
     await typeIn(box, "@ad");
     const list = screen().getByRole("listbox", { name: "Pessoas e agentes" });
     expect(within(list).getAllByRole("option")[0]?.textContent).toContain("Ada");

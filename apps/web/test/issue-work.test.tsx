@@ -24,12 +24,12 @@ describe("asking an agent to implement an issue", () => {
     );
     await settle(3);
     const card = document.querySelector(".iw-card") as HTMLElement;
-    expect(card.textContent).toContain("Você pediu a issue");
+    expect(card.textContent).toContain("Você pediu a tarefa");
     expect(card.textContent).toContain(`#${issue.number}`);
     // The issue's current title and status, not the copy in the message.
     expect(card.textContent).toContain("Login quebra no Safari");
     expect(card.textContent).toContain("A fazer");
-    const open = [...card.querySelectorAll("a")].find((a) => a.textContent?.includes("Ver issue"));
+    const open = [...card.querySelectorAll("a")].find((a) => a.textContent?.includes("Ver tarefa"));
     expect(open?.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/${issue.number}`);
     // Nothing internal: no ids, no instructions.
     expect(card.textContent).not.toContain(issue.id);
@@ -55,7 +55,7 @@ describe("asking an agent to implement an issue", () => {
     await renderPage(<IssueTakenLine message={message} />, { api: createFakeApi(seedState()), org: true });
     await settle(2);
     const line = document.querySelector(".iw-line") as HTMLElement;
-    expect(line.textContent).toMatch(/Ada pegou a issue #24 · Checkout quebra/);
+    expect(line.textContent).toMatch(/Ada pegou a tarefa #24 · Checkout quebra/);
     expect(line.querySelector("a")?.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/24`);
     expect(line.textContent).not.toContain("iss_1");
   });

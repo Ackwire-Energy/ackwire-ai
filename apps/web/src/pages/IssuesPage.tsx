@@ -1,5 +1,5 @@
-import type { Issue, IssuePriority, IssueStatus } from "@agenteschat/client";
-import { useIssueAction, useIssues } from "@agenteschat/client";
+import type { Issue, IssueColumn, IssuePriority, IssueStatus } from "@agenteschat/client";
+import { useIssueAction, useIssueColumns, useIssues } from "@agenteschat/client";
 import { dueLabel, parseDayInput, relativeTime, toYmd } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -17,6 +17,9 @@ import {
   FilterToggle,
   Icon,
   Input,
+  Menu,
+  MenuCheckboxItem,
+  MenuItem,
   SearchField,
   Segmented,
   Select,
@@ -34,6 +37,10 @@ import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import {
   BOARD,
+  columnIdOf,
+  columnsOf,
+  groupByColumn,
+  isCustomBoard,
   isOpen,
   isStalled,
   isWorking,
@@ -42,10 +49,13 @@ import {
   STATUSES,
   splitCriteria,
   useAssigneeColor,
+  useColumnTitle,
+  useStageName,
   useStepText,
 } from "@/lib/issues";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
+import { AddColumnDialog, Board } from "./IssueBoard";
 import { IssueDialog } from "./IssuePage";
 import "./issues.css";
 
@@ -59,7 +69,11 @@ export function StatusChip({ status }: { status: IssueStatus }) {
   return <Chip icon={STATUS_ICON[status]}>{t(`issues.status.${status}`)}</Chip>;
 }
 
-/** Issues (telas/Issues.html): agents working now, a board by status (drag between columns) or a list, a details panel. */
+/**
+ * Tarefas (telas/Tarefas.html; issues in the code): agents working now, the
+ * org's board (custom columns in fixed stages, drag between and inside them)
+ * or a list, a details panel.
+ */
 export function IssuesPage() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -74,9 +88,14 @@ export function IssuesPage() {
   const actorOptions = useActorFilterOptions();
   const copy = useFilterCopy();
   const searchRef = useRef<HTMLInputElement>(null);
-  const [creating, setCreating] = useState(false);
+  // "Nova tarefa": false, or open (in a given column of A fazer, or the first).
+  const [creating, setCreating] = useState<false | { columnId: string | null }>(false);
+  const [showCanceled, setShowCanceled] = useState(false);
+  const [addingColumn, setAddingColumn] = useState(false);
   const search = useDeferredValue(q.trim());
   const issues = useIssues(org.id, search);
+  const columnsQuery = useIssueColumns(org.id);
+  const columns = columnsQuery.data;
   const all = issues.data ?? [];
   const pass = (i: Issue, f: Filter) =>
     f === "all" ||
@@ -101,7 +120,7 @@ export function IssuesPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() === "n") {
         e.preventDefault();
-        setCreating(true);
+        setCreating({ columnId: null });
       } else if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -128,7 +147,7 @@ export function IssuesPage() {
               )}
             </p>
           </div>
-          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+          <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
             {t("issues.new")}
           </Button>
         </header>
@@ -146,31 +165,49 @@ export function IssuesPage() {
             />
           }
           actions={
-            <Segmented
-              label={t("issues.view")}
-              value={view}
-              onValueChange={setView}
-              options={[
-                {
-                  value: "board",
-                  label: (
-                    <>
-                      <Icon name="grid" size={16} />
-                      {t("issues.board")}
-                    </>
-                  ),
-                },
-                {
-                  value: "list",
-                  label: (
-                    <>
-                      <Icon name="list" size={16} />
-                      {t("issues.list")}
-                    </>
-                  ),
-                },
-              ]}
-            />
+            <span className="issues-tools">
+              <Segmented
+                label={t("issues.view")}
+                value={view}
+                onValueChange={setView}
+                options={[
+                  {
+                    value: "board",
+                    label: (
+                      <>
+                        <Icon name="grid" size={16} />
+                        {t("issues.board")}
+                      </>
+                    ),
+                  },
+                  {
+                    value: "list",
+                    label: (
+                      <>
+                        <Icon name="list" size={16} />
+                        {t("issues.list")}
+                      </>
+                    ),
+                  },
+                ]}
+              />
+              <Menu
+                align="end"
+                label={t("issues.moreOptions")}
+                trigger={<Button size="sm" iconOnly icon="more" aria-label={t("issues.moreOptions")} />}
+              >
+                <MenuItem icon="layers" onSelect={() => setAddingColumn(true)} disabled={!columns}>
+                  {t("issues.columns.add")}
+                </MenuItem>
+                <MenuCheckboxItem
+                  checked={showCanceled}
+                  onCheckedChange={setShowCanceled}
+                  hint={all.filter((i) => i.status === "canceled").length}
+                >
+                  {t("issues.showCanceled")}
+                </MenuCheckboxItem>
+              </Menu>
+            </span>
           }
         >
           {/* biome-ignore lint/a11y/useSemanticElements: filter pills */}
@@ -234,7 +271,7 @@ export function IssuesPage() {
             ]}
           />
         </Toolbar>
-        {issues.isLoading &&
+        {(issues.isLoading || (view === "board" && !columns && columnsQuery.isLoading)) &&
           (view === "board" ? (
             <div className="issues-board">
               {BOARD.map((status) => (
@@ -255,7 +292,7 @@ export function IssuesPage() {
             sky
             title={t("issues.emptyTitle")}
             actions={
-              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              <Button variant="primary" icon="plus" onClick={() => setCreating({ columnId: null })}>
                 {t("issues.new")}
               </Button>
             }
@@ -266,13 +303,39 @@ export function IssuesPage() {
         {issues.isSuccess && visible.length === 0 && (all.length > 0 || search) && (
           <EmptyState icon="search">{t("issues.noResults")}</EmptyState>
         )}
-        {visible.length > 0 && view === "board" && <Board issues={visible} openNumber={openNumber} onOpen={toggle} />}
-        {visible.length > 0 && view === "list" && (
-          <IssueList issues={visible} openNumber={openNumber} onOpen={toggle} />
+        {columnsQuery.isError && !columns && (
+          <ErrorState error={columnsQuery.error} onRetry={() => void columnsQuery.refetch()} />
+        )}
+        {visible.length > 0 && view === "board" && columns && (
+          <Board
+            issues={visible.filter((i) => showCanceled || i.status !== "canceled")}
+            columns={columns}
+            showCanceled={showCanceled}
+            onNew={(columnId) => setCreating({ columnId })}
+            renderCard={(i, drag) => (
+              <IssueCard issue={i} selected={i.number === openNumber} onOpen={() => toggle(i.number)} drag={drag} />
+            )}
+          />
+        )}
+        {visible.length > 0 && view === "list" && columns && (
+          <IssueList
+            issues={visible.filter((i) => showCanceled || i.status !== "canceled")}
+            columns={columns}
+            openNumber={openNumber}
+            onOpen={toggle}
+          />
         )}
       </div>
       {opened && <IssueDialog issue={opened} onClose={() => setOpenParam(null)} />}
-      <NewIssueDialog open={creating} onClose={() => setCreating(false)} />
+      <NewIssueDialog
+        open={creating !== false}
+        columnId={creating ? creating.columnId : null}
+        columns={columns ?? []}
+        onClose={() => setCreating(false)}
+      />
+      {columns && (
+        <AddColumnDialog open={addingColumn} afterId={null} columns={columns} onClose={() => setAddingColumn(false)} />
+      )}
     </div>
   );
 }
@@ -436,78 +499,17 @@ const panelClick = (e: MouseEvent, open: () => void) => {
   open();
 };
 
-function Board({
-  issues,
-  openNumber,
+function IssueCard({
+  issue: i,
+  selected,
   onOpen,
+  drag,
 }: {
-  issues: Issue[];
-  openNumber: number | null;
-  onOpen: (n: number) => void;
+  issue: Issue;
+  selected: boolean;
+  onOpen: () => void;
+  drag: { dragging: boolean; onDragStart: (e: DragEvent) => void; onDragEnd: () => void };
 }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const action = useIssueAction(org.id);
-  const [over, setOver] = useState<IssueStatus | null>(null);
-  const move = (number: number, status: IssueStatus) => {
-    const issue = issues.find((i) => i.number === number);
-    if (!issue || issue.status === status) return;
-    const was = issue.status;
-    action.mutate(
-      { type: "update", id: issue.id, patch: { status } },
-      {
-        onSuccess: () =>
-          toast.show(t("issues.moved", { number, status: t(`issues.status.${status}`) }), "info", {
-            label: t("issues.undo"),
-            run: () => action.mutate({ type: "update", id: issue.id, patch: { status: was } }),
-          }),
-      },
-    );
-  };
-  const onDrop = (status: IssueStatus) => (e: DragEvent) => {
-    e.preventDefault();
-    setOver(null);
-    const n = Number(e.dataTransfer.getData("text/plain"));
-    if (n) move(n, status);
-  };
-  return (
-    <div className="issues-board">
-      {BOARD.map((status) => {
-        const items = issues.filter((i) => i.status === status);
-        return (
-          <section
-            key={status}
-            className={cx("issues-col", over === status && "is-over")}
-            aria-label={t(`issues.status.${status}`)}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOver(status);
-            }}
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null);
-            }}
-            onDrop={onDrop(status)}
-          >
-            <div className="issues-col__head">
-              <Icon name={STATUS_ICON[status]} size={16} />
-              <h2>{t(`issues.status.${status}`)}</h2>
-              <span className="tabular">{items.length}</span>
-            </div>
-            <div className="issues-col__cards">
-              {items.map((i) => (
-                <IssueCard key={i.id} issue={i} selected={i.number === openNumber} onOpen={() => onOpen(i.number)} />
-              ))}
-              {items.length === 0 && <p className="issues-col__empty">{t("issues.dropHere")}</p>}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-function IssueCard({ issue: i, selected, onOpen }: { issue: Issue; selected: boolean; onOpen: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const color = useAssigneeColor();
@@ -516,16 +518,15 @@ function IssueCard({ issue: i, selected, onOpen }: { issue: Issue; selected: boo
     <Link
       to="/org/$orgId/issues/$number"
       params={{ orgId: org.id, number: String(i.number) }}
-      className={cx("issue-card", selected && "is-on")}
+      className={cx("issue-card", selected && "is-on", drag.dragging && "is-dragging")}
       aria-label={t("issues.open", { number: i.number, title: i.title })}
       aria-current={selected || undefined}
       draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", String(i.number));
-        e.dataTransfer.effectAllowed = "move";
-      }}
+      onDragStart={drag.onDragStart}
+      onDragEnd={drag.onDragEnd}
       onClick={(e) => panelClick(e, onOpen)}
       data-status={i.status}
+      data-card={i.number}
     >
       <span className="issue-card__top tabular">
         <span>#{i.number}</span>
@@ -550,7 +551,58 @@ function IssueCard({ issue: i, selected, onOpen }: { issue: Issue; selected: boo
   );
 }
 
+/** The list: grouped by stage, then by column when the board is customized. */
 function IssueList({
+  issues,
+  columns,
+  openNumber,
+  onOpen,
+}: {
+  issues: Issue[];
+  columns: IssueColumn[];
+  openNumber: number | null;
+  onOpen: (n: number) => void;
+}) {
+  const stageName = useStageName();
+  const title = useColumnTitle();
+  const custom = isCustomBoard(columns);
+  const byColumn = groupByColumn(issues, columns);
+  return (
+    <div className="issues-groups">
+      {STATUSES.map((status) => {
+        const cols = columnsOf(columns, status);
+        const count = cols.reduce((n, c) => n + (byColumn.get(c.id)?.length ?? 0), 0);
+        if (count === 0) return null;
+        return (
+          <section key={status} className="issues-group" aria-label={stageName(status)}>
+            <h2 className="issues-group__title">
+              <Icon name={STATUS_ICON[status]} size={16} />
+              {stageName(status)}
+              <span>{count}</span>
+            </h2>
+            {cols.map((c) => {
+              const items = byColumn.get(c.id) ?? [];
+              if (items.length === 0) return null;
+              return (
+                <div key={c.id} className="issues-group__col">
+                  {custom && status !== "canceled" && (
+                    <h3 className="issues-group__sub">
+                      {title(c)}
+                      <span>{items.length}</span>
+                    </h3>
+                  )}
+                  <IssueRows issues={items} openNumber={openNumber} onOpen={onOpen} />
+                </div>
+              );
+            })}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function IssueRows({
   issues,
   openNumber,
   onOpen,
@@ -563,57 +615,63 @@ function IssueList({
   const { org } = useOrg();
   const color = useAssigneeColor();
   return (
-    <div className="issues-groups">
-      {STATUSES.map((status) => {
-        const items = issues.filter((i) => i.status === status);
-        if (items.length === 0) return null;
-        return (
-          <section key={status} className="issues-group" aria-label={t(`issues.status.${status}`)}>
-            <h2 className="issues-group__title">
-              <Icon name={STATUS_ICON[status]} size={16} />
-              {t(`issues.status.${status}`)}
-              <span>{items.length}</span>
-            </h2>
-            <ul className="issue-list">
-              {items.map((i) => (
-                <li key={i.id}>
-                  <Link
-                    to="/org/$orgId/issues/$number"
-                    params={{ orgId: org.id, number: String(i.number) }}
-                    className={cx("issue-list__row", i.number === openNumber && "is-on")}
-                    onClick={(e) => panelClick(e, () => onOpen(i.number))}
-                  >
-                    <span className="issue-list__num tabular">#{i.number}</span>
-                    <span className="issue-list__title">
-                      <b>{i.title}</b>
-                      <PriorityChip issue={i} />
-                    </span>
-                    <span className="issue-list__crit">
-                      <Criteria issue={i} />
-                    </span>
-                    <span className="issue-list__who">
-                      <WhoLine issue={i} />
-                    </span>
-                    <span className="issue-list__due">
-                      <DueChip issue={i} />
-                    </span>
-                    <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
-                    {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
-    </div>
+    <ul className="issue-list">
+      {issues.map((i) => (
+        <li key={i.id}>
+          <Link
+            to="/org/$orgId/issues/$number"
+            params={{ orgId: org.id, number: String(i.number) }}
+            className={cx("issue-list__row", i.number === openNumber && "is-on")}
+            onClick={(e) => panelClick(e, () => onOpen(i.number))}
+          >
+            <span className="issue-list__num tabular">#{i.number}</span>
+            <span className="issue-list__title">
+              <b>{i.title}</b>
+              <PriorityChip issue={i} />
+            </span>
+            <span className="issue-list__crit">
+              <Criteria issue={i} />
+            </span>
+            <span className="issue-list__who">
+              <WhoLine issue={i} />
+            </span>
+            <span className="issue-list__due">
+              <DueChip issue={i} />
+            </span>
+            <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
+            {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function NewIssueDialog({
+  open,
+  columnId,
+  columns,
+  onClose,
+}: {
+  open: boolean;
+  /** The column of A fazer it was asked from ("Nova tarefa" under a column); else the first. */
+  columnId: string | null;
+  columns: IssueColumn[];
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
+  const title_ = useColumnTitle();
+  const todoColumns = columnsOf(columns, "todo");
+  const [column, setColumn] = useState<string | null>(null);
+  const [openedWith, setOpenedWith] = useState<string | null | undefined>(undefined);
+  if (open && openedWith !== columnId) {
+    setOpenedWith(columnId);
+    setColumn(columnId);
+  }
+  if (!open && openedWith !== undefined) setOpenedWith(undefined);
+  const chosenColumn = todoColumns.find((c) => c.id === column) ?? todoColumns[0];
   const actors = useActors();
   const action = useIssueAction(org.id);
   const [title, setTitle] = useState("");
@@ -665,6 +723,9 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
             {
               onSuccess: (created) => {
                 const issue = created as Issue;
+                // New tasks land in the first column of A fazer; another one was chosen.
+                if (chosenColumn && chosenColumn.id !== columnIdOf(issue, columns) && chosen?.type !== "agent")
+                  action.mutate({ type: "update", id: issue.id, patch: { columnId: chosenColumn.id } });
                 // An agent picked here starts right away ("Pedir"): assigned, its run linked, in progress.
                 if (chosen?.type === "agent")
                   action.mutate(
@@ -707,6 +768,15 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
                 ))}
               </ul>
             </div>
+          )}
+          {todoColumns.length > 1 && (
+            <Field label={t("issues.column")} id="ni-col">
+              <Select
+                value={chosenColumn?.id}
+                onValueChange={setColumn}
+                options={todoColumns.map((c) => ({ value: c.id, label: title_(c) }))}
+              />
+            </Field>
           )}
           <div className="grid-fields">
             <Field label={t("issues.form.assignee")} id="ni-who">

@@ -1,6 +1,7 @@
 import {
   type Actor,
   type Issue,
+  type IssueColumn,
   type IssuePriority,
   type IssueStatus,
   keys,
@@ -8,6 +9,7 @@ import {
   useChannels,
   useIssue,
   useIssueAction,
+  useIssueColumns,
 } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -36,14 +38,22 @@ import {
   useSurface,
 } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
-import { conversationOf, criteriaProgress, issueState, minutesSince } from "./logic";
-import { StateChip, useStepText } from "./parts";
+import {
+  columnChoices,
+  columnOfIssue,
+  conversationOf,
+  criteriaProgress,
+  issueState,
+  minutesSince,
+  stageCustomized,
+} from "./logic";
+import { StateChip, useColumnLabel, useStepText } from "./parts";
 
 /**
- * One issue (MobileDriveIssues.html, "Issue aberta"): where it came from, the big title, its state, priority
+ * One task (MobileDriveIssues.html, "Issue aberta"; called "tarefa" in the app): where it came from, the big title, its state, priority
  * and who has it; the agent's card with its live steps; the description, the acceptance criteria (checked
  * here too), what is linked (the source message, Drive files, PRs) and its sub-issues. Conversar and Concluir
- * at the bottom; "…" changes status, priority and who does it, as the web allows.
+ * at the bottom; "…" moves it to another board column, changes priority and who does it, as the web allows.
  */
 export function IssueScreen({ number }: { number: number }) {
   return (
@@ -493,7 +503,46 @@ function BottomBar({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** "…": status, priority, who does it (an agent is asked and starts), stop the agent, cancel. */
+/**
+ * The column picker: the board's columns grouped by stage (the stage as the header; a column without a name
+ * reads as its stage). A board that isn't customized shows just the stages. Choosing one sends `columnId`.
+ */
+function ColumnPicker({
+  issue: i,
+  columns,
+  onPick,
+}: {
+  issue: Issue;
+  columns: IssueColumn[];
+  onPick: (c: IssueColumn) => void;
+}) {
+  const { t } = useTranslation();
+  const columnLabel = useColumnLabel();
+  const current = columnOfIssue(i, columns)?.id;
+  const stages = columnChoices(columns);
+  const item = (c: IssueColumn): ActionItem => ({
+    key: c.id,
+    label: columnLabel(c),
+    ...(c.id === current ? { trailing: <Icon name="check" size={18} /> } : {}),
+    onPress: () => onPick(c),
+  });
+  if (!stages.some((s) => stageCustomized(s.columns)))
+    return <ActionList items={stages.flatMap((s) => s.columns.map(item))} />;
+  return (
+    <>
+      {stages.map((s) => (
+        <View key={s.stage} style={styles.pickerStage}>
+          <Text variant="label" accessibilityRole="header" style={styles.pickerTitle}>
+            {t(`mobile.issues.section.${s.stage}`)}
+          </Text>
+          <ActionList items={s.columns.map(item)} />
+        </View>
+      ))}
+    </>
+  );
+}
+
+/** "…": its column, priority, who does it (an agent is asked and starts), stop the agent, cancel. */
 function IssueMenu({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const sheet = useSheet();
@@ -503,6 +552,8 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   const dir = useDirectory();
   const meId = useMeId();
   const action = useIssueAction(orgId);
+  const columns = useIssueColumns(orgId);
+  const columnLabel = useColumnLabel();
   const toast = useToast();
   const stop = useMutation({
     mutationFn: (runId: string) => api.agents.cancelRun(orgId, runId),
@@ -565,14 +616,32 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       onPress: () => assign(null),
     },
   ];
+  const board = columns.data ?? [];
+  const column = columnOfIssue(i, board);
+  // Columns not loaded (or failed): the stages, as before the board had columns.
+  const openColumns = () =>
+    board.length > 0
+      ? sheet.open(
+          <ColumnPicker
+            issue={i}
+            columns={board}
+            onPick={(c) =>
+              update(
+                { type: "update", id: i.id, patch: { columnId: c.id } },
+                t("mobile.issues.moved", { number: i.number, column: columnLabel(c) }),
+              )
+            }
+          />,
+        )
+      : pick(statusItems());
   const w = i.work;
   const items: ActionItem[] = [
     {
-      key: "status",
+      key: "column",
       icon: "circle",
       label: t("mobile.issues.actions.status"),
-      hint: t(`issues.status.${i.status}`),
-      onPress: () => pick(statusItems()),
+      hint: column ? columnLabel(column) : t(`issues.status.${i.status}`),
+      onPress: openColumns,
     },
     {
       key: "priority",
@@ -637,6 +706,8 @@ const styles = StyleSheet.create({
   box: { width: 20, height: 20, borderRadius: 6, alignItems: "center", justifyContent: "center", marginTop: 1 },
   struck: { textDecorationLine: "line-through" },
   link: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  pickerStage: { gap: 6 },
+  pickerTitle: { paddingHorizontal: 4 },
   tile: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   bar: {
     position: "absolute",

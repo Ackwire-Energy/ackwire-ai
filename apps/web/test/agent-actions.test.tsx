@@ -87,7 +87,7 @@ describe("receipts under the agent's reply (FazerDesfazer A/B)", () => {
     await open(withActions([action()]));
     const group = receipts();
     const row = group.querySelector(".ag-rc") as HTMLElement;
-    expect(row.textContent).toContain("Criei a issue #23 · Prompt de avaliação após a assinatura");
+    expect(row.textContent).toContain("Criei a tarefa #23 · Prompt de avaliação após a assinatura");
     const link = within(group).getByRole("link", { name: "#23" });
     expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/23`);
     const undo = within(group).getByRole("button", { name: /^Desfazer/ });

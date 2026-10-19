@@ -30,9 +30,10 @@ export interface OptionListProps<V extends string> {
   /**
    * `rows` (default): full-width rows. `cards`: side by side, the illustration
    * on top (telas/IconesMotor.html: the agent's "Motor"); the chosen card's
-   * settings go under all of them. One column on narrow screens.
+   * settings go under all of them. One column on narrow screens. `tiles`: two
+   * per row, the leading icon on the title's line (telas/Tarefas.html: the stage).
    */
-  layout?: "rows" | "cards";
+  layout?: "rows" | "cards" | "tiles";
   className?: string;
 }
 
@@ -53,6 +54,7 @@ export function OptionList<V extends string>({
   ...rest
 }: OptionListProps<V>) {
   const cards = layout === "cards";
+  const tiles = layout === "tiles";
   const item = (o: OptionListItem<V>) => (
     <RRadioGroup.Item
       key={o.value}
@@ -79,11 +81,17 @@ export function OptionList<V extends string>({
   const chosen = options.find((o) => o.value === value);
   return (
     <RRadioGroup.Root
-      className={cx("ac-optlist", cards && "ac-optlist--cards", disabled && "ac-optlist--locked", className)}
+      className={cx(
+        "ac-optlist",
+        cards && "ac-optlist--cards",
+        tiles && "ac-optlist--tiles",
+        disabled && "ac-optlist--locked",
+        className,
+      )}
       value={value}
       onValueChange={(v) => onValueChange(v as V)}
       disabled={disabled}
-      orientation={cards ? undefined : "vertical"}
+      orientation={cards || tiles ? undefined : "vertical"}
       loop
       {...rest}
     >

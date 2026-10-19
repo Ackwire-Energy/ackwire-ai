@@ -48,6 +48,7 @@ import type {
   InvitationWithStatus,
   Issue,
   IssueActivity,
+  IssueColumn,
   Machine,
   MachineAccess,
   MachineOutages,
@@ -583,6 +584,23 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       askAgent: (orgId, id, agentId) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/ask-agent`, { json: { agentId } }),
+      columns: async (orgId) => (await request<{ columns: IssueColumn[] }>(`${org(orgId)}/issue-columns`)).columns,
+      addColumn: async (orgId, input) =>
+        (await request<{ columns: IssueColumn[] }>(`${org(orgId)}/issue-columns`, { json: input })).columns,
+      updateColumn: async (orgId, columnId, patch) =>
+        (
+          await request<{ columns: IssueColumn[] }>(`${org(orgId)}/issue-columns/${enc(columnId)}`, {
+            method: "PATCH",
+            json: patch,
+          })
+        ).columns,
+      deleteColumn: async (orgId, columnId, moveTo) =>
+        (
+          await request<{ columns: IssueColumn[] }>(`${org(orgId)}/issue-columns/${enc(columnId)}`, {
+            method: "DELETE",
+            query: { moveTo },
+          })
+        ).columns,
     },
     threads: {
       list: (orgId, filters = {}) => request<ThreadPage>(`${org(orgId)}/threads`, { query: threadQuery(filters) }),

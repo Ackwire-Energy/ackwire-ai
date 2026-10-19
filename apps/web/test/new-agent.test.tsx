@@ -93,7 +93,7 @@ describe("Criar agente: steps", () => {
     await proceed();
     expect(title()).toBe("O que o Iris faz");
     expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toStartWith(
-      "Reproduz cada bug relatado antes de abrir issue.",
+      "Reproduz cada bug relatado antes de abrir uma tarefa.",
     );
 
     await proceed();

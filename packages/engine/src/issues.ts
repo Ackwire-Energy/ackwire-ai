@@ -6,6 +6,7 @@ import { recordAudit } from "./audit";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishOrgEvent } from "./events";
+import { boardColumns, columnForMove, columnOf, topRank } from "./issue-columns";
 import type { IssueWorkMeta } from "./issue-work";
 import { getMessage, insertMessage, messageView } from "./messages";
 import { enqueueRunJob } from "./mission-runs";
@@ -38,6 +39,10 @@ export interface IssueView {
   title: string;
   description: string;
   status: IssueStatus;
+  /** Its board column (D55): always one of its stage. */
+  columnId: string | null;
+  /** Order inside the column, lowest first. */
+  boardRank: number;
   priority: IssuePriority;
   assignee: WorkActor | null;
   labels: string[];
@@ -111,6 +116,9 @@ export type IssuePatch = Partial<{
   title: string;
   description: string;
   status: IssueStatus;
+  /** A board column (D55): the issue takes that column's stage. */
+  columnId: string;
+  boardRank: number;
   priority: IssuePriority;
   assignee: WorkActor | null;
   dueDate: string | null;
@@ -299,12 +307,16 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
         .where(and(inArray(artifacts.id, ids), isNull(artifacts.deletedAt)))
     : [];
   const byId = new Map(files.map((f) => [f.id, f]));
+  const orgId = rows[0]?.orgId;
+  const columns = orgId ? await boardColumns(db, orgId) : [];
   return rows.map((r) => ({
     id: r.id,
     number: r.number,
     title: r.title,
     description: r.description,
     status: r.status,
+    columnId: columnOf(columns, r)?.id ?? null,
+    boardRank: r.boardRank,
     priority: r.priority,
     assignee: r.assigneeType && r.assigneeId ? { type: r.assigneeType as WorkActor["type"], id: r.assigneeId } : null,
     labels: r.labels,
@@ -467,6 +479,7 @@ export async function createIssue(
         title,
         description: (input.description ?? "").slice(0, 50_000),
         priority: input.priority ?? "normal",
+        boardRank: topRank(),
         assigneeType: input.assignee?.type ?? null,
         assigneeId: input.assignee?.id ?? null,
         labels: cleanLabels(input.labels) ?? [],
@@ -667,14 +680,21 @@ export async function updateIssue(
     set.description = patch.description.slice(0, 50_000);
     events.push({ text: "edited the description", event: "description_changed" });
   }
-  if (patch.status && patch.status !== current.status) {
-    set.status = patch.status;
+  // A board column carries its stage; a bare status lands on top of the stage's first column.
+  const column = patch.columnId ? await columnForMove(db, orgId, patch.columnId) : null;
+  const status = column?.stage ?? patch.status;
+  if (column) set.columnId = column.id;
+  if (status && status !== current.status) {
+    set.status = status;
+    if (!column) set.columnId = null;
     events.push({
-      text: `changed the status to ${STATUS_WORDS[patch.status]}`,
+      text: `changed the status to ${STATUS_WORDS[status]}`,
       event: "status_changed",
-      data: { from: current.status, to: patch.status },
+      data: { from: current.status, to: status },
     });
   }
+  if (patch.boardRank !== undefined && Number.isFinite(patch.boardRank)) set.boardRank = patch.boardRank;
+  else if (set.columnId !== undefined) set.boardRank = topRank();
   if (patch.priority && patch.priority !== current.priority) {
     set.priority = patch.priority;
     events.push({ text: "changed the priority", event: "priority_changed", data: { to: patch.priority } });
@@ -706,8 +726,15 @@ export async function updateIssue(
     events.push({ text: `linked PR #${pr.number}`, event: "pr_linked", data: { url: pr.url, number: pr.number } });
   }
   // A linked PR moves open work to review on its own (unless the status is being set now).
-  if (patch.addPullRequest && !patch.status && (current.status === "todo" || current.status === "in_progress")) {
+  if (
+    patch.addPullRequest &&
+    !patch.status &&
+    !patch.columnId &&
+    (current.status === "todo" || current.status === "in_progress")
+  ) {
     set.status = "in_review";
+    set.columnId = null;
+    set.boardRank = topRank();
     events.push({
       text: `changed the status to ${STATUS_WORDS.in_review} (automatic: a PR was linked)`,
       event: "status_changed",
@@ -763,7 +790,7 @@ async function startedWork(deps: IssueDeps, issue: IssueRow, agentId: string, ru
   await deps.db.transaction(async (tx) => {
     const [updated] = await tx
       .update(issues)
-      .set({ status: "in_progress", updatedAt: new Date() })
+      .set({ status: "in_progress", columnId: null, boardRank: topRank(), updatedAt: new Date() })
       .where(and(eq(issues.id, current.id), eq(issues.status, "todo")))
       .returning();
     if (!updated) return;
