@@ -33,9 +33,20 @@ const firstSentence = (s: string) => {
   return one.length > 140 ? `${one.slice(0, 137)}…` : one;
 };
 
+/** A scope's group as a stable key (`drive:write` → `drive`, any custom connector → `custom`); "" = conversation. */
+const groupKeyOf = (scope: string) => {
+  const prefix = scope.split(":")[0] ?? "";
+  return prefix.startsWith("custom") ? "custom" : prefix;
+};
+
+/** What a set of scopes allows, as stable group keys (`drive`, `github`, `calendar`…), for the app to label. */
+export function capabilityKeys(scopes: string[]) {
+  return [...new Set(scopes.map(groupKeyOf))].filter((k) => k !== "");
+}
+
 /** Short, human summary of what a set of scopes allows ("Files (Drive), GitHub"), for other agents' context. */
 export function summarizeScopes(scopes: string[]) {
-  const groups = [...new Set(scopes.map((scope) => groupOf({ scope })))].filter((g) => g !== GROUPS[""]);
+  const groups = capabilityKeys(scopes).map((key) => groupOf({ scope: key }));
   return groups.length > 0 ? groups.join(", ") : "conversation only";
 }
 

@@ -14,6 +14,7 @@ import {
   deleteCredential,
   getAgent,
   getAgentBrain,
+  getTeam,
   listAgents,
   listCredentials,
   NotFoundError,
@@ -236,6 +237,62 @@ export function agentRoutes(deps: AppDeps) {
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
       return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id))) }, 200);
+    },
+  );
+
+  const TeamAgent = z.object({
+    id: z.uuid(),
+    name: z.string(),
+    handle: z.string(),
+    role: z.string(),
+    callFor: z
+      .string()
+      .openapi({ description: "When to call it: its role, or the first sentence of its instructions." }),
+    appearance: AgentAppearance.nullable(),
+    ownerUserId: z.string().nullable(),
+    capabilities: z
+      .array(z.string())
+      .openapi({ description: "What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…)." }),
+    busy: z.boolean().openapi({ description: "Working on something right now." }),
+    canTalk: z.boolean(),
+  });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/team",
+      tags,
+      security,
+      summary: "The agents as a team: grouped by responsible person, with who consulted whom in the last day",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            agents: z.array(TeamAgent),
+            people: z.array(z.object({ id: z.string(), name: z.string(), image: z.string().nullable() })),
+            consultations: z.array(
+              z.object({
+                id: z.uuid(),
+                askerAgentId: z.uuid(),
+                targetAgentId: z.uuid(),
+                status: z.string(),
+                createdAt: z.string(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const team = await getTeam(db, c.get("user").id, orgId);
+      return c.json(
+        {
+          ...team,
+          consultations: team.consultations.map((x) => ({ ...x, createdAt: x.createdAt.toISOString() })),
+        },
+        200,
+      );
     },
   );
 

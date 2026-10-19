@@ -1,12 +1,14 @@
-import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
+import type { AgentAppearance } from "./appearance";
 import { canTalkTo } from "./audience";
 import { caches } from "./cache";
-import { summarizeScopes } from "./capabilities";
+import { capabilityKeys, summarizeScopes } from "./capabilities";
 import { requesterOf } from "./dispatch";
 import { getMessage } from "./messages";
+import { requirePermission } from "./organizations";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
-const { agentRuns, agentScopes, agents, users } = schema;
+const { agentConsultations, agentRuns, agentScopes, agents, users } = schema;
 
 export const FIND_AGENT_TOOL = "find_agent";
 /** Up to this many teammates are named in every prompt; above it, only a hint to use `find_agent`. */
@@ -147,4 +149,99 @@ export function createFindAgentToolSource(): ToolSource {
     },
   };
   return { name: "team", tools: async () => [tool] };
+}
+
+/** Consultations shown on the team screen: the last day. */
+export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
+
+const firstSentence = (text: string) => {
+  const one =
+    text
+      .trim()
+      .replace(/\s+/g, " ")
+      .split(/(?<=[.!?])\s/)[0] ?? "";
+  return one.length > 160 ? `${one.slice(0, 157)}…` : one;
+};
+
+/**
+ * The team screen (D54): the org's agents grouped by their responsible person,
+ * what each can do (stable capability keys), who is working now, and which
+ * agents consulted each other in the last day. Questions and answers stay out:
+ * a conversation between agents is private.
+ */
+export async function getTeam(db: Database, actorId: string, orgId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  const list = await db
+    .select({
+      id: agents.id,
+      name: agents.name,
+      handle: agents.handle,
+      role: agents.role,
+      instructions: agents.instructions,
+      appearance: agents.appearance,
+      ownerUserId: agents.ownerUserId,
+      audienceMode: agents.audienceMode,
+      audienceUserIds: agents.audienceUserIds,
+    })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    .orderBy(asc(agents.createdAt));
+  const ids = list.map((a) => a.id);
+  const ownerIds = [...new Set(list.map((a) => a.ownerUserId).filter((id): id is string => !!id))];
+  const since = new Date(Date.now() - TEAM_CONSULTATIONS_MS);
+  const [scopes, owners, busy, consultations] = ids.length
+    ? await Promise.all([
+        db
+          .select({ agentId: agentScopes.agentId, scope: agentScopes.scope })
+          .from(agentScopes)
+          .where(and(eq(agentScopes.orgId, orgId), inArray(agentScopes.agentId, ids))),
+        ownerIds.length
+          ? db
+              .select({ id: users.id, name: users.name, image: users.image })
+              .from(users)
+              .where(inArray(users.id, ownerIds))
+          : Promise.resolve([]),
+        db
+          .selectDistinct({ agentId: agentRuns.agentId })
+          .from(agentRuns)
+          .where(
+            and(
+              eq(agentRuns.orgId, orgId),
+              inArray(agentRuns.agentId, ids),
+              inArray(agentRuns.status, ["running", "waiting_approval", "waiting_input"]),
+            ),
+          ),
+        db
+          .select({
+            id: agentConsultations.id,
+            askerAgentId: agentConsultations.askerAgentId,
+            targetAgentId: agentConsultations.targetAgentId,
+            status: agentConsultations.status,
+            createdAt: agentConsultations.createdAt,
+          })
+          .from(agentConsultations)
+          .where(and(eq(agentConsultations.orgId, orgId), gte(agentConsultations.createdAt, since)))
+          .orderBy(desc(agentConsultations.createdAt))
+          .limit(50),
+      ])
+    : [[], [], [], []];
+  const busyIds = new Set(busy.map((r) => r.agentId));
+  const active = new Set(ids);
+  return {
+    agents: list.map((a) => ({
+      id: a.id,
+      name: a.name,
+      handle: a.handle,
+      role: a.role,
+      callFor: a.role.trim() || firstSentence(a.instructions),
+      appearance: (a.appearance ?? null) as AgentAppearance | null,
+      ownerUserId: a.ownerUserId,
+      capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),
+      busy: busyIds.has(a.id),
+      canTalk: canTalkTo(a, actorId),
+    })),
+    people: owners.map((o) => ({ id: o.id, name: o.name, image: o.image ?? null })),
+    // Only between agents still here (an archived one has no place in the sky).
+    consultations: consultations.filter((c) => active.has(c.askerAgentId) && active.has(c.targetAgentId)),
+  };
 }
