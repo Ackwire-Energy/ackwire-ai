@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * A list of email addresses or `@domains` (email rules, routine filters):
+ * A list of email addresses or `@domains` (email rules, routine filters), or
+ * of other values with their own `split` (a database's hidden columns):
  * type one or several (commas or spaces), Enter or "Adicionar"; each shows
  * as a chip with a remove button.
  */
@@ -15,6 +16,10 @@ export function AddressList({
   values,
   onChange,
   disabled,
+  split = splitAddresses,
+  placeholder,
+  invalidText,
+  inputMode = "email",
 }: {
   id: string;
   label: string;
@@ -22,12 +27,17 @@ export function AddressList({
   values: string[];
   onChange: (values: string[]) => void;
   disabled?: boolean;
+  /** Typed text → what is valid in it (default: addresses and `@domains`). */
+  split?: (text: string) => { valid: string[]; invalid: string[] };
+  placeholder?: string;
+  invalidText?: string;
+  inputMode?: "email" | "text";
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const [invalid, setInvalid] = useState(false);
   const add = () => {
-    const { valid, invalid: wrong } = splitAddresses(text);
+    const { valid, invalid: wrong } = split(text);
     if (wrong.length > 0 || valid.length === 0) {
       setInvalid(text.trim().length > 0);
       return;
@@ -37,14 +47,14 @@ export function AddressList({
   };
   return (
     <div className="mail-list">
-      <Field label={label} id={id} help={help} error={invalid ? t("mail.list.invalid") : undefined}>
+      <Field label={label} id={id} help={help} error={invalid ? (invalidText ?? t("mail.list.invalid")) : undefined}>
         <div className="mail-list__add">
           <Input
             value={text}
             disabled={disabled}
-            inputMode="email"
+            inputMode={inputMode}
             autoComplete="off"
-            placeholder={t("mail.list.placeholder")}
+            placeholder={placeholder ?? t("mail.list.placeholder")}
             onChange={(e) => {
               setText(e.target.value);
               setInvalid(false);

@@ -33,6 +33,7 @@ import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
+import { createFakeDatabases, type FakeDatabases } from "./fakes/databases";
 import { createFakeForum } from "./fakes/forum";
 import { createFakeMachines, type FakeMachines } from "./fakes/machines";
 import { createFakeMail, type FakeMail } from "./fakes/mail";
@@ -598,7 +599,8 @@ type FakedParts =
   | "missions"
   | "calendar"
   | "customConnectors"
-  | "mail";
+  | "mail"
+  | "databases";
 
 /** The core of the fake backend, over `FakeState`. Records every call in `state.calls`. */
 export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
@@ -1509,6 +1511,9 @@ export const fakeMachinesOf = new WeakMap<ApiClient, FakeMachines>();
 /** The mailboxes fake behind each `createFakeApi` client (tests add mailboxes and failures with it). */
 export const fakeMailOf = new WeakMap<ApiClient, FakeMail>();
 
+/** The databases fake behind each `createFakeApi` client (tests add failures and tables with it). */
+export const fakeDatabasesOf = new WeakMap<ApiClient, FakeDatabases>();
+
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
@@ -1525,6 +1530,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
   const customConnectors = createMockCustomConnectors(ctx, (method, ...args) => state.calls.push({ method, args }));
   const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const client: ApiClient = {
     ...http,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
@@ -1565,9 +1571,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,
     mail: mail.client,
+    databases: databases.client,
   };
   fakeMachinesOf.set(client, machines);
   fakeMailOf.set(client, mail);
+  fakeDatabasesOf.set(client, databases);
   return client;
 }
 

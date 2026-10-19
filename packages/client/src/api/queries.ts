@@ -25,6 +25,8 @@ import { keys } from "./keys";
 import type {
   AgentAction,
   AgentComputer,
+  AgentDatabase,
+  AgentDatabaseInput,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
@@ -37,6 +39,8 @@ import type {
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
+  DatabaseActionName,
+  DatabaseConnectionInput,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -2413,6 +2417,96 @@ export function useReminderAction(orgId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.reminders(orgId) });
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+    },
+  });
+}
+
+// ── Databases (ADR 0039) ────────────────────────────────────────────────────
+
+/** The organization's databases (no passwords), with the agents that read each. */
+export const useDatabases = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.databaseList(orgId),
+    queryFn: () => api.databases.list(orgId),
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  });
+};
+
+/** A database's tables (the rules' table picker). */
+export const useDatabaseTables = (orgId: string, connectionId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.databaseTables(orgId, connectionId ?? ""),
+    queryFn: () => api.databases.tables(orgId, connectionId ?? ""),
+    enabled: Boolean(connectionId),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+};
+
+/** An agent's access and rules per database. */
+export const useAgentDatabases = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentDatabases(orgId, agentId),
+    queryFn: () => api.databases.agent(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+/** Connect, rename or reconnect, and disconnect a database; each refreshes every database read. */
+export function useDatabaseAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const done = () => qc.invalidateQueries({ queryKey: keys.databases(orgId) });
+  return {
+    connect: useMutation({
+      mutationFn: (input: DatabaseConnectionInput) => api.databases.connect(orgId, input),
+      onSuccess: done,
+      // The form says why (wrong password, server not reachable…).
+      meta: { silent: true },
+    }),
+    update: useMutation({
+      mutationFn: ({
+        connectionId,
+        ...input
+      }: DatabaseConnectionInput & { connectionId: string; offActions?: DatabaseActionName[] }) =>
+        api.databases.update(orgId, connectionId, input),
+      onSuccess: done,
+      meta: { silent: true },
+    }),
+    disconnect: useMutation({
+      mutationFn: (connectionId: string) => api.databases.disconnect(orgId, connectionId),
+      onSuccess: done,
+    }),
+  };
+}
+
+/** Saves an agent's access and rules for one database. */
+export function useSetAgentDatabase(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      agentId,
+      connectionId,
+      input,
+    }: {
+      agentId: string;
+      connectionId: string;
+      input: AgentDatabaseInput;
+    }) => api.databases.setAgent(orgId, agentId, connectionId, input),
+    meta: { silent: true },
+    onSuccess: (saved, { agentId }) => {
+      qc.setQueryData<AgentDatabase[]>(keys.agentDatabases(orgId, agentId), (list) =>
+        list ? list.map((d) => (d.connectionId === saved.connectionId ? saved : d)) : list,
+      );
+      void qc.invalidateQueries({ queryKey: keys.databaseList(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
     },
   });
 }

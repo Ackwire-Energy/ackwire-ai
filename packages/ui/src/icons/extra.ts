@@ -478,4 +478,10 @@ export const extraIcons = {
     ["rect", { x: "2.75", y: "4.5", width: "14.5", height: "11", rx: "2.25" }],
     ["path", { d: "m3.5 6 6.5 5 6.5-5" }],
   ],
+  /** A database (ADR 0039): the Postgres connector's card, row and steps. */
+  database: [
+    ["path", { d: "M4 5c0-1.24 2.69-2.25 6-2.25S16 3.76 16 5s-2.69 2.25-6 2.25S4 6.24 4 5Z" }],
+    ["path", { d: "M4 5v10c0 1.24 2.69 2.25 6 2.25s6-1.01 6-2.25V5" }],
+    ["path", { d: "M4 10c0 1.24 2.69 2.25 6 2.25s6-1.01 6-2.25" }],
+  ],
 } satisfies Record<string, IconShape[]>;

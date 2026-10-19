@@ -4,6 +4,7 @@ import { connectorDescription, connectorName } from "@agenteschat/client/lib/sco
 import { Chip, Dialog, FilterToggle, Icon, initialsOf, SearchField, Toolbar } from "@agenteschat/ui";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { DatabaseIcon } from "@/components/DatabaseConnect";
 import { LoadingCards } from "@/components/Loading";
 import { MailIcon, mailAuthKind, mailChoiceName } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
@@ -79,6 +80,7 @@ export function ConnectorCatalogDialog({
   onPick,
   onOther,
   mail,
+  database,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -92,6 +94,8 @@ export function ConnectorCatalogDialog({
   onOther: () => void;
   /** The "Email" group (ADR 0038): the mailboxes this server connects, which already have one, and the pick. */
   mail?: { choices: MailChoice[]; connected: Set<MailChoice>; onPick: (choice: MailChoice) => void };
+  /** The Postgres database card (ADR 0039), in "Desenvolvimento"; it can be connected more than once. */
+  database?: { connected: boolean; onPick: () => void };
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -100,7 +104,7 @@ export function ConnectorCatalogDialog({
   const mailChoices = mail?.choices ?? [];
   const present = [
     ...(mailChoices.length > 0 ? (["email"] as const) : []),
-    ...CATEGORIES.filter((c) => connectors.some((d) => d.category === c)),
+    ...CATEGORIES.filter((c) => connectors.some((d) => d.category === c) || (database && c === "dev")),
   ];
   const shown = searchCatalog(connectors, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`).filter(
     (d) => category === "all" || d.category === category,
@@ -116,6 +120,11 @@ export function ConnectorCatalogDialog({
               .includes(needle),
         )
       : [];
+  const databaseShown =
+    !!database &&
+    (category === "all" || category === "dev") &&
+    (!needle ||
+      `postgres postgresql sql ${t("database.name")} ${t("database.cardText")}`.toLowerCase().includes(needle));
   // Ready to connect first; "Em breve" last.
   const sorted = [...shown].sort((a, b) => Number(b.available) - Number(a.available));
   return (
@@ -181,6 +190,32 @@ export function ConnectorCatalogDialog({
                 </button>
               </li>
             ))}
+            {databaseShown && database && (
+              <li>
+                <button
+                  type="button"
+                  className="catalog-card"
+                  aria-label={t("connectors.connectName", { name: t("database.name") })}
+                  onClick={database.onPick}
+                >
+                  <DatabaseIcon />
+                  <span className="catalog-card__text">
+                    <span className="catalog-card__head">
+                      <span className="catalog-card__name">{t("database.name")}</span>
+                      {database.connected && (
+                        <Chip icon="check" tone="done">
+                          {t("connectors.connected")}
+                        </Chip>
+                      )}
+                    </span>
+                    <span className="catalog-card__desc">{t("database.cardText")}</span>
+                    <span className="catalog-card__meta">
+                      <Chip icon="lock">{t("database.auth")}</Chip>
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )}
             {sorted.map((d) => {
               const isConnected = connected.has(d.id);
               return (
@@ -220,7 +255,9 @@ export function ConnectorCatalogDialog({
                 </li>
               );
             })}
-            {!q.trim() && category === "all" ? null : sorted.length === 0 && mailShown.length === 0 ? (
+            {!q.trim() && category === "all" ? null : sorted.length === 0 &&
+              mailShown.length === 0 &&
+              !databaseShown ? (
               <li className="catalog-grid__empty">
                 <p className="ac-dialog__empty">
                   {q.trim() ? t("connectors.empty", { q }) : t("connectors.emptyCategory")}

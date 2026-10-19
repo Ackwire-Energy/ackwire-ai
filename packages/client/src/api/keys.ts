@@ -119,4 +119,9 @@ export const keys = {
   mailAccounts: (orgId: string) => ["org", orgId, "mail", "accounts"] as const,
   mailFolders: (orgId: string, accountId: string) => ["org", orgId, "mail", "folders", accountId] as const,
   agentMail: (orgId: string, agentId: string) => ["org", orgId, "mail", "agent", agentId] as const,
+  /** Every database read (prefix). */
+  databases: (orgId: string) => ["org", orgId, "databases"] as const,
+  databaseList: (orgId: string) => ["org", orgId, "databases", "list"] as const,
+  databaseTables: (orgId: string, connectionId: string) => ["org", orgId, "databases", "tables", connectionId] as const,
+  agentDatabases: (orgId: string, agentId: string) => ["org", orgId, "databases", "agent", agentId] as const,
 };

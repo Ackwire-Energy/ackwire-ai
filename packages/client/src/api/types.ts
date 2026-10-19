@@ -3337,3 +3337,80 @@ export interface AgentMailboxInput {
   canDelete: boolean;
   policy: MailPolicy;
 }
+
+// ── Databases (ADR 0039) ────────────────────────────────────────────────────
+
+/** Where the database lives (only for the help when connecting). */
+export type DatabaseProvider = "supabase" | "neon" | "railway" | "rds" | "render" | "other";
+
+/** What can be turned on or off for a database; one of the agents' database tools each. */
+export type DatabaseActionName = "list_tables" | "describe_table" | "query";
+
+/** A Postgres database the organization connected (never its password). */
+export interface DatabaseConnection {
+  id: string;
+  label: string;
+  provider: DatabaseProvider;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  sslmode: "require" | "disable";
+  status: "active" | "needs_reconnect";
+  lastError: string | null;
+  /** The user can change data: the app recommends a read-only one (agents only read anyway). */
+  canWrite: boolean;
+  createdAt: string;
+  offActions: DatabaseActionName[];
+  /** Columns hidden by default in agents' rules (`schema.table.column`). */
+  suggestedHidden: string[];
+  /** Agents that can read it. */
+  agents: { agentId: string }[];
+}
+
+/** Why a database didn't connect (`422 { error }`). */
+export type DatabaseConnectError = "auth" | "unreachable" | "blocked_host" | "tls" | "unknown";
+
+export interface DatabaseConnectionInput {
+  label?: string;
+  provider?: DatabaseProvider;
+  /** `postgres://user:password@host:5432/database`; the fields win over it. */
+  url?: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  password?: string;
+  sslmode?: "require" | "disable";
+}
+
+export interface DatabaseTable {
+  schema: string;
+  name: string;
+  kind: string;
+  rowsEstimate: number;
+}
+
+/** An agent's rules for one database. */
+export interface DatabasePolicy {
+  /** `schema.table`; empty = every table. */
+  tables: string[];
+  /** `schema.table.column`, never read. */
+  hiddenColumns: string[];
+  /** Queries per day; null = no cap. */
+  dailyQueryCap: number | null;
+  /** Each query is cancelled past this. */
+  timeoutSeconds: number;
+}
+
+/** An agent's access to one database. */
+export interface AgentDatabase {
+  connectionId: string;
+  level: "none" | "read";
+  policy: DatabasePolicy;
+}
+
+export interface AgentDatabaseInput {
+  level: "none" | "read";
+  policy: DatabasePolicy;
+}

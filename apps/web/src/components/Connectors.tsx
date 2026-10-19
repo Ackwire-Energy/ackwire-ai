@@ -1,4 +1,4 @@
-import type { Agent, MailAccount } from "@agenteschat/client";
+import type { Agent, DatabaseConnection, MailAccount } from "@agenteschat/client";
 import {
   keys,
   useAgents,
@@ -6,6 +6,7 @@ import {
   useConnections,
   useCustomServerAction,
   useCustomServers,
+  useDatabases,
   useDisconnect,
   useMailAccounts,
   useMailAction,
@@ -23,6 +24,13 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorCatalogDialog, ConnectorIcon } from "@/components/ConnectorCatalog";
+import {
+  DatabaseConnectFlow,
+  DatabaseDisconnectDialog,
+  type DatabaseFlowState,
+  DatabaseReconnectDialog,
+  DatabaseRow,
+} from "@/components/DatabaseConnect";
 import { GitHubAppPanel } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
 import {
@@ -76,6 +84,12 @@ export function ConnectorsSection({
   const [mailFlow, setMailFlow] = useState<MailFlowState | null>(null);
   const [reconnecting, setReconnecting] = useState<MailAccount | null>(null);
   const [removingMail, setRemovingMail] = useState<MailAccount | null>(null);
+  // People's Postgres databases (ADR 0039): rows of the same list, the same kind of flow.
+  const databases = useDatabases(org.id);
+  const dbList = databases.data ?? [];
+  const [dbFlow, setDbFlow] = useState<DatabaseFlowState | null>(null);
+  const [reconnectingDb, setReconnectingDb] = useState<DatabaseConnection | null>(null);
+  const [removingDb, setRemovingDb] = useState<DatabaseConnection | null>(null);
   const reconnect = (account: MailAccount) => {
     // Gmail/Outlook sign in again on the provider's page; the rest take a new app password.
     if (account.via === "composio" && (account.provider === "gmail" || account.provider === "outlook")) {
@@ -137,10 +151,12 @@ export function ConnectorsSection({
         )}
       </div>
       {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
-      {connections.isSuccess && servers.isSuccess && items.length === 0 && accounts.length === 0 && (
-        <p className="small muted">{t("connectors.none")}</p>
-      )}
-      {items.length + accounts.length > 0 && (
+      {connections.isSuccess &&
+        servers.isSuccess &&
+        items.length === 0 &&
+        accounts.length === 0 &&
+        dbList.length === 0 && <p className="small muted">{t("connectors.none")}</p>}
+      {items.length + accounts.length + dbList.length > 0 && (
         <List aria-label={t("connectors.connectedList")}>
           {accounts.map((account) => (
             <MailRow
@@ -152,6 +168,18 @@ export function ConnectorsSection({
               onWho={() => setMailFlow({ step: 2, account })}
               onReconnect={() => reconnect(account)}
               onDisconnect={() => setRemovingMail(account)}
+            />
+          ))}
+          {dbList.map((connection) => (
+            <DatabaseRow
+              key={`db-${connection.id}`}
+              connection={connection}
+              agents={agentList}
+              admin={admin}
+              onTools={() => setDbFlow({ step: 1, connection })}
+              onWho={() => setDbFlow({ step: 2, connection })}
+              onReconnect={() => setReconnectingDb(connection)}
+              onDisconnect={() => setRemovingDb(connection)}
             />
           ))}
           {items.map((item) => (
@@ -192,11 +220,21 @@ export function ConnectorsSection({
             setMailFlow({ step: 0, choice });
           },
         }}
+        database={{
+          connected: dbList.length > 0,
+          onPick: () => {
+            setAdding(false);
+            setDbFlow({ step: 0 });
+          },
+        }}
       />
       <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
       <MailConnectFlow flow={mailFlow} onChange={setMailFlow} onClose={() => setMailFlow(null)} />
       <MailReconnectDialog account={reconnecting} onClose={() => setReconnecting(null)} />
       <MailDisconnectDialog account={removingMail} onClose={() => setRemovingMail(null)} />
+      <DatabaseConnectFlow flow={dbFlow} onChange={setDbFlow} onClose={() => setDbFlow(null)} />
+      <DatabaseReconnectDialog connection={reconnectingDb} onClose={() => setReconnectingDb(null)} />
+      <DatabaseDisconnectDialog connection={removingDb} onClose={() => setRemovingDb(null)} />
       <DisconnectDialog
         item={removing}
         using={removing ? using(removing).length : 0}

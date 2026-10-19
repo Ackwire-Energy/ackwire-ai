@@ -8,6 +8,7 @@ import type {
   AgentBrain,
   AgentChannel,
   AgentComputer,
+  AgentDatabase,
   AgentDetail,
   AgentForYou,
   AgentMailbox,
@@ -33,6 +34,8 @@ import type {
   Credential,
   CustomConnectStart,
   CustomServer,
+  DatabaseConnection,
+  DatabaseTable,
   DesktopRelease,
   DeviceRequest,
   DirectMessage,
@@ -205,6 +208,30 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ mailboxes: AgentMailbox[] }>(`${org(orgId)}/agents/${enc(agentId)}/mail`)).mailboxes,
       setAgent: (orgId, agentId, accountId, input) =>
         request<AgentMailbox>(`${org(orgId)}/agents/${enc(agentId)}/mail/${enc(accountId)}`, {
+          method: "PUT",
+          json: input,
+        }),
+    },
+    databases: {
+      list: async (orgId) =>
+        (await request<{ connections: DatabaseConnection[] }>(`${org(orgId)}/databases`)).connections,
+      connect: async (orgId, input) =>
+        (await request<{ connection: DatabaseConnection }>(`${org(orgId)}/databases`, { json: input })).connection,
+      update: async (orgId, connectionId, input) =>
+        (
+          await request<{ connection: DatabaseConnection }>(`${org(orgId)}/databases/${enc(connectionId)}`, {
+            method: "PATCH",
+            json: input,
+          })
+        ).connection,
+      disconnect: (orgId, connectionId) =>
+        request<void>(`${org(orgId)}/databases/${enc(connectionId)}`, { method: "DELETE" }),
+      tables: async (orgId, connectionId) =>
+        (await request<{ tables: DatabaseTable[] }>(`${org(orgId)}/databases/${enc(connectionId)}/tables`)).tables,
+      agent: async (orgId, agentId) =>
+        (await request<{ databases: AgentDatabase[] }>(`${org(orgId)}/agents/${enc(agentId)}/databases`)).databases,
+      setAgent: (orgId, agentId, connectionId, input) =>
+        request<AgentDatabase>(`${org(orgId)}/agents/${enc(agentId)}/databases/${enc(connectionId)}`, {
           method: "PUT",
           json: input,
         }),

@@ -8,6 +8,8 @@ import type {
   AgentBrainInput,
   AgentChannel,
   AgentComputer,
+  AgentDatabase,
+  AgentDatabaseInput,
   AgentDetail,
   AgentForYou,
   AgentInput,
@@ -41,6 +43,10 @@ import type {
   Credential,
   CustomConnectStart,
   CustomServer,
+  DatabaseActionName,
+  DatabaseConnection,
+  DatabaseConnectionInput,
+  DatabaseTable,
   DesktopRelease,
   DeviceRequest,
   DirectMessage,
@@ -876,6 +882,23 @@ export interface ApiClient {
     /** An agent's access and rules per mailbox. */
     agent(orgId: string, agentId: string): Promise<AgentMailbox[]>;
     setAgent(orgId: string, agentId: string, accountId: string, input: AgentMailboxInput): Promise<AgentMailbox>;
+  };
+  /** People's Postgres databases for agents (ADR 0039): read-only queries. */
+  databases: {
+    list(orgId: string): Promise<DatabaseConnection[]>;
+    /** Tested first; a `422` carries `DatabaseConnectError` as its code. */
+    connect(orgId: string, input: DatabaseConnectionInput): Promise<DatabaseConnection>;
+    /** A new name, tools on or off, or a new address or password (tested first). */
+    update(
+      orgId: string,
+      connectionId: string,
+      input: DatabaseConnectionInput & { offActions?: DatabaseActionName[] },
+    ): Promise<DatabaseConnection>;
+    disconnect(orgId: string, connectionId: string): Promise<void>;
+    tables(orgId: string, connectionId: string): Promise<DatabaseTable[]>;
+    /** An agent's access and rules per database. */
+    agent(orgId: string, agentId: string): Promise<AgentDatabase[]>;
+    setAgent(orgId: string, agentId: string, connectionId: string, input: AgentDatabaseInput): Promise<AgentDatabase>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {
