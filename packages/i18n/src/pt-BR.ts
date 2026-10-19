@@ -437,6 +437,7 @@ export const ptBR = {
       forum: "Fórum",
       wiki: "Wiki",
       sandbox: "Computador",
+      browser: "Navegador",
       github: "GitHub",
       sentry: "Erros em produção",
       linear: "Linear",
@@ -4636,6 +4637,7 @@ export const ptBR = {
       schedule: "Lembretes e rotinas",
       forum: "Fórum",
       sandbox: "Rodar código",
+      browser: "Navegador",
     },
     areaText: {
       context: {
@@ -4650,6 +4652,9 @@ export const ptBR = {
       schedule: { write: "Cria lembretes e rotinas para quem pediu." },
       forum: { write: "Abre tópicos, lê e posta no fórum." },
       sandbox: { write: "Roda código no PC do agente; custa tempo de máquina." },
+      browser: {
+        write: "Navega em sites com o próprio navegador no computador conectado; os logins ficam por agente.",
+      },
     },
   },
   artifacts: {
@@ -6959,6 +6964,70 @@ export const ptBR = {
     computer_status: {
       label: "Ver o computador",
       description: "Diz se está ligado, o disco usado e o custo do mês.",
+    },
+    browser_open: {
+      label: "Abrir uma página",
+      description: "Abre um site no navegador do próprio agente.",
+    },
+    browser_back: {
+      label: "Voltar",
+      description: "Volta para a página anterior.",
+    },
+    browser_tabs: {
+      label: "Abas do navegador",
+      description: "Lista, abre, troca ou fecha abas.",
+    },
+    browser_read: {
+      label: "Ler a página",
+      description: "Lê a página como texto, com um número para cada botão, campo e link.",
+    },
+    browser_click: {
+      label: "Clicar",
+      description: "Clica num botão ou link da página.",
+    },
+    browser_fill: {
+      label: "Preencher um campo",
+      description: "Escreve um texto num campo da página.",
+    },
+    browser_select: {
+      label: "Escolher uma opção",
+      description: "Escolhe uma opção numa lista da página.",
+    },
+    browser_check: {
+      label: "Marcar uma caixa",
+      description: "Marca ou desmarca uma caixa da página.",
+    },
+    browser_press: {
+      label: "Apertar uma tecla",
+      description: "Aperta uma tecla (Enter, Tab, Esc…).",
+    },
+    browser_scroll: {
+      label: "Rolar",
+      description: "Rola a página.",
+    },
+    browser_upload: {
+      label: "Enviar um arquivo",
+      description: "Envia um arquivo da pasta do agente para a página.",
+    },
+    browser_type_secret: {
+      label: "Digitar uma senha",
+      description: "Digita uma senha que você deu num campo de senha ou código, sem ver o valor.",
+    },
+    browser_wait: {
+      label: "Esperar a página",
+      description: "Espera até aparecer um texto, endereço ou elemento.",
+    },
+    browser_screenshot: {
+      label: "Tirar um print",
+      description: "Salva uma imagem da página na pasta do agente.",
+    },
+    browser_ask_person: {
+      label: "Pedir ajuda no navegador",
+      description: "Pede para uma pessoa fazer algo na página (como entrar numa conta) e espera ela terminar.",
+    },
+    browser_close: {
+      label: "Fechar o navegador",
+      description: "Fecha o navegador do agente; os logins continuam salvos.",
     },
   },
 };

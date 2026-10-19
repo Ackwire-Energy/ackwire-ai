@@ -431,6 +431,7 @@ export const en: Translations = {
       forum: "Forum",
       wiki: "Wiki",
       sandbox: "Computer",
+      browser: "Browser",
       github: "GitHub",
       sentry: "Production errors",
       linear: "Linear",
@@ -4623,6 +4624,7 @@ export const en: Translations = {
       schedule: "Reminders and routines",
       forum: "Forum",
       sandbox: "Run code",
+      browser: "Browser",
     },
     areaText: {
       context: {
@@ -4640,6 +4642,7 @@ export const en: Translations = {
       schedule: { write: "Creates reminders and routines for whoever asked." },
       forum: { write: "Opens topics, reads and posts in the forum." },
       sandbox: { write: "Runs code on the agent's PC; machine time costs money." },
+      browser: { write: "Browses websites in its own browser on its connected computer; logins stay per agent." },
     },
   },
   artifacts: {
@@ -6943,6 +6946,70 @@ export const en: Translations = {
     computer_status: {
       label: "Check the computer",
       description: "Says whether it is on, the disk used and this month's cost.",
+    },
+    browser_open: {
+      label: "Open a page",
+      description: "Opens a website in the agent's own browser.",
+    },
+    browser_back: {
+      label: "Go back",
+      description: "Goes back to the previous page.",
+    },
+    browser_tabs: {
+      label: "Browser tabs",
+      description: "Lists, opens, switches or closes tabs.",
+    },
+    browser_read: {
+      label: "Read the page",
+      description: "Reads the page as text, with a number for each button, field and link.",
+    },
+    browser_click: {
+      label: "Click",
+      description: "Clicks a button or link on the page.",
+    },
+    browser_fill: {
+      label: "Fill in a field",
+      description: "Writes text into a field on the page.",
+    },
+    browser_select: {
+      label: "Choose an option",
+      description: "Picks an option in a list on the page.",
+    },
+    browser_check: {
+      label: "Tick a box",
+      description: "Ticks or unticks a checkbox on the page.",
+    },
+    browser_press: {
+      label: "Press a key",
+      description: "Presses a key (Enter, Tab, Escape…).",
+    },
+    browser_scroll: {
+      label: "Scroll",
+      description: "Scrolls the page.",
+    },
+    browser_upload: {
+      label: "Upload a file",
+      description: "Sends a file from the agent's folder to the page.",
+    },
+    browser_type_secret: {
+      label: "Type a password",
+      description: "Types a password you gave it into a password or code field, without seeing it.",
+    },
+    browser_wait: {
+      label: "Wait for the page",
+      description: "Waits until a text, address or element shows up.",
+    },
+    browser_screenshot: {
+      label: "Take a screenshot",
+      description: "Saves an image of the page in the agent's folder.",
+    },
+    browser_ask_person: {
+      label: "Ask for help in the browser",
+      description: "Asks a person to do something on the page (like signing in) and waits until they're done.",
+    },
+    browser_close: {
+      label: "Close the browser",
+      description: "Closes the agent's browser; logins stay saved.",
     },
   },
 };

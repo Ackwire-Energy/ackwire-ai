@@ -379,7 +379,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         workspace: frame.workspace,
         execAllowed: frame.exec,
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
-        ...(frame.executors ? { executors: { ...frame.executors, detectedAt: now.toISOString() } } : {}),
+        // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found.
+        ...(frame.executors || frame.browser
+          ? {
+              executors: {
+                ...(frame.executors ?? {}),
+                ...(frame.browser ? { browser: frame.browser } : {}),
+                detectedAt: now.toISOString(),
+              },
+            }
+          : {}),
         paused: conn.pause !== null,
         pausedUntil: conn.pause?.until ? new Date(conn.pause.until) : null,
         // Protocol 10: what the machine allows (an older runner reports nothing: unknown).
