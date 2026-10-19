@@ -670,6 +670,14 @@ export function useLive<T>(select: (state: LiveState) => T, isEqual: (a: T, b: T
     check();
     return store.subscribe(check);
   }, [store]);
+  // The selector may read the component's own state (which runs a channel shows): a render checks again.
+  useEffect(() => {
+    const next = selectRef.current(store.get());
+    if (!isEqual(valueRef.current, next)) {
+      valueRef.current = next;
+      setValue(() => next);
+    }
+  });
   return value;
 }
 

@@ -35,6 +35,11 @@
   height: 14px;
 }
 .thread-marker__open {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
   border-radius: 4px;
   font-weight: 600;
   color: var(--muted);
@@ -757,9 +762,10 @@
 .thread-line {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   gap: 8px;
   max-width: 100%;
-  margin: 4px 0 0 -8px;
+  margin: 4px 0 0 -6px;
   padding: 4px 10px 4px 6px;
   border: 0;
   border-radius: 10px 10px 10px 3px;
@@ -788,6 +794,10 @@
 .thread-line__who {
   display: inline-flex;
   flex: none;
+}
+/* Agents are tiles of their own shape: they barely overlap, so none is cut. */
+.thread-line__who .ac-avatar-stack > .ac-avatar + .ac-avatar {
+  margin-left: -3px;
 }
 .thread-line__state {
   display: inline-flex;
@@ -854,4 +864,10 @@
     z-index: 30;
     box-shadow: none;
   }
+}
+/* Narrow: the receipts ("Nenhum agente vai responder") get their own line under the name, from its left. */
+.thread-panel .ac-msg__aside {
+  flex-basis: 100%;
+  margin-left: 0;
+  line-height: 16px;
 }

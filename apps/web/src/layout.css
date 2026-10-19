@@ -272,6 +272,22 @@ p {
   overflow: hidden;
 }
 /*
+ * Pages that aren't a conversation (telas/Cards.html "B · Mesa"): the work area is a paper a shade
+ * darker, so the cards on it stand out. Conversations stay white. A page laid out like a chat but not
+ * one (the calendar) says so with `--desk`.
+ */
+:root,
+[data-theme="light"] {
+  --desk: #f5f5f2;
+}
+[data-theme="dark"] {
+  --desk: #0b0b0a;
+}
+.shell__main:not(.shell__main--chat),
+.shell__main--desk {
+  --pane: var(--desk);
+}
+/*
  * The work area beside the sidebar: an app-wide notice on top when there is one (telas/ComputadorOffline.html),
  * then the page, laid out as before (a row: the page's main column and anything beside it).
  */

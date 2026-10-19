@@ -4,7 +4,7 @@ import { CalendarPage } from "@/pages/CalendarPage";
 /** Calendário (telas/Calendario.dc.html). */
 export const Route = createFileRoute("/org/$orgId/calendar")({
   component: () => (
-    <main className="shell__main shell__main--chat">
+    <main className="shell__main shell__main--chat shell__main--desk">
       <CalendarPage />
     </main>
   ),
