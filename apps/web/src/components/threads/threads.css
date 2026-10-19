@@ -865,8 +865,9 @@
     box-shadow: none;
   }
 }
-/* Narrow: the receipts ("Nenhum agente vai responder") get their own line under the name, from its left. */
-.thread-panel .ac-msg__aside {
+/* Narrow: receipts with words ("Nenhum agente vai responder") get their own line under the name, from
+   its left; the icon alone stays at the end of the name's line. */
+.thread-panel .ac-msg__aside:has(.ac-receipt > span) {
   flex-basis: 100%;
   margin-left: 0;
   line-height: 16px;
