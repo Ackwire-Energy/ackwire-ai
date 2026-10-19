@@ -8,7 +8,24 @@ import { getMessage } from "./messages";
 import { requirePermission } from "./organizations";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
-const { agentConsultations, agentRuns, agentScopes, agents, users } = schema;
+const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
+
+/**
+ * Each agent's scopes, with a whole-connection grant (`connector:*`) named
+ * after its connector (`sentry:*`), so summaries say "Sentry", not "Connector".
+ */
+export async function agentScopeNames(db: Database, orgId: string, agentIds: string[]) {
+  if (agentIds.length === 0) return [];
+  const rows = await db
+    .select({ agentId: agentScopes.agentId, scope: agentScopes.scope, connector: connectorConnections.connector })
+    .from(agentScopes)
+    .leftJoin(connectorConnections, eq(connectorConnections.id, agentScopes.connectionId))
+    .where(and(eq(agentScopes.orgId, orgId), inArray(agentScopes.agentId, agentIds)));
+  return rows.map((r) => ({
+    agentId: r.agentId,
+    scope: r.scope.startsWith("connector:") && r.connector ? `${r.connector}:${r.scope.slice(10)}` : r.scope,
+  }));
+}
 
 export const FIND_AGENT_TOOL = "find_agent";
 /** Up to this many teammates are named in every prompt; above it, only a hint to use `find_agent`. */
@@ -112,10 +129,7 @@ export function createFindAgentToolSource(): ToolSource {
       const ids = scored.map((x) => x.a.id);
       const ownerIds = [...new Set(scored.map((x) => x.a.ownerUserId).filter((id): id is string => !!id))];
       const [scopes, owners, busy] = await Promise.all([
-        db
-          .select({ agentId: agentScopes.agentId, scope: agentScopes.scope })
-          .from(agentScopes)
-          .where(and(eq(agentScopes.orgId, ctx.orgId), inArray(agentScopes.agentId, ids))),
+        agentScopeNames(db, ctx.orgId, ids),
         ownerIds.length
           ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
           : Promise.resolve([]),
@@ -191,10 +205,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
   const since = new Date(Date.now() - TEAM_CONSULTATIONS_MS);
   const [scopes, owners, busy, consultations] = ids.length
     ? await Promise.all([
-        db
-          .select({ agentId: agentScopes.agentId, scope: agentScopes.scope })
-          .from(agentScopes)
-          .where(and(eq(agentScopes.orgId, orgId), inArray(agentScopes.agentId, ids))),
+        agentScopeNames(db, orgId, ids),
         ownerIds.length
           ? db
               .select({ id: users.id, name: users.name, image: users.image })

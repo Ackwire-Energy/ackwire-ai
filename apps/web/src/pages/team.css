@@ -28,9 +28,16 @@
 .team-sky {
   position: relative;
   height: 620px;
+  transition: height 0.4s var(--out);
   border-radius: var(--radius-section);
   overflow: hidden;
   box-shadow: var(--e1), var(--top);
+}
+.team-sky[data-small] {
+  height: 460px;
+}
+.team-sky[data-narrow] .team-sky__agent {
+  --fig: 36px;
 }
 .team-sky__stage {
   position: absolute;
@@ -57,8 +64,10 @@
     top 0.5s var(--out);
 }
 .team-sky__agent {
+  /* The sprite's center sits on its spot (padding 4 + figure padding 6 + half the sprite); the name hangs below. */
+  --fig: 56px;
   position: absolute;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, calc(-10px - var(--fig) / 2));
   display: flex;
   flex-direction: column;
   align-items: center;

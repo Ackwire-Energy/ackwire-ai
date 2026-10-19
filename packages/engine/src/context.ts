@@ -22,10 +22,10 @@ import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import type { AgentRun } from "./runs";
-import { loadTeam, teamPrompt } from "./team";
+import { agentScopeNames, loadTeam, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
 
-const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
+const { messages, users, agents, channels, channelMembers, organizations } = schema;
 
 /** A routine run's whole answer when there is nothing to report: the run ends without posting. */
 export const ROUTINE_NO_REPLY = "NO_REPLY";
@@ -326,17 +326,11 @@ export async function buildRunContext(
     });
   // What the other agents here can do, so this one never answers for them.
   const others = members.filter((m) => m.agentId && m.agentId !== agent.id);
-  const otherScopes = others.length
-    ? await db
-        .select({ agentId: agentScopes.agentId, scope: agentScopes.scope })
-        .from(agentScopes)
-        .where(
-          inArray(
-            agentScopes.agentId,
-            others.map((m) => m.agentId as string),
-          ),
-        )
-    : [];
+  const otherScopes = await agentScopeNames(
+    db,
+    run.orgId,
+    others.map((m) => m.agentId as string),
+  );
   const otherAgents = others
     .map((m) => {
       const scopes = otherScopes.filter((s) => s.agentId === m.agentId).map((s) => s.scope);

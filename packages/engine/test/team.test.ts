@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
-import { addChannelMember, createAgent, drainOutbox, postPersonMessage, teamPrompt } from "../src";
+import { addChannelMember, agentScopeNames, createAgent, drainOutbox, postPersonMessage, teamPrompt } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -91,4 +91,24 @@ test("find_agent searches by what agents do and shows what they can do", async (
   expect(out).toContain("Responsible person:");
   expect(out).not.toContain("@design");
   expect(out).not.toContain("@dev:");
+});
+
+test("a whole-connection grant is named after its connector, not 'Connector'", async () => {
+  f = await setup();
+  const [conn] = await f.db
+    .insert(schema.connectorConnections)
+    .values({
+      orgId: f.org.id,
+      connector: "sentry",
+      label: "Sentry",
+      serverUrl: "https://mcp.sentry.dev",
+      authType: "none",
+    })
+    .returning();
+  await f.db
+    .insert(schema.agentScopes)
+    .values({ orgId: f.org.id, agentId: f.agent.id, connectionId: conn?.id ?? null, scope: "connector:*" });
+  const names = await agentScopeNames(f.db, f.org.id, [f.agent.id]);
+  expect(names.map((n) => n.scope)).toContain("sentry:*");
+  expect(names.map((n) => n.scope)).not.toContain("connector:*");
 });

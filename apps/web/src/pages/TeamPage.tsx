@@ -25,6 +25,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { useTheme } from "@/lib/theme";
 import "./team.css";
 
 /*
@@ -97,17 +98,18 @@ function layout(team: Team, w: number, h: number, narrow: boolean, cardOpen: boo
     const cy = v * h;
     const list = groups.get(key) ?? [];
     const n = list.length;
-    const r = n === 1 ? 0 : (narrow ? 52 : 70) + Math.max(0, n - 6) * 8;
+    const r = n === 1 ? 0 : (narrow ? 56 : 84) + Math.max(0, n - 6) * 8;
     const person = people.get(key);
     labels.push({
       key: key || "none",
       name: person?.name ?? noOwner,
       image: person?.image ?? null,
       x: cx,
-      y: cy - (n > 1 ? r * 0.7 : 0) - (narrow ? 62 : 72),
+      // Above the top sprite: half its height, room for a hat, a gap and the label itself.
+      y: cy - (n > 1 ? r * 0.7 : 0) - (narrow ? 72 : 84),
     });
     list.forEach((a, k) => {
-      const ang = -Math.PI / 2 + (k / n) * Math.PI * 2 + i;
+      const ang = -Math.PI / 2 + (k / n) * Math.PI * 2;
       spots.push({ id: a.id, x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r * 0.7 });
     });
   });
@@ -141,6 +143,12 @@ function puck(f: SkyFrame, x0: number, y0: number, x1: number, y1: number, at: n
 }
 
 const WHITE = pixelOf("#ffffff");
+/** The night sky of the dark theme (telas/Organograma.html). */
+const NIGHT_TONES = ["#04112b", "#071c45", "#0a2b66", "#0e3d8c", "#1452b0", "#2b74e6", "#4b93ff", "#78b4ff"];
+const starAt = (x: number, y: number) => {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
 
 export function TeamPage() {
   const { t, i18n } = useTranslation();
@@ -272,8 +280,9 @@ function TeamSky({ team }: { team: Team }) {
   }, [team, t]);
 
   // Read on every sky frame: the latest positions, pairs and selection.
-  const live = useRef({ spots, team, selected });
-  live.current = { spots, team, selected };
+  const dark = useTheme().resolved === "dark";
+  const live = useRef({ spots, team, selected, dark });
+  live.current = { spots, team, selected, dark };
 
   useEffect(() => {
     if (!agent) return;
@@ -285,10 +294,11 @@ function TeamSky({ team }: { team: Team }) {
   const skyOptions = useMemo(
     () => ({
       pixel: PIXEL,
-      palette: SKY_TONES,
+      palette: () => (live.current.dark ? NIGHT_TONES : SKY_TONES),
       light: 0.16,
       base: (u: number, v: number, tt: number) =>
-        0.25 + v * 0.55 + 0.08 * Math.sin(u * 6 + tt * 0.15) * Math.sin(v * 4 - tt * 0.1),
+        (live.current.dark ? 0.15 + v * 0.35 : 0.25 + v * 0.55) +
+        0.08 * Math.sin(u * 6 + tt * 0.15) * Math.sin(v * 4 - tt * 0.1),
       // A soft glow under each agent, so clusters read as places in the sky.
       blobs: (): [number, number, number, number][] => {
         const { spots: s } = live.current;
@@ -297,7 +307,19 @@ function TeamSky({ team }: { team: Team }) {
         return s.map((p) => [p.x / w, p.y / h, 0.05, 0.14]);
       },
       after: (f: SkyFrame) => {
-        const { spots: s, team: tm, selected: sel } = live.current;
+        const { spots: s, team: tm, selected: sel, dark: dk } = live.current;
+        const L = f.tones.length - 1;
+        if (dk) {
+          // A few twinkling stars in the upper sky.
+          for (let y = 0; y < f.h * 0.7; y++)
+            for (let x = 0; x < f.w; x++) {
+              const h = starAt(x, y);
+              if (h > 0.992 && Math.sin(f.t * 2 + h * 50) > -0.2) f.buf[y * f.w + x] = f.tones[L] ?? WHITE;
+            }
+        }
+        // Lines contrast with the sky: light on the night, deep on the day.
+        const faint = f.tones[dk ? 5 : 2] ?? WHITE;
+        const strong = dk ? WHITE : (f.tones[0] ?? WHITE);
         const at = (id: string) => s.find((p) => p.id === id);
         const seenPairs = new Set<string>();
         for (const c of tm.consultations) {
@@ -308,7 +330,7 @@ function TeamSky({ team }: { team: Team }) {
           const b = at(c.targetAgentId);
           if (!a || !b) continue;
           const focus = !!sel && (c.askerAgentId === sel || c.targetAgentId === sel);
-          plot(f, a.x, a.y, b.x, b.y, focus ? (f.tones[f.tones.length - 1] ?? WHITE) : (f.tones[5] ?? WHITE), !focus);
+          plot(f, a.x, a.y, b.x, b.y, focus ? strong : faint, !focus);
         }
         const now = performance.now();
         hot.current = hot.current.filter((p) => now - p.t0 < HOT_MS);
@@ -329,7 +351,12 @@ function TeamSky({ team }: { team: Team }) {
   );
 
   return (
-    <div className="team-sky" ref={box} data-narrow={narrow ? "" : undefined}>
+    <div
+      className="team-sky"
+      ref={box}
+      data-narrow={narrow ? "" : undefined}
+      data-small={labels.length <= 2 ? "" : undefined}
+    >
       <PixelSky options={skyOptions} />
       <section className="team-sky__stage" aria-label={t("team.skyLabel")}>
         {labels.map((l) => (
