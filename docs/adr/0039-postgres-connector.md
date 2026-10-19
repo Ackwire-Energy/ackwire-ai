@@ -1,6 +1,6 @@
 # 0039. A native Postgres connector: agents read with SQL, writes always ask
 
-- Status: Proposed
+- Status: Accepted (read-only first: `pg_execute` and `postgres:write` come later, after real use)
 - Date: 2026-10-19
 - Planning: D56
 - Extends: ADR 0015 (Tool Gateway and approvals), ADR 0016 (connectors), ADR 0007 (credentials), ADR 0037 (reads never ask)
@@ -91,5 +91,5 @@ A database without a public address (Railway's internal Postgres, a company LAN,
 
 ## Open questions
 
-- Should `pg_execute` exist in the first version, or ship read-only first and add writes after seeing real use? (Proposal: read-only first.)
+- Decided 2026-10-19: read-only first. `pg_execute` and `postgres:write` stay designed here but ship later.
 - Schema context: should the connector keep a cached summary of tables and comments that goes into the agent's context, so it doesn't call `pg_list_tables` every run?
