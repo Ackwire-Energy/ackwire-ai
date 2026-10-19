@@ -49,7 +49,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { Fragment, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { approvalAction } from "@/components/ApprovalItem";
@@ -1103,11 +1103,31 @@ function WaitCard({
 /** An item's row or card on screen. */
 const element = (id: string) => document.querySelector<HTMLElement>(`[data-n="${CSS.escape(id)}"]`);
 
+/** `setTimeout` that is cleared when the component unmounts (a late state update after leaving the page). */
+function useLater() {
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const timer of pending) clearTimeout(timer);
+      pending.clear();
+    };
+  }, []);
+  return useCallback((fn: () => void, ms: number) => {
+    const timer = setTimeout(() => {
+      timers.current.delete(timer);
+      fn();
+    }, ms);
+    timers.current.add(timer);
+  }, []);
+}
+
 /** Items that just arrived (or came back) glow in; merged ones pulse. Nothing on the first load. */
 function useArrivals(items: AppNotification[], filter: NotificationFilter, ready: boolean) {
   const prev = useRef<Map<string, string> | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [pulse, setPulse] = useState<Set<string>>(new Set());
+  const later = useLater();
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new filter starts over
   useEffect(() => {
     prev.current = null;
@@ -1122,13 +1142,13 @@ function useArrivals(items: AppNotification[], filter: NotificationFilter, ready
     const bumped = items.filter((n) => before.has(n.id) && before.get(n.id) !== n.updatedAt).map((n) => n.id);
     if (added.length) {
       setFresh((s) => new Set([...s, ...added]));
-      setTimeout(() => setFresh((s) => new Set([...s].filter((id) => !added.includes(id)))), 2400);
+      later(() => setFresh((s) => new Set([...s].filter((id) => !added.includes(id)))), 2400);
     }
     if (bumped.length) {
       setPulse((s) => new Set([...s, ...bumped]));
-      setTimeout(() => setPulse((s) => new Set([...s].filter((id) => !bumped.includes(id)))), 800);
+      later(() => setPulse((s) => new Set([...s].filter((id) => !bumped.includes(id)))), 800);
     }
-  }, [items, ready]);
+  }, [items, ready, later]);
   return { fresh, pulse };
 }
 
@@ -1157,6 +1177,7 @@ export function NotificationsPage() {
   const [resolving, setResolving] = useState<string | null>(null);
   const [sending, setSending] = useState<string | null>(null);
   const [passing, setPassing] = useState<string | null>(null);
+  const later = useLater();
 
   const items = allItems(list.data);
   const counts = list.data?.pages[0]?.counts;
@@ -1206,7 +1227,7 @@ export function NotificationsPage() {
     el.style.height = `${el.offsetHeight}px`;
     setLeaving((s) => new Set(s).add(n.id));
     // Inline (React doesn't own these rows' style): fold the space so the list closes up.
-    setTimeout(() => {
+    later(() => {
       el.style.transition = "height .26s var(--out), padding .26s var(--out), border-color .26s";
       el.style.overflow = "hidden";
       el.style.borderTopColor = "transparent";
@@ -1214,7 +1235,7 @@ export function NotificationsPage() {
       el.style.paddingTop = "0px";
       el.style.paddingBottom = "0px";
     }, 180);
-    setTimeout(finish, LEAVE_MS);
+    later(finish, LEAVE_MS);
   };
 
   const done = (n: AppNotification) => {
@@ -1300,7 +1321,7 @@ export function NotificationsPage() {
     setResolving(n.id);
     const face = element(n.id)?.querySelector<HTMLElement>(".ac-avatar");
     if (face) prepareBurst(face)();
-    setTimeout(() => {
+    later(() => {
       leave(n, () => dropNotification(qc, org.id, n.id));
       setResolving(null);
     }, 1700);
