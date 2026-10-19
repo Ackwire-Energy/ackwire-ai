@@ -5685,8 +5685,8 @@ export const en: Translations = {
       skipped: "{{name}} stayed: {{reason}}",
       skip: {
         other: "couldn't switch right now",
-        not_waiting: "wasn't waiting for this computer anymore",
-        no_brain: "the new computer doesn't run its brain",
+        not_found: "no longer used this computer",
+        brain_unavailable: "the new computer doesn't have its Claude Code or Codex",
         forbidden: "you can't change this agent",
       },
     },

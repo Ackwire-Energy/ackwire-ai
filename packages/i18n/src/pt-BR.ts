@@ -5695,8 +5695,8 @@ export const ptBR = {
       skipped: "{{name}} ficou: {{reason}}",
       skip: {
         other: "não deu para trocar agora",
-        not_waiting: "já não esperava por este computador",
-        no_brain: "o novo computador não roda o cérebro dele",
+        not_found: "já não usava este computador",
+        brain_unavailable: "o novo computador não tem o Claude Code ou o Codex dele",
         forbidden: "você não pode mudar este agente",
       },
     },
