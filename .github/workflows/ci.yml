@@ -46,7 +46,8 @@ jobs:
       # files sometimes never came up, and the whole step hung until the timeout.
       - name: Test (backend)
         if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.backend == 'true')
-        timeout-minutes: 10
+        # The backend suite takes 8–10 minutes on a runner; 10 left no room.
+        timeout-minutes: 15
         shell: bash
         run: |
           set -o pipefail

@@ -65,7 +65,8 @@ describe("conversations load fast", () => {
     expect(pages.at(-1)).toEqual({ before: history(130)[30]?.createdAt, limit: 50 });
     expect(document.body.textContent).toContain("Mensagem antiga 29");
     expect(document.body.textContent).toContain("Mensagem antiga 129");
-  });
+    // 180 messages rendered twice: ~2 s on a runner, more when it's busy; past 5 s the timeout broke the next files.
+  }, 15_000);
 
   test("opening lands at the latest message (also after the skeleton); layout scrolls never unpin", async () => {
     const state = seedState();
