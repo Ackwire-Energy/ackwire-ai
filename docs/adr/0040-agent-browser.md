@@ -58,13 +58,13 @@ Lessons from OpenMausBot's code (`server/browser-relay.ts`, `server/browser-live
 ### 2. Shipping
 
 - **Desktop app (macOS):** a second Tauri sidecar next to `agentes-runner` (`externalBin`). CI downloads the pinned release, checks its SHA-256, signs it with our Developer ID and notarizes it with the app. It updates with the app.
-- **Terminal installs (servers, Linux, Windows):** the runner downloads the binary on first use from our server, checks the SHA-256 pinned in the runner, into `~/.agentes-runner/bin/`. Machines that never use the browser download nothing.
+- **Terminal installs (servers, Linux, Windows):** the runner downloads the pinned release from GitHub on first use into `~/.agentes-runner/bin/` and runs it only when its SHA-256 matches the one pinned in the runner (integrity comes from the pin, not from where it is served). Machines that never use the browser download nothing.
 - **Chrome:** the one already installed (Chrome, Brave, Chromium); if none, `agent-browser install` (Chrome for Testing) on first use, with progress on the machine page. Linux without Chrome's libraries needs `install --with-deps` (sudo): the runner doesn't report the browser and the machine page shows the command.
 - The license and NOTICE go in the app's about box and the runner's `licenses` output.
 
 ### 3. Turned on in two places
 
-- **On the machine:** a fourth switch in `access.tools`, `browser`, set by the person on the computer (tray app or `agentes-runner access`), off by default. As with the other switches, the server can show it and ask to turn it off, never on. `hello.browser` reports whether it can serve.
+- **On the machine:** a fourth switch in `access.tools`, `browser`, set by the person on the computer (tray app or `agentes-runner access`), off by default. As with the other switches, the server can show it and ask to turn it off, never on. `hello.browser` reports whether the computer can serve it, whatever the switch (the switch itself travels in `access.changed`, so turning it on needs no reconnect).
 - **On the agent:** the scope `browser:use`, outside "all tools" (like `sandbox:run`), on the agent's page next to its computer. Offered only when the agent's computer reports `browser` on; disabled with the reason otherwise.
 
 ### 4. One browser per agent, logins kept
@@ -72,7 +72,7 @@ Lessons from OpenMausBot's code (`server/browser-relay.ts`, `server/browser-live
 - Session `agent-<id8>`, persistent profile and downloads in the agent's folder (`<handle>-<id8>/.agentes/browser`), headless, idle shutdown after 15 minutes. A login done once stays until the site ends it.
 - Per agent, not shared: another agent signs in on its own. Per computer: an agent moved to another computer signs in again.
 - Logins only to test accounts or the agent's own accounts, never a person's personal account (agent instructions, docs, and one line on the agent's page: "Logins stay on this computer, in the agent's folder"). Until protected mode exists, other unprotected agents and the owner can read that folder.
-- Optional site allowlist per agent (`--allowed-domains`). `file://` and the owner's paths blocked.
+- Optional site allowlist per agent, enforced by the runner: `agent-browser`'s `--allowed-domains` refuses persistent profiles, so the runner checks a navigation's URL before it goes and the page's URL after every action (going back when it left the list). Top-level pages only: sub-resources aren't filtered. `file://` and the owner's paths blocked.
 - Cap of live browsers per machine (owner setting, default from memory, about 300 MB each); over it the agent sees "waiting for the computer".
 - The runner serializes commands per session (one at a time, like the daemon), times them out and checks the session before reading.
 

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 11;
+export const MACHINE_PROTOCOL_VERSION = 12;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -93,7 +93,6 @@ export const GIT_PROTOCOL = 11;
  * `agent-browser` command; `browser.stream.*` relays its JPEG stream as
  * `browser.frame` frames only while someone watches, and `browser.input` sends
  * a person's input back. The server never sends `browser.*` to an older runner.
- * `MACHINE_PROTOCOL_VERSION` moves to this number when the runner implements it.
  */
 export const BROWSER_PROTOCOL = 12;
 

@@ -41,6 +41,7 @@ import {
 } from "./access";
 import { ActivityLog } from "./activity";
 import { BrainManager } from "./brain";
+import { BrowserManager } from "./browser";
 import {
   configPath,
   connectUrl,
@@ -66,7 +67,7 @@ import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
-import { agentSecrets } from "./secrets";
+import { agentSecrets, secretValue } from "./secrets";
 import { type SettledTask, TaskManager } from "./tasks";
 
 /**
@@ -192,6 +193,7 @@ interface Session {
   tasks: TaskManager;
   brains: BrainManager;
   mcp: McpBridge;
+  browser: BrowserManager;
   connection: RunnerConnection;
 }
 
@@ -409,6 +411,10 @@ export class RunnerDaemon implements RequestObserver {
         this.record({ kind: "access", summary, result: "ok" });
       }
       this.resolveSatisfied(nextAccess);
+      // The browser switch went off: the agents' browsers close now, not at their next command.
+      if (prevAccess.tools.browser === true && nextAccess.tools.browser !== true) {
+        void this.session?.browser.closeAll();
+      }
     }
 
     if (this.session && paired) {
@@ -458,7 +464,7 @@ export class RunnerDaemon implements RequestObserver {
       browser: "the browser",
     };
     for (const t of TOOL_NAMES)
-      if (a.tools[t] !== b.tools[t]) out.push(`${label[t]} turned ${b.tools[t] ? "on" : "off"}`);
+      if ((a.tools[t] === true) !== (b.tools[t] === true)) out.push(`${label[t]} turned ${b.tools[t] ? "on" : "off"}`);
     const names = (ids: string[]) =>
       ids.map((id) => this.agents.find((x) => x.id === id)?.name ?? id.slice(0, 8)).join(", ") || "no agent";
     for (const f of b.folders) {
@@ -552,6 +558,16 @@ export class RunnerDaemon implements RequestObserver {
       .listen()
       .catch((err: unknown) => log(`mission tools unavailable: ${err instanceof Error ? err.message : String(err)}`));
     const daemon = this;
+    // Frames go out on whatever connection this session has at the time (it reconnects by itself).
+    let live: RunnerConnection | null = null;
+    const browser = new BrowserManager({
+      home,
+      log,
+      send: (frame) => live?.send(frame) ?? false,
+      secret: (agent, name) => secretValue(secretsDir, agent, name),
+    });
+    // Browsers a previous run of this runner left open (a crash, a kill) close now.
+    void browser.closeAll();
     const context: HandlerContext = {
       workspaceReal,
       get exec() {
@@ -569,25 +585,31 @@ export class RunnerDaemon implements RequestObserver {
         request: (agent, req) => this.accessRequest(agent, req),
         reduce: (req) => this.accessReduce(req),
       },
+      browser,
     };
     const connection = new RunnerConnection({
       url: connectUrl(config.server),
       token: config.token,
-      info: () => this.info(workspaceReal),
+      info: () => ({ ...this.info(workspaceReal), browser: browser.info() }),
       executors: () => this.helloExecutors(),
       context,
       mcp,
       log,
       observer: this,
       onAgents: (raw) => this.setAgents(raw),
-      onState: (state) => this.setConnState(state),
+      onState: (state) => {
+        // Offline: frames have nowhere to go; the server starts the live view again when it is back.
+        if (state !== "online") browser.stopStreams();
+        this.setConnState(state);
+      },
       onWelcome: () => {
         this.flushDecisions();
         this.syncLogo(config);
       },
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
-    const session: Session = { config, workspaceReal, tasks, brains, mcp, connection };
+    live = connection;
+    const session: Session = { config, workspaceReal, tasks, brains, mcp, browser, connection };
     this.session = session;
     log(
       `agentes-runner ${RUNNER_VERSION}: connecting to ${config.server} (workspace ${workspaceReal}${this.access().tools.commands ? "" : ", commands off"})`,
@@ -599,6 +621,7 @@ export class RunnerDaemon implements RequestObserver {
     s.connection.stop();
     s.tasks.close();
     s.brains.close();
+    await s.browser.close().catch(() => undefined);
     await s.mcp.close().catch(() => undefined);
   }
 

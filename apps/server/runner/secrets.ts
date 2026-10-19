@@ -164,3 +164,10 @@ export async function agentSecrets(root: string | undefined, agent: AgentScope |
     redact: (text: string) => redactSecrets(text, secrets),
   };
 }
+
+/** One delivered secret's value by name (the agent browser types it into a password field), or null. */
+export async function secretValue(root: string | undefined, agent: AgentScope, name: string): Promise<string | null> {
+  if (!root) return null;
+  const secrets = await readStore(dirOf(root, agent)).catch(() => [] as Stored[]);
+  return secrets.find((s) => s.name === name)?.value ?? null;
+}

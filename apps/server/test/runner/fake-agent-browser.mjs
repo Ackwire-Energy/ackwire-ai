@@ -1,0 +1,86 @@
+// A fake `agent-browser` for browser tests: answers `--json` like the real one.
+// Each run appends `{ args, stdin }` to $FAKE_AB_LOG (one JSON line). The page
+// lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, port }`.
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+
+const argv = process.argv.slice(2);
+const stdin = await new Promise((resolve) => {
+  let data = "";
+  process.stdin.on("data", (c) => {
+    data += c;
+  });
+  process.stdin.on("end", () => resolve(data));
+});
+if (process.env.FAKE_AB_LOG) appendFileSync(process.env.FAKE_AB_LOG, `${JSON.stringify({ args: argv, stdin })}\n`);
+
+const VALUED = new Set([
+  "--namespace",
+  "--session",
+  "--profile",
+  "--config",
+  "--max-output",
+  "--idle-timeout",
+  "--download-path",
+  "--screenshot-dir",
+]);
+const rest = [];
+for (let i = 0; i < argv.length; i++) {
+  if (VALUED.has(argv[i])) i++;
+  else if (!argv[i].startsWith("--")) rest.push(argv[i]);
+  else if (argv[i] === "--all") rest.push("--all");
+}
+const file = process.env.FAKE_AB_STATE;
+const state = file && existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { open: false, url: "about:blank" };
+const save = () => file && writeFileSync(file, JSON.stringify(state));
+const out = (o) => {
+  process.stdout.write(`${JSON.stringify(o)}\n`);
+  save();
+};
+
+const [command, ...args] = rest;
+switch (command) {
+  case "open":
+  case "goto":
+    state.open = true;
+    state.prev = state.url;
+    state.url = args[0].includes("://") ? args[0] : `https://${args[0]}`;
+    out({ success: true, data: { url: state.url } });
+    break;
+  case "stream":
+    out({ success: true, data: { enabled: true, port: state.port ?? 41234, connected: state.open === true } });
+    break;
+  case "get":
+    if (args[0] === "url") out({ success: true, data: { url: state.url } });
+    else if (args[0] === "attr") out({ success: true, data: { value: state.attrs?.[args[1]]?.[args[2]] ?? null } });
+    else out({ success: false, error: "bad get" });
+    break;
+  case "snapshot":
+    out({ success: true, data: { snapshot: '- button "Go" [ref=e1]' } });
+    break;
+  case "click":
+    if (state.clickTo) {
+      state.prev = state.url;
+      state.url = state.clickTo;
+    }
+    out({ success: true, data: { clicked: args[0] } });
+    break;
+  case "back":
+    state.url = state.prev ?? "about:blank";
+    out({ success: true, data: {} });
+    break;
+  case "batch": {
+    const list = JSON.parse(stdin || "[]");
+    out(list.map((cmd) => ({ command: cmd, success: true, result: {}, error: null })));
+    break;
+  }
+  case "close":
+    state.open = false;
+    out({ success: true, data: { closed: true } });
+    break;
+  case "upload":
+    out({ success: true, data: { files: args.slice(1) } });
+    break;
+  default:
+    out({ success: false, data: null, error: `unknown command ${command}` });
+    process.exitCode = 1;
+}
