@@ -17,6 +17,7 @@ import {
   chromeLabel,
   defaultMaxSessions,
   domainAllowed,
+  isWebPage,
   type StreamSocket,
   streamMessage,
 } from "../../runner/browser";
@@ -155,6 +156,26 @@ test("site allowlist: exact hosts, *. wildcards with the bare domain, blank page
   expect(domainAllowed("not a url", list)).toBe(false);
 });
 
+test("only web pages: local files, view-source, browser pages and scripts are refused whatever their case", () => {
+  expect(isWebPage("https://shop.example.com")).toBe(true);
+  expect(isWebPage("HTTP://shop.example.com")).toBe(true);
+  expect(isWebPage("about:blank")).toBe(true);
+  for (const url of [
+    "file:///etc/passwd",
+    "FILE:///etc/passwd",
+    " File:///Users/x/.ssh/id_rsa",
+    "view-source:file:///etc/passwd",
+    "VIEW-SOURCE:https://x.com",
+    "chrome://settings",
+    "devtools://devtools/bundled/inspector.html",
+    "javascript:alert(1)",
+    "data:text/html,hi",
+    "about:settings",
+  ]) {
+    expect(isWebPage(url)).toBe(false);
+  }
+});
+
 test("stream input: keys get the codes and text CDP needs, shortcuts and key-ups type nothing", () => {
   expect(streamMessage({ kind: "key", type: "keyDown", key: "Enter" })).toMatchObject({
     type: "input_keyboard",
@@ -219,6 +240,10 @@ test.if(posix)("flags that reach outside the agent's browser, and unknown comman
   expect(await errorCode(() => t.act("chat", ["hi"]))).toBe("bad_request");
   expect(await errorCode(() => t.act("plugin", ["add", "x"]))).toBe("bad_request");
   expect(await errorCode(() => t.act("open", ["file:///etc/passwd"]))).toBe("not_allowed");
+  expect(await errorCode(() => t.act("open", ["FILE:///etc/passwd"]))).toBe("not_allowed");
+  expect(await errorCode(() => t.act("open", ["view-source:file:///etc/passwd"]))).toBe("not_allowed");
+  expect(await errorCode(() => t.act("goto", ["chrome://settings"]))).toBe("not_allowed");
+  expect(await errorCode(() => t.act("tab", ["new", "File:///Users/x/.ssh/id_rsa"]))).toBe("not_allowed");
   expect(t.logged()).toHaveLength(0);
 });
 
@@ -328,10 +353,27 @@ test.if(posix)("the stream relays frames with the page's URL, changes mode, and 
   expect(await t.manager.streamStart(dev, "control")).toEqual({ mode: "control" });
   expect(t.sockets).toHaveLength(1);
   expect(socket.sent).toEqual([{ type: "config", maxFps: 15 }]);
-  expect(t.manager.streamStop(dev)).toEqual({ stopped: true });
+  expect(await t.manager.streamStop(dev)).toEqual({ stopped: true });
   expect(socket.closed).toBe(true);
   expect(t.frames.at(-1)).toEqual({ type: "browser.stream.ended", agentId: dev.id, reason: "stopped" });
-  expect(t.manager.streamStop(dev)).toEqual({ stopped: false });
+  expect(await t.manager.streamStop(dev)).toEqual({ stopped: false });
+});
+
+test.if(posix)("two starts at once open one socket; a stop sent meanwhile closes it", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  const [a, b] = await Promise.all([t.manager.streamStart(dev, "watch"), t.manager.streamStart(dev, "control")]);
+  expect(a).toEqual({ mode: "watch" });
+  expect(b).toEqual({ mode: "control" });
+  expect(t.sockets).toHaveLength(1);
+  expect((t.sockets[0] as FakeSocket).sent).toEqual([{ type: "config", maxFps: 15 }]);
+  await t.manager.streamStop(dev);
+  const opening = t.manager.streamStart(dev, "watch");
+  const stopped = t.manager.streamStop(dev);
+  await opening;
+  expect(await stopped).toEqual({ stopped: true });
+  expect(t.sockets).toHaveLength(2);
+  expect((t.sockets[1] as FakeSocket).closed).toBe(true);
 });
 
 test.if(posix)("a stream that closes on the machine says so; one dropped with the connection doesn't", async () => {

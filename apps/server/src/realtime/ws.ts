@@ -181,26 +181,28 @@ export function createRealtime(deps: RealtimeDeps) {
     // Held while it starts, so a second `browser.watch` meanwhile is a no-op and an unwatch cancels it.
     const starting = () => {};
     ws.data.browsers.set(agentId, starting);
+    let stop: () => void;
     try {
       await requireBrowserAccess(deps.db, user.id, orgId, agentId);
+      stop = await live.watch(
+        {
+          userId: user.id,
+          send: (message) => {
+            if (ws.readyState === 1) send(ws, message);
+          },
+          // Backed up (a slow phone link): skip frames, the next one sent is the newest.
+          busy: () => ws.getBufferedAmount() > 1024 * 1024,
+        },
+        orgId,
+        agentId,
+      );
     } catch (error) {
+      // Whatever failed, the placeholder goes: a later `browser.watch` tries again.
       if (ws.data.browsers.get(agentId) === starting) ws.data.browsers.delete(agentId);
       const code = error instanceof NotFoundError ? "not_found" : error instanceof ForbiddenError ? "forbidden" : "";
-      if (!code) throw error;
-      return send(ws, { type: "error", code, agentId });
+      if (code) return send(ws, { type: "error", code, agentId });
+      return send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: "try again" });
     }
-    const stop = await live.watch(
-      {
-        userId: user.id,
-        send: (message) => {
-          if (ws.readyState === 1) send(ws, message);
-        },
-        // Backed up (a slow phone link): skip frames, the next one sent is the newest.
-        busy: () => ws.getBufferedAmount() > 1024 * 1024,
-      },
-      orgId,
-      agentId,
-    );
     // Closed or unwatched while it was starting: stop at once.
     if (ws.readyState !== 1 || ws.data.browsers.get(agentId) !== starting) return stop();
     ws.data.browsers.set(agentId, stop);
@@ -298,7 +300,13 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
         const ws = socket as BrowserSocket;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
-        if (browserFrame) return browserMessage(ws, browserFrame);
+        if (browserFrame) {
+          return browserMessage(ws, browserFrame).catch(() => {
+            if (ws.readyState === 1) {
+              send(ws, { type: "browser.unavailable", agentId: browserFrame.agentId, reason: "unavailable" });
+            }
+          });
+        }
         const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
         if (!limit.allowed) return send(ws, { type: "error", code: "rate_limited" });
         const frame = parseClientFrame(raw);

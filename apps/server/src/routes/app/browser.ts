@@ -26,7 +26,7 @@ const BrowserHandoff = z
     requestedForUserId: z.string().nullable(),
     controllerUserId: z.string().nullable(),
     note: z.string().nullable(),
-    expiresAt: z.string(),
+    expiresAt: z.string().nullable(),
     createdAt: z.string(),
     resolvedAt: z.string().nullable(),
   })
@@ -67,7 +67,7 @@ export function browserRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "get",
-      path: "/organizations/{orgId}/agents/{agentId}/browser",
+      path: "/organizations/{orgId}/agents/{agentId}/browser/handoff",
       tags,
       security,
       summary: "The open handoff of an agent's browser (who is in control), if any",

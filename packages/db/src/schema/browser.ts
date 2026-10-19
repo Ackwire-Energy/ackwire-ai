@@ -38,7 +38,17 @@ export const browserHandoffs = pgTable(
     controllerUserId: text().references(() => users.id, { onDelete: "set null" }),
     /** The person's note when it failed ("it asked for Ana's phone code"). */
     note: text(),
+    /**
+     * While `pending`: the agent's deadline (nobody opened it). While
+     * `active`: there is no deadline; this is how long control survives the
+     * controller's live view going away (pushed while they watch).
+     */
     expiresAt: timestamp({ withTimezone: true }).notNull(),
+    /**
+     * When the agent read its page after a person had control (ended). Until
+     * then its other browser tools refuse: the page changed under it.
+     */
+    pageReadAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     resolvedAt: timestamp({ withTimezone: true }),
   },

@@ -229,6 +229,21 @@ export function domainAllowed(url: string, patterns: readonly string[]): boolean
 /** A bare host (`example.com/login`) is how `agent-browser open` takes it too. */
 const asUrl = (raw: string) => (/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`);
 
+/**
+ * Only web pages: `http:`, `https:` and the blank page. Everything else is
+ * refused whatever its case or wrapping (`FILE:///`, `view-source:file:///`,
+ * `chrome:`, `devtools:`, `javascript:`, `data:`): those reach the person's
+ * files or the browser itself.
+ */
+export function isWebPage(url: string): boolean {
+  try {
+    const u = new URL(url.trim());
+    return u.protocol === "http:" || u.protocol === "https:" || u.href === "about:blank";
+  } catch {
+    return false;
+  }
+}
+
 /** Where `agent-browser install` puts Chrome for Testing. */
 const testingChromeDir = (home: string) => path.join(home, ".agent-browser", "browsers");
 
@@ -413,6 +428,8 @@ interface Session {
   queue: Promise<unknown>;
   lastUsed: number;
   stream?: Stream;
+  /** A stream being opened: a second start (or a stop) waits for it instead of opening another socket. */
+  streamOpening?: Promise<void>;
 }
 
 type ActRequest = Extract<MachineRequest, { op: "browser.act" }>;
@@ -641,14 +658,17 @@ export class BrowserManager {
     const positional = args.filter((a) => !a.startsWith("-"));
     if (NAVIGATIONS.has(command) && positional[0]) {
       const url = asUrl(positional[0]);
-      if (url.startsWith("file:")) throw new RunnerError("not_allowed", "The agent browser doesn't open local files");
+      if (!isWebPage(url))
+        throw new RunnerError("not_allowed", "The agent browser only opens web pages (http or https)");
       if (!domainAllowed(url, allowed)) {
         throw new RunnerError("not_allowed", `${hostOf(url)} is outside the sites this agent may use`);
       }
     }
     if (command === "tab" && positional[0] === "new" && positional[1]) {
       const url = asUrl(positional[1]);
-      if (!domainAllowed(url, allowed) || url.startsWith("file:")) {
+      if (!isWebPage(url))
+        throw new RunnerError("not_allowed", "The agent browser only opens web pages (http or https)");
+      if (!domainAllowed(url, allowed)) {
         throw new RunnerError("not_allowed", `${hostOf(url)} is outside the sites this agent may use`);
       }
     }
@@ -881,6 +901,8 @@ export class BrowserManager {
     const session = this.sessions.get(String(agent.id ?? ""));
     if (!session) throw new RunnerError("bad_request", "The agent's browser isn't open");
     session.lastUsed = this.now();
+    // One socket per session: a start while another opens waits for it, then only changes the mode.
+    while (session.streamOpening) await session.streamOpening.catch(() => undefined);
     if (session.stream) {
       if (session.stream.mode !== mode) {
         session.stream.mode = mode;
@@ -888,6 +910,17 @@ export class BrowserManager {
       }
       return { mode };
     }
+    const opening = this.openStream(session, mode);
+    session.streamOpening = opening;
+    try {
+      await opening;
+    } finally {
+      if (session.streamOpening === opening) session.streamOpening = undefined;
+    }
+    return { mode };
+  }
+
+  private async openStream(session: Session, mode: BrowserStreamMode): Promise<void> {
     const port = await this.enqueue(session, async () => {
       let status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
       if (isRecord(status.data) && status.data.connected !== true) return null;
@@ -916,6 +949,16 @@ export class BrowserManager {
         reject(new RunnerError("internal", "The browser's live view didn't open"));
       };
     });
+    // Never two sockets: one left over (it shouldn't be) is closed quietly.
+    const old = session.stream;
+    if (old) {
+      old.closing = true;
+      try {
+        old.socket.close();
+      } catch {
+        // already closed
+      }
+    }
     session.stream = stream;
     socket.onmessage = (event) => this.onStreamMessage(session, stream, event.data);
     socket.onerror = () => undefined;
@@ -924,7 +967,6 @@ export class BrowserManager {
       session.stream = undefined;
       if (!stream.closing) this.opts.send({ type: "browser.stream.ended", agentId: session.agentId, reason: "closed" });
     };
-    return { mode };
   }
 
   private onStreamMessage(session: Session, stream: Stream, raw: unknown) {
@@ -963,9 +1005,10 @@ export class BrowserManager {
     });
   }
 
-  /** `browser.stream.stop`. */
-  streamStop(agent: AgentScope): MachineReplies["browser.stream.stop"] {
+  /** `browser.stream.stop` (after a stream still opening, so it doesn't outlive the stop). */
+  async streamStop(agent: AgentScope): Promise<MachineReplies["browser.stream.stop"]> {
     const session = this.sessions.get(String(agent.id ?? ""));
+    while (session?.streamOpening) await session.streamOpening.catch(() => undefined);
     if (!session?.stream) return { stopped: false };
     this.endStream(session, "stopped");
     return { stopped: true };

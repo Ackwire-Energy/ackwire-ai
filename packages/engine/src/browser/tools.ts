@@ -7,7 +7,7 @@ import { missionOfRun } from "../mission-context";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
-import { waitIfPersonInControl } from "./handoff";
+import { markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserToolName } from "./types";
 
 const { secretRequests } = schema;
@@ -267,8 +267,19 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     description,
     inputSchema,
     scope: BROWSER_SCOPE,
-    // A person in control of this browser (a handoff or a take over) makes the agent wait.
-    execute: async (input, ctx) => (await waitIfPersonInControl(ctx.db, ctx)) ?? execute(input, ctx),
+    // A person in control of this browser, or asked to take it, makes the agent wait; after
+    // they had it, only browser_read works until the agent has seen the page again.
+    execute: async (input, ctx) => {
+      const waiting = await waitIfPersonInControl(ctx.db, ctx);
+      if (waiting) return waiting;
+      if (name !== "browser_read") {
+        const stale = await requirePageRead(ctx.db, ctx);
+        if (stale) return stale;
+      }
+      const out = await execute(input, ctx);
+      if (name === "browser_read" && !out.isError) await markPageRead(ctx.db, ctx);
+      return out;
+    },
     ...extra,
   });
 
@@ -324,8 +335,13 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         const index = typeof input.index === "number" ? String(Math.max(0, Math.round(input.index))) : null;
         let args: string[];
         if (action === "list") args = [];
-        else if (action === "open") args = ["new", ...(str(input.url) ? [str(input.url)] : [])];
-        else if (action === "switch") {
+        else if (action === "open") {
+          const url = str(input.url).trim();
+          if (url && !/^https?:\/\//i.test(url)) {
+            return Promise.resolve({ content: "Give a full web address starting with https://.", isError: true });
+          }
+          args = ["new", ...(url ? [url] : [])];
+        } else if (action === "switch") {
           if (index === null)
             return Promise.resolve({ content: "Say which tab (`index` from `list`).", isError: true });
           args = [index];
@@ -519,7 +535,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         async checkCall(input, ctx): Promise<CallCheck> {
           const name = str(input.secret);
           const status = await machineOf(ctx);
-          const machineId = status.available ? status.machineId : null;
+          if (!status.available) return { ok: false, message: browserUnavailableText(status) };
+          const machineId = status.machineId;
           const [held] = await ctx.db
             .select({ id: secretRequests.id })
             .from(secretRequests)
@@ -530,7 +547,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
                 eq(secretRequests.name, name),
                 eq(secretRequests.status, "delivered"),
                 isNull(secretRequests.removedAt),
-                ...(machineId ? [eq(secretRequests.machineId, machineId)] : []),
+                eq(secretRequests.machineId, machineId),
               ),
             )
             .limit(1);

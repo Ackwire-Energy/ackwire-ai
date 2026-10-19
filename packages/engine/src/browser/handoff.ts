@@ -1,12 +1,26 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
-import { requireChannelAccess } from "../channels";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { getMachineById, machineOnline } from "../machines";
 import { insertMessage, messageView } from "../messages";
+import { missionOfRun } from "../mission-context";
 import {
   browserHandoffRecipient,
+  humanBehindRun,
   notifyBrowserHandoff,
   resolveBrowserHandoffNotifications,
 } from "../notification-producers";
@@ -21,10 +35,17 @@ const { browserHandoffs, agentRuns, agents, messages } = schema;
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
 
-/** The longest an agent may wait for a person in its browser (and the default). */
+/** How long an agent waits by default for a person to open its request. */
+export const HANDOFF_TIMEOUT_DEFAULT_MINUTES = 10;
+/** The longest an agent may ask to wait. */
 export const HANDOFF_TIMEOUT_MAX_MINUTES = 30;
-/** A person in control whose live view dropped keeps control this long, to reconnect and carry on. */
-export const CONTROL_GRACE_MS = 60_000;
+/**
+ * Once a person has control there is no deadline; only their live view going
+ * away for this long ends it (expired): time to reconnect and carry on.
+ */
+export const CONTROL_GRACE_MS = 2 * 60_000;
+/** While the person in control watches, their grace is pushed at most this often (one write, not one per frame). */
+const CONTROL_TOUCH_EVERY_MS = 30_000;
 export const ASK_PERSON_TOOL = "browser_ask_person";
 
 const OPEN: BrowserHandoffStatus[] = ["pending", "active"];
@@ -45,7 +66,8 @@ export interface BrowserHandoffView {
   requestedForUserId: string | null;
   controllerUserId: string | null;
   note: string | null;
-  expiresAt: string;
+  /** Pending: the agent's deadline. Null once a person has control (no deadline then). */
+  expiresAt: string | null;
   createdAt: string;
   resolvedAt: string | null;
 }
@@ -62,7 +84,7 @@ export function handoffView(h: BrowserHandoffRow): BrowserHandoffView {
     requestedForUserId: h.requestedForUserId,
     controllerUserId: h.controllerUserId,
     note: h.note,
-    expiresAt: h.expiresAt.toISOString(),
+    expiresAt: h.status === "pending" ? h.expiresAt.toISOString() : null,
     createdAt: h.createdAt.toISOString(),
     resolvedAt: h.resolvedAt?.toISOString() ?? null,
   };
@@ -101,8 +123,10 @@ export function handoffResultText(result: BrowserHandoffResult, kind: "ask" | "t
 
 /**
  * Who may watch an agent's browser, and take part in its handoffs: org admins,
- * the agent's responsible person, the person a handoff was asked of, and
- * whoever can read the conversation the waiting run belongs to.
+ * the agent's responsible person, the person a handoff was asked of, and the
+ * person behind the work (who asked for the run waiting on it, or for one of
+ * the agent's runs going on now). Not everyone who can read a channel: the
+ * browser shows all of the agent's work, DMs included.
  */
 export async function requireBrowserAccess(
   db: Database,
@@ -118,36 +142,62 @@ export async function requireBrowserAccess(
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
-  if (can(membership.role, "manage_agents") || agent.owner === userId) return agent;
-  if (handoff?.requestedForUserId === userId) return agent;
-  // The conversation of the run waiting on it (or of the agent's latest active run).
-  const runId =
-    handoff?.runId ??
-    (
-      await db
-        .select({ id: agentRuns.id })
-        .from(agentRuns)
-        .where(
-          and(
-            eq(agentRuns.orgId, orgId),
-            eq(agentRuns.agentId, agentId),
-            inArray(agentRuns.status, ["running", "waiting_input", "waiting_approval"]),
-          ),
-        )
-        .orderBy(desc(agentRuns.createdAt))
-        .limit(1)
-    )[0]?.id;
-  if (runId) {
-    const [run] = await db
-      .select({ channelId: agentRuns.channelId })
-      .from(agentRuns)
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
-    if (run) {
-      await requireChannelAccess(db, userId, orgId, run.channelId);
-      return agent;
-    }
+  const admin = can(membership.role, "manage_agents");
+  const access = { ...agent, admin };
+  if (admin || agent.owner === userId) return access;
+  const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId) : handoff;
+  if (open?.requestedForUserId === userId) return access;
+  const runs = open?.runId
+    ? [open.runId]
+    : (
+        await db
+          .select({ id: agentRuns.id })
+          .from(agentRuns)
+          .where(
+            and(
+              eq(agentRuns.orgId, orgId),
+              eq(agentRuns.agentId, agentId),
+              inArray(agentRuns.status, ["queued", "running", "waiting_input", "waiting_approval"]),
+            ),
+          )
+          .orderBy(desc(agentRuns.createdAt))
+          .limit(5)
+      ).map((r) => r.id);
+  for (const runId of runs) {
+    if ((await humanBehindRun({ db }, orgId, runId)) === userId) return access;
   }
   throw new ForbiddenError("You can't use this agent's browser");
+}
+
+/**
+ * The computer an agent's browser runs on now: an open handoff's, else the
+ * mission computer of its latest run going on (ADR 0029), else its own.
+ * The same choice as the browser tools (`agentBrowserStatus`).
+ */
+export async function browserMachineOf(db: Database, orgId: string, agentId: string): Promise<string | null> {
+  const open = await openHandoffOf(db, orgId, agentId);
+  if (open) return open.machineId;
+  const [agent] = await db
+    .select({ machineId: agents.machineId })
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+  const [run] = await db
+    .select({ threadRootId: agentRuns.threadRootId })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        eq(agentRuns.agentId, agentId),
+        inArray(agentRuns.status, ["queued", "running", "waiting_input", "waiting_approval"]),
+      ),
+    )
+    .orderBy(desc(agentRuns.createdAt))
+    .limit(1);
+  if (run) {
+    const mission = await missionOfRun({ db, orgId, agentId, threadRootId: run.threadRootId });
+    if (mission?.machineId) return mission.machineId;
+  }
+  return agent?.machineId ?? null;
 }
 
 async function loadHandoff(db: Executor, orgId: string, handoffId: string) {
@@ -233,13 +283,18 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
   const tool: ToolDefinition = {
     name: ASK_PERSON_TOOL,
     description:
-      "Ask a person to do something in your browser that you can't (sign in, type a code sent to their phone, solve a captcha) and wait until they're done. Write what to do in one short sentence in the language the people use. Use test accounts or your own; never ask for someone's personal account. Before asking, try what you can yourself (a password you were given goes through browser_type_secret). End your turn after calling it: you are woken with the result, then read the page again and check.",
+      "Ask a person to do something in your browser that you can't (sign in, type a code sent to their phone, solve a captcha) and wait until they're done. Write what to do in one short sentence in the language the people use. Before asking, try what you can yourself (a password you were given through request_secret goes in with browser_type_secret). End your turn after calling it: you are woken with the result, then read the page again and check.",
     scope: BROWSER_SCOPE,
     inputSchema: {
       type: "object",
       properties: {
         instructions: { type: "string", minLength: 1, maxLength: 500 },
-        timeout_minutes: { type: "integer", minimum: 1, maximum: HANDOFF_TIMEOUT_MAX_MINUTES },
+        timeout_minutes: {
+          type: "integer",
+          minimum: 1,
+          maximum: HANDOFF_TIMEOUT_MAX_MINUTES,
+          description: `How long to wait for someone to open it (default ${HANDOFF_TIMEOUT_DEFAULT_MINUTES}).`,
+        },
       },
       required: ["instructions"],
       additionalProperties: false,
@@ -254,15 +309,17 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
       const minutes =
         typeof input.timeout_minutes === "number"
           ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
-          : HANDOFF_TIMEOUT_MAX_MINUTES;
+          : HANDOFF_TIMEOUT_DEFAULT_MINUTES;
       const [agent] = await ctx.db
         .select({ machineId: agents.machineId })
         .from(agents)
         .where(and(eq(agents.id, ctx.agentId), eq(agents.orgId, ctx.orgId)));
-      if (!agent?.machineId) {
+      // The computer the browser tools use: the mission's in a mission thread, else the agent's.
+      const machineId = (await missionOfRun(ctx))?.machineId ?? agent?.machineId ?? null;
+      if (!machineId) {
         return { content: "Your browser runs on a connected computer, and you have none.", isError: true };
       }
-      const machine = await getMachineById(ctx.db, agent.machineId);
+      const machine = await getMachineById(ctx.db, machineId);
       if (!machine || machine.deletedAt || !machineOnline(machine)) {
         return {
           content: `Your computer${machine ? ` ${machine.name}` : ""} is offline, so no one can use your browser now. Say so in your reply.`,
@@ -303,7 +360,7 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
             orgId: run.orgId,
             agentId: run.agentId,
             runId: run.id,
-            machineId: agent.machineId as string,
+            machineId,
             kind: "ask",
             instructions,
             requestedForUserId: recipient,
@@ -321,7 +378,7 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
         threadId: where.threadId,
       }).catch(() => {});
       return {
-        content: `Asked ${recipient ? "the person" : "the people"} for help (up to ${minutes} min). End your turn now; you'll be woken with the result.`,
+        content: `Asked for help (if nobody opens it within ${minutes} min you'll be told). End your turn now; you'll be woken with the result.`,
         // The run waits on this handoff and resumes with the result (`resumeRunWithResult`).
         data: { pause: { kind: "input", id: created.row.id }, handoffId: created.row.id },
       };
@@ -332,7 +389,7 @@ export function createBrowserHandoffToolSource(deps: { pubsub?: PubSub } = {}): 
 
 // ── A person's side ───────────────────────────────────────────────────────────
 
-/** Resumes the run waiting on a handoff (if any) with what the agent should read. */
+/** Resumes the run waiting on a handoff (if any) with what the agent should read. Idempotent. */
 async function resumeWaitingRun(db: Database, row: BrowserHandoffRow, result: BrowserHandoffResult) {
   if (!row.runId) return;
   await resumeRunWithResult(db, {
@@ -340,6 +397,24 @@ async function resumeWaitingRun(db: Database, row: BrowserHandoffRow, result: Br
     waitId: row.id,
     result: { content: handoffResultText(result, row.kind) },
   });
+}
+
+/** What an ended handoff tells the agent. */
+function endedResult(row: BrowserHandoffRow): BrowserHandoffResult {
+  if (row.status === "done") return { result: "done" };
+  if (row.status === "cancelled") return { result: "failed", note: "a person canceled the request" };
+  if (row.status === "failed") return { result: "failed", ...(row.note ? { note: row.note } : {}) };
+  return { result: "expired" };
+}
+
+/**
+ * After a handoff ended (committed): the run goes on and everyone hears.
+ * Failures don't undo the end: the sweep (`expireBrowserHandoffs`) resumes
+ * runs still waiting on ended handoffs.
+ */
+async function settle(deps: HandoffDeps, row: BrowserHandoffRow) {
+  await resumeWaitingRun(deps.db, row, endedResult(row)).catch(() => {});
+  await afterChange(deps, row).catch(() => {});
 }
 
 /**
@@ -352,9 +427,15 @@ export async function claimHandoff(deps: HandoffDeps, actorId: string, orgId: st
   await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current);
   if (!OPEN.includes(current.status)) throw new ConflictError("This is already over");
   if (current.status === "active" && current.controllerUserId === actorId) return handoffView(current);
+  const now = Date.now();
   const [row] = await deps.db
     .update(browserHandoffs)
-    .set({ status: "active", controllerUserId: actorId })
+    .set({
+      status: "active",
+      controllerUserId: actorId,
+      // No deadline while in control: only their live view going away for the grace ends it.
+      expiresAt: new Date(now + CONTROL_GRACE_MS),
+    })
     .where(
       and(
         eq(browserHandoffs.id, handoffId),
@@ -396,31 +477,49 @@ export async function finishHandoff(
         controllerUserId: current.controllerUserId ?? actorId,
         resolvedAt: new Date(),
       })
-      .where(and(eq(browserHandoffs.id, handoffId), inArray(browserHandoffs.status, OPEN)))
+      .where(
+        and(
+          eq(browserHandoffs.id, handoffId),
+          inArray(browserHandoffs.status, OPEN),
+          // Someone else took control since it was read: not theirs to finish.
+          sql`(${browserHandoffs.status} <> 'active' or ${browserHandoffs.controllerUserId} is null or ${browserHandoffs.controllerUserId} = ${actorId})`,
+        ),
+      )
       .returning();
     if (!row) return null;
     await syncCard(tx, row);
     return row;
   });
-  if (!ended) throw new ConflictError("This is already over");
-  await resumeWaitingRun(deps.db, ended, { result: input.result, ...(note ? { note } : {}) });
-  await afterChange(deps, ended);
+  if (!ended) {
+    const now = await loadHandoff(deps.db, orgId, handoffId);
+    throw new ConflictError(OPEN.includes(now.status) ? "Someone else is in control" : "This is already over");
+  }
+  await settle(deps, ended);
   return handoffView(ended);
 }
 
 /** A person cancels a handoff (the agent no longer needs it, or they won't do it): the run resumes as failed. */
 export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: string, handoffId: string) {
   const current = await loadHandoff(deps.db, orgId, handoffId);
-  await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current);
-  const [row] = await deps.db
-    .update(browserHandoffs)
-    .set({ status: "cancelled", resolvedAt: new Date() })
-    .where(and(eq(browserHandoffs.id, handoffId), inArray(browserHandoffs.status, OPEN)))
-    .returning();
+  const access = await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current);
+  // Only the person in control, the one it was asked of, the agent's owner or an admin.
+  const mayCancel =
+    access.admin ||
+    access.owner === actorId ||
+    current.requestedForUserId === actorId ||
+    (current.status === "active" && current.controllerUserId === actorId);
+  if (!mayCancel) throw new ForbiddenError("Only the person in control or the agent's owner can cancel this");
+  const [row] = await deps.db.transaction(async (tx) => {
+    const rows = await tx
+      .update(browserHandoffs)
+      .set({ status: "cancelled", resolvedAt: new Date() })
+      .where(and(eq(browserHandoffs.id, handoffId), inArray(browserHandoffs.status, OPEN)))
+      .returning();
+    if (rows[0]) await syncCard(tx, rows[0]);
+    return rows;
+  });
   if (!row) throw new ConflictError("This is already over");
-  await syncCard(deps.db, row);
-  await resumeWaitingRun(deps.db, row, { result: "failed", note: "a person canceled the request" });
-  await afterChange(deps, row);
+  await settle(deps, row);
   return handoffView(row);
 }
 
@@ -431,20 +530,22 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
  * back (`waitIfPersonInControl`).
  */
 export async function startTakeover(deps: HandoffDeps, actorId: string, orgId: string, agentId: string) {
-  const agent = await requireBrowserAccess(deps.db, actorId, orgId, agentId);
-  if (!agent.machineId) throw new ValidationError("This agent has no computer");
+  await requireBrowserAccess(deps.db, actorId, orgId, agentId);
   const open = await openHandoffOf(deps.db, orgId, agentId);
   if (open) return claimHandoff(deps, actorId, orgId, open.id);
+  const machineId = await browserMachineOf(deps.db, orgId, agentId);
+  if (!machineId) throw new ValidationError("This agent has no computer");
+  const now = Date.now();
   const [row] = await deps.db
     .insert(browserHandoffs)
     .values({
       orgId,
       agentId,
-      machineId: agent.machineId,
+      machineId,
       kind: "takeover",
       status: "active",
       controllerUserId: actorId,
-      expiresAt: new Date(Date.now() + HANDOFF_TIMEOUT_MAX_MINUTES * 60_000),
+      expiresAt: new Date(now + CONTROL_GRACE_MS),
     })
     .returning();
   if (!row) throw new Error("takeover not created");
@@ -453,21 +554,20 @@ export async function startTakeover(deps: HandoffDeps, actorId: string, orgId: s
 }
 
 /**
- * Before an agent acts in its browser: a person in control makes the call
- * wait (the run pauses on that handoff and resumes when it is handed back).
- * Null: nobody is in control, go on. For the browser tools (`tools.ts`).
+ * Before an agent acts in its browser: a person in control, or asked to take
+ * it, makes the call wait (the run pauses on that handoff and resumes when
+ * it ends); another run of the agent is refused. Null: go on. For the
+ * browser tools (`tools.ts`).
  */
 export async function waitIfPersonInControl(
   db: Database,
   ctx: { orgId: string; agentId: string; runId: string },
 ): Promise<ToolOutput | null> {
   const open = await openHandoffOf(db, ctx.orgId, ctx.agentId);
-  if (open?.status !== "active") return null;
+  if (!open) return null;
+  const busy = "A person has control of your browser, or has been asked to take it.";
   if (open.runId && open.runId !== ctx.runId) {
-    return {
-      content: "A person is using your browser right now. Try again later, or say so in your reply.",
-      isError: true,
-    };
+    return { content: `${busy} Try again later, or say so in your reply.`, isError: true };
   }
   if (!open.runId) {
     const [bound] = await db
@@ -475,14 +575,56 @@ export async function waitIfPersonInControl(
       .set({ runId: ctx.runId })
       .where(and(eq(browserHandoffs.id, open.id), isNull(browserHandoffs.runId)))
       .returning({ id: browserHandoffs.id });
-    if (!bound) {
-      return { content: "A person is using your browser right now. Try again later.", isError: true };
-    }
+    if (!bound) return { content: `${busy} Try again later.`, isError: true };
   }
   return {
-    content: "A person is using your browser right now. End your turn; you'll be woken when they hand it back.",
+    content: `${busy} End your turn; you'll be woken when it's over.`,
     data: { pause: { kind: "input", id: open.id }, handoffId: open.id },
   };
+}
+
+/**
+ * After a person had control of the agent's browser, the page changed under
+ * it: its browser tools other than `browser_read` refuse until it reads the
+ * page again (`markPageRead`). Null: go on.
+ */
+export async function requirePageRead(
+  db: Database,
+  ctx: { orgId: string; agentId: string },
+): Promise<ToolOutput | null> {
+  const [changed] = await db
+    .select({ id: browserHandoffs.id })
+    .from(browserHandoffs)
+    .where(
+      and(
+        eq(browserHandoffs.orgId, ctx.orgId),
+        eq(browserHandoffs.agentId, ctx.agentId),
+        isNotNull(browserHandoffs.resolvedAt),
+        isNotNull(browserHandoffs.controllerUserId),
+        isNull(browserHandoffs.pageReadAt),
+      ),
+    )
+    .limit(1);
+  if (!changed) return null;
+  return {
+    content: "Read the page again first (a person changed it): call browser_read, then act on what it shows.",
+    isError: true,
+  };
+}
+
+/** The agent read its page: whatever a person changed before is now seen. */
+export async function markPageRead(db: Database, ctx: { orgId: string; agentId: string }) {
+  await db
+    .update(browserHandoffs)
+    .set({ pageReadAt: new Date() })
+    .where(
+      and(
+        eq(browserHandoffs.orgId, ctx.orgId),
+        eq(browserHandoffs.agentId, ctx.agentId),
+        isNotNull(browserHandoffs.resolvedAt),
+        isNull(browserHandoffs.pageReadAt),
+      ),
+    );
 }
 
 /**
@@ -503,13 +645,38 @@ export async function expireControl(deps: HandoffDeps, handoffId: string, userId
     )
     .returning();
   if (!row) return null;
-  await syncCard(deps.db, row);
-  await resumeWaitingRun(deps.db, row, { result: "expired" });
-  await afterChange(deps, row);
+  await syncCard(deps.db, row).catch(() => {});
+  await settle(deps, row);
   return handoffView(row);
 }
 
-/** Ends handoffs past their deadline and resumes their runs (worker, every minute). */
+/**
+ * The person in control is still there (watching or typing): their grace
+ * moves to `CONTROL_GRACE_MS` from now. Kept in the database so control ends
+ * even when the server that saw them go restarts. Written at most every
+ * `CONTROL_TOUCH_EVERY_MS`.
+ */
+export async function touchControl(db: Executor, handoffId: string, userId: string, now = new Date()) {
+  const until = new Date(now.getTime() + CONTROL_GRACE_MS);
+  await db
+    .update(browserHandoffs)
+    .set({ expiresAt: until })
+    .where(
+      and(
+        eq(browserHandoffs.id, handoffId),
+        eq(browserHandoffs.status, "active"),
+        eq(browserHandoffs.controllerUserId, userId),
+        lt(browserHandoffs.expiresAt, new Date(until.getTime() - CONTROL_TOUCH_EVERY_MS)),
+      ),
+    );
+}
+
+/**
+ * Ends handoffs past their deadline (the agent's wait while pending, the
+ * person's inactivity while active) and resumes their runs (worker, every
+ * minute). Then resumes runs still waiting on a handoff that ended (a resume
+ * that failed earlier): resuming is idempotent, so nothing is lost.
+ */
 export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date()) {
   const expired = await deps.db.transaction(async (tx) => {
     const rows = await tx
@@ -520,9 +687,22 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
     for (const row of rows) await syncCard(tx, row);
     return rows;
   });
-  for (const row of expired) {
-    await resumeWaitingRun(deps.db, row, { result: "expired" });
-    await afterChange(deps, row).catch(() => {});
+  for (const row of expired) await settle(deps, row);
+  const stranded = await deps.db
+    .select({ handoff: browserHandoffs })
+    .from(browserHandoffs)
+    .innerJoin(agentRuns, eq(agentRuns.id, browserHandoffs.runId))
+    .where(
+      and(
+        isNotNull(browserHandoffs.resolvedAt),
+        gt(browserHandoffs.resolvedAt, new Date(now.getTime() - 24 * 60 * 60_000)),
+        inArray(agentRuns.status, ["waiting_input", "waiting_approval"]),
+      ),
+    )
+    .limit(50);
+  for (const { handoff } of stranded) {
+    if (OPEN.includes(handoff.status)) continue;
+    await resumeWaitingRun(deps.db, handoff, endedResult(handoff)).catch(() => {});
   }
   return expired.length;
 }

@@ -143,6 +143,8 @@ export function startWorkers(deps: WorkerDeps) {
   every("browserHandoffs", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireBrowserHandoffs(deps.browserLive?.handoffDeps ?? { db, pubsub: deps.pubsub });
     if (expired > 0) log.info("browser handoffs expired", { expired });
+    // A page a person was asked to work in stays open past the runner's idle shutdown.
+    await deps.browserLive?.keepAlive();
   });
 
   every("consultations", WORKER_INTERVALS_MS.approvals, async () => {

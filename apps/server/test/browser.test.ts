@@ -65,13 +65,13 @@ async function seeded() {
 describe("handoff routes", () => {
   test("take over, read who is in control, hand back; outsiders get 403", async () => {
     const { org, api } = await seeded();
-    expect(await (await api(`/agents/${org.agentId}/browser`)).json()).toEqual({ handoff: null });
+    expect(await (await api(`/agents/${org.agentId}/browser/handoff`)).json()).toEqual({ handoff: null });
 
     const takeover = await api(`/agents/${org.agentId}/browser/takeover`, { json: {} });
     expect(takeover.status).toBe(200);
     const h = (await takeover.json()) as { id: string; kind: string; status: string; controllerUserId: string };
     expect(h).toMatchObject({ kind: "takeover", status: "active" });
-    const open = (await (await api(`/agents/${org.agentId}/browser`)).json()) as { handoff: { id: string } };
+    const open = (await (await api(`/agents/${org.agentId}/browser/handoff`)).json()) as { handoff: { id: string } };
     expect(open.handoff.id).toBe(h.id);
     expect((await api(`/browser/handoffs/${h.id}`)).status).toBe(200);
 
@@ -84,7 +84,16 @@ describe("handoff routes", () => {
     expect(done.status).toBe(200);
     expect(((await done.json()) as { status: string }).status).toBe("done");
     expect((await api(`/browser/handoffs/${h.id}/done`, { json: {} })).status).toBe(409);
-    expect(await (await api(`/agents/${org.agentId}/browser`)).json()).toEqual({ handoff: null });
+    expect(await (await api(`/agents/${org.agentId}/browser/handoff`)).json()).toEqual({ handoff: null });
+  });
+
+  test("the agent's browser settings and its open handoff are two routes, each with its own answer", async () => {
+    const { org, api } = await seeded();
+    const settings = (await (await api(`/agents/${org.agentId}/browser`)).json()) as Record<string, unknown>;
+    expect(settings).toHaveProperty("allowedDomains");
+    expect(settings).toHaveProperty("available");
+    expect(settings).not.toHaveProperty("handoff");
+    expect(await (await api(`/agents/${org.agentId}/browser/handoff`)).json()).toEqual({ handoff: null });
   });
 
   test("couldn't takes a note; cancel ends it", async () => {
@@ -121,6 +130,19 @@ describe("live view socket", () => {
         return frames.find(pred);
       };
       await until((f) => f.type === "ready");
+      // A watch that fails (a database hiccup) doesn't stick: the next one tries again.
+      const live = t.engine.browserLive;
+      const watch = live.watch;
+      live.watch = async () => {
+        throw new Error("database hiccup");
+      };
+      ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId }));
+      expect(await until((f) => f.type === "browser.unavailable")).toMatchObject({
+        agentId: org.agentId,
+        reason: "unavailable",
+      });
+      live.watch = watch;
+      frames.length = 0;
       ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId }));
       expect(await until((f) => f.type === "browser.unavailable")).toMatchObject({
         agentId: org.agentId,

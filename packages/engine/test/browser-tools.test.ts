@@ -158,6 +158,10 @@ test("each tool is one agent-browser command in the agent's session, with its si
 
   // Only full web addresses; only paths inside the agent's folder.
   expect((await b.call("browser_open", { url: "file:///etc/passwd" })).isError).toBe(true);
+  expect((await b.call("browser_open", { url: "FILE:///etc/passwd" })).isError).toBe(true);
+  expect((await b.call("browser_open", { url: "view-source:file:///etc/passwd" })).isError).toBe(true);
+  expect((await b.call("browser_tabs", { action: "open", url: "FILE:///Users/x/.ssh/id_rsa" })).isError).toBe(true);
+  expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "tab" && c.args[0] === "new")).toHaveLength(0);
   expect((await b.call("browser_upload", { ref: "e4", path: "../secrets.txt" })).isError).toBe(true);
   expect((await b.call("browser_upload", { ref: "e4", path: "/Users/ana/x.pdf" })).isError).toBe(true);
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "upload")).toHaveLength(0);
@@ -180,6 +184,27 @@ test("stale numbers, covered clicks and runner refusals reach the agent as plain
   expect((await b.call("browser_read", {})).content).toContain("Only the person at that computer");
   b.s.error = new MachineRequestError("browser_unavailable", "Chrome not found");
   expect((await b.call("browser_read", {})).content).toContain("Chrome not found");
+});
+
+test("after a person had the browser, the agent must read the page before acting again", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  await f.db.insert(schema.browserHandoffs).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    machineId: b.machineId,
+    kind: "takeover",
+    status: "done",
+    controllerUserId: f.owner.id,
+    expiresAt: new Date(),
+    resolvedAt: new Date(),
+  });
+  const blocked = await b.call("browser_click", { ref: "e1" });
+  expect(blocked.isError).toBe(true);
+  expect(blocked.content).toContain("Read the page again first");
+  expect(b.calls).toHaveLength(0);
+  expect((await b.call("browser_read", {})).isError).toBeUndefined();
+  expect((await b.call("browser_click", { ref: "e1" })).isError).toBeUndefined();
 });
 
 test("type_secret names a secret delivered to this computer; the value never passes through", async () => {
@@ -208,6 +233,18 @@ test("type_secret names a secret delivered to this computer; the value never pas
   const typed = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
   expect(typed.isError).toBeUndefined();
   expect(b.calls.at(-1)).toMatchObject({ command: "agentes:type_secret", args: ["@e2", "STRIPE_TEST_PASSWORD"] });
+
+  // A secret delivered to another computer doesn't count: the agent asks again for this one.
+  const before = b.calls.length;
+  const other = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Old PC" });
+  await f.db
+    .update(schema.secretRequests)
+    .set({ machineId: other.machineId })
+    .where(eq(schema.secretRequests.name, "STRIPE_TEST_PASSWORD"));
+  const elsewhere = await b.call("browser_type_secret", { ref: "e2", secret: "STRIPE_TEST_PASSWORD" });
+  expect(elsewhere.isError).toBe(true);
+  expect(elsewhere.content).toContain("request_secret");
+  expect(b.calls).toHaveLength(before);
 });
 
 test("the agent's sites: owner or admins set them, every member sees whether the browser can run", async () => {

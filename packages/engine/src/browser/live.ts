@@ -1,20 +1,28 @@
 import type { BrowserInputEvent, BrowserStreamMode, RunnerFrame } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, inArray, schema } from "@agenteschat/db";
 import type { MachineHub } from "../machine-hub";
 import { getMachineById, machineOnline } from "../machines";
 import {
   type BrowserHandoffRow,
   type BrowserHandoffView,
+  browserMachineOf,
   CONTROL_GRACE_MS,
   expireControl,
   type HandoffDeps,
   type HandoffLiveHooks,
   handoffView,
   openHandoffOf,
+  requireBrowserAccess,
+  touchControl,
 } from "./handoff";
 import type { BrowserFrame, BrowserViewer, StreamRelay } from "./types";
 
-const { agents } = schema;
+const { agents, browserHandoffs } = schema;
+
+/** Viewers' access is checked again this often (and before input, at most this often). */
+const ACCESS_RECHECK_MS = 30_000;
+/** While a handoff is open, the agent's browser is touched this often so its idle shutdown (15 min) never closes it. */
+export const HANDOFF_KEEPALIVE_MS = 5 * 60_000;
 
 /**
  * Frames to viewers, in this process's memory (ADR 0040 §7): nothing is
@@ -65,12 +73,13 @@ export type BrowserLiveMessage =
   /**
    * The browser can't be shown from here now: `reconnecting` (the computer is
    * held by another server or is coming back: retry with backoff), `offline`,
-   * `no_computer`, `unavailable` (the runner said why in `message`).
+   * `no_computer`, `unavailable` (the runner said why in `message`),
+   * `forbidden` (this person may no longer see it: the view stopped).
    */
   | {
       type: "browser.unavailable";
       agentId: string;
-      reason: "reconnecting" | "offline" | "no_computer" | "unavailable";
+      reason: "reconnecting" | "offline" | "no_computer" | "unavailable" | "forbidden";
       message?: string;
     }
   /** The runner stopped the stream (the browser closed, an error). */
@@ -95,11 +104,14 @@ interface AgentLive {
   handoff: BrowserHandoffView | null;
   /** The person in control left: control ends when this fires, unless they come back. */
   grace: ReturnType<typeof setTimeout> | null;
+  /** Stream changes run one after the other (a start never races a mode change or a stop). */
+  syncing: Promise<void>;
 }
 
 export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
   hub: Pick<MachineHub, "call" | "isLocal">;
   graceMs?: number;
+  accessRecheckMs?: number;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
@@ -115,6 +127,11 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   const relay = createMemoryStreamRelay();
   const live = new Map<string, AgentLive>();
   const graceMs = deps.graceMs ?? CONTROL_GRACE_MS;
+  const recheckMs = deps.accessRecheckMs ?? ACCESS_RECHECK_MS;
+  /** Last access check passed per person and agent (`userId:agentId` → time). */
+  const checked = new Map<string, number>();
+  /** Last keep-alive per open handoff. */
+  const touched = new Map<string, number>();
 
   const broadcast = (state: AgentLive, message: BrowserLiveMessage) => {
     for (const v of state.viewers) {
@@ -139,8 +156,13 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     return driving ? "control" : "watch";
   };
 
-  /** Asks the runner for the stream the viewers need (start, mode change, stop). */
-  async function sync(agentId: string, state: AgentLive) {
+  /** Asks the runner for the stream the viewers need (start, mode change, stop), one change at a time. */
+  function sync(agentId: string, state: AgentLive): Promise<void> {
+    state.syncing = state.syncing.then(() => syncNow(agentId, state)).catch(() => {});
+    return state.syncing;
+  }
+
+  async function syncNow(agentId: string, state: AgentLive) {
     const mode = wanted(state);
     if (mode === state.mode) return;
     const agent = { id: agentId, handle: state.handle };
@@ -195,6 +217,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     state.grace = setTimeout(() => {
       state.grace = null;
       if ([...state.viewers].some((v) => v.userId === userId)) return;
+      // Nobody left watching: forget this agent here (a later watch starts fresh).
+      if (state.viewers.size === 0 && live.get(agentId) === state) live.delete(agentId);
       void expireControl(handoffDeps, handoffId, userId).catch((error) =>
         deps.log?.warn("browser control expiry failed", { agentId, error: String(error) }),
       );
@@ -213,25 +237,27 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
      */
     async watch(viewer: LiveViewer, orgId: string, agentId: string): Promise<() => void> {
       const [agent] = await deps.db
-        .select({ machineId: agents.machineId, handle: agents.handle })
+        .select({ handle: agents.handle })
         .from(agents)
         .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
-      if (!agent?.machineId) {
+      // The computer the browser runs on now (an open handoff's, a mission's, else the agent's).
+      const machineId = agent ? await browserMachineOf(deps.db, orgId, agentId) : null;
+      if (!agent || !machineId) {
         viewer.send({ type: "browser.unavailable", agentId, reason: "no_computer" });
         return () => {};
       }
-      if (!deps.hub.isLocal(agent.machineId)) {
+      if (!deps.hub.isLocal(machineId)) {
         // Held by another replica (or not connected): frames only flow where the socket is.
-        const machine = await getMachineById(deps.db, agent.machineId);
+        const machine = await getMachineById(deps.db, machineId);
         const online = machine && !machine.deletedAt && machineOnline(machine);
         viewer.send({ type: "browser.unavailable", agentId, reason: online ? "reconnecting" : "offline" });
         return () => {};
       }
       let state = live.get(agentId);
-      if (!state || state.machineId !== agent.machineId) {
+      if (!state || state.machineId !== machineId) {
         state = {
           orgId,
-          machineId: agent.machineId,
+          machineId,
           handle: agent.handle,
           viewers: new Set(),
           unsubscribe: new Map(),
@@ -239,6 +265,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           controllerUserId: null,
           handoff: null,
           grace: null,
+          syncing: Promise.resolve(),
         };
         live.set(agentId, state);
       }
@@ -258,8 +285,29 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         current.grace = null;
       }
       viewer.send(status(agentId, current));
-      await sync(agentId, current);
-      return () => {
+      checked.set(`${viewer.userId}:${agentId}`, Date.now());
+      // Access can end while watching (removed from the org, no longer the agent's owner…): checked again now and then.
+      const recheck = setInterval(() => {
+        void requireBrowserAccess(deps.db, viewer.userId, orgId, agentId).then(
+          () => {
+            checked.set(`${viewer.userId}:${agentId}`, Date.now());
+            // Watching keeps their control alive across servers and restarts (the grace in the database).
+            const handoffId = current.handoff?.id;
+            if (handoffId && current.controllerUserId === viewer.userId) {
+              void touchControl(deps.db, handoffId, viewer.userId).catch(() => {});
+            }
+          },
+          () => {
+            checked.delete(`${viewer.userId}:${agentId}`);
+            try {
+              viewer.send({ type: "browser.unavailable", agentId, reason: "forbidden" });
+            } catch {}
+            stop();
+          },
+        );
+      }, recheckMs);
+      const stop = () => {
+        clearInterval(recheck);
         if (!current.viewers.delete(viewer)) return;
         current.unsubscribe.get(viewer)?.();
         current.unsubscribe.delete(viewer);
@@ -271,6 +319,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           if (current.viewers.size === 0 && !current.grace && live.get(agentId) === current) live.delete(agentId);
         });
       };
+      await sync(agentId, current);
+      return stop;
     },
 
     /**
@@ -280,6 +330,18 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     async input(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]) {
       const open = await openHandoffOf(deps.db, orgId, agentId);
       if (open?.status !== "active" || open.controllerUserId !== userId) return { accepted: 0, refused: true };
+      const key = `${userId}:${agentId}`;
+      if (Date.now() - (checked.get(key) ?? 0) > recheckMs) {
+        try {
+          await requireBrowserAccess(deps.db, userId, orgId, agentId, open);
+          checked.set(key, Date.now());
+        } catch {
+          checked.delete(key);
+          return { accepted: 0, refused: true };
+        }
+      }
+      // The person in control is here: their grace moves on (a write at most every 30 s).
+      await touchControl(deps.db, open.id, userId).catch(() => {});
       const [agent] = await deps.db
         .select({ handle: agents.handle })
         .from(agents)
@@ -325,6 +387,42 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           broadcast(state, { type: "browser.unavailable", agentId, reason: "reconnecting" });
         }
       },
+    },
+
+    /**
+     * Keeps the browsers of open handoffs alive (worker, every minute): a
+     * cheap read every `HANDOFF_KEEPALIVE_MS` counts as use, so the runner's
+     * idle shutdown never closes a page a person was asked to work in.
+     */
+    async keepAlive(now = Date.now()) {
+      const open = await deps.db
+        .select({
+          id: browserHandoffs.id,
+          agentId: browserHandoffs.agentId,
+          machineId: browserHandoffs.machineId,
+          handle: agents.handle,
+        })
+        .from(browserHandoffs)
+        .innerJoin(agents, eq(agents.id, browserHandoffs.agentId))
+        .where(inArray(browserHandoffs.status, ["pending", "active"]));
+      const ids = new Set(open.map((h) => h.id));
+      for (const id of touched.keys()) if (!ids.has(id)) touched.delete(id);
+      let pinged = 0;
+      for (const h of open) {
+        if (now - (touched.get(h.id) ?? 0) < HANDOFF_KEEPALIVE_MS) continue;
+        touched.set(h.id, now);
+        pinged++;
+        await deps.hub
+          .call(h.machineId, {
+            op: "browser.act",
+            agent: { id: h.agentId, handle: h.handle },
+            command: "get",
+            args: ["url"],
+            timeoutSeconds: 10,
+          })
+          .catch(() => {});
+      }
+      return pinged;
     },
 
     /** Whether anyone watches this agent's browser here. */

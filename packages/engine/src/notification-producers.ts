@@ -85,6 +85,9 @@ async function requesterOfRun(
   return null;
 }
 
+/** The person behind a run (who asked for the work, through agents that asked each other), or null. */
+export const humanBehindRun = requesterOfRun;
+
 async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
   const [a] = await deps.db.select({ owner: agents.ownerUserId }).from(agents).where(eq(agents.id, agentId));
   return a?.owner ?? null;
@@ -622,20 +625,29 @@ export async function browserHandoffRecipient(
   return (await requesterOfRun(deps, orgId, runId)) ?? (await agentOwner(deps, agentId));
 }
 
-/** An agent needs a person in its browser (`browser_ask_person`): in their "Waiting for you", with a push. */
+/**
+ * An agent needs a person in its browser (`browser_ask_person`): in the
+ * "Waiting for you" of whoever asked for the work and of the agent's
+ * responsible person, with a push. Either may open it; the first in control
+ * does it, the other sees who is helping.
+ */
 export async function notifyBrowserHandoff(
   deps: NotificationDeps,
   h: typeof schema.browserHandoffs.$inferSelect,
   where: { channelId: string; threadId: string | null },
 ) {
-  if (!h.requestedForUserId) return;
+  // Who asked for the work and the agent's responsible person (once when it's the same person).
+  const userIds = [...new Set([h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
+    (id): id is string => !!id,
+  );
+  if (userIds.length === 0) return;
   const [channel] = await deps.db
     .select({ kind: channels.kind, name: channels.name })
     .from(channels)
     .where(eq(channels.id, where.channelId));
   await notify(deps, {
     orgId: h.orgId,
-    userIds: [h.requestedForUserId],
+    userIds,
     kind: "browser_handoff",
     groupKey: `browser_handoff:${h.id}`,
     waiting: true,

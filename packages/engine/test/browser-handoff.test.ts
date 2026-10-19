@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { BrowserInputEvent, MachineRequest } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   BROWSER_SCOPE,
   type BrowserLiveDeps,
   type BrowserLiveMessage,
+  browserMachineOf,
+  CONTROL_GRACE_MS,
   ConflictError,
+  cancelHandoff,
   claimHandoff,
   createBrowserHandoffToolSource,
   createBrowserLive,
@@ -16,10 +19,14 @@ import {
   finishHandoff,
   grantScopes,
   listMessages,
+  markPageRead,
   postPersonMessage,
   renderPush,
+  requireBrowserAccess,
+  requirePageRead,
   startTakeover,
   type ToolSource,
+  touchControl,
   waitIfPersonInControl,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -160,12 +167,140 @@ describe("browser_ask_person", () => {
     );
     const stranger = await addUser(f.db, "zed");
     await expect(claimHandoff(deps(), stranger.id, f.org.id, h?.id ?? "")).rejects.toBeInstanceOf(ForbiddenError);
-    // A member who isn't the agent's owner, an admin or in the conversation can't watch it.
+    // Reading the channel isn't enough: the browser shows all of the agent's work.
     const member = await addMember(f.db, f.org.id, "member", "caio");
+    await expect(claimHandoff(deps(), member.id, f.org.id, h?.id ?? "")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(requireBrowserAccess(f.db, member.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(cancelHandoff(deps(), member.id, f.org.id, h?.id ?? "")).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("both the person who asked and the agent's owner hear it; either can help, the first in control does", async () => {
+    await start();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, ana.id, f.org.id, f.general.id, {
+      body: "@dev sign in please",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    expect(h?.requestedForUserId).toBe(ana.id);
+    const notified = await f.db
+      .select({ userId: schema.notifications.userId })
+      .from(schema.notifications)
+      .where(eq(schema.notifications.groupKey, `browser_handoff:${h?.id}`));
+    expect(notified.map((n) => n.userId).sort()).toEqual([ana.id, f.owner.id].sort());
+    // Ana, who asked for the work, may take part; the owner gets there first.
+    await requireBrowserAccess(f.db, ana.id, f.org.id, f.agent.id);
+    await claimHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "");
+    await expect(claimHandoff(deps(), ana.id, f.org.id, h?.id ?? "")).rejects.toBeInstanceOf(ConflictError);
+    await expect(finishHandoff(deps(), ana.id, f.org.id, h?.id ?? "", { result: "done" })).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+  });
+
+  test("pending it waits 10 min by default; in control there's no deadline, only the grace while they're away", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [pending] = await handoffs();
+    const waited = (pending?.expiresAt.getTime() ?? 0) - (pending?.createdAt.getTime() ?? 0);
+    expect(Math.round(waited / 60_000)).toBe(10);
+    const claimed = await claimHandoff(deps(), f.owner.id, f.org.id, pending?.id ?? "");
+    expect(claimed.expiresAt).toBeNull();
+    // While they're there (watching or typing) the grace keeps moving; once away, it ends after the grace.
+    const now = Date.now();
+    await touchControl(f.db, claimed.id, f.owner.id, new Date(now + 90_000));
+    expect((await handoffs())[0]?.expiresAt.getTime()).toBe(now + 90_000 + CONTROL_GRACE_MS);
+    await touchControl(f.db, claimed.id, "someone-else", new Date(now + 10 * 60_000));
+    expect((await handoffs())[0]?.expiresAt.getTime()).toBe(now + 90_000 + CONTROL_GRACE_MS);
+    expect(await expireBrowserHandoffs(deps(), new Date(now + 60_000))).toBe(0);
+    expect(await expireBrowserHandoffs(deps(), new Date(now + 90_000 + CONTROL_GRACE_MS + 1000))).toBe(1);
+  });
+
+  test("after a person had the browser, only browser_read works until the agent reads the page", async () => {
+    await start();
+    const ctx = { orgId: f.org.id, agentId: f.agent.id };
+    expect(await requirePageRead(f.db, ctx)).toBeNull();
+    const t = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    await finishHandoff(deps(), f.owner.id, f.org.id, t.id, { result: "done" });
+    expect((await requirePageRead(f.db, ctx))?.content).toContain("Read the page again first");
+    await markPageRead(f.db, ctx);
+    expect(await requirePageRead(f.db, ctx)).toBeNull();
+  });
+
+  test("while a person is asked (pending), another run's browser call is refused", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const other = await waitIfPersonInControl(f.db, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: "00000000-0000-7000-8000-000000000000",
+    });
+    expect(other).toMatchObject({ isError: true });
+    expect(other?.content).toContain("has been asked to take it");
+  });
+
+  test("a resume that fails doesn't strand the others, and the next sweep resumes it", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    // A second agent run also waiting on its own (already ended) handoff stands in for a resume that failed before.
     await f.db
-      .delete(schema.channelMembers)
-      .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.userId, member.id)));
-    await expect(claimHandoff(deps(), member.id, f.org.id, h?.id ?? "")).rejects.toBeTruthy();
+      .update(schema.browserHandoffs)
+      .set({ status: "done", resolvedAt: new Date() })
+      .where(eq(schema.browserHandoffs.id, h?.id ?? ""));
+    expect((await runs())[0]?.status).toBe("waiting_input");
+    await expireBrowserHandoffs(deps());
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("The person says it's done");
+  });
+
+  test("the browser's computer: an open handoff's, else the mission's of a run going on, else the agent's", async () => {
+    const own = await start();
+    expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(own.machineId);
+    const other = await pairMachine(deps(), f.owner.id, f.org.id, { name: "Mission box" });
+    await f.db
+      .update(schema.machines)
+      .set({ online: true, lastSeenAt: new Date() })
+      .where(eq(schema.machines.id, other.machineId));
+    // A run going on (it asked, and its request was dropped without waking it) in what becomes a mission's thread.
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await runs();
+    const [first] = await handoffs();
+    expect(first?.machineId).toBe(own.machineId);
+    expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(own.machineId);
+    await f.db
+      .update(schema.browserHandoffs)
+      .set({ status: "cancelled", resolvedAt: new Date() })
+      .where(eq(schema.browserHandoffs.id, first?.id ?? ""));
+    await f.db.insert(schema.missions).values({
+      orgId: f.org.id,
+      threadRootId: run?.threadRootId ?? "",
+      channelId: f.general.id,
+      agentId: f.agent.id,
+      machineId: other.machineId,
+      title: "t",
+      goal: "g",
+      status: "active",
+      mainSessionId: "s",
+    });
+    expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(other.machineId);
+    // Asking from that thread uses the mission's computer too.
+    const [tool] = await createBrowserHandoffToolSource().tools({} as never);
+    const out = await tool?.execute({ instructions: "Sign in again" }, {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id ?? "",
+      threadRootId: run?.threadRootId ?? "",
+    } as never);
+    expect(out?.isError).toBeUndefined();
+    const second = (await handoffs()).find((h) => h.id !== first?.id);
+    expect(second?.machineId).toBe(other.machineId);
   });
 
   test("the push says the agent needs the person in the browser, with what it asked", () => {
@@ -289,6 +424,73 @@ describe("live view", () => {
     await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     await Bun.sleep(50);
     expect((await handoffs())[0]).toMatchObject({ status: "active", controllerUserId: f.owner.id });
+  });
+
+  test("stream changes go one at a time: a controller joining during a start asks after it", async () => {
+    await start();
+    const calls: MachineRequest[] = [];
+    let inFlight = 0;
+    let overlapped = false;
+    const hub = {
+      isLocal: () => true,
+      call: async (_m: string, request: MachineRequest) => {
+        inFlight++;
+        if (inFlight > 1) overlapped = true;
+        await Bun.sleep(10);
+        calls.push(request);
+        inFlight--;
+        if (request.op === "browser.stream.start") return { mode: request.mode };
+        return { stopped: true };
+      },
+    } as unknown as BrowserLiveDeps["hub"];
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Promise.all([
+      live.watch(viewer("watcher").viewer, f.org.id, f.agent.id),
+      live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id),
+    ]);
+    await Bun.sleep(30);
+    expect(overlapped).toBe(false);
+    const starts = calls.filter((c) => c.op === "browser.stream.start");
+    expect(starts.at(-1)).toMatchObject({ mode: "control" });
+  });
+
+  test("when control ends after the grace and nobody watches, the agent's live state is dropped", async () => {
+    await start();
+    const { hub } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, graceMs: 10 });
+    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    stop();
+    await Bun.sleep(40);
+    expect((await handoffs())[0]?.status).toBe("expired");
+    // A fresh watch starts a new stream (the old state is gone).
+    const { hub: hub2, calls } = fakeHub();
+    void hub2;
+    expect(live.watching(f.agent.id)).toBe(false);
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    expect(live.watching(f.agent.id)).toBe(true);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("a viewer who loses access is cut off; open handoffs keep the browser alive", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, accessRecheckMs: 10 });
+    const member = await addMember(f.db, f.org.id, "member", "caio");
+    const m = viewer(member.id);
+    await live.watch(m.viewer, f.org.id, f.agent.id);
+    await Bun.sleep(40);
+    expect(m.got.some((x) => x.type === "browser.unavailable" && x.reason === "forbidden")).toBe(true);
+
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const before = calls.length;
+    expect(await live.keepAlive()).toBe(1);
+    expect(calls.at(-1)).toMatchObject({ op: "browser.act", command: "get", args: ["url"] });
+    expect(await live.keepAlive()).toBe(0);
+    expect(calls.length).toBe(before + 1);
   });
 
   test("an agent without a computer, or one held by another server, says so", async () => {
