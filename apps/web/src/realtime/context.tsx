@@ -15,6 +15,7 @@ import type {
 } from "@agenteschat/client";
 import {
   ApiError,
+  applyBrowserHandoff,
   applyChannelEvent,
   applyComputerEvent,
   applyConsultEvent,
@@ -23,6 +24,10 @@ import {
   applyReactions,
   applyReceiptEvent,
   applyTyping,
+  type BrowserFrame,
+  type BrowserInputEvent,
+  type BrowserLiveStatus,
+  type BrowserLiveUnavailable,
   type ConnectionStatus,
   type ConsultsState,
   cacheApproval,
@@ -31,6 +36,7 @@ import {
   cacheMessageActions,
   cacheMessageMemories,
   cacheTask,
+  createBrowserLiveConnection,
   dismissRun,
   dropProvisional,
   emptyStreams,
@@ -62,7 +68,7 @@ import { playAgentReaction } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useToast } from "@/lib/toast";
@@ -605,6 +611,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
           void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
       if (event.type === "thread.updated") applyThreadEvent(qc, orgId, event);
+      // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
+      if (event.type === "browser.handoff.updated") applyBrowserHandoff(qc, orgId, event.handoff);
       // Missions (ADR 0029): the pinned card, the cards in the thread, the lists; a task's row.
       if (event.type === "mission.updated") applyMissionEvent(qc, orgId, event);
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
@@ -680,6 +688,59 @@ export function useTypingSender(channelId: string) {
 
 export function useDismissRun() {
   return useRealtime().streams.dismiss;
+}
+
+/** What the live view shows of an agent's browser (ADR 0040 §7). */
+export interface BrowserLiveState {
+  frame: BrowserFrame | null;
+  status: BrowserLiveStatus | null;
+  /** Why nothing is shown now (cleared by the next frame or status). */
+  unavailable: { reason: BrowserLiveUnavailable; message?: string } | null;
+  ended: boolean;
+  /** The last refusal (`not_in_control`, `forbidden`, …). */
+  error: string | null;
+}
+
+const EMPTY_LIVE: BrowserLiveState = { frame: null, status: null, unavailable: null, ended: false, error: null };
+
+/**
+ * Watches an agent's browser on the org's socket while mounted (`enabled`):
+ * frames, who is in control, and why it can't be shown. Watches again when
+ * the socket reconnects. `sendInput` is for the person in control.
+ */
+export function useBrowserLive(agentId: string, enabled = true) {
+  const { connection } = useRealtime();
+  const [state, setState] = useState<BrowserLiveState>(EMPTY_LIVE);
+  const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
+  useEffect(() => {
+    if (!connection || !enabled) return;
+    setState(EMPTY_LIVE);
+    const live = createBrowserLiveConnection({
+      send: (frame) => connection.sendBrowserFrame(frame),
+      agentId,
+      onFrame: (frame) => setState((s) => ({ ...s, frame, unavailable: null, ended: false })),
+      onStatus: (status) => setState((s) => ({ ...s, status, unavailable: null, ended: false })),
+      onUnavailable: (reason, message) =>
+        setState((s) => ({ ...s, unavailable: { reason, ...(message ? { message } : {}) } })),
+      onEnded: () => setState((s) => ({ ...s, ended: true })),
+      onError: (code) => setState((s) => ({ ...s, error: code })),
+    });
+    liveRef.current = live;
+    const off = connection.onBrowserFrame((frame) => live.handleMessage(frame));
+    // Watch once the socket is open, and again after every reconnect (the server forgets the watch).
+    const offStatus = connection.onStatus((status) => {
+      if (status === "open") live.resume();
+    });
+    if (connection.isOpen) live.start();
+    return () => {
+      off();
+      offStatus();
+      live.close();
+      liveRef.current = null;
+    };
+  }, [connection, agentId, enabled]);
+  const sendInput = useCallback((events: BrowserInputEvent[]) => liveRef.current?.sendInput(events) ?? false, []);
+  return { ...state, sendInput };
 }
 
 export function useConnectionStatus(): ConnectionStatus {

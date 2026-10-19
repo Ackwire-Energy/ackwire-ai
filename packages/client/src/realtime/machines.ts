@@ -37,7 +37,12 @@ export function accessOf(v: unknown): MachineAccess | null | undefined {
         ? [{ path: f.path, agents: Array.isArray(f.agents) ? f.agents.filter((a) => typeof a === "string") : [] }]
         : [],
     ),
-    tools: { claude: t.claude === true, codex: t.codex === true, commands: t.commands === true },
+    tools: {
+      claude: t.claude === true,
+      codex: t.codex === true,
+      commands: t.commands === true,
+      ...(t.browser === true ? { browser: true } : {}),
+    },
   };
 }
 
@@ -76,6 +81,10 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   // Who waits for an offline computer changes when one comes back, goes away or its agents move.
   if (e.type === "machine.status" || e.type === "machine.deleted" || e.type === "machine.agents_moved") {
     void qc.invalidateQueries({ queryKey: keys.machineOutages(orgId) });
+  }
+  // Whether agents can use their browser (ADR 0040) follows the computer: its switch, a reconnect, a move.
+  if (e.type !== "machine.state" && e.type !== "machine.updated") {
+    void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
   }
   switch (e.type) {
     case "machine.status": {

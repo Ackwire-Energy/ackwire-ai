@@ -16,6 +16,7 @@ export * from "./api/keys";
 export * from "./api/missions";
 export * from "./api/queries";
 export * from "./api/types";
+export * from "./browser";
 export * from "./realtime/connection";
 export * from "./realtime/consults";
 export * from "./realtime/machines";

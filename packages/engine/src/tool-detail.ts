@@ -9,6 +9,16 @@ function short(v: unknown): string | undefined {
   return t.length > MAX ? `${t.slice(0, MAX - 1)}…` : t;
 }
 
+/** "https://shop.example/checkout?token=…" → "shop.example/checkout". */
+function siteOf(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const m = /^https?:\/\/([^/?#\s]+)([^?#\s]*)/i.exec(v.trim());
+  if (!m) return undefined;
+  const host = (m[1] ?? "").replace(/^[^@]*@/, "").toLowerCase();
+  const path = (m[2] ?? "").replace(/\/$/, "");
+  return short(`${host}${path}`);
+}
+
 function issueRef(v: unknown) {
   const t = short(v);
   if (!t) return undefined;
@@ -52,6 +62,10 @@ export function toolDetail(name: string, input: Record<string, unknown> | undefi
       const skill = short(i.skill);
       return skill ? short(typeof i.path === "string" ? `${skill}/${i.path}` : skill) : undefined;
     }
+    // The agent browser (ADR 0040): the site it opens, never the query string (it can carry tokens).
+    case "browser_open":
+    case "browser_tabs":
+      return siteOf(i.url);
     default:
       return undefined;
   }

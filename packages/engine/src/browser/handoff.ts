@@ -13,8 +13,10 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { getAgentCached } from "../agents";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
+import type { MachineCaller } from "../machine-hub";
 import { getMachineById, machineOnline } from "../machines";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
@@ -705,4 +707,29 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
     await resumeWaitingRun(deps.db, handoff, endedResult(handoff)).catch(() => {});
   }
   return expired.length;
+}
+
+/**
+ * "Parar" on the live view or the computer page: closes the agent's browser
+ * now (its logins stay in its profile). Whoever may watch it may stop it; the
+ * agent's next browser call opens a fresh one.
+ */
+export async function stopAgentBrowser(
+  db: Database,
+  hub: MachineCaller | undefined,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+) {
+  await requireBrowserAccess(db, actorId, orgId, agentId);
+  if (!hub) throw new ValidationError("Connected computers are not available on this server");
+  const machineId = await browserMachineOf(db, orgId, agentId);
+  if (!machineId) throw new ValidationError("This agent has no computer");
+  const agent = await getAgentCached(db, orgId, agentId);
+  if (!agent) throw new NotFoundError("Agent not found");
+  await hub.call<"browser.stop">(
+    machineId,
+    { op: "browser.stop", agent: { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) } },
+    { timeoutMs: 30_000 },
+  );
 }

@@ -31,6 +31,7 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
+import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createFakeDatabases, type FakeDatabases } from "./fakes/databases";
@@ -600,7 +601,8 @@ type FakedParts =
   | "calendar"
   | "customConnectors"
   | "mail"
-  | "databases";
+  | "databases"
+  | "browser";
 
 /** The core of the fake backend, over `FakeState`. Records every call in `state.calls`. */
 export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
@@ -1514,6 +1516,9 @@ export const fakeMailOf = new WeakMap<ApiClient, FakeMail>();
 /** The databases fake behind each `createFakeApi` client (tests add failures and tables with it). */
 export const fakeDatabasesOf = new WeakMap<ApiClient, FakeDatabases>();
 
+/** The agent browser fake behind each `createFakeApi` client (tests add settings and handoffs with it). */
+export const fakeBrowserOf = new WeakMap<ApiClient, FakeBrowser>();
+
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
@@ -1531,6 +1536,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   const customConnectors = createMockCustomConnectors(ctx, (method, ...args) => state.calls.push({ method, args }));
   const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const client: ApiClient = {
     ...http,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
@@ -1572,10 +1578,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     customConnectors,
     mail: mail.client,
     databases: databases.client,
+    browser: browser.client,
   };
   fakeMachinesOf.set(client, machines);
   fakeMailOf.set(client, mail);
   fakeDatabasesOf.set(client, databases);
+  fakeBrowserOf.set(client, browser);
   return client;
 }
 

@@ -43,6 +43,7 @@ import {
   usd,
 } from "@/components/AgentFields";
 import { AgentSecretsList } from "@/components/AgentSecrets";
+import { AgentBrowserCard } from "@/components/browser/AgentBrowserCard";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -516,6 +517,8 @@ export function SettingsTab({
             )}
             <AgentSecretsList agent={agent} editable={admin} />
           </Section>
+
+          {viewer !== "member" && <AgentBrowserCard agent={agent} admin={admin} canSites />}
 
           {admin && (
             <Section id="danger" title={t("agentPage.settings.danger")} fields={[]} danger>

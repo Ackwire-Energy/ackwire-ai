@@ -124,4 +124,10 @@ export const keys = {
   databaseList: (orgId: string) => ["org", orgId, "databases", "list"] as const,
   databaseTables: (orgId: string, connectionId: string) => ["org", orgId, "databases", "tables", connectionId] as const,
   agentDatabases: (orgId: string, agentId: string) => ["org", orgId, "databases", "agent", agentId] as const,
+  /** The agent browser (ADR 0040): an agent's settings, its open request, one request (prefix). */
+  browser: (orgId: string) => ["org", orgId, "browser"] as const,
+  agentBrowser: (orgId: string, agentId: string) => ["org", orgId, "browser", "agent", agentId] as const,
+  agentBrowserHandoff: (orgId: string, agentId: string) =>
+    ["org", orgId, "browser", "agent", agentId, "handoff"] as const,
+  browserHandoff: (orgId: string, handoffId: string) => ["org", orgId, "browser", "handoff", handoffId] as const,
 };
