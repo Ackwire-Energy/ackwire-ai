@@ -1,4 +1,5 @@
 import type { BlobStore } from "./blob";
+import type { DatabaseDriver } from "./database";
 import type { EmailSender } from "./email";
 import type { KeyWrapper, PlatformCredentials } from "./keys";
 import type { MailAdapters } from "./mail";
@@ -13,6 +14,7 @@ export * from "./blob";
 export * from "./blob-postgres";
 export * from "./command-policy";
 export * from "./composio";
+export * from "./database";
 export * from "./email";
 export * from "./imap";
 export * from "./keys";
@@ -57,4 +59,6 @@ export interface Adapters {
   push?: PushSender | null;
   /** People's mailboxes for agents (ADR 0038); absent = no email connectors. */
   mail?: MailAdapters;
+  /** People's Postgres databases for agents (ADR 0039); null/absent = no database connector. */
+  databases?: DatabaseDriver | null;
 }

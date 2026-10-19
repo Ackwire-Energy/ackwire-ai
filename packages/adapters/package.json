@@ -19,7 +19,8 @@
     "@agenteschat/db": "workspace:*",
     "imapflow": "^2.5.5",
     "mailparser": "^3.9.46",
-    "nodemailer": "^10.1.7"
+    "nodemailer": "^10.1.7",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

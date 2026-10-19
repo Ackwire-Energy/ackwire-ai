@@ -3,17 +3,18 @@ import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
 
-const { agentScopes, agents, mailAccounts } = schema;
+const { agentScopes, agents, mailAccounts, dbConnections } = schema;
 
 /**
  * Mail grants (`agent_scopes` rows whose connection is a mailbox, ADR 0038)
- * are managed only by the mail API (`setAgentMail`): replacing an agent's
+ * and database grants (a database connection, ADR 0039) are managed only by
+ * their own APIs (`setAgentMail`, `setAgentDatabase`): replacing an agent's
  * other grants keeps them.
  */
 export const notMailGrant = (orgId: string) =>
-  sql`(${agentScopes.connectionId} is null or ${agentScopes.connectionId} not in (select ${mailAccounts.id} from ${mailAccounts} where ${mailAccounts.orgId} = ${orgId}))`;
+  sql`(${agentScopes.connectionId} is null or (${agentScopes.connectionId} not in (select ${mailAccounts.id} from ${mailAccounts} where ${mailAccounts.orgId} = ${orgId}) and ${agentScopes.connectionId} not in (select ${dbConnections.id} from ${dbConnections} where ${dbConnections.orgId} = ${orgId})))`;
 
-/** Which of these connection ids are the org's mailboxes. */
+/** Which of these connection ids are the org's mailboxes or databases (grants managed by their own APIs). */
 export async function mailConnectionIds(db: Executor, orgId: string, ids: (string | null)[]) {
   const wanted = [...new Set(ids.filter((id): id is string => !!id))];
   if (wanted.length === 0) return new Set<string>();
@@ -21,7 +22,11 @@ export async function mailConnectionIds(db: Executor, orgId: string, ids: (strin
     .select({ id: mailAccounts.id })
     .from(mailAccounts)
     .where(and(eq(mailAccounts.orgId, orgId), inArray(mailAccounts.id, wanted)));
-  return new Set(rows.map((r) => r.id));
+  const dbs = await db
+    .select({ id: dbConnections.id })
+    .from(dbConnections)
+    .where(and(eq(dbConnections.orgId, orgId), inArray(dbConnections.id, wanted)));
+  return new Set([...rows, ...dbs].map((r) => r.id));
 }
 
 /**
@@ -135,8 +140,14 @@ export function toolAccess(
   // Write implies read for built-ins (`issues:write` ⇒ `list_issues`, `drive:write` ⇒ `read_artifact`…).
   const writeScope = impliedByWrite(tool.scope);
   if (!conn && writeScope && granted.has(grantKey(null, writeScope))) return "inherited";
-  // "All tools" never includes running code (D30) nor anyone's mailbox (ADR 0038): always separate, explicit grants.
-  if (granted.has(grantKey(null, ALL_TOOLS)) && !NOT_IN_ALL.has(tool.scope) && !tool.scope.startsWith("mail:"))
+  // "All tools" never includes running code (D30), anyone's mailbox (ADR 0038) nor a database (ADR 0039):
+  // always separate, explicit grants.
+  if (
+    granted.has(grantKey(null, ALL_TOOLS)) &&
+    !NOT_IN_ALL.has(tool.scope) &&
+    !tool.scope.startsWith("mail:") &&
+    !tool.scope.startsWith("database:")
+  )
     return "inherited";
   return "off";
 }

@@ -75,3 +75,35 @@ export async function assertPublicHttpsUrl(raw: string, resolve: ResolveHost = r
   }
   return url;
 }
+
+const HOST_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+/**
+ * A host a person typed for a direct connection (a database): an address
+ * to connect to that is not private, loopback, link-local or metadata.
+ * Resolved on every new connection (DNS rebinding); the caller connects to
+ * the returned address, never to the name again.
+ */
+export async function publicHostAddress(
+  host: string,
+  resolve: ResolveHost = resolveHostDns,
+): Promise<{ ok: true; address: string } | { ok: false; reason: "blocked" | "unreachable" }> {
+  const h = host
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal"))
+    return { ok: false, reason: "blocked" };
+  if (isIP(h)) return isBlockedAddress(h) ? { ok: false, reason: "blocked" } : { ok: true, address: h };
+  if (!HOST_NAME.test(h)) return { ok: false, reason: "blocked" };
+  let addresses: string[];
+  try {
+    addresses = await resolve(h);
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+  const first = addresses[0];
+  if (!first) return { ok: false, reason: "unreachable" };
+  if (addresses.some(isBlockedAddress)) return { ok: false, reason: "blocked" };
+  return { ok: true, address: first };
+}
