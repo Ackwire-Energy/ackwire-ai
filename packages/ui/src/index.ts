@@ -196,6 +196,7 @@ export {
   type RunPixel,
   type RunPixelStatus,
   RunStrip,
+  SkyStrip,
   STRIP_CELL,
   WorkSweep,
 } from "./components/RunPixels";

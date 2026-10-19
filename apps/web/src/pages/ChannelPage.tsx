@@ -123,8 +123,9 @@ import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
+import { RunBrowserCard } from "@/components/browser/BrowserCard";
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
-import { BrowserWatchCard } from "@/components/browser/BrowserWatchCard";
+import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { ConsultationCard } from "@/components/ConsultationCard";
@@ -1112,7 +1113,7 @@ function ChannelView({
   // to a later reply). `liveKey` only changes when runs start or end.
   const liveKey = useStreams((s) =>
     scopedRuns(s)
-      .filter(isWriting)
+      .filter(hasRow)
       .map((r) => JSON.stringify([r.runId, r.startedAt ?? 0, r.threadId, r.triggerMessageId ?? null]))
       .join("\n"),
   );
@@ -1679,10 +1680,13 @@ export function liveAnchors(liveKey: string, items: ReturnType<typeof buildTimel
   return { anchors, unanchored };
 }
 
+/** A live run gets its row once it writes, or (with its browser card) as soon as it uses its browser. */
+const hasRow = (r: LiveRun) => isWriting(r) || usesBrowser(r);
+
 /** One live run, subscribed by id (deltas re-render only this row). Never grouped. */
 function LiveRunSlot({ runId }: { runId: string }) {
   const run = useStreams((s) => s.runs[runId]);
-  if (!run || !isWriting(run)) return null;
+  if (!run || !hasRow(run)) return null;
   return <LiveRunRow run={run} grouped={false} />;
 }
 
@@ -1833,7 +1837,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
         <>
           {/* What it said and did before this answer: narration and each tool call (code + output). */}
           <LiveWorkList work={run.work ?? []} messageAuthor={messageAuthor} />
-          {!canceled && <BrowserWatchCard run={run} name={name} />}
+          {!canceled && <RunBrowserCard run={run} name={name} />}
           {text && (
             <MessageText>
               <MessageBody body={text} resolveMention={dir.mentionName} />
@@ -1980,17 +1984,9 @@ function ActivityBar({
   const behind = runs.filter((r) => behindIds.includes(r.runId));
   // Agents running code (not writing yet): "Ver código" with the live code and output.
   const coding = runs.filter((r) => !isWriting(r) && r.code);
-  // An agent working in its browser: the bar says so, and a click opens its browser live (watching).
+  // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
   const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
-  const navigate = useNavigate();
-  const openBrowser = browsing
-    ? () =>
-        void navigate({
-          to: "/org/$orgId/browser/$agentId",
-          params: { orgId: org.id, agentId: browsing.agentId },
-          search: { watch: 1 },
-        })
-    : undefined;
+  const openBrowser = browsing ? () => requestBrowserCard({ agentId: browsing.agentId }) : undefined;
   // What they said last between tool calls ("Theo: Go não está instalado; vou tentar…").
   const said = runs
     .filter((r) => !isWriting(r))

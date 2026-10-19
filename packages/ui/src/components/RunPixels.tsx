@@ -577,3 +577,46 @@ export function ExpiryFuse({
   }, rem > 0);
   return <canvas ref={ref} className={cx("ac-work-sweep", "ac-expiry-fuse", className)} />;
 }
+
+/**
+ * A thin edge of the agent's pixel sky (telas/NavegadorNoChat.html, header "Céu"): two rows
+ * of its tones drifting slowly along the top of a card, its identity there. `muted` greys
+ * it (a person is in control). Decorative.
+ */
+export function SkyStrip({
+  color = "sky",
+  muted = false,
+  moving = true,
+  className,
+}: {
+  color?: AgentColor;
+  muted?: boolean;
+  moving?: boolean;
+  className?: string;
+}) {
+  const ref = useCanvas((ctx, canvas, t) => {
+    const w = Math.max(8, Math.ceil(canvas.clientWidth / 3) || 120);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== 2) canvas.height = 2;
+    const surface = token(canvas, "--raised", "#ffffff");
+    const dark = document.documentElement.dataset.theme === "dark";
+    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const pal = dark
+      ? [surface, mixHex(surface, bottom, 0.45), mixHex(bottom, top, 0.35), mixHex(top, bottom, 0.2)]
+      : [surface, mixHex(surface, top, 0.35), mixHex(surface, top, 0.7), top];
+    const last = pal.length - 1;
+    for (let y = 0; y < 2; y++)
+      for (let x = 0; x < w; x++) {
+        const u = x / w;
+        const f = Math.min(
+          1,
+          Math.max(0, 0.42 + 0.22 * Math.sin(u * 9 - t * 0.8) + 0.16 * Math.sin(u * 23 + t * 1.3) + (y ? -0.1 : 0.1)),
+        );
+        const s = f * last;
+        const b = Math.floor(s);
+        ctx.fillStyle = pal[Math.min(last, s - b > (BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5) ? b + 1 : b)] ?? surface;
+        ctx.fillRect(x, y, 1, 1);
+      }
+  }, moving);
+  return <canvas ref={ref} className={cx("ac-sky-strip", muted && "is-muted", className)} />;
+}

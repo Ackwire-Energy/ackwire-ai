@@ -206,23 +206,16 @@ export type OpenTarget =
   | { to: "/org/$orgId/routines" }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
-  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" } }
-  | { to: "/org/$orgId/browser/$agentId"; params: { agentId: string }; search: { h?: string } };
+  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" } };
 
+/**
+ * An agent that needs a person in its browser (ADR 0040) goes to its request card in the
+ * conversation, like any message: the browser opens in that card (the page asks for it with
+ * the notification's `handoffId`).
+ */
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
   if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
-  // An agent needs a person in its browser (ADR 0040): straight to the live view.
-  if (n.kind === "browser_handoff") {
-    const agent = n.actors.find((a) => a.type === "agent");
-    if (agent) {
-      return {
-        to: "/org/$orgId/browser/$agentId",
-        params: { agentId: agent.id },
-        search: s.handoffId ? { h: s.handoffId } : {},
-      };
-    }
-  }
   if (n.kind === "machine_connected")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }

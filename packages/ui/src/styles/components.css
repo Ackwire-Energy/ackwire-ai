@@ -5404,6 +5404,16 @@ a.ac-list__row:focus-visible {
   image-rendering: pixelated;
   pointer-events: none;
 }
+/* The agent's pixel-sky edge along the top of a card (SkyStrip, telas/NavegadorNoChat.html "Céu"). */
+.ac-sky-strip {
+  display: block;
+  width: 100%;
+  height: 6px;
+  image-rendering: pixelated;
+}
+.ac-sky-strip.is-muted {
+  filter: saturate(0.35) brightness(1.05);
+}
 /* ---------- Menu item hint: the current value of what it opens (telas/MissaoConfig.html) ---------- */
 .ac-menu__hint {
   margin-left: auto;

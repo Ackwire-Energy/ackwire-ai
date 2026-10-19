@@ -308,6 +308,8 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
           hover = e;
           continue;
         }
+        // The pointer's last position goes first (a click moves there before pressing).
+        if (hover) queue.push(hover);
         dropHover();
         const last = queue.at(-1);
         if (isDragMove(e)) {

@@ -19,7 +19,6 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as OrgOrgIdRouteImport } from './routes/org.$orgId'
 import { Route as OrgOrgIdIndexRouteImport } from './routes/org.$orgId.index'
 import { Route as OrgOrgIdApprovalsRouteImport } from './routes/org.$orgId.approvals'
-import { Route as OrgOrgIdBrowserAgentIdRouteImport } from './routes/org.$orgId.browser.$agentId'
 import { Route as OrgOrgIdCalendarRouteImport } from './routes/org.$orgId.calendar'
 import { Route as OrgOrgIdDriveRouteImport } from './routes/org.$orgId.drive'
 import { Route as OrgOrgIdForumRouteImport } from './routes/org.$orgId.forum'
@@ -94,11 +93,6 @@ const OrgOrgIdIndexRoute = OrgOrgIdIndexRouteImport.update({
 const OrgOrgIdApprovalsRoute = OrgOrgIdApprovalsRouteImport.update({
   id: '/approvals',
   path: '/approvals',
-  getParentRoute: () => OrgOrgIdRoute,
-} as any)
-const OrgOrgIdBrowserAgentIdRoute = OrgOrgIdBrowserAgentIdRouteImport.update({
-  id: '/browser/$agentId',
-  path: '/browser/$agentId',
   getParentRoute: () => OrgOrgIdRoute,
 } as any)
 const OrgOrgIdCalendarRoute = OrgOrgIdCalendarRouteImport.update({
@@ -240,7 +234,6 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId': typeof OrgOrgIdRouteWithChildren
   '/org/$orgId/approvals': typeof OrgOrgIdApprovalsRoute
-  '/org/$orgId/browser/$agentId': typeof OrgOrgIdBrowserAgentIdRoute
   '/org/$orgId/calendar': typeof OrgOrgIdCalendarRoute
   '/org/$orgId/drive': typeof OrgOrgIdDriveRoute
   '/org/$orgId/forum': typeof OrgOrgIdForumRoute
@@ -277,7 +270,6 @@ export interface FileRoutesByTo {
   '/dev/gallery': typeof DevGalleryRoute
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId/approvals': typeof OrgOrgIdApprovalsRoute
-  '/org/$orgId/browser/$agentId': typeof OrgOrgIdBrowserAgentIdRoute
   '/org/$orgId/calendar': typeof OrgOrgIdCalendarRoute
   '/org/$orgId/drive': typeof OrgOrgIdDriveRoute
   '/org/$orgId/forum': typeof OrgOrgIdForumRoute
@@ -316,7 +308,6 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId': typeof OrgOrgIdRouteWithChildren
   '/org/$orgId/approvals': typeof OrgOrgIdApprovalsRoute
-  '/org/$orgId/browser/$agentId': typeof OrgOrgIdBrowserAgentIdRoute
   '/org/$orgId/calendar': typeof OrgOrgIdCalendarRoute
   '/org/$orgId/drive': typeof OrgOrgIdDriveRoute
   '/org/$orgId/forum': typeof OrgOrgIdForumRoute
@@ -356,7 +347,6 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/org/$orgId'
     | '/org/$orgId/approvals'
-    | '/org/$orgId/browser/$agentId'
     | '/org/$orgId/calendar'
     | '/org/$orgId/drive'
     | '/org/$orgId/forum'
@@ -393,7 +383,6 @@ export interface FileRouteTypes {
     | '/dev/gallery'
     | '/invite/$token'
     | '/org/$orgId/approvals'
-    | '/org/$orgId/browser/$agentId'
     | '/org/$orgId/calendar'
     | '/org/$orgId/drive'
     | '/org/$orgId/forum'
@@ -431,7 +420,6 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/org/$orgId'
     | '/org/$orgId/approvals'
-    | '/org/$orgId/browser/$agentId'
     | '/org/$orgId/calendar'
     | '/org/$orgId/drive'
     | '/org/$orgId/forum'
@@ -541,13 +529,6 @@ declare module '@tanstack/react-router' {
       path: '/approvals'
       fullPath: '/org/$orgId/approvals'
       preLoaderRoute: typeof OrgOrgIdApprovalsRouteImport
-      parentRoute: typeof OrgOrgIdRoute
-    }
-    '/org/$orgId/browser/$agentId': {
-      id: '/org/$orgId/browser/$agentId'
-      path: '/browser/$agentId'
-      fullPath: '/org/$orgId/browser/$agentId'
-      preLoaderRoute: typeof OrgOrgIdBrowserAgentIdRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
     '/org/$orgId/calendar': {
@@ -730,7 +711,6 @@ declare module '@tanstack/react-router' {
 
 interface OrgOrgIdRouteChildren {
   OrgOrgIdApprovalsRoute: typeof OrgOrgIdApprovalsRoute
-  OrgOrgIdBrowserAgentIdRoute: typeof OrgOrgIdBrowserAgentIdRoute
   OrgOrgIdCalendarRoute: typeof OrgOrgIdCalendarRoute
   OrgOrgIdDriveRoute: typeof OrgOrgIdDriveRoute
   OrgOrgIdForumRoute: typeof OrgOrgIdForumRoute
@@ -761,7 +741,6 @@ interface OrgOrgIdRouteChildren {
 
 const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
   OrgOrgIdApprovalsRoute: OrgOrgIdApprovalsRoute,
-  OrgOrgIdBrowserAgentIdRoute: OrgOrgIdBrowserAgentIdRoute,
   OrgOrgIdCalendarRoute: OrgOrgIdCalendarRoute,
   OrgOrgIdDriveRoute: OrgOrgIdDriveRoute,
   OrgOrgIdForumRoute: OrgOrgIdForumRoute,

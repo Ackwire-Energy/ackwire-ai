@@ -21,7 +21,12 @@ const NONE: AgentBrowserSettings = {
   machine: null,
 };
 
-export function createFakeBrowser(log: (method: string, ...args: unknown[]) => void, now: () => Date): FakeBrowser {
+export function createFakeBrowser(
+  log: (method: string, ...args: unknown[]) => void,
+  now: () => Date,
+  /** Who the session is: the person who takes control. */
+  me = "u-walter",
+): FakeBrowser {
   const settings = new Map<string, AgentBrowserSettings>();
   const handoffs = new Map<string, BrowserHandoff>();
   const find = (id: string) => {
@@ -59,7 +64,7 @@ export function createFakeBrowser(log: (method: string, ...args: unknown[]) => v
     handoff: async (_orgId, handoffId) => find(handoffId),
     takeControl: async (orgId, handoffId) => {
       log("browser.takeControl", orgId, handoffId);
-      const h = { ...find(handoffId), status: "active" as const, controllerUserId: "me", expiresAt: null };
+      const h = { ...find(handoffId), status: "active" as const, controllerUserId: me, expiresAt: null };
       handoffs.set(handoffId, h);
       return h;
     },
@@ -86,7 +91,7 @@ export function createFakeBrowser(log: (method: string, ...args: unknown[]) => v
         instructions: "",
         status: "active",
         requestedForUserId: null,
-        controllerUserId: "me",
+        controllerUserId: me,
         note: null,
         expiresAt: null,
         createdAt: now().toISOString(),

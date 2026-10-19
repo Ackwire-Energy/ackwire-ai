@@ -11,7 +11,6 @@ import {
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
@@ -19,6 +18,7 @@ import { useStreams } from "@/realtime/context";
 import { AgentAvatar } from "../AgentAvatar";
 import { CommandBlock } from "../Machines";
 import { useOrg } from "../org-context";
+import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
 
 /** The first command in the runner's own words ("…run `agentes-runner browser install --with-deps`"). */
@@ -38,9 +38,9 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   const { org } = useOrg();
   const api = useApi();
   const toast = useToast();
-  const navigate = useNavigate();
   const actions = useBrowserHandoffMutations(org.id);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [seeing, setSeeing] = useState<string | null>(null);
   const agentIds = m.agents.map((a) => a.id);
   const handoffs = useQueries({
     queries: agentIds.map((id) => ({
@@ -185,14 +185,9 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
                     <span className="brw-use__acts">
                       <Button
                         size="sm"
-                        icon="external"
-                        onClick={() =>
-                          void navigate({
-                            to: "/org/$orgId/browser/$agentId",
-                            params: { orgId: org.id, agentId: agent.id },
-                            search: open ? { h: open.id, ...(waiting ? {} : { watch: 1 as const }) } : { watch: 1 },
-                          })
-                        }
+                        icon="globe"
+                        aria-expanded={seeing === agent.id}
+                        onClick={() => setSeeing((v) => (v === agent.id ? null : agent.id))}
                       >
                         {t("browser.machine.see")}
                       </Button>
@@ -215,6 +210,12 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
                         >
                           {t("browser.machine.stop")}
                         </Button>
+                      </div>
+                    )}
+                    {/* "Ver": the agent's browser here, in its card (no page of its own). */}
+                    {seeing === agent.id && (
+                      <div className="brw-use__card">
+                        <BrowserCard agentId={agent.id} name={agent.name} handoff={open ?? null} defaultOpen />
                       </div>
                     )}
                   </div>

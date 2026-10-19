@@ -16,6 +16,7 @@ import {
   keyboardEvents,
   keyEvents,
   modifiersOf,
+  pagePoint,
   parseBrowserLiveMessage,
   usesBrowser,
   wheelEvent,
@@ -81,9 +82,25 @@ describe("agent browser input (ADR 0040)", () => {
     expect(keyboardEvents({ key: "é" }, false)).toEqual([{ kind: "text", text: "é" }]);
     expect(keyboardEvents({ key: "Shift" }, false)).toBeNull();
     expect(clickEvents({ x: 5, y: 6 }).map((e) => e.kind === "mouse" && e.type)).toEqual([
+      "mouseMoved",
       "mousePressed",
       "mouseReleased",
     ]);
+  });
+
+  test("a click on a letterboxed frame lands on the page; the bands around it don't", () => {
+    // A 1280×720 page shown in a 1000×1000 box: drawn 1000×562.5, 218.75 px of band above and below.
+    const meta = { deviceWidth: 1280, deviceHeight: 720 };
+    const box = { left: 100, top: 50, width: 1000, height: 1000 };
+    expect(pagePoint({ x: 100 + 500, y: 50 + 218.75 + 281.25 }, box, meta)).toEqual({ x: 640, y: 360 });
+    expect(pagePoint({ x: 100, y: 50 + 218.75 }, box, meta)).toEqual({ x: 0, y: 0 });
+    // In the band above the image: not on the page.
+    expect(pagePoint({ x: 600, y: 60 }, box, meta)).toBeNull();
+    // An element exactly the image's size (fill) maps straight.
+    expect(pagePoint({ x: 420, y: 230 }, { left: 100, top: 50, width: 640, height: 360 }, meta, "fill")).toEqual({
+      x: 640,
+      y: 360,
+    });
   });
 });
 
@@ -349,9 +366,21 @@ describe("input in bursts, not one message per event", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]?.events?.map((e) => `${e.type}:${e.x}`)).toEqual([
       "mouseMoved:3",
+      "mouseMoved:4",
       "mousePressed:4",
       "mouseReleased:4",
     ]);
+  });
+
+  test("a click's hover move is sent with it, before the press, even right after another hover", () => {
+    const t = fakeTimers();
+    const clock = { now: 1000 };
+    const { sent, conn } = make(t, clock);
+    conn.sendInput([{ kind: "mouse", type: "mouseMoved", ...at(1) }]);
+    clock.now += 5;
+    conn.sendInput(clickEvents(at(7)));
+    const types = sent.flatMap((s) => s.events?.map((e) => `${e.type}:${e.x}`) ?? []);
+    expect(types.slice(-3)).toEqual(["mouseMoved:7", "mousePressed:7", "mouseReleased:7"]);
   });
 
   test("hovering sends the latest position at most every 66 ms", () => {

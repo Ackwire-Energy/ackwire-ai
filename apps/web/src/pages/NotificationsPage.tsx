@@ -53,6 +53,7 @@ import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useR
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { approvalAction } from "@/components/ApprovalItem";
+import { requestBrowserCard } from "@/components/browser/open";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
@@ -1278,6 +1279,8 @@ export function NotificationsPage() {
     markRead(n);
     const target = openTarget(n);
     if (!target) return;
+    // An agent asked for help in its browser: its card opens there, in control (no page of its own).
+    if (n.kind === "browser_handoff" && n.source.handoffId) requestBrowserCard({ handoffId: n.source.handoffId });
     const orgId = org.id;
     switch (target.to) {
       case "/org/$orgId/threads/$threadId":
@@ -1298,8 +1301,6 @@ export function NotificationsPage() {
         return void navigate({ to: target.to, params: { orgId, ...target.params } });
       case "/org/$orgId/settings/$section":
         return void navigate({ to: target.to, params: { orgId, ...target.params }, search: {} });
-      case "/org/$orgId/browser/$agentId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params }, search: target.search });
       default:
         return void navigate({ to: target.to, params: { orgId } });
     }

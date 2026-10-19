@@ -40,11 +40,34 @@ export function fitFrame(
   return { width, height, left: (box.width - width) / 2, top: (box.height - height) / 2 };
 }
 
-/** A click (press and release) at a page point. */
+/**
+ * Where a point on an element showing the frame lands on the page. `box` is the element's
+ * client rect; with `contain` the frame is drawn letterboxed inside it (object-fit: contain),
+ * so the bands around the image are outside the page (null).
+ */
+export function pagePoint(
+  client: { x: number; y: number },
+  box: { left: number; top: number; width: number; height: number },
+  meta: Pick<BrowserFrameMetadata, "deviceWidth" | "deviceHeight">,
+  fit: "fill" | "contain" = "contain",
+): { x: number; y: number } | null {
+  const drawn = fit === "contain" ? fitFrame(box, meta) : { width: box.width, height: box.height, left: 0, top: 0 };
+  return framePoint(
+    { x: client.x - box.left - drawn.left, y: client.y - box.top - drawn.top },
+    { width: drawn.width, height: drawn.height },
+    meta,
+  );
+}
+
+/**
+ * A click at a page point: the pointer moves there first, then presses and releases, as a
+ * real mouse does, so pages that react to the pointer arriving take the click too.
+ */
 export function clickEvents(at: { x: number; y: number }, modifiers?: BrowserModifiers): BrowserInputEvent[] {
   const base = { kind: "mouse" as const, x: at.x, y: at.y, button: "left" as const, clickCount: 1 };
   const mods = modifiers ? { modifiers } : {};
   return [
+    { kind: "mouse", type: "mouseMoved", x: at.x, y: at.y, button: "none", ...mods },
     { ...base, type: "mousePressed", ...mods },
     { ...base, type: "mouseReleased", ...mods },
   ];

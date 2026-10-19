@@ -742,8 +742,12 @@ export function useBrowserLive(agentId: string, enabled = true) {
     liveRef.current = live;
     const off = connection.onBrowserFrame((frame) => live.handleMessage(frame));
     // Watch once the socket is open, and again after every reconnect (the server forgets the watch).
+    // A view that mounted before the socket opened starts here (start is a no-op once started).
     const offStatus = connection.onStatus((status) => {
-      if (status === "open") live.resume();
+      if (status === "open") {
+        live.start();
+        live.resume();
+      }
     });
     if (connection.isOpen) live.start();
     return () => {
