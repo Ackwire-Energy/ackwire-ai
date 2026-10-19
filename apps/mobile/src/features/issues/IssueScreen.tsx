@@ -19,7 +19,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useTheme, useToast } from "@/ui";
+import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useToast } from "@/ui";
 import { MessageText } from "../chat/MessageText";
 import { chatHref } from "../links/logic";
 import { useOpenDm } from "../new/useOpenDm";
@@ -112,7 +112,6 @@ const BAR_HEIGHT = 68;
 function Head({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const { fonts } = useTheme();
   const orgId = useOrgId();
   const channels = useChannels(orgId);
   const channel = i.channelId ? channels.data?.find((x) => x.id === i.channelId) : undefined;
@@ -140,11 +139,7 @@ function Head({ issue: i }: { issue: Issue }) {
       <Text variant="small" tone="faint">
         {line}
       </Text>
-      <Text
-        accessibilityRole="header"
-        style={[styles.bigTitle, { fontFamily: fonts.display }]}
-        maxFontSizeMultiplier={1.4}
-      >
+      <Text variant="display2" accessibilityRole="header" style={styles.bigTitle} maxFontSizeMultiplier={1.4}>
         {i.title}
       </Text>
       <View style={styles.chips}>
@@ -626,7 +621,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   centerText: { textAlign: "center" },
   head: { paddingHorizontal: 20, paddingTop: 6, gap: 6, marginBottom: 14 },
-  bigTitle: { fontSize: 26, lineHeight: 30, letterSpacing: -0.5, fontWeight: "300", marginVertical: 4 },
+  bigTitle: { marginVertical: 4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   work: { marginHorizontal: 16, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   workHead: { flexDirection: "row", alignItems: "center", gap: 8 },

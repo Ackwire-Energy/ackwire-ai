@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Text as RNText, ScrollView, useWindowDimensions, View } from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
@@ -8,7 +8,6 @@ import { Sky } from "@/sky/Sky";
 import { IconButton } from "../IconButton";
 import { Text } from "../Text";
 import { useTheme } from "../theme";
-import { CHROME_MAX_SCALE } from "../type-scale";
 
 export interface AuthScaffoldProps {
   title: string;
@@ -20,7 +19,7 @@ export interface AuthScaffoldProps {
 
 /** One calm question per screen: the pixel sky with an agent on top, a large title, the answer below. */
 export function AuthScaffold({ title, subtitle, onBack, children, footer }: AuthScaffoldProps) {
-  const { colors, fonts } = useTheme();
+  const { colors } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -53,13 +52,9 @@ export function AuthScaffold({ title, subtitle, onBack, children, footer }: Auth
           ) : null}
         </View>
         <View style={{ paddingHorizontal: 24, paddingTop: 8, flex: 1 }}>
-          <RNText
-            accessibilityRole="header"
-            maxFontSizeMultiplier={CHROME_MAX_SCALE}
-            style={{ fontFamily: fonts.display, fontSize: 32, lineHeight: 35, letterSpacing: -0.64, color: colors.ink }}
-          >
+          <Text variant="display" accessibilityRole="header">
             {title}
-          </RNText>
+          </Text>
           {subtitle ? (
             <Text variant="callout" tone="muted" style={{ marginTop: 6 }}>
               {subtitle}

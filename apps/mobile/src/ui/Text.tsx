@@ -44,8 +44,13 @@ export function systemText(style: TypeStyle, fontWeight?: Weight): TextStyle {
   return typeStyle(os, style, fontWeight);
 }
 
-/** Where each variant sits on the native scale (`display` is the brand's large title, not the system font). */
-const VARIANT_STYLE: Record<Exclude<TextVariant, "display" | "display2">, [TypeStyle, Weight?]> = {
+/** Where each variant sits on the native scale. */
+/** Large titles are bold on iOS (Mail, Settings) and regular on Android (Material headlines). */
+const TITLE_WEIGHT = os === "ios" ? weights.bold : weights.regular;
+
+const VARIANT_STYLE: Record<TextVariant, [TypeStyle, Weight?]> = {
+  display: ["largeTitle", TITLE_WEIGHT],
+  display2: ["title1", TITLE_WEIGHT],
   title2: ["title2", weights.semibold],
   title: ["headline"],
   body: ["body"],
@@ -58,14 +63,12 @@ const VARIANT_STYLE: Record<Exclude<TextVariant, "display" | "display2">, [TypeS
 };
 
 /**
- * Variants: display 34 (Funnel Display Light, the brand; the large titles), display2 30 (the same, for a
- * question or a heading inside a screen: "O que você precisa?", an empty state), title2 22 semibold, title 17 semibold (headline),
- * body 17/22, callout 16/21, subhead/small 15/20, footnote 13/18, label 13 semibold, caption 12/16
- * (iOS HIG sizes; Material 3 on Android). Everything but display uses the system font.
+ * Variants: display 34 bold (the large titles), display2 28 bold (a question or a heading inside a screen:
+ * "O que você precisa?", an empty state), title2 22 semibold, title 17 semibold (headline), body 17/22,
+ * callout 16/21, subhead/small 15/20, footnote 13/18, label 13 semibold, caption 12/16 (iOS HIG sizes;
+ * Material 3 on Android). All in the system font, so titles sit with the rest of the OS.
  */
-export function variantStyle(variant: TextVariant, fonts: ReturnType<typeof useTheme>["fonts"]): TextStyle {
-  if (variant === "display") return { fontFamily: fonts.display, fontSize: 34, lineHeight: 37, letterSpacing: -0.68 };
-  if (variant === "display2") return { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6 };
+export function variantStyle(variant: TextVariant): TextStyle {
   const [style, weight] = VARIANT_STYLE[variant];
   return systemText(style, weight);
 }
@@ -79,13 +82,13 @@ const MAX_SCALE: Partial<Record<TextVariant, number>> = {
 
 /** Text in the design system's scale and tones. Names stay in ink; counts use `Count`. */
 export function Text({ variant = "body", tone, style, maxFontSizeMultiplier, ...rest }: TextProps) {
-  const { colors, fonts } = useTheme();
+  const { colors } = useTheme();
   const color = colors[tone ?? DEFAULT_TONE[variant]];
   return (
     <RNText
       {...rest}
       maxFontSizeMultiplier={maxFontSizeMultiplier ?? MAX_SCALE[variant]}
-      style={[variantStyle(variant, fonts), { color }, style]}
+      style={[variantStyle(variant), { color }, style]}
     />
   );
 }

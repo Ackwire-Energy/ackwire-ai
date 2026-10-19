@@ -3,6 +3,7 @@ import { CHROME_MAX_SCALE, type TypeStyle, typeScale, typeStyle, weights } from 
 
 const STYLES: TypeStyle[] = [
   "largeTitle",
+  "title1",
   "title2",
   "title3",
   "headline",
@@ -20,6 +21,7 @@ describe("native type scale", () => {
     const sizes = Object.fromEntries(STYLES.map((s) => [s, [ios[s].fontSize, ios[s].lineHeight]]));
     expect(sizes).toEqual({
       largeTitle: [34, 41],
+      title1: [28, 34],
       title2: [22, 28],
       title3: [20, 25],
       headline: [17, 22],
@@ -47,6 +49,7 @@ describe("native type scale", () => {
       for (const s of STYLES) expect(scale[s].lineHeight).toBeGreaterThanOrEqual(scale[s].fontSize);
       const order: TypeStyle[] = [
         "largeTitle",
+        "title1",
         "title2",
         "title3",
         "body",

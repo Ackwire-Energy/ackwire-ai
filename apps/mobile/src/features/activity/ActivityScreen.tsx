@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   clear: { marginHorizontal: 16, marginTop: 4, borderRadius: 26, overflow: "hidden", padding: 20, paddingTop: 0 },
   clearSky: { height: 108, marginHorizontal: -20, alignItems: "center", justifyContent: "flex-end", paddingBottom: 10 },
   crew: { flexDirection: "row", alignItems: "flex-end", gap: 16 },
-  clearTitle: { fontSize: 26, lineHeight: 30, letterSpacing: -0.5, textAlign: "center" },
+  clearTitle: { textAlign: "center" },
   clearText: { textAlign: "center", marginTop: 6 },
   next: {
     flexDirection: "row",

@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   },
   emo: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   emoPressed: { transform: [{ scale: 1.15 }] },
-  emoText: { fontSize: 26 },
+  emoText: { fontSize: 26, lineHeight: 34 },
   tiles: { flexDirection: "row", justifyContent: "space-between" },
   tileBtn: { flex: 1, alignItems: "center", gap: 7, paddingVertical: 6 },
   bigTile: { width: 54, height: 54, borderRadius: 18, alignItems: "center", justifyContent: "center" },

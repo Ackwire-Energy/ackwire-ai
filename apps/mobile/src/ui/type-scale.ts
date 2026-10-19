@@ -3,8 +3,8 @@
  *
  * Body and UI text use the system font (SF Pro on iOS, Roboto on Android) at the platform's own sizes:
  * Apple's HIG text styles at the default Dynamic Type size, Material 3 on Android. The brand stays in
- * the large title (Funnel Display, `display` in `Text`), a rare hero number (Doto, `Count hero`) and code
- * (mono). Counts, badges, times and countdowns are the system font, semibold, tabular (`countStyle`).
+ * a rare hero number (Doto, `Count hero`) and code (mono); large titles are the system's own (bold on iOS,
+ * like Mail and Settings). Counts, badges, times and countdowns are the system font, semibold, tabular (`countStyle`).
  * Every style scales with the person's text size setting; dense chrome caps its growth with
  * `CHROME_MAX_SCALE`.
  */
@@ -22,6 +22,7 @@ export type Weight = (typeof weights)[keyof typeof weights];
 
 export type TypeStyle =
   | "largeTitle"
+  | "title1"
   | "title2"
   | "title3"
   | "headline"
@@ -50,6 +51,7 @@ const m = (fontSize: number, lineHeight: number, fontWeight: Weight = weights.re
 /** iOS: HIG text styles at the default ("Large") Dynamic Type size. */
 const IOS: Record<TypeStyle, TypeMetrics> = {
   largeTitle: m(34, 41),
+  title1: m(28, 34),
   title2: m(22, 28),
   title3: m(20, 25),
   headline: m(17, 22, weights.semibold),
@@ -64,6 +66,7 @@ const IOS: Record<TypeStyle, TypeMetrics> = {
 /** Android: Material 3 (body large 16/24, body medium 14/20, title medium 16/24 medium, label/body small 12/16). */
 const ANDROID: Record<TypeStyle, TypeMetrics> = {
   largeTitle: m(32, 40),
+  title1: m(28, 36),
   title2: m(22, 28),
   title3: m(20, 26),
   headline: m(16, 24, weights.medium),

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { concentricRadius, displayCornerRadius } from "./display-corner";
 import { Glass } from "./Glass";
 import { useTheme } from "./theme";
 
@@ -26,16 +27,27 @@ export interface SheetProps {
 
 /** How far the grabber must be dragged down to close (points), as on the web. */
 const CLOSE_DRAG = 90;
+/** How far the sheet floats from the screen's edges. */
+const INSET = 8;
+/** The sheet's top corners (and the least for its bottom ones). */
+const RADIUS = 34;
 
 /**
- * The bottom sheet (no dialogs on the phone): floats 8 points from the edges, glass on iOS and an opaque
- * surface on Android, a grabber to drag down, a scrim to tap away. Keyboard-aware for forms.
+ * The bottom sheet (no dialogs on the phone): floats 8 points from the edges, its bottom corners following
+ * the screen's curve, glass on iOS and an opaque surface on Android, a grabber to drag down, a scrim to tap
+ * away. Keyboard-aware for forms.
  */
 export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
   const { colors, shadows, reducedMotion } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const bottomRadius = concentricRadius(
+    displayCornerRadius(Platform.OS === "ios" ? "ios" : "android", width, height, insets.bottom),
+    INSET,
+    RADIUS,
+  );
+  const corners = { borderBottomLeftRadius: bottomRadius, borderBottomRightRadius: bottomRadius };
   const [mounted, setMounted] = useState(open);
   const y = useSharedValue(height);
   const scrim = useSharedValue(0);
@@ -96,9 +108,9 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
       >
         <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { marginBottom: 8, maxHeight: height * 0.86, boxShadow: shadows.e3 }, sheetStyle]}
+          style={[styles.sheet, corners, { maxHeight: height * 0.86, boxShadow: shadows.e3 }, sheetStyle]}
         >
-          <Glass solid={solid} intensity={70} style={styles.surface}>
+          <Glass solid={solid} intensity={70} style={[styles.surface, corners]}>
             <View
               {...pan.panHandlers}
               style={styles.grab}
@@ -110,7 +122,7 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 22 + Math.max(0, insets.bottom - 8) }}
+              contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 22 + Math.max(0, insets.bottom - INSET) }}
             >
               {children}
             </ScrollView>
@@ -123,8 +135,8 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
 
 const styles = StyleSheet.create({
   dock: { flex: 1, justifyContent: "flex-end" },
-  sheet: { marginHorizontal: 8, borderRadius: 34 },
-  surface: { borderRadius: 34, paddingTop: 8, overflow: "hidden", flexShrink: 1 },
+  sheet: { marginHorizontal: INSET, marginBottom: INSET, borderRadius: RADIUS },
+  surface: { borderRadius: RADIUS, paddingTop: 8, overflow: "hidden", flexShrink: 1 },
   grab: { alignItems: "center", paddingTop: 4, paddingBottom: 10 },
   grabBar: { width: 38, height: 5, borderRadius: 3 },
 });

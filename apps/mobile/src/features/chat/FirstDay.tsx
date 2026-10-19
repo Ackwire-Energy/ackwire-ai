@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   },
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 150 },
   born: { position: "absolute", top: 34, alignSelf: "center" },
-  h2: { fontSize: 27, lineHeight: 30, letterSpacing: -0.54, textAlign: "center" },
+  h2: { textAlign: "center" },
   p: { marginTop: 6, textAlign: "center", lineHeight: 21 },
   h3: { fontWeight: "600", paddingHorizontal: 4, paddingTop: 18, paddingBottom: 8 },
   card: { borderRadius: 20, overflow: "hidden" },
