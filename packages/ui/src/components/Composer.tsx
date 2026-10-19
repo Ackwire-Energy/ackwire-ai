@@ -350,6 +350,21 @@ export function Composer({
     }
   }, [value]);
 
+  // A width change rewraps the text (window resize, sidebar opening): measure again so nothing hides.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   /** Replaces the text and selection (formatting, emoji), keeping the focus in the box. */
   const edit = (next: TextEdit) => {
     const el = ref.current;
