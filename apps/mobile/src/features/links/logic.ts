@@ -13,6 +13,8 @@ export type AppHref =
   | `/approval/${string}`
   | `/mission/${string}`
   | `/agent/${string}`
+  | `/browser/${string}`
+  | `/handoff/${string}`
   | `/issues/${number}`
   | "/activity"
   | "/threads";
@@ -29,6 +31,7 @@ export interface PushPayload {
   threadId?: unknown;
   approvalId?: unknown;
   missionId?: unknown;
+  handoffId?: unknown;
 }
 
 const MISSION_KINDS = new Set(["mission_finished", "mission_stopped"]);
@@ -36,6 +39,8 @@ const MISSION_KINDS = new Set(["mission_finished", "mission_stopped"]);
 /** The screen a push opens. A high-risk approval opens the request (it is never approved from the push). */
 export function hrefForPush(p: PushPayload): AppHref {
   if (isSafeId(p.approvalId)) return `/approval/${p.approvalId}`;
+  // An agent needs a person in its browser: straight to the live view.
+  if (p.kind === "browser_handoff" && isSafeId(p.handoffId)) return `/handoff/${p.handoffId}`;
   if (isSafeId(p.missionId) && typeof p.kind === "string" && MISSION_KINDS.has(p.kind))
     return `/mission/${p.missionId}`;
   if (isSafeId(p.channelId)) return chatHref(p.channelId, isSafeId(p.threadId) ? p.threadId : null);
@@ -68,6 +73,8 @@ export function hrefFromUrl(url: string): AppHref | null {
       return isSafeId(id) ? `/mission/${id}` : null;
     case "agent":
       return isSafeId(id) ? `/agent/${id}` : null;
+    case "handoff":
+      return isSafeId(id) ? `/handoff/${id}` : null;
     default:
       return null;
   }
@@ -94,6 +101,9 @@ function queryParam(query: string, name: string): string | undefined {
 export function notificationHref(n: Pick<AppNotification, "kind" | "source" | "actors">): AppHref | null {
   const s = n.source;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
+  // An agent's browser handoff (ADR 0040): the live view (the kind and `source.handoffId` are newer than the types).
+  const handoffId = (s as { handoffId?: unknown }).handoffId;
+  if ((n.kind as string) === "browser_handoff" && isSafeId(handoffId)) return `/handoff/${handoffId}`;
   if ((n.kind === "mission_finished" || n.kind === "mission_stopped") && isSafeId(s.missionId))
     return `/mission/${s.missionId}`;
   if (s.topicId || s.issueId || s.issueNumber != null) return null;
