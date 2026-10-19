@@ -212,6 +212,15 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       workspace: admin || mine ? m.workspace : null,
       /** Folders and tools allowed on the machine (protocol 10); admins and the pairer only, null otherwise or unknown. */
       access: admin || mine ? (m.access ?? null) : null,
+      /** Whether the agent browser can run there (protocol 12, ADR 0040); null when its runner doesn't say. */
+      browser: m.executors?.browser
+        ? {
+            available: m.executors.browser.available,
+            version: m.executors.browser.version ?? null,
+            chrome: m.executors.browser.chrome ?? null,
+            reason: m.executors.browser.reason ?? null,
+          }
+        : null,
       /** This person may rename, delete or reduce its access. */
       canManage: admin || mine,
       createdAt: m.createdAt.toISOString(),

@@ -10,6 +10,7 @@ import {
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
+  createBrowserToolSource,
   createCalendarToolSource,
   createChatToolSource,
   createClaudeCodeBrain,
@@ -235,6 +236,8 @@ export function buildEngine(o: EngineOptions) {
         skills: { blobs: artifacts.blobs },
         pubsub: adapters.pubsub,
       }),
+      // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
+      createBrowserToolSource({ machines: { hub: machineHub } }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
       createGitToolSource({

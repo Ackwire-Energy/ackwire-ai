@@ -1,12 +1,15 @@
 import {
   applyOrgNetwork,
   deleteAgentComputer,
+  getAgentBrowser,
   getAgentComputer,
   getSandboxSettings,
+  MAX_BROWSER_DOMAINS,
   NotFoundError,
   refuseLifecycleOnMachine,
   requirePermission,
   SANDBOX_LIMITS,
+  setAgentBrowserDomains,
   startAgentComputer,
   stopAgentComputer,
   updateSandboxSettings,
@@ -64,6 +67,24 @@ const Settings = z
   })
   .openapi("SandboxSettings");
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
+const AgentBrowser = z
+  .object({
+    allowedDomains: z
+      .array(z.string())
+      .nullable()
+      .openapi({ description: "Sites the browser may open (`*.example.com` covers the domain too); null = any." }),
+    available: z.boolean().openapi({ description: "Its computer serves the browser now (it may still be offline)." }),
+    reason: z
+      .enum(["no_machine", "machine_removed", "outdated", "switched_off", "not_installed", "not_reported"])
+      .nullable()
+      .openapi({
+        description:
+          "Why not: no connected computer, removed, runner too old, turned off on the computer, not ready there, or not reported yet.",
+      }),
+    detail: z.string().nullable().openapi({ description: "The computer's own words when it isn't ready." }),
+    machine: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+  })
+  .openapi("AgentBrowser");
 
 /**
  * Each agent's computer (D30): status, start, stop and delete (the agent's
@@ -216,6 +237,50 @@ export function sandboxRoutes(deps: AppDeps) {
         : { applied: 0, later: 0 };
       return c.json(
         { ...(await settingsView(orgId)), networkApply: applied.later > 0 ? "next_start" : "live" } as const,
+        200,
+      );
+    },
+  );
+
+  const machinesHub = () => deps.extras?.sandbox?.machines?.hub;
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/browser",
+      tags,
+      security,
+      summary: "The agent's browser: whether its computer can serve it, and the sites it may open (ADR 0040)",
+      request: { params: AgentParams },
+      responses: { 200: json(AgentBrowser), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json(await getAgentBrowser(db, machinesHub(), c.get("user").id, orgId, agentId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agents/{agentId}/browser",
+      tags,
+      security,
+      summary: "Set the sites the agent's browser may open (owner or admins); null or empty = any site",
+      request: {
+        params: AgentParams,
+        body: body(
+          z.object({
+            allowedDomains: z.array(z.string().max(253)).max(MAX_BROWSER_DOMAINS).nullable(),
+          }),
+        ),
+      },
+      responses: { 200: json(AgentBrowser), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const { allowedDomains } = c.req.valid("json");
+      return c.json(
+        await setAgentBrowserDomains(db, machinesHub(), c.get("user").id, orgId, agentId, allowedDomains),
         200,
       );
     },

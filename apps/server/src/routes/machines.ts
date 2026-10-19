@@ -47,7 +47,15 @@ export const MachineAccess = z
         agents: z.array(z.string()).openapi({ description: "Agent ids that may use it (empty: none yet)." }),
       }),
     ),
-    tools: z.object({ claude: z.boolean(), codex: z.boolean(), commands: z.boolean() }),
+    tools: z.object({
+      claude: z.boolean(),
+      codex: z.boolean(),
+      commands: z.boolean(),
+      browser: z
+        .boolean()
+        .optional()
+        .openapi({ description: "The agent browser (protocol 12, ADR 0040); absent = off." }),
+    }),
   })
   .openapi("MachineAccess");
 
@@ -77,6 +85,18 @@ export const Machine = z
       description:
         "Folders and tools allowed on the machine (protocol 10); null unless admin or the person who paired it, or when the runner doesn't report it.",
     }),
+    browser: z
+      .object({
+        available: z.boolean(),
+        version: z.string().nullable(),
+        chrome: z.string().nullable(),
+        reason: z.string().nullable().openapi({ description: "Why it can't run yet, from the runner." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Whether the agent browser can run there (protocol 12, ADR 0040); null when its runner doesn't report it. Turned on by the person at the computer (`access.tools.browser`).",
+      }),
     canManage: z.boolean().openapi({ description: "This person may rename, delete or reduce its access." }),
     createdAt: z.string(),
   })
@@ -288,7 +308,7 @@ export function machineAppRoutes(deps: AppDeps) {
           z
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
-              disableTool: z.enum(["claude", "codex", "commands"]).optional(),
+              disableTool: z.enum(["claude", "codex", "commands", "browser"]).optional(),
             })
             .strict(),
         ),

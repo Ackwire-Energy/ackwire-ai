@@ -76,3 +76,29 @@ test("without a provider the sandbox is reported as unavailable", async () => {
   const start = await owner(`/api/app/organizations/${orgId}/agents/${agentId}/computer/start`, { json: {} });
   expect(start.status).toBe(404);
 });
+
+test("the agent's browser: unavailable without a connected computer; its sites are validated and saved", async () => {
+  t = await createTestServer({ sandbox: createFakeSandboxProvider() });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+
+  expect(await (await api(`/agents/${agentId}/browser`)).json()).toEqual({
+    allowedDomains: null,
+    available: false,
+    reason: "no_machine",
+    detail: null,
+    machine: null,
+  });
+  const bad = await api(`/agents/${agentId}/browser`, { method: "PUT", json: { allowedDomains: ["not a site"] } });
+  expect(bad.status).toBe(400);
+  const put = await api(`/agents/${agentId}/browser`, {
+    method: "PUT",
+    json: { allowedDomains: ["https://Shop.Example.com/login", "*.stripe.com"] },
+  });
+  expect(await put.json()).toMatchObject({ allowedDomains: ["shop.example.com", "*.stripe.com"] });
+  const cleared = await api(`/agents/${agentId}/browser`, { method: "PUT", json: { allowedDomains: null } });
+  expect(await cleared.json()).toMatchObject({ allowedDomains: null });
+});
