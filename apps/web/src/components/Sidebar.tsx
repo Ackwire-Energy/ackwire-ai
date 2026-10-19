@@ -439,8 +439,14 @@ export function Sidebar() {
         </SidebarSection>
 
         {dir.loading && dir.agents.length === 0 && (
-          <div className="sidebar__group">
-            <span className="sidebar__label">{t("shell.agents")}</span>
+          // Loading: the same header as the open category, so nothing jumps when the list arrives.
+          <div className="sidebar__group sidebar__section" data-open="true">
+            <div className="sidebar__section-head">
+              <span className="sidebar__section-toggle">
+                <Icon name="chevronDown" size={14} className="sidebar__section-chevron" />
+                <span className="sidebar__label">{t("shell.agents")}</span>
+              </span>
+            </div>
             <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
           </div>
         )}
