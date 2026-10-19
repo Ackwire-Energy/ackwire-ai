@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo de conectores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&display=swap">
+<script>
+  { const h = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = h.get("theme") || "light"; }
+</script>
+<style>
+/*
+  Prototype (CatalogoConectores): the "Adicionar conector" dialog, redone on the design language
+  (RefinoUI tokens, ruler 32/40/48 radius 30%, neutral surfaces, frosted layers, tactile buttons).
+  Today's problems: 9 category pills wrap to two lines, every card repeats "Um clique", descriptions
+  are cut, the grid has no hierarchy (what's connected, what's suggested), "Another MCP server" is jargon.
+  Three directions:
+  A · Lista: categories as a list on the left (with counts), rows on the right; one quiet "Conectar".
+  B · Galeria: suggestions on top with the brand's own pixel sky, then compact tiles; one-line filters.
+  C · Busca e detalhe: search first, a grouped list, and a detail pane that says what agents could do
+      before you connect.
+  All: how it connects only when it isn't one click ("Precisa de senha", "Chave de API"); connected
+  marked with a check on the icon; "Não achou?" connects any service by its address.
+  Brand icons: apps/web/public/connectors (Simple Icons, CC0), drawn as a mask in the brand color.
+*/
+:root,[data-theme="light"]{
+  --bg:#fbfbfa;--pane:#ffffff;--raised:#fff;--sunken:#f3f3f0;--side:#f8f8f6;
+  --line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);--field-line:rgba(23,23,22,.13);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --chosen:#ffffff;--chosen-shadow:0 1px 2px rgba(23,23,22,.07),0 0 0 1px rgba(23,23,22,.09);
+  --glass:rgba(255,255,255,.8);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.3),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --ok:#1f7a45;--scrim:rgba(20,20,18,.28);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--display:"Funnel Display",var(--sans);
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --bg:#0f0f0e;--pane:#151514;--raised:#1c1c1b;--sunken:#0a0a09;--side:#121211;
+  --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);--field-line:rgba(255,255,255,.14);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --chosen:color-mix(in srgb,#fff 7%,var(--raised));--chosen-shadow:0 0 0 1px rgba(255,255,255,.1),inset 0 1px 0 rgba(255,255,255,.1);
+  --glass:rgba(28,28,27,.82);
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);
+  --e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.08);
+  --ok:#5fc48a;--scrim:rgba(0,0,0,.55);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,p{margin:0}
+button,input{font:inherit;color:inherit}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:none}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--ink)!important}
+
+/* ---------- prototype bar ---------- */
+.proto{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--bg);position:relative;z-index:50}
+.proto b{color:var(--ink);font-weight:650}
+.proto .note{flex-basis:100%;max-width:120ch}
+.pseg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.pseg button{height:26px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
+.pseg button[aria-pressed="true"]{background:var(--chosen);color:var(--ink);box-shadow:var(--chosen-shadow)}
+
+/* ---------- page behind ---------- */
+.page{max-width:960px;margin:0 auto;padding:36px 16px;filter:saturate(.9)}
+.page h1{font-family:var(--display);font-weight:300;font-size:40px;letter-spacing:-.03em}
+.page .ghost{height:64px;border-radius:16px;background:var(--raised);box-shadow:var(--e1);margin-top:10px}
+
+/* ---------- shared bits ---------- */
+.scrim{position:fixed;inset:0;top:var(--protoH,0);background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:20px 16px;z-index:30;animation:fade .2s var(--out)}
+@keyframes fade{from{opacity:0}}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.985)}}
+.dlg{background:var(--pane);border-radius:24px;box-shadow:var(--e3),var(--top);display:flex;flex-direction:column;overflow:hidden;max-height:100%;animation:pop .24s var(--out);width:100%}
+.ib{width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;flex:none;transition:background .15s,color .15s,transform .18s var(--spring)}
+.ib:hover{background:var(--plate);color:var(--ink)}
+.ib:active{transform:scale(.94)}
+.b{font-size:13px;font-weight:600;height:32px;padding:0 12px;border-radius:10px;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;transition:transform .18s var(--spring),box-shadow .18s var(--out),filter .15s,background .15s;color:var(--ink);background:transparent;flex:none}
+.b:active{transform:scale(.97)}
+.b svg.i{width:14px;height:14px}
+.b1{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)) 0%,var(--ink) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.b1:hover{filter:brightness(1.08)}
+.b2{background:var(--raised);box-shadow:var(--e1),var(--top)}
+.b2:hover{box-shadow:var(--e2),var(--top)}
+.b.lg{height:40px;padding:0 16px;font-size:14px;border-radius:12px}
+.search{position:relative;flex:1;min-width:0}
+.search svg.i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--faint)}
+.search input{width:100%;height:40px;border-radius:12px;border:0;background:var(--raised);box-shadow:inset 0 0 0 1px var(--field-line);padding:0 12px 0 36px;font-size:14px}
+.search input:focus{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.search input::placeholder{color:var(--faint)}
+.search.big input{height:48px;border-radius:14px;font-size:16px;padding-left:42px}
+.search.big svg.i{left:14px;width:18px;height:18px}
+.search .kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%)}
+.kbd{font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:var(--plate);color:var(--muted)}
+.how{font-size:12px;color:var(--faint);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.how svg.i{width:12px;height:12px}
+.done{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.done svg.i{width:14px;height:14px;color:var(--ok)}
+.new{font-size:11px;font-weight:650;padding:1px 6px;border-radius:6px;background:var(--plate);color:var(--ink2);margin-left:6px;vertical-align:1px}
+.empty{padding:36px 16px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-weight:650;margin-bottom:4px}
+
+/* connector icon: a neutral tile, the brand mark in its color */
+.ci{--s:40px;position:relative;width:var(--s);height:var(--s);border-radius:calc(var(--s) * .3);flex:none;display:grid;place-items:center;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line),var(--top)}
+.ci i{width:calc(var(--s) * .5);height:calc(var(--s) * .5);background:var(--c,var(--ink));-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
+.ci .mono{font-weight:700;font-size:calc(var(--s) * .4);color:var(--ink2)}
+.ci svg.i{width:calc(var(--s) * .5);height:calc(var(--s) * .5);color:var(--ink2)}
+.ci .ok{position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:7px;background:var(--ok);color:#fff;display:grid;place-items:center;box-shadow:0 0 0 2px var(--pane)}
+.ci .ok svg.i{width:11px;height:11px;stroke-width:2.4;color:#fff}
+
+/* ---------- A · Lista ---------- */
+.A{max-width:900px;height:min(680px,100%)}
+.A .hd{display:flex;align-items:center;gap:12px;padding:18px 18px 14px 22px;border-bottom:1px solid var(--line)}
+.A .hd h2{font-size:18px;font-weight:650;letter-spacing:-.015em;white-space:nowrap}
+.A .body{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:0;flex:1}
+.A nav{background:var(--side);border-right:1px solid var(--line);padding:12px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.A nav .sep{height:1px;background:var(--line);margin:8px 6px}
+.A nav button{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--ink2);font-size:14px;cursor:pointer;text-align:left;width:100%}
+.A nav button:hover{background:var(--plate-soft)}
+.A nav button[aria-current="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow);color:var(--ink);font-weight:600}
+.A nav button svg.i{color:var(--muted)}
+.A nav button .n{margin-left:auto;font-size:12px;color:var(--faint);font-weight:500}
+.A .list{overflow-y:auto;padding:6px 10px 16px}
+.A .sh{position:sticky;top:0;z-index:1;background:color-mix(in srgb,var(--pane) 92%,transparent);backdrop-filter:blur(8px);font-size:12.5px;font-weight:650;color:var(--muted);padding:12px 10px 6px}
+.A .row{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;cursor:pointer;transition:background .12s}
+.A .row:hover,.A .row:focus-within{background:var(--plate-soft)}
+.A .row .t{flex:1;min-width:0}
+.A .row .t b{font-weight:600;font-size:14.5px}
+.A .row .t p{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.A .row .r{display:flex;align-items:center;gap:10px}
+.A .row .go{opacity:0;transition:opacity .12s}
+.A .row:hover .go,.A .row:focus-within .go{opacity:1}
+@media (hover:none){.A .row .go{opacity:1}}
+.A .other{display:flex;align-items:center;gap:12px;margin:10px 10px 0;padding:14px;border-radius:16px;background:var(--side);box-shadow:inset 0 0 0 1px var(--line)}
+.A .other .t{flex:1}
+.A .other .t b{font-weight:600}
+.A .other .t p{font-size:13px;color:var(--muted)}
+
+/* ---------- B · Galeria ---------- */
+.B{max-width:960px;height:min(720px,100%)}
+.B .hd{padding:24px 28px 0}
+.B .hd .l1{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+.B .hd h2{font-family:var(--display);font-weight:300;font-size:30px;letter-spacing:-.03em;flex:1;white-space:nowrap}
+.B .hd .search{max-width:340px}
+.B .filters{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 18px;margin:0 -2px}
+.B .filters::-webkit-scrollbar{display:none}
+.B .filters button{height:32px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.B .filters button:hover{color:var(--ink);background:var(--plate-soft)}
+.B .filters button[aria-pressed="true"]{background:var(--chosen);color:var(--ink);box-shadow:var(--chosen-shadow)}
+.B .filters button .n{font-weight:500;color:var(--faint);font-size:12px}
+.B .scroll{overflow-y:auto;padding:24px 28px 32px;border-top:1px solid var(--line)}
+.B h3{font-size:13px;font-weight:650;color:var(--ink2);margin:0 2px 12px}
+.B .feat+h3{margin-top:32px}
+.B .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.B .fc{position:relative;border-radius:20px;background:var(--raised);box-shadow:var(--e1),var(--top);overflow:hidden;cursor:pointer;text-align:left;border:0;padding:0;display:flex;flex-direction:column;transition:box-shadow .18s,transform .2s var(--spring)}
+.B .fc:hover{box-shadow:var(--e2),var(--top);transform:translateY(-2px)}
+.B .fc canvas{display:block;width:100%;height:72px;image-rendering:pixelated}
+.B .fc .ci{position:absolute;left:20px;top:48px;--s:48px;box-shadow:inset 0 0 0 1px var(--line),var(--e1)}
+.B .fc .tx{padding:34px 20px 20px}
+.B .fc .tx b{font-weight:650;font-size:15px}
+.B .fc .tx p{font-size:13px;line-height:18px;height:36px;color:var(--muted);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.B .fc .tx .ft{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+.B .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+/* Tiles: one shape. Icon and name on top (name on one line, "Novo" at the right), the description always
+   two lines tall, the footer (Conectado / how it connects) always at the bottom, even when empty. */
+.B .grid{grid-auto-rows:1fr}
+.B .tile{display:flex;flex-direction:column;gap:14px;padding:18px;border-radius:18px;background:var(--raised);box-shadow:var(--e1),var(--top);cursor:pointer;border:0;text-align:left;height:100%;transition:box-shadow .15s,transform .2s var(--spring)}
+.B .tile:hover{box-shadow:var(--e2),var(--top);transform:translateY(-1px)}
+.B .tile:active{transform:scale(.98)}
+.B .tile .th{display:flex;align-items:center;gap:10px;min-width:0}
+.B .tile .th b{flex:1;min-width:0;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.B .tile .th .new{margin-left:0;flex:none}
+.B .tile p{font-size:12.5px;line-height:18px;height:36px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.B .tile .tf{margin-top:auto;height:18px;display:flex;align-items:center}
+.B .tile .tf .how,.B .tile .tf .done{margin:0}
+.B .tile.other{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2)}
+.B .tile.other:hover{box-shadow:inset 0 0 0 1.5px var(--ink)}
+
+/* ---------- B+C ---------- */
+.D{max-width:1080px;height:min(740px,100%)}
+.D .dbody{display:grid;grid-template-columns:minmax(0,1fr);min-height:0;flex:1;border-top:1px solid var(--line)}
+.D[data-open="true"] .dbody{grid-template-columns:minmax(0,1fr) 340px}
+.D .dbody .scroll{border-top:0;min-height:0}
+.D[data-open="true"] .feat{grid-template-columns:repeat(3,1fr)}
+.D .tile[aria-pressed="true"],.D .fc[aria-pressed="true"]{box-shadow:0 0 0 1.5px var(--ink),var(--top)}
+.D .detail{position:relative;padding:22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;background:var(--side);border-left:1px solid var(--line);animation:slide .24s var(--out)}
+@keyframes slide{from{opacity:0;transform:translateX(12px)}}
+.D .detail .dx{position:absolute;top:12px;right:12px}
+.D .detail .ci{--s:56px}
+.D .detail h3{font-family:var(--display);font-weight:300;font-size:28px;letter-spacing:-.025em;line-height:1.1}
+.D .detail .d{color:var(--muted);font-size:14px}
+.D .detail h4{font-size:12.5px;font-weight:650;color:var(--muted);margin-bottom:6px}
+.D .caps{display:flex;flex-direction:column;gap:6px}
+.D .cap{display:flex;gap:8px;align-items:center;font-size:13.5px;color:var(--ink2)}
+.D .cap svg.i{width:14px;height:14px;color:var(--muted)}
+.D .detail .act{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.D .detail .act .how{justify-content:center}
+@media (max-width:760px){.D[data-open="true"] .dbody{grid-template-columns:1fr}.D .detail{position:absolute;inset:auto 0 0 0;max-height:70%;border-left:0;border-top:1px solid var(--line);border-radius:20px 20px 0 0;box-shadow:var(--e3)}}
+
+/* ---------- C · Busca e detalhe ---------- */
+.C{max-width:880px;height:min(600px,100%)}
+.C .top{padding:16px 16px 12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.C .body{display:grid;grid-template-columns:minmax(0,1fr) 340px;min-height:0;flex:1}
+.C .list{overflow-y:auto;padding:6px 8px 12px;border-right:1px solid var(--line)}
+.C .gh{font-size:12px;font-weight:650;color:var(--faint);padding:12px 10px 4px}
+.C .it{display:flex;align-items:center;gap:10px;height:44px;padding:0 10px;border-radius:12px;cursor:pointer}
+.C .it .ci{--s:28px}
+.C .it .ci .ok{width:14px;height:14px;border-radius:5px;right:-3px;bottom:-3px}
+.C .it .ci .ok svg.i{width:9px;height:9px}
+.C .it .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.C .it .nm small{color:var(--faint);font-size:12.5px;margin-left:6px}
+.C .it[aria-selected="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow)}
+.C .it:not([aria-selected="true"]):hover{background:var(--plate-soft)}
+.C .detail{padding:22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;background:var(--side)}
+.C .detail .ci{--s:56px}
+.C .detail h3{font-family:var(--display);font-weight:300;font-size:28px;letter-spacing:-.025em;line-height:1.1}
+.C .detail .d{color:var(--muted);font-size:14px}
+.C .detail h4{font-size:12.5px;font-weight:650;color:var(--muted);margin-bottom:6px}
+.C .caps{display:flex;flex-direction:column;gap:6px}
+.C .cap{display:flex;gap:8px;align-items:center;font-size:13.5px;color:var(--ink2)}
+.C .cap svg.i{width:14px;height:14px;color:var(--muted)}
+.C .detail .act{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.C .detail .act .how{justify-content:center}
+.C .foot{display:flex;align-items:center;gap:14px;padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
+.C .foot span{display:inline-flex;align-items:center;gap:5px}
+.C .foot .grow{flex:1}
+.C .foot a{color:var(--ink2);font-weight:600;text-decoration:none;cursor:pointer}
+.C .foot a:hover{text-decoration:underline}
+
+@media (max-width:760px){
+  .A .body{grid-template-columns:1fr}.A nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}.A nav button{width:auto;flex:none}.A nav .sep{display:none}
+  .B .feat{grid-template-columns:1fr}.B .hd .l1{flex-wrap:wrap}.B .hd .search{max-width:none;flex-basis:100%}
+  .C .body{grid-template-columns:1fr}.C .detail{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="proto" id="proto">
+  <b>Adicionar conector</b>
+  <div class="pseg" data-k="v"><button data-o="a">A · Lista</button><button data-o="b">B · Galeria</button><button data-o="c">C · Busca e detalhe</button><button data-o="d">B+C</button></div>
+  <div class="pseg" data-k="theme"><button data-o="light">Claro</button><button data-o="dark">Escuro</button></div>
+  <p class="note" id="note"></p>
+</div>
+<div class="page" aria-hidden="true"><h1>Conectores</h1><div class="ghost"></div><div class="ghost"></div><div class="ghost"></div></div>
+<div class="scrim" id="scrim"></div>
+
+<script type="module">
+import { AGENT_GRADIENTS, mixHex } from "../../../packages/ui/src/agent/engine.js";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const sv = (d) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  search: sv('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
+  x: sv('<path d="M6 6l12 12M18 6 6 18"/>'),
+  check: sv('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+  lock: sv('<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>'),
+  key: sv('<circle cx="8" cy="15" r="3.5"/><path d="m10.5 12.5 8-8M16 7l2.5 2.5M14 9l2 2"/>'),
+  mail: sv('<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4 7 8 6 8-6"/>'),
+  db: sv('<ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v6.5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V5.5"/><path d="M5 12v6.5C5 19.9 8.1 21 12 21s7-1.1 7-2.5V12"/>'),
+  plus: sv('<path d="M12 5v14M5 12h14"/>'),
+  link: sv('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+  grid: sv('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'),
+  okc: sv('<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/>'),
+  code: sv('<path d="m9 8-4 4 4 4M15 8l4 4-4 4"/>'),
+  box: sv('<path d="M4 8 12 4l8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/>'),
+  doc: sv('<path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20Z"/><path d="M14 3.5V8h4"/>'),
+  card: sv('<rect x="3.5" y="6" width="17" height="12" rx="2.5"/><path d="M3.5 10h17"/>'),
+  help: sv('<path d="M4 5h16v11H9l-5 4V5Z"/>'),
+  spark: sv('<path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>'),
+  bolt: sv('<path d="M13 3 6 13h6l-1 8 7-10h-6Z"/>'),
+  eye: sv('<path d="M3 12c.5-1.5 4-6 9-6s8.5 4.5 9 6c-.5 1.5-4 6-9 6s-8.5-4.5-9-6Z"/><circle cx="12" cy="12" r="2.5"/>'),
+  pen: sv('<path d="M5 19h3.5L19 8.5 15.5 5 5 15.5Z"/>'),
+  shield: sv('<path d="M12 3.5 5 6.5v5c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9v-5Z"/><path d="m9 12 2 2 4-4"/>'),
+  enter: sv('<path d="M19 6v6a2 2 0 0 1-2 2H6M9 11l-3 3 3 3"/>'),
+  arrows: sv('<path d="M12 5v14M8 9l4-4 4 4M8 15l4 4 4-4"/>'),
+};
+
+/* ---------- catalog (the real one, in plain words) ---------- */
+const CATS = { mail: ["Email", "mail"], dev: ["Desenvolvimento", "code"], product: ["Produto", "box"], docs: ["Documentos", "doc"], payments: ["Pagamentos", "card"], support: ["Suporte", "help"], marketing: ["Marketing", "spark"], automation: ["Automação", "bolt"] };
+const ic = (file, c) => ({ file, c });
+const C = [
+  { id: "gmail", n: "Gmail", cat: "mail", d: "Ler, organizar e responder emails do Gmail.", icon: ic("gmail", "#EA4335"), color: "rose", can: ["Ler e buscar emails", "Organizar em pastas", "Responder (sempre pede sua aprovação)"] },
+  { id: "outlook", n: "Outlook", cat: "mail", d: "Emails do Outlook e do Microsoft 365.", mono: "O", color: "sky", can: ["Ler e buscar emails", "Organizar em pastas", "Responder (sempre pede sua aprovação)"] },
+  { id: "icloud", n: "iCloud", cat: "mail", d: "Emails do iCloud, inclusive com domínio próprio.", icon: ic("icloud", "#3693F3"), how: "Senha de app", conn: true, color: "sky", can: ["Ler e buscar emails", "Organizar em pastas", "Responder (sempre pede sua aprovação)"] },
+  { id: "imap", n: "Outro email", cat: "mail", d: "Locaweb, Hostinger, Zoho e outros provedores.", svg: "mail", how: "Senha de app", color: "graphite", can: ["Ler e buscar emails", "Organizar em pastas", "Responder (sempre pede sua aprovação)"] },
+  { id: "github", n: "GitHub", cat: "dev", d: "Código, pull requests, issues e Actions.", icon: ic("github"), conn: true, color: "graphite", feat: 1, can: ["Ler código e issues", "Abrir pull requests", "Merge e deploy (sempre pedem sua aprovação)"] },
+  { id: "sentry", n: "Sentry", cat: "dev", d: "Erros, eventos e releases.", icon: ic("sentry"), conn: true, color: "violet", can: ["Ver erros e eventos", "Ver releases"] },
+  { id: "db", n: "Banco de dados", cat: "dev", d: "Postgres: os agentes consultam seus dados para responder. Só leitura.", svg: "db", how: "Endereço e senha", isNew: true, color: "teal", feat: 2, can: ["Ver as tabelas", "Consultar dados", "Nunca altera nada"] },
+  { id: "cf", n: "Cloudflare Workers", cat: "dev", d: "Workers, KV, R2 e D1 da conta.", icon: ic("cloudflare", "#F38020"), color: "amber", can: ["Ver e publicar Workers", "Ler KV, R2 e D1"] },
+  { id: "cflogs", n: "Cloudflare logs", cat: "dev", d: "Logs e métricas dos Workers.", icon: ic("cloudflare", "#F38020"), color: "amber", can: ["Ver logs e métricas"] },
+  { id: "supabase", n: "Supabase", cat: "dev", d: "Projetos, banco e funções.", icon: ic("supabase", "#3FCF8E"), color: "green", can: ["Ver projetos e funções", "Consultar e alterar o banco"] },
+  { id: "supabase-ro", n: "Supabase (só leitura)", cat: "dev", d: "Banco, documentação e depuração. O SQL roda só lendo.", icon: ic("supabase", "#3FCF8E"), color: "green", can: ["Consultar o banco", "Ler a documentação"] },
+  { id: "linear", n: "Linear", cat: "product", d: "Issues, projetos e ciclos.", icon: ic("linear", "#5E6AD2"), color: "indigo", feat: 3, can: ["Ler e criar issues", "Mudar status e ciclos"] },
+  { id: "atlassian", n: "Jira e Confluence", cat: "product", d: "Issues do Jira e páginas do Confluence.", icon: ic("atlassian", "#0052CC"), color: "sky", can: ["Ler e criar issues", "Ler e editar páginas"] },
+  { id: "asana", n: "Asana", cat: "product", d: "Tarefas, projetos e times.", icon: ic("asana", "#F06A6A"), color: "rose", can: ["Ler e criar tarefas"] },
+  { id: "notion", n: "Notion", cat: "docs", d: "Páginas e bancos de dados.", icon: ic("notion"), color: "graphite", can: ["Buscar e ler páginas", "Criar e editar páginas"] },
+  { id: "drive", n: "Google Drive", cat: "docs", d: "Buscar, ler e escrever documentos.", icon: ic("googledrive", "#4285F4"), how: "Chave de API", color: "sky", can: ["Buscar e ler arquivos", "Criar e editar", "Compartilhar (sempre pede sua aprovação)"] },
+  { id: "stripe", n: "Stripe", cat: "payments", d: "Clientes, pagamentos, assinaturas e reembolsos.", icon: ic("stripe", "#635BFF"), color: "violet", can: ["Ver clientes e pagamentos", "Reembolsar (sempre pede sua aprovação)"] },
+  { id: "paypal", n: "PayPal", cat: "payments", d: "Pedidos, faturas e transações.", mono: "P", color: "sky", can: ["Ver pedidos e transações", "Criar faturas"] },
+  { id: "square", n: "Square", cat: "payments", d: "Pagamentos, pedidos e catálogo.", mono: "S", color: "graphite", can: ["Ver pagamentos e pedidos"] },
+  { id: "intercom", n: "Intercom", cat: "support", d: "Conversas e contatos (contas dos EUA).", icon: ic("intercom"), color: "graphite", can: ["Ler conversas e contatos", "Responder (sempre pede sua aprovação)"] },
+  { id: "webflow", n: "Webflow", cat: "marketing", d: "Sites, páginas e CMS.", icon: ic("webflow", "#146EF5"), color: "sky", can: ["Ler e editar o CMS", "Publicar (sempre pede sua aprovação)"] },
+  { id: "canva", n: "Canva", cat: "marketing", d: "Designs e modelos.", mono: "C", color: "teal", can: ["Ver e criar designs"] },
+  { id: "zapier", n: "Zapier", cat: "automation", d: "As ações que você ligou no Zapier.", icon: ic("zapier", "#FF4F00"), color: "amber", can: ["Rodar as ações que você ligou"] },
+];
+const byCat = (k) => C.filter((x) => x.cat === k);
+const connected = C.filter((x) => x.conn);
+
+/* ---------- state ---------- */
+const h = new URLSearchParams(location.hash.slice(1));
+const S = { v: h.get("v") || "d", theme: document.documentElement.dataset.theme, cat: "all", q: "", sel: "db" };
+const NOTES = {
+  a: "<b>A · Lista.</b> As categorias viram uma lista à esquerda, com quantos tem em cada uma e um atalho para os já conectados. À direita, linhas calmas: ícone, nome e uma linha do que faz. “Conectar” só aparece no hover; “Um clique” some (é o normal) e só fica o aviso quando precisa de senha ou chave. Em “Todos”, uma seção por categoria com o título fixo no topo enquanto rola.",
+  b: "<b>B · Galeria.</b> Três sugestões no topo, cada uma com o céu em pixel na cor da marca. Embaixo, cartões compactos (nome e duas linhas). As categorias ficam numa linha só, com contagem, e o título grande segue o das páginas. Conectado vira um check verde no ícone.",
+  d: "<b>B+C.</b> A galeria da B (sugestões com o céu da marca, cartões iguais, sem tags: só o check verde em quem já está conectado). Clicar num serviço abre ao lado o detalhe da C: o que os agentes poderão fazer, o que sempre pede aprovação, como conecta e o botão Conectar. A grade se ajusta para caber o painel; clicar de novo ou no X fecha.",
+  c: "<b>C · Busca e detalhe.</b> Abre com a busca focada, como o ⌘K. A lista é curta (ícone e nome); ao lado, o detalhe do selecionado diz o que os agentes poderão fazer antes de conectar, e o que sempre pede aprovação. Setas e Enter funcionam.",
+};
+
+/* ---------- pieces ---------- */
+function icon(x, s = 40) {
+  const inner = x.icon ? `<i style="--m:url(../../../apps/web/public/connectors/${x.icon.file}.svg);${x.icon.c ? `--c:${x.icon.c}` : ""}"></i>`
+    : x.svg ? I[x.svg] : `<span class="mono">${x.mono}</span>`;
+  return `<span class="ci" style="--s:${s}px">${inner}${x.conn ? `<span class="ok" aria-label="Conectado">${I.check}</span>` : ""}</span>`;
+}
+const how = (x) => (x.how ? `<span class="how">${x.how === "Chave de API" ? I.key : I.lock}${x.how}</span>` : "");
+const status = (x) => (x.conn ? `<span class="done">${I.check}Conectado</span>` : how(x));
+const matches = (x) => { const q = S.q.trim().toLowerCase(); return !q || `${x.n} ${x.d} ${CATS[x.cat][0]}`.toLowerCase().includes(q); };
+const shown = () => C.filter((x) => (S.cat === "all" || (S.cat === "conn" ? x.conn : x.cat === S.cat)) && matches(x));
+const otherBlock = (cls) => `<div class="${cls}">${icon({ svg: "link" }, 40)}<div class="t"><b>Não achou o serviço?</b><p>Conecte qualquer serviço pelo endereço dele. Mesmo fluxo: o que faz, quem usa.</p></div><button class="b b2">Conectar pelo endereço</button></div>`;
+const emptyBlock = () => `<div class="empty"><b>Nada encontrado para “${esc(S.q)}”.</b>Tente outro nome, ou conecte pelo endereço do serviço.</div>`;
+
+/* ---------- A ---------- */
+function A() {
+  const navBtn = (k, label, ico, n) => `<button data-cat="${k}" aria-current="${S.cat === k}">${I[ico]}${label}<span class="n">${n}</span></button>`;
+  const row = (x) => `<div class="row" tabindex="0">${icon(x, 40)}<div class="t"><b>${esc(x.n)}</b>${x.isNew ? '<span class="new">Novo</span>' : ""}<p>${esc(x.d)}</p></div>
+    <div class="r">${status(x)}<button class="b ${x.conn ? "b2" : "b1"} go">${x.conn ? "Conectar outra conta" : "Conectar"}</button></div></div>`;
+  let list;
+  const items = shown();
+  if (!items.length) list = emptyBlock();
+  else if (S.cat === "all" && !S.q) list = Object.keys(CATS).map((k) => `<div class="sh">${CATS[k][0]}</div>${byCat(k).map(row).join("")}`).join("");
+  else list = items.map(row).join("");
+  return `<div class="dlg A" role="dialog" aria-label="Adicionar conector">
+    <div class="hd"><h2>Adicionar conector</h2><label class="search">${I.search}<input id="q" placeholder="Buscar por nome ou pelo que faz" value="${esc(S.q)}"></label><button class="ib" aria-label="Fechar">${I.x}</button></div>
+    <div class="body">
+      <nav aria-label="Categorias">${navBtn("all", "Todos", "grid", C.length)}${navBtn("conn", "Conectados", "okc", connected.length)}<span class="sep"></span>
+        ${Object.entries(CATS).map(([k, [l, i]]) => navBtn(k, l, i, byCat(k).length)).join("")}</nav>
+      <div class="list">${list}${otherBlock("other")}</div>
+    </div></div>`;
+}
+
+/* ---------- B ---------- */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+function paintBand(cv, color) {
+  const w = 60, hh = 12; cv.width = w; cv.height = hh;
+  const g = cv.getContext("2d"), dark = S.theme === "dark";
+  const [lt, dp] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+  const base = dark ? "#1c1c1b" : "#ffffff";
+  const tones = dark ? [mixHex(dp, base, .45), mixHex(dp, base, .62), mixHex(dp, base, .8), base] : [mixHex(lt, base, .35), mixHex(lt, base, .55), mixHex(lt, base, .78), base];
+  for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
+    const t = y / (hh - 1) * (tones.length - 1) + BAYER[(y % 4) * 4 + (x % 4)] / 16 - .5;
+    g.fillStyle = tones[Math.max(0, Math.min(tones.length - 1, Math.round(t)))];
+    g.fillRect(x, y, 1, 1);
+  }
+}
+/* B and B+C share the tile, the suggestion card and "Não achou?": no tags, only the check on a connected icon. */
+const tileHTML = (x) => `<button class="tile" data-pick="${x.id}" aria-pressed="${S.v === "d" && S.sel === x.id}"><span class="th">${icon(x, 36)}<b>${esc(x.n)}</b></span><p>${esc(x.d)}</p></button>`;
+const featHTML = (x) => `<button class="fc" data-pick="${x.id}" aria-pressed="${S.v === "d" && S.sel === x.id}"><canvas data-band="${x.color}"></canvas>${icon(x, 48)}<span class="tx"><b>${esc(x.n)}</b><p>${esc(x.d)}</p></span></button>`;
+const otherTile = () => `<button class="tile other" data-pick="other" aria-pressed="${S.v === "d" && S.sel === "other"}"><span class="th">${icon({ svg: "link" }, 36)}<b>Não achou?</b></span><p>Conecte qualquer serviço pelo endereço dele.</p></button>`;
+
+function B() {
+  const f = (k, l, n) => `<button data-cat="${k}" aria-pressed="${S.cat === k}">${l}<span class="n">${n}</span></button>`;
+  const tile = (x) => tileHTML(x);
+  const feats = C.filter((x) => x.feat).sort((a, b) => a.feat - b.feat);
+  const items = shown();
+  const top = S.cat === "all" && !S.q;
+  return `<div class="dlg B" role="dialog" aria-label="Adicionar conector">
+    <div class="hd"><div class="l1"><h2>Adicionar conector</h2><label class="search">${I.search}<input id="q" placeholder="Buscar" value="${esc(S.q)}"></label><button class="ib" aria-label="Fechar">${I.x}</button></div>
+      <div class="filters" role="group" aria-label="Categorias">${f("all", "Todos", C.length)}${f("conn", "Conectados", connected.length)}${Object.entries(CATS).map(([k, [l]]) => f(k, l, byCat(k).length)).join("")}</div></div>
+    <div class="scroll">
+      ${top ? `<h3>Sugeridos para a Viajolo</h3><div class="feat">${feats.map((x) => `${featHTML(x)}`).join("")}</div><h3>Todos</h3>` : ""}
+      ${items.length ? `<div class="grid">${items.map(tile).join("")}${otherTile()}</div>` : emptyBlock()}
+    </div></div>`;
+}
+
+/* What a service lets agents do, and the button (C's pane; B+C opens it beside the gallery). */
+function detailHTML(sel, closable) {
+  if (sel === "other") return `${closable ? `<button class="ib dx" data-unpick aria-label="Fechar detalhe">${I.x}</button>` : ""}${icon({ svg: "link" }, 56)}<div><h3>Outro serviço</h3><p class="d">Qualquer serviço que ofereça conexão para agentes, pelo endereço dele (começa com https://).</p></div>
+    <div><h4>Como funciona</h4><div class="caps"><span class="cap">${I.check}Você cola o endereço e autoriza na página do serviço</span><span class="cap">${I.check}A gente classifica o que cada ferramenta faz</span><span class="cap">${I.shield}O que for sensível sempre pede sua aprovação</span></div></div>
+    <div class="act"><button class="b b1 lg">Conectar pelo endereço</button></div>`;
+  return `${closable ? `<button class="ib dx" data-unpick aria-label="Fechar detalhe">${I.x}</button>` : ""}${icon(sel, 56)}<div><h3>${esc(sel.n)}</h3><p class="d">${esc(sel.d)}</p></div>
+    <div><h4>O que os agentes poderão fazer</h4><div class="caps">${sel.can.map((c) => `<span class="cap">${/aprovação/.test(c) ? I.shield : /Nunca/.test(c) ? I.eye : I.check}${esc(c)}</span>`).join("")}</div></div>
+    <div><h4>Depois de conectar</h4><p class="d" style="font-size:13px">Você escolhe quais agentes usam e o que cada um pode fazer. Nada fica disponível antes disso.</p></div>
+    <div class="act"><button class="b b1 lg">${sel.conn ? "Conectar outra conta" : `Conectar ${esc(sel.n)}`}</button>${sel.conn ? `<span class="done" style="justify-content:center">${I.check}Já conectado</span>` : sel.how ? `<span class="how">${sel.how === "Chave de API" ? I.key : I.lock}Precisa de ${sel.how.toLowerCase()}</span>` : `<span class="how">${I.bolt}Um clique: você autoriza na página do serviço</span>`}</div>`;
+}
+
+/* ---------- B+C: the gallery, and the detail beside it once you pick a service ---------- */
+function D() {
+  const f = (k, l, n) => `<button data-cat="${k}" aria-pressed="${S.cat === k}">${l}<span class="n">${n}</span></button>`;
+  const feats = C.filter((x) => x.feat).sort((a, b) => a.feat - b.feat);
+  const items = shown();
+  const top = S.cat === "all" && !S.q;
+  const sel = S.sel === "other" ? "other" : C.find((x) => x.id === S.sel);
+  return `<div class="dlg B D" role="dialog" aria-label="Adicionar conector" data-open="${!!S.sel}">
+    <div class="hd"><div class="l1"><h2>Adicionar conector</h2><label class="search">${I.search}<input id="q" placeholder="Buscar" value="${esc(S.q)}"></label><button class="ib" aria-label="Fechar">${I.x}</button></div>
+      <div class="filters" role="group" aria-label="Categorias">${f("all", "Todos", C.length)}${f("conn", "Conectados", connected.length)}${Object.entries(CATS).map(([k, [l]]) => f(k, l, byCat(k).length)).join("")}</div></div>
+    <div class="dbody">
+      <div class="scroll">
+        ${top ? `<h3>Sugeridos para a Viajolo</h3><div class="feat">${feats.map(featHTML).join("")}</div><h3>Todos</h3>` : ""}
+        ${items.length ? `<div class="grid">${items.map(tileHTML).join("")}${otherTile()}</div>` : emptyBlock()}
+      </div>
+      ${sel ? `<aside class="detail" aria-label="Detalhe">${detailHTML(sel, true)}</aside>` : ""}
+    </div></div>`;
+}
+
+/* ---------- C ---------- */
+function Cview() {
+  const items = shown();
+  if (!items.find((x) => x.id === S.sel) && items.length) S.sel = items[0].id;
+  const sel = C.find((x) => x.id === S.sel);
+  const groups = [...new Set(items.map((x) => x.cat))];
+  return `<div class="dlg C glass" role="dialog" aria-label="Adicionar conector">
+    <div class="top"><label class="search big">${I.search}<input id="q" placeholder="Que serviço você quer conectar?" value="${esc(S.q)}" autofocus></label><button class="ib" aria-label="Fechar">${I.x}</button></div>
+    <div class="body">
+      <div class="list" role="listbox" aria-label="Serviços">${items.length ? groups.map((g) => `<div class="gh">${CATS[g][0]}</div>${items.filter((x) => x.cat === g).map((x) => `<div class="it" role="option" data-sel="${x.id}" aria-selected="${x.id === S.sel}">${icon(x, 28)}<span class="nm">${esc(x.n)}${x.isNew ? '<span class="new">Novo</span>' : ""}</span>${x.conn ? `<span class="done">${I.check}</span>` : ""}</div>`).join("")}`).join("") : emptyBlock()}</div>
+      <div class="detail">${sel ? detailHTML(sel, false) : ""}</div>
+    </div>
+    <div class="foot"><span><span class="kbd">↑</span><span class="kbd">↓</span> escolher</span><span><span class="kbd">↵</span> conectar</span><span><span class="kbd">esc</span> fechar</span><span class="grow"></span><a>Não achou? Conectar pelo endereço</a></div>
+  </div>`;
+}
+
+/* ---------- render ---------- */
+function render(keepFocus) {
+  document.documentElement.dataset.theme = S.theme;
+  for (const s of $$(".proto .pseg")) for (const b of $$("button", s)) b.setAttribute("aria-pressed", String(S[s.dataset.k] === b.dataset.o));
+  $("#note").innerHTML = NOTES[S.v];
+  document.documentElement.style.setProperty("--protoH", $("#proto").offsetHeight + "px");
+  $("#scrim").innerHTML = S.v === "a" ? A() : S.v === "b" ? B() : S.v === "d" ? D() : Cview();
+  for (const cv of $$("canvas[data-band]")) paintBand(cv, cv.dataset.band);
+  history.replaceState(null, "", `#v=${S.v}&theme=${S.theme}`);
+  if (keepFocus) { const q = $("#q"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  else if (S.v === "c") $("#q")?.focus();
+}
+document.addEventListener("click", (e) => {
+  const p = e.target.closest(".proto .pseg button");
+  if (p) { S[p.parentElement.dataset.k] = p.dataset.o; if (p.parentElement.dataset.k === "v") { S.cat = "all"; S.q = ""; S.sel = S.o === "d" ? null : S.sel; if (S.v === "d") S.sel = null; else S.sel ??= "db"; } return render(); }
+  const c = e.target.closest("[data-cat]");
+  if (c) { S.cat = c.dataset.cat; return render(); }
+  const pk = e.target.closest("[data-pick]");
+  if (pk && S.v === "d") { S.sel = S.sel === pk.dataset.pick ? null : pk.dataset.pick; return render(); }
+  if (e.target.closest("[data-unpick]")) { S.sel = null; return render(); }
+  const s = e.target.closest("[data-sel]");
+  if (s) { S.sel = s.dataset.sel; return render(); }
+});
+document.addEventListener("input", (e) => { if (e.target.id === "q") { S.q = e.target.value; render(true); } });
+document.addEventListener("keydown", (e) => {
+  if (S.v === "d" && e.key === "Escape" && S.sel) { S.sel = null; return render(); }
+  if (S.v !== "c" || !["ArrowDown", "ArrowUp"].includes(e.key)) return;
+  e.preventDefault();
+  const items = shown(); const i = items.findIndex((x) => x.id === S.sel);
+  const n = items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length];
+  if (n) { S.sel = n.id; render(true); $(`[data-sel="${n.id}"]`)?.scrollIntoView({ block: "nearest" }); }
+});
+render();
+</script>
+</body>
+</html>
