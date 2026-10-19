@@ -91,6 +91,7 @@ export function CommandMenu() {
       { key: "routines", to: "/org/$orgId/routines", icon: "routines", label: t("shell.routines") },
       { key: "calendar", to: "/org/$orgId/calendar", icon: "calendar", label: t("shell.calendar") },
       { key: "drive", to: "/org/$orgId/drive", icon: "drive", label: t("shell.drive") },
+      { key: "team", to: "/org/$orgId/team", icon: "agent", label: t("shell.team") },
       { key: "members", to: "/org/$orgId/members", icon: "members", label: t("shell.members") },
       { key: "search", to: "/org/$orgId/search", icon: "search", label: t("shell.searchWorkspace") },
     ] as const;

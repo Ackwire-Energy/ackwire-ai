@@ -9,6 +9,7 @@ export const keys = {
   members: (orgId: string) => ["org", orgId, "members"] as const,
   invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
   agents: (orgId: string) => ["org", orgId, "agents"] as const,
+  team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,

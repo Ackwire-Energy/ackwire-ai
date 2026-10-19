@@ -1,0 +1,330 @@
+/* Equipe (telas/Organograma.html, Céu): the agents in the pixel sky, grouped by their person. */
+.page.team {
+  max-width: 1240px;
+  gap: 20px;
+}
+.team-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.team-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(30px, 4vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.team-head__sub {
+  margin: 6px 0 0;
+  max-width: 60ch;
+  color: var(--muted);
+}
+
+/* The sky: the field is a canvas; agents, people and the card sit on top. */
+.team-sky {
+  position: relative;
+  height: 620px;
+  border-radius: var(--radius-section);
+  overflow: hidden;
+  box-shadow: var(--e1), var(--top);
+}
+.team-sky__stage {
+  position: absolute;
+  inset: 0;
+}
+.team-sky__person {
+  position: absolute;
+  transform: translate(-50%, 0);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--raised) 90%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  pointer-events: none;
+  transition:
+    left 0.5s var(--out),
+    top 0.5s var(--out);
+}
+.team-sky__agent {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    left 0.5s var(--out),
+    top 0.5s var(--out);
+}
+.team-sky__agent:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.team-sky__agent[aria-pressed="true"] .team-sky__figure {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+.team-sky__figure {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  animation: team-bob 3.2s ease-in-out infinite;
+  animation-delay: var(--bob-delay, 0s);
+}
+@keyframes team-bob {
+  0%,
+  100% {
+    transform: translateY(-2px);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+.team-sky__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--raised) 82%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 20, 60, 0.18);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.team-sky__hint {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--raised) 90%, transparent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* The agent's card, inside the sky. */
+.team-card {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 360px;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  animation: team-in 0.3s var(--out);
+}
+@keyframes team-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.team-card__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+.team-card__head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding-right: 32px;
+}
+.team-card__title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.team-card__title h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+}
+.team-card__meta {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+.team-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.team-card__status[data-busy] {
+  color: var(--ink);
+}
+.team-card__sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.team-card__eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.team-card__call {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+.team-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.team-card__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* What agents asked each other: a grid under the sky. */
+.team-feed {
+  gap: 0;
+  padding: 8px;
+}
+.team-feed__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 10px;
+}
+.team-feed__head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+.team-feed__window {
+  font-size: 12px;
+  color: var(--muted);
+}
+.team-feed__empty {
+  margin: 0;
+  padding: 4px 8px 10px;
+  color: var(--muted);
+}
+.team-feed__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.team-feed__item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: 14px;
+  transition: background-color 0.6s;
+}
+.team-feed__item[data-fresh] {
+  background: var(--sunken);
+}
+.team-feed__pair {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  color: var(--muted);
+}
+.team-feed__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.team-feed__text time {
+  color: var(--muted);
+}
+.team-feed__status {
+  color: var(--muted);
+}
+
+@media (max-width: 1000px) {
+  .team-feed__grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .page.team {
+    padding: 16px 16px 40px;
+    gap: 16px;
+  }
+  .team-head > .ac-btn {
+    width: 100%;
+  }
+  .team-sky {
+    height: 600px;
+  }
+  .team-card {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+  }
+  .team-sky__hint {
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .team-sky__figure,
+  .team-card {
+    animation: none;
+  }
+  .team-sky__agent,
+  .team-sky__person {
+    transition: none;
+  }
+}

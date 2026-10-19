@@ -372,6 +372,10 @@ export function Sidebar() {
         {dir.agents.length > 0 && (
           <div className="sidebar__group">
             <span className="sidebar__label">{t("shell.agents")}</span>
+            <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item" title={t("shell.team")}>
+              <Icon name="agent" />
+              <span className="sidebar__item-label">{t("shell.team")}</span>
+            </Link>
             {dir.agents.map((a) => (
               <AgentRow
                 key={a.id}

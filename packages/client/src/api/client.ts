@@ -140,6 +140,7 @@ import type {
   StorageMigration,
   StorageTestResult,
   TaskOutput,
+  Team,
   ThreadAction,
   ThreadCreateInput,
   ThreadFilters,
@@ -213,6 +214,8 @@ export interface ApiClient {
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
+    /** The agents as a team (D54): grouped by person, with who consulted whom in the last day. */
+    team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;

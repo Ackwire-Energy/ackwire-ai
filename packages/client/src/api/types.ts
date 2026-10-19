@@ -113,6 +113,39 @@ export interface Agent {
   brain?: AgentBrainLine;
 }
 
+/** An agent on the team screen (D54): when to call it and what it can do. */
+export interface TeamAgent {
+  id: string;
+  name: string;
+  handle: string;
+  role: string;
+  /** When to call it: its role, or the first sentence of its instructions. */
+  callFor: string;
+  appearance: AgentLookInput | null;
+  ownerUserId: string | null;
+  /** What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…). */
+  capabilities: string[];
+  /** Working on something right now. */
+  busy: boolean;
+  canTalk: boolean;
+}
+
+/** One agent asked another (`ask_agent`); the question itself stays private. */
+export interface TeamConsultation {
+  id: string;
+  askerAgentId: string;
+  targetAgentId: string;
+  status: string;
+  createdAt: string;
+}
+
+/** The team screen: agents, the people responsible for them, the last day's consultations. */
+export interface Team {
+  agents: TeamAgent[];
+  people: { id: string; name: string; image: string | null }[];
+  consultations: TeamConsultation[];
+}
+
 /** `Agent.brain`: shown next to its name instead of the API model when a computer thinks. */
 export interface AgentBrainLine {
   kind: BrainKind;

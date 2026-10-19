@@ -811,6 +811,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       }),
     },
     agents: {
+      team: async () => ({
+        agents: state.agents.map((a) => ({
+          id: a.id,
+          name: a.name,
+          handle: a.handle,
+          role: a.role,
+          callFor: a.role,
+          appearance: a.appearance ?? null,
+          ownerUserId: a.ownerUserId,
+          capabilities: ["drive", "issues"],
+          busy: false,
+          canTalk: true,
+        })),
+        people: state.members
+          .filter((m) => state.agents.some((a) => a.ownerUserId === m.userId))
+          .map((m) => ({ id: m.userId, name: m.name, image: m.image ?? null })),
+        consultations: [],
+      }),
       // Same rule as the backend: everyone, the listed people, or only the owner (who can always talk to it).
       list: async () =>
         state.agents.map((a) => {

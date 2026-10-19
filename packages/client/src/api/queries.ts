@@ -175,6 +175,18 @@ export const useAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
 };
 
+/** The team screen (D54): refetched every 30 s and on focus, so new consultations show up. */
+export const useTeam = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.team(orgId),
+    queryFn: () => api.agents.team(orgId),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+};
+
 export const useModels = () => {
   const api = useApi();
   return useQuery({ queryKey: keys.models, queryFn: () => api.agents.models(), staleTime: 10 * 60_000 });

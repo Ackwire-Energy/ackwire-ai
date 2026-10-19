@@ -296,3 +296,21 @@ describe("Criar agente", () => {
     expect(screen().queryByRole("navigation")?.textContent).not.toContain("Criar agente");
   });
 });
+
+describe("Equipe", () => {
+  test("agents in the sky grouped by their person; a tap opens what it does and how to reach it", async () => {
+    await go("team");
+    expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
+    expect(screen().getByText(/2 agentes, agrupados por quem cuida de cada um\./)).toBeTruthy();
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    expect(sky.textContent).toContain("João");
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const card = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    expect(card.textContent).toContain("Chame para");
+    expect(card.textContent).toContain("Arquivos");
+    expect(within(card).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
+    );
+    expect(screen().getByText("Nenhum agente pediu ajuda a outro nas últimas 24 h.")).toBeTruthy();
+  });
+});

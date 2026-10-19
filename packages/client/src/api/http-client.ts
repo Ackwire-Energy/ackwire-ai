@@ -103,6 +103,7 @@ import type {
   StorageMigration,
   StorageTestResult,
   TaskOutput,
+  Team,
   ThreadFilters,
   ThreadFollow,
   ThreadInfo,
@@ -274,6 +275,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
+      team: (orgId) => request<Team>(`${org(orgId)}/team`),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
