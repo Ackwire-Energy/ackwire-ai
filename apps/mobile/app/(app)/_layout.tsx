@@ -64,6 +64,14 @@ function AppStack() {
         }}
       />
       <Stack.Screen
+        name="browser/[agentId]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
+      <Stack.Screen
+        name="handoff/[id]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
+      <Stack.Screen
         name="file/[id]"
         options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
       />

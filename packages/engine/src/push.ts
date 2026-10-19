@@ -179,7 +179,7 @@ export async function deliverPush(deps: PushDeps, notificationId: string): Promi
     highRisk = approval ? approvalIsHighRisk(approval) : true;
   }
   const data: Record<string, unknown> = { orgId: row.orgId, kind: row.kind, notificationId: row.id };
-  for (const key of ["channelId", "threadId", "approvalId", "missionId"] as const) {
+  for (const key of ["channelId", "threadId", "approvalId", "missionId", "handoffId"] as const) {
     if (source[key]) data[key] = source[key];
   }
   const messages: PushMessage[] = devices.map((d) => ({
