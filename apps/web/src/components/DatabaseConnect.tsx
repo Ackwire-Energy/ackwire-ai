@@ -255,6 +255,8 @@ function ConnectStep({
         <Field label={t("database.url")} id="db-url" help={t("database.urlHelp")} error={urlError}>
           <Input
             autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
             spellCheck={false}
             value={url}
             placeholder={t("database.urlPlaceholder")}
@@ -294,7 +296,9 @@ function ConnectStep({
             <Field label={t("database.password")} id="db-password" help={t("mail.passwordHelp")}>
               <Input
                 type="password"
-                autoComplete="off"
+                // "new-password": the browser must not fill a saved login into this form (it put the
+                // person's email in the address field).
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -725,7 +729,12 @@ export function DatabaseReconnectDialog({
             help={t("mail.passwordHelp")}
             error={touched && !password ? t("database.passwordInvalid") : undefined}
           >
-            <Input type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </Field>
           {error && <Alert>{t(`database.error.${error}`)}</Alert>}
         </DialogBody>

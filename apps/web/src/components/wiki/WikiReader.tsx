@@ -700,8 +700,9 @@ export function WikiReader({
               </span>
             )}
             {p.tags.map((tag) => (
-              <button key={tag} type="button" className="wiki-tag" onClick={() => onTag(tag)}>
-                #{tag}
+              <button key={tag} type="button" className="wiki-chip" aria-label={`#${tag}`} onClick={() => onTag(tag)}>
+                <Icon name="channel" size={14} />
+                {tag}
               </button>
             ))}
           </div>
