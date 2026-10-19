@@ -31,7 +31,6 @@ import {
   DialogFooter,
   Field,
   Icon,
-  type IconName,
   Kbd,
   MenuOverlay,
   MenuOverlayGroup,
@@ -39,6 +38,7 @@ import {
   MenuOverlayRow,
   MenuOverlaySeparator,
   modKey,
+  Popover,
   Segmented,
   Skeleton,
   SkeletonGroup,
@@ -270,43 +270,9 @@ export function Sidebar() {
           />
         )}
 
-        {/* Tools in categories that open and close (telas/SidebarDoisNiveis.html, option D). Closed, a
-            category keeps its tools one click away as icons on its header and its open page in sight. */}
-        <SidebarSection
-          id="inbox"
-          label={t("shell.inbox")}
-          sections={sections}
-          summary={
-            unreadNotifications + pending > 0 && (
-              <CountBadge aria-label={t("shell.waitingInSection", { count: unreadNotifications + pending })}>
-                {unreadNotifications + pending}
-              </CountBadge>
-            )
-          }
-          shortcuts={
-            <>
-              <ToolShortcut
-                to="/org/$orgId/notifications"
-                icon="bell"
-                label={t("shell.notifications")}
-                waiting={unreadNotifications > 0}
-              />
-              <ToolShortcut
-                to="/org/$orgId/approvals"
-                icon="waiting"
-                label={t("shell.approvals")}
-                waiting={pending > 0}
-              />
-              <ToolShortcut
-                to="/org/$orgId/threads"
-                icon="thread"
-                label={t("shell.threads")}
-                waiting={missionsWaiting > 0}
-              />
-              <ToolShortcut to="/org/$orgId/forum" icon="message" label={t("shell.forum")} />
-            </>
-          }
-        >
+        {/* The tools people use most stay in sight; the rest open beside the sidebar from More
+            (telas/SidebarAPartirDaD.html, option 5). */}
+        <div className="sidebar__group sidebar__tools">
           <Link
             to="/org/$orgId/notifications"
             params={{ orgId }}
@@ -346,50 +312,10 @@ export function Sidebar() {
               </CountChip>
             )}
           </Link>
-          {/* The forum is where decisions are made together: it sits with what waits for you. */}
-          <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
-            <Icon name="message" />
-            <span className="sidebar__item-label">{t("shell.forum")}</span>
-          </Link>
-        </SidebarSection>
-
-        <SidebarSection
-          id="work"
-          label={t("shell.work")}
-          sections={sections}
-          shortcuts={
-            <>
-              <ToolShortcut to="/org/$orgId/issues" icon="issues" label={t("shell.issues")} />
-              <ToolShortcut to="/org/$orgId/routines" icon="routines" label={t("shell.routines")} />
-              <ToolShortcut to="/org/$orgId/calendar" icon="calendar" label={t("shell.calendar")} />
-            </>
-          }
-        >
           <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>
             <Icon name="issues" />
             <span className="sidebar__item-label">{t("shell.issues")}</span>
           </Link>
-          <Link to="/org/$orgId/routines" params={{ orgId }} className="sidebar__item" title={t("shell.routines")}>
-            <Icon name="routines" />
-            <span className="sidebar__item-label">{t("shell.routines")}</span>
-          </Link>
-          <Link to="/org/$orgId/calendar" params={{ orgId }} className="sidebar__item" title={t("shell.calendar")}>
-            <Icon name="calendar" />
-            <span className="sidebar__item-label">{t("shell.calendar")}</span>
-          </Link>
-        </SidebarSection>
-
-        <SidebarSection
-          id="docs"
-          label={t("shell.docs")}
-          sections={sections}
-          shortcuts={
-            <>
-              <ToolShortcut to="/org/$orgId/wiki" icon="book" label={t("shell.wiki")} />
-              <ToolShortcut to="/org/$orgId/drive" icon="drive" label={t("shell.drive")} />
-            </>
-          }
-        >
           <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item" title={t("shell.wiki")}>
             <Icon name="book" />
             <span className="sidebar__item-label">{t("shell.wiki")}</span>
@@ -398,7 +324,8 @@ export function Sidebar() {
             <Icon name="drive" />
             <span className="sidebar__item-label">{t("shell.drive")}</span>
           </Link>
-        </SidebarSection>
+          <MoreTools />
+        </div>
 
         <span className="sidebar__divider" aria-hidden="true" />
 
@@ -535,9 +462,7 @@ export function Sidebar() {
   );
 }
 
-type SectionId = "inbox" | "work" | "docs" | "channels" | "agents" | "people";
-/** The tools people reach for less start closed; everything else starts open. */
-const CLOSED_BY_DEFAULT: SectionId[] = ["work", "docs"];
+type SectionId = "channels" | "agents" | "people";
 
 /** Which sidebar categories are closed, remembered per browser. */
 function useSidebarSections() {
@@ -548,7 +473,7 @@ function useSidebarSections() {
     } catch {
       // A bad value falls back to the defaults.
     }
-    return new Set(CLOSED_BY_DEFAULT);
+    return new Set();
   });
   const toggle = (id: SectionId) =>
     setClosed((prev) => {
@@ -562,7 +487,7 @@ function useSidebarSections() {
 
 /**
  * A sidebar category that opens and closes. Closed, it keeps its open page's row in sight (CSS shows
- * only the active item), and shows `shortcuts` (its tools as icons) or `summary` (a count) on its header.
+ * only the active item), and shows `summary` (a count) on its header.
  * On the icon rail the header goes away and every item shows.
  */
 function SidebarSection({
@@ -570,7 +495,6 @@ function SidebarSection({
   label,
   sections,
   summary,
-  shortcuts,
   action,
   children,
 }: {
@@ -578,7 +502,6 @@ function SidebarSection({
   label: string;
   sections: ReturnType<typeof useSidebarSections>;
   summary?: ReactNode;
-  shortcuts?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
@@ -597,7 +520,7 @@ function SidebarSection({
           <Icon name="chevronDown" size={14} className="sidebar__section-chevron" />
           <span className="sidebar__label">{label}</span>
         </button>
-        {!open && (shortcuts ? <span className="sidebar__shortcuts">{shortcuts}</span> : summary)}
+        {!open && summary}
         {action}
       </div>
       <div id={bodyId} className="sidebar__section-body">
@@ -607,35 +530,69 @@ function SidebarSection({
   );
 }
 
-type ToolRoute =
-  | "/org/$orgId/notifications"
-  | "/org/$orgId/approvals"
-  | "/org/$orgId/threads"
-  | "/org/$orgId/issues"
-  | "/org/$orgId/routines"
-  | "/org/$orgId/calendar"
-  | "/org/$orgId/wiki"
-  | "/org/$orgId/drive"
-  | "/org/$orgId/forum";
+/** The tools behind More, in groups, each with a line on what it is for. */
+const MORE_TOOLS = [
+  { group: "schedule", to: "/org/$orgId/routines", icon: "routines", key: "routines" },
+  { group: "schedule", to: "/org/$orgId/calendar", icon: "calendar", key: "calendar" },
+  { group: "decisions", to: "/org/$orgId/forum", icon: "message", key: "forum" },
+] as const;
+const MORE_GROUPS = ["schedule", "decisions"] as const;
 
-/** A tool as an icon on a closed category's header; a dot when something there waits for you. */
-function ToolShortcut({
-  to,
-  icon,
-  label,
-  waiting,
-}: {
-  to: ToolRoute;
-  icon: IconName;
-  label: string;
-  waiting?: boolean;
-}) {
+/**
+ * More: the tools people reach for less, in a panel beside the sidebar (so nothing below moves).
+ * The one you opened from it stays in sight under it (CSS shows only the active row).
+ */
+function MoreTools() {
+  const { t } = useTranslation();
   const { org } = useOrg();
+  const [open, setOpen] = useState(false);
   return (
-    <Link to={to} params={{ orgId: org.id }} className="sidebar__shortcut" aria-label={label} title={label}>
-      <Icon name={icon} size={16} />
-      {waiting && <span className="sidebar__shortcut-dot" aria-hidden="true" />}
-    </Link>
+    <>
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        label={t("shell.more")}
+        side="right"
+        align="start"
+        className="sidebar__more-menu"
+        trigger={
+          <button type="button" className="sidebar__item sidebar__more" title={t("shell.more")}>
+            <Icon name="more" />
+            <span className="sidebar__item-label">{t("shell.more")}</span>
+            <Icon name="chevronRight" size={16} className="sidebar__more-chevron" />
+          </button>
+        }
+      >
+        {MORE_GROUPS.map((group) => (
+          <div key={group} className="sidebar__more-group">
+            <div className="ac-menu__heading">{t(`shell.moreGroups.${group}`)}</div>
+            {MORE_TOOLS.filter((x) => x.group === group).map((x) => (
+              <Link
+                key={x.key}
+                to={x.to}
+                params={{ orgId: org.id }}
+                className="ac-menu__item sidebar__more-item"
+                onClick={() => setOpen(false)}
+              >
+                <Icon name={x.icon} />
+                <span className="ac-menu__label">
+                  {t(`shell.${x.key}`)}
+                  <span className="ac-menu__desc">{t(`shell.moreWhat.${x.key}`)}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        ))}
+      </Popover>
+      <div className="sidebar__more-active">
+        {MORE_TOOLS.map((x) => (
+          <Link key={x.key} to={x.to} params={{ orgId: org.id }} className="sidebar__item" title={t(`shell.${x.key}`)}>
+            <Icon name={x.icon} />
+            <span className="sidebar__item-label">{t(`shell.${x.key}`)}</span>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }
 

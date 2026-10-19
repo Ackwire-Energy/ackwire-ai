@@ -317,11 +317,13 @@ export const en: Translations = {
     skip: "Skip for now",
   },
   shell: {
-    inbox: "For you",
-    work: "Schedule",
-    docs: "Docs",
-    waitingInSection_one: "{{count}} waiting for you",
-    waitingInSection_other: "{{count}} waiting for you",
+    more: "More",
+    moreGroups: { schedule: "Schedule", decisions: "Decisions" },
+    moreWhat: {
+      routines: "What agents do on their own, on time",
+      calendar: "Meetings and deadlines",
+      forum: "When a decision needs several views",
+    },
     inviteHint: "By email or link",
     profileHint: "Name, photo and @",
     thisMonth: "This month",

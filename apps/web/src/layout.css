@@ -10308,14 +10308,32 @@ html[data-menu-overlay] .shell {
   margin-left: var(--space-2);
 }
 
-/* ── Sidebar categories (telas/SidebarDoisNiveis.html, option D) ─────────────
-   Tools and conversations sit in categories that open and close. Closed, a category shows only the
-   open page's row, plus its tools as icons (or a count) on its header. The icon rail ignores all this. */
+/* ── Sidebar (telas/SidebarAPartirDaD.html, option 5) ─────────────
+   The main tools are plain rows; the rest open beside the sidebar from More. Conversations sit in
+   categories that open and close; closed, one shows only the open page's row and a count.
+   The icon rail ignores the headers. */
 .sidebar:not([data-rail="true"]) .sidebar__scroll {
   gap: 4px;
 }
 .sidebar__section {
   gap: 2px;
+}
+/* Rows as in the prototype: 32px, 14px text, 17px muted icons. */
+.sidebar:not([data-rail="true"]) .sidebar__item {
+  min-height: var(--control-h-sm);
+  padding: 0 8px;
+  border-radius: var(--control-r-sm);
+  font-size: 14px;
+}
+.sidebar:not([data-rail="true"]) .sidebar__item > .ac-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--ink-muted);
+}
+.sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__more-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--faint);
 }
 .sidebar__section-head {
   display: flex;
@@ -10355,7 +10373,7 @@ html[data-menu-overlay] .shell {
 }
 .sidebar__section-head .sidebar__label {
   padding: 0;
-  font-size: 14.5px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.005em;
   text-transform: none;
@@ -10395,48 +10413,46 @@ html[data-menu-overlay] .shell {
     opacity: 1;
   }
 }
-.sidebar__shortcuts {
-  display: flex;
-  gap: 2px;
+/* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */
+.sidebar__more {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.sidebar__shortcut {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  color: var(--ink-muted);
-  transition:
-    background-color 0.12s,
-    color 0.12s,
-    transform 0.18s var(--spring);
-}
-.sidebar__shortcut:hover {
-  background: var(--plate);
-  color: var(--ink);
-}
-.sidebar__shortcut:active {
-  transform: scale(0.92);
-}
-.sidebar__shortcut:focus-visible {
+.sidebar__more:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.sidebar__shortcut[data-status="active"] {
-  background: var(--raised);
-  box-shadow: var(--e1);
-  color: var(--ink);
+.sidebar__more-chevron {
+  margin-left: auto;
+  color: var(--faint);
 }
-.sidebar__shortcut-dot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 7px;
-  height: 7px;
-  border-radius: 3px;
-  background: var(--ink);
-  box-shadow: 0 0 0 2px var(--side);
+.sidebar[data-rail="true"] .sidebar__more-chevron {
+  display: none;
+}
+.sidebar__more[data-state="open"] {
+  background: var(--plate);
+}
+.sidebar__more-menu {
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  max-height: none;
+}
+.sidebar__more-item {
+  text-decoration: none;
+}
+.sidebar__more-item[data-status="active"] {
+  background: var(--surface-sunken);
+}
+/* The tool opened from More stays in sight under it. */
+.sidebar__more-active {
+  display: contents;
+}
+.sidebar__more-active > :not([data-status="active"]) {
+  display: none;
 }
 .sidebar__divider {
   height: 1px;
@@ -10444,8 +10460,7 @@ html[data-menu-overlay] .shell {
   background: var(--line);
 }
 @media (prefers-reduced-motion: reduce) {
-  .sidebar__section-chevron,
-  .sidebar__shortcut {
+  .sidebar__section-chevron {
     transition: none;
   }
 }

@@ -323,11 +323,13 @@ export const ptBR = {
     skip: "Pular por agora",
   },
   shell: {
-    inbox: "Para você",
-    work: "Agenda",
-    docs: "Documentos",
-    waitingInSection_one: "{{count}} esperando você",
-    waitingInSection_other: "{{count}} esperando você",
+    more: "Mais",
+    moreGroups: { schedule: "Agenda", decisions: "Decisões" },
+    moreWhat: {
+      routines: "O que os agentes fazem sozinhos, na hora marcada",
+      calendar: "Reuniões e prazos da equipe",
+      forum: "Quando a decisão pede várias opiniões",
+    },
     inviteHint: "Por email ou link",
     profileHint: "Nome, foto e @",
     thisMonth: "Este mês",
