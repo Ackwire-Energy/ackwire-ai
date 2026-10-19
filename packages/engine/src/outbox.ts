@@ -154,23 +154,65 @@ export interface ProcessOptions extends ClaimOptions {
   onError?: (job: OutboxJob, error: unknown, outcome: "retry" | "failed") => void;
 }
 
+async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, options: ProcessOptions) {
+  const handler = handlers[job.kind];
+  try {
+    if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
+    await handler(job, { finalAttempt: job.attempts >= job.maxAttempts });
+    await completeJob(db, job);
+  } catch (error) {
+    const outcome = await failJob(db, job, error, { retryable: isRetryable(error) });
+    options.onError?.(job, error, outcome);
+  }
+}
+
 /** Claims one batch and runs it (jobs in parallel). Returns how many jobs were attempted. */
 export async function processOutbox(db: Database, handlers: JobHandlers, options: ProcessOptions): Promise<number> {
   const jobs = await claimJobs(db, options);
-  await Promise.all(
-    jobs.map(async (job) => {
-      const handler = handlers[job.kind];
-      try {
-        if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
-        await handler(job, { finalAttempt: job.attempts >= job.maxAttempts });
-        await completeJob(db, job);
-      } catch (error) {
-        const outcome = await failJob(db, job, error, { retryable: isRetryable(error) });
-        options.onError?.(job, error, outcome);
-      }
-    }),
-  );
+  await Promise.all(jobs.map((job) => runJob(db, handlers, job, options)));
   return jobs.length;
+}
+
+export interface OutboxPump {
+  /** Claims as many due jobs as there are free slots and starts them; returns how many it started. */
+  pump(): Promise<number>;
+  /** Jobs running now. */
+  inFlight(): number;
+  /** Resolves when every running job has finished. */
+  idle(): Promise<void>;
+}
+
+/**
+ * The worker's job pool: up to `maxInFlight` jobs at once, and a slot that
+ * frees is refilled right away (`onSlotFree`). Unlike `processOutbox`, a
+ * long job (a 5-minute agent run) never holds back the jobs claimed after it.
+ */
+export function createOutboxPump(
+  db: Database,
+  handlers: JobHandlers,
+  options: Omit<ProcessOptions, "batchSize"> & { maxInFlight?: number; onSlotFree?: () => void },
+): OutboxPump {
+  const max = options.maxInFlight ?? 20;
+  const running = new Set<Promise<void>>();
+  return {
+    async pump() {
+      const free = max - running.size;
+      if (free <= 0) return 0;
+      const jobs = await claimJobs(db, { ...options, batchSize: free });
+      for (const job of jobs) {
+        const p: Promise<void> = runJob(db, handlers, job, options).finally(() => {
+          running.delete(p);
+          options.onSlotFree?.();
+        });
+        running.add(p);
+      }
+      return jobs.length;
+    },
+    inFlight: () => running.size,
+    async idle() {
+      while (running.size > 0) await Promise.all(running);
+    },
+  };
 }
 
 /** Runs batches until nothing is due. For tests and CLI tools; workers call `processOutbox` on an interval. */

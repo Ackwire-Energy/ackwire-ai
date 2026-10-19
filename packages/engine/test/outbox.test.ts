@@ -4,6 +4,7 @@ import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   claimJobs,
   completeJob,
+  createOutboxPump,
   DEFAULT_LEASE_MS,
   drainOutbox,
   enqueue,
@@ -118,6 +119,38 @@ test("processOutbox runs handlers and records outcomes", async () => {
   expect(errors.sort()).toEqual(["flaky:retry", "permanent:failed", "unknown.kind:failed"]);
   const byKind = Object.fromEntries((await rows()).map((r) => [r.kind, r.status]));
   expect(byKind).toEqual({ ok: "done", permanent: "failed", flaky: "pending", "unknown.kind": "failed" });
+});
+
+test("createOutboxPump: a slow job doesn't hold back jobs claimed after it, and slots stay capped", async () => {
+  let release: () => void = () => {};
+  const slow = new Promise<void>((r) => {
+    release = r;
+  });
+  const done: string[] = [];
+  let freed = 0;
+  const pump = createOutboxPump(
+    db,
+    {
+      slow: () => slow.then(() => void done.push("slow")),
+      fast: async () => void done.push("fast"),
+    },
+    { workerId: "w", maxInFlight: 2, onSlotFree: () => freed++ },
+  );
+  await enqueue(db, job("slow"));
+  expect(await pump.pump()).toBe(1);
+  await enqueue(db, job("fast"));
+  await enqueue(db, job("fast"));
+  // One slot left while the slow job runs.
+  expect(await pump.pump()).toBe(1);
+  while (pump.inFlight() > 1) await Bun.sleep(1);
+  expect(await pump.pump()).toBe(1);
+  while (pump.inFlight() > 1) await Bun.sleep(1);
+  expect(done).toEqual(["fast", "fast"]);
+  release();
+  await pump.idle();
+  expect(done).toEqual(["fast", "fast", "slow"]);
+  expect(freed).toBe(3);
+  expect((await rows()).every((r) => r.status === "done")).toBe(true);
 });
 
 test("drainOutbox follows chains of jobs", async () => {

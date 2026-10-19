@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import { textOf } from "@agenteschat/providers";
 import { RUN_STALE_MS } from "./cancel";
+import { onConsultedRunFinished } from "./consultations";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
 import { insertMessage, messageView } from "./messages";
@@ -198,6 +199,8 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
   if (channel?.kind === "forum") {
     await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
   }
+  // It was answering another agent: the asker hears it now instead of waiting for the question to expire.
+  await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, "failed", INTERRUPTED_BY_RESTART).catch(() => {});
   return true;
 }
 

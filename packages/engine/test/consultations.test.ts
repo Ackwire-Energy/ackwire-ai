@@ -12,6 +12,7 @@ import {
   listDms,
   listMessages,
   postPersonMessage,
+  recoverStaleRuns,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
@@ -223,5 +224,37 @@ describe("ask_agent", () => {
     });
     expect((await runs()).find((r) => r.id === asker?.id)?.status).toBe("done");
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("didn't answer within 15 minutes");
+  });
+
+  test("the consulted run dies with its worker: the asker hears it at once, not after 15 minutes", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const infra = await addInfra();
+    // @infra's job is lost with its worker (a deploy mid-tool): the run stays "running" with no heartbeat.
+    const handlers: JobHandlers = {
+      ...f.handlers,
+      "agent_run.execute": async (job, ctx) => {
+        const [run] = await f.db
+          .select({ agentId: schema.agentRuns.agentId })
+          .from(schema.agentRuns)
+          .where(eq(schema.agentRuns.id, String(job.payload.runId)));
+        if (run?.agentId === infra.id) return;
+        await f.handlers["agent_run.execute"]?.(job, ctx);
+      },
+    };
+    await post("@dev deploy staging");
+    await drainOutbox(f.db, handlers);
+    const target = (await runs()).find((r) => r.agentId === infra.id);
+    if (!target) throw new Error("no consulted run");
+    const long = new Date(Date.now() - 10 * 60_000);
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "running", startedAt: long, heartbeatAt: long })
+      .where(eq(schema.agentRuns.id, target.id));
+
+    expect((await recoverStaleRuns({ db: f.db })).failed).toEqual([target.id]);
+    await drainOutbox(f.db, handlers);
+    expect((await consultations())[0]?.status).toBe("failed");
+    expect((await runs()).find((r) => r.agentId === f.agent.id)?.status).toBe("done");
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("couldn't answer");
   });
 });

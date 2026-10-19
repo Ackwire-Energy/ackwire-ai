@@ -3,6 +3,7 @@ import { type Database, ensureMessagePartitions, schema } from "@agenteschat/db"
 import {
   type ArtifactDeps,
   type ContextDeps,
+  createOutboxPump,
   enqueue,
   enqueueIdleReflections,
   expireApprovals,
@@ -14,7 +15,6 @@ import {
   listenForRunCancels,
   type MailDeps,
   pollImapWatches,
-  processOutbox,
   purgeDeletedArtifacts,
   queueApprovalDigests,
   reconcileComposioAccounts,
@@ -104,21 +104,21 @@ export function startWorkers(deps: WorkerDeps) {
     void tick();
   };
 
+  // A pool, not batches: a slow job (a long agent run) doesn't hold back the ones claimed after it.
+  const outboxPump = createOutboxPump(db, deps.handlers, {
+    workerId,
+    onSlotFree: () => void ticks.get("outbox")?.(),
+    onError: (job, error, outcome) =>
+      log.warn("outbox job failed", {
+        kind: job.kind,
+        jobId: job.id,
+        attempt: job.attempts,
+        outcome,
+        error: String(error),
+      }),
+  });
   every("outbox", WORKER_INTERVALS_MS.outbox, async () => {
-    while (
-      !stopped &&
-      (await processOutbox(db, deps.handlers, {
-        workerId,
-        onError: (job, error, outcome) =>
-          log.warn("outbox job failed", {
-            kind: job.kind,
-            jobId: job.id,
-            attempt: job.attempts,
-            outcome,
-            error: String(error),
-          }),
-      })) > 0
-    ) {}
+    while (!stopped && (await outboxPump.pump()) > 0) {}
   });
 
   every("partitions", WORKER_INTERVALS_MS.partitions, async () => {
