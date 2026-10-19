@@ -1,4 +1,9 @@
-import type { BrowserInputEvent, BrowserStreamMode, RunnerFrame } from "@agenteschat/adapters";
+import {
+  BROWSER_LIMITS,
+  type BrowserInputEvent,
+  type BrowserStreamMode,
+  type RunnerFrame,
+} from "@agenteschat/adapters";
 import { and, eq, inArray, schema } from "@agenteschat/db";
 import type { MachineHub } from "../machine-hub";
 import { getMachineById, machineOnline } from "../machines";
@@ -27,6 +32,33 @@ const ACCESS_RECHECK_MS = 30_000;
 export const HANDOFF_KEEPALIVE_MS = 5 * 60_000;
 /** Keep-alive pings sent at once (each may wait on a slow computer). */
 const KEEPALIVE_PARALLEL = 5;
+/**
+ * The stream keeps running this long after the last viewer leaves: a page
+ * re-rendering, a reconnect or a person switching screens comes right back,
+ * and a stop/start on the computer each time made the view flap.
+ */
+export const STREAM_STOP_DELAY_MS = 10_000;
+/** A person's input is gathered this long and sent to the computer as one batch. */
+export const INPUT_BATCH_MS = 25;
+
+/**
+ * One batch of a person's input, smaller: a run of plain mouse moves (no
+ * button held) keeps only its last one; moves while dragging and everything
+ * else stay, in order.
+ */
+export function coalesceInput(events: BrowserInputEvent[]): BrowserInputEvent[] {
+  const out: BrowserInputEvent[] = [];
+  let dragging = false;
+  const plainMove = (e: BrowserInputEvent | undefined, held: boolean) =>
+    e?.kind === "mouse" && e.type === "mouseMoved" && !held && (e.button === undefined || e.button === "none");
+  for (const e of events) {
+    if (plainMove(e, dragging) && plainMove(out.at(-1), dragging)) out[out.length - 1] = e;
+    else out.push(e);
+    if (e.kind === "mouse" && e.type === "mousePressed") dragging = true;
+    if (e.kind === "mouse" && e.type === "mouseReleased") dragging = false;
+  }
+  return out;
+}
 
 /**
  * Frames to viewers, in this process's memory (ADR 0040 §7): nothing is
@@ -110,12 +142,18 @@ interface AgentLive {
   grace: ReturnType<typeof setTimeout> | null;
   /** Stream changes run one after the other (a start never races a mode change or a stop). */
   syncing: Promise<void>;
+  /** The last viewer left: the stream stops when this fires, unless someone watches again. */
+  stopTimer: ReturnType<typeof setTimeout> | null;
 }
 
 export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
   hub: Pick<MachineHub, "call" | "isLocal">;
   graceMs?: number;
   accessRecheckMs?: number;
+  /** Tests: how long the stream outlives its last viewer (`STREAM_STOP_DELAY_MS`). */
+  stopDelayMs?: number;
+  /** Tests: how long input is gathered before it goes (`INPUT_BATCH_MS`). */
+  inputBatchMs?: number;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
@@ -132,6 +170,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   const live = new Map<string, AgentLive>();
   const graceMs = deps.graceMs ?? CONTROL_GRACE_MS;
   const recheckMs = deps.accessRecheckMs ?? ACCESS_RECHECK_MS;
+  const stopDelayMs = deps.stopDelayMs ?? STREAM_STOP_DELAY_MS;
+  const inputBatchMs = deps.inputBatchMs ?? INPUT_BATCH_MS;
   /** Last access check passed per person and agent (`userId:agentId` → time). */
   const checked = new Map<string, number>();
   /** Last keep-alive per open handoff. */
@@ -160,15 +200,39 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     return driving ? "control" : "watch";
   };
 
-  /** Asks the runner for the stream the viewers need (start, mode change, stop), one change at a time. */
-  function sync(agentId: string, state: AgentLive): Promise<void> {
-    state.syncing = state.syncing.then(() => syncNow(agentId, state)).catch(() => {});
+  /**
+   * Asks the runner for the stream the viewers need (start, mode change,
+   * stop), one change at a time. A stop waits `stopDelayMs` first, and is
+   * dropped when someone watches again meanwhile.
+   */
+  function sync(agentId: string, state: AgentLive, stopNow = false): Promise<void> {
+    state.syncing = state.syncing.then(() => syncNow(agentId, state, stopNow)).catch(() => {});
     return state.syncing;
   }
 
-  async function syncNow(agentId: string, state: AgentLive) {
+  const cancelStop = (state: AgentLive) => {
+    if (!state.stopTimer) return;
+    clearTimeout(state.stopTimer);
+    state.stopTimer = null;
+  };
+
+  /** Nothing left to keep for this agent here: no viewer, no grace, no stream, no pending stop. */
+  const forget = (agentId: string, state: AgentLive) => {
+    if (state.viewers.size > 0 || state.grace || state.stopTimer || state.mode !== null) return;
+    if (live.get(agentId) === state) live.delete(agentId);
+  };
+
+  async function syncNow(agentId: string, state: AgentLive, stopNow: boolean) {
     const mode = wanted(state);
+    if (mode !== null) cancelStop(state);
     if (mode === state.mode) return;
+    if (mode === null && !stopNow) {
+      state.stopTimer ??= setTimeout(() => {
+        state.stopTimer = null;
+        void sync(agentId, state, true).finally(() => forget(agentId, state));
+      }, stopDelayMs);
+      return;
+    }
     const agent = { id: agentId, handle: state.handle };
     state.mode = mode;
     try {
@@ -237,6 +301,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   function retire(agentId: string, old: AgentLive) {
     if (old.grace) clearTimeout(old.grace);
     old.grace = null;
+    cancelStop(old);
     broadcast(old, { type: "browser.unavailable", agentId, reason: "reconnecting" });
     for (const unsubscribe of old.unsubscribe.values()) unsubscribe();
     old.unsubscribe.clear();
@@ -260,15 +325,41 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     state.grace = setTimeout(() => {
       state.grace = null;
       if ([...state.viewers].some((v) => v.userId === userId)) return;
-      // Nobody left watching: forget this agent here (a later watch starts fresh).
-      if (state.viewers.size === 0 && live.get(agentId) === state) live.delete(agentId);
+      // Nobody left watching: forget this agent here (a later watch starts fresh) once its stream stopped.
+      forget(agentId, state);
       void written
         .then(() => expireControl(handoffDeps, handoffId, userId))
         .catch((error) => deps.log?.warn("browser control expiry failed", { agentId, error: String(error) }));
     }, graceMs);
   }
 
-  return {
+  interface InputBatch {
+    userId: string;
+    orgId: string;
+    agentId: string;
+    events: BrowserInputEvent[];
+    waiters: { resolve(r: { accepted: number; refused: boolean }): void; reject(e: unknown): void }[];
+    timer: ReturnType<typeof setTimeout> | null;
+  }
+  /** Input being gathered, per person and agent. */
+  const batches = new Map<string, InputBatch>();
+
+  function flushInput(key: string, batch: InputBatch) {
+    if (batches.get(key) === batch) batches.delete(key);
+    if (batch.timer) clearTimeout(batch.timer);
+    batch.timer = null;
+    const events = coalesceInput(batch.events);
+    api.sendInput(batch.userId, batch.orgId, batch.agentId, events).then(
+      (r) => {
+        for (const w of batch.waiters) w.resolve(r);
+      },
+      (error) => {
+        for (const w of batch.waiters) w.reject(error);
+      },
+    );
+  }
+
+  const api = {
     relay,
     handoffHooks,
     /** Deps for the handoff functions, so the live view hears about changes. */
@@ -313,6 +404,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           handoff: null,
           grace: null,
           syncing: Promise.resolve(),
+          stopTimer: null,
         };
         live.set(agentId, state);
       }
@@ -365,19 +457,49 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         if (controller === viewer.userId && ![...current.viewers].some((v) => v.userId === controller)) {
           startGrace(agentId, current, controller);
         }
-        void sync(agentId, current).finally(() => {
-          if (current.viewers.size === 0 && !current.grace && live.get(agentId) === current) live.delete(agentId);
-        });
+        void sync(agentId, current).finally(() => forget(agentId, current));
       };
       await sync(agentId, current);
       return stop;
     },
 
     /**
-     * A person's input on the live view: forwarded to the runner only when
-     * they are in control of the open handoff (checked against the database).
+     * A person's input on the live view, gathered for `inputBatchMs` and sent
+     * to the computer as one smaller batch (a mouse sends dozens of moves a
+     * second; each used to be its own request). Every caller of the batch gets
+     * its answer.
      */
-    async input(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]) {
+    input(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]) {
+      const key = `${userId}:${agentId}`;
+      let batch = batches.get(key);
+      if (batch && batch.events.length + events.length > BROWSER_LIMITS.inputEvents) {
+        flushInput(key, batch);
+        batch = undefined;
+      }
+      if (!batch) {
+        const created: InputBatch = { userId, orgId, agentId, events: [], waiters: [], timer: null };
+        created.timer = setTimeout(() => flushInput(key, created), inputBatchMs);
+        batches.set(key, created);
+        batch = created;
+      }
+      batch.events.push(...events);
+      const current = batch;
+      return new Promise<{ accepted: number; refused: boolean }>((resolve, reject) => {
+        current.waiters.push({ resolve, reject });
+      });
+    },
+
+    /** Sends one gathered batch now (it filled up, or its time came). */
+    flushInput: (key: string) => {
+      const batch = batches.get(key);
+      if (batch) flushInput(key, batch);
+    },
+
+    /**
+     * Forwarded to the runner only when the person is in control of the open
+     * handoff (checked against the database).
+     */
+    async sendInput(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]) {
       const open = await openHandoffOf(deps.db, orgId, agentId);
       if (open?.status !== "active" || open.controllerUserId !== userId) return { accepted: 0, refused: true };
       const key = `${userId}:${agentId}`;
@@ -421,6 +543,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       streamEnded(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>) {
         const state = live.get(frame.agentId);
         if (!state || state.machineId !== machineId) return;
+        cancelStop(state);
         state.mode = null;
         broadcast(state, {
           type: "browser.ended",
@@ -433,6 +556,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       closed(machineId: string) {
         for (const [agentId, state] of live) {
           if (state.machineId !== machineId) continue;
+          cancelStop(state);
           state.mode = null;
           broadcast(state, { type: "browser.unavailable", agentId, reason: "reconnecting" });
         }
@@ -486,8 +610,11 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     /** Stops hearing handoff changes from other replicas (shutdown, tests). */
     close() {
       unsubscribeHandoffs?.();
+      for (const state of live.values()) cancelStop(state);
+      for (const [key, batch] of batches) flushInput(key, batch);
     },
   };
+  return api;
 }
 
 export type BrowserLive = ReturnType<typeof createBrowserLive>;

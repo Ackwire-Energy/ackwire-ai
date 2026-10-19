@@ -549,6 +549,8 @@ function describeOp(req: MachineRequest): string {
   }
 }
 
+const isRecordLike = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+
 /** How a request ended, for an observer. */
 export type RequestOutcome =
   | { ok: true; data: unknown }
@@ -594,7 +596,10 @@ export class RequestRunner {
     }
     const controller = new AbortController();
     this.inflight.set(id, controller);
-    this.log(describeRequest(req));
+    // A browser command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
+    const timed = req.op === "browser.act";
+    const startedAt = Date.now();
+    if (!timed) this.log(describeRequest(req));
     this.observe(() => this.observer?.started(id, req));
     const scope: RequestScope = {
       signal: controller.signal,
@@ -623,6 +628,10 @@ export class RequestRunner {
         return { ok: false, error };
       })
       .then((outcome) => {
+        if (timed) {
+          const failed = !outcome.ok || (isRecordLike(outcome.data) && outcome.data.success === false);
+          this.log(`${describeRequest(req)} ${Date.now() - startedAt}ms${failed ? " (failed)" : ""}`);
+        }
         this.observe(() => this.observer?.finished(id, req, outcome));
         this.reply(id, outcome);
       })

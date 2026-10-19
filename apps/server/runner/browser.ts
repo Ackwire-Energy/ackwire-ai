@@ -37,11 +37,14 @@ import { agentFolderName, isInside } from "./paths";
  * - Binary: the desktop app's sidecar next to the runner, else a download of
  *   the pinned release into `<runner home>/bin/`, checked against its SHA-256
  *   before it is ever run.
- * - Chrome: the one installed (Chrome, Brave, Chromium) or Chrome for Testing
- *   (`agent-browser install`) on first use.
+ * - Chrome: always Chrome for Testing (`agent-browser install` on first use),
+ *   passed with `--executable-path`, never the person's own Chrome or Brave:
+ *   their updater rewrites the app while we hold it open, and macOS then
+ *   blames our app ("agentes was prevented from modifying apps").
  * - Commands run one at a time per session (the daemon does too: a read waits
- *   behind the agent's command). Reads first check the browser is open, since
- *   most commands relaunch a Chrome that died on a blank page.
+ *   behind the agent's command). A read first checks the browser is open (most
+ *   commands relaunch a Chrome that died on a blank page), unless the last
+ *   command just succeeded: then it is known to be up.
  * - The site allowlist is ours: `--allowed-domains` refuses persistent
  *   profiles, so navigations are checked before they go and the page after
  *   each action (top-level pages only; sub-resources aren't filtered).
@@ -66,6 +69,8 @@ const QUICK_TIMEOUT_MS = 15_000;
 /** After a failed download or install, wait this long before trying again. */
 const RETRY_FAILURE_MS = 10 * 60_000;
 const STREAM_OPEN_MS = 5000;
+/** A session that answered this long before its idle timeout is checked again before a read. */
+const ALIVE_MARGIN_MS = 60_000;
 
 /** What the server may ask for: everything else (vault, plugins, chat, dashboard, sessions, installs) is refused. */
 const COMMANDS = new Set([
@@ -257,57 +262,49 @@ export function isWebPage(url: string): boolean {
 /** Where `agent-browser install` puts Chrome for Testing. */
 const testingChromeDir = (home: string) => path.join(home, ".agent-browser", "browsers");
 
+/** Where the executable sits inside one Chrome for Testing folder (the layouts `agent-browser` looks for). */
+function testingChromeBinaries(dir: string, platform: string): string[] {
+  if (platform === "darwin") {
+    const app = path.join("Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing");
+    return [path.join(dir, app), path.join(dir, "chrome-mac-arm64", app), path.join(dir, "chrome-mac-x64", app)];
+  }
+  if (platform === "win32") return [path.join(dir, "chrome.exe"), path.join(dir, "chrome-win64", "chrome.exe")];
+  return [path.join(dir, "chrome"), path.join(dir, "chrome-linux64", "chrome")];
+}
+
 /**
- * The Chrome `agent-browser` would launch, as a path, or null (same order as
- * its own search: Chrome for Testing it installed, then the system's).
+ * Chrome for Testing that `agent-browser install` put under the home, newest
+ * first, as its executable; null when none is installed. The person's own
+ * Chrome is never used (see the top of this file).
  */
 export function findChrome(home: string = os.homedir(), platform: string = process.platform): string | null {
   const testing = testingChromeDir(home);
+  let entries: string[];
   try {
-    if (readdirSync(testing).some((e) => statSync(path.join(testing, e)).isDirectory())) return testing;
+    entries = readdirSync(testing).filter((e) => e.startsWith("chrome-"));
   } catch {
-    // none installed
+    return null;
   }
-  const candidates: string[] = [];
-  if (platform === "darwin") {
-    candidates.push(
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
-      "/Applications/Chromium.app/Contents/MacOS/Chromium",
-      "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-    );
-  } else if (platform === "win32") {
-    const local = process.env.LOCALAPPDATA;
-    if (local) {
-      candidates.push(
-        path.join(local, "Google", "Chrome", "Application", "chrome.exe"),
-        path.join(local, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
-      );
+  entries.sort().reverse();
+  for (const e of entries) {
+    const dir = path.join(testing, e);
+    try {
+      if (!statSync(dir).isDirectory()) continue;
+    } catch {
+      continue;
     }
-    candidates.push(
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    );
-  } else {
-    const which = (name: string) => (typeof Bun !== "undefined" ? Bun.which(name) : null);
-    for (const name of [
-      "google-chrome",
-      "google-chrome-stable",
-      "chromium-browser",
-      "chromium",
-      "brave-browser",
-      "brave-browser-stable",
-    ]) {
-      const found = which(name);
-      if (found) return found;
-    }
+    const found = testingChromeBinaries(dir, platform).find((b) => existsSync(b));
+    if (found) return found;
   }
-  return candidates.find((c) => existsSync(c)) ?? null;
+  return null;
 }
+
+/** Chrome flags on every launch: nothing updates Chrome's own files in the background while the agent uses it. */
+export const CHROME_ARGS = ["--disable-component-update", "--no-default-browser-check", "--no-first-run"];
 
 /** "Google Chrome", "Chrome for Testing"… for `hello.browser`. */
 export function chromeLabel(found: string, home: string = os.homedir()): string {
-  if (found === testingChromeDir(home)) return "Chrome for Testing";
+  if (found === testingChromeDir(home) || isInside(testingChromeDir(home), found)) return "Chrome for Testing";
   const base = path.basename(found).replace(/\.exe$/i, "");
   const names: Record<string, string> = {
     chrome: "Google Chrome",
@@ -440,6 +437,8 @@ interface Session {
   stream?: Stream;
   /** A stream being opened: a second start (or a stop) waits for it instead of opening another socket. */
   streamOpening?: Promise<void>;
+  /** When a command last succeeded (the browser was up then); null after an error or a close. */
+  aliveAt: number | null;
 }
 
 type ActRequest = Extract<MachineRequest, { op: "browser.act" }>;
@@ -486,6 +485,8 @@ export class BrowserManager {
   private readonly maxSessions: number;
   private readonly userHome: string;
   private binary: string | null = null;
+  /** The Chrome for Testing executable every session launches. */
+  private chromePath: string | null = null;
   private ready: Promise<string> | null = null;
   private failure: { reason: string; at: number } | null = null;
   private closed = false;
@@ -606,13 +607,15 @@ export class BrowserManager {
     await rename(tmp, file);
   }
 
-  /** A Chrome to drive: the one found, or Chrome for Testing installed once. */
+  /** Chrome for Testing to drive: found, or installed once (`agent-browser install`). */
   private async ensureChrome(command: string[]) {
     const find = this.opts.chrome ?? (() => findChrome(this.userHome));
-    if (find()) return;
-    this.opts.log("no Chrome found; installing Chrome for Testing for the agent browser");
+    this.chromePath = find();
+    if (this.chromePath) return;
+    this.opts.log("installing Chrome for Testing for the agent browser");
     const out = await this.spawn(command, ["install"], { timeoutMs: INSTALL_TIMEOUT_MS, cwd: this.opts.home });
-    if (find()) return;
+    this.chromePath = find();
+    if (this.chromePath) return;
     const hint =
       process.platform === "linux"
         ? `; Chrome's libraries may be missing: run ${command.join(" ")} install --with-deps`
@@ -650,6 +653,12 @@ export class BrowserManager {
     }
     const checked = this.checkArgs(command, args, folder, allowed);
     const session = await this.session(agent, folder);
+    // A screenshot or PDF into a folder that isn't there yet (`screenshots/…`): made first.
+    if (FILE_OUTPUTS.has(command)) {
+      for (const a of checked) {
+        if (path.isAbsolute(a) && isInside(folder, a)) await mkdir(path.dirname(a), { recursive: true });
+      }
+    }
     return this.enqueue(session, async () => {
       if (READS.has(command)) {
         if (!(await this.browserOpen(session, signal))) {
@@ -662,6 +671,8 @@ export class BrowserManager {
         }
       }
       const answer = await this.run(session, [command, ...checked], { timeoutMs, signal });
+      // Up when it just answered (the next read skips the check); unknown after an error or a close.
+      session.aliveAt = answer.success && command !== "close" ? this.now() : null;
       // After anything that may move the page (a click, a tab switch, a new tab…): still on an allowed site?
       if (allowed.length > 0 && !READS.has(command) && command !== "close") {
         const left = await this.leftAllowedSites(session, allowed, signal);
@@ -732,6 +743,9 @@ export class BrowserManager {
     for (const [id, s] of this.sessions) if (!live.includes(s)) this.sessions.delete(id);
     await this.ensureReady();
     await mkdir(path.join(folder, ".agentes", "browser"), { recursive: true });
+    // Where screenshots and downloads land: there before the first one (the browser doesn't make them).
+    await mkdir(path.join(folder, "screenshots"), { recursive: true });
+    await mkdir(path.join(folder, "downloads"), { recursive: true });
     await mkdir(path.dirname(this.configFile), { recursive: true, mode: 0o700 });
     if (!existsSync(this.configFile)) await writeFile(this.configFile, "{}\n", { mode: 0o600 });
     const session: Session = {
@@ -740,6 +754,7 @@ export class BrowserManager {
       folder,
       queue: Promise.resolve(),
       lastUsed: this.now(),
+      aliveAt: null,
     };
     this.sessions.set(agentId, session);
     return session;
@@ -753,7 +768,11 @@ export class BrowserManager {
 
   /** Flags the runner sets on every command of a session. */
   private sessionFlags(session: Session): string[] {
+    const chrome = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
     return [
+      ...(chrome ? ["--executable-path", chrome] : []),
+      "--args",
+      CHROME_ARGS.join(","),
       "--namespace",
       this.namespace,
       "--session",
@@ -799,13 +818,20 @@ export class BrowserManager {
     return parseAnswer(out.stdout, out.stderr, out.exitCode);
   }
 
-  /** Whether the session's Chrome is up (`stream status` never launches one). */
+  /**
+   * Whether the session's Chrome is up (`stream status` never launches one).
+   * Skipped when the last command just succeeded: it was up then, and the
+   * daemon only closes it after the idle timeout.
+   */
   private async browserOpen(session: Session, signal?: AbortSignal): Promise<boolean> {
+    if (session.aliveAt !== null && this.now() - session.aliveAt < this.idleMs - ALIVE_MARGIN_MS) return true;
     const status = await this.run(session, ["stream", "status"], {
       timeoutMs: QUICK_TIMEOUT_MS,
       ...(signal ? { signal } : {}),
     });
-    return status.success && isRecord(status.data) && status.data.connected === true;
+    const open = status.success && isRecord(status.data) && status.data.connected === true;
+    session.aliveAt = open ? this.now() : null;
+    return open;
   }
 
   /** The active tab's address, or null when the browser can't say. */
@@ -1011,7 +1037,11 @@ export class BrowserManager {
     socket.onclose = () => {
       if (session.stream !== stream) return;
       session.stream = undefined;
-      if (!stream.closing) this.opts.send({ type: "browser.stream.ended", agentId: session.agentId, reason: "closed" });
+      if (!stream.closing) {
+        // The browser closed under the stream: the next read checks again.
+        session.aliveAt = null;
+        this.opts.send({ type: "browser.stream.ended", agentId: session.agentId, reason: "closed" });
+      }
     };
   }
 
