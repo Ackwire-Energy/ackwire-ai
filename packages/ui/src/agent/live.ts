@@ -143,7 +143,7 @@ function poseFor(a: ReturnType<LiveAgent["look"]>, t: number, box: HTMLElement, 
 }
 
 /** Smallest framed tile (CSS px) that still shows the accessory. */
-const FRAMED_ACCESSORY_MIN = 26;
+const FRAMED_ACCESSORY_MIN = 24;
 
 const isDark = (el: Element) => el.closest("[data-theme]")?.getAttribute("data-theme") === "dark";
 
@@ -206,7 +206,7 @@ function livePose(agent: LiveAgent, t: number): { pose: Pose; hop: number } {
 /**
  * The tile (telas/RefinoUI.html, "Céu"): the agent's pixel sky fills the
  * canvas; the agent stands centered, feet near the bottom edge, smaller with
- * an accessory so it has room above (accessories only from 26px).
+ * an accessory so it has room above (accessories from 24px, the sidebar size).
  */
 function drawFramed(agent: LiveAgent, ctx: CanvasRenderingContext2D, size: number, dpr: number, t: number) {
   const { canvas, box } = agent;
