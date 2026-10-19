@@ -20,7 +20,7 @@ import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { FAILED_REASONS, siteLetter, siteOf } from "./logic";
+import { FAILED_REASONS, siteOf } from "./logic";
 import { FrameView, TypeBar, useLiveConnection } from "./parts";
 
 /** The log's last lines under the page (the prototype shows three). */
@@ -198,7 +198,6 @@ export function BrowserCard({
           ? t("mobile.browser.card.doing", { name, doing: stepText(t, doing) })
           : t(`mobile.browser.card.where${g}`, { name });
 
-  const letter = siteLetter(host);
   return (
     <View style={[styles.card, raised]}>
       <Sky color={color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
@@ -212,15 +211,6 @@ export function BrowserCard({
         accessibilityLabel={`${title}. ${subtitle}`}
         style={styles.head}
       >
-        <View style={[styles.tile, { backgroundColor: c.sunken }]}>
-          {letter ? (
-            <Text variant="footnote" tone="ink" style={styles.semibold}>
-              {letter}
-            </Text>
-          ) : (
-            <Icon name="globe" size={14} color={c.ink2} />
-          )}
-        </View>
         <View style={styles.grow}>
           <Text variant="footnote" tone="ink" numberOfLines={mine || waiting ? 2 : 1} style={styles.semibold}>
             {title}

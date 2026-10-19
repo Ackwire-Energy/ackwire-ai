@@ -24,7 +24,6 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive } from "@/realtime/context";
-import { AgentAvatar } from "../AgentAvatar";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { useBrowserCardRequest } from "./open";
@@ -359,13 +358,6 @@ export function BrowserCard({
       <SkyStrip color={color} muted={inControl} moving={live_} />
       <div className="brw-ac__head">
         <button type="button" className="brw-ac__tt" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          {host ? (
-            <span className="brw-stile brw-stile--lg" aria-hidden="true">
-              {host.charAt(0)}
-            </span>
-          ) : (
-            <AgentAvatar agentId={agentId} name={name} size="sm" className="brw-ac__avatar" aria-hidden="true" />
-          )}
           <span className="brw-ac__tx">
             <b className={asTitle === "ask" ? "is-ask" : undefined} title={asTitle === "ask" ? title : undefined}>
               {title}
