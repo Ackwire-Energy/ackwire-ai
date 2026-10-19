@@ -1,5 +1,6 @@
 import type { BrowserHandoff, BrowserInputEvent, BrowserStep, LiveRun } from "@agenteschat/client";
 import {
+  browserSiteUrl,
   browserSteps,
   clickEvents,
   isOpenHandoff,
@@ -22,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive } from "@/realtime/context";
+import { AgentAvatar } from "../AgentAvatar";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { useBrowserCardRequest } from "./open";
@@ -83,6 +85,21 @@ export function hostAndPath(url: string | null | undefined): [string, string] {
   if (!url) return ["", ""];
   const m = /^[a-z]+:\/\/([^/?#]+)([^?#]*)/i.exec(url);
   return m ? [m[1] ?? "", (m[2] ?? "").replace(/\/$/, "")] : [url, ""];
+}
+
+/**
+ * What the card's title shows: the request while the person is in control of it, else the
+ * site, "opening" only until the first frame, and the agent's browser when no site is known.
+ */
+export function titleKind(v: {
+  inControl: boolean;
+  ask: string | null;
+  host: string;
+  opening: boolean;
+}): "ask" | "host" | "opening" | "agent" {
+  if (v.inControl && v.ask) return "ask";
+  if (v.host) return "host";
+  return v.opening ? "opening" : "agent";
 }
 
 /** The browser card on an agent's live row, while (and after) it used its browser in this run. */
@@ -287,17 +304,25 @@ export function BrowserCard({
   const starting = open && !frame && !blocker && !reconnecting;
   const src = frame ? `data:image/jpeg;base64,${frame.data}` : null;
   const lastStep = steps.at(-1);
-  const [host, path] = hostAndPath(
-    frame?.metadata.url ?? steps.findLast((s) => s.tool === "browser_open" && s.detail)?.detail ?? null,
-  );
+  const [host, path] = hostAndPath(browserSiteUrl(frame?.metadata.url, steps));
   const ask = handoff?.kind === "ask" ? handoff.instructions : null;
   const working = !inControl && !otherInControl;
   const showLog = open && working && !starting && steps.length > 0;
 
-  const title = (open && starting) || !host ? t("browser.inCard.opening") : host;
+  const asTitle = titleKind({ inControl, ask, host, opening: open && starting });
+  const title =
+    asTitle === "ask"
+      ? (ask ?? "")
+      : asTitle === "host"
+        ? host
+        : asTitle === "opening"
+          ? t("browser.inCard.opening")
+          : t("browser.inCard.group", g);
   const sub = inControl
     ? ask
-      ? t("browser.inCard.subControl", { ask })
+      ? host
+        ? t("browser.inCard.subControl", { site: host, ...g })
+        : t("browser.inCard.subControlAsked", g)
       : t("browser.inCard.subTakeover", g)
     : otherInControl
       ? t("browser.inCard.subOther", { person: controllerName })
@@ -333,13 +358,17 @@ export function BrowserCard({
       <SkyStrip color={color} muted={inControl} moving={live_} />
       <div className="brw-ac__head">
         <button type="button" className="brw-ac__tt" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          <span className="brw-stile brw-stile--lg" aria-hidden="true">
-            {host ? host.charAt(0) : "·"}
-          </span>
+          {host ? (
+            <span className="brw-stile brw-stile--lg" aria-hidden="true">
+              {host.charAt(0)}
+            </span>
+          ) : (
+            <AgentAvatar agentId={agentId} name={name} size="sm" className="brw-ac__avatar" aria-hidden="true" />
+          )}
           <span className="brw-ac__tx">
-            <b>
+            <b className={asTitle === "ask" ? "is-ask" : undefined} title={asTitle === "ask" ? title : undefined}>
               {title}
-              {host && !(open && starting) && path && <span className="brw-ac__path">{path}</span>}
+              {asTitle === "host" && path && <span className="brw-ac__path">{path}</span>}
             </b>
             <small>
               {(live_ || reconnecting) && <PixelSpinner size={14} color={color} />}
@@ -514,7 +543,9 @@ export function BrowserCard({
                         }
                       }}
                     />
-                    <span className="brw-typer__to">{t("browser.live.typeToPage")}</span>
+                    <span className={mark ? "brw-typer__to is-marked" : "brw-typer__to"}>
+                      {mark ? t("browser.live.typeToPage") : t("browser.live.typeClickFirst")}
+                    </span>
                     <button
                       type="button"
                       className="brw-secure"

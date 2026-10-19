@@ -539,6 +539,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.brw-ac__tx b.is-ask {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.brw-ac__avatar {
+  flex: none;
+}
+.brw-typer__to.is-marked {
+  color: var(--ink2);
+}
 .brw-ac__path {
   color: var(--faint);
   font-weight: 500;

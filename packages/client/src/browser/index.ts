@@ -86,9 +86,31 @@ export interface BrowserStep {
 export function browserSteps(work: LiveWork[] | undefined): BrowserStep[] {
   return (work ?? []).flatMap((w) =>
     w.kind === "call" && isBrowserTool(w.tool)
-      ? [{ id: w.id, tool: w.tool, detail: w.detail, running: w.running, ...(w.since ? { since: w.since } : {}) }]
+      ? [
+          {
+            id: w.id,
+            // A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`).
+            tool: w.tool.replace(/^mcp__agentes__/, ""),
+            detail: w.detail,
+            running: w.running,
+            ...(w.since ? { since: w.since } : {}),
+          },
+        ]
       : [],
   );
+}
+
+/**
+ * The page the agent's browser is on, as best known: the live frame's address, else the
+ * site of its latest open (or new tab). Null before either exists.
+ */
+export function browserSiteUrl(frameUrl: string | null | undefined, steps: BrowserStep[]): string | null {
+  if (frameUrl && !/^about:/i.test(frameUrl)) return frameUrl;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s && (s.tool === "browser_open" || s.tool === "browser_tabs") && s.detail) return s.detail;
+  }
+  return null;
 }
 
 /** A request changed (an action's answer, `browser.handoff.updated`): every cached view of it follows. */

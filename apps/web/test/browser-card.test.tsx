@@ -5,6 +5,7 @@ setupDom();
 
 import type { BrowserHandoff } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, settle } from "./render";
 
@@ -63,9 +64,10 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
     const card = document.querySelector(".brw-ac") as HTMLElement;
     expect(card.classList.contains("is-open")).toBe(true);
     expect(card.classList.contains("is-control")).toBe(true);
-    expect(card.querySelector(".brw-ac__tx small")?.textContent).toContain(
-      "Você no controle · Entrar no painel com a conta de teste",
-    );
+    // The request is the title; the line under it says who is in control (prototype A + Céu).
+    expect(card.querySelector(".brw-ac__tx b")?.textContent).toBe("Entrar no painel com a conta de teste");
+    expect(card.querySelector(".brw-ac__tx small")?.textContent).toContain("Você no controle ·");
+    expect(card.querySelector(".brw-ac__tx small")?.textContent).not.toContain("Entrar no painel");
     expect(within(card).getByRole("button", { name: "Pronto" })).toBeTruthy();
     expect(within(card).getByRole("textbox", { name: "Texto para a página" })).toBeTruthy();
     expect(within(card).getByRole("button", { name: "Não consegui" })).toBeTruthy();
@@ -76,5 +78,16 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
     await settle(4);
     expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
     expect(document.querySelector(".brw-ac")).toBeNull();
+  });
+});
+
+describe("the card's title", () => {
+  test("'opening' only until the first frame; then the site, or the agent's browser when none is known", () => {
+    expect(titleKind({ inControl: false, ask: null, host: "", opening: true })).toBe("opening");
+    // A frame arrived (no longer opening) without an address yet: never stuck on "Abrindo".
+    expect(titleKind({ inControl: false, ask: null, host: "", opening: false })).toBe("agent");
+    expect(titleKind({ inControl: false, ask: null, host: "viajolo.example", opening: false })).toBe("host");
+    expect(titleKind({ inControl: true, ask: "Entrar no painel", host: "viajolo.example", opening: false })).toBe("ask");
+    expect(titleKind({ inControl: true, ask: null, host: "viajolo.example", opening: false })).toBe("host");
   });
 });

@@ -28,7 +28,8 @@ export function siteOf(frameUrl: string | null | undefined, steps: { tool: strin
   if (live) return live;
   for (let i = steps.length - 1; i >= 0; i--) {
     const s = steps[i];
-    if (s?.tool.replace(/^mcp__agentes__/, "") !== "browser_open" || !s.detail) continue;
+    const tool = s?.tool.replace(/^mcp__agentes__/, "");
+    if ((tool !== "browser_open" && tool !== "browser_tabs") || !s?.detail) continue;
     return hostOf(s.detail) || s.detail.trim().toLowerCase();
   }
   return "";

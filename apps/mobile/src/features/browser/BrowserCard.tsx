@@ -222,7 +222,7 @@ export function BrowserCard({
           )}
         </View>
         <View style={styles.grow}>
-          <Text variant="footnote" tone="ink" numberOfLines={1} style={styles.semibold}>
+          <Text variant="footnote" tone="ink" numberOfLines={mine || waiting ? 2 : 1} style={styles.semibold}>
             {title}
           </Text>
           <View style={styles.subRow}>
