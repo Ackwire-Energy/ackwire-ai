@@ -12,11 +12,14 @@ import type { ChannelEvent, UserEvent } from "../api/types";
 export type ServerFrame =
   | { type: "ready"; orgId: string; userId: string }
   | { type: "subscribed" | "unsubscribed"; channelId: string }
-  | { type: "error"; code: string; channelId?: string }
+  /** `agentId`: about an agent's browser (ADR 0040), for the live view. */
+  | { type: "error"; code: string; channelId?: string; agentId?: string }
   | { type: "pong" }
   | { type: "event"; channelId: string; event: ChannelEvent }
   /** `user`: for me only; `org`: broadcasts to the whole organization (the forum). */
-  | { type: "event"; scope: "user" | "org"; event: UserEvent };
+  | { type: "event"; scope: "user" | "org"; event: UserEvent }
+  /** The agent browser's live view (ADR 0040): `browser.frame`, `browser.status`, … (see `browser/live.ts`). */
+  | { type: `browser.${string}`; agentId: string; [key: string]: unknown };
 
 export type ConnectionStatus = "idle" | "connecting" | "open" | "reconnecting" | "closed";
 
@@ -88,6 +91,7 @@ export class RealtimeConnection {
   private readonly reconnectListeners = new Set<() => void>();
   private readonly errorListeners = new Set<(code: string, channelId?: string) => void>();
   private readonly userListeners = new Set<(event: UserEvent) => void>();
+  private readonly browserListeners = new Set<(frame: Record<string, unknown>) => void>();
   private attempt = 0;
   private retryTimer: unknown = null;
   private pingTimer: unknown = null;
@@ -176,6 +180,27 @@ export class RealtimeConnection {
     };
   }
 
+  /**
+   * The agent browser's live view frames (ADR 0040: `browser.*`, and errors about
+   * an agent's browser), as they arrive. Feed them to `createBrowserLiveConnection`.
+   */
+  onBrowserFrame(listener: (frame: Record<string, unknown>) => void) {
+    this.browserListeners.add(listener);
+    return () => {
+      this.browserListeners.delete(listener);
+    };
+  }
+
+  /** Sends a live-view frame (`browser.watch`, `browser.unwatch`, `browser.input`); dropped while not connected. */
+  sendBrowserFrame(frame: { type: `browser.${string}`; agentId: string; [key: string]: unknown }) {
+    this.send(frame);
+  }
+
+  /** Whether frames can go out now. */
+  get isOpen() {
+    return this.socket !== null && this.socket.readyState === OPEN;
+  }
+
   onError(listener: (code: string, channelId?: string) => void) {
     this.errorListeners.add(listener);
     return () => {
@@ -215,6 +240,10 @@ export class RealtimeConnection {
 
   private handle(frame: ServerFrame | null) {
     if (!frame) return;
+    if (frame.type.startsWith("browser.") || (frame.type === "error" && typeof frame.agentId === "string")) {
+      for (const l of this.browserListeners) l(frame as Record<string, unknown>);
+      return;
+    }
     if (frame.type === "event" && "scope" in frame) {
       for (const l of this.userListeners) l(frame.event);
     } else if (frame.type === "event") {

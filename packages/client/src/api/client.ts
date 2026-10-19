@@ -6,6 +6,7 @@ import type {
   AgentAction,
   AgentBrain,
   AgentBrainInput,
+  AgentBrowserSettings,
   AgentChannel,
   AgentComputer,
   AgentDatabase,
@@ -30,6 +31,7 @@ import type {
   AuthConfig,
   BatchInviteResult,
   BrainKind,
+  BrowserHandoff,
   CalendarEvent,
   CalendarEventInput,
   CalendarEventPatch,
@@ -899,6 +901,27 @@ export interface ApiClient {
     /** An agent's access and rules per database. */
     agent(orgId: string, agentId: string): Promise<AgentDatabase[]>;
     setAgent(orgId: string, agentId: string, connectionId: string, input: AgentDatabaseInput): Promise<AgentDatabase>;
+  };
+  /** The agent browser on connected computers (ADR 0040). The live view itself is on the realtime socket. */
+  browser: {
+    /** Whether its computer serves the browser, and the sites it may open. */
+    settings(orgId: string, agentId: string): Promise<AgentBrowserSettings>;
+    /** The sites (owner or admins); null or empty = any site. */
+    setDomains(orgId: string, agentId: string, allowedDomains: string[] | null): Promise<AgentBrowserSettings>;
+    /** The agent's open request or take over, if any. */
+    agentHandoff(orgId: string, agentId: string): Promise<BrowserHandoff | null>;
+    handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
+    /** Take control of a request (one person at a time; 409 when someone else has it). */
+    takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;
+    /** "Pronto" (also hands back a take over): the agent reads the page again and goes on. */
+    done(orgId: string, handoffId: string): Promise<BrowserHandoff>;
+    /** "Não consegui", with an optional reason the agent reads. */
+    failed(orgId: string, handoffId: string, note?: string): Promise<BrowserHandoff>;
+    cancel(orgId: string, handoffId: string): Promise<BrowserHandoff>;
+    /** Take over while watching; the agent waits until handed back. */
+    takeover(orgId: string, agentId: string): Promise<BrowserHandoff>;
+    /** "Parar": closes the agent's browser now (its logins stay). */
+    stop(orgId: string, agentId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

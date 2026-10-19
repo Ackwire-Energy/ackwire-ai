@@ -1,0 +1,130 @@
+import type { BrowserFrameMetadata, BrowserInputEvent, BrowserModifiers } from "./live";
+
+/**
+ * A person's input on the live view (ADR 0040 §7): where a click or tap on
+ * the shown frame lands on the page, and the key and text events to send.
+ */
+
+/**
+ * A point on the shown frame (relative to the element showing it, any size)
+ * → page coordinates (CSS pixels of the viewport the frame was taken at).
+ * Null when the point is outside the frame or the frame has no size.
+ */
+export function framePoint(
+  point: { x: number; y: number },
+  shown: { width: number; height: number },
+  meta: Pick<BrowserFrameMetadata, "deviceWidth" | "deviceHeight">,
+): { x: number; y: number } | null {
+  if (shown.width <= 0 || shown.height <= 0 || meta.deviceWidth <= 0 || meta.deviceHeight <= 0) return null;
+  if (point.x < 0 || point.y < 0 || point.x > shown.width || point.y > shown.height) return null;
+  return {
+    x: Math.round((point.x / shown.width) * meta.deviceWidth),
+    y: Math.round((point.y / shown.height) * meta.deviceHeight),
+  };
+}
+
+/**
+ * The size a frame is shown at to fit `box` without distortion (letterboxed),
+ * and its offset inside the box: for an element that is larger than the image.
+ */
+export function fitFrame(
+  box: { width: number; height: number },
+  meta: Pick<BrowserFrameMetadata, "deviceWidth" | "deviceHeight">,
+): { width: number; height: number; left: number; top: number } {
+  if (box.width <= 0 || box.height <= 0 || meta.deviceWidth <= 0 || meta.deviceHeight <= 0) {
+    return { width: 0, height: 0, left: 0, top: 0 };
+  }
+  const scale = Math.min(box.width / meta.deviceWidth, box.height / meta.deviceHeight);
+  const width = meta.deviceWidth * scale;
+  const height = meta.deviceHeight * scale;
+  return { width, height, left: (box.width - width) / 2, top: (box.height - height) / 2 };
+}
+
+/** A click (press and release) at a page point. */
+export function clickEvents(at: { x: number; y: number }, modifiers?: BrowserModifiers): BrowserInputEvent[] {
+  const base = { kind: "mouse" as const, x: at.x, y: at.y, button: "left" as const, clickCount: 1 };
+  const mods = modifiers ? { modifiers } : {};
+  return [
+    { ...base, type: "mousePressed", ...mods },
+    { ...base, type: "mouseReleased", ...mods },
+  ];
+}
+
+/** A tap from the phone (touch start and end). */
+export function tapEvents(at: { x: number; y: number }): BrowserInputEvent[] {
+  return [
+    { kind: "touch", type: "touchStart", touchPoints: [{ x: at.x, y: at.y }] },
+    { kind: "touch", type: "touchEnd", touchPoints: [] },
+  ];
+}
+
+/** Scrolling over the page (the wheel, or a drag on the phone). */
+export function wheelEvent(at: { x: number; y: number }, deltaX: number, deltaY: number): BrowserInputEvent {
+  return { kind: "mouse", type: "mouseWheel", x: at.x, y: at.y, deltaX, deltaY };
+}
+
+/** Whole text into the page's focused field (accents and autofilled passwords included). */
+export function textEvent(text: string): BrowserInputEvent | null {
+  return text ? { kind: "text", text } : null;
+}
+
+/** The special keys the live view sends as keys (everything else goes as text). */
+export const SPECIAL_KEYS = {
+  Enter: "Enter",
+  Tab: "Tab",
+  Backspace: "Backspace",
+  Escape: "Escape",
+  Delete: "Delete",
+  ArrowUp: "ArrowUp",
+  ArrowDown: "ArrowDown",
+  ArrowLeft: "ArrowLeft",
+  ArrowRight: "ArrowRight",
+  Home: "Home",
+  End: "End",
+  PageUp: "PageUp",
+  PageDown: "PageDown",
+} as const;
+
+export type SpecialKey = keyof typeof SPECIAL_KEYS;
+
+export const isSpecialKey = (key: string): key is SpecialKey => Object.hasOwn(SPECIAL_KEYS, key);
+
+/**
+ * The modifier mask of a keyboard or mouse event. Command on the person's Mac
+ * becomes Control when the agent's computer isn't a Mac, so Command+A selects
+ * all there too; on a Mac it stays Meta.
+ */
+export function modifiersOf(
+  e: { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
+  remoteIsMac: boolean,
+): BrowserModifiers {
+  const meta = Boolean(e.metaKey);
+  const control = Boolean(e.ctrlKey) || (meta && !remoteIsMac);
+  return (e.altKey ? 1 : 0) | (control ? 2 : 0) | (meta && remoteIsMac ? 4 : 0) | (e.shiftKey ? 8 : 0);
+}
+
+/** A key press (down and up): Enter, Tab, Backspace, Escape, arrows, or a shortcut letter with modifiers. */
+export function keyEvents(key: string, modifiers?: BrowserModifiers): BrowserInputEvent[] {
+  const code = isSpecialKey(key) ? key : key.length === 1 && /[a-z]/i.test(key) ? `Key${key.toUpperCase()}` : undefined;
+  const base = { kind: "key" as const, key, ...(code ? { code } : {}), ...(modifiers ? { modifiers } : {}) };
+  return [
+    { ...base, type: "keyDown" },
+    { ...base, type: "keyUp" },
+  ];
+}
+
+/**
+ * A key typed on the frame itself (the web, a hardware keyboard): special keys and shortcuts
+ * as keys, a plain character as text. Null for what isn't sent (a modifier alone).
+ */
+export function keyboardEvents(
+  e: { key: string; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
+  remoteIsMac: boolean,
+): BrowserInputEvent[] | null {
+  if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return null;
+  const mods = modifiersOf(e, remoteIsMac);
+  const shortcut = (mods & (1 | 2 | 4)) !== 0;
+  if (isSpecialKey(e.key) || (shortcut && e.key.length === 1)) return keyEvents(e.key, mods);
+  if (e.key.length === 1) return [{ kind: "text", text: e.key }];
+  return null;
+}

@@ -109,6 +109,19 @@ describe("handoff routes", () => {
     const canceled = await api(`/browser/handoffs/${second.id}/cancel`, { json: {} });
     expect(await canceled.json()).toMatchObject({ status: "cancelled" });
   });
+
+  test("stop: refused to outsiders; for the owner it reaches the computer (offline here)", async () => {
+    const { org, api } = await seeded();
+    const other = browser(t);
+    await signUp(other, "zed@example.com");
+    const outsider = await other(`/api/app/organizations/${org.orgId}/agents/${org.agentId}/browser/stop`, {
+      json: {},
+    });
+    expect(outsider.status).toBe(403);
+    // The computer isn't connected in this test: the owner's stop gets as far as the computer.
+    const stop = await api(`/agents/${org.agentId}/browser/stop`, { json: {} });
+    expect([204, 409, 503]).toContain(stop.status);
+  });
 });
 
 describe("live view socket", () => {

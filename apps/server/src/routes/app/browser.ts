@@ -8,6 +8,7 @@ import {
   openHandoffOf,
   requireBrowserAccess,
   startTakeover,
+  stopAgentBrowser,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -163,6 +164,23 @@ export function browserRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       return c.json(await startTakeover(handoffDeps, c.get("user").id, orgId, agentId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/browser/stop",
+      tags,
+      security,
+      summary: "Close the agent's browser now (its logins stay); its next browser call opens a fresh one",
+      request: { params: AgentParams },
+      responses: { 204: { description: "Closed" }, ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      await stopAgentBrowser(db, deps.extras?.sandbox?.machines?.hub, c.get("user").id, orgId, agentId);
+      return c.body(null, 204);
     },
   );
 

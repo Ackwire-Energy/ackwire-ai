@@ -6,6 +6,7 @@ import type {
   AgentAccess,
   AgentAction,
   AgentBrain,
+  AgentBrowserSettings,
   AgentChannel,
   AgentComputer,
   AgentDatabase,
@@ -23,6 +24,7 @@ import type {
   ArtifactVersion,
   AuthConfig,
   BatchInviteResult,
+  BrowserHandoff,
   CalendarEvent,
   CalendarRange,
   Channel,
@@ -235,6 +237,31 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           method: "PUT",
           json: input,
         }),
+    },
+    browser: {
+      settings: (orgId, agentId) => request<AgentBrowserSettings>(`${org(orgId)}/agents/${enc(agentId)}/browser`),
+      setDomains: (orgId, agentId, allowedDomains) =>
+        request<AgentBrowserSettings>(`${org(orgId)}/agents/${enc(agentId)}/browser`, {
+          method: "PUT",
+          json: { allowedDomains },
+        }),
+      agentHandoff: async (orgId, agentId) =>
+        (await request<{ handoff: BrowserHandoff | null }>(`${org(orgId)}/agents/${enc(agentId)}/browser/handoff`))
+          .handoff,
+      handoff: (orgId, handoffId) => request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}`),
+      takeControl: (orgId, handoffId) =>
+        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/control`, { json: {} }),
+      done: (orgId, handoffId) =>
+        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/done`, { json: {} }),
+      failed: (orgId, handoffId, note) =>
+        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/failed`, {
+          json: note ? { note } : {},
+        }),
+      cancel: (orgId, handoffId) =>
+        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/cancel`, { json: {} }),
+      takeover: (orgId, agentId) =>
+        request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/browser/takeover`, { json: {} }),
+      stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),

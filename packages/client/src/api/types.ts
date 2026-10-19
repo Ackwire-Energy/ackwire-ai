@@ -447,6 +447,13 @@ export type ChannelEvent =
       threadId: string | null;
       secretRequest: SecretRequest;
     }
+  /** An agent's browser request changed (ADR 0040 §6): someone took control, or it ended. The card is `meta.browserHandoff`. */
+  | {
+      type: "browser.handoff.updated";
+      channelId: string;
+      threadId: string | null;
+      handoff: BrowserHandoff;
+    }
   /** An agent changed its memory because a person asked (with an undo), or proposed a change. */
   | {
       type: "memory.updated";
@@ -1798,6 +1805,17 @@ export interface Machine {
   paused?: MachinePause | null;
   /** ADR 0036 §8 (protocol 10): what the machine allows, as last reported. Absent until the machine reports it. */
   access?: MachineAccess | null;
+  /** ADR 0040 (protocol 12): whether the agent browser can run there; null or absent when its runner doesn't say. */
+  browser?: MachineBrowser | null;
+}
+
+/** The agent browser on a computer, as its runner reports it. Turned on at the computer (`access.tools.browser`). */
+export interface MachineBrowser {
+  available: boolean;
+  version: string | null;
+  chrome: string | null;
+  /** Why it can't run yet, in the runner's words. */
+  reason: string | null;
 }
 
 /**
@@ -1821,14 +1839,15 @@ export interface MachineFolderGrant {
 /** What the machine allows (the runner's `RunnerAccess`). Granting only ever happens on the machine. */
 export interface MachineAccess {
   folders: MachineFolderGrant[];
-  tools: Record<MachineToolName, boolean>;
+  /** `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). */
+  tools: Record<MachineToolName, boolean> & { browser?: boolean };
 }
 
 /** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
 export interface MachineAccessReduce {
   /** Without `agentId`: the folder for everyone. */
   removeFolder?: { path: string; agentId?: string };
-  disableTool?: MachineToolName;
+  disableTool?: MachineToolName | "browser";
 }
 
 /** Approximate location of the computer that asked for a code (best effort, from its IP). */
@@ -3071,7 +3090,9 @@ export type NotificationKind =
   | "routine_failed"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
-  | "machine_connected";
+  | "machine_connected"
+  /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
+  | "browser_handoff";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -3094,6 +3115,8 @@ export interface NotificationSource {
   routineId?: string;
   /** `machine_connected`: the computer. */
   machineId?: string;
+  /** `browser_handoff`: the request (its chat card has the same id). */
+  handoffId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -3417,4 +3440,52 @@ export interface AgentDatabase {
 export interface AgentDatabaseInput {
   level: "none" | "read";
   policy: DatabasePolicy;
+}
+
+// ── Agent browser (ADR 0040) ─────────────────────────────────────────────────
+
+export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled";
+
+/**
+ * A person's turn in an agent's browser: the agent asked (`ask`, with a chat
+ * card `meta.browserHandoff` whose message id is this id) or someone watching
+ * took over (`takeover`, no card).
+ */
+export interface BrowserHandoff {
+  id: string;
+  agentId: string;
+  runId: string | null;
+  machineId: string;
+  kind: "ask" | "takeover";
+  instructions: string;
+  status: BrowserHandoffStatus;
+  requestedForUserId: string | null;
+  /** Who is in control now (null: nobody yet). */
+  controllerUserId: string | null;
+  /** "Não consegui": the person's reason. */
+  note: string | null;
+  /** While nobody has opened it: when it expires. Null once someone is in control (no deadline then). */
+  expiresAt: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+/** Why an agent can't use its browser now (codes for the app's own text). */
+export type BrowserUnavailableReason =
+  | "no_machine"
+  | "machine_removed"
+  | "outdated"
+  | "switched_off"
+  | "not_installed"
+  | "not_reported";
+
+/** `GET …/agents/{id}/browser`: whether its computer serves the browser, and the sites it may open. */
+export interface AgentBrowserSettings {
+  /** Null: any site. `*.example.com` covers the domain too. */
+  allowedDomains: string[] | null;
+  available: boolean;
+  reason: BrowserUnavailableReason | null;
+  /** The computer's own words, when it said why. */
+  detail: string | null;
+  machine: { id: string; name: string } | null;
 }
