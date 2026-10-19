@@ -14,6 +14,7 @@ import {
   createMemoryRateLimiter,
   createMillionSendSender,
   createPostgresBlobStore,
+  createPostgresDatabaseDriver,
   createPostgresPubSub,
   createPostgresSearchResolver,
   createS3BlobStore,
@@ -117,6 +118,8 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // Phone app push (ADR 0035): only devices that registered get anything.
     push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
     mail: mailAdapters(config),
+    // People's Postgres databases for agents (ADR 0039): always on; every connection is checked and read-only.
+    databases: createPostgresDatabaseDriver(),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });

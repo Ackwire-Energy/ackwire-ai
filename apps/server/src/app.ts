@@ -17,6 +17,7 @@ import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
 import { customConnectorRoutes } from "./routes/app/connectors-custom";
 import type { AppDeps } from "./routes/app/context";
+import { databaseRoutes } from "./routes/app/databases";
 import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
@@ -108,6 +109,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", customConnectorRoutes(deps));
     api.route("/app", connectorRoutes(deps));
     api.route("/app", mailRoutes(deps));
+    api.route("/app", databaseRoutes(deps));
     api.route("/app", managementRoutes(deps));
     api.route("/app", knowledgeRoutes(deps));
     api.route("/app", memoryRoutes(deps));

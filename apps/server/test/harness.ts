@@ -7,6 +7,7 @@ import {
   createMemoryPubSub,
   createMemoryRateLimiter,
   createPostgresSearchResolver,
+  type DatabaseDriver,
   type MailAdapters,
   noPlatformCredentials,
   type S3Fetch,
@@ -75,6 +76,8 @@ export async function createTestServer(
     desktopFetch?: typeof fetch;
     /** Fake mail adapters (Composio, IMAP); absent = no email connectors. */
     mail?: MailAdapters;
+    /** Fake database driver (ADR 0039); absent = no database connector. */
+    databases?: DatabaseDriver;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -101,6 +104,7 @@ export async function createTestServer(
     platformBlobs,
     push,
     ...(options.mail ? { mail: options.mail } : {}),
+    databases: options.databases ?? null,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();

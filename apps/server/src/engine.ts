@@ -15,6 +15,7 @@ import {
   createClaudeCodeBrain,
   createConnectorToolSource,
   createContextToolSource,
+  createDatabaseToolSource,
   createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
@@ -222,6 +223,8 @@ export function buildEngine(o: EngineOptions) {
         resolveHost: o.resolveHost,
         artifacts,
       }),
+      // People's Postgres databases (ADR 0039): read-only queries, when the server has a driver.
+      createDatabaseToolSource({ keyWrappers, databases: adapters.databases, resolveHost: o.resolveHost }),
       createMissionToolSource(missionDeps),
       // Computer-brain runs only (calls through the runner bridge): before the sandbox tools, so these
       // win a name clash (`start_task`) there.
