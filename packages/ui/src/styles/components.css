@@ -843,6 +843,9 @@ textarea.ac-input {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* Never wider than its container: a long name ends in "…" (the full text stays in the DOM). */
+  max-width: 100%;
+  min-width: 0;
   height: 22px;
   padding: 0 var(--space-2);
   font-size: 12px;
@@ -860,8 +863,17 @@ textarea.ac-input {
   color: var(--success);
 }
 .ac-chip .ac-icon {
+  flex: none;
   width: 14px;
   height: 14px;
+}
+.ac-chip > :not(.ac-chip__text) {
+  flex: none;
+}
+.ac-chip__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Small attention note: icon + text, no background (from telas/Agente permissions) */
 .ac-note-attention {

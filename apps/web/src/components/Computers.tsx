@@ -88,10 +88,7 @@ function ComputerKinds() {
           <span className="computers-kind__chips">
             {list.length > 0 ? (
               <>
-                <Chip icon="check">
-                  <span className="ac-num">{list.length}</span>
-                  {t("computers.kinds.mine.connected", { count: list.length })}
-                </Chip>
+                <Chip icon="check">{`${list.length} ${t("computers.kinds.mine.connected", { count: list.length })}`}</Chip>
                 {agents.data && count(mine)}
               </>
             ) : (

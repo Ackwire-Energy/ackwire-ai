@@ -18,7 +18,7 @@ export function Chip({ icon, lead, tone = "neutral", className, children, ...res
   return (
     <span className={cx("ac-chip", tone !== "neutral" && `ac-chip--${tone}`, className)} {...rest}>
       {lead ?? <Icon name={icon} size={14} />}
-      {children}
+      <span className="ac-chip__text">{children}</span>
     </span>
   );
 }
