@@ -349,7 +349,7 @@ export function synthesisPrompt(input: {
   revision: number;
   requesterName?: string | null;
 }): string {
-  const intro = `@${input.handle}, now write the ${input.format === "plan" ? "plan" : "synthesis"} of the forum "${input.title}" for whoever asked${input.requesterName ? ` (${input.requesterName})` : ""}. Be faithful to what was said. Use exactly these markdown headings, in English (they are read by the app); write the content in the language of the discussion.${input.format === "plan" ? " Suggest one issue per step that needs work." : ""}`;
+  const intro = `@${input.handle}, now write the ${input.format === "plan" ? "plan" : "synthesis"} of the forum "${input.title}" for whoever asked${input.requesterName ? ` (${input.requesterName})` : ""}. Be faithful to what was said. Use exactly these markdown headings, in English (they are read by the app); write the content in the language of the forum's title, not of this message.${input.format === "plan" ? " Suggest one issue per step that needs work." : ""}`;
   const issues =
     input.format === "plan"
       ? "## Suggested issues\n- Title — description (step N, owner: @handle or person name)"
@@ -387,6 +387,7 @@ export function turnPrompt(input: { handle: string; round: number; rounds: numbe
     `@${input.handle}, your turn in round ${input.round} of ${input.rounds} of the forum "${input.title}". Goal: ${input.goal}`,
     "Read what was already said, bring your view and data from your tools, disagree when you have a reason and talk to the others with @. One reply per round.",
     'Start your post with the line "Stance: proposes", "Stance: agrees @handle", "Stance: disagrees @handle", "Stance: changes" (you changed your position), "Stance: asks @handle" (or "asks people") or "Stance: answers @handle"; then, optionally, "Replying to: @handle" (whose post you answer) and "Position: <your position in one line>". Keep these labels in English; then write your post.',
+    "Write your post in the language of the forum's title and goal, not of this message (always in English), even if earlier posts used another language.",
     "To ask the people something, ask it in your post (Stance: asks people): don't wait for an answer, the discussion goes on and what stays unanswered goes to the open questions.",
   ].join("\n");
 }

@@ -262,7 +262,13 @@ export function seatsOf(parts: ParticipantRow[]): ForumSeat[] {
 
 const sameSeat = (a: ForumSeat, t: { seatType: string; seatId: string }) => a.type === t.seatType && a.id === t.seatId;
 
-/** Agents whose own monthly budget is used up (the same counter the gateway reserves against). */
+/**
+ * Agents whose own monthly budget is used up (the same counter the gateway
+ * reserves against). An agent that thinks with a computer brain (Claude Code,
+ * Codex) runs on the person's plan, not the budget: it keeps its turn, and if
+ * the computer is out and the turn falls back to the model, that run ends
+ * `budget_exceeded` and the turn is skipped then.
+ */
 async function agentsOutOfBudget(db: Database, orgId: string, agentIds: string[], now: Date) {
   const out = new Set<string>();
   if (agentIds.length === 0) return out;
@@ -271,6 +277,7 @@ async function agentsOutOfBudget(db: Database, orgId: string, agentIds: string[]
     .from(agents)
     .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds)));
   for (const a of rows) {
+    if (a.brain === "claude_code" || a.brain === "codex") continue;
     const budget = await effectiveAgentBudget(db, a);
     const state = await agentBudgetState(db, orgId, a.id, now);
     // No counter row yet this month: the gateway starts it from the recorded usage.

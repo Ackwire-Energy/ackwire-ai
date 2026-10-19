@@ -298,6 +298,20 @@ describe("rounds", () => {
     expect(done.synthesis?.revision).toBe(1);
   });
 
+  test("an agent that thinks with Claude Code on a computer keeps its turn with its budget out", async () => {
+    const { ops } = await twoAgents();
+    await f.db
+      .update(schema.agents)
+      .set({ monthlyBudgetNanoUsd: 0, brain: "claude_code" })
+      .where(eq(schema.agents.id, ops.id));
+    const topic = await open({ agentIds: [f.agent.id, ops.id], rounds: 1 });
+    await drainOutbox(f.db, f.handlers);
+    // Not skipped before the run: its turn goes to the computer (the plan, not the budget).
+    const all = await runs();
+    expect(all.some((r) => r.agentId === ops.id)).toBe(true);
+    expect((await topicOf(topic.id)).status).toBe("done");
+  });
+
   test("a person's post ends the round early and leads the next; Concluir stops after the current turn", async () => {
     let lastPrompt = "";
     const { ops } = await twoAgents(
