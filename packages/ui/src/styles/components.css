@@ -3342,7 +3342,7 @@ a.ac-list__row:focus-visible {
 .ac-avatar__presence {
   right: -1px;
   bottom: -1px;
-  z-index: 2;
+  z-index: var(--z-lifted);
   background: var(--ok);
   box-shadow: 0 0 0 2px var(--raised);
 }
@@ -3392,7 +3392,7 @@ a.ac-list__row:focus-visible {
     inset 0 0 0 1px var(--line),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 [data-theme="dark"] .ac-avatar--framed::before {
   box-shadow:
@@ -5899,7 +5899,7 @@ label.ac-setrow__title {
   position: fixed;
   top: 20px;
   right: 24px;
-  z-index: 2;
+  z-index: var(--z-lifted);
 }
 .ac-mo__wrap {
   position: relative;

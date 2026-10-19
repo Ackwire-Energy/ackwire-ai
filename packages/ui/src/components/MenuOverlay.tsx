@@ -185,6 +185,9 @@ export function MenuOverlayItem({
   current?: boolean;
   onSelect: () => void;
 }) {
+  let lead: ReactNode = null;
+  if (leading) lead = <span className="ac-mo__leading">{leading}</span>;
+  else if (icon) lead = <Icon name={icon} />;
   return (
     <button
       type="button"
@@ -195,7 +198,7 @@ export function MenuOverlayItem({
       data-shortcut={shortcut}
       onClick={onSelect}
     >
-      {leading ? <span className="ac-mo__leading">{leading}</span> : icon ? <Icon name={icon} /> : null}
+      {lead}
       <span className="ac-menu__label">
         <span className="ac-mo__name">
           {children}
