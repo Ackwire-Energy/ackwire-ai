@@ -129,6 +129,8 @@ export function MessageReactions({
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("reactions.someone");
   return (
     <Reactions label={t("channel.reactions")}>
+      {/* No pills: the memory mark starts the row (no divider before it), "+" after it. */}
+      {shown.length === 0 && extra}
       {shown.map((r) => {
         const emoji = reactionEmoji(r.reaction);
         const agentIds = r.agentIds ?? [];
@@ -172,7 +174,7 @@ export function MessageReactions({
           </button>
         }
       />
-      {extra}
+      {shown.length > 0 && extra}
     </Reactions>
   );
 }

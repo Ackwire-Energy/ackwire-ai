@@ -10066,6 +10066,10 @@ a.machine-row__name:hover {
   margin: 0 2px;
   background: var(--line);
 }
+/* Nothing before it to divide from. */
+.ac-reacts > .msg-mem__sep:first-child {
+  display: none;
+}
 .msg-mem {
   height: 26px;
   padding: 0 5px 0 4px;
