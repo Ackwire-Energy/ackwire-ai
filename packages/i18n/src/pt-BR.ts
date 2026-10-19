@@ -5864,9 +5864,7 @@ export const ptBR = {
       unavailable: "O app para Mac ainda não está disponível. Por enquanto, use o Terminal (abaixo).",
       firstTime: "Na primeira vez",
       step1: "Abra o arquivo baixado e arraste o agentes para Aplicativos.",
-      step2:
-        "Se o Mac disser que o app está danificado ou sugerir a lixeira (ele ainda não tem a assinatura da Apple), rode no Terminal e abra de novo:",
-      step3: "Entre com a sua conta. O navegador abre com um código: confira e clique em Conectar.",
+      step2: "Entre com a sua conta. O navegador abre com um código: confira e clique em Conectar.",
       other: "Outras formas: servidor ou Linux",
       otherText:
         "Rode no terminal do computador. Ele mostra um código e um link: abra o link, confira o código e confirme com a sua conta.",
@@ -5953,6 +5951,9 @@ export const ptBR = {
       cardTitle: "Computador na nuvem",
       cardText: "Internet, tempo de uso e aprovação. Valem só para ele.",
       note: "Nos seus computadores, quem decide o que os agentes podem fazer é o app agentes, no próprio computador. Estas regras não mudam nada lá.",
+      adjust: "Ajustar",
+      summary: "{{network}} · até {{minutes}} min por dia",
+      summaryApproval: "pede aprovação antes de rodar código",
     },
     mine: {
       listTitle: "Seus computadores",

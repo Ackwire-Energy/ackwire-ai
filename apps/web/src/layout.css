@@ -7088,8 +7088,20 @@ button.live-call__head:hover {
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  padding-left: 20px;
+  padding: 0;
+  list-style: none;
+  counter-reset: pair-step;
   color: var(--ink-muted);
+}
+/* The numbers sit on the card's left edge, like every other line in it. */
+.machine-pair__steps > li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  counter-increment: pair-step;
+}
+.machine-pair__steps > li::before {
+  content: counter(pair-step) ".";
+  font-variant-numeric: tabular-nums;
 }
 .machine-pair__done {
   display: flex;
@@ -7118,6 +7130,32 @@ a.machine-row__name:hover {
 }
 .machine-connect__other > div {
   align-self: stretch;
+}
+/* Flush with the text above (a ghost button would indent it). */
+.machine-connect__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.machine-connect__toggle:hover {
+  color: var(--ink);
+}
+.machine-connect__toggle:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+.machine-connect__toggle svg {
+  width: 14px;
+  height: 14px;
 }
 .machine-connect__sha {
   display: flex;
@@ -7157,11 +7195,13 @@ a.machine-row__name:hover {
   border-radius: var(--radius-md);
   background: var(--surface-raised);
 }
+/* Runs to the card's edges (no white frame around it), fading into the card below. */
 .computers-kind__pic {
   display: flex;
   justify-content: center;
-  padding: 6px 0 2px;
-  border-radius: 14px;
+  margin: -20px -20px 0;
+  padding: 26px 0 2px;
+  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
   background: linear-gradient(180deg, var(--plate), transparent);
 }
 .computers-kind__title {

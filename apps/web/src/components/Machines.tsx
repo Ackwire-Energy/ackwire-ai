@@ -151,8 +151,8 @@ export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
 
 /**
  * How to connect a computer (ADR 0036 §2, §10): "Baixar o app para Mac" from
- * the latest release (version, size, SHA-256), the first-run steps of an
- * unsigned app, and the terminal installer for servers and Linux. The
+ * the latest release (version, size, SHA-256), the first-run steps (the app
+ * is signed and notarized), and the terminal installer for servers and Linux. The
  * computer shows a code and the person confirms it on `/conectar`.
  */
 export function ConnectComputer() {
@@ -213,25 +213,21 @@ export function ConnectComputer() {
           <span className="newag__label">{t("machines.download.firstTime")}</span>
           <ol className="machine-pair__steps small">
             <li>{t("machines.download.step1")}</li>
-            <li>
-              {t("machines.download.step2")}
-              <CommandBlock command="xattr -dr com.apple.quarantine /Applications/agentes.app" />
-            </li>
-            <li>{t("machines.download.step3")}</li>
+            <li>{t("machines.download.step2")}</li>
           </ol>
         </div>
       )}
       <div className="machine-connect__other">
-        <Button
-          size="sm"
-          variant="ghost"
-          icon={other ? "chevronDown" : "chevronRight"}
+        <button
+          type="button"
+          className="machine-connect__toggle"
           aria-expanded={other}
           aria-controls={otherId}
           onClick={() => setOther((o) => !o)}
         >
+          <Icon name={other ? "chevronDown" : "chevronRight"} />
           {t("machines.download.other")}
-        </Button>
+        </button>
         {other && (
           <div id={otherId} className="stack-4" style={{ gap: 8 }}>
             <p className="small muted" style={{ margin: 0 }}>

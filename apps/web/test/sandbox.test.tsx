@@ -37,12 +37,17 @@ describe("Configurações → Computadores: the cloud computer", () => {
     return state;
   };
 
-  test("on/off, the internet allowlist with presets, limits and approval; saved explicitly", async () => {
+  test("the card: on/off and a summary; internet, limits and approval in the Ajustar dialog", async () => {
     const state = await go();
     const region = screen().getByRole("region", { name: "Computador na nuvem" });
-    const card = within(region);
+    expect(region.textContent).toContain("Sem internet · até");
+    // Only the switch and Ajustar on the card.
+    expect(within(region).queryByRole("radio")).toBeNull();
+    await click(within(region).getByRole("button", { name: "Ajustar" }));
+    const dialog = screen().getByRole("dialog", { name: "Computador na nuvem" });
+    const card = within(dialog);
     expect(card.getByRole("radio", { name: /Sem internet/ }).getAttribute("aria-checked")).toBe("true");
-    expect(region.textContent).toContain("O que o computador na nuvem acessa lá fora.");
+    expect(dialog.textContent).toContain("O que o computador na nuvem acessa lá fora.");
     // Only for the cloud computer: the person's own computers follow the app.
     expect(card.getByRole("note").textContent).toContain("quem decide o que os agentes podem fazer é o app agentes");
     // The domain list only for "Só os sites liberados".
@@ -69,6 +74,8 @@ describe("Configurações → Computadores: the cloud computer", () => {
       execTimeoutSeconds: 300,
       requireApproval: true,
     });
+    // Saved: the dialog closes.
+    expect(screen().queryByRole("dialog", { name: "Computador na nuvem" })).toBeNull();
   });
 
   test("every agent's cloud computer with status, and Ligar / Desligar / Apagar in '…'", async () => {
@@ -104,7 +111,10 @@ describe("internet mode", () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api: createFakeApi(state) });
     await settle(8);
-    const card = within(screen().getByRole("region", { name: "Computador na nuvem" }));
+    await click(
+      within(screen().getByRole("region", { name: "Computador na nuvem" })).getByRole("button", { name: "Ajustar" }),
+    );
+    const card = within(screen().getByRole("dialog", { name: "Computador na nuvem" }));
     await click(card.getByRole("radio", { name: /Qualquer site/ }));
     expect(card.getAllByRole("note").map((n) => n.textContent)).toContain(
       "O agente acessa qualquer site. Chaves e segredos continuam fora da máquina.",

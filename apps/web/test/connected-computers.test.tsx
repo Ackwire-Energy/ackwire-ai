@@ -326,12 +326,13 @@ describe("Configurações → Computadores", () => {
     expect(card.querySelector(".machine-connect__hash")?.textContent).toBe(sha);
     expect(within(card).getByRole("button", { name: "Copiar SHA-256" })).toBeTruthy();
     expect(card.textContent).toContain("arraste o agentes para Aplicativos");
-    expect(card.textContent).toContain("xattr -dr com.apple.quarantine /Applications/agentes.app");
+    // Signed and notarized: no Terminal unlock on first run.
+    expect(card.textContent).not.toContain("xattr");
     // The old flow is gone: no code made on the site, no install command with a code.
     expect(screen().queryByRole("button", { name: "Gerar comando" })).toBeNull();
     const commands = () => [...card.querySelectorAll(".machine-command__code")].map((el) => el.textContent ?? "");
-    // Only the first-run unlock is shown before "Outras formas" opens.
-    expect(commands()).toEqual(["xattr -dr com.apple.quarantine /Applications/agentes.app"]);
+    // No command before "Outras formas" opens.
+    expect(commands()).toEqual([]);
     const other = within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" });
     expect(other.getAttribute("aria-expanded")).toBe("false");
     await click(other);

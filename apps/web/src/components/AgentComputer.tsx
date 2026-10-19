@@ -37,6 +37,7 @@ import {
   ComputerIcon,
   ComputerPortrait,
   Dialog,
+  DialogBody,
   DialogFooter,
   Field,
   Icon,
@@ -548,8 +549,9 @@ const draftOf = (s: SandboxSettings): Draft => ({
 
 /**
  * Configurações → Computadores, "Computador na nuvem" (admins, telas/Computadores.html):
- * on/off, the internet allowlist, limits and approval. They apply only to the
- * cloud computer; the person's own computers follow what is allowed on them.
+ * the card holds the on/off switch (saved at once) and a one-line summary;
+ * internet, limits and approval are set in a dialog ("Ajustar"). They apply only
+ * to the cloud computer; the person's own computers follow what is allowed on them.
  */
 export function CloudComputerCard() {
   const { t } = useTranslation();
@@ -558,41 +560,91 @@ export function CloudComputerCard() {
   const admin = can(org.role, "configure");
   const settings = useSandboxSettings(org.id, admin);
   const save = useSaveSandboxSettings(org.id);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [domain, setDomain] = useState("");
-  const [domainError, setDomainError] = useState<string | null>(null);
-  useEffect(() => {
-    if (settings.data) setDraft(draftOf(settings.data));
-  }, [settings.data]);
+  const [editing, setEditing] = useState(false);
   if (!admin) return null;
-  const head = (
+  const s = settings.data;
+  const head = (actions?: ReactNode, summary?: ReactNode) => (
     <div className="computers-card__head">
-      <ComputerPortrait kind="cloud" state={settings.data && !settings.data.enabled ? "offline" : "online"} />
+      <ComputerPortrait kind="cloud" state={s && !s.enabled ? "offline" : "online"} />
       <span className="computers-card__title">
         <h2 id="sec-cloud" className="ac-card__title">
           {t("computers.cloud.cardTitle")}
         </h2>
-        <span className="small muted">{t("computers.cloud.cardText")}</span>
+        <span className="small muted">{summary ?? t("computers.cloud.cardText")}</span>
       </span>
+      {actions}
     </div>
   );
   if (settings.isError) {
     return (
       <Card aria-labelledby="sec-cloud" id="nuvem">
-        {head}
+        {head()}
         <p className="small muted">{t("sandbox.unavailable")}</p>
       </Card>
     );
   }
-  const s = settings.data;
-  if (!s || !draft) {
+  if (!s) {
     return settings.isLoading ? (
       <Card aria-labelledby="sec-cloud" id="nuvem">
-        {head}
-        <LoadingCards count={3} />
+        {head()}
+        <LoadingCards count={1} />
       </Card>
     ) : null;
   }
+  const summary = !s.enabled
+    ? t("sandbox.enabledHelp")
+    : [
+        t("computers.cloud.summary", { network: t(`sandbox.network.${networkOf(s)}`), minutes: s.dailyMinutes }),
+        ...(s.requireApproval ? [t("computers.cloud.summaryApproval")] : []),
+      ].join(" · ");
+  const actions = (
+    <span className="row" style={{ gap: 10, alignItems: "center" }}>
+      <Button size="sm" icon="settings" disabled={!s.available} onClick={() => setEditing(true)}>
+        {t("computers.cloud.adjust")}
+      </Button>
+      <Switch
+        checked={s.enabled}
+        disabled={!s.available || save.isPending}
+        aria-label={t("sandbox.enabled")}
+        onCheckedChange={(on) =>
+          save.mutate({ ...draftOf(s), enabled: on }, { onSuccess: () => toast.show(t("sandbox.saved")) })
+        }
+      />
+    </span>
+  );
+  return (
+    <Card aria-labelledby="sec-cloud" id="nuvem">
+      {head(actions, summary)}
+      {!s.available && <p className="small muted">{t("sandbox.notConfigured")}</p>}
+      <CloudComputerDialog open={editing} settings={s} onClose={() => setEditing(false)} />
+    </Card>
+  );
+}
+
+/** "Ajustar": internet, usage time and approval of the cloud computer. */
+function CloudComputerDialog({
+  open,
+  settings: s,
+  onClose,
+}: {
+  open: boolean;
+  settings: SandboxSettings;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const save = useSaveSandboxSettings(org.id);
+  const [draft, setDraft] = useState<Draft>(() => draftOf(s));
+  const [domain, setDomain] = useState("");
+  const [domainError, setDomainError] = useState<string | null>(null);
+  // Every opening starts from what is saved.
+  useEffect(() => {
+    if (!open) return;
+    setDraft(draftOf(s));
+    setDomain("");
+    setDomainError(null);
+  }, [open, s]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(s));
   const timeoutOk = draft.execTimeoutSeconds >= 5 && draft.execTimeoutSeconds <= s.maxTimeoutSeconds;
   const minutesOk = draft.dailyMinutes >= 0 && draft.dailyMinutes <= 1440;
@@ -607,19 +659,18 @@ export function CloudComputerCard() {
     return true;
   };
   return (
-    <Card aria-labelledby="sec-cloud" id="nuvem">
-      {head}
-      <p className="computers-note small" role="note">
-        <Icon name="info" size={16} />
-        <span>{t("computers.cloud.note")}</span>
-      </p>
-      {!s.available && <p className="small muted">{t("sandbox.notConfigured")}</p>}
+    <Dialog
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("computers.cloud.cardTitle")}
+      description={t("computers.cloud.cardText")}
+      closeLabel={t("common.close")}
+    >
       <form
-        className="stack-4"
-        style={{ gap: 16 }}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!dirty || !timeoutOk || !minutesOk || !networkOk) return;
+          if (!dirty) return onClose();
+          if (!timeoutOk || !minutesOk || !networkOk) return;
           const networkChanged = draft.network !== networkOf(s) || draft.allowDomains.join() !== s.allowDomains.join();
           save.mutate(draft, {
             onSuccess: (saved) => {
@@ -628,167 +679,156 @@ export function CloudComputerCard() {
                   ? t(saved.networkApply === "live" ? "sandbox.appliedNow" : "sandbox.appliedNext")
                   : t("sandbox.saved"),
               );
+              onClose();
             },
           });
         }}
       >
-        <span className="row" style={{ gap: 10, alignItems: "center" }}>
-          <Switch
-            id="sb-enabled"
-            checked={draft.enabled}
-            disabled={!s.available}
-            aria-describedby="sb-enabled-help"
-            onCheckedChange={(on) => setDraft({ ...draft, enabled: on })}
-          />
-          <span className="list-col" style={{ gap: 2 }}>
-            <label htmlFor="sb-enabled" style={{ fontWeight: 600 }}>
-              {t("sandbox.enabled")}
-            </label>
-            <span id="sb-enabled-help" className="small muted">
-              {t("sandbox.enabledHelp")}
-            </span>
-          </span>
-        </span>
-        <div className="stack-4" style={{ gap: 8 }}>
-          <span className="ac-field__label">{t("sandbox.internet")}</span>
-          <span className="small muted">{t("sandbox.internetHelp")}</span>
-          <RadioGroup
-            value={draft.network}
-            onValueChange={(v) => setDraft({ ...draft, network: v as SandboxNetwork })}
-            aria-label={t("sandbox.internet")}
-            className="stack-4"
-            style={{ gap: 8 }}
-          >
-            {NETWORKS.map((n) => (
-              <RadioCard
-                key={n}
-                value={n}
-                id={`sb-net-${n}`}
-                checked={draft.network === n}
-                title={t(`sandbox.network.${n}`)}
-                description={t(`sandbox.networkText.${n}`)}
-              />
-            ))}
-          </RadioGroup>
-          {draft.network === "open" && (
-            <p className="sandbox-warning small" role="note">
-              <Icon name="alert" size={16} />
-              {t("sandbox.openWarning")}
-            </p>
-          )}
-        </div>
-        {draft.network === "allowlist" && (
+        <DialogBody className="stack-4" style={{ gap: 16 }}>
           <div className="stack-4" style={{ gap: 8 }}>
-            {!networkOk && (
-              <span className="small" style={{ color: "var(--danger)" }}>
-                {t("sandbox.needDomain")}
-              </span>
-            )}
-            {draft.allowDomains.length > 0 ? (
-              <TokenList label={t("sandbox.internet")}>
-                {draft.allowDomains.map((d) => (
-                  <li key={d}>
-                    <Token
-                      removeLabel={t("common.removeName", { name: d })}
-                      onRemove={() => setDraft({ ...draft, allowDomains: draft.allowDomains.filter((x) => x !== d) })}
-                    >
-                      <code>{d}</code>
-                    </Token>
-                  </li>
-                ))}
-              </TokenList>
-            ) : null}
-            <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
-              <Field
-                label={t("sandbox.addDomain")}
-                id="sb-domain"
-                error={domainError ?? undefined}
-                style={{ flex: "1 1 240px" }}
-              >
-                <Input
-                  value={domain}
-                  placeholder={t("sandbox.domainPlaceholder")}
-                  onChange={(e) => {
-                    setDomain(e.target.value);
-                    setDomainError(null);
-                  }}
+            <span className="ac-field__label">{t("sandbox.internet")}</span>
+            <span className="small muted">{t("sandbox.internetHelp")}</span>
+            <RadioGroup
+              value={draft.network}
+              onValueChange={(v) => setDraft({ ...draft, network: v as SandboxNetwork })}
+              aria-label={t("sandbox.internet")}
+              className="stack-4"
+              style={{ gap: 8 }}
+            >
+              {NETWORKS.map((n) => (
+                <RadioCard
+                  key={n}
+                  value={n}
+                  id={`sb-net-${n}`}
+                  checked={draft.network === n}
+                  title={t(`sandbox.network.${n}`)}
+                  description={t(`sandbox.networkText.${n}`)}
                 />
-              </Field>
-              <Button
-                type="button"
-                style={{ marginTop: 24 }}
-                onClick={() => {
-                  if (!isDomain(domain)) {
-                    setDomainError(t("sandbox.domainInvalid"));
-                    return;
-                  }
-                  if (add([domain])) setDomain("");
-                }}
-              >
-                {t("sandbox.add")}
-              </Button>
-            </div>
-            <div className="row" style={{ gap: 8 }}>
-              {DOMAIN_PRESETS.map((p) => (
-                <Button key={p.id} type="button" size="sm" icon="plus" onClick={() => add(p.domains)}>
-                  {t(`sandbox.preset.${p.id}`)}
-                </Button>
               ))}
-            </div>
+            </RadioGroup>
+            {draft.network === "open" && (
+              <p className="sandbox-warning small" role="note">
+                <Icon name="alert" size={16} />
+                {t("sandbox.openWarning")}
+              </p>
+            )}
           </div>
-        )}
-        <div className="grid-fields">
-          <Field
-            label={t("sandbox.dailyMinutes")}
-            id="sb-minutes"
-            help={t("sandbox.dailyMinutesHelp")}
-            error={minutesOk ? undefined : t("sandbox.minutesInvalid")}
-          >
-            <Input
-              inputMode="numeric"
-              value={String(draft.dailyMinutes)}
-              onChange={(e) => setDraft({ ...draft, dailyMinutes: Number(e.target.value.replace(/\D/g, "") || 0) })}
+          {draft.network === "allowlist" && (
+            <div className="stack-4" style={{ gap: 8 }}>
+              {!networkOk && (
+                <span className="small" style={{ color: "var(--danger)" }}>
+                  {t("sandbox.needDomain")}
+                </span>
+              )}
+              {draft.allowDomains.length > 0 ? (
+                <TokenList label={t("sandbox.internet")}>
+                  {draft.allowDomains.map((d) => (
+                    <li key={d}>
+                      <Token
+                        removeLabel={t("common.removeName", { name: d })}
+                        onRemove={() => setDraft({ ...draft, allowDomains: draft.allowDomains.filter((x) => x !== d) })}
+                      >
+                        <code>{d}</code>
+                      </Token>
+                    </li>
+                  ))}
+                </TokenList>
+              ) : null}
+              <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
+                <Field
+                  label={t("sandbox.addDomain")}
+                  id="sb-domain"
+                  error={domainError ?? undefined}
+                  style={{ flex: "1 1 240px" }}
+                >
+                  <Input
+                    value={domain}
+                    placeholder={t("sandbox.domainPlaceholder")}
+                    onChange={(e) => {
+                      setDomain(e.target.value);
+                      setDomainError(null);
+                    }}
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  style={{ marginTop: 24 }}
+                  onClick={() => {
+                    if (!isDomain(domain)) {
+                      setDomainError(t("sandbox.domainInvalid"));
+                      return;
+                    }
+                    if (add([domain])) setDomain("");
+                  }}
+                >
+                  {t("sandbox.add")}
+                </Button>
+              </div>
+              <div className="row" style={{ gap: 8 }}>
+                {DOMAIN_PRESETS.map((p) => (
+                  <Button key={p.id} type="button" size="sm" icon="plus" onClick={() => add(p.domains)}>
+                    {t(`sandbox.preset.${p.id}`)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid-fields">
+            <Field
+              label={t("sandbox.dailyMinutes")}
+              id="sb-minutes"
+              help={t("sandbox.dailyMinutesHelp")}
+              error={minutesOk ? undefined : t("sandbox.minutesInvalid")}
+            >
+              <Input
+                inputMode="numeric"
+                value={String(draft.dailyMinutes)}
+                onChange={(e) => setDraft({ ...draft, dailyMinutes: Number(e.target.value.replace(/\D/g, "") || 0) })}
+              />
+            </Field>
+            <Field
+              label={t("sandbox.timeout")}
+              id="sb-timeout"
+              help={t("sandbox.timeoutHelp", { max: s.maxTimeoutSeconds })}
+              error={timeoutOk ? undefined : t("sandbox.timeoutInvalid", { max: s.maxTimeoutSeconds })}
+            >
+              <Input
+                inputMode="numeric"
+                value={String(draft.execTimeoutSeconds)}
+                onChange={(e) =>
+                  setDraft({ ...draft, execTimeoutSeconds: Number(e.target.value.replace(/\D/g, "") || 0) })
+                }
+              />
+            </Field>
+          </div>
+          <span className="row" style={{ gap: 8, alignItems: "center" }}>
+            <Checkbox
+              id="sb-approval"
+              checked={draft.requireApproval}
+              onCheckedChange={(on) => setDraft({ ...draft, requireApproval: on })}
             />
-          </Field>
-          <Field
-            label={t("sandbox.timeout")}
-            id="sb-timeout"
-            help={t("sandbox.timeoutHelp", { max: s.maxTimeoutSeconds })}
-            error={timeoutOk ? undefined : t("sandbox.timeoutInvalid", { max: s.maxTimeoutSeconds })}
-          >
-            <Input
-              inputMode="numeric"
-              value={String(draft.execTimeoutSeconds)}
-              onChange={(e) =>
-                setDraft({ ...draft, execTimeoutSeconds: Number(e.target.value.replace(/\D/g, "") || 0) })
-              }
-            />
-          </Field>
-        </div>
-        <span className="row" style={{ gap: 8, alignItems: "center" }}>
-          <Checkbox
-            id="sb-approval"
-            checked={draft.requireApproval}
-            onCheckedChange={(on) => setDraft({ ...draft, requireApproval: on })}
-          />
-          <label htmlFor="sb-approval">{t("sandbox.requireApproval")}</label>
-        </span>
-        <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
-          {dirty && <span className="small muted">{t("edit.unsaved")}</span>}
-          <Button type="button" disabled={!dirty} onClick={() => setDraft(draftOf(s))}>
-            {t("edit.discard")}
+            <label htmlFor="sb-approval">{t("sandbox.requireApproval")}</label>
+          </span>
+          <p className="computers-note small" role="note">
+            <Icon name="info" size={16} />
+            <span>{t("computers.cloud.note")}</span>
+          </p>
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" onClick={onClose}>
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
             variant="primary"
-            disabled={!dirty || !timeoutOk || !minutesOk || !networkOk || save.isPending}
+            disabled={!timeoutOk || !minutesOk || !networkOk || save.isPending}
             loading={save.isPending}
           >
             {t("common.save")}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
-    </Card>
+    </Dialog>
   );
 }
 

@@ -5851,9 +5851,7 @@ export const en: Translations = {
       unavailable: "The Mac app isn't available yet. For now, use the Terminal (below).",
       firstTime: "The first time",
       step1: "Open the downloaded file and drag agentes to Applications.",
-      step2:
-        "If the Mac says the app is damaged or offers the Trash (it doesn't carry Apple's signature yet), run this in Terminal and open it again:",
-      step3: "Sign in with your account. The browser opens with a code: check it and click Connect.",
+      step2: "Sign in with your account. The browser opens with a code: check it and click Connect.",
       other: "Other ways: server or Linux",
       otherText:
         "Run this in the computer's terminal. It shows a code and a link: open the link, check the code and confirm with your account.",
@@ -5940,6 +5938,9 @@ export const en: Translations = {
       cardTitle: "Cloud computer",
       cardText: "Internet, usage time and approval. They apply only to it.",
       note: "On your own computers, the agentes app on the computer itself decides what agents may do. These rules change nothing there.",
+      adjust: "Adjust",
+      summary: "{{network}} · up to {{minutes}} min a day",
+      summaryApproval: "asks for approval before running code",
     },
     mine: {
       listTitle: "Your computers",
