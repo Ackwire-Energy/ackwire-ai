@@ -11,6 +11,7 @@ import {
   ConflictError,
   cancelHandoff,
   claimHandoff,
+  coalesceInput,
   createBrowserHandoffToolSource,
   createBrowserLive,
   drainOutbox,
@@ -446,7 +447,7 @@ describe("live view", () => {
   test("frames fan out to the agent's viewers only; the stream follows who watches and who drives", async () => {
     const machine = await start();
     const { hub, calls } = fakeHub();
-    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, graceMs: 20 });
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, graceMs: 20, stopDelayMs: 1 });
     const a = viewer(f.owner.id);
     const b = viewer("someone-else");
     const slow = viewer("slow", true);
@@ -485,6 +486,84 @@ describe("live view", () => {
     await Bun.sleep(5);
     expect(calls.at(-1)).toMatchObject({ op: "browser.stream.stop" });
     expect(live.watching(f.agent.id)).toBe(false);
+  });
+
+  test("the stream outlives its last viewer for a moment: a quick re-watch doesn't stop and start it", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, stopDelayMs: 30 });
+    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    stop();
+    await Bun.sleep(5);
+    // Back before the stop: same stream, nothing asked of the computer.
+    const stopAgain = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await Bun.sleep(50);
+    expect(calls.map((c) => c.op)).toEqual(["browser.stream.start"]);
+    // Gone for good: stopped once, after the delay.
+    stopAgain();
+    await Bun.sleep(5);
+    expect(calls.some((c) => c.op === "browser.stream.stop")).toBe(false);
+    await Bun.sleep(50);
+    expect(calls.filter((c) => c.op === "browser.stream.stop")).toHaveLength(1);
+    expect(live.watching(f.agent.id)).toBe(false);
+    live.close();
+  });
+
+  test("a person's input goes in batches; plain mouse moves shrink to the last, drags stay whole", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, inputBatchMs: 15 });
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    const move = (x: number, button?: "left"): BrowserInputEvent => ({
+      kind: "mouse",
+      type: "mouseMoved",
+      x,
+      y: 1,
+      ...(button ? { button } : {}),
+    });
+    const sent = await Promise.all([
+      live.input(f.owner.id, f.org.id, f.agent.id, [move(1)]),
+      live.input(f.owner.id, f.org.id, f.agent.id, [move(2)]),
+      live.input(f.owner.id, f.org.id, f.agent.id, [move(3)]),
+      live.input(f.owner.id, f.org.id, f.agent.id, [
+        { kind: "mouse", type: "mousePressed", x: 3, y: 1, button: "left" },
+        move(4),
+        move(5),
+        { kind: "mouse", type: "mouseReleased", x: 5, y: 1, button: "left" },
+      ]),
+    ]);
+    const inputs = calls.filter((c) => c.op === "browser.input");
+    expect(inputs).toHaveLength(1);
+    const events = (inputs[0] as Extract<MachineRequest, { op: "browser.input" }>).events as BrowserInputEvent[];
+    expect(events.map((e) => (e.kind === "mouse" ? `${e.type}:${e.x}` : e.kind))).toEqual([
+      "mouseMoved:3",
+      "mousePressed:3",
+      "mouseMoved:4",
+      "mouseMoved:5",
+      "mouseReleased:5",
+    ]);
+    expect(sent.every((r) => !r.refused)).toBe(true);
+    live.close();
+  });
+
+  test("coalesceInput keeps keys, text and touches in order", () => {
+    const events: BrowserInputEvent[] = [
+      { kind: "mouse", type: "mouseMoved", x: 1, y: 1 },
+      { kind: "key", type: "keyDown", key: "a" },
+      { kind: "mouse", type: "mouseMoved", x: 2, y: 1 },
+      { kind: "mouse", type: "mouseMoved", x: 3, y: 1 },
+      { kind: "text", text: "olá" },
+      { kind: "touch", type: "touchMove", touchPoints: [{ x: 1, y: 1 }] },
+    ];
+    expect(coalesceInput(events).map((e) => (e.kind === "mouse" ? `move:${e.x}` : e.kind))).toEqual([
+      "move:1",
+      "key",
+      "move:3",
+      "text",
+      "touch",
+    ]);
   });
 
   test("the person in control coming back within the grace keeps control", async () => {

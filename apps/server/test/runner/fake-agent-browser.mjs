@@ -22,6 +22,8 @@ const VALUED = new Set([
   "--idle-timeout",
   "--download-path",
   "--screenshot-dir",
+  "--executable-path",
+  "--args",
 ]);
 const rest = [];
 for (let i = 0; i < argv.length; i++) {
@@ -83,6 +85,15 @@ switch (command) {
   case "close":
     state.open = false;
     out({ success: true, data: { closed: true } });
+    break;
+  case "screenshot":
+    // Like the real one: it writes the file and fails when its folder isn't there.
+    try {
+      writeFileSync(args[0], "png");
+      out({ success: true, data: { path: args[0] } });
+    } catch {
+      out({ success: false, data: null, error: `Failed to save screenshot to ${args[0]}: No such file or directory` });
+    }
     break;
   case "upload":
     out({ success: true, data: { files: args.slice(1) } });

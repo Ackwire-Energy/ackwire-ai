@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   AGENT_BROWSER_VERSION,
@@ -14,9 +14,11 @@ import {
   agentBrowserTarget,
   BrowserManager,
   type BrowserManagerOptions,
+  CHROME_ARGS,
   chromeLabel,
   defaultMaxSessions,
   domainAllowed,
+  findChrome,
   isWebPage,
   type StreamSocket,
   streamMessage,
@@ -141,6 +143,34 @@ test("release target, session cap and Chrome names", () => {
   expect(chromeLabel("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")).toBe("Google Chrome");
   expect(chromeLabel("/usr/bin/chromium")).toBe("Chromium");
   expect(chromeLabel("/home/x/.agent-browser/browsers", "/home/x")).toBe("Chrome for Testing");
+  expect(chromeLabel("/home/x/.agent-browser/browsers/chrome-155.0.1/chrome-linux64/chrome", "/home/x")).toBe(
+    "Chrome for Testing",
+  );
+});
+
+test("only Chrome for Testing is driven: the newest installed one, never the person's own Chrome", () => {
+  const home = tempDir("chrome-home-");
+  dirs.push(home);
+  // Nothing installed: null, even with a system Chrome on the computer.
+  expect(findChrome(home, "linux")).toBeNull();
+  const browsers = path.join(home, ".agent-browser", "browsers");
+  for (const v of ["chrome-150.0.1", "chrome-155.0.1"]) {
+    mkdirSync(path.join(browsers, v, "chrome-linux64"), { recursive: true });
+    writeFileSync(path.join(browsers, v, "chrome-linux64", "chrome"), "");
+  }
+  expect(findChrome(home, "linux")).toBe(path.join(browsers, "chrome-155.0.1", "chrome-linux64", "chrome"));
+  const mac = path.join(
+    browsers,
+    "chrome-156.0.1",
+    "chrome-mac-arm64",
+    "Google Chrome for Testing.app",
+    "Contents",
+    "MacOS",
+  );
+  mkdirSync(mac, { recursive: true });
+  writeFileSync(path.join(mac, "Google Chrome for Testing"), "");
+  expect(findChrome(home, "darwin")).toBe(path.join(mac, "Google Chrome for Testing"));
+  expect(CHROME_ARGS).toContain("--disable-component-update");
 });
 
 test("site allowlist: exact hosts, *. wildcards with the bare domain, blank pages always", () => {
@@ -224,6 +254,9 @@ test.if(posix)("commands run in the agent's own session and profile, with our fl
   expect(args).toContain("--json");
   expect(args).toContain("--content-boundaries");
   expect(args).toContain("--no-webmcp");
+  // Always our Chrome for Testing, with its background updates off.
+  expect(flag("--executable-path")).toBe("/fake/chrome");
+  expect(flag("--args")).toBe(CHROME_ARGS.join(","));
   expect(args.slice(-2)).toEqual(["open", "https://shop.example.com"]);
   expect(readFileSync(path.join(t.home, "browser", "config.json"), "utf8").trim()).toBe("{}");
   // Another agent: another session and profile.
@@ -253,6 +286,32 @@ test.if(posix)("reads never launch a blank browser: they say it isn't open", asy
   expect(t.logged().map((c) => c.args.slice(-2).join(" "))).toEqual(["stream status"]);
   await t.act("open", ["https://shop.example.com"]);
   expect(await t.act("snapshot", ["-i"])).toMatchObject({ success: true, data: { snapshot: expect.any(String) } });
+});
+
+test.if(posix)(
+  "a read right after a command that worked skips the open check; after an error it checks again",
+  async () => {
+    const t = setup();
+    await t.act("open", ["https://shop.example.com"]);
+    await t.act("snapshot");
+    await t.act("snapshot");
+    const commands = () => t.logged().map((c) => c.args.slice(-2).join(" "));
+    expect(commands().filter((c) => c === "stream status")).toHaveLength(0);
+    // A command that failed: the browser may be gone, so the next read asks first.
+    await t.act("press", ["NoSuchKeyForTheFake"]).catch(() => undefined);
+    await t.act("frame", ["x"]);
+    await t.act("snapshot");
+    expect(commands().filter((c) => c === "stream status")).toHaveLength(1);
+  },
+);
+
+test.if(posix)("the first screenshot works: its folder is made before", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  const res = await t.act("screenshot", ["screenshots/2026/first.png"]);
+  expect(res).toMatchObject({ success: true });
+  expect(existsSync(path.join(await t.folder(), "screenshots", "2026", "first.png"))).toBe(true);
+  expect(existsSync(path.join(await t.folder(), "downloads"))).toBe(true);
 });
 
 test.if(posix)("the allowlist stops navigations before they go and pages that wander off after an action", async () => {
