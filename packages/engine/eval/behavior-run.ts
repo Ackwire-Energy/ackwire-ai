@@ -570,6 +570,8 @@ const STANDARD_CRITERIA: Record<string, string> = {
     "What it says about code, data or errors is backed by what the tools returned (file and line, numbers, ids, links). Nothing is invented or contradicts the tool results, and it never says it lacks access to something a tool returned.",
   next_step:
     "It ends with a concrete next step it takes or offers (e.g. 'abro um PR que muda X no arquivo Y', an issue created or to create, a specific action), not a vague 'let me know' or a list of generic ideas.",
+  talks_like_a_colleague:
+    "The reply reads like a colleague writing in the team chat: plain sentences in short paragraphs (no headings or bold; a list only for several items of the same kind), the people, places, times and versions in the data named as they are (not 'a user'), news put against what came before (new, same pattern, how many so far), and no ritual opening or closing ('I remain available', 'let me know if you need anything', 'hope this helps').",
   asks_well:
     "It does not ask permission to look and does not ask for information its tools could find. It asks only for decisions that are really the person's (product choice, priority) or before a sensitive action, and then one focused question. Internal changes it can undo (issues, priority, assignee, routines, memory) are expected without asking (ADR 0037): doing them is not a fault.",
 };
@@ -598,6 +600,7 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
   const criteria = Object.entries(STANDARD_CRITERIA)
     .filter(([id]) => !(c.expect.skipJudge ?? []).includes(id))
     .filter(([id]) => id !== "looked_first" || c.expect.investigate)
+    .filter(([id]) => id !== "talks_like_a_colleague" || c.expect.noReply !== true)
     .map(([id, text]) => ({ id, text }));
   for (const [i, text] of (c.expect.rubric ?? []).entries()) criteria.push({ id: `case_${i + 1}`, text });
   if (criteria.length === 0) return { checks: [] as CheckResult[], costNanoUsd: 0 };
