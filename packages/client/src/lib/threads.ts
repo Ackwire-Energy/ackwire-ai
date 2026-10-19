@@ -81,7 +81,9 @@ export function timeSpan(locale: string, fromIso: string, toIso: string): string
 }
 
 /** The name a thread shows: its title, else its root's text. */
-export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || t.rootText;
+/** A thread's name: its title, else its first message without markdown marks (`**`, `__`, backticks). */
+export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) =>
+  t.title?.trim() || t.rootText.replace(/\*\*|__|`/g, "");
 
 // ── "Ajustar trecho": the selection on the channel ───────────────────────────
 

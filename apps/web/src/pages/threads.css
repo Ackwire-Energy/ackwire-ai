@@ -77,7 +77,7 @@
 .thread-row {
   position: relative;
   display: grid;
-  grid-template-columns: 18px 32px minmax(0, 1fr) minmax(0, 420px) 96px;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 360px) 96px;
   align-items: center;
   gap: 14px;
   min-height: 66px;
@@ -108,7 +108,12 @@
 .thread-row.is-picked {
   background: color-mix(in srgb, var(--ink) 4%, var(--raised));
 }
+/* The checkbox takes the kind icon's place (hover, picked or selecting): no empty column on the left. */
 .thread-row__check {
+  position: absolute;
+  left: 23px;
+  top: 50%;
+  transform: translateY(-50%);
   opacity: 0;
 }
 .thread-row:hover .thread-row__check,
@@ -117,9 +122,18 @@
 .threads-list[data-selecting] .thread-row__check {
   opacity: 1;
 }
+.thread-row:hover > .thread-kind,
+.thread-row:has(.thread-row__check:focus-visible) > .thread-kind,
+.thread-row.is-picked > .thread-kind,
+.threads-list[data-selecting] .thread-row > .thread-kind {
+  visibility: hidden;
+}
 @media (hover: none) {
   .thread-row__check {
     opacity: 1;
+  }
+  .thread-row > .thread-kind {
+    visibility: hidden;
   }
 }
 .thread-kind {
@@ -212,7 +226,7 @@
 }
 .thread-row__meta {
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr) 172px;
+  grid-template-columns: 92px 96px minmax(0, 1fr);
   align-items: center;
   gap: 14px;
   min-width: 0;
@@ -318,6 +332,8 @@
   }
   .threads-list[data-selecting] .thread-row__check {
     display: inline-flex;
+    position: static;
+    transform: none;
     grid-area: ck;
     align-self: start;
     margin-top: 2px;
