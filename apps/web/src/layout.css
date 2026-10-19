@@ -3321,17 +3321,17 @@ button.drive-where:focus-visible {
   border-radius: var(--radius-section);
   padding: 0 20px 20px;
 }
+/* The sky canvas is absolute (it fills its parent): the band holds it, so it never covers the text. */
 .catalog-feat__sky {
+  position: relative;
+  overflow: hidden;
   display: block;
   height: 72px;
   margin: 0 -20px;
 }
-.catalog-feat__sky canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
 .catalog-feat__icon {
+  position: relative;
+  align-self: flex-start;
   margin-top: -24px;
   margin-bottom: 12px;
 }
