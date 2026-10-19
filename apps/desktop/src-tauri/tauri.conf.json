@@ -62,7 +62,9 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVCREU5NDA5OTVGNEMwNUEKUldSYXdQU1ZDWlRlVzU1RVZjUno1Y1B3cS9UODJQcFd5WkJnbGNsYW5TcUc4OWpZbzRJeHU2K20K",
-      "endpoints": ["https://agentes.chat/api/desktop/update?target={{target}}&arch={{arch}}&current={{current_version}}"]
+      "endpoints": [
+        "https://agentes.chat/api/desktop/update?target={{target}}&arch={{arch}}&current={{current_version}}"
+      ]
     }
   },
   "bundle": {
