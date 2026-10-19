@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
-import { Text } from "@/ui";
+import { Icon, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { LIVE_KEYS, type LiveKey } from "./logic";
@@ -65,15 +65,20 @@ export function FrameView({
   );
 }
 
+/** The keycaps (symbols; the key names are their labels), as on the web. */
+const KEYCAP: Record<LiveKey, string> = { Tab: "⇥", Enter: "↵", Backspace: "⌫", Escape: "esc" };
+
 /**
- * "Digite aqui": the app's own field, whole text into the page's focused field (tap the field on the
- * page first). Senha hides it and makes it a password field, so the phone offers the saved passwords.
+ * Typing into the page (NavegadorCardScroll.html, 4): one quiet field like the composer, whole text into
+ * the page's focused field (tap it on the page first). The lock hides it and makes it a password field,
+ * so the phone offers the saved passwords; the keyboard button shows the special keys; send is round.
  */
 export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) => void }) {
   const { t } = useTranslation();
   const c = useColors();
   const [text, setText] = useState("");
   const [secret, setSecret] = useState(false);
+  const [keys, setKeys] = useState(false);
   const send = () => {
     const event = textEvent(text);
     if (!event) return;
@@ -84,13 +89,31 @@ export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) =>
     tapHaptic();
     onInput(keyEvents(k));
   };
+  const tool = (on: boolean) => [styles.tool, { backgroundColor: on ? c.sunken : "transparent" }];
   return (
     <View style={styles.typeWrap}>
-      <View style={[styles.field, { backgroundColor: c.sunken }]}>
+      {keys ? (
+        <View style={styles.keys} accessibilityLabel={t("mobile.browser.live.keys")}>
+          {LIVE_KEYS.map((k) => (
+            <Pressable
+              key={k}
+              onPress={() => key(k)}
+              accessibilityRole="button"
+              accessibilityLabel={t(`mobile.browser.live.key.${k}`)}
+              style={[styles.keyCap, { backgroundColor: c.sunken }]}
+            >
+              <Text variant="footnote" tone="ink2" style={styles.medium}>
+                {KEYCAP[k]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder={t("mobile.browser.live.typeHere")}
+          placeholder={secret ? t("mobile.browser.live.typeMarkedSecret") : t("mobile.browser.live.typeMarked")}
           placeholderTextColor={c.faint}
           style={[styles.input, { color: c.ink }]}
           secureTextEntry={secret}
@@ -106,27 +129,31 @@ export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) =>
           onPress={() => setSecret((s) => !s)}
           accessibilityRole="switch"
           accessibilityState={{ checked: secret }}
-          accessibilityLabel={t("mobile.browser.live.password")}
-          style={[styles.secure, { backgroundColor: secret ? c.raised : "transparent" }]}
+          accessibilityLabel={secret ? t("mobile.browser.live.secureOn") : t("mobile.browser.live.secureOff")}
+          hitSlop={4}
+          style={tool(secret)}
         >
-          <Text variant="footnote" tone={secret ? "ink" : "muted"} style={styles.medium}>
-            {t("mobile.browser.live.password")}
-          </Text>
+          <Icon name="lock" size={17} color={secret ? c.ink : c.muted} />
         </Pressable>
-      </View>
-      <View style={styles.keys}>
-        {LIVE_KEYS.map((k) => (
-          <Pressable
-            key={k}
-            onPress={() => key(k)}
-            accessibilityRole="button"
-            style={[styles.keyBtn, { backgroundColor: c.sunken }]}
-          >
-            <Text variant="footnote" tone="ink2">
-              {t(`mobile.browser.live.key.${k}`)}
-            </Text>
-          </Pressable>
-        ))}
+        <Pressable
+          onPress={() => setKeys((k) => !k)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: keys }}
+          accessibilityLabel={t("mobile.browser.live.keys")}
+          hitSlop={4}
+          style={tool(keys)}
+        >
+          <Icon name="keyboard" size={17} color={keys ? c.ink : c.muted} />
+        </Pressable>
+        <Pressable
+          onPress={send}
+          disabled={!text}
+          accessibilityRole="button"
+          accessibilityLabel={t("mobile.browser.live.send")}
+          style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !text ? 0.35 : pressed ? 0.8 : 1 }]}
+        >
+          <Icon name="send" size={16} color={c.bg} />
+        </Pressable>
       </View>
     </View>
   );
@@ -206,13 +233,16 @@ const styles = StyleSheet.create({
   field: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
+    gap: 2,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingLeft: 14,
-    paddingRight: 6,
-    minHeight: 46,
+    paddingRight: 5,
+    minHeight: 44,
   },
   input: { flex: 1, fontSize: 17, paddingVertical: 10 },
-  secure: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
-  keys: { flexDirection: "row", gap: 6 },
-  keyBtn: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 10 },
+  tool: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", marginLeft: 2 },
+  keys: { flexDirection: "row", gap: 6, justifyContent: "flex-end" },
+  keyCap: { minWidth: 44, alignItems: "center", paddingVertical: 7, paddingHorizontal: 8, borderRadius: 9 },
 });

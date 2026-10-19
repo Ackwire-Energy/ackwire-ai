@@ -96,6 +96,10 @@ export const ICONS = {
   archive: [r(3.5, 5, 17, 4, 1.2), p("M5 9v9a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V9M10 13h4")],
   circle: [c(12, 12, 7)],
   pause: [p("M9 6v12M15 6v12")],
+  // From NavegadorCardScroll.html: the agent's browser card (Senha, the keys, Parar).
+  lock: [r(5, 11, 14, 9.5, 2.5), p("M8.5 11V8a3.5 3.5 0 0 1 7 0v3")],
+  keyboard: [r(3, 6, 18, 12, 2.5), p("M7 10h.01M10.5 10h.01M14 10h.01M17 10h.01M7 14h.01M17 14h.01M10 14.5h4", 2)],
+  stop: [r(7, 7, 10, 10, 2)],
   flag: [p("M6 21V4M6 4h11l-2 4 2 4H6")],
   // From MobileConversas.html: the question card, "Conversa com…" and "Livre".
   help: [c(12, 12, 8.5), p("M9.6 9.5a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01", 2)],

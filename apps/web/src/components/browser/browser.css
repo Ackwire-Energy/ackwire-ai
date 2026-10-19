@@ -491,7 +491,51 @@
   animation: brw-grow-in 0.24s var(--out);
 }
 .brw-ac:not(.is-open) {
-  max-width: 560px;
+  max-width: 600px;
+}
+/* Closed (telas/NavegadorCardScroll.html, 4): the small live picture, the site, what the agent does now. */
+.brw-ac__compact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 10px;
+}
+.brw-ac__thumb {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  position: relative;
+  flex: none;
+  width: 132px;
+  aspect-ratio: 16 / 10;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fbfbfc;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.brw-ac__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  user-select: none;
+}
+.brw-ac__thumb-blank {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(20, 22, 30, 0.05), rgba(20, 22, 30, 0.02));
+  animation: brw-pulse 1.4s ease-in-out infinite;
+}
+.brw-ac__compact .brw-ac__tx {
+  gap: 3px;
+}
+.brw-ac__hint {
+  color: var(--faint);
+  font-size: 12px;
+}
+.brw-ac__compact .brw-ac__acts {
+  align-self: center;
 }
 @keyframes brw-grow-in {
   from {
@@ -508,6 +552,14 @@
 }
 .brw-ac.is-open .brw-ac__head {
   border-bottom: 1px solid var(--line);
+}
+/* In control: one left edge; the actions line up with the request's first line. */
+.brw-ac.is-control .brw-ac__head {
+  align-items: flex-start;
+  padding: 12px 10px 10px 14px;
+}
+.brw-ac.is-control .brw-ac__head .brw-ac__acts {
+  margin-top: -2px;
 }
 .brw-ac__tt {
   all: unset;
@@ -635,12 +687,38 @@
   background: #fff;
   outline: none;
 }
+/* A fixed shape: frames arriving never change the card's height, so the conversation never jumps. */
+.brw-ac__page {
+  aspect-ratio: 16 / 10;
+  max-height: 440px;
+  width: 100%;
+  margin: 0 auto;
+}
 .brw-ac__page img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
+}
+.brw-ac__page.is-capturing {
+  overscroll-behavior: contain;
+}
+.brw-ac__capture {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+  background: var(--raised);
+  box-shadow: var(--e2);
+  pointer-events: none;
+  white-space: nowrap;
 }
 .brw-ac__page.is-control img {
   cursor: pointer;
@@ -651,7 +729,6 @@
 }
 /* Before the first frame: a page-shaped placeholder (a site is a light page in both themes). */
 .brw-ac__page--blank {
-  aspect-ratio: 16 / 9;
   background: #fbfbfc;
 }
 .brw-skel {
@@ -725,6 +802,91 @@
   font-size: 14px;
   font-weight: 650;
 }
+/* Typing (NavegadorCardScroll.html, 4): one quiet field like the composer. */
+.brw-type {
+  position: relative;
+  padding: 8px 10px 10px;
+}
+.brw-tfield {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--control-h-lg);
+  padding: 0 6px 0 12px;
+  border-radius: var(--control-r-lg);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.brw-tfield:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.brw-tfield input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+.brw-tfield input::placeholder {
+  color: var(--faint);
+}
+.brw-tfield__to {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  max-width: 40%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brw-tfield__to.is-marked {
+  color: var(--ink2);
+}
+.brw-tfield__tool[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--sunken);
+}
+.brw-tfield__send {
+  border-radius: 50%;
+}
+.brw-keycaps {
+  position: absolute;
+  right: 50px;
+  bottom: calc(100% - 4px);
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: var(--e3);
+  z-index: 1;
+}
+.brw-kc {
+  all: unset;
+  cursor: pointer;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--sunken);
+  box-shadow: inset 0 -1px 0 var(--line2);
+}
+.brw-kc:hover {
+  color: var(--ink);
+}
+.brw-kc:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
 
 @media (max-width: 720px) {
   .brw-rq {
@@ -743,7 +905,10 @@
   .brw-ac .brw-log {
     display: none;
   }
-  .brw-ac__foot .brw-keys {
+  .brw-ac__thumb {
+    width: 96px;
+  }
+  .brw-ac__hint {
     display: none;
   }
   .brw-confirm {

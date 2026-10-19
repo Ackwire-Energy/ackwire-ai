@@ -462,6 +462,16 @@ export const extraIcons = {
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M3 10h14M10 3a10.5 10.5 0 0 1 0 14M10 3a10.5 10.5 0 0 0 0 14" }],
   ],
+  /** NavegadorCardScroll.html: the special keys (Tab, Enter, Apagar, Esc) of the agent's browser. */
+  keyboard: [
+    ["rect", { x: "2.5", y: "5", width: "15", height: "10", rx: "2" }],
+    ["path", { d: "M5.5 8h.01M8.5 8h.01M11.5 8h.01M14.5 8h.01M5.5 11h.01M14.5 11h.01M8 11.5h4" }],
+  ],
+  /** NavegadorCardScroll.html: where the typed text goes (the field clicked on the page). */
+  pointer: [
+    ["path", { d: "m5 4 10 4.17-4.17 1.66L9.17 14 5 4Z" }],
+    ["path", { d: "m11 11 3.5 3.5" }],
+  ],
   /** ConversaAgentes.html: a talk only between two agents (the consultation card's footer). */
   eyeOff: [
     ["path", { d: "M3.3 3.3 16.7 16.7" }],

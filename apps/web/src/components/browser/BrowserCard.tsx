@@ -19,7 +19,7 @@ import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, FilterToggle, Icon, type IconName, PixelSpinner, SkyStrip, Textarea } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { type KeyboardEvent, type MouseEvent, useEffect, useRef, useState, type WheelEvent } from "react";
+import { type KeyboardEvent, type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -31,6 +31,17 @@ import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
 const KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
+/** The keycaps of the keys popover (symbols; the key names are their labels). */
+const KEYCAP: Record<(typeof KEYS)[number], string> = { Tab: "⇥", Enter: "↵", Backspace: "⌫", Escape: "esc" };
+
+/** The nearest ancestor that scrolls (the conversation), to keep the card in place when it grows. */
+function scrollerOf(el: HTMLElement | null): HTMLElement | null {
+  for (let p = el?.parentElement ?? null; p; p = p.parentElement) {
+    const y = getComputedStyle(p).overflowY;
+    if ((y === "auto" || y === "scroll") && p.scrollHeight > p.clientHeight) return p;
+  }
+  return null;
+}
 
 const STEP_ICON = {
   browser_open: "globe",
@@ -143,12 +154,39 @@ export function BrowserCard({
   const agent = dir.agentById.get(agentId);
   const g = agentGrammar(t, name);
   const color = colorOf(agent);
-  const [open, setOpen] = useState(defaultOpen);
-  const live = useBrowserLive(agentId, open);
+  const [open, setOpenState] = useState(defaultOpen);
+  const root = useRef<HTMLDivElement>(null);
+  // Opening or closing by hand keeps the card where it is on screen: the conversation doesn't jump.
+  const anchor = useRef<number | null>(null);
+  const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
+    anchor.current = root.current?.getBoundingClientRect().top ?? null;
+    setOpenState(next);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs after each open/close to restore the card's place
+  useLayoutEffect(() => {
+    const before = anchor.current;
+    anchor.current = null;
+    if (before === null || !root.current) return;
+    const scroller = scrollerOf(root.current);
+    if (scroller) scroller.scrollTop += root.current.getBoundingClientRect().top - before;
+  }, [open]);
+  // The small live picture streams only while the card is on screen; off screen it keeps the last frame.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = root.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setVisible(Boolean(e?.isIntersecting)));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const live = useBrowserLive(agentId, open || visible);
+  const [still, setStill] = useState<typeof live.frame>(null);
+  useEffect(() => {
+    if (live.frame) setStill(live.frame);
+  }, [live.frame]);
   const openQ = useAgentBrowserHandoff(org.id, agentId, open);
   const actions = useBrowserHandoffMutations(org.id);
   const machines = useMachines(org.id);
-  const root = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
   const handoff = newest(
@@ -173,12 +211,17 @@ export function BrowserCard({
   const [note, setNote] = useState("");
   const [confirmStop, setConfirmStop] = useState(false);
   const [stoppedAt, setStoppedAt] = useState<string | null>(null);
+  const [keysOpen, setKeysOpen] = useState(false);
+  // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
+  const [capturing, setCapturing] = useState(false);
+  const pageRef = useRef<HTMLDivElement>(null);
 
   // The bar or a notification asked for this card: open it here and bring it into view.
   const asked = useBrowserCardRequest({ agentId, ...(given ? { handoffId: given.id } : {}) });
   useEffect(() => {
     if (asked === null) return;
-    setOpen(true);
+    // Asked from elsewhere: it scrolls into view on purpose (no keeping in place here).
+    setOpenState(true);
     root.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [asked]);
 
@@ -194,20 +237,49 @@ export function BrowserCard({
     const box = img.getBoundingClientRect();
     const at = pagePoint({ x: e.clientX, y: e.clientY }, box, meta);
     if (!at) return;
+    setCapturing(true);
     setMark({ x: e.clientX - box.left, y: e.clientY - box.top, key: Date.now() });
     send(clickEvents(at, modifiersOf(e, remoteIsMac)));
   };
 
-  const onPageWheel = (e: WheelEvent<HTMLImageElement>) => {
+  // Only a page that was clicked into takes the wheel (a native listener: the conversation's scroll is
+  // stopped only then); anywhere else the wheel scrolls the conversation.
+  const wheelTo = useRef<(e: globalThis.WheelEvent) => void>(() => {});
+  wheelTo.current = (e) => {
     const img = imgRef.current;
     const meta = live.frame ? frameMetadata(live.frame) : undefined;
-    if (!inControl || !img || !meta) return;
+    if (!capturing || !inControl || !img || !meta) return;
+    e.preventDefault();
     const at = pagePoint({ x: e.clientX, y: e.clientY }, img.getBoundingClientRect(), meta);
     if (at) send([wheelEvent(at, e.deltaX, e.deltaY)]);
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the page element mounts with the open card
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    const on = (e: globalThis.WheelEvent) => wheelTo.current(e);
+    el.addEventListener("wheel", on, { passive: false });
+    return () => el.removeEventListener("wheel", on);
+  }, [open, Boolean(live.frame)]);
+  useEffect(() => {
+    if (!capturing) return;
+    const out = (e: PointerEvent) => {
+      if (!pageRef.current?.contains(e.target as Node)) setCapturing(false);
+    };
+    document.addEventListener("pointerdown", out, true);
+    return () => document.removeEventListener("pointerdown", out, true);
+  }, [capturing]);
+  useEffect(() => {
+    if (!inControl || !open) setCapturing(false);
+  }, [inControl, open]);
 
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!inControl) return;
+    if (capturing && e.key === "Escape") {
+      e.preventDefault();
+      setCapturing(false);
+      return;
+    }
     const events = keyboardEvents(e, remoteIsMac);
     if (!events) return;
     e.preventDefault();
@@ -304,7 +376,7 @@ export function BrowserCard({
   const starting = open && !frame && !blocker && !reconnecting;
   const src = frame ? `data:image/jpeg;base64,${frame.data}` : null;
   const lastStep = steps.at(-1);
-  const [host, path] = hostAndPath(browserSiteUrl(frame?.metadata.url, steps));
+  const [host, path] = hostAndPath(browserSiteUrl((frame ?? still)?.metadata.url, steps));
   const ask = handoff?.kind === "ask" ? handoff.instructions : null;
   const working = !inControl && !otherInControl;
   const showLog = open && working && !starting && steps.length > 0;
@@ -333,18 +405,69 @@ export function BrowserCard({
           : t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) });
   const live_ = working && !blocker;
   const toggleLabel = open ? t("browser.inCard.collapse") : t("browser.inCard.expand");
-  const chevron = (
-    <Button
-      size="sm"
-      variant="ghost"
-      iconOnly
-      icon="chevronDown"
-      className="brw-ac__chev"
-      aria-label={toggleLabel}
-      title={toggleLabel}
-      aria-expanded={open}
-      onClick={() => setOpen((v) => !v)}
-    />
+  const thumb = frame ?? still;
+  const thumbSrc = thumb ? `data:image/jpeg;base64,${thumb.data}` : null;
+
+  // Watching: Assumir (a labelled, tactile button) and Parar (quiet, with a confirmation), never a lone red square.
+  const watchActs = confirmStop ? (
+    <>
+      <span className="small muted">{t("browser.watch.stopAsk")}</span>
+      <Button size="sm" variant="ghost" onClick={() => setConfirmStop(false)}>
+        {t("browser.watch.no")}
+      </Button>
+      <Button size="sm" variant="primary" loading={actions.stop.isPending} onClick={stop}>
+        {t("browser.inCard.stop")}
+      </Button>
+    </>
+  ) : (
+    !otherInControl &&
+    !blocker && (
+      <>
+        <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
+          {t("browser.inCard.takeover")}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          iconOnly
+          icon="stop"
+          aria-label={t("browser.inCard.stop")}
+          title={t("browser.inCard.stop")}
+          onClick={() => setConfirmStop(true)}
+        />
+      </>
+    )
+  );
+  const controlActs = (
+    <>
+      {ask && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setOpen(true);
+            setFailing(true);
+          }}
+        >
+          {t("browser.inCard.giveUp")}
+        </Button>
+      )}
+      <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
+        {ask ? t("browser.inCard.done") : t("browser.inCard.handBack")}
+      </Button>
+    </>
+  );
+  const titleText = (
+    <b className={asTitle === "ask" ? "is-ask" : undefined} title={asTitle === "ask" ? title : undefined}>
+      {title}
+      {asTitle === "host" && path && <span className="brw-ac__path">{path}</span>}
+    </b>
+  );
+  const subText = (
+    <small>
+      {(live_ || reconnecting) && <PixelSpinner size={14} color={color} />}
+      <span>{sub}</span>
+    </small>
   );
 
   return (
@@ -356,79 +479,51 @@ export function BrowserCard({
       aria-label={t("browser.inCard.group", g)}
     >
       <SkyStrip color={color} muted={inControl} moving={live_} />
-      <div className="brw-ac__head">
-        <button type="button" className="brw-ac__tt" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          <span className="brw-ac__tx">
-            <b className={asTitle === "ask" ? "is-ask" : undefined} title={asTitle === "ask" ? title : undefined}>
-              {title}
-              {asTitle === "host" && path && <span className="brw-ac__path">{path}</span>}
-            </b>
-            <small>
-              {(live_ || reconnecting) && <PixelSpinner size={14} color={color} />}
-              <span>{sub}</span>
-            </small>
+      {!open ? (
+        // Closed: the small live picture, the site, what the agent does now; a click opens it right here.
+        <div className="brw-ac__compact">
+          <button
+            type="button"
+            className="brw-ac__thumb"
+            aria-label={toggleLabel}
+            tabIndex={-1}
+            onClick={() => setOpen(true)}
+          >
+            {thumbSrc ? <img src={thumbSrc} alt="" draggable={false} /> : <span className="brw-ac__thumb-blank" />}
+          </button>
+          <button type="button" className="brw-ac__tt" aria-expanded={false} onClick={() => setOpen(true)}>
+            <span className="brw-ac__tx">
+              {titleText}
+              {subText}
+              <span className="brw-ac__hint">{t("browser.inCard.expandHint")}</span>
+            </span>
+          </button>
+          <span className="brw-ac__acts">{inControl ? controlActs : watchActs}</span>
+        </div>
+      ) : (
+        <div className="brw-ac__head">
+          <button type="button" className="brw-ac__tt" aria-expanded onClick={() => setOpen(false)}>
+            <span className="brw-ac__tx">
+              {titleText}
+              {subText}
+            </span>
+          </button>
+          <span className="brw-ac__acts">
+            {inControl ? controlActs : watchActs}
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon="chevronDown"
+              className="brw-ac__chev"
+              aria-label={toggleLabel}
+              title={toggleLabel}
+              aria-expanded
+              onClick={() => setOpen(false)}
+            />
           </span>
-        </button>
-        <span className="brw-ac__acts">
-          {inControl ? (
-            <>
-              {ask && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setOpen(true);
-                    setFailing(true);
-                  }}
-                >
-                  {t("browser.inCard.giveUp")}
-                </Button>
-              )}
-              <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
-                {ask ? t("browser.inCard.done") : t("browser.inCard.handBack")}
-              </Button>
-              {!open && chevron}
-            </>
-          ) : confirmStop ? (
-            <>
-              <span className="small muted">{t("browser.watch.stopAsk")}</span>
-              <Button size="sm" variant="ghost" onClick={() => setConfirmStop(false)}>
-                {t("browser.watch.no")}
-              </Button>
-              <Button size="sm" variant="primary" loading={actions.stop.isPending} onClick={stop}>
-                {t("browser.inCard.stop")}
-              </Button>
-            </>
-          ) : (
-            <>
-              {open && !otherInControl && !blocker && (
-                <>
-                  <Button
-                    size="sm"
-                    iconOnly
-                    icon="person"
-                    aria-label={t("browser.inCard.takeover")}
-                    title={t("browser.inCard.takeover")}
-                    loading={actions.takeover.isPending}
-                    onClick={takeover}
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    iconOnly
-                    icon="stop"
-                    className="brw-ac__stop"
-                    aria-label={t("browser.inCard.stop")}
-                    title={t("browser.inCard.stop")}
-                    onClick={() => setConfirmStop(true)}
-                  />
-                </>
-              )}
-              {chevron}
-            </>
-          )}
-        </span>
-      </div>
+        </div>
+      )}
 
       {open && (
         <>
@@ -437,7 +532,10 @@ export function BrowserCard({
               {src ? (
                 // biome-ignore lint/a11y/noStaticElementInteractions: the page takes the person's keys while in control
                 <div
-                  className={inControl ? "brw-ac__page is-control" : "brw-ac__page"}
+                  ref={pageRef}
+                  className={["brw-ac__page", inControl && "is-control", capturing && "is-capturing"]
+                    .filter(Boolean)
+                    .join(" ")}
                   tabIndex={inControl ? 0 : -1}
                   onKeyDown={onPageKey}
                   onPaste={(e) => {
@@ -449,15 +547,13 @@ export function BrowserCard({
                   }}
                 >
                   {/* biome-ignore lint/a11y/useKeyWithClickEvents: keys go through the page's own handler above */}
-                  <img
-                    ref={imgRef}
-                    src={src}
-                    alt={t("browser.live.page", g)}
-                    draggable={false}
-                    onClick={onPageClick}
-                    onWheel={onPageWheel}
-                  />
+                  <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} onClick={onPageClick} />
                   {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
+                  {capturing && (
+                    <span className="brw-ac__capture" role="status">
+                      {t("browser.inCard.scrollHint")}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div className="brw-ac__page brw-ac__page--blank" aria-hidden="true">
@@ -531,56 +627,80 @@ export function BrowserCard({
                 </div>
               </div>
             ) : (
-              <div className="brw-ac__foot">
-                <div className="brw-ac__row">
-                  <label className="brw-typer">
-                    <input
-                      type={secure ? "password" : "text"}
-                      placeholder={t("browser.live.typeHere")}
-                      aria-label={t("browser.live.typeLabel")}
-                      autoComplete={secure ? "current-password" : "off"}
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          sendText();
-                        }
-                      }}
-                    />
-                    <span className={mark ? "brw-typer__to is-marked" : "brw-typer__to"}>
-                      {mark ? t("browser.live.typeToPage") : t("browser.live.typeClickFirst")}
-                    </span>
-                    <button
-                      type="button"
-                      className="brw-secure"
-                      aria-pressed={secure}
-                      aria-label={t("browser.live.secureLabel")}
-                      onClick={() => setSecure((v) => !v)}
-                    >
-                      <Icon name="lock" size={14} />
-                      {t("browser.live.secure")}
-                    </button>
-                    <Button size="sm" icon="send" disabled={!text} onClick={sendText}>
-                      {t("browser.live.send")}
-                    </Button>
-                  </label>
-                </div>
-                <div className="brw-ac__row">
-                  <div className="brw-keys">
+              // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, send.
+              <div className="brw-ac__foot brw-type">
+                {keysOpen && (
+                  // biome-ignore lint/a11y/useSemanticElements: a small row of keys, not a form fieldset
+                  <div className="brw-keycaps" role="group" aria-label={t("browser.inCard.keysLabel")}>
                     {KEYS.map((key) => (
-                      <button key={key} type="button" className="brw-key" onClick={() => send(keyEvents(key))}>
-                        {t(`browser.live.keys.${key}`)}
+                      <button
+                        key={key}
+                        type="button"
+                        className="brw-kc"
+                        aria-label={t(`browser.live.keys.${key}`)}
+                        title={t(`browser.live.keys.${key}`)}
+                        onClick={() => send(keyEvents(key))}
+                      >
+                        {KEYCAP[key]}
                       </button>
                     ))}
                   </div>
-                  <span className="brw-grow" />
-                  {ask && (
-                    <Button size="sm" variant="ghost" onClick={() => setFailing(true)}>
-                      {t("browser.inCard.couldnt")}
-                    </Button>
-                  )}
-                </div>
+                )}
+                <label className="brw-tfield">
+                  <span className={mark ? "brw-tfield__to is-marked" : "brw-tfield__to"}>
+                    <Icon name="pointer" size={14} />
+                    {mark ? t("browser.inCard.targetMarked") : t("browser.inCard.targetNone")}
+                  </span>
+                  <input
+                    type={secure ? "password" : "text"}
+                    placeholder={
+                      secure ? t("browser.inCard.typePlaceholderSecret") : t("browser.inCard.typePlaceholder")
+                    }
+                    aria-label={t("browser.live.typeLabel")}
+                    autoComplete={secure ? "current-password" : "off"}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        sendText();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon="lock"
+                    className="brw-tfield__tool"
+                    aria-pressed={secure}
+                    aria-label={secure ? t("browser.inCard.secureOn") : t("browser.inCard.secureOff")}
+                    title={secure ? t("browser.inCard.secureOn") : t("browser.inCard.secureOff")}
+                    onClick={() => setSecure((v) => !v)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon="keyboard"
+                    className="brw-tfield__tool"
+                    aria-pressed={keysOpen}
+                    aria-label={t("browser.inCard.keysLabel")}
+                    title={t("browser.inCard.keysLabel")}
+                    onClick={() => setKeysOpen((v) => !v)}
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    iconOnly
+                    icon="send"
+                    className="brw-tfield__send"
+                    aria-label={t("browser.live.send")}
+                    title={t("browser.live.send")}
+                    disabled={!text}
+                    onClick={sendText}
+                  />
+                </label>
               </div>
             ))}
           {otherInControl && (

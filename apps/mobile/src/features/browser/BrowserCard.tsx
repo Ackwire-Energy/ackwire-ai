@@ -12,7 +12,7 @@ import {
 import type { TFunction } from "i18next";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from "react-native";
 import { Sky } from "@/sky/Sky";
 import { Button, Fuse, Icon, PixelOrbit, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
@@ -89,7 +89,8 @@ export function BrowserCard({
   // A take over has no message of its own: the agent's open request, while this card is open.
   const ofAgent = useAgentBrowserHandoff(orgId, agentId, open && !given);
   const handoff = given ?? (ofAgent.data && isOpenHandoff(ofAgent.data) ? ofAgent.data : null);
-  const live = useLiveConnection(agentId, open);
+  // Open, or closed while the agent works in it (its small live picture); a finished one keeps the last frame.
+  const live = useLiveConnection(agentId, open || Boolean(run));
   const controller = live.handoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
   const mine = Boolean(meId) && controller === meId;
   const waiting = handoff?.status === "pending";
@@ -211,6 +212,19 @@ export function BrowserCard({
         accessibilityLabel={`${title}. ${subtitle}`}
         style={styles.head}
       >
+        {!open ? (
+          // Closed: the page's small live picture (NavegadorCardScroll.html, 4).
+          <View style={[styles.thumb, { backgroundColor: c.sunken, borderColor: c.line }]}>
+            {live.frame ? (
+              <Image
+                source={{ uri: `data:image/jpeg;base64,${live.frame.data}` }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                fadeDuration={0}
+              />
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.grow}>
           <Text variant="footnote" tone="ink" numberOfLines={mine || waiting ? 2 : 1} style={styles.semibold}>
             {title}
@@ -221,6 +235,11 @@ export function BrowserCard({
               {subtitle}
             </Text>
           </View>
+          {!open && !mine && !waiting ? (
+            <Text variant="caption" tone="faint" numberOfLines={1} style={styles.hint}>
+              {t("mobile.browser.card.expandHint")}
+            </Text>
+          ) : null}
         </View>
         {mine && handoff ? (
           <Button
@@ -241,13 +260,11 @@ export function BrowserCard({
               <Pressable
                 onPress={stop}
                 accessibilityRole="button"
-                accessibilityLabel={t("browser.watch.stop")}
+                accessibilityLabel={t("mobile.browser.card.stop")}
                 hitSlop={8}
                 style={styles.icon}
               >
-                <View style={[styles.stopRing, { borderColor: c.danger }]}>
-                  <View style={[styles.stopSquare, { backgroundColor: c.danger }]} />
-                </View>
+                <Icon name="stop" size={16} color={c.muted} />
               </Pressable>
             ) : null}
             <View style={open ? styles.flip : undefined}>
@@ -354,16 +371,14 @@ const styles = StyleSheet.create({
   medium: { fontWeight: "500" },
   acts: { flexDirection: "row", alignItems: "center", gap: 4 },
   icon: { width: 30, height: 30, borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  // "Parar": a circle with a rounded square, as in the working line.
-  stopRing: {
-    width: 13,
-    height: 13,
-    borderRadius: 999,
-    borderWidth: 1.25,
-    alignItems: "center",
-    justifyContent: "center",
+  thumb: {
+    width: 96,
+    height: 60,
+    borderRadius: 9,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  stopSquare: { width: 5, height: 5, borderRadius: 1 },
+  hint: { marginTop: 2 },
   flip: { transform: [{ rotate: "180deg" }] },
   page: { aspectRatio: 16 / 10, marginHorizontal: 8, borderRadius: 12, overflow: "hidden" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 16 },

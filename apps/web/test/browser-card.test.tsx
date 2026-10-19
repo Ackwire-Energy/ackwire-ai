@@ -70,14 +70,127 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
     expect(card.querySelector(".brw-ac__tx small")?.textContent).not.toContain("Entrar no painel");
     expect(within(card).getByRole("button", { name: "Pronto" })).toBeTruthy();
     expect(within(card).getByRole("textbox", { name: "Texto para a página" })).toBeTruthy();
-    expect(within(card).getByRole("button", { name: "Não consegui" })).toBeTruthy();
+    // Desistir next to Pronto in the header (the old "Não consegui" under the field is gone).
+    expect(within(card).getByRole("button", { name: "Desistir" })).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Não consegui" })).toBeNull();
     expect(document.querySelector(".brw-rq")?.textContent).toContain("Você está ajudando · neste card");
+
+    // The typing bar: one field, Senha as a lock toggle, the keys behind a keyboard button.
+    const lock = within(card).getByRole("button", { name: "Esconder o texto (senha)" });
+    await act(async () => fireEvent.click(lock));
+    expect(within(card).getByRole("button", { name: "Mostrar o texto" }).getAttribute("aria-pressed")).toBe("true");
+    expect(card.querySelector(".brw-keycaps")).toBeNull();
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Teclas" })));
+    const keys = within(card).getByRole("group", { name: "Teclas" });
+    expect(
+      within(keys)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Tab", "Enter", "Apagar", "Esc"]);
 
     // Pronto hands back: the card folds away, the request says it's done.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
     await settle(4);
     expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
     expect(document.querySelector(".brw-ac")).toBeNull();
+  });
+});
+
+/** A JPEG's first bytes (SOI + a start-of-frame for 1280×800): enough for the page's size. */
+const FRAME_DATA = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 3, 32, 5, 0, 3, 0, 0, 0));
+
+describe("the card in the message (NavegadorCardScroll 4)", () => {
+  test("closed it's a small live card; a click opens it in place", async () => {
+    const { state, handoff } = seedRequest();
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    // Taking over from the request opens the card; fold it to see the closed form.
+    await act(async () =>
+      fireEvent.click(
+        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+      ),
+    );
+    await settle(4);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    await act(async () =>
+      socket.push({
+        type: "browser.frame",
+        agentId: ADA_ID,
+        seq: 1,
+        data: FRAME_DATA,
+        metadata: { deviceWidth: 1280, deviceHeight: 800 },
+      }),
+    );
+    // Folded, it keeps the last frame as its small picture (it streams only while on screen).
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Recolher" })));
+    expect(card.classList.contains("is-open")).toBe(false);
+    expect(card.querySelector(".brw-ac__thumb img")).toBeTruthy();
+    expect(card.textContent).toContain("Clique para expandir");
+    await act(async () => fireEvent.click(card.querySelector(".brw-ac__tt") as HTMLElement));
+    expect(card.classList.contains("is-open")).toBe(true);
+  });
+
+  test("the wheel scrolls the conversation until the page is clicked; Esc gives it back", async () => {
+    const { state, handoff } = seedRequest();
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await act(async () =>
+      fireEvent.click(
+        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+      ),
+    );
+    await settle(4);
+    await act(async () =>
+      socket.push({
+        type: "browser.frame",
+        agentId: ADA_ID,
+        seq: 1,
+        data: FRAME_DATA,
+        metadata: { deviceWidth: 1280, deviceHeight: 800 },
+      }),
+    );
+    await settle(2);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    const page = card.querySelector(".brw-ac__page") as HTMLElement;
+    const img = page.querySelector("img") as HTMLImageElement;
+    img.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 640,
+        height: 400,
+        right: 640,
+        bottom: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    const wheelOn = async () => {
+      const e = new WheelEvent("wheel", { deltaY: 120, clientX: 100, clientY: 100, bubbles: true, cancelable: true });
+      await act(async () => page.dispatchEvent(e));
+      return e;
+    };
+
+    // Not clicked yet: the wheel is the conversation's (not taken by the page).
+    expect((await wheelOn()).defaultPrevented).toBe(false);
+    expect(card.querySelector(".brw-ac__capture")).toBeNull();
+
+    // A click into the page takes the wheel: the hint shows and the page keeps the wheel.
+    await act(async () => fireEvent.click(img, { clientX: 100, clientY: 100 }));
+    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolando a página · Esc para sair");
+    expect((await wheelOn()).defaultPrevented).toBe(true);
+
+    // Esc gives the wheel back to the conversation.
+    await act(async () => fireEvent.keyDown(page, { key: "Escape" }));
+    expect(card.querySelector(".brw-ac__capture")).toBeNull();
   });
 });
 

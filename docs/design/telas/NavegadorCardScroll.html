@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navegador na mensagem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Martian+Mono:wght@400&display=swap">
+<script>{const q=new URLSearchParams(location.hash.slice(1));document.documentElement.dataset.theme=q.get("theme")||"dark";}</script>
+<style>
+/*
+  Prototype (NavegadorCardScroll): the agent's browser in the message, fixing scroll.
+  The user, after testing the card (NavegadorNoChat A + Céu): "o scroll ta complicado".
+  Problems today: the wheel over the page scrolls the remote page and traps the chat; the open
+  card is tall and pushes the conversation; the chat jumps when it opens or frames arrive; the
+  step log scrolls inside the card; in control the text field is far from the page.
+  Alternatives: 0 Hoje (before) · 1 Encaixado · 2 Doca · 3 Fixa ao topo · 4 Card + janela.
+  Hash: #alt=0..4&st=watch|ask|control&theme=dark|light (&open=1 opens the dock/window).
+*/
+:root,[data-theme="light"]{
+  --bg:#fbfbfa;--raised:#fff;--sunken:#f3f3f0;--side:#f8f8f6;--pane:#fff;
+  --glass:rgba(255,255,255,.88);--glass2:rgba(255,255,255,.72);
+  --line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --agent:#0063d1;--ok:#1f7a45;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b42a20;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --field-bg:#fff;--field-line:rgba(23,23,22,.13);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.3),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);--scrim:rgba(10,10,10,.32);
+  --site-bg:#f6f8fb;--site-card:#fff;--site-ink:#1a1f36;--site-muted:#5b6478;--site-line:#e3e8ee;--site-accent:#5a54d6;
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#1c1c1b;--sunken:#0a0a09;--side:#0a0a09;--pane:#0f0f0e;
+  --glass:rgba(30,30,28,.86);--glass2:rgba(40,40,38,.6);
+  --line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.15);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;
+  --agent:#5aa8ff;--ok:#5fc48a;--warn:#e0a84a;--warn-soft:#33260e;--danger:#f08a80;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --field-bg:color-mix(in srgb,var(--sunken) 40%,var(--raised));--field-line:rgba(255,255,255,.1);
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);
+  --e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.08);--scrim:rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+:root{
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--mono:"Martian Mono",ui-monospace,monospace;
+  --ios:-apple-system,"SF Pro Text",system-ui,sans-serif;
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --h-sm:32px;--h-md:40px;--h-lg:48px;--r-sm:10px;--r-md:12px;--r-lg:14px;
+}
+*{box-sizing:border-box;margin:0}
+html,body{background:var(--bg)}
+body{color:var(--ink);font:400 14px/1.5 var(--sans);-webkit-font-smoothing:antialiased;transition:background .25s}
+button,input,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.sm{width:14px;height:14px}
+.i.lg{width:20px;height:20px}
+canvas.av{display:block;flex:none}
+
+/* ---------- prototype bar ---------- */
+.proto{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px;background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-bottom:1px solid var(--line)}
+.proto h1{font:300 20px/1 var(--display);letter-spacing:-.02em;margin-right:auto}
+.seg{display:inline-flex;flex-wrap:wrap;padding:3px;gap:2px;border-radius:var(--r-md);background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.seg button{all:unset;cursor:pointer;height:26px;padding:0 10px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top)}
+.seg button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+
+/* ---------- layout ---------- */
+.page{max-width:1440px;margin:0 auto;padding:26px 28px 60px}
+.page h2{font:300 34px/1.1 var(--display);letter-spacing:-.02em}
+.lead{max-width:780px;color:var(--muted);margin-top:8px;font-size:14.5px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:18px 0 14px}
+.bar small{color:var(--muted);font-weight:600;font-size:12.5px}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 392px;gap:28px;align-items:start}
+@media (max-width:1180px){.stage{grid-template-columns:1fr}}
+.cap{margin-top:10px;color:var(--faint);font-size:12.5px;text-align:center}
+
+/* web window */
+.win{border-radius:18px;overflow:hidden;background:var(--pane);box-shadow:var(--e3)}
+.tb{display:flex;align-items:center;gap:7px;height:36px;padding:0 14px;background:var(--side);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--faint)}
+.tb i{width:11px;height:11px;border-radius:50%;background:var(--plate)}
+.tb span{margin-left:10px}
+.wbody{display:grid;grid-template-columns:200px minmax(0,1fr);height:700px}
+.side{background:var(--side);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.side .ws{display:flex;align-items:center;gap:9px;font-weight:650;padding:4px 8px 12px}
+.side .ws em{width:22px;height:22px;border-radius:7px;background:var(--ink);color:var(--bg);font-style:normal;font-size:12px;display:grid;place-items:center}
+.side a{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:550}
+.side a[aria-current="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+.chat{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--pane)}
+.chead{flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 20px;border-bottom:1px solid var(--line);font-weight:650}
+.chead small{color:var(--faint);font-weight:500}
+.msgs{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:16px 20px 18px;display:flex;flex-direction:column;gap:16px;scroll-behavior:auto}
+.msg{display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:12px}
+.msg .h{display:flex;align-items:baseline;gap:8px;font-size:14px}
+.msg .h b{font-weight:650}
+.msg .h small{color:var(--faint);font-size:12px}
+.msg .x{grid-column:2;color:var(--ink2);font-size:14.5px}
+.msg .x + *{grid-column:2;margin-top:10px}
+.msg > .tile,.msg > .pp{grid-row:span 3}
+.pp{display:grid;place-items:center;border-radius:30%;background:var(--ink2);color:var(--bg);font-weight:650;flex:none}
+.composer{flex:none;padding:10px 20px 16px;position:relative;z-index:3;background:var(--pane)}
+.composer .fld{height:46px;border-radius:14px}
+.fld{display:flex;align-items:center;gap:8px;height:var(--h-md);padding:0 12px;border-radius:var(--r-md);background:var(--field-bg);box-shadow:inset 0 0 0 1px var(--field-line)}
+.fld:focus-within{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.fld input{all:unset;flex:1;min-width:0;font-size:14px}
+.fld input::placeholder{color:var(--faint)}
+.fld small{color:var(--faint);font-size:12px;white-space:nowrap}
+.tile{position:relative;display:grid;place-items:center;overflow:hidden;flex:none;border-radius:30%}
+.tile canvas.sky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.tile canvas.av{position:relative}
+canvas.orbit{image-rendering:pixelated;flex:none}
+
+/* ---------- the browser card (Céu header, no site tile) ---------- */
+.bc{position:relative;border-radius:16px;background:var(--raised);box-shadow:var(--e2),var(--top);overflow:hidden;max-width:720px}
+.bc .strip{display:block;width:100%;height:6px;image-rendering:pixelated}
+.bc.ctl .strip{filter:saturate(.35) brightness(1.05)}
+.bh{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;min-height:56px}
+.bh .tt{all:unset;cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.bh .tt b{font-weight:650;font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bh .tt b em{font-style:normal;color:var(--faint);font-weight:500}
+.bh .tt b.ask{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.bh .tt small{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bh .acts{display:flex;align-items:center;gap:4px;flex:none}
+.ib{all:unset;cursor:pointer;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;color:var(--muted)}
+.ib:hover{background:var(--plate);color:var(--ink)}
+.ib.danger{color:var(--danger)}
+.ib .i{width:15px;height:15px}
+.ib.rot .i{transform:rotate(180deg)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:var(--h-md);padding:0 14px;border-radius:var(--r-md);border:0;background:var(--raised);color:var(--ink);font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer;box-shadow:var(--e1),var(--top);transition:transform .12s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 86%,#fff),var(--ink));color:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.18)}
+.btn.ghost{background:transparent;box-shadow:none;color:var(--muted)}
+.btn.ghost:hover{background:var(--plate);color:var(--ink)}
+.btn.sm{height:var(--h-sm);padding:0 12px;border-radius:var(--r-sm);font-size:13px}
+
+/* the live page */
+.pv{position:relative;overflow:hidden;background:var(--site-bg);border-radius:12px;margin:0 10px;box-shadow:inset 0 0 0 1px var(--line)}
+.pv .site{position:absolute;left:0;right:0;top:0;transform-origin:0 0;will-change:transform}
+.pv.cap{box-shadow:inset 0 0 0 2px var(--agent)}
+.pv .hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:999px;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:var(--e2);font-size:12px;font-weight:600;color:var(--ink2);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.pv .hint.on{opacity:1}
+.pv .scrub{position:absolute;top:8px;bottom:8px;right:4px;width:8px;border-radius:999px;background:color-mix(in srgb,var(--ink) 8%,transparent);opacity:.0;transition:opacity .2s}
+.pv:hover .scrub,.pv .scrub.drag{opacity:1}
+.pv .scrub i{position:absolute;left:1px;right:1px;border-radius:999px;background:color-mix(in srgb,var(--ink) 38%,transparent);cursor:grab}
+.pv .mark{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;box-shadow:0 0 0 2px var(--agent);animation:mk .7s var(--out) forwards;pointer-events:none}
+@keyframes mk{from{transform:scale(.4);opacity:1}to{transform:scale(1.4);opacity:0}}
+
+/* the fake site (a long checkout/login page) */
+.site{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;color:var(--site-ink);background:var(--site-bg)}
+.site .nav{display:flex;align-items:center;gap:8px;height:44px;padding:0 22px;background:var(--site-card);border-bottom:1px solid var(--site-line);font-weight:650;font-size:13px}
+.site .nav i{width:14px;height:14px;border-radius:4px;background:var(--site-accent)}
+.site .nav span{margin-left:auto;font-weight:500;color:var(--site-muted)}
+.site .wrap{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:26px 30px}
+.site .card{background:var(--site-card);border:1px solid var(--site-line);border-radius:10px;padding:18px}
+.site h3{font-size:16px;margin-bottom:10px}
+.site label{display:block;font-size:11px;font-weight:600;color:var(--site-muted);margin:10px 0 4px}
+.site .in{height:30px;border:1px solid var(--site-line);border-radius:6px;padding:0 9px;font-size:12px;display:flex;align-items:center;color:var(--site-ink)}
+.site .in.focus{border-color:var(--site-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--site-accent) 22%,transparent)}
+.site .pay{margin-top:14px;height:34px;border-radius:6px;background:var(--site-accent);color:#fff;font-size:12.5px;font-weight:650;display:grid;place-items:center}
+.site .sum p{display:flex;justify-content:space-between;font-size:12px;color:var(--site-muted);margin:6px 0}
+.site .sum b{font-size:22px;color:var(--site-ink)}
+.site .faq{padding:0 30px 30px}
+.site .faq div{background:var(--site-card);border:1px solid var(--site-line);border-radius:8px;padding:12px 14px;margin-top:10px;font-size:12px;color:var(--site-muted)}
+.site .faq div b{display:block;color:var(--site-ink);margin-bottom:3px;font-size:12.5px}
+.site .foot{padding:20px 30px 40px;font-size:11px;color:var(--site-muted);border-top:1px solid var(--site-line)}
+
+/* steps */
+.steps{padding:8px 14px 12px;font-size:13px;color:var(--muted)}
+.steps .now{display:flex;align-items:center;gap:8px;color:var(--ink2);min-height:28px}
+.steps .now span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steps .now small{color:var(--faint)}
+.steps ul{list-style:none;padding:0;margin:4px 0 0;display:grid;gap:2px}
+.steps li{display:flex;gap:8px;align-items:center;height:26px;color:var(--muted)}
+.steps li small{margin-left:auto;color:var(--faint)}
+.lnk{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)}
+.lnk:hover{color:var(--ink)}
+.log-old{max-height:118px;overflow-y:auto;padding:6px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+.log-old li{list-style:none;height:28px;display:flex;align-items:center;justify-content:space-between}
+
+/* typing bar, right under the page */
+.typebar{display:flex;align-items:center;gap:8px;padding:10px}
+/* the window's header: one column (title, state, where it came from), actions on the title's first line */
+.bh.win{align-items:flex-start;gap:12px;padding:12px 12px 12px 16px;min-height:0}
+.bh.win .tt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-top:6px}
+.bh.win .tt b{font-size:14px;line-height:20px}
+.bh.win .tt small{display:block;font-size:12.5px;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bh.win .from{all:unset;cursor:pointer;display:block;width:max-content;max-width:100%;font-size:12px;line-height:18px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bh.win .from:hover{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+.bh.win .acts{height:var(--h-sm);gap:6px}
+/* narrow window and the phone sheet: the text gets the full width, × stays top-right, Desistir and Pronto under it */
+.fw,.sheet{container-type:inline-size}
+@container (max-width:470px){
+  .bh.win{position:relative;flex-direction:column;align-items:stretch;gap:10px}
+  .bh.win .tt{padding:0 40px 0 0}
+  .bh.win .acts{justify-content:flex-end}
+  .bh.win .acts [data-act="close"]{position:absolute;top:10px;right:10px}
+}
+/* 4 · window chrome: one surface, one radius, the page inset evenly */
+.fw{background:var(--raised);border-radius:16px;box-shadow:var(--e3),0 0 0 1px var(--line)}
+.fw .pv{margin:0 8px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--line)}
+.fw .grow{flex:1}
+.fw .wt{font-weight:650;font-size:13.5px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fw .ws{font-size:13px;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fw .wsep{width:1px;height:18px;background:var(--line2);margin:0 2px}
+.fw .ib{width:30px;height:30px;border-radius:9px}
+.fw .strip.edge{display:block;width:100%;height:3px;image-rendering:pixelated;flex:none}
+.wrow{display:flex;align-items:center;gap:8px;height:48px;padding:0 8px 0 14px;flex:none;cursor:grab}
+.wrow .wt{flex:0 1 auto}
+.wrow .ws{flex:0 1 auto}
+.wrow .ws::before{content:"·";margin-right:6px;color:var(--faint)}
+.wrow .acts,.wbot .acts{display:flex;align-items:center;gap:4px}
+.fw .wrow>.btn,.fw .wbot>.btn,.fw .wfoot>.btn{flex:none}
+.wnav{display:flex;align-items:center;gap:8px;height:42px;padding:0 6px 0 14px;flex:none;cursor:grab}
+.wnav .host{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wnav .host em{font-style:normal;font-weight:500;color:var(--faint)}
+.wfoot{display:flex;align-items:center;gap:8px;min-height:48px;padding:6px 8px 8px 14px;flex:none}
+.wfoot .wl{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wfoot .wl b{color:var(--ink);font-weight:650}
+.fw.wh3 .pv{margin-top:8px}
+.wbot{display:flex;align-items:center;gap:8px;height:52px;padding:0 8px 0 14px;flex:none;cursor:grab}
+.wbot .wl{display:flex;align-items:center;gap:8px;min-width:0}
+.wbot .wl b{font-weight:650;font-size:13.5px;flex:none}
+.wbot .wl .wt{flex:0 1 auto}
+.fw .typer{padding:8px 8px 0}
+.fw.wh1 .typer,.fw.wh2 .typer{padding-bottom:8px}
+.fw.wh1:not(.ctl) .pv{margin-bottom:8px}
+.wsteps{list-style:none;margin:0;padding:6px 14px 0;display:flex;flex-direction:column;gap:2px;max-height:140px;overflow:auto;flex:none}
+.wsteps li{display:flex;align-items:center;gap:8px;height:26px;font-size:12.5px;color:var(--muted)}
+.wsteps li span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wsteps li small{color:var(--faint)}
+.wmenu{position:absolute;z-index:3;top:46px;right:8px;min-width:220px;padding:6px;border-radius:12px;background:var(--raised);box-shadow:var(--e3),0 0 0 1px var(--line)}
+.fw.wh3 .wmenu{top:auto;bottom:54px}
+.wmenu button{all:unset;cursor:pointer;display:block;width:calc(100% - 20px);padding:8px 10px;border-radius:8px;font-size:13px;color:var(--ink)}
+.wmenu button:hover{background:var(--plate)}
+.wmenu button.danger{color:var(--danger)}
+.wmenu hr{border:0;height:1px;background:var(--line);margin:4px 6px}
+/* typing: one quiet field like the composer */
+.typer{position:relative;padding:8px 12px 12px}
+.tfield{display:flex;align-items:center;gap:4px;height:44px;padding:0 6px 0 10px;border-radius:14px;background:var(--field-bg);box-shadow:inset 0 0 0 1px var(--field-line)}
+.tfield input{flex:1;min-width:0;border:0;background:none;outline:none;color:var(--ink);font:inherit;font-size:14px}
+.tfield input::placeholder{color:var(--faint)}
+.tfield .target{display:inline-flex;align-items:center;gap:4px;flex:none;max-width:40%;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tfield .target .i{width:13px;height:13px}
+.ib.sm{width:30px;height:30px;border-radius:9px}
+.ib.on{color:var(--ink);background:var(--plate)}
+.tfield .send{all:unset;cursor:pointer;display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--pane)}
+.tfield .send .i{width:15px;height:15px}
+.keycaps{position:absolute;right:52px;bottom:58px;display:flex;gap:4px;padding:5px;border-radius:12px;background:var(--raised);box-shadow:var(--e3)}
+.kc{all:unset;cursor:pointer;min-width:30px;height:28px;padding:0 6px;display:grid;place-items:center;border-radius:7px;font-size:12px;font-weight:600;color:var(--muted);background:var(--plate);box-shadow:inset 0 -1px 0 var(--line2)}
+.kc:hover{color:var(--ink)}
+.typebar .fld{flex:1}
+.keys{display:flex;gap:4px}
+.key{all:unset;cursor:pointer;height:30px;padding:0 9px;border-radius:9px;font-size:12px;font-weight:600;color:var(--muted);box-shadow:inset 0 0 0 1px var(--line2)}
+.key:hover{color:var(--ink);background:var(--plate-soft)}
+
+/* compact card (Doca and Card + janela) */
+.cc{display:flex;align-items:center;gap:12px;padding:10px 10px 10px 12px}
+.thumb{position:relative;flex:none;width:132px;height:82px;border-radius:9px;overflow:hidden;background:var(--site-bg);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer}
+.thumb .site{transform-origin:0 0;position:absolute;left:0;top:0;pointer-events:none}
+.cc .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.cc .tx b{font-weight:650;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc .tx small{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc .tx .where{color:var(--faint);font-size:12px}
+.away{display:flex;align-items:center;gap:8px;padding:12px 14px;color:var(--muted);font-size:13px}
+.away b{color:var(--ink2);font-weight:600}
+
+/* request card */
+.rq{border-radius:16px;background:var(--raised);box-shadow:var(--e2),var(--top);padding:14px 16px;max-width:720px}
+.rq .who{font-size:12.5px;color:var(--muted)}
+.rq .who b{color:var(--ink)}
+.rq h4{font-size:15px;font-weight:650;margin:3px 0 12px}
+.rq .row{display:flex;align-items:center;gap:10px}
+.rq .row small{color:var(--faint);font-size:12.5px}
+
+/* 2 · Doca */
+.dock{flex:none;position:relative;z-index:4;margin:0 12px;border-radius:16px 16px 12px 12px;background:var(--raised);box-shadow:0 -10px 30px -12px rgba(0,0,0,.35),var(--e2);display:flex;flex-direction:column;overflow:hidden}
+.dock .grip{height:12px;cursor:ns-resize;display:grid;place-items:center}
+.dock .grip::after{content:"";width:38px;height:4px;border-radius:9px;background:var(--line2)}
+.dock .from{display:flex;align-items:center;gap:6px;padding:0 14px 6px;font-size:12px;color:var(--faint)}
+.dock .from button{all:unset;cursor:pointer;color:var(--muted);font-weight:600}
+.dock .from button:hover{color:var(--ink)}
+.dock .pv{flex:1;min-height:0}
+.msg.flash .x{animation:fl 1.2s}
+@keyframes fl{0%,40%{background:color-mix(in srgb,var(--agent) 14%,transparent)}100%{background:transparent}}
+
+/* 3 · Fixa ao topo */
+.pin{position:absolute;left:12px;right:12px;top:58px;z-index:6;transform:translateY(-8px);opacity:0;pointer-events:none;transition:.22s var(--out)}
+.pin.on{transform:none;opacity:1;pointer-events:auto}
+.pin .bc{max-width:none;box-shadow:var(--e3)}
+
+/* 4 · Card + janela */
+.fw{position:absolute;z-index:8;width:min(540px,calc(100% - 24px));height:500px;min-width:380px;min-height:300px;border-radius:16px;background:var(--raised);box-shadow:var(--e3);display:flex;flex-direction:column;overflow:hidden;resize:both}
+.fw .bh{cursor:grab}
+.fw .bh:active{cursor:grabbing}
+.fw .from{display:flex;align-items:center;gap:6px;padding:0 14px 6px;font-size:12px;color:var(--faint)}
+.fw .from button{all:unset;cursor:pointer;color:var(--muted);font-weight:600}
+.fw .pv{flex:1;min-height:0}
+.fw .steps{padding-top:6px}
+.fw .typebar,.dock .typebar{flex-wrap:wrap}
+.fw .typebar .fld,.dock .typebar .fld{flex-basis:100%}
+
+/* phone */
+.phone{width:392px;border-radius:56px;padding:12px;background:#0a0a0a;box-shadow:var(--e3)}
+.screen{position:relative;height:800px;border-radius:44px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;font-family:var(--ios)}
+.sbar{flex:none;height:46px;display:flex;align-items:center;justify-content:space-between;padding:6px 28px 0 34px;font-weight:600;font-size:15px}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:118px;height:34px;border-radius:20px;background:#000;z-index:20}
+.phead{flex:none;text-align:center;padding:2px 0 8px;border-bottom:1px solid var(--line);font-weight:650;font-size:15px}
+.phead small{display:block;color:var(--faint);font-weight:500;font-size:11.5px}
+.screen .msgs{padding:12px 12px 12px;gap:12px}
+.screen .msg{grid-template-columns:26px minmax(0,1fr);column-gap:8px}
+.screen .msg .x{font-size:14.5px}
+.screen .bc,.screen .rq{max-width:none}
+.screen .bh{min-height:50px;padding:8px 8px 8px 12px}
+.screen .bh .tt b{font-size:13.5px}
+.screen .composer{padding:8px 12px 26px}
+.screen .composer .fld{height:42px;border-radius:21px}
+.screen .thumb{width:96px;height:60px}
+.screen .typebar{flex-wrap:wrap}
+.screen .typebar .fld small{display:none}
+.screen .keys{width:100%;justify-content:space-between}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:12;border-radius:22px 22px 0 0;background:var(--raised);box-shadow:var(--e3);display:flex;flex-direction:column;max-height:76%;transform:translateY(102%);transition:transform .32s var(--out)}
+.sheet.on{transform:none}
+.sheet .grab{height:18px;display:grid;place-items:center}
+.sheet .grab::after{content:"";width:38px;height:5px;border-radius:9px;background:var(--line2)}
+.scrim{position:absolute;inset:0;z-index:11;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim.on{opacity:1;pointer-events:auto}
+
+/* footer */
+.cmp{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:30px}
+@media (max-width:1180px){.cmp{grid-template-columns:1fr 1fr}}
+.cmp div{padding:14px 16px;border-radius:14px;background:var(--raised);box-shadow:var(--e1);font-size:13px;color:var(--muted)}
+.cmp div b{display:block;color:var(--ink);font-size:14px;margin-bottom:6px}
+.cmp div.rec{box-shadow:inset 0 0 0 1.5px var(--ink),var(--e1)}
+.cmp ul{margin:6px 0 0;padding-left:16px}
+.cmp li{margin:3px 0}
+</style>
+</head>
+<body>
+<header class="proto">
+  <h1>Navegador na mensagem · rolagem</h1>
+  <div class="seg" id="altSeg" aria-label="Alternativa"></div>
+  <div class="seg" id="themeSeg" aria-label="Tema"><button data-v="dark">Escuro</button><button data-v="light">Claro</button></div>
+</header>
+<main class="page">
+  <h2 id="title"></h2>
+  <p class="lead" id="lead"></p>
+  <div class="bar"><small>Estado</small><div class="seg" id="stSeg"></div><small id="tip" style="font-weight:500;color:var(--faint)"></small></div>
+  <div class="stage"><div><div id="web"></div><p class="cap" id="webcap"></p></div><div><div id="mob"></div><p class="cap" id="mobcap"></p></div></div>
+  <section class="cmp" id="cmp"></section>
+</main>
+<script type="module">
+import { drawAgent, idlePose, AGENT_GRADIENTS, mixHex } from "../../../packages/ui/src/agent/engine.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const sv = (d, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  hash: sv('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>', "i sm"),
+  bell: sv('<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>', "i sm"),
+  agents: sv('<path d="M8 4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H4V8a4 4 0 0 1 4-4Z"/><path d="M9.5 10.5v2.5M14.5 10.5v2.5"/>', "i sm"),
+  laptop: sv('<rect x="4.5" y="5" width="15" height="10" rx="1.6"/><path d="M2.5 18.5h19"/>', "i sm"),
+  hand: sv('<path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v7c0 4-2.5 7-6 7-2.7 0-4-1.4-5.3-3.6L4 13.2a1.5 1.5 0 0 1 2.5-1.6L8 13.5"/>'),
+  stop: sv('<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>'),
+  up: sv('<path d="m6 15 6-6 6 6"/>'),
+  down: sv('<path d="m6 9 6 6 6-6"/>'),
+  x: sv('<path d="M6 6l12 12M18 6 6 18"/>'),
+  pop: sv('<path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
+  back: sv('<path d="M5 12h14M11 6l-6 6 6 6"/>', "i sm"),
+  check: sv('<path d="m5 12.5 4.5 4.5L19 7.5"/>', "i sm"),
+  lock: sv('<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>', "i sm"),
+  send: sv('<path d="M12 19V5M6 11l6-6 6 6"/>', "i sm"),
+  click: sv('<path d="m9 9 10 4-4.2 1.6L13 19Z"/><path d="M5 5l1.5 1.5M9 3v2M3 9h2"/>', "i sm"),
+  type: sv('<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 14h8"/>', "i sm"),
+  read: sv('<path d="M4 6.5h16M4 12h16M4 17.5h10"/>', "i sm"),
+  globe: sv('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5Z"/>', "i sm"),
+  more: sv('<circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/>'),
+  arrowUp: sv('<path d="M12 19V5M6 11l6-6 6 6"/>', "i sm"),
+};
+
+/* ---------- state ---------- */
+const q = new URLSearchParams(location.hash.slice(1));
+const S = { alt: q.get("alt") || "4", st: q.get("st") || "watch", theme: document.documentElement.dataset.theme, keysOpen: q.get("keys") === "1", wh: q.get("wh") || "1" };
+const ALTS = [
+  ["0", "Hoje", "Como está hoje", "O card abre alto na mensagem: a roda do mouse sobre a página rola a página e prende a conversa, o passo a passo tem a própria rolagem, o campo de digitar fica longe da página e a conversa pula quando o card abre ou chega um quadro. Role a conversa com o mouse sobre a página para sentir."],
+  ["1", "1 · Encaixado", "1 · Encaixado", "A página tem tamanho fixo (16:10, até 420 px) dentro da mensagem. A roda rola a conversa; para rolar a página, clique nela (aparece “rolando a página · Esc para sair”) ou arraste a barrinha na borda direita. Os passos mostram só o último, com “ver passos”."],
+  ["2", "2 · Doca", "2 · Doca", "Na mensagem fica uma linha com miniatura ao vivo. Abrir ou assumir encaixa o navegador acima da caixa de mensagem, com altura ajustável: a conversa rola livre em cima e nunca pula. A doca diz de qual mensagem veio."],
+  ["3", "3 · Fixa ao topo", "3 · Fixa ao topo", "O card aberto fica na mensagem; quando você rola para além dele, o cabeçalho gruda no topo da conversa com os controles e dá para reabrir a página ali. A roda sobre a página só rola a página depois de um clique."],
+  ["4", "4 · Card + janela", "4 · Card + janela", "Na mensagem o navegador é sempre um card baixo: faixa de céu, miniatura ao vivo e o passo de agora. Clicar, assumir ou “Abrir” no pedido solta o navegador numa janela flutuante sobre a conversa, que dá para arrastar e redimensionar. A roda dentro da janela rola a página; fora dela, a conversa."],
+];
+const STS = [["watch", "Agente usando"], ["ask", "Pediu ajuda"], ["control", "Você no controle"]];
+const setHash = () => { const h = new URLSearchParams({ alt: S.alt, st: S.st, theme: S.theme, wh: S.wh }); history.replaceState(null, "", "#" + h); };
+
+/* ---------- avatars, sky, orbit ---------- */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const rgb = (h) => { const n = parseInt(h.slice(1, 7), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const toHex = (c) => { if (c.startsWith("#")) return c.length === 4 ? "#" + [...c.slice(1)].map((x) => x + x).join("") : c.slice(0, 7); const m = c.match(/\d+(\.\d+)?/g); return m ? "#" + m.slice(0, 3).map((v) => (+v | 0).toString(16).padStart(2, "0")).join("") : "#808080"; };
+const DEV = { name: "Dev", color: "teal", eyes: "round" };
+const live = [], skies = [], strips = [], orbits = [];
+function agentEl(size, mode) {
+  const tile = document.createElement("span"); tile.className = "tile"; tile.style.width = tile.style.height = size + "px";
+  const sky = document.createElement("canvas"); sky.className = "sky"; tile.append(sky); skies.push(sky);
+  const cv = document.createElement("canvas"); cv.className = "av";
+  const dpr = Math.min(2, devicePixelRatio || 1), inner = Math.round(size * .86);
+  cv.width = cv.height = Math.round(inner * dpr); cv.style.width = cv.style.height = inner + "px";
+  tile.append(cv); live.push({ cv, mode, seed: Math.random() * 5, size }); return tile;
+}
+const av = (size, mode = "run") => `<span class="avs" data-s="${size}" data-m="${mode}"></span>`;
+const pp = (n, size) => `<span class="pp" style="width:${size}px;height:${size}px;font-size:${Math.round(size * .42)}px">${n}</span>`;
+const orbit = (size = 13) => `<canvas class="orbit" style="width:${size}px;height:${size}px" aria-hidden="true"></canvas>`;
+function hydrate(root) {
+  for (const el of $$(".avs", root)) el.replaceWith(agentEl(+el.dataset.s, el.dataset.m));
+  for (const cv of $$("canvas.orbit", root)) orbits.push(cv);
+  for (const cv of $$("canvas.strip", root)) strips.push(cv);
+  drawSkies();
+}
+function drawSkies() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  for (let i = skies.length - 1; i >= 0; i--) {
+    const cv = skies[i]; if (!cv.isConnected) { skies.splice(i, 1); continue; }
+    const [top, bot] = AGENT_GRADIENTS.teal, base = dark ? mixHex(bot, "#0f0f0e", .55) : mixHex(top, "#ffffff", .62);
+    const pal = [base, mixHex(base, top, .35), mixHex(base, top, .6), dark ? mixHex(top, bot, .5) : mixHex(top, "#ffffff", .15)].map(rgb);
+    const n = 12; cv.width = cv.height = n; const ctx = cv.getContext("2d"), img = ctx.createImageData(n, n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const f = Math.min(1, Math.max(0, (y / n) * .9 + Math.sin(x * .7) * .04)); const s2 = f * (pal.length - 1), b = s2 | 0, idx = Math.min(pal.length - 1, s2 - b > BAYER[((y & 3) << 2) | (x & 3)] ? b + 1 : b); const o = (y * n + x) * 4, c = pal[idx]; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255; }
+    ctx.putImageData(img, 0, 0);
+  }
+}
+function drawStrips(t) {
+  const dark = document.documentElement.dataset.theme === "dark";
+  for (let i = strips.length - 1; i >= 0; i--) {
+    const cv = strips[i]; if (!cv.isConnected) { strips.splice(i, 1); continue; }
+    const r = cv.getBoundingClientRect(); if (!r.width) continue;
+    const w = Math.max(2, Math.ceil(r.width / 3)), h = 2; if (cv.width !== w) { cv.width = w; cv.height = h; }
+    const [top, bot] = AGENT_GRADIENTS.teal, bg = toHex(cssVar("--raised"));
+    const pal = (dark ? [bg, mixHex(bg, bot, .45), mixHex(bot, top, .35), mixHex(top, bot, .2)] : [bg, mixHex(bg, top, .35), mixHex(bg, top, .7), top]).map(rgb);
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const u = x / w; const f = Math.min(1, Math.max(0, .42 + .22 * Math.sin(u * 9 - t * .8) + .16 * Math.sin(u * 23 + t * 1.3) + (y ? -.1 : .1))); const s2 = f * (pal.length - 1), b = s2 | 0, idx = Math.min(pal.length - 1, s2 - b > BAYER[((y & 3) << 2) | (x & 3)] ? b + 1 : b); const o = (y * w + x) * 4, c = pal[idx]; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255; }
+    ctx.putImageData(img, 0, 0);
+  }
+}
+const RING = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+function drawOrbits(t) {
+  for (let i = orbits.length - 1; i >= 0; i--) {
+    const cv = orbits[i]; if (!cv.isConnected) { orbits.splice(i, 1); continue; }
+    if (cv.width !== 3) cv.width = cv.height = 3;
+    const ctx = cv.getContext("2d"), [top, bot] = AGENT_GRADIENTS.teal; ctx.clearRect(0, 0, 3, 3);
+    const k = Math.floor(t * 8) % 8;
+    for (let j = 0; j < 8; j++) { const age = (k - j + 8) % 8; if (age > 3) continue; ctx.globalAlpha = [1, .55, .3, .15][age]; ctx.fillStyle = age === 0 ? bot : top; ctx.fillRect(RING[j][0], RING[j][1], 1, 1); }
+    ctx.globalAlpha = 1;
+  }
+}
+function frame(t) {
+  t /= 1000;
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i]; if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const ctx = it.cv.getContext("2d"), s = it.cv.width; ctx.clearRect(0, 0, s, s);
+    let pose = idlePose(t, it.seed, { every: 15, active: it.mode === "run", expressions: ["happy"] });
+    if (it.mode === "run") { pose.writing = true; pose.expression = undefined; }
+    if (it.mode === "wait") { pose.turn = [.05, -.32]; pose.look = [0, -.12]; }
+    const inner = s * .9; drawAgent(ctx, (s - inner) / 2, s - inner, inner, { color: DEV.color, eyes: DEV.eyes, cells: it.size <= 32 ? 12 : undefined, pose });
+  }
+  drawStrips(t); drawOrbits(t); tickFrames(t);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- the fake site: a page longer than the view, scrolled remotely ---------- */
+const PAGE_W = 1280;
+function site(kind) {
+  const login = kind === "login";
+  const left = login
+    ? `<div class="card"><h3>Entrar no painel de pagamentos</h3><label>E-mail</label><div class="in focus">teste@loja.exemplo</div><label>Senha</label><div class="in">••••••••</div><div class="pay">Continuar</div><p style="font-size:11px;color:var(--site-muted);margin-top:10px">Esqueceu a senha? · Usar código</p></div>`
+    : `<div class="card sum"><p>Loja Exemplo · pedido de teste</p><b>R$ 129,90</b><p><span>Camiseta azul (M)</span><span>R$ 119,90</span></p><p><span>Frete</span><span>R$ 10,00</span></p></div>`;
+  const right = login
+    ? `<div class="card"><h3>Novo por aqui?</h3><p style="font-size:12px;color:var(--site-muted)">Crie uma conta de teste para receber pagamentos de mentira e ver o painel funcionando.</p><div class="in" style="margin-top:12px">Criar conta</div></div>`
+    : `<div class="card"><h3>Pagamento</h3><label>E-mail</label><div class="in">teste@loja.exemplo</div><label>Cartão</label><div class="in">4242 4242 4242 4242</div><label>Validade · CVC</label><div class="in">12 / 34 · 123</div><div class="pay">Pagar R$ 129,90</div></div>`;
+  const faq = ["Quanto tempo leva a entrega?", "Posso trocar o tamanho?", "Como funciona o reembolso?", "Vocês emitem nota fiscal?", "Tem frete grátis?", "Como acompanho meu pedido?"]
+    .map((x) => `<div><b>${x}</b>Resposta curta de exemplo para deixar a página mais longa do que a janela.</div>`).join("");
+  return `<div class="site" style="width:${PAGE_W}px"><div class="nav"><i></i>${login ? "Painel de pagamentos" : "Loja Exemplo"}<span>${login ? "Ajuda" : "Minha conta"}</span></div><div class="wrap">${left}${right}</div><div class="faq"><h3>Dúvidas</h3>${faq}</div><div class="foot">Loja Exemplo · Termos · Privacidade · Ajuda</div></div>`;
+}
+// Every live view: scale the 1280 px page to its width; `scrollY` is the remote page's scroll.
+const views = [];
+function mountView(pv, kind, opts = {}) {
+  pv.innerHTML = site(kind) + `<span class="hint"></span>${opts.scrub ? `<span class="scrub"><i></i></span>` : ""}`;
+  const v = { pv, el: $(".site", pv), y: 0, cap: false, mode: opts.mode || "pass", scrub: opts.scrub };
+  views.push(v); layoutView(v);
+  // the wheel: "pass" lets the chat scroll (unless captured), "trap" always scrolls the page (today), "own" scrolls the page (a window or dock outside the chat)
+  pv.addEventListener("wheel", (e) => {
+    if (v.mode === "trap" || v.mode === "own" || v.cap) { e.preventDefault(); scrollView(v, e.deltaY); }
+    else hint(v, "Clique na página para rolar ela");
+  }, { passive: false });
+  pv.addEventListener("click", (e) => {
+    if (e.target.closest(".scrub")) return;
+    if (v.mode === "pass" && !v.cap) { v.cap = true; pv.classList.add("cap"); hint(v, "rolando a página · Esc para sair", true); }
+    const r = pv.getBoundingClientRect(), m = document.createElement("span"); m.className = "mark"; m.style.left = e.clientX - r.left + "px"; m.style.top = e.clientY - r.top + "px"; pv.append(m); setTimeout(() => m.remove(), 700);
+  });
+  if (opts.scrub) {
+    const thumb = $(".scrub i", pv), track = $(".scrub", pv);
+    thumb.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); e.stopPropagation(); track.classList.add("drag"); thumb.setPointerCapture(e.pointerId);
+      const y0 = e.clientY, s0 = v.y, ratio = (v.max) / (track.clientHeight - thumb.clientHeight || 1);
+      const mv = (ev) => { v.y = Math.max(0, Math.min(v.max, s0 + (ev.clientY - y0) * ratio)); layoutView(v); };
+      const up = () => { track.classList.remove("drag"); thumb.removeEventListener("pointermove", mv); thumb.removeEventListener("pointerup", up); };
+      thumb.addEventListener("pointermove", mv); thumb.addEventListener("pointerup", up);
+    });
+  }
+  return v;
+}
+function layoutView(v) {
+  const w = v.pv.clientWidth || 600, k = w / PAGE_W, full = v.el.offsetHeight * k, h = v.pv.clientHeight;
+  v.max = Math.max(0, (full - h) / k);
+  v.y = Math.max(0, Math.min(v.max, v.y));
+  v.el.style.transform = `translateY(${-v.y * k}px) scale(${k})`;
+  if (v.scrub) { const tr = $(".scrub", v.pv), th = $(".scrub i", v.pv), th_h = Math.max(24, tr.clientHeight * (h / (full || 1))); th.style.height = th_h + "px"; th.style.top = (v.max ? (v.y / v.max) * (tr.clientHeight - th_h) : 0) + "px"; }
+}
+function scrollView(v, dy) { v.y += dy; layoutView(v); }
+let hintT;
+function hint(v, text, stay) { const h = $(".hint", v.pv); h.textContent = text; h.classList.add("on"); clearTimeout(h._t); if (!stay) h._t = setTimeout(() => h.classList.remove("on"), 1400); }
+addEventListener("keydown", (e) => { if (e.key === "Escape") for (const v of views) if (v.cap) { v.cap = false; v.pv.classList.remove("cap"); $(".hint", v.pv).classList.remove("on"); } });
+addEventListener("pointerdown", (e) => { for (const v of views) if (v.cap && !v.pv.contains(e.target)) { v.cap = false; v.pv.classList.remove("cap"); $(".hint", v.pv).classList.remove("on"); } });
+addEventListener("resize", () => views.forEach(layoutView));
+// "Today": a new frame changes the page height a little and the chat jumps (shown only in Hoje).
+let lastJump = 0;
+function tickFrames(t) {
+  for (let i = views.length - 1; i >= 0; i--) if (!views[i].pv.isConnected) views.splice(i, 1);
+  if (S.alt === "0" && t - lastJump > 2.2) { lastJump = t; for (const pv of $$(".pv.jumpy")) { pv.style.height = (pv.clientHeight === 520 ? 548 : 520) + "px"; } }
+}
+
+/* ---------- pieces ---------- */
+const STEPS = [[I.globe, "Abriu loja.exemplo", "14:13"], [I.read, "Leu a página do produto", "14:13"], [I.click, "Clicou em Comprar", "14:14"], [I.read, "Leu o checkout", "14:14"], [I.type, "Preencheu o cartão de teste", "14:15"], [I.click, "Clicando em Pagar R$ 129,90", "agora", true]];
+const ctl = () => S.st === "control";
+const kind = () => (S.st === "watch" ? "checkout" : "login");
+function header({ open = true, compact = false, actions = "card", from = "" } = {}) {
+  const c = ctl();
+  const title = c ? `<b class="ask" title="Entrar no painel de pagamentos com a conta de teste da loja">Entrar no painel de pagamentos com a conta de teste da loja</b>` : S.st === "ask" ? `<b>dashboard.stripe.com<em>/login</em></b>` : `<b>loja.exemplo<em>/checkout</em></b>`;
+  const win = actions === "close";
+  const sub = c ? `<small>Você no controle · dashboard.stripe.com${win ? "" : " · o Dev pediu"}</small>` : S.st === "ask" ? `<small>Dev está esperando você</small>` : `<small>${orbit()}Dev · clicando em Pagar R$ 129,90</small>`;
+  let acts;
+  if (c) acts = `<button class="btn ghost sm" data-act="giveup">Desistir</button><button class="btn primary sm" data-act="done">${I.check}Pronto</button>`;
+  else if (S.st === "ask") acts = `<button class="btn primary sm" data-act="answer">Abrir aqui</button>`;
+  else acts = `<button class="ib" data-tip="Assumir" data-act="take">${I.hand}</button><button class="ib danger" data-tip="Parar">${I.stop}</button>`;
+  if (actions === "card" && !c) acts += `<button class="ib" data-act="toggle" aria-label="${open ? "Recolher" : "Abrir"}">${open ? I.up : I.down}</button>`;
+  if (actions === "pop") acts += `<button class="ib" data-act="pop" aria-label="Abrir na janela">${I.pop}</button>`;
+  if (actions === "close") acts += `<button class="ib" data-act="close" aria-label="Fechar">${I.x}</button>`;
+  if (win) return `<canvas class="strip"></canvas><div class="bh win"><div class="tt">${title}${sub}${from}</div><div class="acts">${acts}</div></div>`;
+  return `<canvas class="strip"></canvas><div class="bh"><button class="tt" data-act="${actions === "card" ? "toggle" : actions === "pop" ? "pop" : "none"}">${title}${sub}</button><div class="acts">${acts}</div></div>${from}`;
+}
+/* ---------- 4 · the window's chrome, three restrained options (&wh=1|2|3) ---------- */
+const REQ = "Entrar no painel de pagamentos com a conta de teste da loja";
+const NOW = "clicando em Pagar R$ 129,90";
+function winMenu() {
+  if (!S.menu) return "";
+  return `<div class="wmenu" role="menu"><button role="menuitem" data-act="tomsg">Ir para a mensagem</button><button role="menuitem" data-act="steps">${S.stepsOpen ? "Esconder os passos" : "Ver os passos"}</button><hr><button role="menuitem" class="danger" data-act="close">Parar o navegador do Dev</button></div>`;
+}
+function winActs() {
+  const c = ctl();
+  const main = c
+    ? `<button class="btn ghost sm" data-act="giveup">Desistir</button><button class="btn primary sm" data-act="done">${I.check}Pronto</button>`
+    : S.st === "ask"
+      ? `<button class="btn primary sm" data-act="take">Ajudar</button>`
+      : `<button class="btn ghost sm" data-act="take">Assumir</button>`;
+  return `${main}<span class="wsep"></span><button class="ib" data-act="menu" aria-label="Mais" data-tip="Mais">${I.more}</button><button class="ib" data-act="close" aria-label="Fechar" data-tip="Fechar">${I.x}</button>`;
+}
+const winWho = () => (ctl() ? `<b class="wt" title="${REQ}">${REQ}</b>` : `${av(20, S.st === "ask" ? "wait" : "run")}<b class="wt">Dev no navegador</b>`);
+const winStatus = () => (ctl() ? "você no controle" : S.st === "ask" ? "esperando você" : NOW);
+const winSteps = () => (S.stepsOpen && !ctl() ? `<ul class="wsteps">${STEPS.slice(0, 5).reverse().map(([ic, t, at]) => `<li>${ic}<span>${t}</span><small>${at}</small></li>`).join("")}</ul>` : "");
+function winChrome() {
+  const v = S.wh, page = `<div class="pv" data-view="own"></div>`;
+  if (v === "2") {
+    // a calm browser bar on top (the page is the hero), who and what under it, actions bottom-right
+    return `<div class="wnav drag">${ctl() ? "" : orbit(12)}<span class="host">${kind() === "login" ? `dashboard.stripe.com<em>/login</em>` : `loja.exemplo<em>/checkout</em>`}</span><span class="grow"></span><button class="ib" data-act="menu" aria-label="Mais" data-tip="Mais">${I.more}</button><button class="ib" data-act="close" aria-label="Fechar" data-tip="Fechar">${I.x}</button></div>${page}${winSteps()}${typebar()}<div class="wfoot">${ctl() ? `<b class="wt" title="${REQ}">${REQ}</b>` : `${av(18, S.st === "ask" ? "wait" : "run")}<span class="wl"><b>Dev</b> · ${winStatus()}</span>`}<span class="grow"></span>${ctl() ? `<button class="btn ghost sm" data-act="giveup">Desistir</button><button class="btn primary sm" data-act="done">${I.check}Pronto</button>` : S.st === "ask" ? `<button class="btn primary sm" data-act="take">Ajudar</button>` : `<button class="btn ghost sm" data-act="take">Assumir</button>`}</div>${winMenu()}`;
+  }
+  if (v === "3") {
+    // no header: the page first, one bar at the bottom carries who, what and the actions (and drags the window)
+    return `${page}${winSteps()}${typebar()}<div class="wbot drag"><span class="wl">${ctl() ? `<b class="wt" title="${REQ}">${REQ}</b>` : `${av(20, S.st === "ask" ? "wait" : "run")}<b>Dev</b><span class="ws">${winStatus()}</span>`}</span><span class="grow"></span>${winActs()}</div>${winMenu()}`;
+  }
+  // 1 · one line on top, sky only as the window's top edge
+  return `<canvas class="strip edge"></canvas><div class="wrow drag">${winWho()}${ctl() ? "" : `<span class="ws">${winStatus()}</span>`}<span class="grow"></span>${winActs()}</div>${page}${winSteps()}${typebar()}${winMenu()}`;
+}
+const typebar = () => ctl() ? `<div class="typer">${S.keysOpen ? `<div class="keycaps" role="group" aria-label="Teclas"><button class="kc" data-tip="Tab">⇥</button><button class="kc" data-tip="Enter">↵</button><button class="kc" data-tip="Apagar">⌫</button><button class="kc" data-tip="Esc">esc</button></div>` : ""}<label class="tfield"><span class="target">${I.click}E-mail</span><input ${S.secret ? `type="password"` : ""} placeholder="${S.secret ? "Senha do campo marcado" : "Digite no campo marcado"}"><button type="button" class="ib sm ${S.secret ? "on" : ""}" data-act="secret" data-tip="${S.secret ? "Mostrar o texto" : "Esconder o texto (senha)"}">${I.lock}</button><button type="button" class="ib sm ${S.keysOpen ? "on" : ""}" data-act="keys" data-tip="Teclas">${I.type}</button><button type="button" class="send" aria-label="Enviar">${I.send}</button></label></div>` : "";
+const stepsOne = (open) => ctl() ? "" : `<div class="steps"><div class="now">${orbit(14)}<span>${STEPS[5][1]}</span><small>agora</small>${open ? "" : ""}<button class="lnk" data-act="steps">${S.stepsOpen ? "esconder passos" : "ver passos"}</button></div>${S.stepsOpen ? `<ul>${STEPS.slice(0, 5).reverse().map(([ic, t, at]) => `<li>${ic}<span>${t}</span><small>${at}</small></li>`).join("")}</ul>` : ""}</div>`;
+const requestCard = (where = "") => `<div class="rq"><div class="who"><b>Dev</b> precisa de você · 10 min restantes</div><h4>Entrar no painel de pagamentos com a conta de teste da loja</h4><div class="row"><button class="btn primary sm" data-act="answer">Abrir aqui</button><small>${where || "Abre a página do Dev ao vivo. Quem abrir primeiro faz o login e aperta Pronto."}</small></div></div>`;
+const filler = (n, phone) => {
+  const lines = ["Alguém viu o e-mail do fornecedor?", "Vi sim, chega amanhã.", "Fechou. Vou atualizar a planilha.", "Dev, depois testa o cupom também.", "Os pedidos de ontem já saíram?", "Saíram 14, falta 1.", "Beleza, valeu."];
+  return lines.slice(0, n).map((t, i) => `<div class="msg">${pp(i % 2 ? "A" : "W", phone ? 26 : 36)}<div class="h"><b>${i % 2 ? "Ana" : "Walter"}</b><small>13:${40 + i}</small></div><div class="x">${t}</div></div>`).join("");
+};
+const userMsg = (phone) => `<div class="msg">${pp("W", phone ? 26 : 36)}<div class="h"><b>Walter</b><small>13:58</small></div><div class="x">Dev, testa o checkout da loja com o cartão de teste e me conta se o recibo chega.</div></div>`;
+const agentMsg = (body, phone) => `<div class="msg" id="${phone ? "pAgentMsg" : "agentMsg"}">${av(phone ? 26 : 36, S.st === "ask" ? "wait" : "run")}<div class="h"><b>Dev</b><small>14:13</small></div><div class="x">${S.st === "watch" ? "Fazendo a compra de teste agora." : "Para ver o pagamento chegar, preciso entrar no painel com a conta de teste, e não tenho a senha."}</div>${body}</div>`;
+const after = (phone) => `<div class="msg">${pp("A", phone ? 26 : 36)}<div class="h"><b>Ana</b><small>14:14</small></div><div class="x">Enquanto isso: o cupom de 10% ainda vale?</div></div><div class="msg">${pp("W", phone ? 26 : 36)}<div class="h"><b>Walter</b><small>14:15</small></div><div class="x">Vale até sexta.</div></div>`;
+const composer = (phone) => `<div class="composer"><label class="fld"><input placeholder="${phone ? "Mensagem" : "Mensagem em #loja"}"></label></div>`;
+
+/* ---------- per alternative: the card in the message, and anything outside it ---------- */
+function cardFull(o = {}) {
+  const open = S.open;
+  const pvH = o.today ? "height:520px" : `aspect-ratio:16/10;max-height:${o.phone ? 260 : 420}px`;
+  if (S.st === "ask" && !o.forceOpen) return requestCard();
+  return `<div class="bc ${ctl() ? "ctl" : ""}" data-card>${header({ open, actions: "card" })}${open ? `<div class="pv ${o.today ? "jumpy" : ""}" data-view="${o.today ? "trap" : "pass"}" ${o.today ? "" : "data-scrub"} style="${pvH}"></div>${o.today ? (ctl() ? `<ul class="log-old">${STEPS.map(([, t, at]) => `<li><span>${t}</span><small>${at}</small></li>`).join("")}</ul>${typebar()}` : `<ul class="log-old">${STEPS.map(([, t, at]) => `<li><span>${t}</span><small>${at}</small></li>`).join("")}</ul>`) : `${ctl() ? typebar() : stepsOne()}`}` : ""}</div>`;
+}
+function cardCompact(o = {}) {
+  if (S.st === "ask" && !o.away) return requestCard(o.where);
+  const away = o.away;
+  if (away) return `<div class="bc"><canvas class="strip"></canvas><div class="away">${orbit(14)}<span><b>Aberto ${o.phone ? "embaixo" : o.dock ? "na doca" : "na janela"}</b> · ${ctl() ? "você está no controle" : "Dev clicando em Pagar"}</span><span style="flex:1"></span><button class="btn ghost sm" data-act="${o.dock ? "undock" : "back"}">${o.dock ? "Fechar" : "Trazer de volta"}</button></div></div>`;
+  return `<div class="bc"><canvas class="strip"></canvas><div class="cc"><span class="thumb" data-act="pop" data-thumb></span><div class="tx"><b>loja.exemplo<span style="color:var(--faint);font-weight:500">/checkout</span></b><small>${orbit()}Dev · clicando em Pagar R$ 129,90</small><span class="where">Clique para ${o.dock ? "abrir embaixo" : "abrir na janela"}</span></div><div class="acts" style="display:flex;gap:4px"><button class="ib" data-tip="Assumir" data-act="take">${I.hand}</button><button class="ib danger">${I.stop}</button></div></div></div>`;
+}
+function renderWeb() {
+  let card = "", outside = "";
+  const a = S.alt;
+  if (a === "0") card = cardFull({ today: true, forceOpen: S.st !== "ask" ? false : false });
+  if (a === "1" || a === "3") card = cardFull();
+  if (a === "2") {
+    const docked = S.docked || ctl();
+    card = cardCompact({ dock: true, away: docked });
+    if (docked) outside = `<div class="dock" style="height:${S.dockH}px"><div class="grip" data-grip></div>${header({ actions: "close", from: `<button class="from" data-act="tomsg">#loja · mensagem do Dev, 14:13</button>` })}<div class="pv" data-view="own"></div>${ctl() ? typebar() : stepsOne()}</div>`;
+  }
+  if (a === "4") {
+    const floating = S.floating || ctl();
+    card = cardCompact({ away: floating });
+    if (floating) outside = `<div class="fw wh${S.wh} ${ctl() ? "ctl" : ""}" style="left:${S.fx}px;top:${S.fy}px${q.get("fw") ? `;width:${q.get("fw")}px` : ""}">${winChrome()}</div>`;
+  }
+  const pin = a === "3" ? `<div class="pin" id="pin"><div class="bc ${ctl() ? "ctl" : ""}">${header({ actions: "none" })}${S.pinOpen ? `<div class="pv" data-view="pass" data-scrub style="aspect-ratio:16/10;max-height:300px"></div>${ctl() ? typebar() : ""}` : ""}<div style="display:flex;gap:8px;padding:0 12px 10px"><button class="lnk" data-act="pinopen">${S.pinOpen ? "Esconder a página" : "Ver a página aqui"}</button><span style="flex:1"></span><button class="lnk" data-act="tocard">Voltar ao card</button></div></div></div>` : "";
+  const dockWrap = a === "2" && outside;
+  $("#web").innerHTML = `<div class="win"><div class="tb"><i></i><i></i><i></i><span>agentes.chat · #loja</span></div><div class="wbody">
+    <nav class="side"><div class="ws"><em>L</em>Loja Exemplo</div><a aria-current="true">${I.hash}loja</a><a>${I.bell}Notificações</a><a>${I.agents}Agentes</a><a>${I.laptop}Computadores</a></nav>
+    <section class="chat" id="chat"><div class="chead">${I.hash} loja <small>· 4 pessoas e 2 agentes</small></div>${pin}
+      <div class="msgs" id="msgs">${filler(7)}${userMsg()}${agentMsg(card)}${after()}${filler(3)}</div>${dockWrap ? outside : ""}${composer()}${a === "4" ? outside : ""}</section></div></div>`;
+}
+function renderPhone() {
+  const a = S.alt;
+  let card, sheet = "";
+  if (a === "0") card = cardFull({ today: true, phone: true });
+  else if (a === "1" || a === "3") card = cardFull({ phone: true });
+  else {
+    const out = (a === "2" ? S.docked : S.floating) || ctl();
+    card = cardCompact({ away: out, phone: true, dock: a === "2", where: "Abre a página do Dev embaixo, sem sair da conversa." });
+    if (out) sheet = a === "2"
+      ? `<div class="dock" style="height:360px;margin:0 8px"><div class="grip"></div>${header({ actions: "close" })}<div class="pv" data-view="own"></div>${ctl() ? typebar() : ""}</div>`
+      : `<div class="scrim on" data-act="close"></div><div class="sheet on"><div class="grab"></div>${header({ actions: "close" })}<div class="pv" data-view="own" style="aspect-ratio:16/13;max-height:300px"></div>${ctl() ? typebar() : stepsOne()}</div>`;
+  }
+  const pin = a === "3" ? `<div class="pin" id="ppin" style="top:96px;left:8px;right:8px"><div class="bc ${ctl() ? "ctl" : ""}">${header({ actions: "none" })}<div style="display:flex;padding:0 12px 10px"><span style="flex:1"></span><button class="lnk" data-act="tocard">Voltar ao card</button></div></div></div>` : "";
+  $("#mob").innerHTML = `<div class="phone"><div class="screen"><div class="island"></div><div class="sbar"><span>9:41</span><span></span></div><div class="phead">#loja<small>Dev trabalhando</small></div>${pin}
+    <div class="msgs" id="pmsgs">${filler(5, true)}${userMsg(true)}${agentMsg(card, true)}${after(true)}${filler(2, true)}</div>${a === "2" ? sheet : ""}${composer(true)}${a !== "2" ? sheet : ""}</div></div>`;
+}
+function render() {
+  $("#altSeg").innerHTML = ALTS.map(([k, label]) => `<button data-v="${k}" aria-pressed="${S.alt === k}">${label}</button>`).join("");
+  $("#stSeg").innerHTML = STS.map(([k, label]) => `<button data-v="${k}" aria-pressed="${S.st === k}">${label}</button>`).join("");
+  for (const b of $$("#themeSeg button")) b.setAttribute("aria-pressed", b.dataset.v === S.theme);
+  const alt = ALTS.find((x) => x[0] === S.alt);
+  $("#title").textContent = alt[2]; $("#lead").textContent = alt[3];
+  $("#tip").textContent = "Role a conversa com o mouse em cima da página para sentir a diferença.";
+  $("#webcap").textContent = { 0: "Hoje: a página prende a roda, o card é alto e a conversa pula", 1: "No card, com tamanho fixo; a roda rola a conversa até você clicar na página", 2: "A doca fica acima da caixa de mensagem; arraste a borda de cima para mudar a altura", 3: "Role para cima até o card sair: o cabeçalho gruda no topo", 4: "Arraste a janela pelo cabeçalho; o canto redimensiona" }[S.alt];
+  $("#mobcap").textContent = { 0: "No celular hoje: o card ocupa a tela", 1: "No celular: a página encaixada, menor", 2: "No celular: a doca acima do teclado", 3: "No celular: o cabeçalho gruda no topo", 4: "No celular: o card na conversa; abrir sobe uma folha" }[S.alt];
+  renderWeb(); renderPhone();
+  for (const pv of $$(".pv")) mountView(pv, kind(), { mode: pv.dataset.view, scrub: pv.hasAttribute("data-scrub") });
+  for (const th of $$("[data-thumb]")) { th.innerHTML = site(kind()); const k = th.clientWidth / PAGE_W; $(".site", th).style.transform = `scale(${k})`; }
+  hydrate(document);
+  wire();
+  // land the conversation on the agent's message
+  for (const [list, id] of [["#msgs", "#agentMsg"], ["#pmsgs", "#pAgentMsg"]]) { const l = $(list), m = $(id); if (l && m) l.scrollTop = m.offsetTop - l.offsetTop - 60; }
+  renderCmp();
+  setHash();
+}
+function wire() {
+  for (const b of $$("[data-act]")) b.onclick = (e) => {
+    const act = b.dataset.act; e.stopPropagation();
+    if (act === "toggle") { S.open = !S.open; render(); }
+    if (act === "steps") { S.stepsOpen = !S.stepsOpen; render(); }
+    if (act === "take" || act === "answer") { S.st = "control"; S.open = true; render(); }
+    if (act === "done" || act === "giveup") { S.st = "watch"; S.floating = false; S.docked = false; render(); }
+    if (act === "pop") { if (S.alt === "2") S.docked = true; else S.floating = true; render(); }
+    if (act === "close" || act === "back" || act === "undock") { S.fx = S.fy = null; S.floating = false; S.docked = false; if (S.st === "control") S.st = "watch"; render(); }
+    if (act === "menu") { S.menu = !S.menu; render(); return; }
+    if (S.menu && act !== "menu") S.menu = false;
+    if (act === "keys") { S.keysOpen = !S.keysOpen; render(); }
+    if (act === "secret") { S.secret = !S.secret; render(); }
+    if (act === "pinopen") { S.pinOpen = !S.pinOpen; render(); }
+    if (act === "tomsg" || act === "tocard") { const m = $("#agentMsg"), l = $("#msgs"); l.scrollTo({ top: m.offsetTop - l.offsetTop - 40, behavior: "smooth" }); m.classList.add("flash"); setTimeout(() => m.classList.remove("flash"), 1200); }
+  };
+  // 2 · dock: drag the top edge to resize
+  const grip = $("[data-grip]");
+  if (grip) grip.onpointerdown = (e) => { const y0 = e.clientY, h0 = S.dockH; grip.setPointerCapture(e.pointerId); grip.onpointermove = (ev) => { S.dockH = Math.max(220, Math.min(560, h0 - (ev.clientY - y0))); $(".dock").style.height = S.dockH + "px"; views.forEach(layoutView); }; grip.onpointerup = () => { grip.onpointermove = null; }; };
+  // 4 · window: drag by the header
+  const fw = $(".fw");
+  if (fw) {
+    // bottom-right of the conversation by default, above the composer
+    if (S.fx == null) { const chat = $("#chat"); S.fx = Math.max(12, chat.clientWidth - fw.offsetWidth - 16); S.fy = Math.max(56, chat.clientHeight - fw.offsetHeight - 78); }
+    fw.style.left = S.fx + "px"; fw.style.top = S.fy + "px";
+    const bh = $(".drag", fw) || $(".bh", fw);
+    bh.onpointerdown = (e) => { if (e.target.closest("button")) return; const x0 = e.clientX, y0 = e.clientY, fx = S.fx, fy = S.fy; bh.setPointerCapture(e.pointerId); bh.onpointermove = (ev) => { S.fx = fx + ev.clientX - x0; S.fy = fy + ev.clientY - y0; fw.style.left = S.fx + "px"; fw.style.top = S.fy + "px"; }; bh.onpointerup = () => { bh.onpointermove = null; }; };
+    new ResizeObserver(() => views.forEach(layoutView)).observe(fw);
+  }
+  // 3 · pin when the card scrolls out of view
+  const card = $("#agentMsg [data-card]"), pin = $("#pin");
+  if (card && pin) new IntersectionObserver(([en]) => pin.classList.toggle("on", !en.isIntersecting && en.boundingClientRect.top < en.rootBounds.top), { root: $("#msgs"), threshold: 0 }).observe(card);
+  const pcard = $("#pAgentMsg [data-card]"), ppin = $("#ppin");
+  if (pcard && ppin) new IntersectionObserver(([en]) => ppin.classList.toggle("on", !en.isIntersecting && en.boundingClientRect.top < en.rootBounds.top), { root: $("#pmsgs"), threshold: 0 }).observe(pcard);
+}
+function renderCmp() {
+  const rec = "4";
+  const C = [
+    ["0", "Hoje", ["A roda prende na página", "Card alto empurra a conversa", "Passos com rolagem própria", "Campo de digitar longe da página"]],
+    ["1", "1 · Encaixado", ["Tudo continua na mensagem", "Sem prender a roda (clique para rolar a página)", "Ainda ocupa até 420 px no meio da conversa", "No celular a página fica pequena"]],
+    ["2", "2 · Doca", ["A conversa rola livre e nunca pula", "Altura ajustável", "Tira espaço de baixo da conversa enquanto aberta", "No celular disputa espaço com o teclado"]],
+    ["3", "3 · Fixa ao topo", ["Controles sempre à mão", "Card continua na mensagem", "Comportamento de “grudar” pode surpreender", "Ainda alto quando aberto"]],
+    ["4", "4 · Card + janela", ["Na mensagem é sempre baixo: nada empurra nem pula", "A janela tem a própria roda: sem conflito", "Página grande, campo de digitar colado nela", "Cobre parte da conversa (dá para arrastar); no celular vira folha"]],
+  ];
+  $("#cmp").innerHTML = C.map(([k, t, pts]) => `<div class="${k === rec ? "rec" : ""}"><b>${t}${k === rec ? " · recomendo" : ""}</b><ul>${pts.map((p) => `<li>${p}</li>`).join("")}</ul></div>`).join("")
+    + `<div style="grid-column:1/-1"><b>Minha recomendação</b>A <b style="display:inline">4 · Card + janela</b> resolve todos os problemas de hoje sem meio-termo: na mensagem o navegador nunca passa de uma linha com miniatura (a conversa não cresce nem pula), e quando você quer ver ou assumir ele sai para uma janela com a própria rolagem, onde a página é grande e o campo de digitar fica colado nela. Comparada à 1, não precisa de “clique para rolar”; comparada à 2, não rouba altura fixa da conversa e dá para pôr a janela onde quiser; comparada à 3, não tem nada grudando de surpresa. Se a janela por cima da conversa incomodar, a 2 (doca) é a segunda melhor. No celular, a 4 vira uma folha por cima, com a conversa atrás.</div>`;
+}
+
+/* ---------- controls ---------- */
+S.open = true; S.stepsOpen = false; S.floating = false; S.docked = false; S.dockH = 320; S.fx = null; S.fy = null; S.pinOpen = false;
+$("#altSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.alt = b.dataset.v; S.floating = S.docked = false; S.open = true; render(); };
+$("#stSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.st = b.dataset.v; if (S.st !== "control") { S.floating = S.docked = false; } render(); };
+$("#themeSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.theme = b.dataset.v; document.documentElement.dataset.theme = S.theme; render(); };
+if (q.get("open") === "1") { S.floating = true; S.docked = true; }
+render();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
