@@ -9411,7 +9411,8 @@ a.machine-row__name:hover {
 .agp-ident {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  /* The actions sit in the middle of name + chips, not hanging below the chips. */
+  align-items: center;
   gap: 16px;
   padding: 16px 4px 4px;
 }
