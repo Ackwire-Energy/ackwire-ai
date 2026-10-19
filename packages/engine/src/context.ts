@@ -22,6 +22,7 @@ import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import type { AgentRun } from "./runs";
+import { loadTeam, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
 
 const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
@@ -122,6 +123,8 @@ export async function buildRunContext(
     capabilities?: string;
     /** Skills enabled for the agent (name and description; the body loads on demand). */
     skills?: { name: string; description: string }[];
+    /** `find_agent` is available: name the other agents in "# Your team" (D54). */
+    team?: boolean;
     trigger?: Message;
   },
 ): Promise<RunContext> {
@@ -362,6 +365,11 @@ export async function buildRunContext(
   const referenced = others
     .filter((m) => m.agentId && referencedIds.includes(m.agentId))
     .map((m) => `@${m.agentHandle}`);
+  // The rest of the org's agents (D54): channel members are described in "Where you are".
+  const team =
+    options.team && channel.kind !== "forum"
+      ? teamPrompt(await loadTeam(db, run.orgId), agent.id, requester, new Set(others.map((m) => m.agentId as string)))
+      : "";
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
@@ -420,6 +428,7 @@ export async function buildRunContext(
       cache: true,
     },
     ...(options.capabilities ? [{ text: options.capabilities }] : []),
+    ...(team ? [{ text: team }] : []),
     ...(options.skills && options.skills.length > 0
       ? [
           {

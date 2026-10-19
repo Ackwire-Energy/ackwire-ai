@@ -28,6 +28,7 @@ import {
   createCredential,
   createFakeJudge,
   createFakeScheduleReader,
+  createFindAgentToolSource,
   createForumToolSource,
   createIssueToolSource,
   createJobHandlers,
@@ -242,7 +243,7 @@ export async function setup(
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
-    ...(options.askAgent ? [createAskAgentToolSource({ pubsub })] : []),
+    ...(options.askAgent ? [createAskAgentToolSource({ pubsub }), createFindAgentToolSource()] : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),

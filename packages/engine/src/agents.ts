@@ -100,6 +100,7 @@ export async function createAgent(
     }
     // Every agent has a budget (its own or the org's default): the month's counter exists
     // from the start, so the first call reserves in one statement.
+    caches.agents.delete(`${orgId}:team`);
     await resyncBudgetCounter(db, orgId, agent.id);
     return agent;
   } catch (error) {
@@ -124,6 +125,7 @@ export async function updateAgent(
     .returning();
   if (!agent) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
+  caches.agents.delete(`${orgId}:team`);
   if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
   return agent;
 }
@@ -135,6 +137,7 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
     .set({ archivedAt: new Date() })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   caches.agents.delete(`${orgId}:${agentId}`);
+  caches.agents.delete(`${orgId}:team`);
 }
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {

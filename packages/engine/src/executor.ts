@@ -79,6 +79,7 @@ import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, 
 import { SANDBOX_SCOPE } from "./sandbox";
 import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
 import { enabledSkills } from "./skills";
+import { FIND_AGENT_TOOL } from "./team";
 import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
 import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolContext, ToolDefinition } from "./tools/types";
@@ -580,6 +581,7 @@ async function executeRunInner(
         react: tools.some((t) => t.name === REACT_TOOL),
         capabilities: [describeCapabilities(tools, pending), repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
+        team: tools.some((t) => t.name === FIND_AGENT_TOOL),
         trigger,
       }),
       contextDeps

@@ -15,6 +15,7 @@ import {
   createClaudeCodeBrain,
   createConnectorToolSource,
   createContextToolSource,
+  createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
   createIssueToolSource,
@@ -200,6 +201,7 @@ export function buildEngine(o: EngineOptions) {
     sources: [
       createAskUserToolSource(),
       createAskAgentToolSource({ pubsub: adapters.pubsub }),
+      createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),

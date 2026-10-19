@@ -154,6 +154,7 @@ export async function setAgentAudience(
     .returning();
   if (!updated) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
+  caches.agents.delete(`${orgId}:team`);
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },

@@ -135,6 +135,7 @@ export * from "./secrets";
 export * from "./skill-tools";
 export * from "./skills";
 export * from "./storage";
+export * from "./team";
 export * from "./threads";
 export * from "./tools/gateway";
 export * from "./tools/json-schema";
