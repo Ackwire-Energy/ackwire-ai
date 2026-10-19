@@ -63,6 +63,20 @@ export const extraIcons = {
   ],
   /** Sidebar.dc.html: Criar agente. */
   plus: [["path", { d: "M10 4.5v11M4.5 10h11" }]],
+  /** Tarefas.html: the stages of a task, a circle that fills as the work goes (to do, doing, review, done). */
+  stageTodo: [["circle", { cx: "10", cy: "10", r: "6.75" }]],
+  stageProgress: [
+    ["circle", { cx: "10", cy: "10", r: "6.75" }],
+    ["path", { d: "M10 3.25a6.75 6.75 0 0 1 0 13.5z", fill: "currentColor" }],
+  ],
+  stageReview: [
+    ["circle", { cx: "10", cy: "10", r: "6.75" }],
+    ["path", { d: "M10 3.25a6.75 6.75 0 1 1-6.75 6.75H10z", fill: "currentColor" }],
+  ],
+  stageDone: [
+    ["circle", { cx: "10", cy: "10", r: "6.75", fill: "currentColor" }],
+    ["path", { d: "m7.2 10.2 2 2 3.6-3.9", stroke: "var(--bg)", strokeWidth: "1.8" }],
+  ],
   /** Onboarding / Agente dialogs: remove, close. */
   close: [["path", { d: "m6 6 8 8M14 6l-8 8" }]],
   /** Select.dc.html: trigger chevron. */

@@ -2006,7 +2006,7 @@ export const en: Translations = {
       stageHint: {
         todo: "Not started yet",
         in_progress: "Someone is doing it",
-        in_review: "Waiting for someone to check",
+        in_review: "Ready to be checked",
         done: "Finished",
         canceled: "Won't be done",
       },

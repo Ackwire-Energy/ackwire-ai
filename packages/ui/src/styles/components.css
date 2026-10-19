@@ -4672,9 +4672,13 @@ a.ac-list__row:focus-visible {
 }
 .ac-searchfield__input {
   box-sizing: border-box;
+  /* Safari draws type=search with its own box and height: ours is the field's. */
+  appearance: none;
+  -webkit-appearance: none;
   flex: 1;
   min-width: 0;
   height: 100%;
+  margin: 0;
   padding: 0 36px 0 36px;
   border: 0;
   border-radius: inherit;
@@ -4682,6 +4686,7 @@ a.ac-list__row:focus-visible {
   color: inherit;
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
 }
 .ac-searchfield--sm .ac-searchfield__input,
 .ac-toolbar .ac-searchfield__input {
@@ -5433,6 +5438,10 @@ a.ac-list__row:focus-visible {
   align-items: center;
   color: var(--muted);
 }
+/* Side by side, a lifted tile would leave its row: the chosen one stays in line. */
+.ac-optlist--tiles .ac-optrow[data-state="checked"] {
+  transform: none;
+}
 .ac-optlist--tiles .ac-optrow__title {
   line-height: 20px;
   font-weight: 600;
@@ -5441,6 +5450,10 @@ a.ac-list__row:focus-visible {
   font-size: 12.5px;
   line-height: 18px;
   margin-top: 2px;
+  /* One line each, so the tiles keep one height. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 @media (max-width: 440px) {
   .ac-optlist--tiles {
