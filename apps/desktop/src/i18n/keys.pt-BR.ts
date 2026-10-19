@@ -159,6 +159,10 @@ export const desktopPtBR = {
       "Comandos podem chegar a outras partes do Mac, não só às pastas liberadas. Você vê cada um em Atividade.",
     commandsWarnOrgs:
       "Comandos podem chegar a outras partes do Mac, não só às pastas liberadas, inclusive às pastas de outra organização. O modo protegido vai evitar isso. Cada comando fica em Atividade.",
+    browserName: "Navegador",
+    browserDesc: "Abre sites para os agentes num navegador só deles, sem os seus logins.",
+    browserLogins:
+      "Os logins que um agente faz ficam salvos neste Mac, na pasta dele. Use só contas de teste ou do próprio agente.",
   },
   prefs: {
     nav: {

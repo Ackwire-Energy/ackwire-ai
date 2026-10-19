@@ -18,6 +18,7 @@ export function Tools() {
     claude: false,
     codex: false,
     commands: false,
+    browser: false,
   };
   const executors: ControlStatus["executors"] = homes.find((h) => h.status)?.status?.executors ?? {};
 
@@ -111,6 +112,27 @@ export function Tools() {
             <span className="dk-honest">
               <Icon name="alert" size={14} />
               <span>{homes.length > 1 ? t("desktop.tools.commandsWarnOrgs") : t("desktop.tools.commandsWarn")}</span>
+            </span>
+          }
+        />
+        <PrefRow
+          top
+          lead={logo("globe")}
+          htmlFor="tool-browser"
+          title={t("desktop.tools.browserName")}
+          desc={t("desktop.tools.browserDesc")}
+          end={
+            <Switch
+              id="tool-browser"
+              checked={tools.browser === true}
+              disabled={homes.length === 0}
+              onCheckedChange={(on) => void set("browser", on)}
+            />
+          }
+          under={
+            <span className="dk-honest">
+              <Icon name="lock" size={14} />
+              <span>{t("desktop.tools.browserLogins")}</span>
             </span>
           }
         />
