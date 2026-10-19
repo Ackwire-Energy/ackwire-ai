@@ -2451,6 +2451,8 @@ export interface ThreadInfo {
   /** An agent run is in progress (or waiting) in this thread. */
   working: boolean;
   needsYou: boolean;
+  /** Open, and a model judged its matter done after its last message: offer one-click close. Never closes by itself. */
+  suggestedResolved: boolean;
   /** You may close, archive, rename or change the context. */
   canManage: boolean;
   /**

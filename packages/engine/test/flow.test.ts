@@ -104,7 +104,12 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     .where(eq(schema.agentRunSteps.runId, run?.id ?? ""))
     .orderBy(asc(schema.agentRunSteps.seq));
   expect(steps.map((s) => s.kind)).toEqual(["context", "model_call", "message"]);
-  expect((await f.db.select().from(schema.outbox)).every((j) => j.status === "done")).toBe(true);
+  expect(
+    (await f.db.select().from(schema.outbox))
+      // The thread's assessment is due minutes later (threads.assess).
+      .filter((j) => j.kind !== "threads.assess")
+      .every((j) => j.status === "done"),
+  ).toBe(true);
 });
 
 test("agents answer each other at most once in a row without a person", async () => {
@@ -174,7 +179,12 @@ test("an agent over budget fails the run without calling the model", async () =>
   });
   expect(events.at(-1)).toMatchObject({ type: "message.handled", status: "failed" });
   // The job itself succeeded: a failed run is a handled outcome, not a retry.
-  expect((await f.db.select().from(schema.outbox)).every((j) => j.status === "done")).toBe(true);
+  expect(
+    (await f.db.select().from(schema.outbox))
+      // The thread's assessment is due minutes later (threads.assess).
+      .filter((j) => j.kind !== "threads.assess")
+      .every((j) => j.status === "done"),
+  ).toBe(true);
 });
 
 test("a model refusal fails the run but still records usage", async () => {

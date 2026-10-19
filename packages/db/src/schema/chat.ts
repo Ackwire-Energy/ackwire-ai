@@ -171,6 +171,13 @@ export const threads = pgTable(
     rootMessageId: uuid().notNull(),
     /** Null: the web shows the root message's text. */
     title: text(),
+    /** The title was written by a model (`threads.assess`); a person's title is never overwritten. */
+    titleAuto: boolean().notNull().default(false),
+    /**
+     * A cheap model judged the thread's matter done: the time of the last message
+     * it read. Suggests "resolved?" while no newer message came (never closes).
+     */
+    resolvedSuggestedAt: timestamp({ withTimezone: true }),
     state: threadStateEnum().notNull().default("open"),
     createdBy: text().references(() => users.id, { onDelete: "set null" }),
     closedBy: text().references(() => users.id, { onDelete: "set null" }),

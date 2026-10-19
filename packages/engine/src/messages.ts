@@ -249,6 +249,8 @@ export function parseMentionHandles(body: string): string[] {
 
 /** An agent's message may bring in one more agent only up to this hop (D49); `router.ts` enforces it too. */
 export const AGENT_CHIME_IN_MAX_HOP = 2;
+/** A reply waits this long before its thread is assessed (`threads.assess`); a newer reply's job takes over. */
+export const THREAD_ASSESS_DELAY_MS = 2 * 60_000;
 
 export type MessageAuthor =
   | { type: "person"; userId: string }
@@ -503,6 +505,16 @@ export async function insertMessageWithRuns(
           where cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
             or (m.author_type = 'person' and exists (
               select 1 from ${channels} dc where dc.id = ${input.channelId}::uuid and dc.kind = 'dm'))
+        on conflict do nothing
+        returning id
+      ), assess as (
+        -- A reply: the thread's title and "resolved?" are assessed a while later (threads.assess);
+        -- a newer reply's job takes over. Forum replies are skipped by the handler.
+        insert into ${outbox} (id, org_id, kind, payload, dedupe_key, max_attempts, next_attempt_at)
+        select gen_random_uuid(), ${input.orgId}::uuid, 'threads.assess',
+          jsonb_build_object('threadRootId', m.thread_id, 'messageId', m.id), 'threads.assess:' || m.id, 2,
+          now() + ${THREAD_ASSESS_DELAY_MS / 1000}::int * interval '1 second'
+        from m where m.thread_id is not null
         on conflict do nothing
         returning id
       )

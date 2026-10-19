@@ -36,6 +36,7 @@ import type { AgentRun } from "./runs";
 import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";
+import { assessThread } from "./thread-assess";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -345,6 +346,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "context.reflect": async (job) => {
       if (!deps.context) return;
       await reflectThread(deps.context, { orgId: orgOf(job), threadRootId: String(job.payload.threadRootId) });
+    },
+    // A reply a while ago: the thread's title and "resolved?" suggestion, unless a newer reply came.
+    "threads.assess": async (job) => {
+      if (!deps.context) return;
+      await assessThread(deps.context, {
+        orgId: orgOf(job),
+        threadRootId: String(job.payload.threadRootId),
+        messageId: typeof job.payload.messageId === "string" ? job.payload.messageId : undefined,
+      });
     },
     "context.feedback": async (job) => {
       await applyReactionFeedback(deps.db, {

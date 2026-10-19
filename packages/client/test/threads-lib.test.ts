@@ -62,6 +62,7 @@ const thread = (over: Partial<ThreadInfo> = {}): ThreadInfo => ({
   participants: [],
   working: false,
   needsYou: false,
+  suggestedResolved: false,
   canManage: true,
   createdAt: at(40),
   ...over,

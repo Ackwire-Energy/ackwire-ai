@@ -5,12 +5,14 @@ import {
   addChannelMember,
   archiveThread,
   buildRunContext,
+  cleanAssessedTitle,
   closeThread,
   createChannel,
   createThreadFromRange,
   deleteThread,
   drainOutbox,
   getThread,
+  insertMessage,
   listMessages,
   listThreads,
   moveContextIntoThread,
@@ -18,14 +20,22 @@ import {
   postPersonMessage,
   reopenThread,
   returnContextToChannel,
+  THREAD_ASSESS_DELAY_MS,
   unarchiveThread,
   updateThread,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
+/** What the fake cheap model answers to `threads.assess` (other calls get "ok"). */
+let assessed: { title: string; resolved: boolean } = { title: "", resolved: false };
+const isAssess = (system: Parameters<typeof systemText>[0]) =>
+  systemText(system).startsWith("You read a conversation thread");
 beforeEach(async () => {
-  f = await setup();
+  assessed = { title: "", resolved: false };
+  f = await setup({
+    reply: (request) => ({ chunks: [isAssess(request.system) ? JSON.stringify(assessed) : "ok"] }),
+  });
 });
 afterEach(() => f.close());
 
@@ -363,4 +373,98 @@ test("the run's context reads the thread's range (minus exclusions), not the cha
   // Moved into the thread: the same messages, read once (as replies now).
   await moveContextIntoThread(deps(), f.owner.id, f.org.id, thread.id);
   check(await contextFor("@dev and now?"));
+});
+
+// ── Assessment (threads.assess): title and "resolved?" ─────────────────────────
+
+/** Runs the jobs due once the assessment delay has passed. */
+const drainLater = () => drainOutbox(f.db, f.handlers, { now: new Date(Date.now() + THREAD_ASSESS_DELAY_MS + 60_000) });
+const assessCalls = () => f.provider.calls.filter((c) => isAssess(c.request.system));
+const viewOf = (rootId: string) => getThread(f.db, f.owner.id, f.org.id, rootId);
+
+test("a reply gets the thread a model-written title a while later; only the latest reply's job asks", async () => {
+  const root = await post(f.owner.id, f.general.id, "**App Hang** no iOS de novo");
+  await post(f.owner.id, f.general.id, "acontece ao abrir a câmera", root.id);
+  const last = await post(f.owner.id, f.general.id, "pode olhar?", root.id);
+  // Not yet: due minutes later.
+  await drainOutbox(f.db, f.handlers);
+  expect(assessCalls()).toHaveLength(0);
+  expect((await viewOf(root.id)).title).toBeNull();
+
+  assessed = { title: "**App travando** ao abrir a câmera no iOS @dev.", resolved: false };
+  const events = f.listen(f.general.id);
+  await drainLater();
+  // The first reply's job saw a newer reply and left it to that one.
+  expect(assessCalls()).toHaveLength(1);
+  const prompt = JSON.stringify(assessCalls()[0]?.request.messages);
+  expect(prompt).toContain("pode olhar?");
+  const view = await viewOf(root.id);
+  expect(view).toMatchObject({ title: "App travando ao abrir a câmera no iOS", suggestedResolved: false });
+  expect(events.some((e) => e.type === "thread.updated" && e.threadId === root.id)).toBe(true);
+  // Billed to the org (no agent budget), kind `summary`.
+  const usage = await f.db.select().from(schema.usageRecords);
+  expect(usage.some((u) => u.kind === "summary" && u.orgId === f.org.id && u.agentId === null)).toBe(true);
+  expect(last.threadId).toBe(root.id);
+
+  // The model may rewrite its own title later.
+  assessed = { title: "Travamento da câmera no iOS", resolved: false };
+  await post(f.owner.id, f.general.id, "mais detalhes", root.id);
+  await drainLater();
+  expect((await viewOf(root.id)).title).toBe("Travamento da câmera no iOS");
+});
+
+test("a person's title is never overwritten by the model", async () => {
+  const root = await post(f.owner.id, f.general.id, "@theo");
+  await updateThread(deps(), f.owner.id, f.org.id, root.id, { title: "Rotina de relatórios" });
+  assessed = { title: "Pedido ao Theo", resolved: true };
+  await post(f.owner.id, f.general.id, "pode fazer sim", root.id);
+  await drainLater();
+  expect(assessCalls()).toHaveLength(1);
+  expect(await viewOf(root.id)).toMatchObject({ title: "Rotina de relatórios", suggestedResolved: true });
+});
+
+test("'resolved?' holds until a new message; closing or reopening clears it; it never closes", async () => {
+  const root = await post(f.owner.id, f.general.id, "a rotina pode rodar a cada 30 min?");
+  await post(f.owner.id, f.general.id, "Feito, a rotina agora roda a cada 30 min", root.id);
+  assessed = { title: "Rotina a cada 30 minutos", resolved: true };
+  await drainLater();
+  let view = await viewOf(root.id);
+  expect(view).toMatchObject({ suggestedResolved: true, state: "open" });
+  expect((await listThreads(f.db, f.owner.id, { orgId: f.org.id })).threads[0]?.suggestedResolved).toBe(true);
+
+  // A new message: the suggestion no longer holds (before any new assessment).
+  await post(f.owner.id, f.general.id, "na verdade, a cada 15", root.id);
+  expect((await viewOf(root.id)).suggestedResolved).toBe(false);
+
+  assessed = { title: "Rotina a cada 15 minutos", resolved: true };
+  await drainLater();
+  view = await viewOf(root.id);
+  expect(view).toMatchObject({ suggestedResolved: true, title: "Rotina a cada 15 minutos" });
+
+  // Closing answers it; reopening doesn't bring it back.
+  expect((await closeThread(deps(), f.owner.id, f.org.id, root.id)).suggestedResolved).toBe(false);
+  expect((await reopenThread(deps(), f.owner.id, f.org.id, root.id)).suggestedResolved).toBe(false);
+  // A closed thread isn't assessed (an agent's late reply doesn't reopen it).
+  await closeThread(deps(), f.owner.id, f.org.id, root.id);
+  const calls = assessCalls().length;
+  await f.db.transaction((tx) =>
+    insertMessage(tx, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: root.id,
+      author: { type: "agent", agentId: f.agent.id, runId: crypto.randomUUID(), hop: 1 },
+      body: "Anotado",
+    }),
+  );
+  await drainLater();
+  expect(assessCalls()).toHaveLength(calls);
+  expect((await viewOf(root.id)).suggestedResolved).toBe(false);
+});
+
+test("a model's title is plain text on one line", () => {
+  expect(cleanAssessedTitle("**App Hang** no @theo.")).toBe("App Hang no");
+  expect(cleanAssessedTitle('"Deploy  de\nsexta"')).toBe("Deploy de sexta");
+  expect(cleanAssessedTitle("x".repeat(80))?.length).toBe(60);
+  expect(cleanAssessedTitle("  ")).toBeNull();
+  expect(cleanAssessedTitle(3)).toBeNull();
 });

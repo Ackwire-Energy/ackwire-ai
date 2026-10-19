@@ -67,6 +67,10 @@ const Thread = z
         "An agent run is in progress (or waiting for an approval or an answer) in this thread; not one waiting for its computer.",
     }),
     needsYou: z.boolean(),
+    suggestedResolved: z.boolean().openapi({
+      description:
+        "Open, and a model judged its matter done after its last message: offer to close it. Cleared by a new message, closing or reopening; never closes by itself.",
+    }),
     canManage: z.boolean().openapi({ description: "You may close, archive, rename or change the context." }),
     following: z.boolean().openapi({
       description:

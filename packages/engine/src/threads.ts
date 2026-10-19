@@ -78,7 +78,7 @@ export interface ThreadInfo {
   channelId: string;
   channelName: string;
   channelKind: "channel" | "dm" | "forum";
-  /** Null: no title of its own (show `rootText`). */
+  /** Null: no title of its own (show `rootText`). Written by a person, or by a model (`threads.assess`). */
   title: string | null;
   /** The root message's text, on one line (≤ 200 chars). */
   rootText: string;
@@ -100,6 +100,12 @@ export interface ThreadInfo {
   working: boolean;
   /** An agent asked something here and the actor took part, or an approval here waits for the actor. */
   needsYou: boolean;
+  /**
+   * Open, and a cheap model judged its matter done after its last message
+   * (`threads.assess`): the app offers to close it. Cleared by a new message,
+   * closing or reopening; never closes anything by itself.
+   */
+  suggestedResolved: boolean;
   /** Whether the actor may close, archive, rename or change the context. */
   canManage: boolean;
   /**
@@ -417,7 +423,8 @@ export async function createThreadFromRange(
   if (source.kind === "forum") throw new ValidationError("Forum topics have no threads", "thread.forum");
   const range = await resolveRange(db, orgId, source, input);
   await requireRangeVisible(db, orgId, channel.id, source);
-  const title = cleanTitle(input.title) ?? autoThreadTitle(range.first.body);
+  const given = cleanTitle(input.title);
+  const title = given ?? autoThreadTitle(range.first.body);
   const start: ThreadStartMeta = {
     title,
     contextChannelId: source.id,
@@ -447,6 +454,8 @@ export async function createThreadFromRange(
       channelId: channel.id,
       rootMessageId: message.id,
       title,
+      // Made from the first message: a model may write a better one later; a person's title stays.
+      titleAuto: given === null,
       createdBy: actorId,
       contextChannelId: source.id,
       contextFirstMessageId: range.first.id,
@@ -543,7 +552,8 @@ export async function updateThread(
     await tx
       .update(threads)
       .set({
-        ...(title !== undefined ? { title } : {}),
+        // A person's title: the model never overwrites it (an empty one gives the model the floor again).
+        ...(title !== undefined ? { title, titleAuto: false } : {}),
         ...(range
           ? {
               contextChannelId: range.source.id,
@@ -805,6 +815,8 @@ async function setThreadState(
       .update(threads)
       .set({
         state: next,
+        // Any decision about the state answers the "resolved?" suggestion.
+        resolvedSuggestedAt: null,
         ...(action === "close" ? { closedBy: actorId, closedAt: now } : {}),
         ...(action === "reopen" ? { closedBy: null, closedAt: null } : {}),
         ...(action === "archive" ? { archivedBy: actorId, archivedAt: now } : {}),
@@ -909,6 +921,7 @@ interface ThreadSqlRow {
   context_count: number | string | null;
   working: boolean;
   needs_you: boolean;
+  suggested_resolved?: boolean | null;
   following?: boolean | null;
   mission_id?: string | null;
   mission_agent_id?: string | null;
@@ -1032,6 +1045,9 @@ async function queryThreads(
               and ap.status = 'pending' and ap.thread_root_id = root.id
               and (${isAdmin}::boolean or ap.owner_user_id = ${userId}))
           ) as needs_you,
+          -- The model's "resolved?" holds while no message came after the one it read.
+          (coalesce(t.state, 'open') = 'open' and t.resolved_suggested_at is not null
+            and t.resolved_suggested_at >= coalesce(r.last_at, root.created_at)) as suggested_resolved,
           ${participated} as participated,
           ${followsThreadSql(orgId, userId, sql`root.id`)} as following,
           mi.id as mission_id, mi.agent_id as mission_agent_id, mi.status as mission_status, mi.plan_done as mission_plan_done,
@@ -1152,6 +1168,7 @@ function toView(
     participants: extras.authors.get(r.id) ?? [],
     working: r.working === true,
     needsYou: r.needs_you === true,
+    suggestedResolved: r.suggested_resolved === true,
     canManage: r.created_by === userId || (r.author_type === "person" && r.author_user_id === userId) || isAdmin,
     following: r.following === true,
     mission:
