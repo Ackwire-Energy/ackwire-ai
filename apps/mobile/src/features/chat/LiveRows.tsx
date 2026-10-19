@@ -1,7 +1,6 @@
 import { elapsedClock, type LiveConsult, type LiveRun, narrationOf, usesBrowser } from "@agenteschat/client";
 import { activitySentence, isWriting } from "@agenteschat/client/lib/activity";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
@@ -44,6 +43,16 @@ export function StreamingRow({ run }: { run: LiveRun }) {
 export const writingRuns = (runs: LiveRun[]) =>
   runs.filter((r) => r.text.length > 0 && (r.status === "running" || r.status === "canceled"));
 
+/** The runs at work in their browser (not writing yet), one per agent: each gets its browser card. */
+export function browsingRuns(runs: LiveRun[]): LiveRun[] {
+  const seen = new Set<string>();
+  return runs.filter((r) => {
+    if (isWriting(r) || !usesBrowser(r) || seen.has(r.agentId)) return false;
+    seen.add(r.agentId);
+    return true;
+  });
+}
+
 /** How many faces the stack shows (the sentence says "e mais N"), as on the web. */
 const STACK_MAX = 4;
 
@@ -62,11 +71,14 @@ export function WorkingLine({
   consults,
   canStop,
   onStop,
+  onOpenBrowser,
 }: {
   runs: LiveRun[];
   consults: LiveConsult[];
   canStop: (run: LiveRun) => boolean;
   onStop: (run: LiveRun) => void;
+  /** An agent in its browser: tapping the line opens its card in the conversation. */
+  onOpenBrowser?: (agentId: string) => void;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -107,9 +119,9 @@ export function WorkingLine({
     ]);
   };
   const plate = [styles.tok, { backgroundColor: c.glassSolid }];
-  // An agent working in its browser: the line says so, and a tap opens its browser live (watching).
-  const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
-  const openBrowser = browsing ? () => router.push(`/browser/${browsing.agentId}`) : undefined;
+  // An agent working in its browser: the line says so, and a tap opens its browser card in the conversation.
+  const browsing = browsingRuns(runs)[0];
+  const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
   return (
     <View style={styles.dock}>
       {said.map((n) => (

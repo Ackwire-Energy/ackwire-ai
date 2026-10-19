@@ -1,19 +1,29 @@
-import { useBrowserHandoff } from "@agenteschat/client";
-import { useLocalSearchParams } from "expo-router";
-import { View } from "react-native";
-import { LiveView } from "@/features/browser/LiveView";
-import { useOrgId } from "@/features/shared/hooks";
-import { useTheme } from "@/ui";
+import { useNotifications } from "@agenteschat/client";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
+import { handoffHref } from "@/features/links/logic";
+import { useColors, useOrgId } from "@/features/shared/hooks";
 
 /**
- * An agent's request for help in its browser (the chat card, the push, "Esperando você"): the live view of
- * that agent's browser, taking the control (`/handoff/<id>`, deep link `agenteschat://handoff/<id>`).
+ * A bare link to an agent's request for help in its browser (`agenteschat://handoff/<id>`): the request
+ * lives in its conversation, so this finds the conversation (from the request's notice in "Esperando
+ * você") and goes there with the card in control; without it, to the activity.
  */
 export default function HandoffRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const orgId = useOrgId();
-  const { colors } = useTheme();
-  const handoff = useBrowserHandoff(orgId, id);
-  if (!handoff.data) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  return <LiveView agentId={handoff.data.agentId} handoffId={id} />;
+  const c = useColors();
+  const waiting = useNotifications(orgId, "waiting");
+  useEffect(() => {
+    if (!waiting.data && !waiting.isError) return;
+    const notice = waiting.data?.pages.flatMap((p) => p.items).find((n) => n.source.handoffId === id);
+    const href = notice ? handoffHref(id, notice.source.channelId ?? notice.source.dmId, notice.source.threadId) : null;
+    router.replace(href && !href.startsWith("/handoff/") ? href : "/activity");
+  }, [waiting.data, waiting.isError, id]);
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}>
+      <ActivityIndicator color={c.muted} />
+    </View>
+  );
 }

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { browserHandoffOf } from "@agenteschat/client";
 import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
-import { cardStateOf, hostOf } from "../../src/features/browser/logic";
-import { hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
+import { cardStateOf, hostOf, siteLetter, siteOf } from "../../src/features/browser/logic";
+import { handoffHref, hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
 import { readPushData } from "../../src/lib/push-payload";
 import { notification } from "./fixtures";
 
@@ -43,24 +43,50 @@ describe("the help request card", () => {
   });
 });
 
+describe("the browser card", () => {
+  test("names the live page's site, else the last page the agent opened", () => {
+    const steps = [
+      { tool: "browser_open", detail: "https://www.loja.exemplo/checkout" },
+      { tool: "mcp__agentes__browser_click", detail: null },
+    ];
+    expect(siteOf("https://Dashboard.Stripe.com/login", steps)).toBe("dashboard.stripe.com");
+    expect(siteOf(null, steps)).toBe("www.loja.exemplo");
+    expect(siteOf(null, [{ tool: "mcp__agentes__browser_open", detail: "loja.exemplo" }])).toBe("loja.exemplo");
+    expect(siteOf(undefined, [])).toBe("");
+  });
+
+  test("its letter tile", () => {
+    expect(siteLetter("www.loja.exemplo")).toBe("L");
+    expect(siteLetter("dashboard.stripe.com")).toBe("D");
+    expect(siteLetter("")).toBe("");
+  });
+});
+
 describe("where a browser request opens", () => {
-  test("the push opens the live view", () => {
+  test("the push opens its conversation with the card in control", () => {
     const data = readPushData({ orgId: "o1", kind: "browser_handoff", channelId: "c1", handoffId: "h1" });
     expect(data.handoffId).toBe("h1");
-    expect(hrefForPush(data)).toBe("/handoff/h1");
+    expect(hrefForPush(data)).toBe("/chat/c1?handoff=h1");
+    expect(hrefForPush({ kind: "browser_handoff", channelId: "c1", threadId: "t1", handoffId: "h1" })).toBe(
+      "/chat/c1?thread=t1&handoff=h1",
+    );
+    // Without the conversation, the bare route finds it.
+    expect(hrefForPush({ kind: "browser_handoff", handoffId: "h1" })).toBe("/handoff/h1");
     // Another kind with a stray handoffId still opens its conversation.
     expect(hrefForPush({ kind: "mention", channelId: "c1", handoffId: "h1" })).toBe("/chat/c1");
   });
 
-  test("the deep link and the inbox item", () => {
+  test("the deep links and the inbox item", () => {
     expect(hrefFromUrl("agenteschat://handoff/h1")).toBe("/handoff/h1");
+    expect(hrefFromUrl("agenteschat://chat/c1?handoff=h1")).toBe("/chat/c1?handoff=h1");
+    expect(handoffHref("h1", "c1", "c1")).toBe("/chat/c1?handoff=h1");
     const n = notification({
       id: "n1",
       kind: "browser_handoff",
       waiting: true,
       source: { channelId: "c1", handoffId: "h1" },
     });
-    expect(notificationHref(n)).toBe("/handoff/h1");
+    expect(notificationHref(n)).toBe("/chat/c1?handoff=h1");
   });
 
   test("it is a waiting card that opens, and it comes first", () => {

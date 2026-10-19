@@ -40,6 +40,8 @@ import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, Composer, Count, Icon, IconButton, PressScale, Text, useTheme, useToast } from "@/ui";
+import { BrowserRunCard } from "../browser/BrowserCard";
+import { OpenHandoffProvider } from "../browser/open";
 import { isListedThread, threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
@@ -52,7 +54,7 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { FirstDay } from "./FirstDay";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
-import { StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
+import { browsingRuns, StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
 import { useChatLive } from "./live";
 import { buildRows, type ChatRow, mayStopRun, mergeTimeline, parseSlash, pinTarget, threadRootsToLoad } from "./logic";
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
@@ -78,7 +80,11 @@ import {
   ThreadOptions,
 } from "./sheets";
 
-type Row = ChatRow | { kind: "marker"; key: string; text: string } | { kind: "run"; key: string; run: LiveRun };
+type Row =
+  | ChatRow
+  | { kind: "marker"; key: string; text: string }
+  | { kind: "run"; key: string; run: LiveRun }
+  | { kind: "browser"; key: string; run: LiveRun };
 
 const rowKey = (r: Row) => r.key;
 const rowType = (r: Row) => r.kind;
@@ -89,12 +95,25 @@ const FRESH_MS = 800;
 const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
 
-/** A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). */
-export function ChatScreen({ channelId, threadId }: { channelId: string; threadId?: string | null }) {
+/**
+ * A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). `handoffId`: a request
+ * for help a push or the inbox opened it for (its card opens in place, in control).
+ */
+export function ChatScreen({
+  channelId,
+  threadId,
+  handoffId,
+}: {
+  channelId: string;
+  threadId?: string | null;
+  handoffId?: string | null;
+}) {
   return (
     <SheetHostProvider>
       <FocusLive>
-        <Chat channelId={channelId} threadId={threadId ?? null} />
+        <OpenHandoffProvider handoffId={handoffId ?? null}>
+          <Chat channelId={channelId} threadId={threadId ?? null} />
+        </OpenHandoffProvider>
       </FocusLive>
     </SheetHostProvider>
   );
@@ -215,6 +234,18 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     return () => clearTimeout(id);
   }, [runRows]);
   const shownRuns = runRows.shown;
+  // An agent at work in its browser: its card in the conversation (NavegadorNoChat A), open on demand.
+  const browsing = useMemo(() => browsingRuns(runs), [runs]);
+  const [openBrowsers, setOpenBrowsers] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleBrowser = useCallback((agentId: string, open: boolean) => {
+    setOpenBrowsers((prev) => {
+      if (prev.has(agentId) === open) return prev;
+      const next = new Set(prev);
+      if (open) next.add(agentId);
+      else next.delete(agentId);
+      return next;
+    });
+  }, []);
 
   // ── Rows ──
   // One waiting card per agent and computer: an older "my computer is away" gives way to the newer one.
@@ -248,6 +279,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       return [
         ...head,
         ...buildRows(replies, (m) => superseded.has(m.id)),
+        ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...shownRuns.map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
       ];
     }
@@ -255,9 +287,22 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       superseded.has(m.id) || Boolean(m.threadId && (linkThreads.has(m.threadId) || collapsed.has(m.threadId)));
     return [
       ...buildRows(list, hidden),
+      ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...shownRuns.map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
     ];
-  }, [isThread, threadId, list, thread.data, channel?.name, shownRuns, linkThreads, collapsed, superseded, t]);
+  }, [
+    isThread,
+    threadId,
+    list,
+    thread.data,
+    channel?.name,
+    shownRuns,
+    browsing,
+    linkThreads,
+    collapsed,
+    superseded,
+    t,
+  ]);
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
@@ -648,6 +693,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               <StreamingRow run={item.run} />
             </Animated.View>
           );
+        case "browser":
+          return (
+            <Animated.View entering={isFresh(item.key) ? ENTER : undefined} style={styles.browserRow}>
+              <BrowserRunCard
+                run={item.run}
+                open={openBrowsers.has(item.run.agentId)}
+                onToggle={(open) => toggleBrowser(item.run.agentId, open)}
+              />
+            </Animated.View>
+          );
         case "message":
           // An agent took an issue made from this conversation: one quiet line, not a voice.
           if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
@@ -666,7 +721,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           );
       }
     },
-    [when, meId, isThread, linkThreads, onLongPress, onRetry, isFresh],
+    [when, meId, isThread, linkThreads, onLongPress, onRetry, isFresh, openBrowsers, toggleBrowser],
   );
 
   // ── Composer and keyboard ──
@@ -772,7 +827,19 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             style={[styles.composer, { paddingBottom: bottomPad, backgroundColor: c.bg }]}
           >
             {/* Who is working, right above the composer (as on the web); it takes room only while someone is. */}
-            {member ? <WorkingLine runs={runs} consults={consults} canStop={canStop} onStop={stopRun} /> : null}
+            {member ? (
+              <WorkingLine
+                runs={runs}
+                consults={consults}
+                canStop={canStop}
+                onStop={stopRun}
+                onOpenBrowser={(agentId) => {
+                  // The agent's browser card opens in the conversation (at the end), not another screen.
+                  toggleBrowser(agentId, true);
+                  toEnd();
+                }}
+              />
+            ) : null}
             {member ? (
               <Composer
                 placeholder={placeholder}
@@ -830,6 +897,8 @@ function ToLatest({ unread, onPress }: { unread: number; onPress: () => void }) 
 }
 
 const styles = StyleSheet.create({
+  // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
+  browserRow: { paddingLeft: 59, paddingRight: 16, paddingBottom: 6 },
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },

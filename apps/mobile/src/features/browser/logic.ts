@@ -22,6 +22,24 @@ export function hostOf(url: string | undefined | null): string {
   return m?.[1]?.toLowerCase() ?? "";
 }
 
+/** The site the card names: the live page's host, else the last page the agent opened ("loja.exemplo"). */
+export function siteOf(frameUrl: string | null | undefined, steps: { tool: string; detail: string | null }[]): string {
+  const live = hostOf(frameUrl);
+  if (live) return live;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s?.tool.replace(/^mcp__agentes__/, "") !== "browser_open" || !s.detail) continue;
+    return hostOf(s.detail) || s.detail.trim().toLowerCase();
+  }
+  return "";
+}
+
+/** The site's letter tile ("L" for loja.exemplo, without "www."), or nothing. */
+export function siteLetter(host: string): string {
+  const name = host.replace(/^www\./, "");
+  return name ? name.charAt(0).toUpperCase() : "";
+}
+
 /** The live view's key row: Tab, Enter, Apagar, Esc. */
 export const LIVE_KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
 export type LiveKey = (typeof LIVE_KEYS)[number];
