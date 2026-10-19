@@ -10,7 +10,7 @@ import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useConversations, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
-import { FirstAgentEmpty, Greeting } from "./Greeting";
+import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
 import { CollapsibleSection, SeeAllRow, useCollapsedSections } from "./HomeSection";
 import { homeSections, type ListKind } from "./logic";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
@@ -26,8 +26,8 @@ export const openKindList = (kind: ListKind) => router.push(`/conversations/${ki
 
 /**
  * Conversas, the home (MobileHomeAgentes.html, Recomendada; MobileRefinos.html; MobileIntencional.html, A): the
- * greeting over a light sky with what changed (what an agent finished, how many work), the native large title
- * with Você and "+" (Novo) in the bar, the "Esperando você" strip (only while something waits; it opens into
+ * large title with Você and "+" (Novo) in the bar, over a light sky, the greeting under it with what changed
+ * (what an agent finished, how many work), the "Esperando você" strip (only while something waits; it opens into
  * the first item's card, and scrolling closes it), then Agentes, Canais and Pessoas by latest activity, each
  * collapsible (remembered), five rows and "Ver todos". An agent's row says it waits on your ok, or what it is
  * doing. Search and Threads have their own tabs. Empty, it invites the first agent.
@@ -66,17 +66,11 @@ export function ChatsScreen() {
     <LargeTitleScreen
       title={t("mobile.chats.title")}
       {...header}
-      header={
-        empty
-          ? undefined
-          : (reach) => (
-              <Greeting
-                working={working}
-                finished={finished.finished}
-                onFinishedPress={(f) => finished.dismiss(f.key)}
-                reach={reach}
-              />
-            )
+      backdrop={empty ? undefined : <GreetingSky />}
+      below={
+        empty ? undefined : (
+          <Greeting working={working} finished={finished.finished} onFinishedPress={(f) => finished.dismiss(f.key)} />
+        )
       }
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
       onScrollBeginDrag={waitOpen ? () => setWaitOpen(false) : undefined}

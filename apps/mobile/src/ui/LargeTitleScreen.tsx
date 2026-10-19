@@ -1,6 +1,6 @@
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { type ReactElement, type ReactNode, useMemo, useState } from "react";
+import { type ReactElement, type ReactNode, useMemo } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,11 +20,10 @@ export interface LargeTitleScreenProps {
   left?: ReactNode;
   /** Native buttons on the bar's leading side (iOS). */
   leftActions?: HeaderAction[];
-  /**
-   * A header above the large title (Conversas: the greeting over the sky), part of the content: seen at rest,
-   * it scrolls away with the list. It gets `reach`, how far its art should extend up behind the clear bar.
-   */
-  header?: (reach: number) => ReactNode;
+  /** Under the large title, scrolling with it (Conversas: the greeting and what changed). */
+  below?: ReactNode;
+  /** Art behind the clear bar, the large title and `below` (Conversas: the sky). */
+  backdrop?: ReactNode;
   children?: ReactNode;
   refreshControl?: ReactElement<RefreshControlProps>;
   /** Room under the content (default 24; the system already keeps content clear of the tab bar). */
@@ -52,7 +51,8 @@ export function LargeTitleScreen({
   actions,
   left,
   leftActions,
-  header,
+  below,
+  backdrop,
   children,
   refreshControl,
   bottomInset = 24,
@@ -67,20 +67,16 @@ export function LargeTitleScreen({
   // height): the automatic adjustment didn't apply inside the system tabs, so the list rested under the bar
   // with the large title hidden, shown only while pulled. Android lays it out from the top, under the bar.
   const { y, onScroll } = useCoverScroll(IOS ? headerHeight : 0);
-  // The header's height: the large title (and the bar's title) start below it.
-  const [headerH, setHeaderH] = useState(0);
-  const titleFade = useScrollFade(y, headerH, headerH + TITLE_GONE);
+  const titleFade = useScrollFade(y, 0, TITLE_GONE);
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
   const options = useMemo<NativeStackNavigationOptions>(
     () => ({
       ...actionOptions,
       title,
-      headerTitle: () => (
-        <FadingHeaderTitle y={y} from={headerH + BAR_TITLE_FROM} to={headerH + BAR_TITLE_TO} text={title} />
-      ),
+      headerTitle: () => <FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />,
     }),
-    [actionOptions, title, y, headerH],
+    [actionOptions, title, y],
   );
   return (
     <View style={[styles.screen, { backgroundColor: grouped ? colors.grouped : colors.bg }]}>
@@ -103,28 +99,24 @@ export function LargeTitleScreen({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingTop: IOS ? 0 : headerHeight, paddingBottom: bottomInset }}
         >
-          {header ? (
-            <View
-              style={IOS ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}
-              onLayout={(e) => setHeaderH(e.nativeEvent.layout.height - (IOS ? headerHeight : 0))}
-            >
-              {header(IOS ? headerHeight : 0)}
-            </View>
-          ) : null}
-          <Animated.View style={[styles.head, titleFade]}>
-            <Text variant="display" accessibilityRole="header" numberOfLines={1}>
-              {title}
-            </Text>
-            {subtitle ? (
-              <Text variant="small" tone="muted" style={styles.subtitle}>
-                {subtitle}
+          <View style={backdrop && IOS ? { marginTop: -headerHeight, paddingTop: headerHeight } : undefined}>
+            {backdrop ? <View style={StyleSheet.absoluteFill}>{backdrop}</View> : null}
+            <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
+              <Text variant="display" accessibilityRole="header" numberOfLines={1}>
+                {title}
               </Text>
-            ) : null}
-          </Animated.View>
+              {subtitle ? (
+                <Text variant="small" tone="muted" style={styles.subtitle}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </Animated.View>
+            {below}
+          </View>
           {children}
         </Animated.ScrollView>
       </LivePause>
-      <CoverBarBackdrop y={y} from={Math.max(0, headerH - 40)} to={headerH + 12} height={headerHeight} />
+      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} />
     </View>
   );
 }
@@ -142,5 +134,6 @@ const BAR_TITLE_TO = 48;
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
+  headTight: { paddingBottom: 4 },
   subtitle: { marginTop: 2 },
 });

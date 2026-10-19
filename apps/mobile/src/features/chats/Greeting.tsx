@@ -27,25 +27,27 @@ const FACES = 4;
 /** Opens Agentes (who is working, doing what). */
 const openAgents = () => router.navigate("/agents");
 
+/** The light sky behind Conversas' bar, large title and greeting, fading out toward the list. */
+export function GreetingSky() {
+  return <Sky color="sky" depth={0.9} fade={0.45} style={StyleSheet.absoluteFill} />;
+}
+
 /**
- * The one-line greeting on top of Conversas (MobileHomeAgentes.html `.gmini`; MobileIntencional.html, A),
- * seen at rest and scrolling away with the list: "Boa noite, Walter", then what changed: what an agent
- * finished ("Theo terminou “…”", opens where it happened) and how many work now (opens Agentes), with the
- * faces of the ones working (moving), over a light sky that fades out. `reach`: how far the sky extends up
- * behind the clear bar.
+ * The greeting under Conversas' large title (MobileHomeAgentes.html `.gmini`; MobileIntencional.html, A),
+ * scrolling away with the list: "Boa noite, Walter", then what changed: what an agent finished ("Theo
+ * terminou “…”", opens where it happened) and how many work now (opens Agentes), with the faces of the
+ * ones working (moving).
  */
 export function Greeting({
   working,
   finished,
   onFinishedPress,
-  reach,
 }: {
   working: readonly string[];
   /** The newest thing an agent finished (null: nothing new). */
   finished: FinishedItem | null;
   /** Tapped what finished (it opens there and is taken off). */
   onFinishedPress?: (f: FinishedItem) => void;
-  reach: number;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -76,9 +78,8 @@ export function Greeting({
   );
   return (
     <View style={styles.mini}>
-      <Sky color="sky" depth={0.9} fade={0.45} style={[StyleSheet.absoluteFill, { top: -reach }]} />
       <View style={styles.grow}>
-        <Text variant="small" tone="ink" style={styles.bold} numberOfLines={1} accessibilityRole="header">
+        <Text variant="body" tone="ink2" numberOfLines={1}>
           {greeting}
         </Text>
         <View style={styles.line}>
@@ -221,8 +222,8 @@ export function FirstAgentEmpty() {
 }
 
 const styles = StyleSheet.create({
-  mini: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 6 },
-  line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
+  mini: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 18 },
+  line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
   part: { flexDirection: "row", alignItems: "center", gap: 4 },
   shrink: { flexShrink: 1 },
   noShrink: { flexShrink: 0 },
