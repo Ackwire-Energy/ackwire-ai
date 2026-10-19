@@ -71,7 +71,7 @@ Lessons from OpenMausBot's code (`server/browser-relay.ts`, `server/browser-live
 
 - Session `agent-<id8>`, persistent profile and downloads in the agent's folder (`<handle>-<id8>/.agentes/browser`), headless, idle shutdown after 15 minutes. A login done once stays until the site ends it.
 - Per agent, not shared: another agent signs in on its own. Per computer: an agent moved to another computer signs in again.
-- Logins only to test accounts or the agent's own accounts, never a person's personal account (agent instructions, docs, and one line on the agent's page: "Logins stay on this computer, in the agent's folder"). Until protected mode exists, other unprotected agents and the owner can read that folder.
+- The agent signs in to whatever account the person tells it to: it types a password only when it was given one through `request_secret`, otherwise it asks the person (§6). No rule about which accounts; the agent's page says only "The agent stays signed in to the sites it enters, on this computer". Real payments, deletions and sending on someone's behalf still go through an approval. Until protected mode exists, other unprotected agents and the owner can read that folder.
 - Optional site allowlist per agent, enforced by the runner: `agent-browser`'s `--allowed-domains` refuses persistent profiles, so the runner checks a navigation's URL before it goes and the page's URL after every action (going back when it left the list). Top-level pages only: sub-resources aren't filtered. `file://` and the owner's paths blocked.
 - Cap of live browsers per machine (owner setting, default from memory, about 300 MB each); over it the agent sees "waiting for the computer".
 - The runner serializes commands per session (one at a time, like the daemon), times them out and checks the session before reading.
@@ -96,15 +96,17 @@ Refs go stale after navigation; the tools say so (`stale_ref`) and the agent rea
 Modeled on Cloudflare's handoff:
 
 1. The agent calls `browser_ask_person("Sign in to Stripe with the shop's test account", 30 min)`. The run suspends, like `request_secret` and approvals.
-2. A card in the chat ("Dev needs you · Sign in to Stripe · Open"), at the top of "Waiting for you" in notifications, and a push to the phone. It goes to whoever asked for the work, else the agent's responsible person.
+2. A card in the chat ("Dev needs you · Sign in to Stripe · Open"), at the top of "Waiting for you" in notifications, and a push to the phone. It goes to both the person who asked for the work and the agent's responsible person (once when they are the same); the first to open takes control, the other sees "Walter is helping".
 3. The person opens a full-screen live view (§7) with the agent's instructions on top, a "you're in control" badge, and two buttons: **Done** and **Couldn't** (optional reason).
 4. The agent resumes with `{ result: done | failed | expired, note? }`, reads the page again and checks the outcome (still on the login page → it says so in the chat instead of carrying on). The card resolves itself.
 
 A person watching can also **take over** on their own: the same screen; the agent pauses and, when handed back, is told "a person changed the page" and reads again before acting.
 
 - One person in control per agent browser; others watch ("Ana is in control").
-- Control survives a dropped stream for a short time (reconnect, deploy overlap), as in OpenMausBot's hold; after that it ends as `expired`.
-- Default timeout 30 minutes, up to the agent's request within a cap.
+- Timing, as in OpenBot and OpenMausBot: a request waits 10 minutes for someone to open it (the agent may ask for up to 30), then expires; once a person is in control there is no deadline; if their view drops, control is kept for 2 minutes (presence renewed every 30 s and stored in the database, so it holds across replicas and restarts), then it ends as `expired`.
+- While a request is open (waiting or in control) the agent's browser tools wait or refuse; after a person had control, only `browser_read` works until the agent reads the page again (`page_read_at`, migration 0080), as OpenBot requires a fresh snapshot after hand back.
+- The agent's browser stays alive while a request is open (the server keeps the session active so the 15-minute idle shutdown doesn't close it).
+- Who may watch, take control or cancel: org admins, the agent's owner, the people the request went to and whoever asked for the work; a channel reader can't. Access is checked again every 30 s while watching and before each input.
 - Nothing reaches the model during a handoff: no frames, no keys.
 - Passkeys and hardware keys don't cross a remote view; the person picks another sign-in method.
 - We never copy cookies from the owner's own browser.
