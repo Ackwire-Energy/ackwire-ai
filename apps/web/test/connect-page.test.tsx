@@ -94,6 +94,30 @@ describe("/conectar: confirm a computer's code", () => {
     expect(document.body.textContent).toContain("Esse código expirou. Comece de novo no computador.");
   });
 
+  test("a reconnect: Reconectar o {nome}, no organization or name to pick; the same computer comes back", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
+    const mac = machines.pair({ name: "Mac da Ana", online: false });
+    machines.addDevice(CODE, {
+      reconnect: { machineId: mac.id, name: "Mac da Ana", orgId: ORG_ID, orgName: "Acme" },
+    });
+    await renderApp(`/conectar?code=${CODE}`, { api });
+    await settle(6);
+    const page = document.querySelector(".connect-page") as HTMLElement;
+    expect(within(page).getByRole("heading", { name: "Reconectar o Mac da Ana?" })).toBeTruthy();
+    expect(page.textContent).toContain("Os agentes que usavam este computador voltam a usar.");
+    expect(page.textContent).toContain("Na Acme, com o mesmo nome e as mesmas permissões.");
+    expect(within(page).queryByRole("combobox", { name: "Organização" })).toBeNull();
+    expect(within(page).queryByLabelText("Nome do computador")).toBeNull();
+    await click(within(page).getByRole("button", { name: "Reconectar" }));
+    await settle(4);
+    expect(calls(state, "machines.confirmDevice")).toEqual([[ORG_ID, CODE, {}]]);
+    expect(document.body.textContent).toContain("Computador reconectado");
+    expect(document.body.textContent).toContain("Mac da Ana voltou para a Acme.");
+    expect(machines.all()).toHaveLength(1);
+  });
+
   test("no code in the link", async () => {
     await open("/conectar", false);
     expect(document.body.textContent).toContain("Falta o código. Abra o link que aparece no computador.");

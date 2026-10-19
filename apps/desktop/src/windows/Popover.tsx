@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
-import { type Home, isIncompatible, orgName, pairedHomes } from "../control/store";
+import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
 import { SITE_URL } from "../control/version";
 import { agentOf, useOnShown, useUpdateCheck, writePref } from "../hooks";
@@ -42,7 +42,7 @@ export function Popover() {
   const jobs = homes.flatMap((h) => h.jobs);
   const requests = homes.flatMap((h) => h.requests.map((r) => ({ home: h, request: r })));
   const incompatible = snap.homes.some(isIncompatible);
-  const refused = homes.find((h) => h.status?.connection === "refused");
+  const refused = homes.find(isRefusedHome);
   const outdated = homes.some((h) => h.status?.connection === "outdated");
   const machine = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? t("desktop.tray.label");
 
@@ -88,6 +88,12 @@ export function Popover() {
     void host.showWindow("prefs").catch(() => {});
   };
   const addOrg = () => void host.showWindow("welcome").catch(() => {});
+  /** "Reconectar este Mac": the connect window, on the refused organization's home (same computer back). */
+  const reconnectMac = (home: Home) => {
+    writePref(RECONNECT_PREF, home.homeId);
+    void host.showWindow("welcome").catch(() => {});
+    void host.hideWindow("popover").catch(() => {});
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -216,9 +222,14 @@ export function Popover() {
             icon="alert"
             title={t("desktop.tray.refusedTitle", { org: orgName(refused) })}
             actions={
-              <Button size="sm" onClick={() => openPrefs("general")}>
-                {t("desktop.tray.prefs")}
-              </Button>
+              <>
+                <Button size="sm" variant="primary" icon="refresh" onClick={() => reconnectMac(refused)}>
+                  {t("desktop.tray.reconnectMac")}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => openPrefs("general")}>
+                  {t("desktop.tray.prefs")}
+                </Button>
+              </>
             }
           >
             {t("desktop.tray.refusedBody")}

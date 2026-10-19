@@ -32,7 +32,7 @@ import {
   writeConfig,
 } from "./config";
 import { runControl } from "./control";
-import { configFromGrant, deviceInfo, prepareWorkspace, RunnerDaemon } from "./daemon";
+import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
 import { RUNNER_VERSION } from "./errors";
 import { runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
@@ -46,10 +46,13 @@ import { runTaskWrapper } from "./tasks";
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
 
 Usage:
-  agentes-runner pair --server <url> [--dir <workspace>] [--name <name>] [--no-exec]
+  agentes-runner pair --server <url> [--dir <workspace>] [--name <name>] [--no-exec] [--new]
       Shows a code and a link; confirm it on the site (signed in) and this computer is connected.
+      Paired with that server before (even if it was removed there): it comes back as the same
+      computer, with its name, permissions and agents, when you may manage it.
       --dir      the folder agents work in (default ~/agentes)
       --no-exec  files and uploads only; agents can't run commands
+      --new      connect as a new computer instead
   agentes-runner start
       Connects and stays connected (reconnects on its own).
   agentes-runner service install|uninstall
@@ -132,7 +135,7 @@ function storedOrNull(home = runnerHome()): StoredConfig | null {
 
 /** The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site. */
 async function pair(p: Parsed): Promise<number> {
-  const usage = "Usage: agentes-runner pair --server <url> [--dir <workspace>] [--name <name>] [--no-exec]";
+  const usage = "Usage: agentes-runner pair --server <url> [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
   if (p.flags.has("code")) {
     console.error(
       "Pairing codes from the site are gone: run agentes-runner pair --server <url> and confirm the code it shows.",
@@ -162,7 +165,7 @@ async function pair(p: Parsed): Promise<number> {
   try {
     grant = await devicePair(
       server,
-      deviceInfo(name),
+      deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
       (code) => {
         console.log("");
         console.log(`To connect this computer, open this link and confirm the code ${formatUserCode(code.userCode)}:`);

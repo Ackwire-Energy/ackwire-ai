@@ -124,13 +124,15 @@ export function prepareWorkspace(dir: string): string {
 
 /**
  * The config after a device-code pairing. Limits of an earlier pairing of
- * this home stay; access starts from `tools` with no folders.
+ * this home stay; access starts from `tools` with no folders, except when
+ * the server gave back the same machine (a reconnect): its folders and tools stay.
  */
 export function configFromGrant(
   prev: StoredConfig | null,
   input: { server: string; grant: DeviceGrant; workspace: string; name?: string; tools: RunnerTools; desktop: boolean },
 ): StoredConfig {
   const { grant, tools } = input;
+  const same = prev?.machineId === grant.machineId && prev?.server === input.server;
   return {
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
@@ -145,18 +147,28 @@ export function configFromGrant(
     exec: tools.commands,
     ...(grant.org.id ? { orgId: grant.org.id } : {}),
     ...(grant.org.name ? { orgName: grant.org.name } : {}),
-    access: { folders: [], tools },
+    access: same && prev?.access ? prev.access : { folders: [], tools },
   };
 }
 
+/**
+ * The machine this home was on `server`, to reconnect it instead of making a
+ * new one (the id stays in the config after a refusal and after "leave").
+ * Undefined for another server or a home never paired.
+ */
+export function previousMachineFor(prev: StoredConfig | null, server: string): string | undefined {
+  return prev?.machineId && prev.server === server ? prev.machineId : undefined;
+}
+
 /** What `POST /api/machines/device` is told about this computer. */
-export function deviceInfo(name?: string) {
+export function deviceInfo(name?: string, previousMachineId?: string) {
   return {
     ...(name ? { name } : {}),
     os: machineOs(),
     arch: os.arch(),
     hostname: os.hostname(),
     version: RUNNER_VERSION,
+    ...(previousMachineId ? { previousMachineId } : {}),
   };
 }
 
@@ -828,9 +840,13 @@ export class RunnerDaemon implements RequestObserver {
 
   // ── Pairing ────────────────────────────────────────────────────────────────
 
-  /** App mode: the device-code sign-in; progress comes as events. */
+  /**
+   * App mode: the device-code sign-in; progress comes as events. Also
+   * "Reconectar este Mac" on a home the server refused: the same server's
+   * previous machine id goes along, so the site brings that machine back.
+   */
   pairStart(server: string, name?: string, tools?: { claude?: boolean; codex?: boolean }): { started: true } {
-    if (this.config)
+    if (this.config && this.connState !== "refused")
       throw new ControlError("already_paired", "This computer is already connected; disconnect it first");
     let url: string;
     try {
@@ -844,7 +860,7 @@ export class RunnerDaemon implements RequestObserver {
     this.pairing = ac;
     void devicePair(
       url,
-      deviceInfo(label),
+      deviceInfo(label, previousMachineFor(this.stored, url)),
       (code) =>
         this.emit({
           kind: "pair.code",
@@ -908,20 +924,15 @@ export class RunnerDaemon implements RequestObserver {
     return { canceled: had };
   }
 
-  /** Forgets the pairing: the token goes; settings that aren't the organization's stay. */
+  /**
+   * Forgets the pairing: the token goes; settings that aren't the
+   * organization's stay. `machineId` stays too, so pairing again with the
+   * same server can bring that machine back (`previousMachineFor`).
+   */
   unpair(): { unpaired: true } {
     const s = this.stored;
     if (!s?.token) return { unpaired: true };
-    const {
-      token: _token,
-      machineId: _machineId,
-      orgId: _orgId,
-      orgName,
-      name: _name,
-      paused: _paused,
-      access,
-      ...rest
-    } = s;
+    const { token: _token, orgId: _orgId, orgName, name: _name, paused: _paused, access, ...rest } = s;
     this.agents = [];
     try {
       writeAgents(this.opts.home, []);

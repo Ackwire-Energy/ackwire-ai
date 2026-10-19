@@ -5,6 +5,7 @@
  * - `PATCH  …/machines/{id}` `{ name }`, `DELETE …/machines/{id}`
  * - `GET    /api/app/machines/device/{userCode}` → the computer that made the code (404 once gone)
  * - `POST   …/organizations/{orgId}/machines/device/{userCode}/confirm` `{ name? }` → 201, the machine
+ *   (the same one when the code's `reconnect` names a machine of that organization)
  * - `POST   /api/app/machines/device/{userCode}/deny` → 204
  * - `POST   …/machines/{id}/access/reduce` `{ removeFolder?, disableTool? }` → the new access
  * - `GET    /api/desktop/latest?target=&arch=` → the release, or 404 (`null`)
@@ -110,6 +111,12 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.confirmDevice", orgId, userCode, input);
         const d = device(userCode);
         devices.delete(userCode);
+        // A reconnect in the same organization brings back the same machine (name kept).
+        const back = d.reconnect?.orgId === orgId ? machines.find((m) => m.id === d.reconnect?.machineId) : undefined;
+        if (back) {
+          Object.assign(back, { online: true, hostname: d.hostname, runnerVersion: d.version });
+          return clone(back);
+        }
         // A new computer gets no agents until someone points one at it.
         return pair({
           name: input.name ?? d.name,

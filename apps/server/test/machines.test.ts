@@ -190,6 +190,34 @@ test("rename, delete, target and the computer view; deleting revokes the token",
   ).toBe(404);
 });
 
+test("reconnecting over HTTP: the removed computer comes back with its agent; a junk id is a new computer", async () => {
+  const { owner, api, pair, agentId } = await start();
+  const { machineId } = await pair("Laptop");
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId } });
+  expect((await api(`/machines/${machineId}`, { method: "DELETE" })).status).toBe(204);
+
+  const started = await runnerPost("/api/machines/device", { name: "x", ...RUNNER, previousMachineId: machineId });
+  const code = (await started.json()) as { deviceCode: string; userCode: string };
+  const view = await owner(`/api/app/machines/device/${code.userCode}`);
+  expect(await view.json()).toMatchObject({ reconnect: { machineId, name: "Laptop", orgName: "Acme" } });
+  const confirmed = await api(`/machines/device/${code.userCode}/confirm`, { json: {} });
+  expect(await confirmed.json()).toMatchObject({ id: machineId, name: "Laptop" });
+  const token = await runnerPost("/api/machines/device/token", { deviceCode: code.deviceCode });
+  expect(await token.json()).toMatchObject({ machineId, name: "Laptop" });
+  expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({
+    target: { kind: "machine", machineId },
+  });
+
+  const junk = await runnerPost(
+    "/api/machines/device",
+    { name: "y", ...RUNNER, previousMachineId: "nope" },
+    "203.0.113.8",
+  );
+  expect(junk.status).toBe(200);
+  const junkCode = (await junk.json()) as { userCode: string };
+  expect((await (await owner(`/api/app/machines/device/${junkCode.userCode}`)).json()).reconnect).toBeUndefined();
+});
+
 test("the runner's WebSocket: no Origin, hello → welcome, online in the list", async () => {
   const { api, pair } = await start();
   const { machineId, token } = await pair();

@@ -77,6 +77,12 @@ export const machines = pgTable(
     access: jsonb().$type<MachineAccess>(),
     /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
     resumeTasks: boolean().notNull().default(true),
+    /**
+     * Agents that used this computer when it was removed (set by the removal,
+     * which points them back to the cloud). Reconnecting the same computer
+     * gives it back to those that still have none, then clears this.
+     */
+    previousAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Last known; trust it only with a recent `last_seen_at` (a replica may have died). */
     online: boolean().notNull().default(false),
     /** The server process holding its socket. */
@@ -123,7 +129,13 @@ export const machineDeviceCodes = pgTable(
     requesterIp: text().notNull().default(""),
     approxLocation: text(),
     confirmedByUserId: text().references(() => users.id, { onDelete: "set null" }),
-    /** The machine made on confirm; its token is issued when the computer polls. */
+    /**
+     * The computer asks to come back as this machine (it was refused: removed
+     * or its token revoked). Honoured on confirm only for a machine of the
+     * chosen organization that the confirming person may manage; else a new one.
+     */
+    previousMachineId: uuid(),
+    /** The machine made (or reconnected) on confirm; its token is issued when the computer polls. */
     machineId: uuid(),
     lastPolledAt: timestamp({ withTimezone: true }),
     decidedAt: timestamp({ withTimezone: true }),

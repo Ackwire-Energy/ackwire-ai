@@ -322,7 +322,7 @@ export class FakeRunner {
         this.emit({ kind: "status", status: this.status() });
         return reply(this.config);
       case "pair.start": {
-        if (s) return fail("already_paired", "already paired");
+        if (s && this.connection !== "refused") return fail("already_paired", "already paired");
         reply({ started: true });
         const code = Array.from(
           { length: 6 },

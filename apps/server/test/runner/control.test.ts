@@ -516,6 +516,76 @@ test("device pairing from the app: code, confirmation, a desktop home with safe 
   expect(await c.data({ type: "status" })).toMatchObject({ paired: false, connection: "unpaired" });
 });
 
+test("reconnect after the server refused this Mac: pair.start sends the previous machine id; folders stay", async () => {
+  const folder = tempDir("notes-");
+  dirs.push(folder);
+  const { home, ws } = pairedHome({
+    access: { folders: [{ path: folder, agents: [] }], tools: { claude: true, codex: false, commands: false } },
+  });
+  const bodies: Record<string, unknown>[] = [];
+  const NEW_TOKEN = "agm_new_machine_token_never_shown_9876";
+  const fetch: FetchFn = async (url, init) => {
+    if (url.endsWith("/api/machines/device")) {
+      bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+      return Response.json({ deviceCode: "dc", userCode: "K7Q4ZP", verificationUrl: "x", expiresIn: 600, interval: 3 });
+    }
+    if (url.endsWith("/api/machines/device/token")) {
+      return Response.json({ token: NEW_TOKEN, machineId: "m1", name: "box", org: { id: "o1", name: "Acme" } });
+    }
+    return new Response(null, { status: 404 });
+  };
+  const c = control(home, { fetch, pairSleep: async () => {} });
+  // Still connected: no pairing on top of it.
+  const first = await c.connect();
+  expect(await c.request({ type: "pair.start", server: "https://agentes.test" })).toMatchObject({
+    ok: false,
+    error: { code: "already_paired" },
+  });
+  first.frame({ type: "refused", reason: "revoked", message: "This computer was removed from the organization." });
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "refused"));
+
+  expect(await c.data({ type: "pair.start", server: "https://agentes.test" })).toEqual({ started: true });
+  await waitFor(() => c.events("pair.done").length === 1);
+  expect(bodies[0]).toMatchObject({ previousMachineId: "m1" });
+  expect(readStoredConfig(home)).toMatchObject({
+    machineId: "m1",
+    token: NEW_TOKEN,
+    workspace: ws,
+    access: { folders: [{ path: folder, agents: [] }], tools: { claude: true } },
+  });
+  // The new token connects again.
+  await waitFor(() => c.sockets.length === 2);
+  const second = await c.connect();
+  expect(second).not.toBe(first);
+  expect(second.of("hello")[0]).toMatchObject({ token: NEW_TOKEN });
+});
+
+test("unpair keeps the machine id, so pairing again with the same server asks to come back as it", async () => {
+  const { home } = pairedHome();
+  const bodies: Record<string, unknown>[] = [];
+  const fetch: FetchFn = async (url, init) => {
+    if (url.endsWith("/api/machines/device")) {
+      bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+      return Response.json({ deviceCode: "dc", userCode: "K7Q4ZP", verificationUrl: "x", expiresIn: 600, interval: 3 });
+    }
+    return Response.json({ error: "authorization_pending" }, { status: 400 });
+  };
+  const c = control(home, { fetch, pairSleep: async () => new Promise((r) => setTimeout(r, 5)) });
+  await c.connect();
+  await c.data({ type: "unpair" });
+  expect(readStoredConfig(home)).toMatchObject({ machineId: "m1", server: "https://agentes.test" });
+  expect(readStoredConfig(home)?.token).toBeUndefined();
+  await c.data({ type: "pair.start", server: "https://agentes.test" });
+  await waitFor(() => bodies.length === 1);
+  expect(bodies[0]).toMatchObject({ previousMachineId: "m1" });
+  await c.data({ type: "pair.cancel" });
+  // Another server: a new computer there.
+  await c.data({ type: "pair.start", server: "https://other.test" });
+  await waitFor(() => bodies.length === 2);
+  expect(bodies[1]?.previousMachineId).toBeUndefined();
+  await c.data({ type: "pair.cancel" });
+});
+
 test("device pairing refused on the site: pair.failed with `denied`; cancel stops a pairing in progress", async () => {
   const home = tempDir("home-");
   dirs.push(home);

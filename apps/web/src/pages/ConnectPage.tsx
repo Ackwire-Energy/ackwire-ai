@@ -17,12 +17,18 @@ export const isGoneCode = (error: unknown) =>
   error instanceof ApiError &&
   (error.status === 404 || error.status === 410 || /expired|not_found|invalid/.test(error.code));
 
-type Outcome = { kind: "confirmed"; machine: Machine; orgId: string; orgName: string } | { kind: "denied" } | null;
+type Outcome =
+  | { kind: "confirmed"; machine: Machine; orgId: string; orgName: string; reconnected: boolean }
+  | { kind: "denied" }
+  | null;
 
 /**
  * `/conectar?code=` (ADR 0036 §5): a computer made a code; the person,
  * signed in, compares it, picks the organization and the computer's name,
- * and connects it, or says it wasn't them. One question on screen.
+ * and connects it, or says it wasn't them. One question on screen. A
+ * computer coming back as the machine it was (`reconnect`, shown only to
+ * people who may manage it) asks only "Reconectar o {nome}?": same
+ * organization, name and permissions, and its agents use it again.
  */
 export function ConnectPage({ code }: { code: string }) {
   const { t, i18n } = useTranslation();
@@ -37,10 +43,16 @@ export function ConnectPage({ code }: { code: string }) {
   const [expired, setExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = device.data;
+  const reconnect =
+    request?.reconnect && orgs.some((o) => o.id === request.reconnect?.orgId) ? request.reconnect : null;
 
   useEffect(() => {
     if (request) setName((n) => n || request.name);
   }, [request]);
+  const reconnectOrg = reconnect?.orgId;
+  useEffect(() => {
+    if (reconnectOrg) setOrgId(reconnectOrg);
+  }, [reconnectOrg]);
   useEffect(() => {
     if (!orgId && orgs[0]) setOrgId(orgs[0].id);
   }, [orgId, orgs]);
@@ -80,7 +92,7 @@ export function ConnectPage({ code }: { code: string }) {
         <Card padded as="div" className="connect-page">
           <EmptyState
             sky
-            title={t("connect.doneTitle")}
+            title={outcome.reconnected ? t("connect.reconnectDoneTitle") : t("connect.doneTitle")}
             actions={
               <Button asChild variant="primary">
                 <Link
@@ -95,7 +107,9 @@ export function ConnectPage({ code }: { code: string }) {
             {t("connect.done")}
           </EmptyState>
           <p className="small muted" role="status" style={{ margin: 0, textAlign: "center" }}>
-            {t("connect.doneText", { name: outcome.machine.name, org: outcome.orgName })}
+            {outcome.reconnected
+              ? t("connect.reconnectDoneText", { name: outcome.machine.name, org: outcome.orgName })
+              : t("connect.doneText", { name: outcome.machine.name, org: outcome.orgName })}
           </p>
         </Card>
       </CenteredLayout>
@@ -169,11 +183,18 @@ export function ConnectPage({ code }: { code: string }) {
             e.preventDefault();
             if (!org || busy) return;
             setError(null);
-            const clean = name.trim();
+            const clean = reconnect ? "" : name.trim();
             confirm.mutate(
               { orgId: org.id, userCode: code, ...(clean ? { name: clean } : {}) },
               {
-                onSuccess: (machine) => setOutcome({ kind: "confirmed", machine, orgId: org.id, orgName: org.name }),
+                onSuccess: (machine) =>
+                  setOutcome({
+                    kind: "confirmed",
+                    machine,
+                    orgId: org.id,
+                    orgName: org.name,
+                    reconnected: !!reconnect && machine.id === reconnect.machineId,
+                  }),
                 onError: fail,
               },
             );
@@ -181,9 +202,9 @@ export function ConnectPage({ code }: { code: string }) {
         >
           <div className="stack-4" style={{ gap: 4 }}>
             <h1 className="page-title" style={{ margin: 0 }}>
-              {t("connect.title")}
+              {reconnect ? t("connect.reconnectTitle", { name: reconnect.name }) : t("connect.title")}
             </h1>
-            <span className="small muted">{t("connect.lead")}</span>
+            <span className="small muted">{reconnect ? t("connect.reconnectLead") : t("connect.lead")}</span>
           </div>
           <p className="connect-page__code" role="img" aria-label={`${t("connect.code")}: ${code}`}>
             {formatUserCode(code)}
@@ -202,7 +223,11 @@ export function ConnectPage({ code }: { code: string }) {
             </span>
           </div>
           <Alert tone="neutral">{t("connect.warning")}</Alert>
-          {orgs.length === 0 ? (
+          {reconnect ? (
+            <p className="small muted" style={{ margin: 0 }}>
+              {t("connect.reconnectIn", { org: reconnect.orgName })}
+            </p>
+          ) : orgs.length === 0 ? (
             <p className="small muted" style={{ margin: 0 }}>
               {t("connect.noOrgs")}
             </p>
@@ -236,7 +261,7 @@ export function ConnectPage({ code }: { code: string }) {
             </Button>
             {orgs.length > 0 && (
               <Button type="submit" variant="primary" loading={confirm.isPending} disabled={busy || !org}>
-                {t("connect.confirm")}
+                {reconnect ? t("connect.reconnectConfirm") : t("connect.confirm")}
               </Button>
             )}
           </div>

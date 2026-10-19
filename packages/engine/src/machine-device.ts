@@ -1,12 +1,15 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { type MachineOs, MIN_RUNNER_PROTOCOL, type PubSub } from "@agenteschat/adapters";
-import { and, count, type Database, eq, gt, isNull, schema } from "@agenteschat/db";
+import { and, count, type Database, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { caches } from "./cache";
 import { ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import {
   cleanMachineName,
   generateMachineToken,
+  MACHINE_CONTROL_TOPIC,
+  type MachineRow,
   type MachineView,
   machineView,
   publishMachineAgentsChanged,
@@ -15,7 +18,7 @@ import {
 import { notifyMachineConnected } from "./notification-producers";
 import { can, getMembership } from "./organizations";
 
-const { machineDeviceCodes, machines, organizations } = schema;
+const { agents, machineDeviceCodes, machines, organizations } = schema;
 
 /**
  * Connecting a computer (ADR 0036 §5): a device-code flow like OAuth's. The
@@ -29,6 +32,13 @@ const { machineDeviceCodes, machines, organizations } = schema;
  * single use, the page shows what asked and from roughly where, admins are
  * notified of every new computer, and a new computer gets no agents until
  * someone points one at it.
+ *
+ * Reconnecting: a computer the server refused (removed, token revoked) asks
+ * again with `previousMachineId`. When the person confirming picks that
+ * machine's organization and may manage it (admin, or who paired it), the
+ * same row comes back: same name and permissions, a fresh token, and the
+ * agents that used it before its removal get it back. Anything else (other
+ * organization, no permission, unknown id) is an ordinary new computer.
  */
 export type DeviceCodeRow = typeof machineDeviceCodes.$inferSelect;
 
@@ -83,7 +93,11 @@ export interface DeviceStartInput {
   protocol?: number;
   workspace?: string;
   exec?: boolean;
+  /** The machine this computer was before (it was refused); see "Reconnecting" above. */
+  previousMachineId?: string;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface DeviceRequester {
   ip: string;
@@ -134,6 +148,9 @@ export async function startDeviceCode(
         ...(input.protocol !== undefined ? { protocol: input.protocol } : {}),
         ...(input.workspace !== undefined ? { workspace: input.workspace.slice(0, 500) } : {}),
         ...(input.exec !== undefined ? { execAllowed: input.exec } : {}),
+        ...(input.previousMachineId && UUID_RE.test(input.previousMachineId)
+          ? { previousMachineId: input.previousMachineId.toLowerCase() }
+          : {}),
         requesterIp: ip,
         approxLocation: requester.approxLocation?.slice(0, 120) || null,
         expiresAt,
@@ -177,7 +194,10 @@ export async function pollDeviceToken(deps: DeviceDeps, deviceCode: string): Pro
   if (row.status === "redeemed") return { ok: false, error: "expired_token" };
   if (row.expiresAt.getTime() <= now.getTime()) {
     // Confirmed but never collected: the machine made on confirm can't ever connect.
-    if (row.status === "confirmed" && row.machineId) await dropUncollected(deps, row, now);
+    // A reconnected machine stays (offline, no token): it has agents and permissions to keep.
+    if (row.status === "confirmed" && row.machineId && row.machineId !== row.previousMachineId) {
+      await dropUncollected(deps, row, now);
+    }
     return { ok: false, error: "expired_token" };
   }
   if (row.status === "pending") {
@@ -267,14 +287,45 @@ async function pendingCode(db: Database, userCode: string, now: Date) {
 const notFound = () =>
   new NotFoundError("This code is unknown or expired; start again on the computer", "machine.device_not_found");
 
-/** What the confirm page shows (`GET /api/app/machines/device/{userCode}`), for any signed-in person. */
-export async function getDeviceCode(deps: DeviceDeps, userCode: string) {
+/**
+ * What the confirm page shows (`GET /api/app/machines/device/{userCode}`), for
+ * any signed-in person. `reconnect` only when the code asks to come back as a
+ * machine this person may manage (others see an ordinary new computer).
+ */
+export async function getDeviceCode(deps: DeviceDeps, userCode: string, actorId?: string) {
   const row = await pendingCode(deps.db, userCode, nowOf(deps));
   if (!row) throw notFound();
-  return deviceCodeView(row);
+  const view = deviceCodeView(row);
+  if (!actorId || !row.previousMachineId) return view;
+  const target = await reconnectTarget(deps.db, actorId, row.previousMachineId);
+  if (!target) return view;
+  const { machine, orgName } = target;
+  return { ...view, reconnect: { machineId: machine.id, name: machine.name, orgId: machine.orgId, orgName } };
 }
 
-export function deviceCodeView(row: DeviceCodeRow) {
+/**
+ * The machine a code asks to come back as, when `actorId` may manage it: a
+ * member of its organization who can post and is an admin (`configure`) or
+ * paired it. Removed machines count (that is the point). Null otherwise.
+ */
+async function reconnectTarget(
+  db: Database,
+  actorId: string,
+  machineId: string,
+  orgId?: string,
+): Promise<{ machine: MachineRow; orgName: string } | null> {
+  const [machine] = await db
+    .select()
+    .from(machines)
+    .where(and(eq(machines.id, machineId), ...(orgId ? [eq(machines.orgId, orgId)] : [])));
+  if (!machine) return null;
+  const member = await getMembership(db, actorId, machine.orgId);
+  if (!member || !can(member.role, "post")) return null;
+  if (!can(member.role, "configure") && machine.pairedByUserId !== actorId) return null;
+  return { machine, orgName: member.orgName };
+}
+
+export function deviceCodeView(row: DeviceCodeRow): DeviceCodeView {
   return {
     userCode: row.userCode,
     name: row.name,
@@ -288,13 +339,27 @@ export function deviceCodeView(row: DeviceCodeRow) {
   };
 }
 
-export type DeviceCodeView = ReturnType<typeof deviceCodeView>;
+export interface DeviceCodeView {
+  userCode: string;
+  name: string;
+  os: string;
+  arch: string;
+  hostname: string;
+  version: string;
+  approxLocation: string | null;
+  createdAt: string;
+  expiresAt: string;
+  /** The code reconnects this machine (shown only to people who may manage it). */
+  reconnect?: { machineId: string; name: string; orgId: string; orgName: string };
+}
 
 /**
  * `POST …/organizations/{orgId}/machines/device/{userCode}/confirm`: a member
  * who can post connects the computer to this organization. The machine is
  * made now (no token yet, no agents), the org's admins are notified, and the
- * computer gets its token on its next poll.
+ * computer gets its token on its next poll. A reconnect (the code names a
+ * machine of this organization the person may manage) reuses that row
+ * instead: see "Reconnecting" above.
  */
 export async function confirmDeviceCode(
   deps: DeviceDeps,
@@ -313,62 +378,126 @@ export async function confirmDeviceCode(
   }
   const now = nowOf(deps);
   const code = normalizeUserCode(userCode);
+  const pending = await pendingCode(deps.db, code, now);
+  if (!pending) throw notFound();
+  const previous = pending.previousMachineId
+    ? ((await reconnectTarget(deps.db, actorId, pending.previousMachineId, orgId))?.machine ?? null)
+    : null;
   const machine = await deps.db.transaction(async (tx) => {
     const [claimed] = await tx
       .update(machineDeviceCodes)
       .set({ status: "confirmed", orgId, confirmedByUserId: actorId, decidedAt: now })
       .where(
         and(
-          eq(machineDeviceCodes.userCode, code),
+          eq(machineDeviceCodes.id, pending.id),
           eq(machineDeviceCodes.status, "pending"),
           gt(machineDeviceCodes.expiresAt, now),
         ),
       )
       .returning();
     if (!claimed) return null;
-    const name = cleanMachineName(input.name) || claimed.name || claimed.hostname.slice(0, 80) || "Computer";
-    const [row] = await tx
-      .insert(machines)
-      .values({
-        orgId,
-        name,
-        pairedByUserId: actorId,
-        hostname: claimed.hostname,
-        os: claimed.os,
-        arch: claimed.arch,
-        runnerVersion: claimed.runnerVersion,
-        ...(claimed.protocol !== null ? { protocol: claimed.protocol } : {}),
-        ...(claimed.workspace !== null ? { workspace: claimed.workspace } : {}),
-        ...(claimed.execAllowed !== null ? { execAllowed: claimed.execAllowed } : {}),
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
-    if (!row) throw new Error("machine insert returned nothing");
+    const reported = {
+      hostname: claimed.hostname,
+      os: claimed.os,
+      arch: claimed.arch,
+      runnerVersion: claimed.runnerVersion,
+      ...(claimed.protocol !== null ? { protocol: claimed.protocol } : {}),
+      ...(claimed.workspace !== null ? { workspace: claimed.workspace } : {}),
+      ...(claimed.execAllowed !== null ? { execAllowed: claimed.execAllowed } : {}),
+    };
+    let row: MachineRow | undefined;
+    let restored: string[] = [];
+    if (previous) {
+      // The same row: name and permissions stay; the old token stops working
+      // now (the new one is issued to the computer's next poll).
+      [row] = await tx
+        .update(machines)
+        .set({
+          ...reported,
+          tokenHash: null,
+          online: false,
+          connectedReplica: null,
+          deletedAt: null,
+          previousAgentIds: [],
+          updatedAt: now,
+        })
+        .where(and(eq(machines.id, previous.id), eq(machines.orgId, orgId)))
+        .returning();
+      if (row && previous.previousAgentIds.length > 0) {
+        // Back to the agents that used it, unless they got another computer meanwhile.
+        const back = await tx
+          .update(agents)
+          .set({ machineId: row.id, updatedAt: now })
+          .where(
+            and(
+              eq(agents.orgId, orgId),
+              inArray(agents.id, previous.previousAgentIds),
+              isNull(agents.machineId),
+              isNull(agents.archivedAt),
+            ),
+          )
+          .returning({ id: agents.id });
+        restored = back.map((a) => a.id);
+      }
+    } else {
+      const name = cleanMachineName(input.name) || claimed.name || claimed.hostname.slice(0, 80) || "Computer";
+      [row] = await tx
+        .insert(machines)
+        .values({ orgId, name, pairedByUserId: actorId, ...reported, createdAt: now, updatedAt: now })
+        .returning();
+    }
+    if (!row) throw new Error("machine write returned nothing");
     await tx.update(machineDeviceCodes).set({ machineId: row.id }).where(eq(machineDeviceCodes.id, claimed.id));
-    return { row, ip: claimed.requesterIp, location: claimed.approxLocation };
+    return { row, restored, ip: claimed.requesterIp, location: claimed.approxLocation };
   });
   if (!machine) throw notFound();
-  const { row } = machine;
-  await recordAudit(deps.db, {
-    orgId,
-    actor: { type: "person", id: actorId },
-    action: "machine.connected",
-    target: { type: "machine", id: row.id },
-    details: {
-      name: row.name,
-      hostname: row.hostname,
-      os: row.os,
-      arch: row.arch,
-      ip: machine.ip,
-      ...(machine.location ? { location: machine.location } : {}),
-    },
-  });
+  const { row, restored } = machine;
+  const where = {
+    name: row.name,
+    hostname: row.hostname,
+    os: row.os,
+    arch: row.arch,
+    ip: machine.ip,
+    ...(machine.location ? { location: machine.location } : {}),
+  };
+  if (previous) {
+    for (const agentId of restored) caches.agents.delete(`${orgId}:${agentId}`);
+    // A socket still open with the old token (another copy of the runner) is closed.
+    await deps.pubsub
+      ?.publish(MACHINE_CONTROL_TOPIC, { type: "machine.revoke", machineId: row.id })
+      .catch(() => undefined);
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "machine.reconnected",
+      target: { type: "machine", id: row.id },
+      details: { ...where, wasRemoved: previous.deletedAt !== null, agents: restored },
+    });
+  } else {
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "machine.connected",
+      target: { type: "machine", id: row.id },
+      details: where,
+    });
+  }
   await publishOrgEvent(deps.pubsub, {
     type: "org.broadcast",
     orgId,
     event: { type: "machine.paired", machineId: row.id, name: row.name },
   });
+  for (const agentId of restored) {
+    await publishOrgEvent(deps.pubsub, {
+      type: "org.broadcast",
+      orgId,
+      event: {
+        type: "agent.computer",
+        agentId,
+        target: { kind: "machine", machineId: row.id, name: row.name, online: false },
+      },
+    });
+  }
   await publishMachineAgentsChanged(deps.pubsub, orgId);
   await notifyMachineConnected(deps, row, actorId).catch(() => undefined);
   return machineView(deps.db, actorId, orgId, row.id);

@@ -1,7 +1,9 @@
 /**
  * First run and "Adicionar organização" (AppBandeja.html, view "welcome"): sign in with a code the
  * computer shows and the person confirms in the browser (ADR 0036 §5), then, the first time only,
- * folders, tools and "open when the Mac starts". One simple question per screen.
+ * folders, tools and "open when the Mac starts". One simple question per screen. Also "Reconectar
+ * este Mac" from the popover: the same code screen on the refused organization's home, which comes
+ * back as the same computer (its agents and permissions).
  */
 
 import type { RunnerTools } from "@agenteschat/adapters/machine-protocol";
@@ -11,9 +13,9 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { ControlError } from "../control/client";
-import { type Home, orgName, pairedHomes } from "../control/store";
+import { type Home, orgName, pairedHomes, RECONNECT_PREF, reconnectTarget } from "../control/store";
 import { SITE_URL } from "../control/version";
-import { useOnShown } from "../hooks";
+import { readPref, useOnShown, writePref } from "../hooks";
 import { BrandFace, CodeDigits, MacPortrait } from "../ui/bits";
 import { useToast } from "../ui/Toast";
 import { baseName, listNames, shortPath } from "../ui/time";
@@ -42,8 +44,13 @@ export function Welcome() {
   const snap = useSnapshot();
   const toast = useToast();
   const [step, setStep] = useState<Step>("hello");
-  /** "org": connecting one more organization (no folders/tools steps). Fixed when the flow starts. */
-  const [mode, setMode] = useState<"first" | "org">("first");
+  /**
+   * "org": connecting one more organization (no folders/tools steps); "reconnect": an organization
+   * that refused this Mac, on its own home. Fixed when the flow starts.
+   */
+  const [mode, setMode] = useState<"first" | "org" | "reconnect">("first");
+  /** "reconnect": the home and its organization's name. */
+  const [target, setTarget] = useState<{ homeId: string; org: string } | null>(null);
   const [homeId, setHomeId] = useState<string | null>(null);
   const [code, setCode] = useState<{ userCode: string; verificationUrl: string } | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -57,9 +64,13 @@ export function Welcome() {
   const executors: ControlStatus["executors"] = home?.status?.executors ?? {};
 
   const reset = () => {
-    const paired = pairedHomes(store.getSnapshot());
-    setMode(paired.length > 0 ? "org" : "first");
-    setStep(paired.length > 0 ? "code" : "hello");
+    const snapshot = store.getSnapshot();
+    const paired = pairedHomes(snapshot);
+    const again = reconnectTarget(snapshot, readPref<string | null>(RECONNECT_PREF, null));
+    writePref(RECONNECT_PREF, null);
+    setTarget(again ? { homeId: again.homeId, org: orgName(again) } : null);
+    setMode(again ? "reconnect" : paired.length > 0 ? "org" : "first");
+    setStep(again || paired.length > 0 ? "code" : "hello");
     setHomeId(null);
     setCode(null);
     setFailure(null);
@@ -67,9 +78,14 @@ export function Welcome() {
     opened.current = null;
   };
 
-  // Brought up again (from the popover or Preferences): start over unless a sign-in is under way.
+  // Brought up again (from the popover or Preferences): start over unless a sign-in is under way
+  // ("Reconectar este Mac" always starts over).
   useOnShown("welcome", () => {
-    if (step === "code" && homeId && !failure) return;
+    const reconnecting = readPref<string | null>(RECONNECT_PREF, null) !== null;
+    if (reconnecting && step === "code" && homeId && mode !== "first") {
+      void store.request(homeId, { type: "pair.cancel" }).catch(() => {});
+      if (mode === "org") void store.removeHome(homeId).catch(() => {});
+    } else if (step === "code" && homeId && !failure) return;
     if (step === "folders" || step === "tools") return;
     reset();
   });
@@ -106,15 +122,20 @@ export function Welcome() {
     setFailure(null);
     setCode(null);
     try {
-      // Reuse a home left unpaired by an earlier attempt; else a new one.
+      // Reconnect: the refused organization's own home (its runner sends the machine it was).
+      // Else reuse a home left unpaired by an earlier attempt, or a new one.
       // A home whose runner never answered counts too: retrying must not leave empty homes behind.
       const spare = store.getSnapshot().homes.find((h) => !h.status?.paired);
-      const id = spare?.homeId ?? (await store.addHome());
+      const id = mode === "reconnect" && target ? target.homeId : (spare?.homeId ?? (await store.addHome()));
       homeRef.current = id;
       setHomeId(id);
       await store.request(id, { type: "pair.start", server: SITE_URL });
     } catch (err) {
-      if (err instanceof ControlError && err.code === "already_paired") return;
+      // Connected again meanwhile (another flow): nothing to do here.
+      if (err instanceof ControlError && err.code === "already_paired") {
+        if (mode === "reconnect") void host.hideWindow("welcome").catch(() => {});
+        return;
+      }
       setFailure("internal");
     }
   }
@@ -122,6 +143,10 @@ export function Welcome() {
   async function afterPaired(id: string, org: string) {
     toast(t("desktop.welcome.connected", { org }));
     await store.refresh(id);
+    if (mode === "reconnect") {
+      setStep("done");
+      return;
+    }
     if (mode === "org") {
       // Tools are for the whole computer: the new organization gets what the others have.
       const base = pairedHomes(store.getSnapshot()).find((h) => h.homeId !== id)?.access?.tools;
@@ -140,8 +165,9 @@ export function Welcome() {
 
   async function cancel() {
     if (homeId) await store.request(homeId, { type: "pair.cancel" }).catch(() => {});
-    if (mode === "org") {
-      if (homeId) await store.removeHome(homeId).catch(() => {});
+    if (mode === "org" || mode === "reconnect") {
+      // A refused home stays as it was (Preferências can still remove it).
+      if (homeId && mode === "org") await store.removeHome(homeId).catch(() => {});
       reset();
       void host.hideWindow("welcome").catch(() => {});
       return;
@@ -244,13 +270,21 @@ export function Welcome() {
     body = (
       <>
         {steps}
-        <h1>{mode === "org" ? t("desktop.welcome.orgTitle") : t("desktop.welcome.codeTitle")}</h1>
+        <h1>
+          {mode === "reconnect"
+            ? t("desktop.welcome.reconnectTitle", { org: target?.org ?? "" })
+            : mode === "org"
+              ? t("desktop.welcome.orgTitle")
+              : t("desktop.welcome.codeTitle")}
+        </h1>
         <p className="dk-lead">
           {!code
             ? t("desktop.welcome.codeLeadPreparing")
-            : mode === "org"
-              ? t("desktop.welcome.orgLead")
-              : t("desktop.welcome.codeLead")}
+            : mode === "reconnect"
+              ? t("desktop.welcome.reconnectLead")
+              : mode === "org"
+                ? t("desktop.welcome.orgLead")
+                : t("desktop.welcome.codeLead")}
         </p>
         <div className="dk-codebox">
           {code ? <CodeDigits code={code.userCode} /> : <span className="dk-code dk-code--empty">···&nbsp;···</span>}
@@ -299,7 +333,7 @@ export function Welcome() {
           )}
         </span>
         <Button variant="ghost" onClick={() => void cancel()}>
-          {mode === "org" ? t("desktop.common.cancel") : t("desktop.common.back")}
+          {mode === "first" ? t("desktop.common.back") : t("desktop.common.cancel")}
         </Button>
       </>
     );
@@ -407,7 +441,13 @@ export function Welcome() {
         <span className="dk-done__mark">
           <MacPortrait state="online" size={96} />
         </span>
-        <h1>{mode === "org" ? t("desktop.welcome.orgDone", { count }) : t("desktop.welcome.doneTitle")}</h1>
+        <h1>
+          {mode === "reconnect"
+            ? t("desktop.welcome.reconnectDone", { org: target?.org ?? "" })
+            : mode === "org"
+              ? t("desktop.welcome.orgDone", { count })
+              : t("desktop.welcome.doneTitle")}
+        </h1>
         <p className="dk-lead">{t("desktop.welcome.doneLead")}</p>
         <div className="dk-mini" aria-hidden="true">
           <div className="dk-mini__bar">

@@ -312,7 +312,8 @@ export async function renameMachine(
 /**
  * Removes a machine: its token stops working, its socket is closed
  * (`refused: revoked`, on whichever replica holds it), and agents that used
- * it go back to the cloud computer. Soft delete, audited.
+ * it go back to the cloud computer (remembered in `previous_agent_ids`, so
+ * reconnecting the same computer gives them back). Soft delete, audited.
  */
 export async function deleteMachine(
   deps: Pick<MachineDeps, "db" | "pubsub">,
@@ -328,11 +329,20 @@ export async function deleteMachine(
       .set({ machineId: null, updatedAt: now })
       .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machine.id)))
       .returning({ id: agents.id });
+    const ids = rows.map((r) => r.id);
+    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`).
     await tx
       .update(machines)
-      .set({ deletedAt: now, tokenHash: null, online: false, connectedReplica: null, updatedAt: now })
+      .set({
+        deletedAt: now,
+        tokenHash: null,
+        online: false,
+        connectedReplica: null,
+        previousAgentIds: ids,
+        updatedAt: now,
+      })
       .where(eq(machines.id, machine.id));
-    return rows.map((r) => r.id);
+    return ids;
   });
   for (const agentId of freed) caches.agents.delete(`${orgId}:${agentId}`);
   await recordAudit(deps.db, {

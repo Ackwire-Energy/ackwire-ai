@@ -104,6 +104,13 @@ const DeviceCode = z
     approxLocation: z.string().nullable().openapi({ description: "Roughly where the request came from, when known." }),
     createdAt: z.string(),
     expiresAt: z.string(),
+    reconnect: z
+      .object({ machineId: z.uuid(), name: z.string(), orgId: z.uuid(), orgName: z.string() })
+      .optional()
+      .openapi({
+        description:
+          "The code brings back this machine (same name, permissions and agents); only for people who may manage it.",
+      }),
   })
   .openapi("MachineDeviceCode");
 
@@ -226,7 +233,7 @@ export function machineAppRoutes(deps: AppDeps) {
         windowMs: 60_000,
       });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
-      return c.json(await getDeviceCode({ db }, c.req.valid("param").userCode), 200);
+      return c.json(await getDeviceCode({ db }, c.req.valid("param").userCode, c.get("user").id), 200);
     },
   );
 
@@ -444,6 +451,8 @@ const DeviceBody = z.object({
   protocol: z.number().int().optional(),
   workspace: z.string().max(500).optional(),
   exec: z.boolean().optional(),
+  /** A refused computer asking to come back as the machine it was (reconnect); ignored unless a uuid. */
+  previousMachineId: z.string().max(64).optional(),
 });
 
 /** New codes per address per minute, and polls (every 3 s by contract: 20 a minute, with room for two computers). */

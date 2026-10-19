@@ -1796,6 +1796,8 @@ export interface DeviceRequest {
   approxLocation?: DeviceLocation | null;
   createdAt: string;
   expiresAt: string;
+  /** The code brings back this machine (same name, permissions and agents); only for people who may manage it. */
+  reconnect?: { machineId: string; name: string; orgId: string; orgName: string };
 }
 
 /** `GET /api/desktop/latest?target=&arch=` (ADR 0036 §9): the newest app build. */

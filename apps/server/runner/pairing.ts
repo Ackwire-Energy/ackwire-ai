@@ -47,6 +47,12 @@ export interface DeviceInfo {
   arch: string;
   hostname: string;
   version: string;
+  /**
+   * The machine this computer was on that server (its config keeps it after
+   * a refusal or "leave"): the site reconnects that machine, with its name,
+   * permissions and agents, when the person confirming may manage it.
+   */
+  previousMachineId?: string;
 }
 
 /** `K7Q4ZP` → `K7Q·4ZP`. */
