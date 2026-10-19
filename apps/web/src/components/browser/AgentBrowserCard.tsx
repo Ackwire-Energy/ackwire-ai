@@ -1,4 +1,4 @@
-import type { Agent, ScopeGrant } from "@agenteschat/client";
+import type { Agent } from "@agenteschat/client";
 import {
   BROWSER_TOOL_SCOPE,
   keys,
@@ -7,6 +7,7 @@ import {
   useApi,
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
+import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Card, Icon, Input, OptionList, SettingRow, Switch } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -57,15 +58,12 @@ export function AgentBrowserCard({
   const granted = (scopes.data ?? []).some((s) => s.connectionId === null && s.scope === BROWSER_TOOL_SCOPE);
   const toggle = useMutation({
     meta: { silent: true },
-    mutationFn: async (on: boolean) => {
-      const current = await api.scopes.get(org.id, agent.id);
-      const rest = current.filter((s) => !(s.connectionId === null && s.scope === BROWSER_TOOL_SCOPE));
-      const next: ScopeGrant[] = on ? [...rest, { connectionId: null, scope: BROWSER_TOOL_SCOPE }] : rest;
-      return api.scopes.set(org.id, agent.id, next);
-    },
+    // Through the access tree like the access levels screen: the raw scopes PUT
+    // refuses per-tool grants (`tool:…`), so it failed for agents that have any.
+    mutationFn: (on: boolean) => saveLevels(api, org.id, agent.id, { "area:browser": on ? "write" : "none" }),
     onSuccess: (saved) => {
-      qc.setQueryData(keys.scopes(org.id, agent.id), saved);
-      void qc.invalidateQueries({ queryKey: keys.agentAccess(org.id, agent.id) });
+      qc.setQueryData(keys.agentAccess(org.id, agent.id), saved);
+      void qc.invalidateQueries({ queryKey: keys.scopes(org.id, agent.id) });
     },
     onError: () => setError(t("browser.agent.saveFailed")),
   });
