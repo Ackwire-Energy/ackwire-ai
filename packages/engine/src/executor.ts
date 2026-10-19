@@ -86,7 +86,9 @@ import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, approvals, agentQuestions, secretRequests, users } = schema;
+const { agentRuns, approvals, agentQuestions, messages, secretRequests, users } = schema;
+/** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
+const ASKED_GRACE_MS = 250;
 
 /**
  * What the agent engine needs (ADR 0032). The engine is this file: it owns the
@@ -195,6 +197,8 @@ export interface Transcript {
       secretRequestId?: string;
       /** Made by a computer brain through the runner bridge (`suspendRunForTool`): resumed as text. */
       bridged?: boolean;
+      /** A bridged question: when it was asked (ms), to post only the text the brain wrote before it. */
+      askedAt?: number;
       /** A mission tool's own wait (a blocking decision, a review): its id; the answer comes as `result`. */
       waitId?: string;
       result?: { content: string; isError: boolean };
@@ -533,12 +537,25 @@ async function executeRunInner(
       ? { id: routineCall.id, name: routineCall.name }
       : null;
   routineOfRun = viaRoutine;
-  const post = async (tx: Executor, threadId: string | null, body: string, meta?: Record<string, unknown>) => {
-    const m = await postAgentMessage(tx, run, threadId, body, {
-      ...meta,
-      ...(viaRoutine ? { viaRoutine } : {}),
-      ...(joined ? { joined: true } : {}),
-    });
+  const post = async (
+    tx: Executor,
+    threadId: string | null,
+    body: string,
+    meta?: Record<string, unknown>,
+    createdAt?: Date,
+  ) => {
+    const m = await postAgentMessage(
+      tx,
+      run,
+      threadId,
+      body,
+      {
+        ...meta,
+        ...(viaRoutine ? { viaRoutine } : {}),
+        ...(joined ? { joined: true } : {}),
+      },
+      createdAt,
+    );
     // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
     if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
     return m;
@@ -917,19 +934,48 @@ async function executeRunInner(
     return "waited";
   };
 
+  /** The first question a computer brain asked through the bridge in this pause: when, and when its card was posted. */
+  const bridgedQuestionCard = async (t: Transcript): Promise<{ askedAt: number; cardAt: Date } | null> => {
+    const calls = (t.pending?.calls ?? []).filter((c) => c.bridged && c.questionId && typeof c.askedAt === "number");
+    const first = calls.reduce<(typeof calls)[number] | null>(
+      (a, b) => (a && (a.askedAt ?? 0) <= (b.askedAt ?? 0) ? a : b),
+      null,
+    );
+    if (!first?.questionId) return null;
+    const [card] = await db
+      .select({ at: messages.createdAt })
+      .from(agentQuestions)
+      .innerJoin(messages, eq(messages.id, agentQuestions.messageId))
+      .where(eq(agentQuestions.id, first.questionId));
+    return card ? { askedAt: first.askedAt as number, cardAt: card.at } : null;
+  };
+
   /**
    * A computer brain's call through the bridge paused the run during the turn
    * (`suspendRunForTool` posted the card and moved it to `waiting_*`): keep the
    * pending calls it recorded, post what the brain said, and stop here.
    */
-  const suspendedByBridge = async (status: "waiting_approval" | "waiting_input", said: string) => {
+  const suspendedByBridge = async (
+    status: "waiting_approval" | "waiting_input",
+    said: string,
+    textBefore?: (at: number) => string,
+  ) => {
     await deferred;
     const [row] = await db.select({ transcript: agentRuns.transcript }).from(agentRuns).where(eq(agentRuns.id, run.id));
     const stored = row?.transcript as unknown as Transcript | null;
     const t = transcript as Transcript;
     if (stored?.pending) t.pending = stored.pending;
     t.postedCount = Math.max(t.postedCount, stored?.postedCount ?? 0);
-    const message = said ? await post(db, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
+    // A question the brain asked mid-turn is already posted. Only what it wrote before asking leads to it
+    // (posted just before the card, so it reads first); what it wrote after only repeats the question.
+    const asked = await bridgedQuestionCard(t);
+    let text = said;
+    let at: Date | undefined;
+    if (asked && textBefore) {
+      text = textBefore(asked.askedAt + ASKED_GRACE_MS).trim();
+      at = new Date(asked.cardAt.getTime() - 1);
+    }
+    const message = text ? await post(db, replyThreadId, text, withFallback(t, takeMemoryUpdates(t)), at) : null;
     if (message) t.postedCount++;
     t.postedUpTo = t.messages.length;
     await db
@@ -1141,7 +1187,7 @@ async function executeRunInner(
           // pending calls the bridge wrote (no fallback, no failure; the decision resumes the session).
           const [row] = await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
           if (row?.status === "waiting_approval" || row?.status === "waiting_input") {
-            return suspendedByBridge(row.status, deltas.text().trim());
+            return suspendedByBridge(row.status, deltas.text().trim(), deltas.text() ? deltas.textBefore : undefined);
           }
         }
         // Only while the run is running: never over the pending calls of a bridged pause.
@@ -1225,7 +1271,7 @@ async function executeRunInner(
       if (counted[0]) run = counted[0];
       // A computer brain's call through the bridge paused the run during the turn: it waits now.
       if (turnPlan.kind !== "model" && (run.status === "waiting_approval" || run.status === "waiting_input")) {
-        return suspendedByBridge(run.status, turnText);
+        return suspendedByBridge(run.status, turnText, deltas.text() ? deltas.textBefore : undefined);
       }
 
       // Canceled while the model answered: its tool calls never run.
@@ -1819,6 +1865,7 @@ function postAgentMessage(
   threadId: string | null,
   body: string,
   meta?: Record<string, unknown>,
+  createdAt?: Date,
 ) {
   return insertMessage(tx, {
     orgId: run.orgId,
@@ -1827,6 +1874,7 @@ function postAgentMessage(
     author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
     body,
     meta,
+    ...(createdAt ? { createdAt } : {}),
   });
 }
 
@@ -1853,6 +1901,8 @@ function createDeltaPublisher(
   const MAX_CHUNK = 2000;
   let buffer = "";
   let all = "";
+  /** When each piece arrived: [ms, length of `all` once it was added]. */
+  const marks: [number, number][] = [];
   let seq = startSeq;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Promise<void> = Promise.resolve();
@@ -1890,6 +1940,7 @@ function createDeltaPublisher(
       }
       buffer += text;
       all += text;
+      if (text) marks.push([Date.now(), all.length]);
       if (flushMs === 0 || buffer.length >= MAX_CHUNK) send();
       else timer ??= setTimeout(send, flushMs);
     },
@@ -1902,6 +1953,15 @@ function createDeltaPublisher(
     seq: () => seq,
     /** Everything streamed in this turn (kept when the run is canceled mid-stream). */
     text: () => all,
+    /** What had streamed by `at` (ms): the text a computer brain wrote before a bridged call. */
+    textBefore(at: number) {
+      let length = 0;
+      for (const [when, upTo] of marks) {
+        if (when > at) break;
+        length = upTo;
+      }
+      return all.slice(0, length);
+    },
   };
 }
 

@@ -298,6 +298,38 @@ describe("agent questions (ask_user)", () => {
     ]);
   });
 
+  test("the question shows once: its card, not its text above it too", async () => {
+    const state = seedState();
+    const text = "Quais datas eu coloco na viagem para o Chile?";
+    const question = {
+      id: "q3",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: "m-1",
+      messageId: "msg-q3",
+      text,
+      choices: null,
+      status: "answered",
+      answer: "Ainda não sei as datas",
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-q3",
+      channelId: ENG_ID,
+      threadId: "m-1",
+      author: { type: "agent", id: ADA_ID },
+      body: text,
+      mentionedAgentIds: [],
+      agentRunId: "r-q3",
+      meta: { question },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    const message = card.closest("article") as HTMLElement;
+    expect(message.textContent?.split(text).length).toBe(2);
+  });
+
   test("a question someone already answered (409) is explained on the card", async () => {
     const state = seedState();
     const question = {

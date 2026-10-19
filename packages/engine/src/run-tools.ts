@@ -586,7 +586,7 @@ export async function suspendRunForTool(
       // Its tool_use lives in the computer brain's session, not in the transcript: resumed as text.
       bridged: true,
       ...(gated.type === "approval" ? { approvalId: gated.approval.id } : {}),
-      ...(questionId ? { questionId } : {}),
+      ...(questionId ? { questionId, askedAt: Date.now() } : {}),
       ...(gated.type === "secret" ? { secretRequestId: gated.requestId } : {}),
       ...(gated.type === "wait" ? { waitId: gated.id } : {}),
     };
@@ -671,7 +671,7 @@ export async function suspendRunForTool(
     };
   }
   return {
-    content: `Asked: ${gated.text} Stop now and end your turn; you'll be resumed with the answer.`,
+    content: `Asked: ${gated.text} The person sees it as a card. Stop now and end your turn without writing anything more (don't repeat the question); you'll be resumed with the answer.`,
     pause: { kind: "input", id: questionId ?? call.id },
   };
 }

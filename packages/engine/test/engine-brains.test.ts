@@ -335,6 +335,46 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
   expect(seen[1]?.trigger).toContain("github_merge_pr ok: acme/app#42");
 });
 
+test("a question asked through the bridge: the text written before it comes first, what follows isn't posted", async () => {
+  f = await setup({ askUser: true });
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (n, turn) {
+    if (n > 0) return;
+    yield { type: "text_delta", text: "Estou criando a viagem no meu navegador; o formulário pede as datas." };
+    const result = await executeToolForRun(
+      f.jobDeps,
+      { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+      { id: "ask-1", name: "ask_user", input: { question: "Quais datas eu coloco?" } },
+    );
+    yield { type: "tool_call", id: "ask-1", name: "ask_user", input: {}, executed: result };
+    // After the call the brain repeats itself (what the person saw in production).
+    await Bun.sleep(400);
+    yield { type: "text_delta", text: "\n\nQuais datas eu coloco: você me passa a ida e a volta?" };
+    yield {
+      type: "done",
+      text: "Estou criando a viagem no meu navegador; o formulário pede as datas.\n\nQuais datas eu coloco: você me passa a ida e a volta?",
+    };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const asked = await post(f, "@dev cria a viagem para o Chile");
+  await drainOutbox(f.db, handlers);
+
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: asked.id });
+  const fromAgent = thread.filter((m) => m.author.type === "agent");
+  // The context first, then the card; the repeated question after the call is never posted.
+  expect(fromAgent.map((m) => (m.meta.question ? "card" : m.body))).toEqual([
+    "Estou criando a viagem no meu navegador; o formulário pede as datas.",
+    "card",
+  ]);
+  expect(thread.some((m) => m.body.includes("você me passa a ida e a volta"))).toBe(false);
+});
+
 test("a plan limit falls back to the model brain; the reply carries a quiet note", async () => {
   f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
   const machineId = await computerAgent(f);

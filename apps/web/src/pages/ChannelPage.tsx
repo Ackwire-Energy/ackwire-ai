@@ -2333,6 +2333,8 @@ export const TimelineMessage = memo(function TimelineMessage({
         !forumSuggestion &&
         !issueWork &&
         !waitNotice &&
+        // A question's card already says it: its own text isn't repeated above.
+        !(question && body.trim() === question.text.trim()) &&
         (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
           <MessageText>
             <MessageBody

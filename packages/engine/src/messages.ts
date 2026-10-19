@@ -263,6 +263,8 @@ export interface NewMessage {
   author: MessageAuthor;
   body: string;
   meta?: Record<string, unknown>;
+  /** Placed at this time instead of now (an agent's text that came before a card already posted). */
+  createdAt?: Date;
 }
 
 /**
@@ -442,7 +444,7 @@ export async function insertMessageWithRuns(
       ), m as (
         insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
           author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, mentioned_user_ids, meta)
-        select ${id}::uuid, now(), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
+        select ${id}::uuid, coalesce(${input.createdAt?.toISOString() ?? null}::timestamptz, now()), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
           ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop}, ${body},
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
           coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
