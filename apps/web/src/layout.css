@@ -3186,23 +3186,90 @@ button.drive-where:focus-visible {
   }
 }
 
-/* "Adicionar conector": the catalog. Neutral cards; state in a chip. */
+/*
+ * "Adicionar conector" (telas/CatalogoConectores.html, B+C): a gallery with a big title, search and one
+ * line of filters; suggestions with the brand's pixel sky; even tiles with no tags (a check on the icon
+ * when connected); a tile opens the detail pane beside the grid (a bottom sheet on phones).
+ */
+.ac-dialog.catalog {
+  height: min(740px, calc(100dvh - 48px));
+}
+.catalog .ac-dialog__head {
+  padding: 24px 24px 14px 28px;
+}
+.catalog .ac-dialog__title {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
 .catalog__tools {
+  flex: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  padding: 0 28px 18px;
+}
+.catalog__search {
+  max-width: 360px;
+}
+/* One line of filters that scrolls sideways (never wraps). */
+.catalog__filters .ac-toolbar__filters {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: -2px;
+  padding: 2px;
+}
+.catalog__filters .ac-toolbar__filters::-webkit-scrollbar {
+  display: none;
+}
+.catalog__filters .ac-filtertoggle {
+  flex: none;
+}
+.catalog__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid var(--line);
+}
+.catalog__body[data-pane] {
+  grid-template-columns: minmax(0, 1fr) 340px;
 }
 .catalog__list {
-  padding-bottom: 20px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
 }
+.catalog__h {
+  margin: 0 2px 12px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink2);
+}
+.catalog-feat,
 .catalog-grid {
   list-style: none;
   margin: 0;
-  padding: 2px;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
-  gap: 10px;
 }
+.catalog-feat {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+}
+.catalog-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  grid-auto-rows: 1fr;
+  gap: 14px;
+}
+.catalog-feat > li,
 .catalog-grid > li {
   display: flex;
   min-width: 0;
@@ -3210,81 +3277,287 @@ button.drive-where:focus-visible {
 .catalog-grid__empty {
   grid-column: 1 / -1;
 }
-.catalog-card {
+.catalog-feat__card,
+.catalog-tile {
   flex: 1;
   min-width: 0;
   box-sizing: border-box;
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
+  flex-direction: column;
   font: inherit;
   color: inherit;
   text-align: left;
   border: 0;
-  border-radius: var(--radius-lg);
   background: var(--raised);
-  box-shadow: var(--e1);
+  box-shadow: var(--e1), var(--top);
   cursor: pointer;
   transition:
     transform 0.2s var(--spring),
     box-shadow 0.2s;
 }
-.catalog-card:hover:not(:disabled) {
+.catalog-feat__card:hover,
+.catalog-tile:hover {
   transform: translateY(-1px);
-  box-shadow: var(--e2);
+  box-shadow: var(--e2), var(--top);
 }
-.catalog-card:focus-visible {
+.catalog-feat__card:active,
+.catalog-tile:active {
+  transform: scale(0.98);
+}
+.catalog-feat__card:focus-visible,
+.catalog-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.catalog-card:disabled {
-  cursor: default;
+.catalog-feat__card[aria-pressed="true"],
+.catalog-tile[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 1.5px var(--ink),
+    var(--top);
 }
-.catalog-card:disabled .catalog-card__text {
-  opacity: 0.7;
+.catalog-feat__card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-section);
+  padding: 0 20px 20px;
 }
-.catalog-card--other {
-  background: transparent;
-  box-shadow: none;
-  border: 1.5px dashed var(--line2);
+.catalog-feat__sky {
+  display: block;
+  height: 72px;
+  margin: 0 -20px;
 }
-.catalog-card__text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-  align-self: stretch;
+.catalog-feat__sky canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
-.catalog-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
+.catalog-feat__icon {
+  margin-top: -24px;
+  margin-bottom: 12px;
 }
-.catalog-card__name {
+.catalog-feat__icon .connector-icon {
+  box-shadow:
+    inset 0 0 0 1px var(--line2),
+    var(--e1);
+  background: var(--raised);
+}
+.catalog-feat__name,
+.catalog-tile__name {
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.catalog-card__desc {
+.catalog-feat__name {
+  font-size: 15px;
+}
+.catalog-feat__desc,
+.catalog-tile__desc {
+  margin-top: 2px;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 18px;
+  height: 36px;
   color: var(--ink-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.catalog-card__meta {
+.catalog-tile {
+  gap: 12px;
+  padding: 18px;
+  border-radius: 18px;
+}
+.catalog-tile__head {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.catalog-tile__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+.catalog-tile__desc {
+  margin-top: 0;
+  font-size: 12.5px;
+}
+.catalog-tile[data-soon] .catalog-tile__head,
+.catalog-tile[data-soon] .catalog-tile__desc {
+  opacity: 0.6;
+}
+.catalog-tile--other {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+}
+.catalog-tile--other:hover {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+/* A connected service: a green check on its icon (the only mark a card carries). */
+.catalog-icon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.catalog-icon__check {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--ok);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--raised);
+}
+.catalog-icon__check .ac-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.4;
+}
+/* The detail pane. */
+.catalog-detail {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--side, var(--surface-sunken));
+  border-left: 1px solid var(--line);
+  animation: catalog-pane 0.24s var(--out);
+}
+.catalog-detail:focus {
+  outline: none;
+}
+@keyframes catalog-pane {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+.catalog-detail__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.catalog-detail .connector-icon--lg {
+  width: 56px;
+  height: 56px;
+  border-radius: 17px;
+  font-size: 20px;
+}
+.catalog-detail__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+.catalog-detail__desc,
+.catalog-detail__text {
+  margin: 4px 0 0;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+.catalog-detail__text {
+  margin: 0;
+  font-size: 13px;
+}
+.catalog-detail__part {
+  align-self: stretch;
+}
+.catalog-detail__h {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-muted);
+}
+.catalog-detail__caps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  /* Pinned to the bottom, so the tags line up across a row of cards. */
+}
+.catalog-detail__caps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+.catalog-detail__caps .ac-icon {
+  margin-top: 3px;
+  color: var(--ink-muted);
+}
+.catalog-detail__act {
+  align-self: stretch;
   margin-top: auto;
-  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.catalog-detail__how {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--faint);
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .catalog__body[data-pane] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .catalog-detail {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 75%;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 20px 20px 0 0;
+    box-shadow: var(--e3);
+    animation-name: catalog-sheet;
+  }
+  .catalog__tools,
+  .catalog__list {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .catalog .ac-dialog__head {
+    padding: 20px 16px 12px;
+  }
+  .catalog .ac-dialog__title {
+    font-size: 24px;
+  }
+  .catalog__search {
+    max-width: none;
+  }
+}
+@keyframes catalog-sheet {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .catalog-detail,
+  .catalog-feat__card,
+  .catalog-tile {
+    animation: none;
+    transition: none;
+  }
 }
 
 /* A connector's brand icon (Simple Icons, CC0) as a mask in its color, or a monogram. */
@@ -4100,6 +4373,7 @@ button.drive-where:focus-visible {
 .catalog-grid--loading {
   margin-top: 0;
   flex-direction: row;
+  flex-wrap: wrap;
 }
 
 /*
@@ -4804,7 +5078,7 @@ button.drive-where:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The quote above a reply: a neutral strip with a hairline; opens the original. */
+/* The quote above a reply: a neutral strip; opens the original. */
 .msg-quote {
   display: flex;
   align-items: baseline;
@@ -4813,8 +5087,7 @@ button.drive-where:focus-visible {
   margin: 4px 0 2px;
   padding: 3px 10px;
   border: 0;
-  border-left: 2px solid var(--line-strong);
-  border-radius: 0 var(--radius-item) var(--radius-item) 0;
+  border-radius: var(--radius-item);
   background: var(--sunken);
   font: inherit;
   font-size: 13px;

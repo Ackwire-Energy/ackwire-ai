@@ -16,7 +16,7 @@ import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useOrg } from "@/components/org-context";
 import { SaveToWikiDialog } from "@/components/SaveToWiki";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { Markdown } from "@/lib/markdown";
+import { Markdown, renderInline } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { OriginLink, SeatAvatar, useForumWho } from "./pieces";
 
@@ -43,7 +43,7 @@ function List({ items, icon }: { items: string[]; icon: "plus" | "dash" | "alert
           <span className="forum-ol__k">
             <Icon name={icon} size={14} />
           </span>
-          <span>{x}</span>
+          <span>{renderInline(x, x)}</span>
         </li>
       ))}
     </ul>
@@ -72,6 +72,11 @@ function DecisionBody({ s }: { s: ForumDecisionCards }) {
   const who = useForumWho();
   return (
     <>
+      {s.reasons && s.reasons.length > 0 && (
+        <Section title={t("forum.synthesis.why")}>
+          <List items={s.reasons} icon="flag" />
+        </Section>
+      )}
       {s.positions.length > 0 && (
         <Section title={t("forum.synthesis.prosCons")}>
           {s.positions.map((p) => (
@@ -425,7 +430,9 @@ export function SynthesisCard({ topic }: { topic: ForumTopicDetail }) {
         <>
           <div className="forum-dec">
             <span className="forum-eyebrow">{t(plan ? "forum.synthesis.objective" : "forum.synthesis.decision")}</span>
-            <p>{headlineOf(s)}</p>
+            <p className={headlineOf(s).length > 220 ? "forum-dec__long" : undefined}>
+              {renderInline(headlineOf(s), "dec")}
+            </p>
           </div>
           {s.format === "plan" ? <PlanBody s={s} topic={topic} /> : <DecisionBody s={s} />}
         </>

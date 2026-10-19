@@ -11,6 +11,12 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+/** Picks a service in "Adicionar conector" (its tile or suggestion) and presses Conectar in its detail pane. */
+const pick = async (dialog: HTMLElement, name: string) => {
+  await click(within(dialog).getByRole("button", { name }));
+  const pane = within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
+  await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
+};
 const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
 
 function databaseApi() {
@@ -37,16 +43,20 @@ describe("Conectores → Banco de dados", () => {
         name: "Desenvolvimento",
       }),
     );
-    const card = within(dialog).getByRole("button", { name: "Conectar Banco de dados" });
-    expect(card.textContent).toContain("Endereço e senha");
+    const card = within(dialog).getByRole("button", { name: "Banco de dados" });
     expect(card.textContent).toContain("só leitura");
+    // How it connects, and that it never changes anything, in the detail pane.
+    await click(card);
+    const detail = within(dialog).getByRole("complementary", { name: "Sobre Banco de dados" });
+    expect(detail.textContent).toContain("Precisa do endereço do banco e de uma senha");
+    expect(detail.textContent).toContain("Nunca altera nada");
     expect(dialog.textContent).not.toMatch(/MCP server|scope/i);
   });
 
   test("connect → o que faz → quem pode usar → regras, with plain errors and the read-only user help", async () => {
     const { api, state, databases } = databaseApi();
     const dialog = await openCatalog(api);
-    await click(within(dialog).getByRole("button", { name: "Conectar Banco de dados" }));
+    await pick(dialog, "Banco de dados");
     expect(flow().textContent).toContain("Conectar Banco de dados");
     // How to make a read-only user: the steps, the SQL to paste (with Copiar) and the provider's page.
     expect(flow().textContent).toContain("Como criar um usuário só de leitura?");

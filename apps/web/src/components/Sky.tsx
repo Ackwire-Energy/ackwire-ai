@@ -229,6 +229,32 @@ export function CardSky({ color }: { color: AgentColor }) {
   );
 }
 
+/**
+ * The top of a suggested connector in the catalog: a soft pixel sky in the brand's own color (the
+ * ink's sky when the brand has none), fading into the card.
+ */
+export function ConnectorSky({ brand }: { brand: string | null }) {
+  return (
+    <span className="catalog-feat__sky" aria-hidden="true">
+      <PixelSky
+        options={{
+          pixel: 3,
+          surface: "--raised",
+          palette: (bg) =>
+            brand
+              ? [bg, mix(bg, brand, 0.1), mix(bg, brand, 0.22), mix(bg, brand, 0.36), mix(bg, brand, 0.52)]
+              : softTones("sky", bg),
+          light: 0,
+          base: (u, v, tt) => {
+            const fade = Math.max(0, 1 - v);
+            return fade * (0.35 + 0.35 * u + 0.06 * S(u * 6 + tt * 0.4));
+          },
+        }}
+      />
+    </span>
+  );
+}
+
 /** The whole app loading (the workspace's first load): the sky rises and agents pass through it. */
 export function BootSplash() {
   const { t } = useTranslation();

@@ -505,6 +505,15 @@ describe("after the synthesis", () => {
       ],
     });
     expect(parseSynthesis("decision", "Só um parágrafo.").format).toBe("decision");
+    // The decision stays one sentence: the reasons have their own section, or come from a list written under it.
+    expect(
+      parseSynthesis("decision", "## Decision\nSeguir com A.\n\n## Why\n- é barato\n- `pdfExported` fica"),
+    ).toMatchObject({
+      reasons: ["é barato", "`pdfExported` fica"],
+    });
+    expect(
+      parseSynthesis("decision", "## Decision\nSeguir com A. Motivos:\n- 5 negativos\n- fácil de reverter"),
+    ).toMatchObject({ decision: "Seguir com A. Motivos:", reasons: ["5 negativos", "fácil de reverter"] });
   });
 });
 

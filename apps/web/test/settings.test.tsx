@@ -17,6 +17,13 @@ const go = async (state = seedState(), path = "settings") => {
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 
+/** Picks a service in "Adicionar conector" (its tile) and presses Conectar in its detail pane. */
+const pick = async (dialog: HTMLElement, name: string) => {
+  await click(within(dialog).getByRole("button", { name }));
+  const pane = within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
+  await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
+};
+
 describe("Configurações da organização", () => {
   test("organization context is saved with PATCH /settings", async () => {
     const { state } = await go();
@@ -58,7 +65,7 @@ describe("Configurações da organização", () => {
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "sentry");
     // Sentry, and the card for any other MCP server.
     expect(within(add).getAllByRole("listitem")).toHaveLength(2);
-    await click(within(add).getByRole("button", { name: "Conectar Sentry" }));
+    await pick(add, "Sentry");
     const connect = screen().getByRole("dialog", { name: "Conectar Sentry" });
     // Sentry has no OAuth app on this server: API key only.
     expect(within(connect).queryByRole("button", { name: "Continuar no Sentry" })).toBeNull();
@@ -91,7 +98,7 @@ describe("Configurações da organização", () => {
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "drive");
-    await click(within(add).getByRole("button", { name: "Conectar Google Drive" }));
+    await pick(add, "Google Drive");
     const connect = screen().getByRole("dialog", { name: "Conectar Google Drive" });
     await type(within(connect).getByLabelText("Endereço do servidor MCP"), "http://inseguro");
     await type(within(connect).getByLabelText("Chave de API"), "chave-longa-123");

@@ -78,6 +78,7 @@ const Structured = z
     z.object({
       format: z.literal("decision"),
       decision: z.string(),
+      reasons: z.array(z.string()).optional(),
       positions: z.array(
         z.object({
           agentId: z.uuid().nullable(),

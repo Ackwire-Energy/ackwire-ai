@@ -1024,7 +1024,6 @@ a.forum-facts__lnk:hover {
   border: 0;
   border-radius: 9px;
   background: transparent;
-  box-shadow: inset 2px 0 0 var(--line2);
   font: inherit;
   font-size: 12.5px;
   color: var(--muted);
@@ -1335,6 +1334,14 @@ a.forum-facts__lnk:hover {
   line-height: 1.32;
   letter-spacing: -0.015em;
   color: var(--ink);
+}
+/* A long decision (older syntheses) reads as body text, not a headline. */
+.forum-dec p.forum-dec__long {
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.55;
+  letter-spacing: 0;
 }
 .forum-ss {
   display: flex;

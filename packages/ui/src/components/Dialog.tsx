@@ -16,6 +16,8 @@ export interface DialogProps {
   width?: number;
   children: ReactNode;
   className?: string;
+  /** Esc pressed: call `preventDefault()` to keep the dialog open (e.g. close an inner pane first). */
+  onEscapeKeyDown?: (event: KeyboardEvent) => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function Dialog({
   width = 600,
   children,
   className,
+  onEscapeKeyDown,
 }: DialogProps) {
   // Controlled dialogs have no Radix Trigger to return focus to, so remember
   // what had focus when it opened and give focus back on close.
@@ -47,6 +50,7 @@ export function Dialog({
         <RDialog.Content
           className={cx("ac-dialog", className)}
           style={{ "--ac-dialog-width": `${width}px` } as CSSProperties}
+          onEscapeKeyDown={onEscapeKeyDown}
           onCloseAutoFocus={(e) => {
             const target = returnTo.current;
             if (target?.isConnected) {

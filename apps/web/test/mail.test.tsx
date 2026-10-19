@@ -14,6 +14,12 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+/** Picks a service in "Adicionar conector" (its tile) and presses Conectar in its detail pane. */
+const pick = async (dialog: HTMLElement, name: string) => {
+  await click(within(dialog).getByRole("button", { name }));
+  const pane = within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
+  await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
+};
 const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
 
 /** A client with email on (Gmail/Outlook and IMAP), optionally with mailboxes already connected. */
@@ -54,14 +60,17 @@ describe("Conectores → Email", () => {
     const dialog = await openCatalog(api);
     const cats = within(dialog).getByRole("group", { name: "Categorias" });
     await click(within(cats).getByRole("button", { name: "Email" }));
-    const names = within(dialog)
-      .getAllByRole("listitem")
-      .map((li) => li.querySelector(".catalog-card__name")?.textContent);
-    expect(names).toEqual(["Gmail", "Outlook", "iCloud", "Outro email", "Outro servidor MCP"]);
-    const gmail = within(dialog).getByRole("button", { name: "Conectar Gmail" });
-    expect(gmail.textContent).toContain("Um clique");
+    const names = [...dialog.querySelectorAll(".catalog-tile__name")].map((el) => el.textContent);
+    expect(names).toEqual(["Gmail", "Outlook", "iCloud", "Outro email", "Não achou?"]);
+    const gmail = within(dialog).getByRole("button", { name: "Gmail" });
     expect(gmail.querySelector(".connector-icon__mark")?.getAttribute("style")).toContain("/connectors/gmail.svg");
-    expect(within(dialog).getByRole("button", { name: "Conectar iCloud" }).textContent).toContain("Senha de app");
+    // How it connects lives in the detail pane, not on the card.
+    await click(gmail);
+    expect(within(dialog).getByRole("complementary", { name: "Sobre Gmail" }).textContent).toContain("Um clique");
+    await click(within(dialog).getByRole("button", { name: "iCloud" }));
+    expect(within(dialog).getByRole("complementary", { name: "Sobre iCloud" }).textContent).toContain(
+      "Precisa de uma senha de app",
+    );
     // No internal names in the copy.
     expect(dialog.textContent).not.toMatch(/Composio|IMAP/);
   });
@@ -69,7 +78,7 @@ describe("Conectores → Email", () => {
   test("a server without email shows no Email group", async () => {
     const state = seedState({ connections: [] });
     const dialog = await openCatalog(createFakeApi(state));
-    expect(within(dialog).queryByRole("button", { name: "Conectar Gmail" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Gmail" })).toBeNull();
     expect(
       within(within(dialog).getByRole("group", { name: "Categorias" })).queryByRole("button", { name: "Email" }),
     ).toBeNull();
@@ -80,7 +89,7 @@ describe("Conectores → Email", () => {
     setNavigateAway((url) => left.push(url));
     const { api, state } = mailApi();
     const dialog = await openCatalog(api);
-    await click(within(dialog).getByRole("button", { name: "Conectar Gmail" }));
+    await pick(dialog, "Gmail");
     expect(flow().textContent).toContain("Conectar Gmail");
     await click(within(flow()).getByRole("button", { name: "Conectar com Google" }));
     await settle(4);
@@ -91,7 +100,7 @@ describe("Conectores → Email", () => {
   test("iCloud: address and app password; a 422 says why in plain words; then o que faz → quem pode usar", async () => {
     const { api, state, mail } = mailApi();
     const dialog = await openCatalog(api);
-    await click(within(dialog).getByRole("button", { name: "Conectar iCloud" }));
+    await pick(dialog, "iCloud");
     // What an app password is, the steps and the provider's page; the hint for a dedicated mailbox.
     expect(flow().textContent).toContain("O que é uma senha de app?");
     expect(within(flow()).getByRole("link", { name: "Abrir a página de iCloud" }).getAttribute("href")).toBe(
@@ -171,7 +180,7 @@ describe("Conectores → Email", () => {
   test("each connect error has its own message", async () => {
     const { api, mail } = mailApi();
     const dialog = await openCatalog(api);
-    await click(within(dialog).getByRole("button", { name: "Conectar iCloud" }));
+    await pick(dialog, "iCloud");
     await type(within(flow()).getByLabelText("Endereço de email"), "ana@icloud.com");
     await type(within(flow()).getByLabelText("Senha de app"), "x");
     const said: string[] = [];

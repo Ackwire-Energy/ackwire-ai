@@ -100,7 +100,10 @@ export interface ForumSuggestedIssue {
 
 export interface ForumDecisionSynthesis {
   format: "decision";
+  /** One short sentence. */
   decision: string;
+  /** Why it was decided, one short line each. */
+  reasons: string[];
   positions: { agentId: string | null; name: string; pros: string[]; cons: string[] }[];
   openQuestions: string[];
   nextSteps: { text: string; owner: ForumOwner | null; ownerLabel: string | null; when: string | null }[];
@@ -137,7 +140,8 @@ export type OwnerResolver = (label: string) => ForumOwner | null;
 const clean = (s: string) =>
   s
     .replace(/\*\*|__/g, "")
-    .replace(/^[`"']|[`"']$/g, "")
+    // Quotes around the whole line go; inline code stays (the app renders it).
+    .replace(/^(["'])(.*)\1$/s, "$2")
     .trim();
 const norm = (h: string) =>
   h
@@ -169,10 +173,12 @@ function sectionOf(sections: { title: string; body: string }[], names: string[])
 }
 
 /** The items of a list section (bullets or numbers); plain lines when there are no bullets. */
+const BULLET = /^\s*(?:[-*+•]|\d+[.)])\s+(.+)$/;
+
 function items(text: string, max = 30): string[] {
   const lines = text.split("\n").filter((l) => l.trim() && !/^\s*#/.test(l));
   const bullets = lines.flatMap((l) => {
-    const m = /^\s*(?:[-*+•]|\d+[.)])\s+(.+)$/.exec(l);
+    const m = BULLET.exec(l);
     return m?.[1] ? [clean(m[1])] : [];
   });
   return (bullets.length > 0 ? bullets : lines.map(clean)).filter(Boolean).slice(0, max);
@@ -323,11 +329,17 @@ export function parseSynthesis(
       changes,
     };
   }
+  // The decision is a sentence; a list written under it (the reasoning) goes to the reasons.
+  const decisionText = sectionOf(sections, ["decision", "recommendation", "decisão", "recomendação"]);
+  const lines = decisionText.split("\n");
+  const firstBullet = lines.findIndex((l) => BULLET.test(l));
+  const lead = firstBullet < 0 ? decisionText : lines.slice(0, firstBullet).join("\n");
+  const listed = firstBullet < 0 ? [] : items(lines.slice(firstBullet).join("\n"), 8);
+  const why = items(sectionOf(sections, ["why", "reasons", "por quê", "por que", "motivos"]), 8);
   return {
     format: "decision",
-    decision:
-      paragraph(sectionOf(sections, ["decision", "recommendation", "decisão", "recomendação"])) ||
-      firstParagraph(markdown),
+    decision: paragraph(lead) || firstParagraph(markdown),
+    reasons: why.length > 0 ? why : listed,
     positions: parsePositions(sectionOf(sections, ["pros and cons", "prós e contras"]), resolve),
     openQuestions,
     nextSteps: parseNextSteps(sectionOf(sections, ["next steps", "próximos passos"]), resolve),
@@ -368,7 +380,8 @@ export function synthesisPrompt(input: {
           issues,
         ]
       : [
-          "## Decision\nThe decision or recommendation.",
+          "## Decision\nOne short sentence: what was decided (no list, no details; at most ~25 words).",
+          "## Why\n- the main reasons, one short line each (up to 5)",
           "## Pros and cons\n### @handle (one per participant)\n- Pro: …\n- Con: …",
           "## Open questions\n- questions nobody answered (also the ones asked to people)",
           "## Next steps\n- @handle or person name: what — when",

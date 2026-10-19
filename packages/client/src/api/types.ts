@@ -2030,6 +2030,8 @@ export interface ForumNextStep {
 export interface ForumDecisionCards {
   format: "decision";
   decision: string;
+  /** Why it was decided (syntheses before this field have none). */
+  reasons?: string[];
   positions: { agentId: string | null; name: string; pros: string[]; cons: string[] }[];
   openQuestions: string[];
   nextSteps: ForumNextStep[];
