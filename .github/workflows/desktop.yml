@@ -1,6 +1,7 @@
 name: Desktop
 
-# The macOS app (ADR 0036): compile the runner for both architectures, build a universal .app + .dmg
+# The macOS app (ADR 0036): compile the runner for both architectures, fetch the pinned agent-browser
+# (ADR 0040), build a universal .app + .dmg
 # with Tauri, signed with a Developer ID and notarized, plus the updater bundle
 # signed with the updater key. On a `desktop-v*` tag publish a GitHub Release with
 # `agentes_<version>_universal.dmg`, its `.sha256`, `…universal.app.tar.gz` and its `.sig`
@@ -92,6 +93,33 @@ jobs:
           chmod +x "$BIN_DIR"/agentes-runner-*
           lipo -info "$BIN_DIR/agentes-runner-universal-apple-darwin"
 
+      # agent-browser ships next to the runner as a second sidecar (ADR 0040): the pinned release, checked
+      # against the SHA-256 in machine-protocol.ts (the one source of the version and the hashes), lipo'd
+      # for the universal build. Tauri re-signs it with the Developer ID and the hardened runtime.
+      - name: Fetch agent-browser
+        shell: bash
+        run: |
+          bun -e '
+            import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserAsset } from "./packages/adapters/src/machine-protocol.ts";
+            for (const target of ["darwin-arm64", "darwin-x64"]) {
+              console.log([AGENT_BROWSER_VERSION, agentBrowserAsset(target), AGENT_BROWSER_SHA256[target]].join(" "));
+            }
+          ' > "$RUNNER_TEMP/agent-browser.txt"
+          while read -r VERSION ASSET SHA; do
+            case "$ASSET" in
+              *darwin-arm64) TRIPLE=aarch64-apple-darwin ;;
+              *darwin-x64) TRIPLE=x86_64-apple-darwin ;;
+            esac
+            OUT="$BIN_DIR/agent-browser-$TRIPLE"
+            curl -fsSL --retry 3 -o "$OUT" \
+              "https://github.com/vercel-labs/agent-browser/releases/download/v$VERSION/$ASSET"
+            echo "$SHA  $OUT" | shasum -a 256 -c -
+          done < "$RUNNER_TEMP/agent-browser.txt"
+          lipo -create -output "$BIN_DIR/agent-browser-universal-apple-darwin" \
+            "$BIN_DIR/agent-browser-aarch64-apple-darwin" "$BIN_DIR/agent-browser-x86_64-apple-darwin"
+          chmod +x "$BIN_DIR"/agent-browser-*
+          lipo -info "$BIN_DIR/agent-browser-universal-apple-darwin"
+
       - name: Icons
         working-directory: apps/desktop
         run: |
@@ -119,6 +147,9 @@ jobs:
           APP=$(ls -d apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app | head -1)
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign --verify --strict --verbose=2 "$APP/Contents/MacOS/agentes-runner"
+          codesign --verify --strict --verbose=2 "$APP/Contents/MacOS/agent-browser"
+          "$APP/Contents/MacOS/agent-browser" --version
+          test -s "$APP/Contents/Resources/licenses/agent-browser/LICENSE"
           xcrun stapler validate "$APP"
           spctl --assess --type execute --verbose=4 "$APP"
 

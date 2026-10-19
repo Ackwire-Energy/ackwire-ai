@@ -62,7 +62,11 @@ async function inChannel(deps: NotificationDeps, channelId: string, userIds: str
 }
 
 /** The person behind a run: the author of its trigger, following agent hand-offs (at most 6 hops). */
-async function requesterOfRun(deps: NotificationDeps, orgId: string, runId: string | null): Promise<string | null> {
+async function requesterOfRun(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  runId: string | null,
+): Promise<string | null> {
   let current = runId;
   for (let hop = 0; current && hop < 6; hop++) {
     const [run] = await deps.db
@@ -81,7 +85,10 @@ async function requesterOfRun(deps: NotificationDeps, orgId: string, runId: stri
   return null;
 }
 
-async function agentOwner(deps: NotificationDeps, agentId: string) {
+/** The person behind a run (who asked for the work, through agents that asked each other), or null. */
+export const humanBehindRun = requesterOfRun;
+
+async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
   const [a] = await deps.db.select({ owner: agents.ownerUserId }).from(agents).where(eq(agents.id, agentId));
   return a?.owner ?? null;
 }
@@ -604,4 +611,60 @@ export async function notifyMachineConnected(
     source: { machineId: machine.id, label: machine.name },
     latest: { title: machine.name, ...(machine.hostname ? { text: notificationSnippet(machine.hostname) } : {}) },
   });
+}
+
+// ── Agent browser (ADR 0040) ──────────────────────────────────────────────────
+
+/** Who an agent's browser handoff is asked of: the person behind the run, else the agent's owner. */
+export async function browserHandoffRecipient(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  runId: string | null,
+  agentId: string,
+) {
+  return (await requesterOfRun(deps, orgId, runId)) ?? (await agentOwner(deps, agentId));
+}
+
+/**
+ * An agent needs a person in its browser (`browser_ask_person`): in the
+ * "Waiting for you" of whoever asked for the work and of the agent's
+ * responsible person, with a push. Either may open it; the first in control
+ * does it, the other sees who is helping.
+ */
+export async function notifyBrowserHandoff(
+  deps: NotificationDeps,
+  h: typeof schema.browserHandoffs.$inferSelect,
+  where: { channelId: string; threadId: string | null },
+) {
+  // Who asked for the work and the agent's responsible person (once when it's the same person).
+  const userIds = [...new Set([h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
+    (id): id is string => !!id,
+  );
+  if (userIds.length === 0) return;
+  const [channel] = await deps.db
+    .select({ kind: channels.kind, name: channels.name })
+    .from(channels)
+    .where(eq(channels.id, where.channelId));
+  await notify(deps, {
+    orgId: h.orgId,
+    userIds,
+    kind: "browser_handoff",
+    groupKey: `browser_handoff:${h.id}`,
+    waiting: true,
+    actor: agent(h.agentId),
+    source: {
+      channelId: where.channelId,
+      ...(where.threadId ? { threadId: where.threadId } : {}),
+      messageId: h.id,
+      ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
+      ...(channel?.kind === "channel" ? { label: channel.name } : {}),
+      handoffId: h.id,
+    },
+    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
+  });
+}
+
+/** Done, couldn't, canceled or expired: out of everyone's inbox. */
+export async function resolveBrowserHandoffNotifications(deps: NotificationDeps, orgId: string, handoffId: string) {
+  await resolveNotifications(deps, orgId, { groupKey: `browser_handoff:${handoffId}` });
 }

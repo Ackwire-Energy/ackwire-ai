@@ -598,6 +598,11 @@ export const secretRequests = pgTable(
     targetPath: text(),
     /** The connected machine holding the key; null = the agent's cloud computer. */
     machineId: uuid(),
+    /**
+     * For a password the agent's browser types (ADR 0040): the only site
+     * (`https://host[:port]`) it may be typed on. Shown to the person.
+     */
+    site: text(),
     /** The computer's public key for this request (raw P-256, base64). */
     publicKey: text().notNull(),
     status: secretRequestStatusEnum().notNull().default("pending"),

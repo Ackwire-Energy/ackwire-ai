@@ -554,6 +554,27 @@
       "when": 1792470000000,
       "tag": "0078_brain_session_on_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1792480000000,
+      "tag": "0079_agent_browser",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1792490000000,
+      "tag": "0080_browser_page_read",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1792500000000,
+      "tag": "0081_browser_review",
+      "breakpoints": true
     }
   ]
 }

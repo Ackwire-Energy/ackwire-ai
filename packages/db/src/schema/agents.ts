@@ -98,6 +98,13 @@ export const agents = pgTable(
     brainModel: text(),
     /** When the computer brain can't answer, answer through the API (counts against the budget). */
     brainFallback: boolean().notNull().default(true),
+    /** Sites its browser may open (ADR 0040, `*.example.com` matches the domain too); null = any site. */
+    browserAllowedDomains: text().array(),
+    /**
+     * The connected computer its browser last ran on (ADR 0040): a mission's
+     * or its own. The live view, take over and Stop follow it.
+     */
+    browserMachineId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

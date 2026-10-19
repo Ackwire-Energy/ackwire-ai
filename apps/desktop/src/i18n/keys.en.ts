@@ -156,6 +156,9 @@ export const desktopEn: DesktopTranslations = {
       "Commands can reach other parts of the Mac, not only the allowed folders. You see each one in Activity.",
     commandsWarnOrgs:
       "Commands can reach other parts of the Mac, not only the allowed folders, including another organization's folders. Protected mode will prevent that. Every command shows in Activity.",
+    browserName: "Browser",
+    browserDesc: "Opens websites for the agents in a browser of their own, without your logins.",
+    browserLogins: "Logins an agent makes stay on this Mac, in its folder. Use only test accounts or the agent's own.",
   },
   prefs: {
     nav: {

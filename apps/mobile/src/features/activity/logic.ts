@@ -9,8 +9,11 @@ import { daysAgo } from "../shared/logic";
 
 export type ActivityFilter = "all" | "waiting";
 
-/** Waiting ones in this order: an agent's question, my turn at the table, an approval; newest first within a kind. */
-const WAITING_ORDER: AppNotification["kind"][] = ["agent_question", "forum_turn", "approval"];
+/**
+ * Waiting ones in this order: an agent stuck in its browser (it expires in minutes), an agent's question, my
+ * turn at the table, an approval; newest first within a kind.
+ */
+const WAITING_ORDER: string[] = ["browser_handoff", "agent_question", "forum_turn", "approval"];
 
 export const isVisible = (n: Pick<AppNotification, "doneAt" | "snoozedUntil">, now = Date.now()) =>
   !n.doneAt && !(n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now);
@@ -81,22 +84,24 @@ export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.late
 
 // ── Esperando você as cards, and what comes next (MobileIntencional.html, Atividade) ─────────────
 
-/** What a waiting item asks of you: approve, answer an agent, take your turn at the table. */
-export type WaitingCardKind = "approval" | "question" | "forum";
+/** What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser. */
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
-  /** The exact request: the action to approve, the question, the topic. */
+  /** The exact request: the action to approve, the question, the topic, what to do in the browser. */
   title: string;
   /** Only requests expire. */
   expiresAt: string | null;
-  /** The one button: "Revisar" (a request) or "Responder". */
-  action: "review" | "answer";
+  /** The one button: "Revisar" (a request), "Responder" or "Abrir" (the agent's browser). */
+  action: "review" | "answer" | "open";
 }
 
 /** A waiting inbox item as a card: who asks (`actors`), the kind, the exact request, the deadline, one button. */
 export function waitingCardOf(n: Pick<AppNotification, "kind" | "latest">): WaitingCard {
   const l = n.latest;
+  if (n.kind === "browser_handoff")
+    return { kind: "browser", title: l.text ?? l.title ?? "", expiresAt: l.expiresAt ?? null, action: "open" };
   if (n.kind === "approval")
     return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
   if (n.kind === "forum_turn")

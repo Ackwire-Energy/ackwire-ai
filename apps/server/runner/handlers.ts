@@ -15,6 +15,7 @@ import {
 import { realFoldersFor } from "./access";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
+import type { BrowserManager } from "./browser";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
@@ -37,6 +38,8 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "task.start",
   "brain.turn",
   "git.sync",
+  "browser.act",
+  "browser.stream.start",
 ]);
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -89,6 +92,8 @@ export interface HandlerContext {
   };
   /** Set per request (protocol 10): the folders allowed for the request's agent, as real paths. */
   grants?: string[];
+  /** Protocol 12: the agents' browsers (ADR 0040); without it the runner refuses `browser.*`. */
+  browser?: BrowserManager;
 }
 
 export interface RequestScope {
@@ -115,6 +120,7 @@ const TOOL_LABEL: Record<keyof RunnerTools, string> = {
   claude: "Claude Code",
   codex: "Codex",
   commands: "Commands",
+  browser: "Browser",
 };
 
 /** Whether a tool is on: from the machine's access (protocol 10), or `exec` for a runner without it. */
@@ -283,6 +289,15 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     if (!ctx.secretsDir) throw new RunnerError("bad_request", "This runner keeps no secrets");
     return handleSecret(ctx.secretsDir, req.agent, ctx.workspaceReal, req);
   }
+  if (
+    req.op === "browser.act" ||
+    req.op === "browser.stop" ||
+    req.op === "browser.stream.start" ||
+    req.op === "browser.stream.stop" ||
+    req.op === "browser.input"
+  ) {
+    return handleBrowser(ctx, req, scope);
+  }
   const secrets = await agentSecrets(ctx.secretsDir, req.agent);
   switch (req.op) {
     case "brain.turn":
@@ -326,6 +341,39 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       });
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
+  }
+}
+
+/**
+ * Protocol 12: the agent's browser (ADR 0040). Needs the machine's browser
+ * switch on; stopping (the browser, its live view) always goes, so Stop works
+ * even after the switch went off.
+ */
+async function handleBrowser(
+  ctx: HandlerContext,
+  req: Extract<
+    MachineRequest,
+    { op: "browser.act" | "browser.stop" | "browser.stream.start" | "browser.stream.stop" | "browser.input" }
+  >,
+  scope: RequestScope,
+) {
+  const browser = ctx.browser;
+  if (!browser) throw new RunnerError("browser_unavailable", "This runner has no agent browser");
+  if (!req.agent) throw new RunnerError("bad_request", "A browser belongs to an agent");
+  switch (req.op) {
+    case "browser.stop":
+      return browser.stop(req.agent);
+    case "browser.stream.stop":
+      return browser.streamStop(req.agent);
+    case "browser.act":
+      requireTool(ctx, "browser");
+      return browser.act(req.agent, ctx.workspaceReal, req, scope.signal);
+    case "browser.stream.start":
+      requireTool(ctx, "browser");
+      return browser.streamStart(req.agent, req.mode);
+    case "browser.input":
+      requireTool(ctx, "browser");
+      return browser.input(req.agent, Array.isArray(req.events) ? req.events : []);
   }
 }
 
@@ -483,6 +531,17 @@ function describeOp(req: MachineRequest): string {
     }
     case "access.request":
       return `access.request ${String(req.path ?? "")}`;
+    case "browser.act": {
+      // The command, and the URL of a navigation; never typed text.
+      const command = String(req.command ?? "");
+      const first = Array.isArray(req.args) ? String(req.args[0] ?? "") : "";
+      const nav = ["open", "goto", "navigate"].includes(command) ? ` ${first.slice(0, 120)}` : "";
+      return `browser.act ${command}${nav}`;
+    }
+    case "browser.stream.start":
+      return `browser.stream.start (${String(req.mode ?? "")})`;
+    case "browser.input":
+      return `browser.input (${Array.isArray(req.events) ? req.events.length : 0} events)`;
     case "access.reduce":
       return `access.reduce${req.removeFolder ? ` folder ${String(req.removeFolder.path ?? "")}` : ""}${req.disableTool ? ` tool ${String(req.disableTool)}` : ""}`;
     default:

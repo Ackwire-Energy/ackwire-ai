@@ -33,6 +33,7 @@ import {
   useToast,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
+import { AgentBrowserRow } from "../browser/AgentBrowserRow";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -352,6 +353,8 @@ function Profile({ id }: { id: string }) {
             )}
           </Section>
         ) : null}
+
+        <AgentBrowserRow agentId={id} />
 
         {access.data ? (
           <Section title={t("mobile.intentAgents.uses.title")}>

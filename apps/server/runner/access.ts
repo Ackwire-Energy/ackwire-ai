@@ -16,7 +16,7 @@ import { isInside } from "./paths";
 /**
  * Folders and tools on the machine (protocol 10, ADR 0036 §8). The person
  * allows a folder beyond the agents' own folders for some agents, and turns
- * Claude Code, Codex and commands on or off. Everything here is a plain
+ * Claude Code, Codex, commands and the agent browser on or off. Everything here is a plain
  * transform of `RunnerAccess` (the caller writes the config), plus the
  * checks a folder must pass before it is allowed and the store of pending
  * requests. Access only widens on the machine: the server can only reduce.
@@ -33,7 +33,7 @@ export class ControlError extends Error {
   }
 }
 
-export const TOOL_NAMES: readonly (keyof RunnerTools)[] = ["claude", "codex", "commands"];
+export const TOOL_NAMES: readonly (keyof RunnerTools)[] = ["claude", "codex", "commands", "browser"];
 
 const caseless = process.platform === "win32" || process.platform === "darwin";
 const samePath = (a: string, b: string) => (caseless ? a.toLowerCase() === b.toLowerCase() : a === b);
@@ -213,7 +213,7 @@ export function reduceAccess(
 
 /** Whether `a` allows anything `b` doesn't (tests: a reduce never widens). */
 export function widens(a: RunnerAccess, b: RunnerAccess): boolean {
-  for (const t of TOOL_NAMES) if (a.tools[t] && !b.tools[t]) return true;
+  for (const t of TOOL_NAMES) if (a.tools[t] === true && b.tools[t] !== true) return true;
   for (const f of a.folders) {
     const g = b.folders.find((x) => samePath(x.path, f.path));
     if (!g) return true;

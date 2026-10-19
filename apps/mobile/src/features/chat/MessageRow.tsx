@@ -1,4 +1,4 @@
-import { type Message, type ThreadInfo, useReactions, useToggleReaction } from "@agenteschat/client";
+import { browserHandoffOf, type Message, type ThreadInfo, useReactions, useToggleReaction } from "@agenteschat/client";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
@@ -8,6 +8,7 @@ import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { CHROME_MAX_SCALE, Count, Icon, Text } from "@/ui";
+import { HandoffCard } from "../browser/HandoffCard";
 import { MessageFiles } from "../files/MessageFiles";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
@@ -84,6 +85,8 @@ export const MessageRow = memo(function MessageRow({
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
   const question = isAgent ? questionOf(meta) : null;
+  // The agent needs a person in its browser (ADR 0040): the request, live.
+  const handoff = isAgent ? browserHandoffOf(meta) : null;
   // "Esperando o MacBook Air voltar": its brain's computer is offline (the card, when it says which computer).
   const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
@@ -252,6 +255,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
+        {handoff ? <HandoffCard handoff={handoff} /> : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
         {cards}
       </View>

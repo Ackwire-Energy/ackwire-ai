@@ -206,6 +206,7 @@ export const hidesBody = (m: Message) =>
       m.meta?.missionStart ||
       m.meta?.threadStart ||
       m.meta?.issueWork ||
+      m.meta?.browserHandoff ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );
 

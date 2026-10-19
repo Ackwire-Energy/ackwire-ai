@@ -48,6 +48,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
+import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 
 const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];
 export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ? (os as MachineOs) : "other");
@@ -507,7 +508,7 @@ export function MachinesSection() {
 
 type Reduce =
   | { kind: "folder"; path: string; agent?: { id: string; name: string } }
-  | { kind: "tool"; tool: MachineToolName };
+  | { kind: "tool"; tool: MachineToolName | "browser" };
 
 /** Confirm before taking something away; granting it back only happens on the machine. */
 function ReduceDialog({ machine, reduce, onClose }: { machine: Machine; reduce: Reduce | null; onClose: () => void }) {
@@ -866,6 +867,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
       )}
       <FoldersCard machine={m} onReduce={setReduce} />
       <ToolsCard machine={m} onReduce={setReduce} />
+      <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
       <GrantCard machine={m} />
       <ReduceDialog machine={m} reduce={reduce} onClose={() => setReduce(null)} />
       <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />

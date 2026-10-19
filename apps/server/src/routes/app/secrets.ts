@@ -34,6 +34,10 @@ const SecretRequest = z
     name: z.string(),
     purpose: z.string(),
     target: Target,
+    site: z
+      .string()
+      .nullable()
+      .openapi({ description: "For a browser password: the only site it may be typed on (https://host)." }),
     machineId: z.uuid().nullable(),
     publicKey: z
       .string()

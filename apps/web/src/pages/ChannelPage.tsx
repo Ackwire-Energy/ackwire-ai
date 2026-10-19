@@ -13,6 +13,7 @@ import type {
 } from "@agenteschat/client";
 import {
   agentStateOfRun,
+  browserHandoffOf,
   consultsIn,
   isQuiet,
   keys,
@@ -127,6 +128,8 @@ import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
+import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
+import { BrowserWatchCard } from "@/components/browser/BrowserWatchCard";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { ConsultationCard } from "@/components/ConsultationCard";
@@ -1866,6 +1869,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
         <>
           {/* What it said and did before this answer: narration and each tool call (code + output). */}
           <LiveWorkList work={run.work ?? []} messageAuthor={messageAuthor} />
+          {!canceled && <BrowserWatchCard run={run} name={name} />}
           {text && (
             <MessageText>
               <MessageBody body={text} resolveMention={dir.mentionName} />
@@ -2169,6 +2173,8 @@ export const TimelineMessage = memo(function TimelineMessage({
     : [];
   const question = isQuestion(meta.question) ? meta.question : null;
   const secretRequest = isSecretRequest(meta.secretRequest) ? meta.secretRequest : null;
+  // The agent needs a person in its browser (ADR 0040): the request card.
+  const browserHandoff = m.author.type === "agent" ? browserHandoffOf(meta) : null;
   // Files an agent made, or a person attached.
   const artifacts = artifactRefs(meta);
   // "Responder": the message this one quotes.
@@ -2355,6 +2361,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
       {question && <QuestionCard question={question} />}
       {secretRequest && <SecretCard request={secretRequest} />}
+      {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
       {m.author.type === "agent" && m.agentRunId && !card && !m.local && (
         <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
       )}

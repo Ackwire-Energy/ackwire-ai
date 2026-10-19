@@ -2,11 +2,13 @@ import type { PubSub } from "@agenteschat/adapters";
 import { type Database, ensureMessagePartitions, schema } from "@agenteschat/db";
 import {
   type ArtifactDeps,
+  type BrowserLive,
   type ContextDeps,
   createOutboxPump,
   enqueue,
   enqueueIdleReflections,
   expireApprovals,
+  expireBrowserHandoffs,
   expireConsultations,
   expireQuestions,
   expireSecretRequests,
@@ -35,6 +37,8 @@ export interface WorkerDeps {
   approvalDigest?: { publicUrl: string; afterHours: number };
   /** People's mailboxes (ADR 0038): IMAP polling for routines and Composio account checks. */
   mail?: { deps: MailDeps; pollSeconds: number };
+  /** The agent browser's live view (ADR 0040): expired handoffs are told to its viewers. */
+  browserLive?: BrowserLive;
   log: Logger;
   workerId?: string;
 }
@@ -134,6 +138,13 @@ export function startWorkers(deps: WorkerDeps) {
   every("questions", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireQuestions({ db, pubsub: deps.pubsub });
     if (expired > 0) log.info("agent questions expired", { expired });
+  });
+
+  every("browserHandoffs", WORKER_INTERVALS_MS.approvals, async () => {
+    const expired = await expireBrowserHandoffs(deps.browserLive?.handoffDeps ?? { db, pubsub: deps.pubsub });
+    if (expired > 0) log.info("browser handoffs expired", { expired });
+    // A page a person was asked to work in stays open past the runner's idle shutdown.
+    await deps.browserLive?.keepAlive();
   });
 
   every("consultations", WORKER_INTERVALS_MS.approvals, async () => {

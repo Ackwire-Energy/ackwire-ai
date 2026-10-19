@@ -71,6 +71,11 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
     description:
       "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time. Never on by default.",
   },
+  "browser:use": {
+    label: "Use a browser",
+    description:
+      "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer. Never on by default.",
+  },
 };
 
 /**
@@ -140,7 +145,8 @@ export function toolAccess(
   // Write implies read for built-ins (`issues:write` ⇒ `list_issues`, `drive:write` ⇒ `read_artifact`…).
   const writeScope = impliedByWrite(tool.scope);
   if (!conn && writeScope && granted.has(grantKey(null, writeScope))) return "inherited";
-  // "All tools" never includes running code (D30), anyone's mailbox (ADR 0038) nor a database (ADR 0039):
+  // "All tools" never includes running code (D30), the agent browser (ADR 0040), anyone's mailbox (ADR 0038)
+  // nor a database (ADR 0039):
   // always separate, explicit grants.
   if (
     granted.has(grantKey(null, ALL_TOOLS)) &&
@@ -159,7 +165,7 @@ export function impliedByWrite(scope: string) {
 }
 
 /** Scopes that "all tools" (`*`) doesn't cover. */
-const NOT_IN_ALL = new Set(["sandbox:run"]);
+const NOT_IN_ALL = new Set(["sandbox:run", "browser:use"]);
 
 export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";
 

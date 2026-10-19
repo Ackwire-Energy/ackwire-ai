@@ -11,9 +11,20 @@ export interface PushData {
   threadId?: string;
   approvalId?: string;
   missionId?: string;
+  /** An agent's browser handoff (ADR 0040): opens its live view. */
+  handoffId?: string;
 }
 
-const FIELDS = ["orgId", "kind", "notificationId", "channelId", "threadId", "approvalId", "missionId"] as const;
+const FIELDS = [
+  "orgId",
+  "kind",
+  "notificationId",
+  "channelId",
+  "threadId",
+  "approvalId",
+  "missionId",
+  "handoffId",
+] as const;
 
 export function readPushData(data: unknown): PushData {
   const out: PushData = {};

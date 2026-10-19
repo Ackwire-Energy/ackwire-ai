@@ -2,6 +2,7 @@ import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/ada
 import type { AgentActionView } from "./agent-actions";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
+import type { BrowserHandoffView } from "./browser/handoff";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
@@ -221,6 +222,13 @@ export type ChannelEvent =
       channelId: string;
       threadId: string | null;
       secretRequest: SecretRequestView;
+    }
+  /** An agent's browser handoff changed (ADR 0040 §6): someone took control, or it ended. The card is `meta.browserHandoff`. */
+  | {
+      type: "browser.handoff.updated";
+      channelId: string;
+      threadId: string | null;
+      handoff: BrowserHandoffView;
     }
   /** An issue of this channel was created or changed, or got a comment. */
   | { type: "issue.created" | "issue.updated"; channelId: string; issue: IssueView }

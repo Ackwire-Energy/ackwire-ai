@@ -32,6 +32,7 @@ import {
   removeAgentSecret,
   renameMachine,
   type SecretRequestView,
+  secretSite,
   setAgentComputerTarget,
   startAgentComputer,
   type ToolContext,
@@ -743,7 +744,9 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   const VALUE = "npm_s3cr3t_value_0123456789";
 
   /** An agent that asks for NPM_TOKEN when told "publica", then says what it got. */
-  async function asking(target: { target: "env" } | { target: "file"; path: string } = { target: "env" }) {
+  async function asking(
+    target: ({ target: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
+  ) {
     f = await setup({
       machines: true,
       reply: (req) => {
@@ -886,6 +889,15 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     await drainOutbox(f.db, f.handlers);
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs.every((r) => r.status === "done")).toBe(true);
+  });
+
+  test("a browser password names its site: kept as the origin, shown to the person in the purpose", async () => {
+    const { row } = await asking({ target: "env", site: "dashboard.stripe.com/login" });
+    expect(row.site).toBe("https://dashboard.stripe.com");
+    expect(row.purpose).toBe("publicar o pacote no npm (dashboard.stripe.com)");
+    expect(secretSite("https://a.example:8443/x")).toBe("https://a.example:8443");
+    expect(secretSite("file:///etc/passwd")).toBeNull();
+    expect(secretSite("not a site")).toBeNull();
   });
 
   test("a runner older than protocol 3 is told to update", async () => {

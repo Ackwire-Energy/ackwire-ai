@@ -1,0 +1,82 @@
+import { describe, expect, test } from "bun:test";
+import { browserHandoffOf } from "@agenteschat/client";
+import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
+import { cardStateOf, hostOf } from "../../src/features/browser/logic";
+import { hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
+import { readPushData } from "../../src/lib/push-payload";
+import { notification } from "./fixtures";
+
+const card = {
+  id: "h1",
+  agentId: "a1",
+  kind: "ask",
+  instructions: "Entrar no painel com a conta de teste",
+  status: "pending",
+  requestedForUserId: "u1",
+  controllerUserId: null,
+  note: null,
+  expiresAt: "2026-10-19T12:10:00.000Z",
+  createdAt: "2026-10-19T12:00:00.000Z",
+};
+
+describe("the help request card", () => {
+  test("reads the handoff from the message, and nothing malformed", () => {
+    expect(browserHandoffOf({ browserHandoff: card })?.instructions).toBe(card.instructions);
+    expect(browserHandoffOf({ browserHandoff: { status: "pending" } })).toBeNull();
+    expect(browserHandoffOf({})).toBeNull();
+    expect(browserHandoffOf(undefined)).toBeNull();
+  });
+
+  test("its state: waiting, me in control, someone else, or how it ended", () => {
+    expect(cardStateOf({ status: "pending", controllerUserId: null }, "u1")).toBe("waiting");
+    expect(cardStateOf({ status: "active", controllerUserId: "u1" }, "u1")).toBe("mine");
+    expect(cardStateOf({ status: "active", controllerUserId: "u2" }, "u1")).toBe("helping");
+    expect(cardStateOf({ status: "active", controllerUserId: "u2" }, null)).toBe("helping");
+    expect(cardStateOf({ status: "done", controllerUserId: "u1" }, "u1")).toBe("done");
+    expect(cardStateOf({ status: "expired", controllerUserId: null }, "u1")).toBe("expired");
+  });
+
+  test("the site's host", () => {
+    expect(hostOf("https://Dashboard.Stripe.com/login?x=1")).toBe("dashboard.stripe.com");
+    expect(hostOf("about:blank")).toBe("");
+    expect(hostOf(undefined)).toBe("");
+  });
+});
+
+describe("where a browser request opens", () => {
+  test("the push opens the live view", () => {
+    const data = readPushData({ orgId: "o1", kind: "browser_handoff", channelId: "c1", handoffId: "h1" });
+    expect(data.handoffId).toBe("h1");
+    expect(hrefForPush(data)).toBe("/handoff/h1");
+    // Another kind with a stray handoffId still opens its conversation.
+    expect(hrefForPush({ kind: "mention", channelId: "c1", handoffId: "h1" })).toBe("/chat/c1");
+  });
+
+  test("the deep link and the inbox item", () => {
+    expect(hrefFromUrl("agenteschat://handoff/h1")).toBe("/handoff/h1");
+    const n = notification({
+      id: "n1",
+      kind: "browser_handoff",
+      waiting: true,
+      source: { channelId: "c1", handoffId: "h1" },
+    });
+    expect(notificationHref(n)).toBe("/handoff/h1");
+  });
+
+  test("it is a waiting card that opens, and it comes first", () => {
+    const n = notification({
+      id: "n1",
+      kind: "browser_handoff",
+      waiting: true,
+      latest: { text: "Entrar no painel", expiresAt: "2026-10-19T12:10:00.000Z" },
+    });
+    expect(waitingCardOf(n)).toEqual({
+      kind: "browser",
+      title: "Entrar no painel",
+      expiresAt: "2026-10-19T12:10:00.000Z",
+      action: "open",
+    });
+    const q = notification({ id: "n2", kind: "agent_question", waiting: true });
+    expect(sortWaiting([q, n]).map((x) => x.id)).toEqual(["n1", "n2"]);
+  });
+});

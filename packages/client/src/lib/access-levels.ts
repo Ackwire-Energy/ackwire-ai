@@ -50,7 +50,21 @@ export interface AccessResource {
 const on = (s: AccessState) => s === "granted" || s === "inherited";
 
 /** Built-in areas, in the order the UI shows them. `memory:*` joins the context area. */
-export const AREA_ORDER = ["context", "drive", "issues", "calendar", "wiki", "skills", "schedule", "forum", "sandbox"];
+export const AREA_ORDER = [
+  "context",
+  "drive",
+  "issues",
+  "calendar",
+  "wiki",
+  "skills",
+  "schedule",
+  "forum",
+  "sandbox",
+  "browser",
+];
+
+/** Areas "all tools" doesn't cover: running code, and the agent browser (ADR 0040). */
+export const NOT_IN_ALL_AREAS = ["sandbox", "browser"];
 
 /** "drive:read" → "drive"; "memory:write" → "context"; "" (always-on "ask the person") → null. */
 export function builtinArea(scope: string): string | null {
@@ -101,7 +115,7 @@ function builtinResources(builtins: AccessScope[], all: boolean): AccessResource
       const levels: Level[] = ["none"];
       if (readScopes.length > 0) levels.push("read");
       if (readScopes.length < names.length) levels.push("write");
-      const notInAll = area === "sandbox";
+      const notInAll = NOT_IN_ALL_AREAS.includes(area);
       return {
         id: `area:${area}`,
         kind: "builtin",

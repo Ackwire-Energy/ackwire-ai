@@ -10,6 +10,9 @@ import {
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
+  createBrowserHandoffToolSource,
+  createBrowserLive,
+  createBrowserToolSource,
   createCalendarToolSource,
   createChatToolSource,
   createClaudeCodeBrain,
@@ -201,6 +204,8 @@ export function buildEngine(o: EngineOptions) {
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
+      // The agent browser asks a person for help (ADR 0040 §6).
+      createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
       createAskAgentToolSource({ pubsub: adapters.pubsub }),
       createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
@@ -235,6 +240,8 @@ export function buildEngine(o: EngineOptions) {
         skills: { blobs: artifacts.blobs },
         pubsub: adapters.pubsub,
       }),
+      // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
+      createBrowserToolSource({ machines: { hub: machineHub } }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
       createGitToolSource({
@@ -249,6 +256,9 @@ export function buildEngine(o: EngineOptions) {
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
+  // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
+  const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
+  machineHub.setBrowserHooks(browserLive.hubHooks);
   // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
@@ -338,7 +348,20 @@ export function buildEngine(o: EngineOptions) {
     publicUrl: config.PUBLIC_URL,
     resolveHost: o.resolveHost,
   };
-  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox, gitProxy, machineHub, mail };
+  return {
+    gateway,
+    tools,
+    context,
+    handlers,
+    connectorDeps,
+    storage,
+    artifacts,
+    sandbox,
+    gitProxy,
+    machineHub,
+    browserLive,
+    mail,
+  };
 }
 
 export type Engine = ReturnType<typeof buildEngine>;

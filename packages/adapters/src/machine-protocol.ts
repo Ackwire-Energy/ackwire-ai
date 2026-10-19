@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 11;
+export const MACHINE_PROTOCOL_VERSION = 12;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -84,6 +84,105 @@ export const ACCESS_PROTOCOL = 10;
  * credential helper at it. The server never sends `git.sync` to an older runner.
  */
 export const GIT_PROTOCOL = 11;
+
+/**
+ * From this protocol on (ADR 0040): the agent browser. The runner drives
+ * `agent-browser` (pinned below), one headless session per agent with its
+ * profile in the agent's folder, when the person turned `access.tools.browser`
+ * on. `hello.browser` says whether it can serve. `browser.act` runs one
+ * `agent-browser` command; `browser.stream.*` relays its JPEG stream as
+ * `browser.frame` frames only while someone watches, and `browser.input` sends
+ * a person's input back. The server never sends `browser.*` to an older runner.
+ */
+export const BROWSER_PROTOCOL = 12;
+
+/** The `agent-browser` release the runner and the desktop app ship (ADR 0040 §2). */
+export const AGENT_BROWSER_VERSION = "0.39.1";
+/** Targets of `agent-browser`'s release assets (`agent-browser-<target>`, `.exe` on Windows). */
+export type AgentBrowserTarget = "darwin-arm64" | "darwin-x64" | "linux-arm64" | "linux-x64" | "win32-x64";
+/** SHA-256 (hex) of each release asset of `AGENT_BROWSER_VERSION`, checked before the binary is used. */
+export const AGENT_BROWSER_SHA256: Record<AgentBrowserTarget, string> = {
+  "darwin-arm64": "cc18fac41d9dc9821918340a136e643286ea05544c4dd35671b796f1a874cdef",
+  "darwin-x64": "339cb9aa6dfd404856cf938df34cd3b4779c61dfd57fc257be11b14fd1a885f9",
+  "linux-arm64": "9d8fdc586056df65747927ae166157c83af91b52cea287175e5544afd2591d33",
+  "linux-x64": "6906d3a2a67b05809932a93d99e53d1132373f0a52a617b2d6032dbb954df6fc",
+  "win32-x64": "af1ff5f2afd5c187fb50ac3bbc1e7114baadc180d67cef63f644af9031be5049",
+};
+/** `darwin-arm64` → `agent-browser-darwin-arm64`; `win32-x64` → `agent-browser-win32-x64.exe`. */
+export const agentBrowserAsset = (target: AgentBrowserTarget) =>
+  `agent-browser-${target}${target.startsWith("win32") ? ".exe" : ""}`;
+
+/** Largest pieces of browser frames. */
+export const BROWSER_LIMITS = {
+  /** One `browser.frame` image (base64 JPEG). */
+  frameBytes: 3 * 1024 * 1024,
+  /** Events in one `browser.input`. */
+  inputEvents: 100,
+  /** A `text` input event (pasted or typed through the app's field). */
+  inputText: 10_000,
+  /** A `browser.act` command name, and its arguments as JSON characters. */
+  command: 64,
+  args: 64 * 1024,
+  url: 2048,
+  message: 500,
+} as const;
+
+/** `hello.browser` (protocol 12): whether this machine can run the agent browser. */
+export interface RunnerBrowserInfo {
+  /** The binary is there (checked) and a Chrome was found. */
+  available: boolean;
+  /** `agent-browser`'s version. */
+  version?: string;
+  /** The Chrome it uses ("Google Chrome 141.0…", "Chrome for Testing …"). */
+  chrome?: string;
+  /** Why it isn't available, for people ("Chrome's libraries are missing: run …"). */
+  reason?: string;
+}
+
+/** `watch`: about 1 frame a second for viewers; `control`: 10–15 while a person drives. */
+export type BrowserStreamMode = "watch" | "control";
+
+/** Bits of CDP's modifier mask: Alt 1, Control 2, Meta 4, Shift 8. */
+export type BrowserModifiers = number;
+
+/** A person's input during a take over, in page coordinates (CSS pixels of the frame's viewport). */
+export type BrowserInputEvent =
+  | {
+      kind: "mouse";
+      type: "mousePressed" | "mouseReleased" | "mouseMoved" | "mouseWheel";
+      x: number;
+      y: number;
+      button?: "left" | "right" | "middle" | "none";
+      clickCount?: number;
+      deltaX?: number;
+      deltaY?: number;
+      modifiers?: BrowserModifiers;
+    }
+  | {
+      kind: "key";
+      type: "keyDown" | "keyUp" | "char";
+      key: string;
+      code?: string;
+      text?: string;
+      modifiers?: BrowserModifiers;
+    }
+  | {
+      kind: "touch";
+      type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel";
+      touchPoints: { x: number; y: number }[];
+      modifiers?: BrowserModifiers;
+    }
+  /** Whole text into the focused field (CDP `Input.insertText`): accents, paste, the app's own text field. */
+  | { kind: "text"; text: string };
+
+/** What a frame shows. */
+export interface BrowserFrameMetadata {
+  deviceWidth: number;
+  deviceHeight: number;
+  pageScaleFactor?: number;
+  /** The active tab's URL when the frame was taken. */
+  url?: string;
+}
 
 /** Where an agent's checkouts live inside its folder. */
 export const GIT_CHECKOUTS_DIR = "repos";
@@ -383,6 +482,8 @@ export interface RunnerTools {
   codex: boolean;
   /** Shell commands (`exec`, `shell` tasks). The same as `exec` in `hello` once protocol 10 is in use. */
   commands: boolean;
+  /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
+  browser?: boolean;
 }
 
 /** A folder allowed on the machine beyond the agents' own folders, and which agents use it (protocol 10). */
@@ -428,6 +529,8 @@ export interface RunnerInfo {
   paused?: RunnerPause;
   /** Protocol 10: folders and tools allowed on the machine. */
   access?: RunnerAccess;
+  /** Protocol 12: whether the agent browser can run here. */
+  browser?: RunnerBrowserInfo;
 }
 
 export interface FileEntry {
@@ -495,6 +598,20 @@ export type MachineRequest = (
       uploadId: string;
       maxBytes: number;
     }
+  /**
+   * Protocol 12: one `agent-browser` command in the request's agent's session
+   * (`open`, `snapshot`, `click`…; `args` as on its command line, without
+   * `--session`, `--profile` or `--json`, which the runner sets). Commands run
+   * one at a time per session. `allowedDomains`: the agent's site allowlist.
+   */
+  | { op: "browser.act"; command: string; args: string[]; timeoutSeconds: number; allowedDomains?: string[] }
+  /** Protocol 12: close the agent's browser session (Stop, idle). */
+  | { op: "browser.stop" }
+  /** Protocol 12: start (or change the mode of) the agent's stream: `browser.frame` frames until `browser.stream.stop`. */
+  | { op: "browser.stream.start"; mode: BrowserStreamMode }
+  | { op: "browser.stream.stop" }
+  /** Protocol 12: a person's input during a take over, in order. */
+  | { op: "browser.input"; events: BrowserInputEvent[] }
 ) & { agent?: AgentScope };
 
 export type MachineOp = MachineRequest["op"];
@@ -514,6 +631,11 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "git.sync",
   "access.request",
   "access.reduce",
+  "browser.act",
+  "browser.stop",
+  "browser.stream.start",
+  "browser.stream.stop",
+  "browser.input",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -539,6 +661,14 @@ export interface MachineReplies {
   "git.sync": { repos: GitSyncRepo[] };
   "access.request": { requestId: string; status: "pending" | "granted" };
   "access.reduce": { access: RunnerAccess };
+  /** `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered click). */
+  "browser.act": { success: boolean; data: unknown; error?: string };
+  /** `false`: there was no session. */
+  "browser.stop": { stopped: boolean };
+  "browser.stream.start": { mode: BrowserStreamMode };
+  "browser.stream.stop": { stopped: boolean };
+  /** Events sent to the page. */
+  "browser.input": { accepted: number };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -554,6 +684,8 @@ export type MachineErrorCode =
   | "paused"
   /** Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. */
   | "not_allowed"
+  /** Protocol 12: the agent browser can't run here (no binary, no Chrome, too many sessions); the message says why. */
+  | "browser_unavailable"
   | "bad_request"
   | "internal";
 
@@ -633,7 +765,11 @@ export type RunnerFrame =
       decision: "granted" | "denied" | "expired";
       /** Granted for this agent only, or for every agent of the organization on this machine. */
       scope?: "agent" | "all";
-    };
+    }
+  /** Protocol 12: one image of an agent's browser while its stream is on (newest wins; the server never stores it). */
+  | { type: "browser.frame"; agentId: string; seq: number; data: string; metadata: BrowserFrameMetadata }
+  /** Protocol 12: an agent's stream stopped on the machine (asked, session closed, error). */
+  | { type: "browser.stream.ended"; agentId: string; reason: "stopped" | "closed" | "error"; message?: string };
 
 /** A tool as `mcp.tools` lists it (what MCP `tools/list` returns). */
 export interface McpToolInfo {
@@ -812,6 +948,41 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           : {}),
         ...(paused ? { paused } : {}),
         ...(access ? { access } : {}),
+        ...(isObject(f.browser) ? { browser: parseBrowserInfo(f.browser) } : {}),
+      };
+    }
+    case "browser.frame": {
+      if (!isString(f.agentId) || !isString(f.data) || f.data.length > BROWSER_LIMITS.frameBytes) return null;
+      const seq = finite(f.seq);
+      const m = isObject(f.metadata) ? f.metadata : null;
+      const width = finite(m?.deviceWidth);
+      const height = finite(m?.deviceHeight);
+      if (seq === undefined || !m || width === undefined || height === undefined) return null;
+      const scale = finite(m.pageScaleFactor);
+      const url = cut(m.url, BROWSER_LIMITS.url);
+      return {
+        type: "browser.frame",
+        agentId: f.agentId.slice(0, 64),
+        seq,
+        data: f.data,
+        metadata: {
+          deviceWidth: width,
+          deviceHeight: height,
+          ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
+          ...(url !== undefined ? { url } : {}),
+        },
+      };
+    }
+    case "browser.stream.ended": {
+      if (!isString(f.agentId)) return null;
+      const reason = (["stopped", "closed", "error"] as const).find((r) => r === f.reason);
+      if (!reason) return null;
+      const message = cut(f.message, BROWSER_LIMITS.message);
+      return {
+        type: "browser.stream.ended",
+        agentId: f.agentId.slice(0, 64),
+        reason,
+        ...(message !== undefined ? { message } : {}),
       };
     }
     case "runner.state": {
@@ -1349,5 +1520,93 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
       : [];
     folders.push({ path: f.path.slice(0, ACCESS_LIMITS.path), agents });
   }
-  return { folders, tools: { claude: t.claude === true, codex: t.codex === true, commands: t.commands === true } };
+  return {
+    folders,
+    tools: {
+      claude: t.claude === true,
+      codex: t.codex === true,
+      commands: t.commands === true,
+      ...(t.browser === true ? { browser: true } : {}),
+    },
+  };
+}
+
+/** `hello.browser` (protocol 12), cut. */
+export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo {
+  const version = cut(v.version, 40);
+  const chrome = cut(v.chrome, 120);
+  const reason = cut(v.reason, BROWSER_LIMITS.message);
+  return {
+    available: v.available === true,
+    ...(version !== undefined ? { version } : {}),
+    ...(chrome !== undefined ? { chrome } : {}),
+    ...(reason !== undefined ? { reason } : {}),
+  };
+}
+
+const BROWSER_MODIFIERS_MAX = 15;
+const coord = (v: unknown) => {
+  const n = finite(v);
+  return n !== undefined && Math.abs(n) <= 100_000 ? n : undefined;
+};
+
+/** One `browser.input` event, checked and cut; null when it isn't one (runner side). */
+export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
+  if (!isObject(v)) return null;
+  const m = finite(v.modifiers);
+  const modifiers =
+    m !== undefined && Number.isInteger(m) && m >= 0 && m <= BROWSER_MODIFIERS_MAX ? { modifiers: m } : {};
+  switch (v.kind) {
+    case "mouse": {
+      const type = (["mousePressed", "mouseReleased", "mouseMoved", "mouseWheel"] as const).find((t) => t === v.type);
+      const x = coord(v.x);
+      const y = coord(v.y);
+      if (!type || x === undefined || y === undefined) return null;
+      const button = (["left", "right", "middle", "none"] as const).find((b) => b === v.button);
+      const clickCount = finite(v.clickCount);
+      const deltaX = coord(v.deltaX);
+      const deltaY = coord(v.deltaY);
+      return {
+        kind: "mouse",
+        type,
+        x,
+        y,
+        ...(button ? { button } : {}),
+        ...(clickCount !== undefined ? { clickCount: Math.max(0, Math.min(3, Math.round(clickCount))) } : {}),
+        ...(deltaX !== undefined ? { deltaX } : {}),
+        ...(deltaY !== undefined ? { deltaY } : {}),
+        ...modifiers,
+      };
+    }
+    case "key": {
+      const type = (["keyDown", "keyUp", "char"] as const).find((t) => t === v.type);
+      if (!type || !isString(v.key) || !v.key || v.key.length > 32) return null;
+      const code = cut(v.code, 32);
+      const text = cut(v.text, 8);
+      return {
+        kind: "key",
+        type,
+        key: v.key,
+        ...(code !== undefined ? { code } : {}),
+        ...(text !== undefined ? { text } : {}),
+        ...modifiers,
+      };
+    }
+    case "touch": {
+      const type = (["touchStart", "touchMove", "touchEnd", "touchCancel"] as const).find((t) => t === v.type);
+      if (!type || !Array.isArray(v.touchPoints)) return null;
+      const touchPoints: { x: number; y: number }[] = [];
+      for (const p of v.touchPoints.slice(0, 10)) {
+        const x = isObject(p) ? coord(p.x) : undefined;
+        const y = isObject(p) ? coord(p.y) : undefined;
+        if (x === undefined || y === undefined) return null;
+        touchPoints.push({ x, y });
+      }
+      return { kind: "touch", type, touchPoints, ...modifiers };
+    }
+    case "text":
+      return isString(v.text) && v.text.length <= BROWSER_LIMITS.inputText ? { kind: "text", text: v.text } : null;
+    default:
+      return null;
+  }
 }
