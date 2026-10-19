@@ -3655,7 +3655,10 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--e1);
 }
 /* Lower (RefinoUI "Nova leitura"): one 32px line at rest, the toolbar 4px under it. */
+/* In the column card the height comes from the text (Composer measures it); `flex: 1` from the
+   row layout above would pin it to its minimum. */
 .ac-composer textarea {
+  flex: none;
   font-size: 15.5px;
   line-height: 22px;
   min-height: 32px;
