@@ -6,6 +6,7 @@ import {
   BROWSER_PROTOCOL,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
+  parseServerFrame,
   type RunnerAccess,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
@@ -693,4 +694,69 @@ test.if(posix)("a paused computer starts no browser work", async () => {
   };
   expect(await errorCode(() => handleRequest(ctx, req, scope))).toBe("paused");
   expect(t.logged()).toHaveLength(0);
+});
+
+// ── For the desktop app's tray ───────────────────────────────────────────────
+
+test("browser.handoff from the server parses; a malformed one is dropped", () => {
+  const ok = parseServerFrame(
+    JSON.stringify({ type: "browser.handoff", agentId: dev.id, handoff: { status: "pending", request: "Entrar" } }),
+  );
+  expect(ok).toEqual({ type: "browser.handoff", agentId: dev.id, handoff: { status: "pending", request: "Entrar" } });
+  expect(parseServerFrame(JSON.stringify({ type: "browser.handoff", agentId: dev.id, handoff: null }))).not.toBeNull();
+  expect(parseServerFrame(JSON.stringify({ type: "browser.handoff", handoff: null }))).toBeNull();
+  expect(parseServerFrame(JSON.stringify({ type: "browser.handoff", agentId: dev.id, handoff: "x" }))).toBeNull();
+});
+
+test.skipIf(!posix)(
+  "tray state: open with host, what it did and the conversation; a person's turn; closed",
+  async () => {
+    let changes = 0;
+    const t = setup({ onChange: () => changes++ });
+    expect(t.manager.states()).toEqual([]);
+    await t.manager.act(dev, await t.folder(), {
+      op: "browser.act",
+      command: "open",
+      args: ["https://web.viajolo.example/login"],
+      timeoutSeconds: 30,
+      link: "/org/o1/c/c1",
+    });
+    await t.act("click", ["@e3"]);
+    expect(t.manager.states()).toEqual([
+      { agentId: dev.id, open: true, host: "web.viajolo.example", doing: "clicking", link: "/org/o1/c/c1" },
+    ]);
+    expect(changes).toBeGreaterThan(0);
+
+    // The server says a person was asked; then that one is in control; a link elsewhere is dropped.
+    t.manager.setHandoff(dev.id, { status: "pending", request: "Entrar no Viajolo", link: "https://evil.example/x" });
+    expect(t.manager.states()[0]?.handoff).toEqual({ status: "pending", request: "Entrar no Viajolo" });
+    t.manager.setHandoff(dev.id, { status: "active", controller: "Walter", link: "/org/o1/c/c1?m=h1" });
+    expect(t.manager.states()[0]?.handoff).toEqual({
+      status: "active",
+      controller: "Walter",
+      link: "/org/o1/c/c1?m=h1",
+    });
+
+    // Closed with a request still open: it stays listed (not open) so the tray can say "precisa de você".
+    await t.manager.stop(dev);
+    expect(t.manager.states()).toEqual([
+      { agentId: dev.id, open: false, handoff: { status: "active", controller: "Walter", link: "/org/o1/c/c1?m=h1" } },
+    ]);
+    t.manager.setHandoff(dev.id, null);
+    expect(t.manager.states()).toEqual([]);
+
+    // Offline: what the server told is forgotten (it tells again on reconnect).
+    t.manager.setHandoff(ops.id, { status: "pending" });
+    t.manager.clearHandoffs();
+    expect(t.manager.states()).toEqual([]);
+  },
+);
+
+test.skipIf(!posix)("tray state: a browser left idle stops counting as open", async () => {
+  let now = 1_000_000;
+  const t = setup({ now: () => now, idleMs: 60_000 });
+  await t.act("open", ["https://a.example"]);
+  expect(t.manager.states()[0]?.open).toBe(true);
+  now += 61_000;
+  expect(t.manager.states()).toEqual([]);
 });

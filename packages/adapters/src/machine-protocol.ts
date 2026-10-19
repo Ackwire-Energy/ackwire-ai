@@ -139,6 +139,22 @@ export interface RunnerBrowserInfo {
   reason?: string;
 }
 
+/**
+ * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
+ * the desktop app shows it: a request waiting for someone (`pending`) or a
+ * person in control (`active`). The runner only shows it; nothing here grants
+ * anything.
+ */
+export interface BrowserHandoffInfo {
+  status: "pending" | "active";
+  /** The person in control (their display name), when `active`. */
+  controller?: string;
+  /** What the agent asked for, short. */
+  request?: string;
+  /** Where the request's card is (`/org/…/c/…?m=…`), to open it. */
+  link?: string;
+}
+
 /** `watch`: about 1 frame a second for viewers; `control`: 10–15 while a person drives. */
 export type BrowserStreamMode = "watch" | "control";
 
@@ -613,7 +629,15 @@ export type MachineRequest = (
    * `--session`, `--profile` or `--json`, which the runner sets). Commands run
    * one at a time per session. `allowedDomains`: the agent's site allowlist.
    */
-  | { op: "browser.act"; command: string; args: string[]; timeoutSeconds: number; allowedDomains?: string[] }
+  | {
+      op: "browser.act";
+      command: string;
+      args: string[];
+      timeoutSeconds: number;
+      allowedDomains?: string[];
+      /** The conversation the command is for (`/org/…/c/…`): the desktop app's "Ver" opens it. */
+      link?: string;
+    }
   /** Protocol 12: close the agent's browser session (Stop, idle). */
   | { op: "browser.stop" }
   /** Protocol 12: start (or change the mode of) the agent's stream: `browser.frame` frames until `browser.stream.stop`. */
@@ -719,6 +743,13 @@ export type ServerFrame =
    * changes. The runner shows them in the desktop app.
    */
   | { type: "agents"; agents: MachineAgent[] }
+  /**
+   * Protocol 12: a request for help or a person in control in an agent's
+   * browser started, changed or ended (`handoff: null`); sent again on
+   * reconnect for the ones still open. The desktop app shows it. Older
+   * runners ignore it.
+   */
+  | { type: "browser.handoff"; agentId: string; handoff: BrowserHandoffInfo | null }
   /** The server closes after sending this (bad token, revoked, outdated runner). */
   | { type: "refused"; reason: "invalid_token" | "revoked" | "outdated" | "replaced"; message: string };
 
@@ -1112,6 +1143,7 @@ const SERVER_FRAME_TYPES = [
   "mcp.result",
   "mcp.tools",
   "agents",
+  "browser.handoff",
 ];
 
 /** Parses a server frame (runner side); null when it isn't one. */
@@ -1133,6 +1165,9 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   if ((f.type === "mcp.result" || f.type === "mcp.tools") && !isString(f.callId)) return null;
   if (f.type === "mcp.tools" && f.ok === true && !Array.isArray(f.tools)) return null;
   if (f.type === "agents" && !Array.isArray(f.agents)) return null;
+  if (f.type === "browser.handoff" && (!isString(f.agentId) || (f.handoff !== null && !isObject(f.handoff)))) {
+    return null;
+  }
   if (!SERVER_FRAME_TYPES.includes(f.type)) return null;
   return f as ServerFrame;
 }

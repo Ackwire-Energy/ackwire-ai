@@ -1,4 +1,6 @@
 import {
+  BROWSER_PROTOCOL,
+  type BrowserHandoffInfo,
   brainTopic,
   HEARTBEAT_MS,
   HELLO_TIMEOUT_MS,
@@ -262,6 +264,8 @@ export interface MachineBrowserHooks {
   frame?(machineId: string, frame: Extract<RunnerFrame, { type: "browser.frame" }>): void;
   streamEnded?(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>): void;
   closed?(machineId: string): void;
+  /** A runner on protocol 12+ said hello here: what it should know again (open handoffs). */
+  connected?(machineId: string): void;
 }
 
 export function createMachineHub(deps: MachineHubDeps) {
@@ -422,6 +426,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
     // Protocol 9: the agents that use this computer, for the desktop app.
     if (frame.protocol >= PAUSE_PROTOCOL) await sendAgents(conn);
+    if (frame.protocol >= BROWSER_PROTOCOL) browserHooks.connected?.(machine.id);
     conn.pingTimer = setInterval(() => {
       if (Date.now() - conn.lastPong > 3 * heartbeatMs) {
         try {
@@ -970,6 +975,17 @@ export function createMachineHub(deps: MachineHubDeps) {
 
     /** Whether this replica holds the machine's socket. */
     isLocal: (machineId: string) => local.has(machineId),
+
+    /**
+     * `browser.handoff` to a computer whose socket is here (protocol 12+), for
+     * its desktop app; false when it isn't here or too old (nothing to do).
+     */
+    sendBrowserHandoff(machineId: string, agentId: string, handoff: BrowserHandoffInfo | null): boolean {
+      const conn = local.get(machineId);
+      if (!conn || conn.protocol < BROWSER_PROTOCOL) return false;
+      send(conn, { type: "browser.handoff", agentId, handoff });
+      return true;
+    },
 
     /** Stops listening and closes every socket (shutdown, tests). */
     async stop() {

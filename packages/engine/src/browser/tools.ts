@@ -227,6 +227,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
           args: cmd.args,
           timeoutSeconds: cmd.timeoutSeconds,
           ...(domains ? { allowedDomains: domains } : {}),
+          // The computer's tray opens this conversation ("Ver").
+          link: `/org/${ctx.orgId}/c/${ctx.channelId}`,
         },
         { signal: ctx.signal, timeoutMs: (cmd.timeoutSeconds + 30) * 1000 },
       );

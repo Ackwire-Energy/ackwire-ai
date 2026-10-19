@@ -4,16 +4,24 @@
  * way to Preferences, the site and Quit. This window also owns the tray icon's state and raises the
  * macOS notification for folder requests (it lives, hidden, for as long as the app runs).
  */
-import type { ControlAccessRequest, ControlJob } from "@agenteschat/adapters/runner-control";
+import type { ControlAccessRequest, ControlBrowser, ControlJob } from "@agenteschat/adapters/runner-control";
 import { Button, Icon, Kbd, normalizeAppearance, PixelSpinner, Segmented } from "@agenteschat/ui";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
+import {
+  BROWSER_NOTIFY_PREF,
+  browserRowState,
+  browsersOf,
+  helpRequestKeys,
+  newHelpRequests,
+  siteLink,
+} from "../control/browser";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
 import { SITE_URL } from "../control/version";
-import { agentOf, useOnShown, useUpdateCheck, writePref } from "../hooks";
+import { agentOf, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
 import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
@@ -51,6 +59,28 @@ export function Popover() {
   useEffect(() => {
     void host.setTrayState(tray).catch(() => {});
   }, [host, tray]);
+
+  // An agent asking for help in its browser: a macOS notification, if the person turned it on
+  // (Preferências → Geral; off by default). Requests already there at start don't notify.
+  const statuses = homes.map((h) => h.status);
+  const helpKeys = [...helpRequestKeys(statuses)].sort().join("|");
+  const notified = useRef<Set<string> | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the set of requests changes
+  useEffect(() => {
+    if (notified.current === null) {
+      notified.current = helpRequestKeys(statuses);
+      return;
+    }
+    const fresh = newHelpRequests(notified.current, statuses);
+    notified.current = helpRequestKeys(statuses);
+    if (fresh.length === 0 || !readPref(BROWSER_NOTIFY_PREF, false)) return;
+    for (const r of fresh) {
+      const home = homes.find((h) => h.status === r.status);
+      const agent = agentOf(home, { id: r.agentId, name: t("desktop.tray.browser.someAgent") });
+      const body = [r.status.org?.name, r.request].filter(Boolean).join(" · ");
+      void host.notify(t("desktop.tray.browser.notifTitle", { agent: agent.name }), body).catch(() => {});
+    }
+  }, [helpKeys]);
 
   // "há 2 min" stays true.
   useEffect(() => {
@@ -411,7 +441,14 @@ function NowList({ homes, paused, now }: { homes: Home[]; paused: boolean; now: 
       </div>
     );
   }
-  const total = homes.reduce((n, h) => n + h.jobs.length, 0);
+  const rows = homes.map((h) => {
+    const browsers = browsersOf(h.status);
+    const inBrowser = new Set(browsers.map((b) => b.agentId));
+    // An agent in its browser shows once, as its browser row (its thinking is what drives it).
+    const jobs = h.jobs.filter((j) => !(j.kind === "brain" && j.agent && inBrowser.has(j.agent.id)));
+    return { home: h, browsers, jobs };
+  });
+  const total = rows.reduce((n, r) => n + r.jobs.length + r.browsers.length, 0);
   if (total === 0) {
     const someone = homes.flatMap((h) => h.status?.agents ?? [])[0];
     return (
@@ -430,24 +467,140 @@ function NowList({ homes, paused, now }: { homes: Home[]; paused: boolean; now: 
   }
   return (
     <>
-      {homes.map((h) => (
+      {rows.map(({ home: h, browsers, jobs }) => (
         <div key={h.homeId}>
           <div className="dk-ohead">
             <OrgTile name={orgName(h)} logo={h.logo} size="sm" />
             {orgName(h)}
-            <Count n={h.jobs.length} />
-            {h.jobs.length === 0 && (
+            <Count n={jobs.length + browsers.length} />
+            {jobs.length + browsers.length === 0 && (
               <span className="dk-ohead__end">
                 {isOnline(h) ? t("desktop.tray.nothingNow") : t("desktop.tray.waitingConnection")}
               </span>
             )}
           </div>
-          {h.jobs.map((j) => (
+          {browsers.map((b) => (
+            <BrowserRow key={`browser:${b.agentId}`} home={h} browser={b} />
+          ))}
+          {jobs.map((j) => (
             <JobRow key={j.id} home={h} job={j} now={now} />
           ))}
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * An agent in its browser (BandejaNavegador.html, option 2 · Ponto): "Theo no navegador" with the
+ * site and what it does, Ver and Parar; "Walter está no controle" while a person drives; "Theo
+ * precisa de você" with Abrir when it asked for help.
+ */
+function BrowserRow({ home, browser }: { home: Home; browser: ControlBrowser }) {
+  const { t } = useTranslation();
+  const host = useHost();
+  const store = useStore();
+  const toast = useToast();
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const agent = agentOf(home, { id: browser.agentId, name: t("desktop.tray.browser.someAgent") });
+  const color = normalizeAppearance(agent.look).color;
+  const state = browserRowState(browser);
+  const open = (path?: string) => {
+    void host.openExternal(siteLink(home.status?.server, path, SITE_URL)).catch(() => {});
+    void host.hideWindow("popover").catch(() => {});
+  };
+  const stop = async () => {
+    setBusy(true);
+    try {
+      await store.request(home.homeId, { type: "browser.stop", agentId: browser.agentId });
+      toast(t("desktop.tray.browser.stopped", { agent: agent.name }), "stop");
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+    } finally {
+      setBusy(false);
+      setConfirm(false);
+    }
+  };
+  const where = browser.host ?? t("desktop.tray.browser.noSite");
+  const detail =
+    state.kind === "needs"
+      ? state.request
+        ? `${where} · ${state.request}`
+        : where
+      : state.kind === "control"
+        ? state.controller
+          ? t("desktop.tray.browser.inControl", { person: state.controller })
+          : t("desktop.tray.browser.someoneInControl")
+        : browser.doing
+          ? `${where} · ${t(`desktop.tray.browser.doing.${browser.doing}`)}`
+          : where;
+
+  if (confirm) {
+    return (
+      <div className="dk-job dk-job--browser dk-job--confirm">
+        <span className="dk-job__text">
+          <b>
+            <span>{t("desktop.tray.browser.stopAsk", { agent: agent.name })}</span>
+          </b>
+          <small>{t("desktop.tray.browser.stopHint")}</small>
+        </span>
+        <span className="dk-job__acts">
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirm(false)}>
+            {t("desktop.common.cancel")}
+          </Button>
+          <Button size="sm" variant="primary" disabled={busy} onClick={() => void stop()}>
+            {t("desktop.tray.browser.stopConfirm")}
+          </Button>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className={`dk-job dk-job--browser${state.kind === "needs" ? " dk-job--needs" : ""}`}>
+      <span className="dk-job__av">
+        <AgentFace agent={agent} size="sm" state={state.kind === "needs" ? "waiting" : "writing"} />
+      </span>
+      <span className="dk-job__text">
+        <b>
+          <span>
+            {state.kind === "needs"
+              ? t("desktop.tray.browser.needs", { agent: agent.name })
+              : t("desktop.tray.browser.title", { agent: agent.name })}
+          </span>
+        </b>
+        <small>
+          {state.kind === "needs" ? <Icon name="globe" size={14} /> : <PixelSpinner size={14} color={color} />}
+          <span className="dk-job__detail">{detail}</span>
+        </small>
+      </span>
+      <span className="dk-job__acts">
+        {state.kind === "needs" ? (
+          <Button size="sm" variant="primary" onClick={() => open(state.link)}>
+            {t("desktop.tray.browser.open")}
+          </Button>
+        ) : (
+          <button
+            type="button"
+            className="dk-iconbtn"
+            title={t("desktop.tray.browser.see")}
+            aria-label={t("desktop.tray.browser.see")}
+            onClick={() => open(state.link)}
+          >
+            <Icon name="external" size={14} />
+          </button>
+        )}
+        <button
+          type="button"
+          className="dk-iconbtn"
+          title={t("desktop.tray.browser.stop")}
+          aria-label={t("desktop.tray.browser.stop")}
+          onClick={() => setConfirm(true)}
+        >
+          <Icon name="stop" size={14} />
+        </button>
+      </span>
+    </div>
   );
 }
 

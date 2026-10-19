@@ -108,6 +108,8 @@ export class ControlServer {
         return d.accessAnswer(str(m.requestId), m.decision, m.scope === "all" ? "all" : "agent");
       case "reconnect":
         return d.reconnect();
+      case "browser.stop":
+        return d.browserStop(str(m.agentId));
       case "shutdown":
         return { stopping: true };
       default:

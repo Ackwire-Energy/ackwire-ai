@@ -12,6 +12,7 @@ import {
   type AgentScope,
   agentBrowserAsset,
   BROWSER_LIMITS,
+  type BrowserHandoffInfo,
   type BrowserInputEvent,
   type BrowserStreamMode,
   type MachineReplies,
@@ -20,6 +21,7 @@ import {
   type RunnerBrowserInfo,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
 import { RunnerError } from "./errors";
 import { agentFolderName, isInside } from "./paths";
@@ -449,6 +451,8 @@ export interface BrowserManagerOptions {
   now?: () => number;
   /** Tests: opens the session's stream socket. */
   connectStream?: (url: string) => StreamSocket;
+  /** What `states()` returns may have changed (the desktop app's tray shows it). */
+  onChange?: () => void;
 }
 
 interface Stream {
@@ -476,7 +480,48 @@ interface Session {
   streamOpening?: Promise<void>;
   /** When a command last succeeded (the browser was up then); null after an error or a close. */
   aliveAt: number | null;
+  /** For the desktop app: the page's host, what the agent did last, and the conversation it was for. */
+  host?: string;
+  doing?: ControlBrowserDoing;
+  link?: string;
 }
+
+/** What a command is, as the desktop app words it ("lendo a página", "preenchendo"). */
+const DOING: Record<string, ControlBrowserDoing> = {
+  open: "opening",
+  back: "opening",
+  snapshot: "reading",
+  get: "reading",
+  click: "clicking",
+  dblclick: "clicking",
+  fill: "filling",
+  type: "typing",
+  press: "typing",
+  "agentes:type_secret": "typing",
+  select: "choosing",
+  check: "choosing",
+  uncheck: "choosing",
+  scroll: "scrolling",
+  wait: "waiting",
+  upload: "uploading",
+  screenshot: "capturing",
+  pdf: "capturing",
+  tab: "tabs",
+};
+
+/** `https://web.viajolo.example/trips` → `web.viajolo.example`; null for anything that isn't a web page. */
+export function pageHost(url: string): string | null {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.host : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A conversation path we pass on to the app (`/org/…`), nothing else. */
+const isLink = (v: unknown): v is string =>
+  typeof v === "string" && v.length <= 500 && /^\/org\/[\w-]+\//.test(v) && !v.includes("//");
 
 type ActRequest = Extract<MachineRequest, { op: "browser.act" }>;
 
@@ -515,6 +560,8 @@ function parseAnswer(stdout: string, stderr: string, exitCode: number | null): B
 
 export class BrowserManager {
   private readonly sessions = new Map<string, Session>();
+  /** A person's turn in each agent's browser, as the server last told (`browser.handoff`). */
+  private readonly handoffs = new Map<string, BrowserHandoffInfo>();
   private readonly namespace: string;
   private readonly configFile: string;
   private readonly now: () => number;
@@ -681,7 +728,11 @@ export class BrowserManager {
     const timeoutMs = Math.max(1, Math.min(600, Number(req.timeoutSeconds) || 60)) * 1000;
     if (command === "agentes:type_secret") {
       const session = await this.session(agent, folder);
-      return this.enqueue(session, () => this.typeSecret(agent, session, args, timeoutMs, signal));
+      return this.enqueue(session, async () => {
+        const answer = await this.typeSecret(agent, session, args, timeoutMs, signal);
+        this.noteAct(session, command, [], answer, req.link);
+        return answer;
+      });
     }
     if (!COMMANDS.has(command)) throw new RunnerError("bad_request", `The browser doesn't take ${command}`);
     for (const a of args) {
@@ -710,6 +761,7 @@ export class BrowserManager {
       const answer = await this.run(session, [command, ...checked], { timeoutMs, signal });
       // Up when it just answered (the next read skips the check); unknown after an error or a close.
       session.aliveAt = answer.success && command !== "close" ? this.now() : null;
+      this.noteAct(session, command, checked, answer, req.link);
       // After anything that may move the page (a click, a tab switch, a new tab…): still on an allowed site?
       if (allowed.length > 0 && !READS.has(command) && command !== "close") {
         const left = await this.leftAllowedSites(session, allowed, signal);
@@ -978,16 +1030,86 @@ export class BrowserManager {
     if (!session) return { stopped: false };
     this.endStream(session, "stopped");
     this.sessions.delete(agentId);
+    this.changed();
     await this.enqueue(session, () => this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS })).catch(
       () => undefined,
     );
     return { stopped: true };
   }
 
+  // ── For the desktop app ────────────────────────────────────────────────────
+
+  /** What the last command tells the app: what the agent did, the page's host, the conversation. */
+  private noteAct(session: Session, command: string, args: string[], answer: BrowserAnswer, link?: unknown) {
+    if (isLink(link)) session.link = link;
+    const doing = DOING[command];
+    if (doing) session.doing = doing;
+    const url =
+      answer.success && isRecord(answer.data) && typeof answer.data.url === "string"
+        ? answer.data.url
+        : command === "open" && answer.success
+          ? args[0]
+          : undefined;
+    const host = url ? pageHost(url) : null;
+    if (host) session.host = host;
+    this.changed();
+  }
+
+  /** `browser.handoff` from the server: a request waiting, a person in control, or none (null). */
+  setHandoff(agentId: string, handoff: BrowserHandoffInfo | null) {
+    if (handoff && (handoff.status === "pending" || handoff.status === "active")) {
+      this.handoffs.set(agentId, {
+        status: handoff.status,
+        ...(typeof handoff.controller === "string" ? { controller: handoff.controller.slice(0, 120) } : {}),
+        ...(typeof handoff.request === "string" ? { request: handoff.request.slice(0, 300) } : {}),
+        ...(isLink(handoff.link) ? { link: handoff.link } : {}),
+      });
+    } else this.handoffs.delete(agentId);
+    this.changed();
+  }
+
+  /** The server connection dropped: what it told about handoffs is stale (it says again on reconnect). */
+  clearHandoffs() {
+    if (this.handoffs.size === 0) return;
+    this.handoffs.clear();
+    this.changed();
+  }
+
+  /**
+   * The agents' browsers the tray shows: open ones (answered within the idle
+   * window, or being watched) and any with a person's turn, sorted by agent.
+   */
+  states(): ControlBrowser[] {
+    const ids = new Set([...this.sessions.keys(), ...this.handoffs.keys()]);
+    const out: ControlBrowser[] = [];
+    for (const agentId of [...ids].sort()) {
+      const s = this.sessions.get(agentId);
+      const handoff = this.handoffs.get(agentId);
+      const open = !!s && (!!s.stream || (s.aliveAt !== null && this.now() - s.lastUsed < this.idleMs));
+      if (!open && !handoff) continue;
+      const host = (s?.stream?.url && pageHost(s.stream.url)) || s?.host;
+      out.push({
+        agentId,
+        open,
+        ...(host ? { host } : {}),
+        ...(s?.doing ? { doing: s.doing } : {}),
+        ...(s?.stream ? { mode: s.stream.mode } : {}),
+        ...(handoff ? { handoff: { ...handoff } } : {}),
+        ...(s?.link ? { link: s.link } : {}),
+      });
+    }
+    return out;
+  }
+
+  private changed() {
+    this.opts.onChange?.();
+  }
+
   /** Every browser of this runner home closes (the switch went off, the runner stops, or it just started). */
   async closeAll() {
     for (const s of this.sessions.values()) this.endStream(s, "closed");
     this.sessions.clear();
+    this.changed();
     const command = this.presentCommand();
     if (!command) return;
     await this.spawn(command, ["--namespace", this.namespace, "--json", "close", "--all"], {
@@ -1016,6 +1138,7 @@ export class BrowserManager {
       if (session.stream.mode !== mode) {
         session.stream.mode = mode;
         session.stream.socket.send(JSON.stringify({ type: "config", maxFps: STREAM_FPS[mode] }));
+        this.changed();
       }
       return { mode };
     }
@@ -1076,11 +1199,13 @@ export class BrowserManager {
       }
     }
     session.stream = stream;
+    this.changed();
     socket.onmessage = (event) => this.onStreamMessage(session, stream, event.data);
     socket.onerror = () => undefined;
     socket.onclose = () => {
       if (session.stream !== stream) return;
       session.stream = undefined;
+      this.changed();
       if (!stream.closing) {
         // The browser closed under the stream: the next read checks again.
         session.aliveAt = null;
@@ -1099,7 +1224,9 @@ export class BrowserManager {
     }
     if (!isRecord(msg)) return;
     if (msg.type === "url" && typeof msg.url === "string") {
+      const before = stream.url ? pageHost(stream.url) : null;
       stream.url = msg.url.slice(0, BROWSER_LIMITS.url);
+      if (pageHost(stream.url) !== before) this.changed();
       return;
     }
     if (msg.type !== "frame" || typeof msg.data !== "string" || msg.data.length > BROWSER_LIMITS.frameBytes) return;
@@ -1142,6 +1269,7 @@ export class BrowserManager {
       s.stream.socket.close();
       s.stream = undefined;
     }
+    this.changed();
   }
 
   private endStream(session: Session, reason: "stopped" | "closed") {
@@ -1155,6 +1283,7 @@ export class BrowserManager {
       // already closed
     }
     this.opts.send({ type: "browser.stream.ended", agentId: session.agentId, reason });
+    this.changed();
   }
 
   /**

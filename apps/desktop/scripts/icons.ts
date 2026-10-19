@@ -5,7 +5,7 @@
  * `tauri icon app-icon.png` makes the .icns and the PNG sizes from the 1024 px master.
  *
  * Outputs (all ignored by git):
- *   src-tauri/icons/tray/{idle,working,paused,offline,update}.png  36×36 template images (18 pt @2x)
+ *   src-tauri/icons/tray/{idle,working,paused,offline,update,browsing,needs}.png  36×36 template images (18 pt @2x)
  *   app-icon.png                                                   1024×1024 app icon master
  *
  * No dependencies: a tiny PNG encoder over node:zlib.
@@ -110,7 +110,7 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
 
 /* ---------- Tray: 36×36 template images (only alpha counts; macOS tints them) ---------- */
 
-type TrayState = "idle" | "working" | "paused" | "offline" | "update";
+type TrayState = "idle" | "working" | "paused" | "offline" | "update" | "browsing" | "needs";
 const TRAY_PX = 36;
 /** The body's square inside the 36 px canvas. */
 const TB = { x: 4, y: 4, s: 28 };
@@ -128,6 +128,17 @@ function trayCoverage(state: TrayState, px: number, py: number): boolean {
     const inner = (uu: number, vv: number) =>
       inBody((uu - stroke) / (1 - 2 * stroke), (vv - stroke) / (1 - 2 * stroke));
     return inBody(u, v) && !inner(u, v);
+  }
+  if (state === "browsing" || state === "needs") {
+    // A badge cut out of the bottom-right corner: a ring while an agent is in its browser, a
+    // filled dot when one needs a person. Same place and gap as the update badge.
+    const bx = 28;
+    const by = 28;
+    const d = Math.hypot(px - bx, py - by);
+    if (d <= 8) {
+      if (d > 6.4) return false; // the gap around the badge
+      return state === "needs" ? true : d >= 3.6;
+    }
   }
   if (state === "update") {
     // A round badge cut out of the bottom-right corner, with a down arrow in it.
@@ -227,8 +238,8 @@ function appIconPng(): Uint8Array {
 
 const trayDir = join(root, "src-tauri", "icons", "tray");
 mkdirSync(trayDir, { recursive: true });
-for (const state of ["idle", "working", "paused", "offline", "update"] as const) {
+for (const state of ["idle", "working", "paused", "offline", "update", "browsing", "needs"] as const) {
   writeFileSync(join(trayDir, `${state}.png`), trayPng(state));
 }
 writeFileSync(join(root, "app-icon.png"), appIconPng());
-console.log("icons: tray (5 states) and app-icon.png written");
+console.log("icons: tray (7 states) and app-icon.png written");

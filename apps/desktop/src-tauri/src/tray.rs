@@ -13,6 +13,10 @@ const WORKING: &[u8] = include_bytes!("../icons/tray/working.png");
 const PAUSED: &[u8] = include_bytes!("../icons/tray/paused.png");
 const OFFLINE: &[u8] = include_bytes!("../icons/tray/offline.png");
 const UPDATE: &[u8] = include_bytes!("../icons/tray/update.png");
+/// An agent is in its browser: a ring in the corner.
+const BROWSING: &[u8] = include_bytes!("../icons/tray/browsing.png");
+/// An agent needs a person in its browser: a filled dot in the corner.
+const NEEDS: &[u8] = include_bytes!("../icons/tray/needs.png");
 
 fn bytes_for(state: &str) -> Option<&'static [u8]> {
     match state {
@@ -21,6 +25,8 @@ fn bytes_for(state: &str) -> Option<&'static [u8]> {
         "paused" => Some(PAUSED),
         "offline" => Some(OFFLINE),
         "update" => Some(UPDATE),
+        "browsing" => Some(BROWSING),
+        "needs" => Some(NEEDS),
         _ => None,
     }
 }

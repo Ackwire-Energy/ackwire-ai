@@ -4,6 +4,7 @@ import {
   parseServerFrame,
   type RunnerFrame,
   type RunnerInfo,
+  type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import { type HandlerContext, handleRequest, type RequestObserver, RequestRunner } from "./handlers";
 import type { McpBridge } from "./mcp";
@@ -106,6 +107,8 @@ export interface ConnectionOptions {
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
   /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
   onAgents?: (agents: unknown) => void;
+  /** Protocol 12: a person's turn in an agent's browser started, changed or ended (`browser.handoff`). */
+  onBrowserHandoff?: (frame: Extract<ServerFrame, { type: "browser.handoff" }>) => void;
   /** The socket's state: dialing, welcomed, or down (reconnecting). */
   onState?: (state: "connecting" | "online" | "offline") => void;
   /** Sees every request start and end (the desktop app's jobs, the activity log). */
@@ -283,6 +286,9 @@ export class RunnerConnection {
           }
           case "agents":
             opts.onAgents?.(frame.agents);
+            return;
+          case "browser.handoff":
+            opts.onBrowserHandoff?.(frame);
             return;
           case "mcp.result":
             opts.mcp?.result(frame);

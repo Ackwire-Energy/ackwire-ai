@@ -16,8 +16,10 @@ import {
   expireControl,
   type HandoffDeps,
   type HandoffLiveHooks,
+  handoffInfo,
   handoffView,
   openHandoffOf,
+  openHandoffsOfMachine,
   requireBrowserAccess,
   setControlDeadline,
   touchControl,
@@ -147,7 +149,7 @@ interface AgentLive {
 }
 
 export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
-  hub: Pick<MachineHub, "call" | "isLocal">;
+  hub: Pick<MachineHub, "call" | "isLocal"> & Partial<Pick<MachineHub, "sendBrowserHandoff">>;
   graceMs?: number;
   accessRecheckMs?: number;
   /** Tests: how long the stream outlives its last viewer (`STREAM_STOP_DELAY_MS`). */
@@ -276,6 +278,23 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   };
 
   const handoffDeps: HandoffDeps = { db: deps.db, pubsub: deps.pubsub, live: handoffHooks };
+
+  /** Tells the computer (when its socket is here) the agent's open handoff, or that there is none: its tray shows it. */
+  const tellComputer = async (machineId: string, orgId: string, agentId: string) => {
+    if (!deps.hub.sendBrowserHandoff || !deps.hub.isLocal(machineId)) return;
+    const row = await openHandoffOf(deps.db, orgId, agentId);
+    const info = row && row.machineId === machineId ? await handoffInfo(deps.db, row) : null;
+    deps.hub.sendBrowserHandoff(machineId, agentId, info);
+  };
+
+  // The computer's desktop app hears every change, from whichever replica made it.
+  const unsubscribeComputers = deps.pubsub?.subscribe(BROWSER_HANDOFF_TOPIC, (event) => {
+    const { machineId, orgId, agentId } = event;
+    if (typeof machineId !== "string" || typeof orgId !== "string" || typeof agentId !== "string") return;
+    void tellComputer(machineId, orgId, agentId).catch((error) =>
+      deps.log?.warn("browser handoff to computer failed", { agentId, error: String(error) }),
+    );
+  });
 
   // A handoff changed on another replica (a person claimed it there, handed it back…): the state
   // here, where the computer's socket may be, is read again from the database.
@@ -552,6 +571,17 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           ...(frame.message ? { message: frame.message } : {}),
         });
       },
+      /** A computer came back here: it hears its open handoffs again (it forgot them while offline). */
+      connected(machineId: string) {
+        void openHandoffsOfMachine(deps.db, machineId)
+          .then(async (rows) => {
+            for (const row of rows) {
+              const info = await handoffInfo(deps.db, row);
+              deps.hub.sendBrowserHandoff?.(machineId, row.agentId, info);
+            }
+          })
+          .catch((error) => deps.log?.warn("browser handoffs resync failed", { machineId, error: String(error) }));
+      },
       /** The machine's socket closed here: viewers retry (it may come back on any replica). */
       closed(machineId: string) {
         for (const [agentId, state] of live) {
@@ -610,6 +640,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     /** Stops hearing handoff changes from other replicas (shutdown, tests). */
     close() {
       unsubscribeHandoffs?.();
+      unsubscribeComputers?.();
       for (const state of live.values()) cancelStop(state);
       for (const [key, batch] of batches) flushInput(key, batch);
     },

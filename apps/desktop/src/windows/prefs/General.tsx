@@ -2,6 +2,7 @@ import { Button, Dialog, DialogFooter, Input, Switch } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
+import { BROWSER_NOTIFY_PREF } from "../../control/browser";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
 import { SITE_URL } from "../../control/version";
@@ -23,6 +24,8 @@ export function General() {
   const [saving, setSaving] = useState(false);
   const [launch, setLaunch] = useState<boolean | null>(null);
   const [notify, setNotify] = usePref("notify", true);
+  // Off by default: the request already comes by push and in the site's "Esperando você".
+  const [notifyBrowser, setNotifyBrowser] = usePref(BROWSER_NOTIFY_PREF, false);
   const [leaving, setLeaving] = useState<Home | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -190,6 +193,12 @@ export function General() {
           desc={t("desktop.prefs.general.notifyDesc")}
           htmlFor="notify"
           end={<Switch id="notify" checked={notify} onCheckedChange={setNotify} />}
+        />
+        <PrefRow
+          title={t("desktop.prefs.general.notifyBrowserTitle")}
+          desc={t("desktop.prefs.general.notifyBrowserDesc")}
+          htmlFor="notify-browser"
+          end={<Switch id="notify-browser" checked={notifyBrowser} onCheckedChange={setNotifyBrowser} />}
         />
       </PrefCard>
 

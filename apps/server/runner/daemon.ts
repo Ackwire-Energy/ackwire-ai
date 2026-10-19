@@ -104,6 +104,9 @@ const LIMIT_BOUNDS: Record<keyof typeof DEFAULT_LIMITS, [number, number]> = {
 /** Error codes that mean "refused here" in the activity log (not "it broke"). */
 const REFUSED = new Set(["paused", "not_allowed", "exec_disabled", "outside_workspace"]);
 
+/** How often the agents' browsers are looked at again for the app (one left idle stops counting as open). */
+const BROWSER_STATE_POLL_MS = 5000;
+
 export function machineOs(): MachineOs {
   switch (process.platform) {
     case "linux":
@@ -251,6 +254,8 @@ export class RunnerDaemon implements RequestObserver {
   /** Stamps every status (events and replies) so the app can tell the newest (`ControlStatus.seq`). */
   private statusSeq = 0;
   private lastExecutors = "";
+  /** The browsers last reported to the app (JSON), so a status goes out only when they change. */
+  private lastBrowsers = "[]";
   /** The organization's logo cached in `<home>/org-logo.json` (app mode, refreshed on each `welcome`). */
   private logo: CachedLogo | null = null;
   private logoSync: Promise<void> | null = null;
@@ -297,6 +302,10 @@ export class RunnerDaemon implements RequestObserver {
       expiry.unref?.();
       this.timers.push(expiry);
     }
+    // A browser left idle closes by itself: the tray learns within a few seconds.
+    const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
+    browsers.unref?.();
+    this.timers.push(browsers);
     this.expireRequests();
   }
 
@@ -565,6 +574,7 @@ export class RunnerDaemon implements RequestObserver {
       log,
       send: (frame) => live?.send(frame) ?? false,
       secret: (agent, name) => secretValue(secretsDir, agent, name),
+      onChange: () => queueMicrotask(() => this.browsersChanged()),
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
@@ -597,9 +607,14 @@ export class RunnerDaemon implements RequestObserver {
       log,
       observer: this,
       onAgents: (raw) => this.setAgents(raw),
+      onBrowserHandoff: (frame) => browser.setHandoff(frame.agentId, frame.handoff),
       onState: (state) => {
         // Offline: frames have nowhere to go; the server starts the live view again when it is back.
-        if (state !== "online") browser.stopStreams();
+        if (state !== "online") {
+          browser.stopStreams();
+          // What it said about people's turns is stale; it says again on reconnect.
+          browser.clearHandoffs();
+        }
         this.setConnState(state);
       },
       onWelcome: () => {
@@ -692,6 +707,14 @@ export class RunnerDaemon implements RequestObserver {
     }
   }
 
+  /** The agents' browsers changed (or may have: the periodic check): the app hears it only on a real change. */
+  private browsersChanged() {
+    const now = JSON.stringify(this.session?.browser.states() ?? []);
+    if (now === this.lastBrowsers) return;
+    this.lastBrowsers = now;
+    this.queueStatus();
+  }
+
   private queueStatus() {
     if (this.statusQueued || !this.opts.onEvent) return;
     this.statusQueued = true;
@@ -762,6 +785,8 @@ export class RunnerDaemon implements RequestObserver {
   status(): ControlStatus {
     const c = this.config;
     const s = this.stored;
+    const browsers = this.session?.browser.states() ?? [];
+    this.lastBrowsers = JSON.stringify(browsers);
     return {
       paired: c !== null,
       ...(s?.server ? { server: s.server } : {}),
@@ -780,6 +805,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(c ? { workspace: this.session?.workspaceReal ?? c.workspace } : {}),
       agents: this.agents.map((a) => ({ ...a })),
       access: this.access(),
+      browsers,
       seq: ++this.statusSeq,
     };
   }
@@ -805,6 +831,21 @@ export class RunnerDaemon implements RequestObserver {
     this.opts.log("reconnect asked by the app");
     s.connection.reconnect();
     return { reconnecting: true };
+  }
+
+  /**
+   * The tray's "Parar": the agent's browser closes on this computer (its
+   * profile and logins stay). A live view watching it is told it ended.
+   */
+  async browserStop(agentId: string): Promise<{ stopped: boolean }> {
+    this.requirePaired();
+    const s = this.session;
+    if (!s || !agentId) return { stopped: false };
+    const agent = this.agents.find((a) => a.id === agentId);
+    this.opts.log(`browser of ${agent?.handle ?? agentId} closed from the app`);
+    const out = await s.browser.stop({ id: agentId, handle: agent?.handle ?? "agent" });
+    this.browsersChanged();
+    return out;
   }
 
   // ── Pause ──────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { BrowserHandoffInfo, PubSub } from "@agenteschat/adapters";
 import {
   and,
   type Database,
@@ -34,7 +34,7 @@ import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../too
 import { agentBrowserStatus, browserUnavailableText } from "./status";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserHandoffResult } from "./types";
 
-const { browserHandoffs, agentRuns, agents, messages } = schema;
+const { browserHandoffs, agentRuns, agents, messages, users } = schema;
 
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
@@ -247,6 +247,37 @@ async function cardWhere(db: Executor, row: BrowserHandoffRow) {
   return m ?? null;
 }
 
+/** The open handoffs on a computer (sent to it again when it reconnects). */
+export function openHandoffsOfMachine(db: Executor, machineId: string) {
+  return db
+    .select()
+    .from(browserHandoffs)
+    .where(and(eq(browserHandoffs.machineId, machineId), inArray(browserHandoffs.status, OPEN)));
+}
+
+/**
+ * An open handoff as the computer's desktop app shows it (`browser.handoff`):
+ * waiting or in control, who is in control, what was asked, where its card is.
+ */
+export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise<BrowserHandoffInfo | null> {
+  if (!OPEN.includes(row.status)) return null;
+  const [person] = row.controllerUserId
+    ? await db.select({ name: users.name }).from(users).where(eq(users.id, row.controllerUserId))
+    : [];
+  const where = await cardWhere(db, row);
+  const link = where
+    ? where.threadId
+      ? `/org/${row.orgId}/threads/${where.threadId}`
+      : `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
+    : `/org/${row.orgId}/agents/${row.agentId}`;
+  return {
+    status: row.status === "active" && row.controllerUserId ? "active" : "pending",
+    ...(person?.name ? { controller: person.name } : {}),
+    ...(row.instructions ? { request: row.instructions.slice(0, 300) } : {}),
+    link,
+  };
+}
+
 /** Tells the conversation (card state) and the live view (who is in control) after a change committed. */
 async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow) {
   deps.live?.changed(row);
@@ -257,6 +288,7 @@ async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow) {
       orgId: row.orgId,
       agentId: row.agentId,
       handoffId: row.id,
+      machineId: row.machineId,
     })
     .catch(() => {});
   const where = await cardWhere(deps.db, row);

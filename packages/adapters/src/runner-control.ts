@@ -26,6 +26,40 @@ export interface ControlAgent {
   look?: { color?: string; eyes?: string; accessory?: string };
 }
 
+/**
+ * What an agent's browser does now (ADR 0040), for the desktop app's tray:
+ * open while its session is up, and the person's turn (a request waiting, or
+ * someone in control) as the server told it (`browser.handoff`).
+ */
+export interface ControlBrowser {
+  agentId: string;
+  /** The session is up (it answered recently, or someone is watching it). */
+  open: boolean;
+  /** The page's host (`web.viajolo.example`), when known. */
+  host?: string;
+  /** What the agent did last, as a key the app words (`reading`, `clicking`, `filling`…). */
+  doing?: ControlBrowserDoing;
+  /** Someone is watching (`watch`) or driving (`control`) its live view. */
+  mode?: "watch" | "control";
+  /** A request waiting for a person, or a person in control. */
+  handoff?: { status: "pending" | "active"; controller?: string; request?: string; link?: string };
+  /** The conversation the agent last used it for (`/org/…/c/…`), for "Ver". */
+  link?: string;
+}
+
+export type ControlBrowserDoing =
+  | "opening"
+  | "reading"
+  | "clicking"
+  | "filling"
+  | "choosing"
+  | "typing"
+  | "scrolling"
+  | "waiting"
+  | "uploading"
+  | "capturing"
+  | "tabs";
+
 /** Where the runner stands. */
 export interface ControlStatus {
   paired: boolean;
@@ -55,6 +89,8 @@ export interface ControlStatus {
   agents: ControlAgent[];
   /** Protocol 10: folders and tools allowed on this machine. */
   access?: RunnerAccess;
+  /** The agents' browsers that are open or have a person's turn (absent: older runner). */
+  browsers?: ControlBrowser[];
   /**
    * Grows by one for every status the runner reports (events and `status` replies alike), from 1
    * when the process starts; the app keeps the newest and drops anything older. Absent: older runner.
@@ -162,6 +198,8 @@ export type ControlRequest =
    * (not paired, or refused). An older runner answers `bad_request`.
    */
   | { type: "reconnect" }
+  /** Closes an agent's browser on this computer (the tray's "Parar"); its profile stays. */
+  | { type: "browser.stop"; agentId: string }
   /** Finish what's running briefly, then exit 0 (the app quits). */
   | { type: "shutdown" };
 
@@ -191,6 +229,7 @@ export interface ControlReplies {
   "access.pending": { requests: ControlAccessRequest[] };
   "access.answer": { access: RunnerAccess };
   reconnect: { reconnecting: boolean };
+  "browser.stop": { stopped: boolean };
   shutdown: { stopping: true };
 }
 
