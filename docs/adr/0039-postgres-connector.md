@@ -1,6 +1,6 @@
 # 0039. A native Postgres connector: agents read with SQL, writes always ask
 
-- Status: Accepted (read-only first: `pg_execute` and `postgres:write` come later, after real use)
+- Status: Accepted (read-only first: `pg_execute` and `database:write` come later, after real use)
 - Date: 2026-10-19
 - Planning: D56
 - Extends: ADR 0015 (Tool Gateway and approvals), ADR 0016 (connectors), ADR 0007 (credentials), ADR 0037 (reads never ask)
@@ -36,10 +36,10 @@ So the plumbing is there. The work is making SQL safe to hand to a model.
 
 | Tool | Scope | Level |
 | --- | --- | --- |
-| `pg_list_tables` (schemas, tables, views, row estimates) | `postgres:read` | read |
-| `pg_describe_table` (columns, types, keys, indexes, comments) | `postgres:read` | read |
-| `pg_query` (one `SELECT`/`WITH` statement, parameters allowed) | `postgres:read` | read, never asks (ADR 0037) |
-| `pg_execute` (one `INSERT`/`UPDATE`/`DELETE`) | `postgres:write` | sensitive: always an approval showing the exact SQL, the parameters and the database |
+| `pg_list_tables` (schemas, tables, views, row estimates) | `database:read` | read |
+| `pg_describe_table` (columns, types, keys, indexes, comments) | `database:read` | read |
+| `pg_query` (one `SELECT`/`WITH` statement, parameters allowed) | `database:read` | read, never asks (ADR 0037) |
+| `pg_execute` (one `INSERT`/`UPDATE`/`DELETE`) | `database:write` | sensitive: always an approval showing the exact SQL, the parameters and the database |
 
 - No DDL tool (`CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `GRANT`). Changing a schema is a migration in the person's repository, not an agent call.
 - Tool names carry the connection name when an agent has more than one database, so the model can tell them apart.
@@ -48,7 +48,7 @@ So the plumbing is there. The work is making SQL safe to hand to a model.
 
 Layered, because no single check is enough:
 
-1. **The database user (strongest).** The connect screen recommends, with the exact SQL to run, a dedicated role with only `SELECT` (and `pg_read_all_data` where available), ideally on a read replica. A connection whose role can write is marked "can change data" in the app; only such a connection can grant `postgres:write`.
+1. **The database user (strongest).** The connect screen recommends, with the exact SQL to run, a dedicated role with only `SELECT` (and `pg_read_all_data` where available), ideally on a read replica. A connection whose role can write is marked "can change data" in the app; only such a connection can grant `database:write`.
 2. **Read-only transaction.** Every read runs as `BEGIN TRANSACTION READ ONLY` … `ROLLBACK`, so even a writable role cannot change data through `pg_query`.
 3. **One statement.** The statement is parsed (a real Postgres parser, not a regex) and must be a single `SELECT`/`WITH`/`EXPLAIN` (no `ANALYZE`). Rejected: multiple statements, `COPY`, `DO`, `CALL`, `SET`/`RESET` of session settings, `LISTEN`/`NOTIFY`, `pg_sleep` and the admin functions (`pg_read_file`, `pg_terminate_backend`, `lo_*`, `dblink*`).
 4. **Limits per call.** `statement_timeout` 15 s (org setting up to 60 s), `idle_in_transaction_session_timeout`, `lock_timeout` 2 s. The server streams rows and stops at 500 rows or 64 KB of text, whichever comes first, and tells the model the result was cut (with the total when cheap). Values longer than 2 KB are truncated; `bytea` is never returned.
@@ -91,5 +91,19 @@ A database without a public address (Railway's internal Postgres, a company LAN,
 
 ## Open questions
 
-- Decided 2026-10-19: read-only first. `pg_execute` and `postgres:write` stay designed here but ship later.
+- Decided 2026-10-19: read-only first. `pg_execute` and `database:write` stay designed here but ship later.
 - Schema context: should the connector keep a cached summary of tables and comments that goes into the agent's context, so it doesn't call `pg_list_tables` every run?
+
+## Built (2026-10-19, read-only)
+
+- **Tables** (migration 0076): `db_connections` (address, user, sealed password bound to `db-connection|org|id`, `can_write` from the last test, `off_actions`, `suggested_hidden`), `db_agent_policies` (tables, hidden columns, daily cap, time limit) and `db_queries` (every call: statement, row count, duration, error; never the rows).
+- **Driver** (`packages/adapters/src/database.ts`): `DatabaseDriver` → `DatabaseClient.readOnly(limits, fn)`; postgres.js in the server (2 sockets, 5 minutes idle, `application_name = agentes.chat`, TLS `require` without certificate check like libpq, the server name for SNI); `createFakeDatabaseDriver` over PGlite in tests. Adapters get `databases` (always on in the server).
+- **Engine** (`packages/engine/src/databases/*`): `connections.ts` (test, create, reconnect, revoke, pool per connection version, `publicHostAddress` in `net-guard.ts` resolves and checks the host on every new pool and the driver connects to that address), `policies.ts`, `guard.ts`, `tools.ts`, `text.ts`.
+- **Tool names**: `pg_<slug>_list_tables`, `pg_<slug>_describe_table`, `pg_<slug>_query`, the slug from the connection's label (`databaseSlugs`); `connectorLabel` is the label, so the chat's work steps say "Produção".
+- **Parser**: `libpg-query` (Postgres 17's own parser as WASM, ~1.2 MB, no native build). The guard also walks the tree for any other `*Stmt`, `SELECT INTO`, `FOR UPDATE`, blocked functions (sleep, files, signals, advisory locks, large objects, dblink, `query_to_xml` and the other SQL-from-text XML functions, replication) and blocked catalogs (`pg_statistic`, `pg_stats*`, `pg_authid`, `pg_shadow`, user mappings). `SELECT`s run wrapped as `select * from (…) limit 501` with `search_path = public`, so unqualified names are `public.*` for the rules too.
+- **Hidden columns**: refused when named (any table in the query that has hidden columns), through `*`/`t.*`, or as a whole-row value (`row_to_json(t)`, `to_jsonb(users)`). Default: on connect the test lists columns whose names look sensitive (password, hash, secret, token, api key, salt, otp, cpf, cnpj, ssn, passport, phone, card, cvv, iban, birth…) into `suggested_hidden`; an agent without saved rules gets them hidden, and the rules step starts from them.
+- **Grants**: `database:read` with `connection_id`; never part of "all tools" (`*`), and replacing an agent's other grants keeps it (`notMailGrant` / `mailConnectionIds` now cover databases too). Levels in the app: Sem acesso · Ler.
+- **API** (`apps/server/src/routes/app/databases.ts`): list, connect (`422 { error: auth | unreachable | blocked_host | tls | unknown }`), update (label, tools off, new address or password, tested), disconnect, tables, and per agent get/put.
+- **Web**: the "Banco de dados" card (Desenvolvimento), the 4-step flow of email (conectar → o que faz → quem pode usar → regras), connected row, Reconectar, Desconectar, and a "Bancos de dados" card on the agent page.
+
+Not done: the private-network path through a connected computer; `pg_execute`; a schema summary in the agent's context (open question above); views or user functions that read hidden columns or other tables are not caught by the rules (the read-only role and the transaction still hold; recommend a role without access to what agents must not read).
