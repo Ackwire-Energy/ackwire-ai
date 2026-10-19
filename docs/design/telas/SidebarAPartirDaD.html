@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidebar a partir da D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&display=swap">
+<script>
+  { const h = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = h.get("theme") || "light"; }
+</script>
+<style>
+/*
+  Prototype (SidebarAPartirDaD): option D of SidebarDoisNiveis.html shipped (categories that open and close,
+  tools as icons on a closed header), and in the app it reads as confusing: three kinds of header (open
+  category, closed category with icons, conversation category), rows at 40px, icons that look like actions.
+  Hoje is the app as it is. Four simpler alternatives from D:
+
+  1 "Sem ícones": same categories, a closed one shows only its name and what waits for you. Prototype sizes.
+  2 "Fixas + Mais": what waits for you is three plain rows on top; the other six tools hide behind one "Mais"
+    row that opens in place. Only conversations have category headers.
+  3 "Grade": the same three rows, then the six tools as a 3×2 grid of small tiles, always in sight.
+  4 "Abas": the same three rows, then Conversas | Ferramentas; one list at a time.
+
+  Agents come from packages/ui/src/agent/engine.js (serve the repo root over http).
+*/
+:root,[data-theme="light"]{
+  --bg:#fbfbfa;--side:#f8f8f6;--rail:#f1f1ee;--pane:#ffffff;--raised:#fff;--sunken:#f3f3f0;
+  --line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --chosen:#ffffff;--chosen-shadow:0 1px 2px rgba(23,23,22,.07),0 0 0 1px rgba(23,23,22,.09);
+  --glass:rgba(255,255,255,.78);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.3),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --ok:#1f7a45;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b42a20;
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--display:"Funnel Display",var(--sans);
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --bg:#0f0f0e;--side:#121211;--rail:#0b0b0a;--pane:#151514;--raised:#1c1c1b;--sunken:#0a0a09;
+  --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --chosen:color-mix(in srgb,#fff 7%,var(--raised));--chosen-shadow:0 0 0 1px rgba(255,255,255,.1),inset 0 1px 0 rgba(255,255,255,.1);
+  --glass:rgba(30,30,28,.72);
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);
+  --e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.08);
+  --ok:#5fc48a;--warn:#e0a84a;--warn-soft:#33260e;--danger:#f08a80;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","tnum"}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit;color:inherit}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:none}
+.focusable:focus-visible,button:focus-visible{box-shadow:0 0 0 2px var(--side),0 0 0 4px var(--ink)!important}
+
+/* ---------- prototype bar (not product) ---------- */
+.proto{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--bg)}
+.proto b{color:var(--ink);font-weight:650}
+.proto .grow{flex:1}
+.proto .note{flex-basis:100%;max-width:110ch}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.seg button{height:26px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--chosen);color:var(--ink);box-shadow:var(--chosen-shadow)}
+.tog{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-weight:600}
+.tog input{accent-color:var(--ink)}
+
+/* ---------- shared bits ---------- */
+.kbd{font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:var(--plate);color:var(--muted);box-shadow:inset 0 -1px 0 rgba(0,0,0,.08)}
+.badge{min-width:18px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:var(--ink);color:var(--bg);flex:none}
+.count{min-width:18px;height:18px;padding:0 6px;border-radius:999px;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;background:var(--plate);color:var(--muted);flex:none}
+.glass{background:var(--glass);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3)}
+.av{position:relative;display:inline-grid;place-items:center;flex:none;width:var(--s);height:var(--s);border-radius:calc(var(--s) * .3);overflow:hidden}
+.av::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 rgba(255,255,255,.55);pointer-events:none}
+[data-theme="dark"] .av::after{box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 rgba(255,255,255,.07)}
+.av canvas{display:block;width:100%;height:100%}
+.av.person{background:var(--plate);color:var(--muted);font-weight:650;font-size:calc(var(--s) * .44)}
+.av.person img{width:100%;height:100%;object-fit:cover}
+.avw{position:relative;display:inline-flex;flex:none}
+.avw .st{position:absolute;right:-3px;bottom:-3px;width:12px;height:12px;border-radius:5px;background:var(--side);display:grid;place-items:center}
+.avw .st canvas{width:8px;height:8px;image-rendering:pixelated}
+@keyframes popin{from{opacity:0;transform:translateY(4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes slidein{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+
+/* ---------- app frame ---------- */
+.app{display:grid;grid-template-columns:auto minmax(0,1fr);height:calc(100vh - var(--protoH,90px));min-height:560px}
+.nav{display:flex;height:100%;min-height:0;position:relative;z-index:5}
+
+/* panel */
+.panel{width:272px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;transition:width .28s var(--out),opacity .2s}
+.panel.hidden{width:0;opacity:0;overflow:hidden;border-right:0}
+.panel .inner{width:272px;display:flex;flex-direction:column;min-height:0;height:100%;animation:slidein .22s var(--out)}
+.ph{display:flex;align-items:center;gap:6px;padding:14px 12px 10px 16px;min-height:58px}
+.ph h2{font-size:16px;font-weight:650;letter-spacing:-.015em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.ph h2 button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:2px 4px;margin:-2px -4px}
+.ph h2 button:hover{background:var(--plate)}
+.ph h2 svg.i{width:14px;height:14px;color:var(--muted)}
+.ib{width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;flex:none;transition:background .15s,color .15s,transform .18s var(--spring)}
+.ib:hover{background:var(--plate);color:var(--ink)}
+.ib:active{transform:scale(.94)}
+.ib svg.i{width:17px;height:17px}
+.jump{margin:0 12px 8px;height:32px;border-radius:10px;border:0;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2);display:flex;align-items:center;gap:8px;padding:0 6px 0 10px;color:var(--faint);cursor:pointer;font-size:13.5px}
+.jump:hover{box-shadow:inset 0 0 0 1px rgba(127,127,127,.3)}
+.jump svg.i{width:15px;height:15px}
+.jump span.t{flex:1;text-align:left}
+.scroll{flex:1;min-height:0;overflow-y:auto;padding:2px 8px 16px;scrollbar-width:thin}
+.row{position:relative;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:10px;color:var(--ink2);text-decoration:none;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;font-size:14px;transition:background .12s}
+.row:hover{background:var(--plate-soft)}
+.row[aria-current="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow);color:var(--ink);font-weight:600}
+.row svg.i{color:var(--muted);width:17px;height:17px}
+.row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sub{font-size:12px;color:var(--faint);font-weight:500;white-space:nowrap}
+.row.unread .nm{font-weight:650;color:var(--ink)}
+.row.tall{height:auto;min-height:48px;padding:7px 8px;align-items:flex-start}
+.row.tall .txt{flex:1;min-width:0}
+.row.tall .l1{display:flex;align-items:baseline;gap:6px}
+.row.tall .l1 b{font-weight:600;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.tall .l1 time{font-size:11.5px;color:var(--faint);flex:none}
+.row.tall .l2{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.row.tall.unread .l2{color:var(--ink2)}
+.row .live{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+.row .live canvas{width:10px;height:10px;image-rendering:pixelated}
+.sec{margin-top:14px}
+.sec:first-child{margin-top:4px}
+.sh{display:flex;align-items:center;gap:4px;height:28px;padding:0 4px 0 8px}
+.sh button.t{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:650;color:var(--muted);border-radius:6px;padding:2px 4px;margin-left:-4px;flex:1}
+.sh button.t:hover{color:var(--ink)}
+.sh button.t svg.i{width:13px;height:13px;transition:transform .2s var(--out)}
+.sec.closed .sh button.t svg.i{transform:rotate(-90deg)}
+.sec.closed .bd{display:none}
+.sh .ib{width:26px;height:26px;border-radius:8px;opacity:0;transition:opacity .15s}
+.sec:hover .sh .ib,.sh .ib:focus-visible{opacity:1}
+.sh .ib svg.i{width:15px;height:15px}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 4px 4px}
+.tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:60px;border-radius:12px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;position:relative;transition:transform .18s var(--spring),box-shadow .15s}
+.tool:hover{box-shadow:var(--e2),var(--top)}
+.tool:active{transform:scale(.96)}
+.tool[aria-current="true"]{box-shadow:0 0 0 1.5px var(--ink),var(--top)}
+.tool svg.i{width:18px;height:18px;color:var(--muted)}
+.tool .count{position:absolute;top:6px;right:6px;height:16px;min-width:16px;font-size:10.5px;padding:0 5px}
+.tabs{display:flex;gap:4px;margin:0 12px 10px;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.tabs button{flex:1;height:28px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.tabs button[aria-pressed="true"]{background:var(--chosen);color:var(--ink);box-shadow:var(--chosen-shadow)}
+.tabs button .count{height:16px;min-width:16px;font-size:10.5px;padding:0 5px}
+.pf{border-top:1px solid var(--line);padding:10px 12px;display:flex;align-items:center;gap:8px}
+.pf .b{flex:1;height:32px;border-radius:10px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);font-size:13px;font-weight:600;color:var(--ink2);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.pf .b svg.i{width:15px;height:15px}
+.note-s{font-size:12px;color:var(--faint);padding:2px 8px 8px}
+.wiki-tree .row{height:30px}
+.wiki-tree .row.l2{padding-left:30px}
+.wiki-tree .row.l3{padding-left:52px}
+.chip-s{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;background:var(--plate);color:var(--muted);font-size:11px;font-weight:600;flex:none}
+.chip-s svg.i{width:11px;height:11px}
+.chip-s.warn{background:var(--warn-soft);color:var(--warn)}
+
+/* ---------- D: categories ---------- */
+.dorg{display:flex;align-items:center;gap:6px;padding:12px 10px 10px 10px}
+.orgb{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:48px;padding:0 10px 0 6px;border:0;border-radius:14px;background:transparent;cursor:pointer;text-align:left}
+.orgb:hover{background:var(--plate-soft)}
+.orgb .tile{width:36px;height:36px;border-radius:11px;position:relative;overflow:hidden;flex:none;box-shadow:var(--e1),var(--top)}
+.orgb .tile canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.orgb .tile span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:18px;color:#0a3f9c}
+[data-theme="dark"] .orgb .tile span{color:#eef7ff}
+.orgb .tx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.orgb .tx b{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.orgb .tx small{font-size:12px;color:var(--faint)}
+.orgb>svg.i{width:14px;height:14px;color:var(--muted)}
+.dscroll{padding-top:4px}
+.cat{margin-top:6px}
+.cat:first-child{margin-top:0}
+.ch{display:flex;align-items:center;gap:6px;height:32px;padding:0 4px 0 4px;border-radius:10px}
+.ch:hover{background:var(--plate-soft)}
+.ch button.t{all:unset;cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px;border-radius:8px;font-size:13px;font-weight:650;color:var(--muted)}
+.ch button.t:hover,.cat.open .ch button.t{color:var(--ink2)}
+.ch button.t svg.i{width:14px;height:14px;transform:rotate(-90deg);transition:transform .22s var(--out);color:var(--faint)}
+.cat.open .ch button.t svg.i{transform:none}
+.ch .add{width:26px;height:26px;border-radius:8px;opacity:0;transition:opacity .15s}
+.ch:hover .add,.ch .add:focus-visible{opacity:1}
+.ch .add svg.i{width:15px;height:15px}
+.ch .badge,.ch .count{margin-right:4px}
+.cat:not(.open) .ch:hover .add{display:none}
+.ci{display:flex;gap:2px;margin-right:2px}
+.mini{position:relative;width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;transition:background .12s,transform .18s var(--spring)}
+.mini:hover{background:var(--plate);color:var(--ink)}
+.mini:active{transform:scale(.92)}
+.mini[aria-current="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow);color:var(--ink)}
+.mini svg.i{width:16px;height:16px}
+.mini .dot-n{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:3px;background:var(--ink);box-shadow:0 0 0 2px var(--side)}
+.cb{display:grid;grid-template-rows:1fr;transition:grid-template-rows .26s var(--out)}
+.cbi{min-height:0;overflow:hidden;padding-left:6px}
+.cat:not(.open) .cbi:empty{display:none}
+.dsep{height:1px;background:var(--line);margin:12px 8px 10px}
+.dfoot{display:flex;gap:8px;align-items:center;padding:10px;border-top:1px solid var(--line)}
+.dfoot .b{height:40px;padding:0 14px;border-radius:12px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);font-size:13.5px;font-weight:600;color:var(--ink2);display:inline-flex;align-items:center;gap:7px;cursor:pointer;flex:none}
+.dfoot .b:hover{box-shadow:var(--e2),var(--top)}
+.dfoot .b svg.i{width:16px;height:16px}
+.mecard{flex:1;min-width:0;height:40px;display:flex;align-items:center;gap:9px;padding:0 10px 0 4px;border:0;border-radius:12px;background:transparent;cursor:pointer;text-align:left}
+.mecard:hover{background:var(--plate-soft)}
+.mecard .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.mecard .tx b{font-size:13.5px;font-weight:600;line-height:1}
+.mecard .bar{height:4px;border-radius:2px;background:var(--plate);overflow:hidden}
+.mecard .bar i{display:block;height:100%;width:16%;background:var(--ink2)}
+.mecard .pc{font-size:12px;color:var(--faint)}
+
+/* menu (Mais, +, me) */
+.menu{position:absolute;z-index:30;width:260px;border-radius:16px;padding:6px;animation:popin .16s var(--out)}
+.menu .mh{font-size:11.5px;font-weight:650;color:var(--faint);padding:8px 10px 4px}
+.menu button.mi{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border:0;border-radius:10px;background:transparent;cursor:pointer;font-size:14px;color:var(--ink2);text-align:left}
+.menu button.mi:hover{background:var(--plate)}
+.menu button.mi svg.i{width:17px;height:17px;color:var(--muted)}
+.menu button.mi .d{font-size:12px;color:var(--faint);margin-left:auto}
+.menu hr{border:0;height:1px;background:var(--line);margin:6px 4px}
+.menu .budget{padding:6px 10px 10px}
+.menu .budget .bar{height:6px;border-radius:3px;background:var(--plate);margin-top:6px;overflow:hidden}
+.menu .budget .bar i{display:block;height:100%;width:16%;background:var(--ink2);border-radius:3px}
+.menu .budget p{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+.menu .who{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.menu .who b{display:block;font-size:14px}
+.menu .who small{color:var(--faint);font-size:12px}
+.tip{position:absolute;z-index:40;left:80px;padding:6px 10px;border-radius:10px;font-size:12.5px;font-weight:600;white-space:nowrap;pointer-events:none;animation:popin .12s var(--out)}
+
+/* ---------- main (mock of the open page) ---------- */
+.main{min-width:0;background:var(--pane);display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:10px;height:58px;padding:0 22px;border-bottom:1px solid var(--line)}
+.topbar h1{font-size:16px;font-weight:650;letter-spacing:-.015em;display:flex;align-items:center;gap:8px}
+.topbar h1 svg.i{color:var(--muted)}
+.topbar .grow{flex:1}
+.mb{flex:1;overflow:auto;padding:24px 28px;max-width:860px}
+.mb h3{font-family:var(--display);font-weight:300;font-size:34px;letter-spacing:-.03em;line-height:1.05;margin-bottom:8px}
+.mb .lead{color:var(--muted);max-width:60ch;margin-bottom:22px}
+.msg{display:flex;gap:12px;padding:8px 0;max-width:72ch}
+.msg .who{font-weight:650;font-size:14px}
+.msg .who time{font-weight:500;color:var(--faint);font-size:12px;margin-left:6px}
+.msg p{color:var(--ink2)}
+.ghost{height:12px;border-radius:6px;background:var(--plate-soft);margin:10px 0}
+.board{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px}
+.col{background:var(--sunken);border-radius:16px;padding:10px;min-height:260px}
+.col h4{margin:2px 4px 10px;font-size:12.5px;font-weight:650;color:var(--muted)}
+.card{background:var(--raised);border-radius:12px;box-shadow:var(--e1),var(--top);padding:10px 12px;font-size:13px;margin-bottom:8px}
+.cmp{margin-top:24px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:900px}
+.cmp .opt{border-radius:20px;background:var(--raised);box-shadow:var(--e1),var(--top);padding:14px 16px}
+.cmp .opt[data-on="true"]{box-shadow:0 0 0 1.5px var(--ink),var(--top)}
+.cmp h4{font-size:14px;font-weight:650;margin-bottom:6px}
+.cmp ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px}
+.cmp li{margin:3px 0}
+.cmp li.p::marker{content:"+  ";color:var(--ok)}
+.cmp li.m::marker{content:"–  ";color:var(--danger)}
+@media (max-width:1100px){.cmp{grid-template-columns:1fr}.board{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){.main{display:none}.app{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ---------- this prototype ---------- */
+.app{grid-template-columns:280px minmax(0,1fr)}
+.panel,.panel .inner{width:280px}
+/* Hoje: the app as shipped (40px rows, 14.5px names, 20px dark icons, 14.5px category names). */
+[data-v="hoje"] .row{height:40px;font-size:14.5px;color:var(--ink)}
+[data-v="hoje"] .row svg.i{width:20px;height:20px;color:var(--ink)}
+[data-v="hoje"] .ch button.t{font-size:14.5px}
+[data-v="hoje"] .cat.open .ch button.t{color:var(--ink)}
+/* 2 · Mais: one row that opens the other tools in place. */
+.row.more .chv{margin-left:auto;display:inline-flex;color:var(--faint);transition:transform .22s var(--out)}
+.row.more .chv svg.i{width:14px;height:14px}
+.row.more[aria-expanded="false"] .chv{transform:rotate(-90deg)}
+.morebody{padding-left:6px}
+/* 3 · Grade: six small tiles, quiet until hovered. */
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 2px 2px}
+.tile2{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:54px;border:0;border-radius:12px;background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2);font-size:12px;font-weight:550;cursor:pointer;transition:background .12s,transform .18s var(--spring)}
+.tile2:hover{background:var(--plate-soft)}
+.tile2:active{transform:scale(.96)}
+.tile2[aria-current="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow);color:var(--ink);font-weight:650}
+.tile2 svg.i{width:18px;height:18px;color:var(--muted)}
+/* 4 · Abas */
+.dscroll .tabs{margin:10px 0 8px}
+.tlabel{font-size:12.5px;font-weight:650;color:var(--muted);padding:12px 8px 4px}
+.tlabel:first-child{padding-top:2px}
+/* 5 · Mais ao lado: the other tools float next to the sidebar, with a line on what each one is for. */
+.menu.side{width:300px;padding:8px}
+.menu.side .mh:first-child{padding-top:4px}
+.menu.side button.mi{height:auto;min-height:48px;padding:7px 10px;align-items:flex-start}
+.menu.side button.mi svg.i{margin-top:2px}
+.menu.side .mt{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
+.menu.side .mt b{font-weight:600;font-size:14px;color:var(--ink)}
+.menu.side .mt small{font-size:12.5px;color:var(--muted);line-height:1.35}
+.menu.side button.mi[aria-current="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow)}
+.row.more[aria-expanded="true"]{background:var(--plate)}
+.row.more.side .chv{transform:none}
+</style>
+</head>
+<body>
+<div class="proto" id="proto">
+  <b>Sidebar a partir da D</b>
+  <div class="seg" data-k="v"><button data-o="hoje">Hoje</button><button data-o="limpa">1 · Sem ícones</button><button data-o="mais">2 · Fixas + Mais</button><button data-o="grade">3 · Grade</button><button data-o="abas">4 · Abas</button><button data-o="lado">5 · Mais ao lado</button></div>
+  <div class="seg" data-k="theme"><button data-o="light">Claro</button><button data-o="dark">Escuro</button></div>
+  <p class="note" id="note"></p>
+</div>
+<div class="app">
+  <div class="nav" id="nav"></div>
+  <main class="main" id="main"></main>
+</div>
+
+<script type="module">
+import { drawAgent, idlePose, drawAccessory, AGENT_GRADIENTS, mixHex, bodyTones } from "../../../packages/ui/src/agent/engine.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/* ---------- icons ---------- */
+const sv = (d) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  home: sv('<path d="M4 11 12 4.5l8 6.5"/><path d="M6 9.5V19a1 1 0 0 0 1 1h3.5v-5.5h3V20H17a1 1 0 0 0 1-1V9.5"/>'),
+  dm: sv('<path d="M4 5h16v11H9l-5 4V5Z"/>'),
+  bell: sv('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+  inbox: sv('<path d="M4 13.5 6.5 5h11l2.5 8.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M4 13.5h4.5l1 2h5l1-2H20"/>'),
+  waiting: sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  thread: sv('<path d="M4 5h12v8H9l-5 3.5V5Z"/><path d="M19 9.5v10l-3-2.5h-5"/>'),
+  tasks: sv('<rect x="4.5" y="4" width="15" height="16" rx="3.5"/><path d="M8.5 9.5h7M8.5 13.5h5"/>'),
+  routines: sv('<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5M12 8v4l2.5 1.5"/>'),
+  cal: sv('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
+  forum: sv('<path d="M3.5 5h11v8H8l-4.5 3.5V5Z"/><path d="M17.5 9h3v10.5L17 17h-6.5v-2"/>'),
+  book: sv('<path d="M4 5.5C6.5 4.5 9.5 4.5 12 6c2.5-1.5 5.5-1.5 8-.5V19c-2.5-1-5.5-1-8 .5-2.5-1.5-5.5-1.5-8-.5Z"/><path d="M12 6v13.5"/>'),
+  drive: sv('<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>'),
+  work: sv('<rect x="3.5" y="7" width="17" height="12.5" rx="3"/><path d="M9 7V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>'),
+  know: sv('<path d="M12 3.5a6 6 0 0 0-3.5 10.9V17h7v-2.6A6 6 0 0 0 12 3.5Z"/><path d="M9.5 20.5h5"/>'),
+  team: sv('<circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="8.5" r="2.5"/><path d="M15.5 13.6c2.4-.3 4.4 1.2 5 4.4"/>'),
+  more: sv('<circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/>'),
+  hash: sv('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>'),
+  search: sv('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
+  plus: sv('<path d="M12 5v14M5 12h14"/>'),
+  chev: sv('<path d="m6 9 6 6 6-6"/>'),
+  side: sv('<rect x="3.5" y="4.5" width="17" height="15" rx="3.5"/><path d="M14.5 4.5v15"/>'),
+  agent: sv('<rect x="5" y="6" width="14" height="13" rx="4"/><path d="M9.5 11.5v1.5M14.5 11.5v1.5M12 3.5V6"/>'),
+  edit: sv('<path d="M5 19h3.5L19 8.5 15.5 5 5 15.5Z"/><path d="m13.5 7 3.5 3.5"/>'),
+  doc: sv('<path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20Z"/><path d="M14 3.5V8h4"/>'),
+  gear: sv('<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/>'),
+  moon: sv('<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5Z"/>'),
+  out: sv('<path d="M10 5H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h4M14 8l4 4-4 4M18 12H9.5"/>'),
+  org: sv('<rect x="9" y="3.5" width="6" height="5" rx="1.5"/><rect x="3.5" y="15.5" width="6" height="5" rx="1.5"/><rect x="14.5" y="15.5" width="6" height="5" rx="1.5"/><path d="M12 8.5V12M6.5 15.5V12h11v3.5"/>'),
+  plug: sv('<path d="M9 3.5v4M15 3.5v4M6.5 7.5h11V11a5.5 5.5 0 0 1-11 0Z"/><path d="M12 16.5v4"/>'),
+  pc: sv('<rect x="3.5" y="4.5" width="17" height="11.5" rx="2.5"/><path d="M8.5 20h7M12 16v4"/>'),
+  stage: sv('<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none" opacity=".35"/>'),
+};
+
+/* ---------- workspace ---------- */
+const AGENTS = {
+  lia: { name: "Lia", role: "Engenharia", color: "sky", eyes: "round", acc: "headset", state: "run", what: "escrevendo em #tech" },
+  atlas: { name: "Atlas", role: "Observabilidade", color: "violet", eyes: "round", acc: "headphones", state: "idle" },
+  theo: { name: "Theo", role: "Produto", color: "amber", eyes: "round", acc: "cap", state: "run", what: "rodando uma rotina" },
+  nina: { name: "Nina", role: "Dados", color: "green", eyes: "dots", acc: "bow", state: "idle" },
+};
+const ME_IMG = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#c9cfd6"/><circle cx="20" cy="16" r="7" fill="#7b8794"/><path d="M6 40c2-9 8-13 14-13s12 4 14 13Z" fill="#4b5563"/></svg>');
+const PEOPLE = { thay: { name: "Thay" } };
+const CHANNELS = [
+  { id: "general", name: "general", unread: false },
+  { id: "tech", name: "tech", unread: true },
+  { id: "produto", name: "produto", unread: false },
+  { id: "incidentes", name: "incidentes", unread: false },
+];
+const DMS = [
+  { id: "lia", m: "2 min", text: "Subi a correção do frete no PR #415.", unread: 2 },
+  { id: "thay", m: "18 min", text: "Consegue olhar o texto do onboarding?", unread: 1 },
+  { id: "nina", m: "1 h", text: "Relatório de churn de setembro pronto.", unread: 0 },
+  { id: "theo", m: "ontem", text: "Rotina das 18h rodou sem erro.", unread: 0 },
+  { id: "atlas", m: "sex", text: "Taxa de erro estável em 0,4%.", unread: 0 },
+];
+const THREADS = [
+  { t: "Release 2.4.1", ch: "tech", m: "9 min", unread: true },
+  { t: "Plano anual com 2 meses grátis", ch: "produto", m: "1 h", unread: true },
+];
+const COUNTS = { notif: 210, approvals: 1, threads: 2 };
+const nameOf = (id) => AGENTS[id]?.name ?? PEOPLE[id]?.name ?? id;
+const unreadDms = DMS.reduce((s, d) => s + d.unread, 0);
+const cap = (n) => (n > 99 ? "99+" : String(n));
+
+/* ---------- tools (every route the app has) ---------- */
+const TOOLS = {
+  notifications: { label: "Notificações", short: "Avisos", icon: "bell" },
+  approvals: { label: "Aprovações", short: "Aprovar", icon: "waiting" },
+  threads: { label: "Threads", icon: "thread" },
+  tasks: { label: "Tarefas", icon: "tasks" },
+  routines: { label: "Rotinas", icon: "routines" },
+  calendar: { label: "Calendário", icon: "cal" },
+  forum: { label: "Fórum", icon: "forum" },
+  wiki: { label: "Wiki", icon: "book" },
+  drive: { label: "Drive", icon: "drive" },
+  team: { label: "Equipe", icon: "org" },
+};
+
+/* ---------- state ---------- */
+const h = new URLSearchParams(location.hash.slice(1));
+const S = {
+  v: h.get("v") || "hoje",
+  // Categories open at start: what waits for you and the conversations; the rest closed.
+  dopen: new Set(["inbox", "channels", "agents", "people"]),
+  more: false,
+  tabv: "talk",
+  theme: document.documentElement.dataset.theme,
+  open: { kind: "channel", id: "general" }, // what the main shows
+  closed: new Set(),
+  menu: null,
+};
+const NOTES = {
+  hoje: "<b>Hoje.</b> O sidebar como está no app: <b>Para você</b> (notificações, aprovações, threads, fórum) aberta; <b>Agenda</b> e <b>Documentos</b> fechadas, com as ferramentas como ícones no cabeçalho. Linhas de 40px.",
+  limpa: "<b>1 · Sem ícones.</b> As mesmas categorias, mas fechada a categoria mostra só o nome e o que espera você, igual a Canais, Agentes e Pessoas. Um tipo de cabeçalho só. Linhas de 32px como na D.",
+  mais: "<b>2 · Fixas + Mais.</b> Notificações, Aprovações e Threads são linhas soltas no topo (o que espera você nunca se esconde). As outras seis ferramentas ficam atrás de <b>Mais</b>, que abre ali mesmo; fechado, continua mostrando a ferramenta aberta. Só as conversas têm cabeçalho.",
+  grade: "<b>3 · Grade.</b> As mesmas três linhas no topo; as outras seis ferramentas viram blocos pequenos com nome, sempre à vista. Nada abre e fecha nas ferramentas.",
+  lado: "<b>5 · Mais ao lado.</b> Fixas as principais: Notificações, Aprovações, Threads, Tarefas, Wiki e Drive. <b>Mais</b> abre ao lado da sidebar, sem empurrar nada, com Rotinas, Calendário e Fórum em grupos e uma linha dizendo para que serve cada um. A ferramenta aberta pelo Mais aparece embaixo dele até você sair dela.",
+  abas: "<b>4 · Abas.</b> As mesmas três linhas no topo; embaixo, <b>Conversas | Ferramentas</b>. Uma lista por vez: Conversas mostra canais, agentes e pessoas; Ferramentas mostra Agenda e Documentos com nome, sem recolher.",
+};
+
+/* ---------- avatars (engine, Céu frame) ---------- */
+const live = [];
+const orbs = [];
+const seedOf = (id) => [...id].reduce((s, c) => s + c.charCodeAt(0), 0) % 7;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const skyCache = new Map();
+function skyOf(color, px, dark) {
+  const key = `${color}|${px}|${dark}`;
+  if (skyCache.has(key)) return skyCache.get(key);
+  const [lt, dp] = AGENT_GRADIENTS[color];
+  const base = dark ? "#1c1c1b" : "#ffffff";
+  const a = dark ? mixHex(dp, base, .78) : mixHex(lt, base, .86);
+  const b = dark ? mixHex(dp, base, .55) : mixHex(lt, base, .62);
+  const c = document.createElement("canvas");
+  c.width = c.height = px;
+  const g = c.getContext("2d");
+  const n = Math.max(8, Math.round(px / 4)), cell = px / n;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const t = Math.min(1, Math.max(0, (y / (n - 1)) * 1.15 - .1));
+    g.fillStyle = t * 16 > BAYER[(y % 4) * 4 + (x % 4)] ? b : a;
+    g.fillRect(Math.floor(x * cell), Math.floor(y * cell), Math.ceil(cell), Math.ceil(cell));
+  }
+  skyCache.set(key, c);
+  return c;
+}
+const av = (id, size) =>
+  AGENTS[id]
+    ? `<span class="avs" data-a="${id}" data-s="${size}"></span>`
+    : id === "me"
+      ? `<span class="av person" style="--s:${size}px" role="img" aria-label="Walter"><img src="${ME_IMG}" alt=""></span>`
+      : `<span class="av person" style="--s:${size}px" role="img" aria-label="${esc(nameOf(id))}">${esc(nameOf(id)[0])}</span>`;
+/* Working agents carry the 3×3 pixel orbit at the corner. */
+const avState = (id, size) =>
+  `<span class="avw">${av(id, size)}${AGENTS[id]?.state === "run" ? `<span class="st"><canvas class="orb" data-c="${AGENTS[id].color}"></canvas></span>` : ""}</span>`;
+function mount(root) {
+  for (const el of $$(".avs", root)) {
+    const id = el.dataset.a, size = +el.dataset.s, a = AGENTS[id];
+    const w = document.createElement("span");
+    w.className = "av";
+    w.style.setProperty("--s", size + "px");
+    w.setAttribute("role", "img");
+    w.setAttribute("aria-label", `${a.name}, agente`);
+    const cv = document.createElement("canvas");
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = cv.height = Math.round(size * dpr);
+    w.append(cv);
+    el.replaceWith(w);
+    live.push({ cv, a, size, seed: seedOf(id) + Math.random() });
+  }
+  for (const cv of $$("canvas.orb:not([data-on])", root)) {
+    cv.dataset.on = "1";
+    cv.width = cv.height = 3;
+    orbs.push({ cv, color: cv.dataset.c });
+  }
+}
+const RING = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+function draw(t) {
+  const dark = S.theme === "dark";
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i];
+    if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const g = it.cv.getContext("2d"), s = it.cv.width;
+    g.clearRect(0, 0, s, s);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(skyOf(it.a.color, s, dark), 0, 0, s, s);
+    const acc = it.size >= 30 && it.a.acc;
+    const inner = s * (acc ? .6 : .66);
+    const x = (s - inner) / 2, y = s - inner - s * (acc ? .1 : .14);
+    let pose;
+    if (REDUCED) pose = {};
+    else if (it.a.state === "run") { pose = idlePose(t, it.seed, { active: true, expressions: [] }); pose.writing = true; }
+    else pose = idlePose(t, it.seed, { every: 14, expressions: ["happy", "wink"] });
+    drawAgent(g, x, y, inner, {
+      color: it.a.color, eyes: it.a.eyes, cells: 12, pose,
+      after: acc ? (gg, side, frame) => drawAccessory(gg, side, it.a.acc, frame, t, it.a.state === "run") : undefined,
+    });
+  }
+  const step = Math.floor(t * 8);
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i];
+    if (!o.cv.isConnected) { orbs.splice(i, 1); continue; }
+    const g = o.cv.getContext("2d"), tn = bodyTones(o.color);
+    g.clearRect(0, 0, 3, 3);
+    RING.forEach(([x, y], k) => {
+      const d = (step - k + 80) % 8;
+      g.fillStyle = d === 0 ? tn[0] : d === 1 ? tn[2] ?? tn[0] : d === 2 ? tn.at(-1) : mixHex(tn.at(-1), dark ? "#1c1c1b" : "#ffffff", .6);
+      g.fillRect(x, y, 1, 1);
+    });
+  }
+}
+function loop(ms) { draw(ms / 1000); if (!REDUCED) requestAnimationFrame(loop); }
+
+/* The workspace tile and the rail's foot: the brand sky in soft tones (light in persistent chrome). */
+const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+function paintOrg(cv) {
+  const n = 10; cv.width = cv.height = n;
+  const g = cv.getContext("2d"), dark = S.theme === "dark";
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const t = y / (n - 1), k = t * 3 + BAYER[(y % 4) * 4 + (x % 4)] / 16;
+    g.fillStyle = dark ? SKY[Math.min(3, Math.floor(k))] : SKY[7 - Math.min(3, Math.floor(k))];
+    g.fillRect(x, y, 1, 1);
+  }
+}
+
+/* ---------- pieces ---------- */
+const isOpen = (kind, id) => S.open.kind === kind && (id === undefined || S.open.id === id);
+const cur = (b) => `aria-current="${b}"`;
+function row({ kind, id, icon, label, right = "", unread = false, avatarId }) {
+  return `<button class="row focusable ${unread ? "unread" : ""}" data-open="${kind}:${id ?? ""}" ${cur(isOpen(kind, id))}>
+    ${avatarId ? avState(avatarId, 22) : I[icon]}<span class="nm">${esc(label)}</span>${right}</button>`;
+}
+const toolRow = (k, right = "") => row({ kind: "tool", id: k, icon: TOOLS[k].icon, label: TOOLS[k].label, right });
+function sec(key, title, body, add) {
+  return `<div class="sec ${S.closed.has(key) ? "closed" : ""}" data-sec="${key}">
+    <div class="sh"><button class="t focusable" data-toggle="${key}" aria-expanded="${!S.closed.has(key)}">${I.chev}${esc(title)}</button>
+    ${add ? `<button class="ib focusable" aria-label="${esc(add)}" title="${esc(add)}" data-menu="new">${I.plus}</button>` : ""}</div>
+    <div class="bd">${body}</div></div>`;
+}
+const agentLive = (id) => {
+  const a = AGENTS[id];
+  if (a.state === "run") return `<span class="live">${esc(a.what)}</span>`;
+  const n = DMS.find((d) => d.id === id)?.unread;
+  return n ? `<span class="count">${n}</span>` : "";
+};
+const channelsBody = () => CHANNELS.map((c) => row({ kind: "channel", id: c.id, icon: "hash", label: c.name, unread: c.unread })).join("");
+const agentsBody = () => Object.keys(AGENTS).map((id) => row({ kind: "dm", id, label: AGENTS[id].name, avatarId: id, right: agentLive(id), unread: !!DMS.find((d) => d.id === id)?.unread })).join("");
+const peopleBody = () => Object.keys(PEOPLE).map((id) => row({ kind: "dm", id, label: nameOf(id), avatarId: id, unread: !!DMS.find((d) => d.id === id)?.unread, right: DMS.find((d) => d.id === id)?.unread ? `<span class="count">${DMS.find((d) => d.id === id).unread}</span>` : "" })).join("");
+function head(title, { orgMenu = false, actions = "" } = {}) {
+  return `<div class="ph"><h2>${orgMenu ? `<button class="focusable" data-menu="org">${esc(title)}${I.chev}</button>` : esc(title)}</h2>${actions}
+    <button class="ib focusable" data-hide aria-label="Esconder painel" title="Esconder painel (⌘\\)">${I.side}</button></div>`;
+}
+const jump = (ph = "Ir para…") => `<button class="jump focusable">${I.search}<span class="t">${ph}</span><span class="kbd">⌘</span><span class="kbd">K</span></button>`;
+const dmRow = (d) => `<button class="row tall focusable ${d.unread ? "unread" : ""}" data-open="dm:${d.id}" ${cur(isOpen("dm", d.id))}>
+  ${avState(d.id, 32)}<span class="txt"><span class="l1"><b>${esc(nameOf(d.id))}</b><time>${d.m}</time></span><span class="l2">${esc(d.text)}</span></span>
+  ${d.unread ? `<span class="count">${d.unread}</span>` : ""}</button>`;
+const threadRow = (x) => `<button class="row tall focusable ${x.unread ? "unread" : ""}" data-open="tool:threads">
+  ${I.thread}<span class="txt"><span class="l1"><b>${esc(x.t)}</b><time>${x.m}</time></span><span class="l2">#${x.ch}</span></span></button>`;
+const ACTIVITY = [
+  { who: "lia", wait: true, t: "Lia está esperando você", s: "Uso o cupom antigo quando o novo falhar?", m: "25 min" },
+  { who: "atlas", wait: true, t: "Aprovação: merge do PR #412", s: "GitHub · squash em main", m: "1 h", ap: true },
+  { who: "thay", t: "Thay mencionou você em #produto", s: "Consegue revisar o texto do onboarding?", m: "34 min" },
+  { who: "nina", t: "Nina terminou uma tarefa", s: "Relatório de churn de setembro", m: "1 h" },
+  { who: "theo", t: "Theo comentou em Release 2.4.1", s: "Rotina das 18h rodou sem erro.", m: "2 h" },
+];
+const actRow = (x) => `<button class="row tall focusable unread" data-open="tool:${x.ap ? "approvals" : "notifications"}">
+  ${avState(x.who, 32)}<span class="txt"><span class="l1"><b>${esc(x.t)}</b><time>${x.m}</time></span><span class="l2">${esc(x.s)}</span></span></button>`;
+
+const TASKS = [
+  { t: "Timeout no cálculo de frete", n: 131, who: "lia", st: "Em andamento" },
+  { t: "Exportar relatório em CSV", n: 119, who: "nina", st: "Em revisão" },
+  { t: "Texto do onboarding", n: 140, who: "me", st: "A fazer" },
+];
+const taskRow = (x) => `<button class="row tall focusable" data-open="tool:tasks">${avState(x.who, 22)}<span class="txt"><span class="l1"><b>${esc(x.t)}</b></span><span class="l2">#${x.n} · ${x.st}</span></span></button>`;
+
+/* ---------- sidebar variants ---------- */
+const TODAY = [
+  { k: "inbox", label: "Para você", tools: ["notifications", "approvals", "threads", "forum"] },
+  { k: "work", label: "Agenda", tools: ["tasks", "routines", "calendar"] },
+  { k: "docs", label: "Documentos", tools: ["wiki", "drive"] },
+];
+const INBOX = ["notifications", "approvals", "threads"];
+const OTHER = ["tasks", "routines", "calendar", "forum", "wiki", "drive"];
+const toolCount = (k) => (k === "notifications" ? `<span class="badge">${cap(COUNTS.notif)}</span>` : k === "approvals" ? `<span class="badge">${COUNTS.approvals}</span>` : k === "threads" ? `<span class="count">${COUNTS.threads}</span>` : k === "tasks" ? '<span class="count">3</span>' : "");
+const rows = (list) => list.map((k) => toolRow(k, toolCount(k))).join("");
+const activeTool = (list) => rows(list.filter((k) => isOpen("tool", k)));
+/* What a closed category still says: the sum of what waits for you (badge = needs you, count = neutral). */
+function catSum(tools) {
+  const urgent = tools.includes("notifications") ? COUNTS.notif + COUNTS.approvals : 0;
+  if (urgent) return `<span class="badge">${cap(urgent)}</span>`;
+  const n = tools.includes("threads") ? COUNTS.threads : tools.includes("tasks") ? 3 : 0;
+  return n ? `<span class="count">${n}</span>` : "";
+}
+const minis = (tools) => tools.map((k) => `<button class="mini focusable" data-open="tool:${k}" ${cur(isOpen("tool", k))} aria-label="${TOOLS[k].label}" title="${TOOLS[k].label}">${I[TOOLS[k].icon]}${k === "notifications" || k === "approvals" ? '<i class="dot-n"></i>' : ""}</button>`).join("");
+const unreadIn = { channels: CHANNELS.filter((c) => c.unread).length, agents: DMS.filter((d) => AGENTS[d.id] && d.unread).reduce((s, d) => s + d.unread, 0), people: DMS.filter((d) => PEOPLE[d.id] && d.unread).reduce((s, d) => s + d.unread, 0) };
+function cat(k, label, body, { sum = "", icons = "", add = "", active = "" } = {}) {
+  const open = S.dopen.has(k);
+  return `<div class="cat ${open ? "open" : ""}" data-k="${k}">
+    <div class="ch">
+      <button class="t focusable" data-cat="${k}" aria-expanded="${open}">${I.chev}<span>${esc(label)}</span></button>
+      ${!open && icons ? `<span class="ci">${icons}</span>` : ""}
+      ${!open && !icons ? sum : ""}
+      ${add ? `<button class="ib add focusable" aria-label="${esc(add)}" title="${esc(add)}" data-menu="new">${I.plus}</button>` : ""}
+    </div>
+    <div class="cb"><div class="cbi">${open ? body : active}</div></div></div>`;
+}
+const sumOf = (n) => (n ? `<span class="count">${n}</span>` : "");
+const activeConv = (filter) => (S.open.kind === "channel" || S.open.kind === "dm" ? filter() : "");
+const conversations = () => `
+  ${cat("channels", "Canais", channelsBody(), { sum: sumOf(unreadIn.channels), add: "Novo canal", active: activeConv(() => CHANNELS.filter((c) => isOpen("channel", c.id)).map((c) => row({ kind: "channel", id: c.id, icon: "hash", label: c.name })).join("")) })}
+  ${cat("agents", "Agentes", agentsBody() + row({ kind: "tool", id: "team", icon: "org", label: "Equipe" }), { sum: sumOf(unreadIn.agents), add: "Criar agente", active: activeConv(() => Object.keys(AGENTS).filter((id) => isOpen("dm", id)).map((id) => row({ kind: "dm", id, label: AGENTS[id].name, avatarId: id })).join("")) })}
+  ${cat("people", "Pessoas", peopleBody(), { sum: sumOf(unreadIn.people), add: "Convidar pessoa", active: activeConv(() => Object.keys(PEOPLE).filter((id) => isOpen("dm", id)).map((id) => row({ kind: "dm", id, label: nameOf(id), avatarId: id })).join("")) })}`;
+const shell = (content) => `<div class="inner">
+  <div class="dorg"><button class="orgb focusable" data-menu="org"><span class="tile"><canvas id="orgSky"></canvas><span>T</span></span>
+    <span class="tx"><b>Viajolo</b><small>2 pessoas · 4 agentes</small></span>${I.chev}</button>
+    <button class="ib focusable" aria-label="Esconder sidebar" title="Esconder sidebar (⌘\\)">${I.side}</button></div>
+  ${jump()}
+  <div class="scroll dscroll">${content}</div>
+  <div class="dfoot">
+    <button class="b focusable" data-menu="new">${I.plus}Criar</button>
+    <button class="mecard focusable" data-menu="me">${av("me", 32)}<span class="tx"><b>Walter</b><span class="bar"><i></i></span></span><span class="pc">16%</span></button>
+  </div></div>`;
+const SEP = '<div class="dsep"></div>';
+
+const P = {};
+/* Hoje: the app as it is (D with icons on closed headers, today's names and groups). */
+P.hoje = () => shell(TODAY.map((c) => cat(c.k, c.label, rows(c.tools), { icons: minis(c.tools), active: activeTool(c.tools) })).join("") + SEP + conversations());
+/* 1: the same categories, without icons on the header; closed = name + what waits for you. */
+P.limpa = () => shell(TODAY.map((c) => cat(c.k, c.label, rows(c.tools), { sum: catSum(c.tools), active: activeTool(c.tools) })).join("") + SEP + conversations());
+/* 2: what waits for you on top, the rest behind "Mais" (opens in place; keeps the open tool in sight). */
+P.mais = () => shell(`${rows(INBOX)}
+  <button class="row focusable more" data-more aria-expanded="${S.more}">${I.more}<span class="nm">Mais</span><span class="chv">${I.chev}</span></button>
+  <div class="morebody">${S.more ? rows(OTHER) : activeTool(OTHER)}</div>${SEP}${conversations()}`);
+/* 3: what waits for you on top, then every other tool as a small tile. */
+P.grade = () => shell(`${rows(INBOX)}
+  <div class="tgrid">${OTHER.map((k) => `<button class="tile2 focusable" data-open="tool:${k}" ${cur(isOpen("tool", k))}>${I[TOOLS[k].icon]}${TOOLS[k].label}</button>`).join("")}</div>${SEP}${conversations()}`);
+/* 4: what waits for you on top, then one list at a time. */
+/* 5: the main ones fixed, the rest in a panel that opens beside the sidebar. */
+const MAIN = ["notifications", "approvals", "threads", "tasks", "wiki", "drive"];
+const SIDE = [["Agenda", ["routines", "calendar"]], ["Decisões", ["forum"]]];
+const WHAT = { routines: "O que os agentes fazem sozinhos, na hora marcada", calendar: "Reuniões e prazos da equipe", wiki: "O que a equipe sabe, escrito", drive: "Arquivos, relatórios e tabelas", forum: "Quando a decisão pede várias opiniões" };
+P.lado = () => shell(`${rows(MAIN)}
+  <button class="row focusable more side" data-menu="side" aria-expanded="${S.menu?.kind === "side"}">${I.more}<span class="nm">Mais</span><span class="chv">${I.chev.replace("m6 9 6 6 6-6", "m9 6 6 6-6 6")}</span></button>
+  <div class="morebody">${activeTool(SIDE.flatMap(([, t]) => t))}</div>${SEP}${conversations()}`);
+P.abas = () => shell(`${rows(INBOX)}
+  <div class="tabs"><button aria-pressed="${S.tabv === "talk"}" data-tabv="talk">Conversas${unreadDms ? ` <span class="count">${unreadDms}</span>` : ""}</button><button aria-pressed="${S.tabv === "tools"}" data-tabv="tools">Ferramentas</button></div>
+  ${S.tabv === "talk" ? conversations() : `<div class="tlabel">Agenda</div>${rows(["tasks", "routines", "calendar"])}<div class="tlabel">Documentos</div>${rows(["wiki", "drive", "forum"])}`}`);
+
+/* ---------- main mock ---------- */
+function mainHTML() {
+  const o = S.open;
+  if (o.kind === "channel" || o.kind === "dm") {
+    const title = o.kind === "channel" ? `${I.hash}${o.id}` : `${av(o.id, 24)}${esc(nameOf(o.id))}`;
+    const msgs = o.kind === "channel"
+      ? [["lia", "14:02", "Subi a correção do frete no PR #415. Testes passando."], ["thay", "14:10", "Rodei no staging, o checkout ficou bem mais rápido."], ["atlas", "14:31", "Taxa de erro estável em 0,4% desde as 14h."]]
+      : [[o.id, "14:02", DMS.find((d) => d.id === o.id)?.text ?? "Oi!"]];
+    return `<div class="topbar"><h1>${title}</h1></div><div class="mb">
+      ${msgs.map(([w, t, p]) => `<div class="msg">${av(w, 36)}<div><div class="who">${esc(nameOf(w))}<time>${t}</time></div><p>${esc(p)}</p></div></div>`).join("")}
+      <div class="ghost" style="width:60%"></div><div class="ghost" style="width:42%"></div>
+      ${compare()}</div>`;
+  }
+  const k = o.kind === "tool" ? o.id : "tasks";
+  const t = TOOLS[k] ?? { label: "Página", icon: "doc" };
+  return `<div class="topbar"><h1>${I[t.icon]}${t.label}</h1></div><div class="mb">
+    ${k === "tasks" ? `<div class="board">${["A fazer", "Em andamento", "Em revisão", "Feito"].map((c, i) => `<div class="col"><h4>${c}</h4>${TASKS.slice(0, 3 - (i % 2)).map((x) => `<div class="card">${esc(x.t)}</div>`).join("")}</div>`).join("")}</div>`
+      : `<h3>${t.label}</h3><p class="lead">A página da ferramenta abre aqui. O protótipo é sobre a navegação à esquerda.</p><div class="ghost" style="width:70%"></div><div class="ghost" style="width:52%"></div><div class="ghost" style="width:64%"></div>`}
+    ${compare()}</div>`;
+}
+function compare() {
+  const O = [
+    ["hoje", "Hoje (no app)", ["Tudo a um clique"], ["Três tipos de cabeçalho; ícones na linha parecem botões de ação", "Linhas de 40px: pouca coisa cabe"]],
+    ["limpa", "1 · Sem ícones", ["Todo cabeçalho igual (ferramentas e conversas)", "Fechada, só diz o que espera você"], ["Ferramenta de categoria fechada pede um clique a mais"]],
+    ["mais", "2 · Fixas + Mais", ["Só conversas têm cabeçalho", "O que espera você nunca se esconde", "O mais curto de todos"], ["Rotinas, Calendário, Fórum, Wiki e Drive atrás do “Mais”"]],
+    ["grade", "3 · Grade", ["Todas as ferramentas à vista, com nome", "Nada abre e fecha nas ferramentas"], ["Ocupa duas linhas de 54px", "Os blocos destoam das linhas de conversa"]],
+    ["lado", "5 · Mais ao lado", ["As seis que você mais usa sempre à vista", "O resto não empurra as conversas para baixo", "Cada ferramenta explica para que serve"], ["Rotinas, Calendário e Fórum a dois cliques"]],
+    ["abas", "4 · Abas", ["Lista sempre curta", "Ferramentas com nome e grupo, sem recolher"], ["Trocar de aba esconde as conversas"]],
+  ];
+  return `<div class="cmp">${O.map(([k, n, p, m]) => `<div class="opt" data-on="${S.v === k}"><h4>${n}</h4><ul>${p.map((x) => `<li class="p">${x}</li>`).join("")}${m.map((x) => `<li class="m">${x}</li>`).join("")}</ul></div>`).join("")}</div>`;
+}
+
+/* ---------- menus ---------- */
+function menuHTML(kind) {
+  if (kind === "side") return SIDE.map(([g, tools]) => `<div class="mh">${g}</div>${tools.map((k) => `<button class="mi" data-open="tool:${k}" ${cur(isOpen("tool", k))}>${I[TOOLS[k].icon]}<span class="mt"><b>${TOOLS[k].label}</b><small>${WHAT[k]}</small></span>${k === "forum" ? '<span class="chip-s warn">sua vez</span>' : ""}</button>`).join("")}`).join("");
+  if (kind === "new") return `<div class="mh">Criar</div><button class="mi">${I.agent}Agente</button><button class="mi">${I.hash}Canal</button><button class="mi">${I.tasks}Tarefa</button><button class="mi">${I.routines}Rotina</button><hr><button class="mi">${I.team}Convidar pessoa</button>`;
+  if (kind === "me") return `<div class="who">${av("me", 36)}<div><b>Walter</b><small>Dono · Viajolo</small></div></div>
+    <div class="budget"><p><span>Orçamento do mês</span><span>16%</span></p><div class="bar"><i></i></div></div><hr>
+    <button class="mi">${I.gear}Configurações</button><button class="mi">${I.plug}Conectores</button><button class="mi">${I.pc}Computadores</button><button class="mi" data-theme-toggle>${I.moon}Tema escuro</button><hr><button class="mi">${I.out}Sair</button>`;
+  return `<div class="mh">Viajolo</div><button class="mi">${I.gear}Configurações da organização</button><button class="mi">${I.team}Membros</button><hr><button class="mi">${I.plus}Outra organização</button>`;
+}
+
+/* ---------- render ---------- */
+function render() {
+  document.documentElement.dataset.theme = S.theme;
+  document.documentElement.dataset.v = S.v;
+  for (const s of $$(".proto .seg")) for (const b of $$("button", s)) b.setAttribute("aria-pressed", String(S[s.dataset.k] === b.dataset.o));
+  $("#note").innerHTML = NOTES[S.v];
+  $("#nav").innerHTML = `<aside class="panel" id="panel">${P[S.v]()}</aside>
+    ${S.menu ? `<div class="menu glass ${S.menu.kind === "side" ? "side" : ""}" id="menu" style="${S.menu.pos}">${menuHTML(S.menu.kind)}</div>` : ""}`;
+  $("#main").innerHTML = mainHTML();
+  for (const cv of $$("#orgSky")) paintOrg(cv);
+  mount(document.body);
+  document.documentElement.style.setProperty("--protoH", $("#proto").offsetHeight + "px");
+  history.replaceState(null, "", `#v=${S.v}&theme=${S.theme}`);
+  if (REDUCED) draw(0);
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", (e) => {
+  const seg = e.target.closest(".proto .seg button");
+  if (seg) { S[seg.parentElement.dataset.k] = seg.dataset.o; S.menu = null; return render(); }
+  if (e.target.closest("[data-theme-toggle]")) { S.theme = S.theme === "dark" ? "light" : "dark"; S.menu = null; skyCache.clear(); return render(); }
+  const m = e.target.closest("[data-menu]");
+  if (m) {
+    const r = m.getBoundingClientRect(), navR = $("#nav").getBoundingClientRect();
+    const kind = m.dataset.menu;
+    const pos = kind === "side"
+      ? `left:${$("#panel").offsetWidth + 8}px;top:${Math.min(r.top - navR.top - 8, navR.height - 380)}px`
+      : r.top - navR.top > navR.height / 2
+      ? `left:${r.left - navR.left}px;bottom:${navR.bottom - r.top + 6}px`
+      : `left:${r.left - navR.left}px;top:${r.bottom - navR.top + 6}px`;
+    S.menu = S.menu?.kind === kind ? null : { kind, pos };
+    return render();
+  }
+  const op = e.target.closest("[data-open]");
+  if (op) { const [kind, id] = op.dataset.open.split(":"); S.open = { kind, id }; S.menu = null; return render(); }
+  const ct = e.target.closest("[data-cat]");
+  if (ct) { const k = ct.dataset.cat; S.dopen.has(k) ? S.dopen.delete(k) : S.dopen.add(k); return render(); }
+  if (e.target.closest("[data-more]")) { S.more = !S.more; return render(); }
+  const tv = e.target.closest("[data-tabv]");
+  if (tv) { S.tabv = tv.dataset.tabv; return render(); }
+  if (S.menu && !e.target.closest("#menu")) { S.menu = null; render(); }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.menu) { S.menu = null; render(); } });
+
+render();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
