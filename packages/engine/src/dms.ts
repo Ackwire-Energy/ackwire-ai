@@ -188,7 +188,15 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
         authorType: messages.authorType,
       })
       .from(messages)
-      .where(and(eq(messages.orgId, orgId), inArray(messages.channelId, ids), isNull(messages.deletedAt)))
+      .where(
+        and(
+          eq(messages.orgId, orgId),
+          inArray(messages.channelId, ids),
+          isNull(messages.deletedAt),
+          // A routine's call is hidden in the chat (only the agent's answer shows), so not the preview either.
+          sql`not (${messages.authorType} = 'person' and ${messages.meta}->'routine' is not null)`,
+        ),
+      )
       .orderBy(messages.channelId, desc(messages.createdAt)),
   ]);
   const readAt = new Map(reads.map((r) => [r.channelId, r.lastReadAt]));

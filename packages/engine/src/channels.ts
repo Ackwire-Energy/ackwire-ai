@@ -81,7 +81,10 @@ export interface ChannelListItem {
    * `MAX_CHANNEL_UNREAD`; 0 when I'm not a member.
    */
   unreadCount: number;
-  /** The latest top-level message; null when I'm not a member (I can't read it) or it's empty. */
+  /**
+   * The latest top-level message, skipping a routine's call (hidden in the chat, only the agent's answer
+   * shows); null when I'm not a member (I can't read it) or it's empty.
+   */
   lastMessage: ChannelLastMessage | null;
 }
 
@@ -128,6 +131,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
         from ${schema.messages} m
         where cm.id is not null and m.org_id = ${orgId}::uuid and m.channel_id = c.id
           and m.thread_id is null and m.deleted_at is null
+          and not (m.author_type = 'person' and m.meta->'routine' is not null)
         order by m.created_at desc, m.id desc
         limit 1
       ) lm on true

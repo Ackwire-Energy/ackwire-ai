@@ -8,6 +8,7 @@ import {
   drainOutbox,
   getThread,
   listChannels,
+  listDms,
   listMessages,
   listMyReminders,
   listPins,
@@ -78,6 +79,20 @@ describe("channel list: unread and last message", () => {
     expect(after.lastMessage?.authorName).toBe("ana");
     expect(after.lastMessage?.preview.startsWith("Deploy y")).toBe(true);
     expect(after.lastMessage?.preview.length).toBeLessThanOrEqual(140);
+  });
+
+  test("a routine's call (hidden in the chat) is never the preview, in a channel or a DM", async () => {
+    f = await setup();
+    const bia = await withBia();
+    const answer = await post(f.owner.id, f.general.id, "the agent's answer");
+    const routine = { routine: { id: "r1", name: "Daily", runId: "rr1" } };
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@atlas check", meta: routine });
+    expect((await general(bia.id)).lastMessage?.id).toBe(answer.id);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { userId: bia.id });
+    const said = await post(f.owner.id, dm.id, "hi");
+    await postPersonMessage(deps(), f.owner.id, f.org.id, dm.id, { body: "check", meta: routine });
+    const dms = await listDms(f.db, f.owner.id, f.org.id);
+    expect(dms.find((d) => d.channelId === dm.id)?.lastMessage?.id).toBe(said.id);
   });
 
   test("a thread reply counts only in a thread I follow (wrote there, or followed; muting wins)", async () => {
