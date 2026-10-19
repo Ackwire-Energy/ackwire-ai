@@ -3,6 +3,7 @@
 Manual, never in CI: they call real models and cost a little. Keys come from `.env`.
 
 - `bun run eval:memory`: memory judgments (ADR 0028).
+- `bun run eval:mentions`: an agent's @mention of another agent, hand-off (it gets a run) or only a reference (D49). `--judge llm` scores the fallback instead of Jev.
 - `bun run eval:behavior`: agent behavior: investigate before answering, cite evidence, concrete next step, ask only the person's decisions, sensitive actions only with approval (ADR 0037). Needs `ANTHROPIC_API_KEY`.
 
 ## Behavior eval

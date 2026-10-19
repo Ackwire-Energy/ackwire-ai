@@ -257,11 +257,12 @@ export async function mentionHandoffs(
       instructions: {
         agent: { handle: `@${t.handle}`, name: t.name, role: t.role },
         question:
-          "Is `message` asking `agent` to do something or to answer something now (a hand-off or a direct question), rather than naming it, quoting it, or telling a person to talk to it?",
+          "Is `message` asking `agent` to do something or to answer something now (a hand-off or a direct question), rather than naming it, quoting it, telling a person to talk to it, or offering a person to involve it later?",
       },
       criteria: {
-        true: "It hands work or a question to that agent, to act on now.",
-        false: "It only names the agent (what it said, did or can do, or 'talk to @agent').",
+        true: "It hands work or a question to that agent, to act on now, with nothing left for a person to decide first.",
+        false:
+          "It only names the agent: what it said, did or can do, 'talk to @agent', or a plan or offer that waits for a person ('if you agree, I'll open an issue for @agent', 'want me to ask @agent?').",
       },
     };
   });
