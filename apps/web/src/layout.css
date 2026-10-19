@@ -6728,27 +6728,26 @@ button.live-call__head:hover {
   font-size: 12.5px;
   word-break: break-all;
 }
+/* A command or snippet to copy: small code that scrolls sideways (never breaks a word), copy as an icon in the corner. */
 .machine-command {
   position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 10px 10px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--control-r-md);
   background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .machine-command__code {
-  flex: 1;
-  min-width: 0;
   margin: 0;
+  padding: 10px 44px 10px 12px;
   overflow-x: auto;
-  font-size: 13px;
-  line-height: 20px;
-  white-space: pre-wrap;
-  word-break: break-all;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre;
+  scrollbar-width: thin;
 }
 .machine-command__copy {
-  flex: none;
+  position: absolute;
+  top: 4px;
+  right: 4px;
 }
 .machine-pair__steps {
   display: flex;

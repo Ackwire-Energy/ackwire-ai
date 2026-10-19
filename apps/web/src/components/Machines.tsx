@@ -122,12 +122,13 @@ export function CommandBlock({ command }: { command: string }) {
       <Button
         size="sm"
         variant="ghost"
+        iconOnly
         icon="copy"
         className="machine-command__copy"
+        aria-label={t("common.copy")}
+        title={t("common.copy")}
         onClick={() => void copy(command, t("machines.commandCopied"))}
-      >
-        {t("common.copy")}
-      </Button>
+      />
     </div>
   );
 }
