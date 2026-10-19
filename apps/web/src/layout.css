@@ -7233,15 +7233,23 @@ a.machine-row__name:hover {
 }
 .computers-kind__foot {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  min-height: 44px;
   margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid var(--line);
 }
-.computers-kind__grow {
+/* The chips wrap among themselves; the action stays on the right, on the same line in both cards. */
+.computers-kind__chips {
+  display: flex;
   flex: 1;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.computers-kind__foot > .ac-btn {
+  flex: none;
 }
 .computers-card__head {
   display: flex;

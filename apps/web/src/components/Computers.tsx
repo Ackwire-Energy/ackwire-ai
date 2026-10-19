@@ -60,13 +60,12 @@ function ComputerKinds() {
           ))}
         </ul>
         <div className="computers-kind__foot">
-          {agents.data && count(total - mine)}
-          <span className="computers-kind__grow" />
+          <span className="computers-kind__chips">{agents.data && count(total - mine)}</span>
           {admin && (
-            <Button asChild size="sm" variant="ghost">
+            <Button asChild size="sm">
               <a href="#nuvem">
+                <Icon name="settings" />
                 {t("computers.kinds.cloud.adjust")}
-                <Icon name="chevronDown" />
               </a>
             </Button>
           )}
@@ -86,18 +85,19 @@ function ComputerKinds() {
           ))}
         </ul>
         <div className="computers-kind__foot">
-          {list.length > 0 ? (
-            <>
-              <Chip icon="check">
-                <span className="ac-num">{list.length}</span>
-                {t("computers.kinds.mine.connected", { count: list.length })}
-              </Chip>
-              {agents.data && count(mine)}
-            </>
-          ) : (
-            machines.isSuccess && <Chip icon="dash">{t("computers.kinds.mine.none")}</Chip>
-          )}
-          <span className="computers-kind__grow" />
+          <span className="computers-kind__chips">
+            {list.length > 0 ? (
+              <>
+                <Chip icon="check">
+                  <span className="ac-num">{list.length}</span>
+                  {t("computers.kinds.mine.connected", { count: list.length })}
+                </Chip>
+                {agents.data && count(mine)}
+              </>
+            ) : (
+              machines.isSuccess && <Chip icon="dash">{t("computers.kinds.mine.none")}</Chip>
+            )}
+          </span>
           <DownloadMacButton primary={machines.isSuccess && list.length === 0} />
         </div>
       </div>
