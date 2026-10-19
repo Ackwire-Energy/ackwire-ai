@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidebar em dois níveis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&display=swap">
+<script>
+  { const h = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = h.get("theme") || "light"; }
+</script>
+<style>
+/*
+  Prototype (SidebarDoisNiveis): today's sidebar stacks 9 tools above the conversations, so the
+  conversations (the reason you open the app) start below the fold. Three two-level alternatives:
+
+  A "Slack": a slim rail with few places (Início, Mensagens, Atividade, Tarefas, Mais). Início is the
+    conversations panel; Mais opens the other tools in a frosted menu, and a tool you open takes the panel.
+  B "Por assunto": the rail groups tools by what you are doing (Conversas, Caixa, Trabalho, Saber, Equipe);
+    each one has its own panel with its tools on top and its own content below (a contextual second level).
+  C "Agentes no trilho": the rail is the tools (icons) plus the agents themselves, alive; the panel is always
+    the conversations. Chat first, tools one click away.
+
+  All: the panel can be hidden (rail only); with it hidden, hovering a rail place floats its panel.
+  Tokens from RefinoUI ("Depois": white work area, near-white paper sidebar); ruler 32/40/48, radius 30%.
+  Agents come from packages/ui/src/agent/engine.js (serve the repo root over http).
+*/
+:root,[data-theme="light"]{
+  --bg:#fbfbfa;--side:#f8f8f6;--rail:#f1f1ee;--pane:#ffffff;--raised:#fff;--sunken:#f3f3f0;
+  --line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --chosen:#ffffff;--chosen-shadow:0 1px 2px rgba(23,23,22,.07),0 0 0 1px rgba(23,23,22,.09);
+  --glass:rgba(255,255,255,.78);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.3),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --ok:#1f7a45;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b42a20;
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--display:"Funnel Display",var(--sans);
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --bg:#0f0f0e;--side:#121211;--rail:#0b0b0a;--pane:#151514;--raised:#1c1c1b;--sunken:#0a0a09;
+  --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --chosen:color-mix(in srgb,#fff 7%,var(--raised));--chosen-shadow:0 0 0 1px rgba(255,255,255,.1),inset 0 1px 0 rgba(255,255,255,.1);
+  --glass:rgba(30,30,28,.72);
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);
+  --e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.08);
+  --ok:#5fc48a;--warn:#e0a84a;--warn-soft:#33260e;--danger:#f08a80;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","tnum"}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit;color:inherit}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:none}
+.focusable:focus-visible,button:focus-visible{box-shadow:0 0 0 2px var(--side),0 0 0 4px var(--ink)!important}
+
+/* ---------- prototype bar (not product) ---------- */
+.proto{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--bg)}
+.proto b{color:var(--ink);font-weight:650}
+.proto .grow{flex:1}
+.proto .note{flex-basis:100%;max-width:110ch}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.seg button{height:26px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--chosen);color:var(--ink);box-shadow:var(--chosen-shadow)}
+.tog{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-weight:600}
+.tog input{accent-color:var(--ink)}
+
+/* ---------- shared bits ---------- */
+.kbd{font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:var(--plate);color:var(--muted);box-shadow:inset 0 -1px 0 rgba(0,0,0,.08)}
+.badge{min-width:18px;height:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:var(--ink);color:var(--bg);flex:none}
+.count{min-width:18px;height:18px;padding:0 6px;border-radius:999px;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;background:var(--plate);color:var(--muted);flex:none}
+.glass{background:var(--glass);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3)}
+.av{position:relative;display:inline-grid;place-items:center;flex:none;width:var(--s);height:var(--s);border-radius:calc(var(--s) * .3);overflow:hidden}
+.av::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 rgba(255,255,255,.55);pointer-events:none}
+[data-theme="dark"] .av::after{box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 rgba(255,255,255,.07)}
+.av canvas{display:block;width:100%;height:100%}
+.av.person{background:var(--plate);color:var(--muted);font-weight:650;font-size:calc(var(--s) * .44)}
+.av.person img{width:100%;height:100%;object-fit:cover}
+.avw{position:relative;display:inline-flex;flex:none}
+.avw .st{position:absolute;right:-3px;bottom:-3px;width:12px;height:12px;border-radius:5px;background:var(--side);display:grid;place-items:center}
+.avw .st canvas{width:8px;height:8px;image-rendering:pixelated}
+@keyframes popin{from{opacity:0;transform:translateY(4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes slidein{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+
+/* ---------- app frame ---------- */
+.app{display:grid;grid-template-columns:auto minmax(0,1fr);height:calc(100vh - var(--protoH,90px));min-height:560px}
+.nav{display:flex;height:100%;min-height:0;position:relative;z-index:5}
+
+/* rail */
+.rail{width:72px;flex:none;background:var(--rail);display:flex;flex-direction:column;align-items:center;padding:12px 0 12px;gap:4px;border-right:1px solid var(--line);position:relative}
+.rail .org{width:40px;height:40px;border-radius:12px;position:relative;overflow:hidden;border:0;padding:0;cursor:pointer;margin-bottom:10px;box-shadow:var(--e1),var(--top);flex:none}
+.rail .org canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.rail .org span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:20px;font-weight:400;color:#0a3f9c}
+[data-theme="dark"] .rail .org span{color:#eef7ff}
+.place{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:64px;padding:2px 0 4px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:12px}
+.place .ico{width:40px;height:32px;border-radius:10px;display:grid;place-items:center;transition:background .15s,transform .18s var(--spring),box-shadow .15s}
+.place:hover .ico{background:var(--plate)}
+.place:active .ico{transform:scale(.94)}
+.place .lb{font-size:11px;font-weight:600;letter-spacing:-.005em;line-height:1.1}
+.place[aria-current="true"]{color:var(--ink)}
+.place[aria-current="true"] .ico{background:var(--chosen);box-shadow:var(--chosen-shadow)}
+.place .badge{position:absolute;top:-3px;left:38px;height:17px;min-width:17px;font-size:10px;padding:0 5px;box-shadow:0 0 0 2px var(--rail)}
+.place .badge.soft{background:var(--plate);color:var(--ink2);box-shadow:0 0 0 2px var(--rail)}
+.rail.icons .place{width:48px;padding:0}
+.rail.icons .place .ico{width:40px;height:40px;border-radius:12px}
+.rail.icons .place .lb{display:none}
+.rail.icons .place .badge{left:30px;top:-2px}
+.rail .sep{width:28px;height:1px;background:var(--line2);margin:8px 0}
+.rail .grow{flex:1}
+.rail .agent{position:relative;border:0;background:transparent;padding:0;cursor:pointer;border-radius:12px;transition:transform .18s var(--spring)}
+.rail .agent:hover{transform:translateY(-1px)}
+.rail .agent[aria-current="true"]::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:4px;border-radius:0 4px 4px 0;background:var(--ink)}
+.rail .agent .badge{position:absolute;top:-4px;right:-5px;height:16px;min-width:16px;font-size:10px;padding:0 4px;box-shadow:0 0 0 2px var(--rail)}
+.rail .me{position:relative;width:40px;height:40px;border:0;padding:0;background:transparent;cursor:pointer;border-radius:12px;margin-top:6px}
+.rail .me .av{--s:36px;position:absolute;left:2px;top:2px}
+.rail .me svg.ring{position:absolute;inset:-1px;width:42px;height:42px}
+.rail .new{width:40px;height:40px;border-radius:12px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink2);display:grid;place-items:center;cursor:pointer;transition:transform .18s var(--spring)}
+.rail .new:hover{box-shadow:var(--e2),var(--top)}
+.rail .new:active{transform:scale(.94)}
+.rail .horizon{position:absolute;left:0;right:0;bottom:0;height:120px;pointer-events:none;opacity:.9}
+.rail .horizon canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.rail>*:not(.horizon){position:relative;z-index:1}
+.rail.labels .place{width:64px}
+.rail.labels .sep{margin:6px 0}
+/* Rail colors: the rail redefines the tokens inside it, so every piece (icons, chosen tile, badges, +) follows. */
+[data-rail="grafite"] .rail,[data-rail="ceu"] .rail,[data-rail="noite"] .rail{
+  --ink:#ffffff;--ink2:#f1f1ee;--muted:rgba(255,255,255,.66);--bg:#151514;
+  --plate:rgba(255,255,255,.1);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);
+  --chosen:rgba(255,255,255,.16);--chosen-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 0 1px rgba(255,255,255,.08);
+  --raised:rgba(255,255,255,.1);--e1:0 0 0 1px rgba(255,255,255,.1);--e2:0 0 0 1px rgba(255,255,255,.18);--top:inset 0 1px 0 rgba(255,255,255,.12);
+  border-right:0}
+[data-rail="grafite"] .rail{--rail:#232321}
+[data-theme="dark"][data-rail="grafite"] .rail{--rail:#000000}
+[data-rail="ceu"] .rail{--rail:#0b47a8}
+[data-theme="dark"][data-rail="ceu"] .rail{--rail:#082a63}
+[data-rail="ceu"] .rail .horizon{height:100%;opacity:1}
+[data-rail="noite"] .rail{--rail:#18202f}
+[data-theme="dark"][data-rail="noite"] .rail{--rail:#0d1422}
+/* Céu claro: the brand sky at its light end, rising from the foot (the app-sky rule: light in chrome). */
+[data-rail="ceuclaro"] .rail{--rail:#f3f7fc;--plate:rgba(10,63,156,.07);--chosen:#ffffff;border-right:0}
+[data-theme="dark"][data-rail="ceuclaro"] .rail{--rail:#0f1724;--plate:rgba(140,195,255,.1);--chosen:rgba(140,195,255,.14);--chosen-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 0 0 1px rgba(140,195,255,.14)}
+[data-rail="ceuclaro"] .rail .horizon{height:100%;opacity:1}
+/* Vidro: same paper, but the rail is a raised tile floating on it (depth instead of color). */
+[data-rail="vidro"] .nav{background:var(--side)}
+[data-rail="vidro"] .rail{--rail:#ffffff;width:64px;margin:8px 0 8px 8px;border-radius:20px;border-right:0;box-shadow:var(--e2),var(--top);overflow:hidden}
+[data-rail="vidro"] .rail.labels .place{width:60px}
+[data-rail="vidro"] .panel{border-right:1px solid var(--line)}
+[data-theme="dark"][data-rail="vidro"] .rail{--rail:#1f1f1d}
+/* Pedra: a warm mid gray, one step darker than the panel. */
+[data-rail="pedra"] .rail{--rail:#e4e2db;--plate:rgba(60,50,30,.08);border-right:0}
+[data-theme="dark"][data-rail="pedra"] .rail{--rail:#22211e;--plate:rgba(255,240,210,.08)}
+[data-rail]:not([data-rail="papel"]) .rail .org{box-shadow:0 0 0 1px rgba(255,255,255,.18),var(--top)}
+
+/* panel */
+.panel{width:272px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;transition:width .28s var(--out),opacity .2s}
+.panel.hidden{width:0;opacity:0;overflow:hidden;border-right:0}
+.panel .inner{width:272px;display:flex;flex-direction:column;min-height:0;height:100%;animation:slidein .22s var(--out)}
+.ph{display:flex;align-items:center;gap:6px;padding:14px 12px 10px 16px;min-height:58px}
+.ph h2{font-size:16px;font-weight:650;letter-spacing:-.015em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.ph h2 button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:2px 4px;margin:-2px -4px}
+.ph h2 button:hover{background:var(--plate)}
+.ph h2 svg.i{width:14px;height:14px;color:var(--muted)}
+.ib{width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;flex:none;transition:background .15s,color .15s,transform .18s var(--spring)}
+.ib:hover{background:var(--plate);color:var(--ink)}
+.ib:active{transform:scale(.94)}
+.ib svg.i{width:17px;height:17px}
+.jump{margin:0 12px 8px;height:32px;border-radius:10px;border:0;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2);display:flex;align-items:center;gap:8px;padding:0 6px 0 10px;color:var(--faint);cursor:pointer;font-size:13.5px}
+.jump:hover{box-shadow:inset 0 0 0 1px rgba(127,127,127,.3)}
+.jump svg.i{width:15px;height:15px}
+.jump span.t{flex:1;text-align:left}
+.scroll{flex:1;min-height:0;overflow-y:auto;padding:2px 8px 16px;scrollbar-width:thin}
+.row{position:relative;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:10px;color:var(--ink2);text-decoration:none;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;font-size:14px;transition:background .12s}
+.row:hover{background:var(--plate-soft)}
+.row[aria-current="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow);color:var(--ink);font-weight:600}
+.row svg.i{color:var(--muted);width:17px;height:17px}
+.row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sub{font-size:12px;color:var(--faint);font-weight:500;white-space:nowrap}
+.row.unread .nm{font-weight:650;color:var(--ink)}
+.row.tall{height:auto;min-height:48px;padding:7px 8px;align-items:flex-start}
+.row.tall .txt{flex:1;min-width:0}
+.row.tall .l1{display:flex;align-items:baseline;gap:6px}
+.row.tall .l1 b{font-weight:600;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.tall .l1 time{font-size:11.5px;color:var(--faint);flex:none}
+.row.tall .l2{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.row.tall.unread .l2{color:var(--ink2)}
+.row .live{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+.row .live canvas{width:10px;height:10px;image-rendering:pixelated}
+.sec{margin-top:14px}
+.sec:first-child{margin-top:4px}
+.sh{display:flex;align-items:center;gap:4px;height:28px;padding:0 4px 0 8px}
+.sh button.t{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:650;color:var(--muted);border-radius:6px;padding:2px 4px;margin-left:-4px;flex:1}
+.sh button.t:hover{color:var(--ink)}
+.sh button.t svg.i{width:13px;height:13px;transition:transform .2s var(--out)}
+.sec.closed .sh button.t svg.i{transform:rotate(-90deg)}
+.sec.closed .bd{display:none}
+.sh .ib{width:26px;height:26px;border-radius:8px;opacity:0;transition:opacity .15s}
+.sec:hover .sh .ib,.sh .ib:focus-visible{opacity:1}
+.sh .ib svg.i{width:15px;height:15px}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 4px 4px}
+.tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:60px;border-radius:12px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;position:relative;transition:transform .18s var(--spring),box-shadow .15s}
+.tool:hover{box-shadow:var(--e2),var(--top)}
+.tool:active{transform:scale(.96)}
+.tool[aria-current="true"]{box-shadow:0 0 0 1.5px var(--ink),var(--top)}
+.tool svg.i{width:18px;height:18px;color:var(--muted)}
+.tool .count{position:absolute;top:6px;right:6px;height:16px;min-width:16px;font-size:10.5px;padding:0 5px}
+.tabs{display:flex;gap:4px;margin:0 12px 10px;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.tabs button{flex:1;height:28px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.tabs button[aria-pressed="true"]{background:var(--chosen);color:var(--ink);box-shadow:var(--chosen-shadow)}
+.tabs button .count{height:16px;min-width:16px;font-size:10.5px;padding:0 5px}
+.pf{border-top:1px solid var(--line);padding:10px 12px;display:flex;align-items:center;gap:8px}
+.pf .b{flex:1;height:32px;border-radius:10px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);font-size:13px;font-weight:600;color:var(--ink2);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.pf .b svg.i{width:15px;height:15px}
+.note-s{font-size:12px;color:var(--faint);padding:2px 8px 8px}
+.wiki-tree .row{height:30px}
+.wiki-tree .row.l2{padding-left:30px}
+.wiki-tree .row.l3{padding-left:52px}
+.chip-s{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;background:var(--plate);color:var(--muted);font-size:11px;font-weight:600;flex:none}
+.chip-s svg.i{width:11px;height:11px}
+.chip-s.warn{background:var(--warn-soft);color:var(--warn)}
+
+/* ---------- D: categories ---------- */
+[data-v="d"] .panel{width:280px}
+[data-v="d"] .panel .inner{width:280px}
+.dorg{display:flex;align-items:center;gap:6px;padding:12px 10px 10px 10px}
+.orgb{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:48px;padding:0 10px 0 6px;border:0;border-radius:14px;background:transparent;cursor:pointer;text-align:left}
+.orgb:hover{background:var(--plate-soft)}
+.orgb .tile{width:36px;height:36px;border-radius:11px;position:relative;overflow:hidden;flex:none;box-shadow:var(--e1),var(--top)}
+.orgb .tile canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.orgb .tile span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:18px;color:#0a3f9c}
+[data-theme="dark"] .orgb .tile span{color:#eef7ff}
+.orgb .tx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.orgb .tx b{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.orgb .tx small{font-size:12px;color:var(--faint)}
+.orgb>svg.i{width:14px;height:14px;color:var(--muted)}
+.dscroll{padding-top:4px}
+.cat{margin-top:6px}
+.cat:first-child{margin-top:0}
+.ch{display:flex;align-items:center;gap:6px;height:32px;padding:0 4px 0 4px;border-radius:10px}
+.ch:hover{background:var(--plate-soft)}
+.ch button.t{all:unset;cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px;border-radius:8px;font-size:13px;font-weight:650;color:var(--muted)}
+.ch button.t:hover,.cat.open .ch button.t{color:var(--ink2)}
+.ch button.t svg.i{width:14px;height:14px;transform:rotate(-90deg);transition:transform .22s var(--out);color:var(--faint)}
+.cat.open .ch button.t svg.i{transform:none}
+.ch .add{width:26px;height:26px;border-radius:8px;opacity:0;transition:opacity .15s}
+.ch:hover .add,.ch .add:focus-visible{opacity:1}
+.ch .add svg.i{width:15px;height:15px}
+.ch .badge,.ch .count{margin-right:4px}
+.cat:not(.open) .ch:hover .add{display:none}
+.ci{display:flex;gap:2px;margin-right:2px}
+.mini{position:relative;width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;transition:background .12s,transform .18s var(--spring)}
+.mini:hover{background:var(--plate);color:var(--ink)}
+.mini:active{transform:scale(.92)}
+.mini[aria-current="true"]{background:var(--chosen);box-shadow:var(--chosen-shadow);color:var(--ink)}
+.mini svg.i{width:16px;height:16px}
+.mini .dot-n{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:3px;background:var(--ink);box-shadow:0 0 0 2px var(--side)}
+.cb{display:grid;grid-template-rows:1fr;transition:grid-template-rows .26s var(--out)}
+.cbi{min-height:0;overflow:hidden;padding-left:6px}
+.cat:not(.open) .cbi:empty{display:none}
+.dsep{height:1px;background:var(--line);margin:12px 8px 10px}
+.dfoot{display:flex;gap:8px;align-items:center;padding:10px;border-top:1px solid var(--line)}
+.dfoot .b{height:40px;padding:0 14px;border-radius:12px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);font-size:13.5px;font-weight:600;color:var(--ink2);display:inline-flex;align-items:center;gap:7px;cursor:pointer;flex:none}
+.dfoot .b:hover{box-shadow:var(--e2),var(--top)}
+.dfoot .b svg.i{width:16px;height:16px}
+.mecard{flex:1;min-width:0;height:40px;display:flex;align-items:center;gap:9px;padding:0 10px 0 4px;border:0;border-radius:12px;background:transparent;cursor:pointer;text-align:left}
+.mecard:hover{background:var(--plate-soft)}
+.mecard .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.mecard .tx b{font-size:13.5px;font-weight:600;line-height:1}
+.mecard .bar{height:4px;border-radius:2px;background:var(--plate);overflow:hidden}
+.mecard .bar i{display:block;height:100%;width:16%;background:var(--ink2)}
+.mecard .pc{font-size:12px;color:var(--faint)}
+
+/* floating panel (panel hidden, hover a place) */
+.fly{position:absolute;left:78px;top:8px;bottom:8px;width:272px;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;animation:popin .18s var(--out);z-index:20}
+.fly .inner{width:100%}
+
+/* menu (Mais, +, me) */
+.menu{position:absolute;z-index:30;width:260px;border-radius:16px;padding:6px;animation:popin .16s var(--out)}
+.menu .mh{font-size:11.5px;font-weight:650;color:var(--faint);padding:8px 10px 4px}
+.menu button.mi{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border:0;border-radius:10px;background:transparent;cursor:pointer;font-size:14px;color:var(--ink2);text-align:left}
+.menu button.mi:hover{background:var(--plate)}
+.menu button.mi svg.i{width:17px;height:17px;color:var(--muted)}
+.menu button.mi .d{font-size:12px;color:var(--faint);margin-left:auto}
+.menu hr{border:0;height:1px;background:var(--line);margin:6px 4px}
+.menu .budget{padding:6px 10px 10px}
+.menu .budget .bar{height:6px;border-radius:3px;background:var(--plate);margin-top:6px;overflow:hidden}
+.menu .budget .bar i{display:block;height:100%;width:16%;background:var(--ink2);border-radius:3px}
+.menu .budget p{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+.menu .who{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.menu .who b{display:block;font-size:14px}
+.menu .who small{color:var(--faint);font-size:12px}
+.tip{position:absolute;z-index:40;left:80px;padding:6px 10px;border-radius:10px;font-size:12.5px;font-weight:600;white-space:nowrap;pointer-events:none;animation:popin .12s var(--out)}
+.tip small{font-weight:500;color:var(--muted);margin-left:6px}
+
+/* ---------- main (mock of the open page) ---------- */
+.main{min-width:0;background:var(--pane);display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:10px;height:58px;padding:0 22px;border-bottom:1px solid var(--line)}
+.topbar h1{font-size:16px;font-weight:650;letter-spacing:-.015em;display:flex;align-items:center;gap:8px}
+.topbar h1 svg.i{color:var(--muted)}
+.topbar .grow{flex:1}
+.mb{flex:1;overflow:auto;padding:24px 28px;max-width:860px}
+.mb h3{font-family:var(--display);font-weight:300;font-size:34px;letter-spacing:-.03em;line-height:1.05;margin-bottom:8px}
+.mb .lead{color:var(--muted);max-width:60ch;margin-bottom:22px}
+.msg{display:flex;gap:12px;padding:8px 0;max-width:72ch}
+.msg .who{font-weight:650;font-size:14px}
+.msg .who time{font-weight:500;color:var(--faint);font-size:12px;margin-left:6px}
+.msg p{color:var(--ink2)}
+.ghost{height:12px;border-radius:6px;background:var(--plate-soft);margin:10px 0}
+.board{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px}
+.col{background:var(--sunken);border-radius:16px;padding:10px;min-height:260px}
+.col h4{margin:2px 4px 10px;font-size:12.5px;font-weight:650;color:var(--muted)}
+.card{background:var(--raised);border-radius:12px;box-shadow:var(--e1),var(--top);padding:10px 12px;font-size:13px;margin-bottom:8px}
+.cmp{margin-top:24px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:900px}
+.cmp .opt{border-radius:20px;background:var(--raised);box-shadow:var(--e1),var(--top);padding:14px 16px}
+.cmp .opt[data-on="true"]{box-shadow:0 0 0 1.5px var(--ink),var(--top)}
+.cmp h4{font-size:14px;font-weight:650;margin-bottom:6px}
+.cmp ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px}
+.cmp li{margin:3px 0}
+.cmp li.p::marker{content:"+  ";color:var(--ok)}
+.cmp li.m::marker{content:"–  ";color:var(--danger)}
+@media (max-width:1100px){.cmp{grid-template-columns:1fr}.board{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){.main{display:none}.app{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="proto" id="proto">
+  <b>Sidebar em dois níveis</b>
+  <div class="seg" data-k="v"><button data-o="d">D · Categorias</button><button data-o="a">A · Slack</button><button data-o="b">B · Por assunto</button><button data-o="c">C · Ferramentas no trilho</button></div>
+  <div class="seg" data-k="theme"><button data-o="light">Claro</button><button data-o="dark">Escuro</button></div>
+  <span id="dstyleWrap"><span>Recolher</span>
+  <div class="seg" data-k="dstyle"><button data-o="lista">Lista</button><button data-o="icones">Ícones na linha</button><button data-o="uma">Uma por vez</button></div></span>
+  <span id="railWrap"><span>Trilho</span>
+  <div class="seg" data-k="rail"><button data-o="ceuclaro">Céu claro</button><button data-o="vidro">Vidro</button><button data-o="pedra">Pedra</button><button data-o="noite">Noite</button><button data-o="ceu">Céu</button><button data-o="grafite">Grafite</button><button data-o="papel">Igual ao painel</button></div></span>
+  <label class="tog" id="labelsTog"><input type="checkbox" id="labels"> Rótulos</label>
+  <label class="tog"><input type="checkbox" id="hide"> Esconder painel</label>
+  <span class="grow"></span>
+  <span>Passe o mouse no trilho com o painel escondido · <span class="kbd">⌘</span> <span class="kbd">\</span> esconde</span>
+  <p class="note" id="note"></p>
+</div>
+<div class="app">
+  <div class="nav" id="nav"></div>
+  <main class="main" id="main"></main>
+</div>
+
+<script type="module">
+import { drawAgent, idlePose, drawAccessory, AGENT_GRADIENTS, mixHex, bodyTones } from "../../../packages/ui/src/agent/engine.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/* ---------- icons ---------- */
+const sv = (d) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  home: sv('<path d="M4 11 12 4.5l8 6.5"/><path d="M6 9.5V19a1 1 0 0 0 1 1h3.5v-5.5h3V20H17a1 1 0 0 0 1-1V9.5"/>'),
+  dm: sv('<path d="M4 5h16v11H9l-5 4V5Z"/>'),
+  bell: sv('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+  inbox: sv('<path d="M4 13.5 6.5 5h11l2.5 8.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M4 13.5h4.5l1 2h5l1-2H20"/>'),
+  waiting: sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  thread: sv('<path d="M4 5h12v8H9l-5 3.5V5Z"/><path d="M19 9.5v10l-3-2.5h-5"/>'),
+  tasks: sv('<rect x="4.5" y="4" width="15" height="16" rx="3.5"/><path d="M8.5 9.5h7M8.5 13.5h5"/>'),
+  routines: sv('<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5M12 8v4l2.5 1.5"/>'),
+  cal: sv('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
+  forum: sv('<path d="M3.5 5h11v8H8l-4.5 3.5V5Z"/><path d="M17.5 9h3v10.5L17 17h-6.5v-2"/>'),
+  book: sv('<path d="M4 5.5C6.5 4.5 9.5 4.5 12 6c2.5-1.5 5.5-1.5 8-.5V19c-2.5-1-5.5-1-8 .5-2.5-1.5-5.5-1.5-8-.5Z"/><path d="M12 6v13.5"/>'),
+  drive: sv('<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>'),
+  work: sv('<rect x="3.5" y="7" width="17" height="12.5" rx="3"/><path d="M9 7V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>'),
+  know: sv('<path d="M12 3.5a6 6 0 0 0-3.5 10.9V17h7v-2.6A6 6 0 0 0 12 3.5Z"/><path d="M9.5 20.5h5"/>'),
+  team: sv('<circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="8.5" r="2.5"/><path d="M15.5 13.6c2.4-.3 4.4 1.2 5 4.4"/>'),
+  more: sv('<circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/>'),
+  hash: sv('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>'),
+  search: sv('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
+  plus: sv('<path d="M12 5v14M5 12h14"/>'),
+  chev: sv('<path d="m6 9 6 6 6-6"/>'),
+  side: sv('<rect x="3.5" y="4.5" width="17" height="15" rx="3.5"/><path d="M14.5 4.5v15"/>'),
+  agent: sv('<rect x="5" y="6" width="14" height="13" rx="4"/><path d="M9.5 11.5v1.5M14.5 11.5v1.5M12 3.5V6"/>'),
+  edit: sv('<path d="M5 19h3.5L19 8.5 15.5 5 5 15.5Z"/><path d="m13.5 7 3.5 3.5"/>'),
+  doc: sv('<path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20Z"/><path d="M14 3.5V8h4"/>'),
+  gear: sv('<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/>'),
+  moon: sv('<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5Z"/>'),
+  out: sv('<path d="M10 5H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h4M14 8l4 4-4 4M18 12H9.5"/>'),
+  org: sv('<rect x="9" y="3.5" width="6" height="5" rx="1.5"/><rect x="3.5" y="15.5" width="6" height="5" rx="1.5"/><rect x="14.5" y="15.5" width="6" height="5" rx="1.5"/><path d="M12 8.5V12M6.5 15.5V12h11v3.5"/>'),
+  plug: sv('<path d="M9 3.5v4M15 3.5v4M6.5 7.5h11V11a5.5 5.5 0 0 1-11 0Z"/><path d="M12 16.5v4"/>'),
+  pc: sv('<rect x="3.5" y="4.5" width="17" height="11.5" rx="2.5"/><path d="M8.5 20h7M12 16v4"/>'),
+  stage: sv('<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none" opacity=".35"/>'),
+};
+
+/* ---------- workspace ---------- */
+const AGENTS = {
+  lia: { name: "Lia", role: "Engenharia", color: "sky", eyes: "round", acc: "headset", state: "run", what: "escrevendo em #tech" },
+  atlas: { name: "Atlas", role: "Observabilidade", color: "violet", eyes: "round", acc: "headphones", state: "idle" },
+  theo: { name: "Theo", role: "Produto", color: "amber", eyes: "round", acc: "cap", state: "run", what: "rodando uma rotina" },
+  nina: { name: "Nina", role: "Dados", color: "green", eyes: "dots", acc: "bow", state: "idle" },
+};
+const ME_IMG = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#c9cfd6"/><circle cx="20" cy="16" r="7" fill="#7b8794"/><path d="M6 40c2-9 8-13 14-13s12 4 14 13Z" fill="#4b5563"/></svg>');
+const PEOPLE = { thay: { name: "Thay" } };
+const CHANNELS = [
+  { id: "general", name: "general", unread: false },
+  { id: "tech", name: "tech", unread: true },
+  { id: "produto", name: "produto", unread: false },
+  { id: "incidentes", name: "incidentes", unread: false },
+];
+const DMS = [
+  { id: "lia", m: "2 min", text: "Subi a correção do frete no PR #415.", unread: 2 },
+  { id: "thay", m: "18 min", text: "Consegue olhar o texto do onboarding?", unread: 1 },
+  { id: "nina", m: "1 h", text: "Relatório de churn de setembro pronto.", unread: 0 },
+  { id: "theo", m: "ontem", text: "Rotina das 18h rodou sem erro.", unread: 0 },
+  { id: "atlas", m: "sex", text: "Taxa de erro estável em 0,4%.", unread: 0 },
+];
+const THREADS = [
+  { t: "Release 2.4.1", ch: "tech", m: "9 min", unread: true },
+  { t: "Plano anual com 2 meses grátis", ch: "produto", m: "1 h", unread: true },
+];
+const COUNTS = { notif: 210, approvals: 1, threads: 2 };
+const nameOf = (id) => AGENTS[id]?.name ?? PEOPLE[id]?.name ?? id;
+const unreadDms = DMS.reduce((s, d) => s + d.unread, 0);
+const cap = (n) => (n > 99 ? "99+" : String(n));
+
+/* ---------- tools (every route the app has) ---------- */
+const TOOLS = {
+  notifications: { label: "Notificações", short: "Avisos", icon: "bell" },
+  approvals: { label: "Aprovações", short: "Aprovar", icon: "waiting" },
+  threads: { label: "Threads", icon: "thread" },
+  tasks: { label: "Tarefas", icon: "tasks" },
+  routines: { label: "Rotinas", icon: "routines" },
+  calendar: { label: "Calendário", icon: "cal" },
+  forum: { label: "Fórum", icon: "forum" },
+  wiki: { label: "Wiki", icon: "book" },
+  drive: { label: "Drive", icon: "drive" },
+  team: { label: "Equipe", icon: "org" },
+};
+
+/* ---------- state ---------- */
+const h = new URLSearchParams(location.hash.slice(1));
+const S = {
+  v: h.get("v") || "d",
+  dstyle: h.get("dstyle") || "lista",
+  // D: which categories are open (tools categories start closed except the inbox).
+  dopen: new Set(["inbox", "channels", "agents", "people"]),
+  rail: h.get("rail") || "ceuclaro",
+  labels: h.get("labels") === "1",
+  theme: document.documentElement.dataset.theme,
+  hidden: h.get("hide") === "1",
+  place: null, // rail place
+  open: { kind: "channel", id: "general" }, // what the main shows
+  closed: new Set(),
+  tab: "all",
+  fly: null,
+  menu: null,
+};
+const NOTES = {
+  d: "<b>D · Categorias.</b> Sem trilho: um sidebar só, com as ferramentas em categorias que abrem e fecham, no mesmo estilo de Canais, Agentes e Pessoas. <b>Caixa</b> (notificações, aprovações, threads) começa aberta; <b>Trabalho</b> (tarefas, rotinas, calendário) e <b>Conhecimento</b> (wiki, drive, fórum) começam fechadas. Fechada, a categoria soma o que espera você e continua mostrando a página aberta dentro dela. O app lembra o que você abriu ou fechou. <b>Recolher</b>: Lista (abre e fecha), Ícones na linha (fechada, os ícones ficam a um clique) ou Uma por vez (abrir uma fecha as outras).",
+  a: "<b>A · Slack.</b> Trilho com 5 lugares e rótulo embaixo, como o Slack. <b>Início</b> é o painel de conversas (threads e aprovações no topo, depois canais, agentes e pessoas, todas recolhíveis). <b>Mensagens</b> lista DMs por recência com prévia. <b>Atividade</b> junta notificações e aprovações. <b>Mais</b> abre o resto num menu; a ferramenta que você abre assume o painel com a navegação dela.",
+  b: "<b>B · Por assunto.</b> O trilho agrupa pelo que você está fazendo: <b>Conversas</b>, <b>Caixa</b> (notificações + aprovações), <b>Trabalho</b> (tarefas, rotinas, calendário), <b>Saber</b> (wiki, drive, fórum) e <b>Equipe</b>. Cada lugar tem um painel próprio: as ferramentas dele em cima, e embaixo o conteúdo (minhas tarefas, próximas rotinas, árvore da wiki, recentes).",
+  c: "<b>C · Ferramentas no trilho.</b> O trilho, numa cor própria, tem só as ferramentas, em grupos: Conversas · Notificações e Aprovações · Tarefas, Rotinas e Calendário · Fórum, Wiki e Drive. O painel é sempre as conversas (canais, agentes, pessoas); abrir uma ferramenta muda só a área principal. Conversas de novo esconde o painel.",
+};
+const DEFAULT_PLACE = { a: "home", b: "talk", c: null, d: null };
+
+/* ---------- avatars (engine, Céu frame) ---------- */
+const live = [];
+const orbs = [];
+const seedOf = (id) => [...id].reduce((s, c) => s + c.charCodeAt(0), 0) % 7;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const skyCache = new Map();
+function skyOf(color, px, dark) {
+  const key = `${color}|${px}|${dark}`;
+  if (skyCache.has(key)) return skyCache.get(key);
+  const [lt, dp] = AGENT_GRADIENTS[color];
+  const base = dark ? "#1c1c1b" : "#ffffff";
+  const a = dark ? mixHex(dp, base, .78) : mixHex(lt, base, .86);
+  const b = dark ? mixHex(dp, base, .55) : mixHex(lt, base, .62);
+  const c = document.createElement("canvas");
+  c.width = c.height = px;
+  const g = c.getContext("2d");
+  const n = Math.max(8, Math.round(px / 4)), cell = px / n;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const t = Math.min(1, Math.max(0, (y / (n - 1)) * 1.15 - .1));
+    g.fillStyle = t * 16 > BAYER[(y % 4) * 4 + (x % 4)] ? b : a;
+    g.fillRect(Math.floor(x * cell), Math.floor(y * cell), Math.ceil(cell), Math.ceil(cell));
+  }
+  skyCache.set(key, c);
+  return c;
+}
+const av = (id, size) =>
+  AGENTS[id]
+    ? `<span class="avs" data-a="${id}" data-s="${size}"></span>`
+    : id === "me"
+      ? `<span class="av person" style="--s:${size}px" role="img" aria-label="Walter"><img src="${ME_IMG}" alt=""></span>`
+      : `<span class="av person" style="--s:${size}px" role="img" aria-label="${esc(nameOf(id))}">${esc(nameOf(id)[0])}</span>`;
+/* Working agents carry the 3×3 pixel orbit at the corner. */
+const avState = (id, size) =>
+  `<span class="avw">${av(id, size)}${AGENTS[id]?.state === "run" ? `<span class="st"><canvas class="orb" data-c="${AGENTS[id].color}"></canvas></span>` : ""}</span>`;
+function mount(root) {
+  for (const el of $$(".avs", root)) {
+    const id = el.dataset.a, size = +el.dataset.s, a = AGENTS[id];
+    const w = document.createElement("span");
+    w.className = "av";
+    w.style.setProperty("--s", size + "px");
+    w.setAttribute("role", "img");
+    w.setAttribute("aria-label", `${a.name}, agente`);
+    const cv = document.createElement("canvas");
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = cv.height = Math.round(size * dpr);
+    w.append(cv);
+    el.replaceWith(w);
+    live.push({ cv, a, size, seed: seedOf(id) + Math.random() });
+  }
+  for (const cv of $$("canvas.orb:not([data-on])", root)) {
+    cv.dataset.on = "1";
+    cv.width = cv.height = 3;
+    orbs.push({ cv, color: cv.dataset.c });
+  }
+}
+const RING = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+function draw(t) {
+  const dark = S.theme === "dark";
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i];
+    if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const g = it.cv.getContext("2d"), s = it.cv.width;
+    g.clearRect(0, 0, s, s);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(skyOf(it.a.color, s, dark), 0, 0, s, s);
+    const acc = it.size >= 30 && it.a.acc;
+    const inner = s * (acc ? .6 : .66);
+    const x = (s - inner) / 2, y = s - inner - s * (acc ? .1 : .14);
+    let pose;
+    if (REDUCED) pose = {};
+    else if (it.a.state === "run") { pose = idlePose(t, it.seed, { active: true, expressions: [] }); pose.writing = true; }
+    else pose = idlePose(t, it.seed, { every: 14, expressions: ["happy", "wink"] });
+    drawAgent(g, x, y, inner, {
+      color: it.a.color, eyes: it.a.eyes, cells: 12, pose,
+      after: acc ? (gg, side, frame) => drawAccessory(gg, side, it.a.acc, frame, t, it.a.state === "run") : undefined,
+    });
+  }
+  const step = Math.floor(t * 8);
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i];
+    if (!o.cv.isConnected) { orbs.splice(i, 1); continue; }
+    const g = o.cv.getContext("2d"), tn = bodyTones(o.color);
+    g.clearRect(0, 0, 3, 3);
+    RING.forEach(([x, y], k) => {
+      const d = (step - k + 80) % 8;
+      g.fillStyle = d === 0 ? tn[0] : d === 1 ? tn[2] ?? tn[0] : d === 2 ? tn.at(-1) : mixHex(tn.at(-1), dark ? "#1c1c1b" : "#ffffff", .6);
+      g.fillRect(x, y, 1, 1);
+    });
+  }
+}
+function loop(ms) { draw(ms / 1000); if (!REDUCED) requestAnimationFrame(loop); }
+
+/* The workspace tile and the rail's foot: the brand sky in soft tones (light in persistent chrome). */
+const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+function paintOrg(cv) {
+  const n = 10; cv.width = cv.height = n;
+  const g = cv.getContext("2d"), dark = S.theme === "dark";
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const t = y / (n - 1), k = t * 3 + BAYER[(y % 4) * 4 + (x % 4)] / 16;
+    g.fillStyle = dark ? SKY[Math.min(3, Math.floor(k))] : SKY[7 - Math.min(3, Math.floor(k))];
+    g.fillRect(x, y, 1, 1);
+  }
+}
+function paintHorizon(cv) {
+  const rail = cv.closest(".rail");
+  const surf = getComputedStyle(rail).getPropertyValue("--rail").trim();
+  const g = cv.getContext("2d");
+  // Céu: the whole rail is the brand sky, deep on top, lighter toward the horizon at the foot.
+  if (S.rail === "ceu" || S.rail === "ceuclaro") {
+    const w = 18, hh = Math.round(rail.offsetHeight / 4); cv.width = w; cv.height = hh;
+    const dark = S.theme === "dark";
+    const steps = S.rail === "ceu"
+      ? (dark ? [surf, mixHex(SKY[1], surf, .55), mixHex(SKY[2], surf, .5), mixHex(SKY[3], surf, .55)] : [surf, SKY[1], SKY[2], mixHex(SKY[3], SKY[2], .3)])
+      : (dark ? [surf, mixHex(SKY[0], surf, .6), mixHex(SKY[1], surf, .55), mixHex(SKY[2], surf, .55)] : [surf, mixHex(SKY[7], surf, .3), SKY[6], mixHex(SKY[5], SKY[6], .4)]);
+    for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
+      const t = Math.max(0, (y / (hh - 1) - .45) / .55);
+      const k = t * (steps.length - 1) + BAYER[(y % 4) * 4 + (x % 4)] / 16 - .5;
+      g.fillStyle = steps[Math.max(0, Math.min(steps.length - 1, Math.round(k)))];
+      g.fillRect(x, y, 1, 1);
+    }
+    return;
+  }
+  const w = 18, hh = 30; cv.width = w; cv.height = hh;
+  const dark = S.theme === "dark" || S.rail === "grafite" || S.rail === "noite";
+  const tones = dark ? [mixHex(SKY[0], surf, .55), mixHex(SKY[1], surf, .7)] : [mixHex(SKY[6], surf, .2), mixHex(SKY[5], surf, .45)];
+  for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
+    const t = y / (hh - 1);
+    const thr = BAYER[(y % 4) * 4 + (x % 4)] / 16;
+    if (t * 1.25 - .25 < thr) continue;
+    g.fillStyle = t * 1.6 - .6 > thr ? tones[1] : tones[0];
+    g.fillRect(x, y, 1, 1);
+  }
+}
+
+/* ---------- pieces ---------- */
+const isOpen = (kind, id) => S.open.kind === kind && (id === undefined || S.open.id === id);
+const cur = (b) => `aria-current="${b}"`;
+function row({ kind, id, icon, label, right = "", unread = false, avatarId }) {
+  return `<button class="row focusable ${unread ? "unread" : ""}" data-open="${kind}:${id ?? ""}" ${cur(isOpen(kind, id))}>
+    ${avatarId ? avState(avatarId, 22) : I[icon]}<span class="nm">${esc(label)}</span>${right}</button>`;
+}
+const toolRow = (k, right = "") => row({ kind: "tool", id: k, icon: TOOLS[k].icon, label: TOOLS[k].label, right });
+function sec(key, title, body, add) {
+  return `<div class="sec ${S.closed.has(key) ? "closed" : ""}" data-sec="${key}">
+    <div class="sh"><button class="t focusable" data-toggle="${key}" aria-expanded="${!S.closed.has(key)}">${I.chev}${esc(title)}</button>
+    ${add ? `<button class="ib focusable" aria-label="${esc(add)}" title="${esc(add)}" data-menu="new">${I.plus}</button>` : ""}</div>
+    <div class="bd">${body}</div></div>`;
+}
+const agentLive = (id) => {
+  const a = AGENTS[id];
+  if (a.state === "run") return `<span class="live">${esc(a.what)}</span>`;
+  const n = DMS.find((d) => d.id === id)?.unread;
+  return n ? `<span class="count">${n}</span>` : "";
+};
+const channelsBody = () => CHANNELS.map((c) => row({ kind: "channel", id: c.id, icon: "hash", label: c.name, unread: c.unread })).join("");
+const agentsBody = () => Object.keys(AGENTS).map((id) => row({ kind: "dm", id, label: AGENTS[id].name, avatarId: id, right: agentLive(id), unread: !!DMS.find((d) => d.id === id)?.unread })).join("");
+const peopleBody = () => Object.keys(PEOPLE).map((id) => row({ kind: "dm", id, label: nameOf(id), avatarId: id, unread: !!DMS.find((d) => d.id === id)?.unread, right: DMS.find((d) => d.id === id)?.unread ? `<span class="count">${DMS.find((d) => d.id === id).unread}</span>` : "" })).join("");
+function head(title, { orgMenu = false, actions = "" } = {}) {
+  return `<div class="ph"><h2>${orgMenu ? `<button class="focusable" data-menu="org">${esc(title)}${I.chev}</button>` : esc(title)}</h2>${actions}
+    <button class="ib focusable" data-hide aria-label="Esconder painel" title="Esconder painel (⌘\\)">${I.side}</button></div>`;
+}
+const jump = (ph = "Ir para…") => `<button class="jump focusable">${I.search}<span class="t">${ph}</span><span class="kbd">⌘</span><span class="kbd">K</span></button>`;
+const dmRow = (d) => `<button class="row tall focusable ${d.unread ? "unread" : ""}" data-open="dm:${d.id}" ${cur(isOpen("dm", d.id))}>
+  ${avState(d.id, 32)}<span class="txt"><span class="l1"><b>${esc(nameOf(d.id))}</b><time>${d.m}</time></span><span class="l2">${esc(d.text)}</span></span>
+  ${d.unread ? `<span class="count">${d.unread}</span>` : ""}</button>`;
+const threadRow = (x) => `<button class="row tall focusable ${x.unread ? "unread" : ""}" data-open="tool:threads">
+  ${I.thread}<span class="txt"><span class="l1"><b>${esc(x.t)}</b><time>${x.m}</time></span><span class="l2">#${x.ch}</span></span></button>`;
+const ACTIVITY = [
+  { who: "lia", wait: true, t: "Lia está esperando você", s: "Uso o cupom antigo quando o novo falhar?", m: "25 min" },
+  { who: "atlas", wait: true, t: "Aprovação: merge do PR #412", s: "GitHub · squash em main", m: "1 h", ap: true },
+  { who: "thay", t: "Thay mencionou você em #produto", s: "Consegue revisar o texto do onboarding?", m: "34 min" },
+  { who: "nina", t: "Nina terminou uma tarefa", s: "Relatório de churn de setembro", m: "1 h" },
+  { who: "theo", t: "Theo comentou em Release 2.4.1", s: "Rotina das 18h rodou sem erro.", m: "2 h" },
+];
+const actRow = (x) => `<button class="row tall focusable unread" data-open="tool:${x.ap ? "approvals" : "notifications"}">
+  ${avState(x.who, 32)}<span class="txt"><span class="l1"><b>${esc(x.t)}</b><time>${x.m}</time></span><span class="l2">${esc(x.s)}</span></span></button>`;
+
+/* ---------- panels ---------- */
+const P = {};
+/* Conversations (A Início, B Conversas, C always). `tools` = what sits above the lists. */
+P.home = (tools = "a") => `<div class="inner">
+  ${head("Viajolo", { orgMenu: true, actions: `<button class="ib focusable" aria-label="Escrever" title="Nova mensagem">${I.edit}</button>` })}
+  ${jump()}
+  <div class="scroll">
+    <div class="sec">
+      ${tools === "a" ? toolRow("threads", `<span class="count">${COUNTS.threads}</span>`) + toolRow("approvals", `<span class="badge">${COUNTS.approvals}</span>`) : ""}
+      ${tools === "b" ? toolRow("threads", `<span class="count">${COUNTS.threads}</span>`) : ""}
+      ${tools === "c" ? toolRow("threads", `<span class="count">${COUNTS.threads}</span>`) : ""}
+    </div>
+    ${sec("channels", "Canais", channelsBody(), "Novo canal")}
+    ${sec("agents", "Agentes", agentsBody() + row({ kind: "tool", id: "team", icon: "org", label: "Equipe" }), "Criar agente")}
+    ${sec("people", "Pessoas", peopleBody(), "Convidar pessoa")}
+  </div></div>`;
+P.dms = () => `<div class="inner">${head("Mensagens", { actions: `<button class="ib focusable" aria-label="Nova mensagem" title="Nova mensagem">${I.edit}</button>` })}
+  ${jump("Buscar em mensagens")}
+  <div class="tabs"><button aria-pressed="${S.tab === "all"}" data-tab="all">Todas</button><button aria-pressed="${S.tab === "unread"}" data-tab="unread">Não lidas <span class="count">${unreadDms}</span></button></div>
+  <div class="scroll">${DMS.filter((d) => S.tab !== "unread" || d.unread).map(dmRow).join("")}</div></div>`;
+P.activity = () => `<div class="inner">${head("Atividade")}
+  <div class="tabs"><button aria-pressed="${S.tab === "all"}" data-tab="all">Tudo</button><button aria-pressed="${S.tab === "wait"}" data-tab="wait">Esperando você <span class="count">2</span></button><button aria-pressed="${S.tab === "men"}" data-tab="men">Menções</button></div>
+  <div class="scroll">${ACTIVITY.filter((x) => S.tab === "all" || (S.tab === "wait" ? x.wait : x.who === "thay")).map(actRow).join("")}
+  <div class="note-s" style="padding-top:10px">e mais ${COUNTS.notif - 5} na caixa</div></div>
+  <div class="pf"><button class="b focusable" data-open="tool:notifications">${I.inbox}Abrir a caixa</button></div></div>`;
+const TASKS = [
+  { t: "Timeout no cálculo de frete", n: 131, who: "lia", st: "Em andamento" },
+  { t: "Exportar relatório em CSV", n: 119, who: "nina", st: "Em revisão" },
+  { t: "Texto do onboarding", n: 140, who: "me", st: "A fazer" },
+];
+const taskRow = (x) => `<button class="row tall focusable" data-open="tool:tasks">${avState(x.who, 22)}<span class="txt"><span class="l1"><b>${esc(x.t)}</b></span><span class="l2">#${x.n} · ${x.st}</span></span></button>`;
+P.tasks = () => `<div class="inner">${head("Tarefas", { actions: `<button class="ib focusable" aria-label="Nova tarefa" title="Nova tarefa">${I.plus}</button>` })}
+  ${jump("Buscar tarefas")}
+  <div class="scroll">
+    <div class="sec">${row({ kind: "tool", id: "tasks", icon: "tasks", label: "Quadro", right: '<span class="count">14</span>' })}
+    ${row({ kind: "view", id: "mine", icon: "home", label: "Minhas", right: '<span class="count">3</span>' })}
+    ${row({ kind: "view", id: "agents", icon: "agent", label: "Dos agentes", right: '<span class="count">8</span>' })}</div>
+    ${sec("stages", "Etapas", ["A fazer · 4", "Em andamento · 5", "Em revisão · 3", "Feito · 2"].map((s, i) => row({ kind: "stage", id: i, icon: "stage", label: s.split(" · ")[0], right: `<span class="sub">${s.split(" · ")[1]}</span>` })).join(""))}
+    ${sec("mine", "Comigo agora", TASKS.map(taskRow).join(""))}
+  </div></div>`;
+P.wiki = () => `<div class="inner">${head("Wiki", { actions: `<button class="ib focusable" aria-label="Nova página" title="Nova página">${I.plus}</button>` })}
+  ${jump("Buscar na wiki")}
+  <div class="scroll wiki-tree">
+    ${row({ kind: "tool", id: "wiki", icon: "book", label: "Início da wiki" })}
+    ${sec("w1", "Produto", `${row({ kind: "page", id: 1, icon: "doc", label: "Visão e princípios" })}${row({ kind: "page", id: 2, icon: "doc", label: "Planos e preços" })}`)}
+    ${sec("w2", "Engenharia", `${row({ kind: "page", id: 3, icon: "doc", label: "Como fazer deploy" })}${row({ kind: "page", id: 4, icon: "doc", label: "Plantão e incidentes" })}${row({ kind: "page", id: 5, icon: "doc", label: "Padrões de código" })}`)}
+    ${sec("w3", "Atendimento", row({ kind: "page", id: 6, icon: "doc", label: "Respostas prontas" }))}
+  </div></div>`;
+P.generic = (k) => `<div class="inner">${head(TOOLS[k].label)}${jump(`Buscar em ${TOOLS[k].label.toLowerCase()}`)}
+  <div class="scroll">${row({ kind: "tool", id: k, icon: TOOLS[k].icon, label: `Todos` })}
+  ${k === "drive" ? sec("d", "Recentes", ["Organograma.png", "Churn setembro.xlsx", "Diff PR #415"].map((f, i) => row({ kind: "file", id: i, icon: "doc", label: f })).join("")) : ""}
+  ${k === "routines" ? sec("r", "Hoje", [["Relatório diário", "18:00", "nina"], ["Resumo do suporte", "19:30", "theo"]].map(([n, h2, w]) => row({ kind: "rt", id: n, label: n, avatarId: w, right: `<span class="sub">${h2}</span>` })).join("")) : ""}
+  ${k === "calendar" ? sec("c", "Hoje", [["Daily", "09:30"], ["Revisão da 2.4.1", "16:00"]].map(([n, h2]) => row({ kind: "ev", id: n, icon: "cal", label: n, right: `<span class="sub">${h2}</span>` })).join("")) : ""}
+  ${k === "forum" ? sec("f", "Em andamento", row({ kind: "topic", id: 1, icon: "forum", label: "Plano anual com 2 meses grátis", right: '<span class="chip-s warn">sua vez</span>' })) : ""}
+  ${k === "team" ? sec("t", "Agentes", agentsBody()) : ""}
+  </div></div>`;
+P.tool = (k) => (k === "tasks" ? P.tasks() : k === "wiki" ? P.wiki() : P.generic(k));
+
+/* D: one sidebar, everything in categories that open and close (same header for tools and conversations). */
+const CATS = [
+  { k: "inbox", label: "Caixa", tools: ["notifications", "approvals", "threads"] },
+  { k: "work", label: "Trabalho", tools: ["tasks", "routines", "calendar"] },
+  { k: "know", label: "Conhecimento", tools: ["wiki", "drive", "forum"] },
+];
+const toolCount = (k) => (k === "notifications" ? `<span class="badge">${cap(COUNTS.notif)}</span>` : k === "approvals" ? `<span class="badge">${COUNTS.approvals}</span>` : k === "threads" ? `<span class="count">${COUNTS.threads}</span>` : k === "tasks" ? '<span class="count">3</span>' : "");
+/* What a closed category still says: the sum of what waits for you (badge = needs you, count = neutral). */
+function catSum(c) {
+  const urgent = c.tools.includes("notifications") ? COUNTS.notif + COUNTS.approvals : 0;
+  if (urgent) return `<span class="badge">${cap(urgent)}</span>`;
+  const n = c.tools.includes("threads") ? COUNTS.threads : c.tools.includes("tasks") ? 3 : 0;
+  return n ? `<span class="count">${n}</span>` : "";
+}
+const unreadIn = { channels: CHANNELS.filter((c) => c.unread).length, agents: DMS.filter((d) => AGENTS[d.id] && d.unread).reduce((s, d) => s + d.unread, 0), people: DMS.filter((d) => PEOPLE[d.id] && d.unread).reduce((s, d) => s + d.unread, 0) };
+function cat(k, label, body, { sum = "", icons = "", add = "", active = "" } = {}) {
+  const open = S.dopen.has(k);
+  return `<div class="cat ${open ? "open" : ""}" data-k="${k}">
+    <div class="ch">
+      <button class="t focusable" data-cat="${k}" aria-expanded="${open}">${I.chev}<span>${esc(label)}</span></button>
+      ${!open && icons ? `<span class="ci">${icons}</span>` : ""}
+      ${!open && !icons ? sum : ""}
+      ${add ? `<button class="ib add focusable" aria-label="${esc(add)}" title="${esc(add)}" data-menu="new">${I.plus}</button>` : ""}
+    </div>
+    <div class="cb"><div class="cbi">${open ? body : active}</div></div></div>`;
+}
+P.d = () => {
+  const cats = CATS.map((c) => {
+    const icons = S.dstyle === "icones"
+      ? c.tools.map((k) => `<button class="mini focusable" data-open="tool:${k}" ${cur(isOpen("tool", k))} aria-label="${TOOLS[k].label}" title="${TOOLS[k].label}">${I[TOOLS[k].icon]}${k === "notifications" || k === "approvals" ? '<i class="dot-n"></i>' : ""}</button>`).join("")
+      : "";
+    // A closed category keeps the open page in sight (its one row).
+    const active = c.tools.filter((k) => isOpen("tool", k)).map((k) => toolRow(k, toolCount(k))).join("");
+    return cat(c.k, c.label, c.tools.map((k) => toolRow(k, toolCount(k))).join(""), { sum: catSum(c), icons, active });
+  }).join("");
+  const sumOf = (n) => (n ? `<span class="count">${n}</span>` : "");
+  const activeConv = (filter) => (S.open.kind === "channel" || S.open.kind === "dm") ? filter() : "";
+  return `<div class="inner">
+    <div class="dorg"><button class="orgb focusable" data-menu="org"><span class="tile"><canvas id="orgSky"></canvas><span>T</span></span>
+      <span class="tx"><b>Viajolo</b><small>2 pessoas · 4 agentes</small></span>${I.chev}</button>
+      <button class="ib focusable" data-hide aria-label="Esconder sidebar" title="Esconder sidebar (⌘\\)">${I.side}</button></div>
+    ${jump()}
+    <div class="scroll dscroll">
+      ${cats}
+      <div class="dsep"></div>
+      ${cat("channels", "Canais", channelsBody(), { sum: sumOf(unreadIn.channels), add: "Novo canal", active: activeConv(() => CHANNELS.filter((c) => isOpen("channel", c.id)).map((c) => row({ kind: "channel", id: c.id, icon: "hash", label: c.name })).join("")) })}
+      ${cat("agents", "Agentes", agentsBody() + row({ kind: "tool", id: "team", icon: "org", label: "Equipe" }), { sum: sumOf(unreadIn.agents), add: "Criar agente", active: Object.keys(AGENTS).filter((id) => isOpen("dm", id)).map((id) => row({ kind: "dm", id, label: AGENTS[id].name, avatarId: id })).join("") })}
+      ${cat("people", "Pessoas", peopleBody(), { sum: sumOf(unreadIn.people), add: "Convidar pessoa", active: Object.keys(PEOPLE).filter((id) => isOpen("dm", id)).map((id) => row({ kind: "dm", id, label: nameOf(id), avatarId: id })).join("") })}
+    </div>
+    <div class="dfoot">
+      <button class="b focusable" data-menu="new">${I.plus}Criar</button>
+      <button class="mecard focusable" data-menu="me">${av("me", 32)}<span class="tx"><b>Walter</b><span class="bar"><i></i></span></span><span class="pc">16%</span></button>
+    </div></div>`;
+};
+
+/* B: one panel per subject, its tools as tiles on top, its content below. */
+const tiles = (keys) => `<div class="tools">${keys.map((k) => `<button class="tool focusable" data-open="tool:${k}" ${cur(isOpen("tool", k))}>${I[TOOLS[k].icon]}${TOOLS[k].label}${k === "approvals" ? `<span class="badge" style="position:absolute;top:6px;right:6px;height:16px;min-width:16px;font-size:10px;padding:0 5px">1</span>` : ""}</button>`).join("")}</div>`;
+P.b_talk = () => P.home("b");
+P.b_inbox = () => `<div class="inner">${head("Caixa")}
+  ${tiles(["notifications", "approvals", "threads"])}
+  <div class="tabs" style="margin-top:6px"><button aria-pressed="${S.tab === "all"}" data-tab="all">Tudo</button><button aria-pressed="${S.tab === "wait"}" data-tab="wait">Esperando você <span class="count">2</span></button><button aria-pressed="${S.tab === "men"}" data-tab="men">Menções</button></div>
+  <div class="scroll">${ACTIVITY.filter((x) => S.tab === "all" || (S.tab === "wait" ? x.wait : x.who === "thay")).map(actRow).join("")}</div></div>`;
+P.b_work = () => `<div class="inner">${head("Trabalho", { actions: `<button class="ib focusable" aria-label="Nova tarefa" title="Nova tarefa">${I.plus}</button>` })}
+  ${tiles(["tasks", "routines", "calendar"])}
+  <div class="scroll">
+    ${sec("bm", "Comigo agora", TASKS.map(taskRow).join(""))}
+    ${sec("br", "Hoje", [["Relatório diário", "18:00", "nina"], ["Resumo do suporte", "19:30", "theo"]].map(([n, h2, w]) => row({ kind: "rt", id: n, label: n, avatarId: w, right: `<span class="sub">${h2}</span>` })).join("") + row({ kind: "ev", id: "rev", icon: "cal", label: "Revisão da 2.4.1", right: '<span class="sub">16:00</span>' }))}
+  </div></div>`;
+P.b_know = () => `<div class="inner">${head("Saber")}
+  ${tiles(["wiki", "drive", "forum"])}
+  <div class="scroll wiki-tree">
+    ${sec("bk1", "Recentes", [["Como fazer deploy", "book"], ["Churn setembro.xlsx", "drive"], ["Plano anual com 2 meses grátis", "forum"]].map(([n, ic], i) => row({ kind: "rec", id: i, icon: ic, label: n })).join(""))}
+    ${sec("bk2", "Wiki", `${row({ kind: "page", id: 1, icon: "doc", label: "Produto" })}${row({ kind: "page", id: 3, icon: "doc", label: "Engenharia" })}${row({ kind: "page", id: 6, icon: "doc", label: "Atendimento" })}`)}
+  </div></div>`;
+P.b_team = () => `<div class="inner">${head("Equipe", { actions: `<button class="ib focusable" aria-label="Criar agente" title="Criar agente">${I.plus}</button>` })}
+  ${tiles(["team"]).replace('class="tools"', 'class="tools" style="grid-template-columns:1fr"')}
+  <div class="scroll">
+    ${sec("ta", "Agentes", Object.keys(AGENTS).map((id) => `<button class="row tall focusable" data-open="dm:${id}" ${cur(isOpen("dm", id))}>${avState(id, 32)}<span class="txt"><span class="l1"><b>${AGENTS[id].name}</b></span><span class="l2">${AGENTS[id].state === "run" ? esc(AGENTS[id].what) : esc(AGENTS[id].role)}</span></span></button>`).join(""))}
+    ${sec("tp", "Pessoas", `<button class="row tall focusable" data-open="dm:thay">${av("thay", 32)}<span class="txt"><span class="l1"><b>Thay</b></span><span class="l2">Admin</span></span></button>`)}
+  </div></div>`;
+
+/* ---------- rails ---------- */
+const place = (key, icon, label, badge = "", soft = false) =>
+  `<button class="place focusable" data-place="${key}" ${cur(S.place === key)} aria-label="${esc(label)}">
+    <span class="ico">${I[icon]}</span><span class="lb">${esc(label)}</span>${badge ? `<span class="badge ${soft ? "soft" : ""}">${badge}</span>` : ""}</button>`;
+const railTop = () => `<button class="org focusable" data-menu="org" aria-label="Viajolo, trocar de organização"><canvas id="orgSky"></canvas><span>T</span></button>`;
+const railFoot = () => `<button class="new focusable" data-menu="new" aria-label="Criar" title="Criar">${I.plus}</button>
+  <button class="me focusable" data-menu="me" aria-label="Walter, 16% do orçamento" title="Walter · 16% do orçamento">
+    <svg class="ring" viewBox="0 0 42 42" aria-hidden="true"><rect x="1" y="1" width="40" height="40" rx="12.5" fill="none" stroke="var(--line2)" stroke-width="1.6"/><rect x="1" y="1" width="40" height="40" rx="12.5" fill="none" stroke="var(--ink2)" stroke-width="1.6" pathLength="100" stroke-dasharray="16 100" stroke-linecap="round" transform="rotate(0)"/></svg>
+    ${av("me", 36)}</button>
+  <div class="horizon" aria-hidden="true"><canvas id="horizon"></canvas></div>`;
+const RAILS = {
+  a: () => `<div class="rail">${railTop()}
+    ${place("home", "home", "Início")}
+    ${place("dms", "dm", "Mensagens", unreadDms ? String(unreadDms) : "")}
+    ${place("activity", "bell", "Atividade", cap(COUNTS.notif))}
+    ${place("tasks", "tasks", "Tarefas")}
+    ${place("more", "more", "Mais")}
+    <span class="grow"></span>${railFoot()}</div>`,
+  b: () => `<div class="rail">${railTop()}
+    ${place("talk", "dm", "Conversas", unreadDms ? String(unreadDms) : "")}
+    ${place("inbox", "inbox", "Caixa", cap(COUNTS.notif))}
+    ${place("work", "work", "Trabalho")}
+    ${place("know", "know", "Saber")}
+    ${place("team", "team", "Equipe")}
+    <span class="grow"></span>${railFoot()}</div>`,
+  /* C: tools only, in small groups (talk · inbox · work · knowledge); the conversations panel never changes. */
+  c: () => {
+    const tool = (k) => `<button class="place focusable" data-tool="${k}" ${cur(isOpen("tool", k))} aria-label="${TOOLS[k].label}"><span class="ico">${I[TOOLS[k].icon]}</span><span class="lb">${TOOLS[k].short ?? TOOLS[k].label}</span>${k === "notifications" ? `<span class="badge">${cap(COUNTS.notif)}</span>` : k === "approvals" ? `<span class="badge">1</span>` : ""}</button>`;
+    const talk = `<button class="place focusable" data-talk ${cur(S.open.kind === "channel" || S.open.kind === "dm")} aria-label="Conversas"><span class="ico">${I.dm}</span><span class="lb">Conversas</span>${unreadDms ? `<span class="badge">${unreadDms}</span>` : ""}</button>`;
+    const groups = [["notifications", "approvals"], ["tasks", "routines", "calendar"], ["forum", "wiki", "drive"]];
+    return `<div class="rail ${S.labels ? "labels" : "icons"}">${railTop()}${talk}
+      ${groups.map((g) => `<span class="sep"></span>${g.map(tool).join("")}`).join("")}
+      <span class="grow"></span>${railFoot()}</div>`;
+  },
+};
+function panelFor(p) {
+  if (S.v === "d") return P.d();
+  if (S.v === "a") {
+    if (p === "home") return P.home("a");
+    if (p === "dms") return P.dms();
+    if (p === "activity") return P.activity();
+    if (p === "tasks") return P.tasks();
+    if (p?.startsWith("tool:")) return P.tool(p.slice(5));
+    return P.home("a");
+  }
+  if (S.v === "b") return (P[`b_${p}`] ?? P.b_talk)();
+  return P.home("c");
+}
+
+/* ---------- main mock ---------- */
+function mainHTML() {
+  const o = S.open;
+  if (o.kind === "channel" || o.kind === "dm") {
+    const title = o.kind === "channel" ? `${I.hash}${o.id}` : `${av(o.id, 24)}${esc(nameOf(o.id))}`;
+    const msgs = o.kind === "channel"
+      ? [["lia", "14:02", "Subi a correção do frete no PR #415. Testes passando."], ["thay", "14:10", "Rodei no staging, o checkout ficou bem mais rápido."], ["atlas", "14:31", "Taxa de erro estável em 0,4% desde as 14h."]]
+      : [[o.id, "14:02", DMS.find((d) => d.id === o.id)?.text ?? "Oi!"]];
+    return `<div class="topbar"><h1>${title}</h1></div><div class="mb">
+      ${msgs.map(([w, t, p]) => `<div class="msg">${av(w, 36)}<div><div class="who">${esc(nameOf(w))}<time>${t}</time></div><p>${esc(p)}</p></div></div>`).join("")}
+      <div class="ghost" style="width:60%"></div><div class="ghost" style="width:42%"></div>
+      ${compare()}</div>`;
+  }
+  const k = o.kind === "tool" ? o.id : "tasks";
+  const t = TOOLS[k] ?? { label: "Página", icon: "doc" };
+  return `<div class="topbar"><h1>${I[t.icon]}${t.label}</h1></div><div class="mb">
+    ${k === "tasks" ? `<div class="board">${["A fazer", "Em andamento", "Em revisão", "Feito"].map((c, i) => `<div class="col"><h4>${c}</h4>${TASKS.slice(0, 3 - (i % 2)).map((x) => `<div class="card">${esc(x.t)}</div>`).join("")}</div>`).join("")}</div>`
+      : `<h3>${t.label}</h3><p class="lead">A página da ferramenta abre aqui. O protótipo é sobre a navegação à esquerda.</p><div class="ghost" style="width:70%"></div><div class="ghost" style="width:52%"></div><div class="ghost" style="width:64%"></div>`}
+    ${compare()}</div>`;
+}
+function compare() {
+  const O = [
+    ["d", "D · Categorias", ["Um sidebar só, sem trilho: nada novo para aprender", "Ferramentas que você não usa ficam fechadas, e as conversas sobem", "Fechada, a categoria ainda mostra o que espera você e a página aberta"], ["Abrir uma ferramenta de uma categoria fechada pede um clique a mais (ou use Ícones na linha)"]],
+    ["a", "A · Slack", ["Familiar para quem vem do Slack", "Conversas logo no topo do Início", "Atividade junta notificações e aprovações"], ["Rotinas, Calendário, Fórum, Wiki e Drive ficam atrás do “Mais”"]],
+    ["b", "B · Por assunto", ["Cada ferramenta ganha um segundo nível útil (minhas tarefas, árvore da wiki)", "5 lugares com nomes simples", "Escala quando vierem mais ferramentas"], ["Um clique a mais para chegar no Drive ou no Calendário", "É preciso aprender onde cada coisa mora"]],
+    ["c", "C · Ferramentas no trilho", ["O chat nunca sai do lugar", "Todas as ferramentas a um clique, em grupos", "Trilho de tamanho fixo, cabe em tela baixa"], ["Ícones sem rótulo pedem tooltip (ou ligar Rótulos)", "Ferramentas não ganham segundo nível próprio"]],
+  ];
+  return `<div class="cmp">${O.map(([k, n, p, m]) => `<div class="opt" data-on="${S.v === k}"><h4>${n}</h4><ul>${p.map((x) => `<li class="p">${x}</li>`).join("")}${m.map((x) => `<li class="m">${x}</li>`).join("")}</ul></div>`).join("")}</div>`;
+}
+
+/* ---------- menus ---------- */
+function menuHTML(kind) {
+  if (kind === "more") return `<div class="mh">Mais ferramentas</div>${["routines", "calendar", "forum", "wiki", "drive", "threads", "approvals", "team"].map((k) => `<button class="mi" data-open="tool:${k}">${I[TOOLS[k].icon]}${TOOLS[k].label}${k === "approvals" ? '<span class="d">1 esperando</span>' : k === "threads" ? '<span class="d">2</span>' : ""}</button>`).join("")}`;
+  if (kind === "new") return `<div class="mh">Criar</div><button class="mi">${I.agent}Agente</button><button class="mi">${I.hash}Canal</button><button class="mi">${I.tasks}Tarefa</button><button class="mi">${I.routines}Rotina</button><hr><button class="mi">${I.team}Convidar pessoa</button>`;
+  if (kind === "me") return `<div class="who">${av("me", 36)}<div><b>Walter</b><small>Dono · Viajolo</small></div></div>
+    <div class="budget"><p><span>Orçamento do mês</span><span>16%</span></p><div class="bar"><i></i></div></div><hr>
+    <button class="mi">${I.gear}Configurações</button><button class="mi">${I.plug}Conectores</button><button class="mi">${I.pc}Computadores</button><button class="mi" data-theme-toggle>${I.moon}Tema escuro</button><hr><button class="mi">${I.out}Sair</button>`;
+  return `<div class="who">${railTop().replace('class="org focusable"', 'class="org" style="width:36px;height:36px;margin:0;border:0;border-radius:11px;position:relative;overflow:hidden"').replace('id="orgSky"', 'class="orgSky2"')}<div><b>Viajolo</b><small>2 pessoas · 4 agentes</small></div></div><hr>
+    <button class="mi">${I.gear}Configurações da organização</button><button class="mi">${I.team}Membros</button><hr><button class="mi">${I.plus}Outra organização</button>`;
+}
+
+/* ---------- render ---------- */
+function render() {
+  document.documentElement.dataset.theme = S.theme;
+  document.documentElement.dataset.rail = S.rail;
+  document.documentElement.dataset.v = S.v;
+  $("#labels").checked = S.labels;
+  $("#labelsTog").hidden = S.v !== "c";
+  for (const s of $$(".proto .seg")) for (const b of $$("button", s)) b.setAttribute("aria-pressed", String(S[s.dataset.k] === b.dataset.o));
+  $("#hide").checked = S.hidden;
+  $("#note").innerHTML = NOTES[S.v];
+  const nav = $("#nav");
+  $("#dstyleWrap").hidden = S.v !== "d";
+  $("#railWrap").hidden = S.v !== "c";
+  nav.innerHTML = `${S.v === "d" ? "" : RAILS[S.v]()}<aside class="panel ${S.hidden ? "hidden" : ""}" id="panel">${panelFor(S.place)}</aside>
+    ${S.fly && S.hidden ? `<aside class="fly glass" id="fly">${panelFor(S.fly)}</aside>` : ""}
+    ${S.menu ? `<div class="menu glass" id="menu" style="${S.menu.pos}">${menuHTML(S.menu.kind)}</div>` : ""}`;
+  $("#main").innerHTML = mainHTML();
+  for (const cv of $$("#orgSky, .orgSky2")) paintOrg(cv);
+  const hz = $("#horizon"); if (hz) paintHorizon(hz);
+  mount(document.body);
+  document.documentElement.style.setProperty("--protoH", $("#proto").offsetHeight + "px");
+  history.replaceState(null, "", `#v=${S.v}&dstyle=${S.dstyle}&theme=${S.theme}&rail=${S.rail}&labels=${S.labels ? 1 : 0}&hide=${S.hidden ? 1 : 0}`);
+  if (REDUCED) draw(0);
+}
+
+/* ---------- events ---------- */
+function setV(v) { S.v = v; S.place = DEFAULT_PLACE[v]; S.open = { kind: "channel", id: "general" }; S.tab = "all"; S.menu = null; S.fly = null; }
+document.addEventListener("click", (e) => {
+  const seg = e.target.closest(".proto .seg button");
+  if (seg) { const k = seg.parentElement.dataset.k; if (k === "v") setV(seg.dataset.o); else S[k] = seg.dataset.o; return render(); }
+  if (e.target.closest("[data-theme-toggle]")) { S.theme = S.theme === "dark" ? "light" : "dark"; S.menu = null; skyCache.clear(); return render(); }
+  const m = e.target.closest("[data-menu]");
+  if (m) {
+    const r = m.getBoundingClientRect(), navR = $("#nav").getBoundingClientRect();
+    const kind = m.dataset.menu;
+    const inRail = !!m.closest(".rail");
+    const pos = inRail
+      ? (kind === "org" ? `left:${r.right - navR.left + 8}px;top:${r.top - navR.top}px` : `left:${r.right - navR.left + 8}px;bottom:${navR.bottom - r.bottom}px`)
+      : r.top - navR.top > navR.height / 2
+        ? `left:${r.left - navR.left}px;bottom:${navR.bottom - r.top + 6}px`
+        : `left:${r.left - navR.left}px;top:${r.bottom - navR.top + 6}px`;
+    S.menu = S.menu?.kind === kind ? null : { kind, pos };
+    return render();
+  }
+  const pl = e.target.closest("[data-place]");
+  if (pl) {
+    const p = pl.dataset.place;
+    if (S.v === "a" && p === "more") {
+      const r = pl.getBoundingClientRect(), navR = $("#nav").getBoundingClientRect();
+      S.menu = S.menu?.kind === "more" ? null : { kind: "more", pos: `left:${r.right - navR.left + 8}px;top:${r.top - navR.top}px` };
+      return render();
+    }
+    // Clicking the open place again hides/shows the panel (like Slack).
+    if (S.place === p && !S.hidden) S.hidden = true; else { S.place = p; S.hidden = false; }
+    S.tab = "all"; S.menu = null; S.fly = null;
+    if (p === "tasks") S.open = { kind: "tool", id: "tasks" };
+    return render();
+  }
+  if (e.target.closest("[data-talk]")) {
+    // Conversas: back to the last conversation; clicking it again while there toggles the panel.
+    if (S.open.kind === "channel" || S.open.kind === "dm") S.hidden = !S.hidden; else { S.open = { kind: "channel", id: "general" }; S.hidden = false; }
+    S.menu = null; return render();
+  }
+  const tl = e.target.closest("[data-tool]");
+  if (tl) { S.open = { kind: "tool", id: tl.dataset.tool }; S.menu = null; return render(); }
+  const op = e.target.closest("[data-open]");
+  if (op) {
+    const [kind, id] = op.dataset.open.split(":");
+    S.open = { kind, id };
+    // A: a tool opened from "Mais" takes over the panel with its own navigation.
+    if (S.v === "a" && kind === "tool" && op.closest("#menu")) { S.place = `tool:${id}`; S.hidden = false; }
+    if (S.v === "a" && kind === "tool" && id === "notifications") S.place = "activity";
+    S.menu = null;
+    if (op.closest("#fly")) S.fly = null;
+    return render();
+  }
+  const ct = e.target.closest("[data-cat]");
+  if (ct) {
+    const k = ct.dataset.cat, tools = CATS.some((c) => c.k === k);
+    if (S.dopen.has(k)) S.dopen.delete(k);
+    else {
+      // "Uma por vez": opening a tools category closes the other tools categories.
+      if (S.dstyle === "uma" && tools) for (const c of CATS) S.dopen.delete(c.k);
+      S.dopen.add(k);
+    }
+    return render();
+  }
+  const tg = e.target.closest("[data-toggle]");
+  if (tg) { const k = tg.dataset.toggle; S.closed.has(k) ? S.closed.delete(k) : S.closed.add(k); return render(); }
+  const tb = e.target.closest("[data-tab]");
+  if (tb) { S.tab = tb.dataset.tab; return render(); }
+  if (e.target.closest("[data-hide]")) { S.hidden = true; return render(); }
+  if (S.menu && !e.target.closest("#menu")) { S.menu = null; render(); }
+});
+$("#labels").addEventListener("change", (e) => { S.labels = e.target.checked; render(); });
+$("#hide").addEventListener("change", (e) => { S.hidden = e.target.checked; S.fly = null; render(); });
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "\\") { e.preventDefault(); S.hidden = !S.hidden; S.fly = null; render(); }
+  if (e.key === "Escape" && (S.menu || S.fly)) { S.menu = null; S.fly = null; render(); }
+});
+/* Panel hidden: hovering a rail place floats its panel; leaving the nav closes it. */
+let flyT;
+$("#nav").addEventListener("mouseover", (e) => {
+  if (!S.hidden || S.v === "c") return;
+  const pl = e.target.closest("[data-place]");
+  if (!pl || pl.dataset.place === "more") return;
+  clearTimeout(flyT);
+  const p = pl.dataset.place;
+  if (S.fly !== p) flyT = setTimeout(() => { S.fly = p; render(); }, 120);
+});
+$("#nav").addEventListener("mouseleave", () => { clearTimeout(flyT); if (S.fly) { S.fly = null; render(); } });
+/* C: tooltips on the icon rail. */
+$("#nav").addEventListener("mouseover", (e) => {
+  $$(".tip").forEach((t) => t.remove());
+  if (S.v !== "c") return;
+  if (S.labels) return;
+  const b = e.target.closest(".rail [data-tool], .rail [data-talk]");
+  if (!b) return;
+  const r = b.getBoundingClientRect(), navR = $("#nav").getBoundingClientRect();
+  const tip = document.createElement("div");
+  tip.className = "tip glass";
+  tip.innerHTML = b.dataset.tool ? esc(TOOLS[b.dataset.tool].label) : "Conversas";
+  tip.style.top = `${r.top - navR.top + r.height / 2 - 15}px`;
+  $("#nav").append(tip);
+});
+
+S.place = DEFAULT_PLACE[S.v];
+render();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
