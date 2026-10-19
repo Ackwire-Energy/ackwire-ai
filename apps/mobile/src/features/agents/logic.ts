@@ -112,6 +112,8 @@ export interface TeamLine {
   preview: string | null;
   /** Free: that message's body was written by the server; show it in the reader's language (`previewBody`). */
   previewMeta?: PreviewMeta | null;
+  /** Its brain's computer is offline and it waits for it ("Esperando o MacBook Air"): the computer's name. */
+  computer?: string;
 }
 
 /**
@@ -124,6 +126,8 @@ export function teamLines(
   work: WorkItem[],
   dms: Pick<DirectMessage, "with" | "lastMessage">[],
   waitingOnYou: Pick<Approval, "id" | "agentId" | "title" | "createdAt">[] = [],
+  /** Agents waiting for an offline computer (`waitingComputerByAgent`): never "working", listed first in Livres. */
+  offline: ReadonlyMap<string, { name: string }> = new Map(),
 ): { waiting: TeamLine[]; working: TeamLine[]; free: TeamLine[] } {
   const byId = new Map(agents.map((a) => [a.id, a]));
   const waiting: TeamLine[] = [];
@@ -146,7 +150,7 @@ export function teamLines(
   const working: TeamLine[] = [];
   for (const w of workByAgent(work)) {
     const agent = byId.get(w.agentId);
-    if (agent && !asking.has(agent.id))
+    if (agent && !asking.has(agent.id) && !offline.has(agent.id))
       working.push({ agent, work: w, approval: null, waitingCount: 0, at: w.since, preview: null });
   }
   const busy = new Set([...asking, ...working.map((l) => l.agent.id)]);
@@ -168,9 +172,14 @@ export function teamLines(
         at: last?.createdAt ?? null,
         preview: last ? previewOf(last.body) || null : null,
         ...(last?.meta ? { previewMeta: last.meta } : {}),
+        ...(offline.has(agent.id) ? { computer: offline.get(agent.id)?.name ?? "" } : {}),
       };
     })
     .sort((a, b) => {
+      if (a.computer !== undefined || b.computer !== undefined) {
+        if (a.computer === undefined) return 1;
+        if (b.computer === undefined) return -1;
+      }
       if (a.at && b.at) return b.at.localeCompare(a.at);
       if (a.at) return -1;
       if (b.at) return 1;

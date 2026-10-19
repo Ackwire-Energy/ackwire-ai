@@ -20,8 +20,8 @@ const AVATAR = LIST_AVATAR;
  * One conversation in the list (MobileConversas.html, readable per MobileIntencional.html), in the shared
  * `ListRow`: the agent's living body (moving while it works), a person's face, or the tile of a channel;
  * the name and the time; the last line ("Nome: …", two lines). An agent's row says what matters instead
- * (`agent`): it waits on your ok (amber, "espera seu ok · PR #128"), or what it is doing with the pixel
- * orbit. Unread: bold name, darker time and preview, the count. Threads and missions (MobileRefinos.html
+ * (`agent`): it waits on your ok (amber, "espera seu ok · PR #128"), it waits for its offline computer
+ * (dozing, "Esperando o MacBook Air"), or what it is doing with the pixel orbit. Unread: bold name, darker time and preview, the count. Threads and missions (MobileRefinos.html
  * `trowApp`) add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
  * and items ("Esperando você · 4 de 9 itens") and what waits on you in it; a thread shows the face and the
  * line of its last reply. `live`: the agent moves (the first rows only).
@@ -50,11 +50,13 @@ export const ConversationRowView = memo(function ConversationRowView({
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
   const agentState = agentDm ? (agent ?? null) : null;
-  const working = r.kind === "channel" ? false : r.working || agentState?.kind === "working";
+  // Waiting for its offline computer: dozing, no working orbit (its run only waits).
+  const away = agentState?.kind === "computer";
+  const working = r.kind === "channel" || away ? false : r.working || agentState?.kind === "working";
   const leading =
     r.kind === "dm" ? (
       agentDm ? (
-        <AgentFace agentId={r.with.id} size={AVATAR - 2} mode={working ? "run" : "idle"} live={live} />
+        <AgentFace agentId={r.with.id} size={AVATAR - 2} mode={away ? "rest" : working ? "run" : "idle"} live={live} />
       ) : (
         <Face who={{ type: r.with.type, id: r.with.id }} size={AVATAR} live={false} />
       )
@@ -112,6 +114,16 @@ export const ConversationRowView = memo(function ConversationRowView({
             {verb}
           </Text>
           {agentState.title ? ` · ${agentState.title}` : ""}
+        </Text>
+      </View>
+    );
+  } else if (agentState?.kind === "computer") {
+    label = t("mobile.outage.rowWaiting", { computer: agentState.computer });
+    line = (
+      <View style={styles.work}>
+        <Icon name="clock" size={14} color={c.muted} />
+        <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
+          {label}
         </Text>
       </View>
     );

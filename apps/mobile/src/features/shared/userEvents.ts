@@ -8,13 +8,15 @@ import {
   type ThreadFollowEvent,
   type ThreadInfo,
 } from "@agenteschat/client";
+import { isOutageEvent } from "@agenteschat/client/lib/machine-outages";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { outagesKey } from "../outages/queries";
 import { useConnection, useOrgId } from "./hooks";
 
 /**
  * Events for the signed-in person, whatever screen is open: requests they
- * can decide, the inbox and its badge (D46), missions waiting on them. Keeps
+ * can decide, the inbox and its badge (D46), missions waiting on them, computers going offline or back. Keeps
  * Início, Atividade and the tab badges live, and "Seguir" in step across
  * devices.
  */
@@ -45,6 +47,8 @@ export function useUserEvents() {
         );
         void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
       }
+      // Org events: a computer went offline or came back, agents moved off one ("Computador desconectado").
+      if (isOutageEvent(event)) void qc.invalidateQueries({ queryKey: outagesKey(orgId) });
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")
         refreshMission(qc, orgId, event.missionId);
     });

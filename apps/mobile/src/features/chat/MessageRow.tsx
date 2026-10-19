@@ -1,5 +1,6 @@
 import { type Message, type ThreadInfo, useReactions, useToggleReaction } from "@agenteschat/client";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
+import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
@@ -9,6 +10,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { CHROME_MAX_SCALE, Count, Icon, Text } from "@/ui";
 import { MessageFiles } from "../files/MessageFiles";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/cards";
+import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
@@ -82,6 +84,8 @@ export const MessageRow = memo(function MessageRow({
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
   const question = isAgent ? questionOf(meta) : null;
+  // "Esperando o MacBook Air voltar": its brain's computer is offline (the card, when it says which computer).
+  const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
   const issueWork = issueWorkOf(meta);
   // My own message: a light bubble on the right, no face or name (MobileIntencional.html, `.me`).
@@ -236,7 +240,14 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} /> : null}
+        {brainWait ? (
+          <BrainWait
+            message={m}
+            fallback={body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} /> : null}
+          />
+        ) : body ? (
+          <MessageText body={body} muted={m.local === "pending"} selectable={false} />
+        ) : null}
         {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}

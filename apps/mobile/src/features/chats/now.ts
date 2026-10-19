@@ -17,10 +17,11 @@ import type { WaitingItem, WaitingKind } from "./waiting";
 export type AgentRowState =
   | { kind: "waiting"; wait: WaitingKind; title: string }
   | { kind: "working"; work: WorkItem }
+  | { kind: "computer"; computer: string }
   | null;
 
 /**
- * Waiting on you wins (amber, the only waiting color), then what it is on: the item in this conversation
+ * Waiting on you wins (amber, the only waiting color), then waiting for its offline computer, then what it is on: the item in this conversation
  * first, else its first item anywhere (missions come first in `workingNow`).
  */
 export function agentRowState(
@@ -28,9 +29,13 @@ export function agentRowState(
   channelId: string,
   work: readonly WorkItem[],
   waiting: readonly Pick<WaitingItem, "agentId" | "kind" | "title">[],
+  /** Agents waiting for an offline computer (`waitingComputerByAgent`): "Esperando o MacBook Air", never working. */
+  offline: ReadonlyMap<string, { name: string }> = new Map(),
 ): AgentRowState {
   const wait = waiting.find((w) => w.agentId === agentId);
   if (wait) return { kind: "waiting", wait: wait.kind, title: wait.title };
+  const computer = offline.get(agentId);
+  if (computer) return { kind: "computer", computer: computer.name };
   const mine = work.filter((w) => w.agentId === agentId);
   const here = mine.find((w) => w.channelId === channelId) ?? mine[0];
   return here ? { kind: "working", work: here } : null;

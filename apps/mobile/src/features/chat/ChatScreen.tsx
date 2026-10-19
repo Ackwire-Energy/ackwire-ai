@@ -24,6 +24,7 @@ import {
   useThreads,
 } from "@agenteschat/client";
 import { issueTakenOf } from "@agenteschat/client/lib/issues";
+import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { can } from "@agenteschat/client/lib/permissions";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
@@ -216,6 +217,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const shownRuns = runRows.shown;
 
   // ── Rows ──
+  // One waiting card per agent and computer: an older "my computer is away" gives way to the newer one.
+  const superseded = useMemo(() => supersededBrainNotices(list), [list]);
   const rows = useMemo<Row[]>(() => {
     if (isThread && threadId) {
       const root = list.find((m) => m.id === threadId);
@@ -244,16 +247,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         : [];
       return [
         ...head,
-        ...buildRows(replies),
+        ...buildRows(replies, (m) => superseded.has(m.id)),
         ...shownRuns.map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
       ];
     }
-    const hidden = (m: Message) => Boolean(m.threadId && (linkThreads.has(m.threadId) || collapsed.has(m.threadId)));
+    const hidden = (m: Message) =>
+      superseded.has(m.id) || Boolean(m.threadId && (linkThreads.has(m.threadId) || collapsed.has(m.threadId)));
     return [
       ...buildRows(list, hidden),
       ...shownRuns.map((run) => ({ kind: "run" as const, key: `run-${run.runId}`, run })),
     ];
-  }, [isThread, threadId, list, thread.data, channel?.name, shownRuns, linkThreads, collapsed, t]);
+  }, [isThread, threadId, list, thread.data, channel?.name, shownRuns, linkThreads, collapsed, superseded, t]);
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther

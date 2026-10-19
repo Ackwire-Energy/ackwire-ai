@@ -1,11 +1,14 @@
 import { keys } from "@agenteschat/client";
+import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet } from "react-native";
 import { LargeTitleScreen, Text } from "@/ui";
 import { workByAgent } from "../agents/logic";
+import { OutageNotices } from "../outages/OutageNotice";
+import { useMachineOutages } from "../outages/queries";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useConversations, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
@@ -29,8 +32,9 @@ export const openKindList = (kind: ListKind) => router.push(`/conversations/${ki
  * large title with Você and "+" (Novo) in the bar, over a light sky, the greeting under it with what changed
  * (what an agent finished, how many work), the "Esperando você" strip (only while something waits; it opens into
  * the first item's card, and scrolling closes it), then Agentes, Canais and Pessoas by latest activity, each
- * collapsible (remembered), five rows and "Ver todos". An agent's row says it waits on your ok, or what it is
- * doing. Search and Threads have their own tabs. Empty, it invites the first agent.
+ * collapsible (remembered), five rows and "Ver todos". Under the greeting, a notice per computer that went
+ * offline with agents waiting for it (ComputadorOffline.html). An agent's row says it waits on your ok, waits
+ * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  */
 export function ChatsScreen() {
   const { t } = useTranslation();
@@ -51,12 +55,15 @@ export function ChatsScreen() {
     return () => clearInterval(timer);
   }, [focused, qc, orgId]);
 
+  const outages = useMachineOutages();
+  const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
+  // An agent waiting for its offline computer isn't working (its run only waits).
   const working = workByAgent(work)
     .map((w) => w.agentId)
-    .filter((id) => dir.agentById.has(id));
+    .filter((id) => dir.agentById.has(id) && !offline.has(id));
   const finished = useFinished(work, list.rows);
-  const agentStates = useAgentRowStates(list.rows, work, waiting.items);
-  const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch()]));
+  const agentStates = useAgentRowStates(list.rows, work, waiting.items, offline);
+  const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
   const sections = homeSections(list.rows);
   const empty = !list.loading && list.rows.length === 0;
   const strip = <WaitingStrip items={waiting.items} open={waitOpen} onOpenChange={setWaitOpen} />;
@@ -75,6 +82,7 @@ export function ChatsScreen() {
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
       onScrollBeginDrag={waitOpen ? () => setWaitOpen(false) : undefined}
     >
+      <OutageNotices />
       {strip}
       {empty ? (
         <FirstAgentEmpty />

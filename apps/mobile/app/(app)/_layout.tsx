@@ -35,6 +35,7 @@ function AppStack() {
   const newSheet = useFormSheetOptions([0.6, 1]);
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
+  const switchSheet = useFormSheetOptions([0.8, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -48,6 +49,7 @@ function AppStack() {
       <Stack.Screen name="issues/new" options={formSheet} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="approval/[id]" options={approvalSheet} />
+      <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="me" options={meSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />

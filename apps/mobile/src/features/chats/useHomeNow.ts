@@ -80,14 +80,22 @@ export function useFinished(work: WorkItem[], rows: ConversationRow[]) {
   return { finished, dismiss };
 }
 
-/** What each agent DM says instead of its last message (it waits on you, or what the agent is doing), by row key. */
-export function useAgentRowStates(rows: ConversationRow[], work: WorkItem[], waiting: WaitingItem[]) {
+/**
+ * What each agent DM says instead of its last message (it waits on you, waits for its offline computer, or
+ * what the agent is doing), by row key.
+ */
+export function useAgentRowStates(
+  rows: ConversationRow[],
+  work: WorkItem[],
+  waiting: WaitingItem[],
+  offline?: ReadonlyMap<string, { name: string }>,
+) {
   return useMemo(() => {
     const out = new Map<string, AgentRowState>();
     for (const r of rows) {
       if (r.kind === "dm" && r.with.type === "agent")
-        out.set(r.key, agentRowState(r.with.id, r.channelId, work, waiting));
+        out.set(r.key, agentRowState(r.with.id, r.channelId, work, waiting, offline));
     }
     return out;
-  }, [rows, work, waiting]);
+  }, [rows, work, waiting, offline]);
 }

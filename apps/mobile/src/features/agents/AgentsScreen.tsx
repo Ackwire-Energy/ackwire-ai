@@ -1,9 +1,12 @@
 import { useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
+import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { router } from "expo-router";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Chip, EmptyState, Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
+import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -19,7 +22,8 @@ const LIVE_ROWS = 8;
 /**
  * Agentes (MobileIntencional.html, "Aba Agentes"): the team in Conversas' rows, who needs you first.
  * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
- * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked). Tapping an agent
+ * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
+ * ones waiting for their offline computer: "Esperando o MacBook Air"). Tapping an agent
  * opens its profile (Conversar is one tap there); "Novo agente" at the end.
  */
 export function AgentsScreen() {
@@ -33,9 +37,13 @@ export function AgentsScreen() {
   const approvals = useApprovals(orgId);
   const work = useWorkingNow();
   const asking = useWaitingApprovals();
-  const { waiting, working, free } = teamLines(dir.agents, work, dms.data ?? [], asking);
+  const outages = useMachineOutages();
+  const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
+  const { waiting, working, free } = teamLines(dir.agents, work, dms.data ?? [], asking, offline);
   const busy = waiting.length + working.length;
-  const pull = usePullRefresh(() => Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch()]));
+  const pull = usePullRefresh(() =>
+    Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch()]),
+  );
   const total = dir.agents.length;
   return (
     <LargeTitleScreen
@@ -92,7 +100,7 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
   const c = useColors();
   const when = useWhen();
   const now = useNow();
-  const { agent: a, work: w, approval } = l;
+  const { agent: a, work: w, approval, computer } = l;
   const busy = Boolean(approval || w);
   const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
   const sub = approval
@@ -101,7 +109,9 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
       : t("mobile.intentAgents.waitingLine", { title: approval.title })
     : w
       ? workTitle(t, w)
-      : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
+      : computer !== undefined
+        ? t("mobile.outage.rowWaiting", { computer })
+        : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
   return (
     <ListRow
       onPress={() => router.push(`/agent/${a.id}`)}
@@ -111,15 +121,19 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
           ? t("mobile.intentAgents.waitingLabel", { name: a.name })
           : w
             ? t("mobile.agents.workingLabel", { name: a.name })
-            : a.name,
+            : computer !== undefined
+              ? t("mobile.outage.rowWaitingLabel", { name: a.name, computer })
+              : a.name,
         a.role.trim() || null,
         time,
-        sub || null,
+        computer !== undefined ? null : sub || null,
       ]
         .filter(Boolean)
         .join(", ")}
       divider={divider}
-      leading={<AgentFace agentId={a.id} size={50} mode={w ? "run" : "idle"} live={live} />}
+      leading={
+        <AgentFace agentId={a.id} size={50} mode={w ? "run" : computer !== undefined ? "rest" : "idle"} live={live} />
+      }
       title={
         <View style={styles.l1}>
           <Text variant="title" numberOfLines={1} style={styles.name}>
@@ -145,6 +159,13 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
           <View style={styles.work}>
             <PixelOrbit color={agentLook(a).color} size={12} />
             <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.medium, styles.shrink]}>
+              {sub}
+            </Text>
+          </View>
+        ) : computer !== undefined ? (
+          <View style={styles.work}>
+            <Icon name="clock" size={13} color={c.muted} />
+            <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
               {sub}
             </Text>
           </View>
