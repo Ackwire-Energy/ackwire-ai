@@ -325,7 +325,7 @@ export const ptBR = {
   shell: {
     inbox: "Para você",
     work: "Agenda",
-    knowledge: "Biblioteca",
+    docs: "Documentos",
     waitingInSection_one: "{{count}} esperando você",
     waitingInSection_other: "{{count}} esperando você",
     inviteHint: "Por email ou link",

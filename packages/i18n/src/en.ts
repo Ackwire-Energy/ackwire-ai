@@ -319,7 +319,7 @@ export const en: Translations = {
   shell: {
     inbox: "For you",
     work: "Schedule",
-    knowledge: "Library",
+    docs: "Docs",
     waitingInSection_one: "{{count}} waiting for you",
     waitingInSection_other: "{{count}} waiting for you",
     inviteHint: "By email or link",

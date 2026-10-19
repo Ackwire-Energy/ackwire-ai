@@ -303,6 +303,7 @@ export function Sidebar() {
                 label={t("shell.threads")}
                 waiting={missionsWaiting > 0}
               />
+              <ToolShortcut to="/org/$orgId/forum" icon="message" label={t("shell.forum")} />
             </>
           }
         >
@@ -345,6 +346,11 @@ export function Sidebar() {
               </CountChip>
             )}
           </Link>
+          {/* The forum is where decisions are made together: it sits with what waits for you. */}
+          <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
+            <Icon name="message" />
+            <span className="sidebar__item-label">{t("shell.forum")}</span>
+          </Link>
         </SidebarSection>
 
         <SidebarSection
@@ -374,14 +380,13 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection
-          id="knowledge"
-          label={t("shell.knowledge")}
+          id="docs"
+          label={t("shell.docs")}
           sections={sections}
           shortcuts={
             <>
               <ToolShortcut to="/org/$orgId/wiki" icon="book" label={t("shell.wiki")} />
               <ToolShortcut to="/org/$orgId/drive" icon="drive" label={t("shell.drive")} />
-              <ToolShortcut to="/org/$orgId/forum" icon="message" label={t("shell.forum")} />
             </>
           }
         >
@@ -392,10 +397,6 @@ export function Sidebar() {
           <Link to="/org/$orgId/drive" params={{ orgId }} className="sidebar__item" title={t("shell.drive")}>
             <Icon name="drive" />
             <span className="sidebar__item-label">{t("shell.drive")}</span>
-          </Link>
-          <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
-            <Icon name="message" />
-            <span className="sidebar__item-label">{t("shell.forum")}</span>
           </Link>
         </SidebarSection>
 
@@ -528,9 +529,9 @@ export function Sidebar() {
   );
 }
 
-type SectionId = "inbox" | "work" | "knowledge" | "channels" | "agents" | "people";
+type SectionId = "inbox" | "work" | "docs" | "channels" | "agents" | "people";
 /** The tools people reach for less start closed; everything else starts open. */
-const CLOSED_BY_DEFAULT: SectionId[] = ["work", "knowledge"];
+const CLOSED_BY_DEFAULT: SectionId[] = ["work", "docs"];
 
 /** Which sidebar categories are closed, remembered per browser. */
 function useSidebarSections() {

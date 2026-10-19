@@ -93,7 +93,7 @@ describe("the sidebar on a phone (drawer)", () => {
     onPhone();
     const { router } = await go(`c/${GENERAL_ID}`);
     await click(menuButton());
-    // Knowledge starts closed: Drive is the icon on its header.
+    // Docs starts closed: Drive is the icon on its header.
     await click(within(nav()).getAllByRole("link", { name: "Drive" })[0] as HTMLElement);
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
@@ -109,7 +109,7 @@ describe("the sidebar on a phone (drawer)", () => {
     await go("drive");
     await click(menuButton());
     expect(nav().getAttribute("data-open")).toBe("true");
-    // Knowledge starts closed: Drive is the icon on its header.
+    // Docs starts closed: Drive is the icon on its header.
     await click(within(nav()).getAllByRole("link", { name: "Drive" })[0] as HTMLElement);
     await settle();
     expect(nav().getAttribute("data-open")).toBe("false");
