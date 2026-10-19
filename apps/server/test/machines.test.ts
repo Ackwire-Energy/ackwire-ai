@@ -215,7 +215,10 @@ test("reconnecting over HTTP: the removed computer comes back with its agent; a 
   );
   expect(junk.status).toBe(200);
   const junkCode = (await junk.json()) as { userCode: string };
-  expect((await (await owner(`/api/app/machines/device/${junkCode.userCode}`)).json()).reconnect).toBeUndefined();
+  const junkView = (await (await owner(`/api/app/machines/device/${junkCode.userCode}`)).json()) as {
+    reconnect?: unknown;
+  };
+  expect(junkView.reconnect).toBeUndefined();
 });
 
 test("the runner's WebSocket: no Origin, hello → welcome, online in the list", async () => {
