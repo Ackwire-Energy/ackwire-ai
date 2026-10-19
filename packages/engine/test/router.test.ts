@@ -184,6 +184,50 @@ describe("routeMessage", () => {
     );
   });
 
+  test("asking the agent you talk to about what it already said still gets its answer; another agent stays quiet", async () => {
+    f = await setup();
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "ops", handle: "ops" },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
+    const question = await post("our timezone is Sao Paulo, note it");
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: question.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      body: "Noted. I also moved the hourly reviews routine to Sao Paulo time.",
+    });
+    const answered = (scores: Record<string, number>): RouterStrategy => ({
+      name: "fixed",
+      async decide(input) {
+        return {
+          agents: input.candidates.map((c) => ({ agentId: c.agentId, score: scores[c.handle] ?? 0 })),
+          needsAgent: 0.94,
+          alreadyAnswered: 0.9,
+        };
+      },
+    });
+    // Longer than a short follow-up, about something the agent already said: it answers anyway.
+    const again = await post("and what is the interval of that review routine of yours again?");
+    const toDev = await routeMessage(
+      { db: f.db, strategy: answered({ [f.agent.handle]: 1, ops: 0.05 }), policy },
+      { orgId: f.org.id, messageId: again.id },
+    );
+    expect(toDev.selected).toEqual([f.agent.id]);
+    // The router would bring in someone else for an answer already given: nobody.
+    const other = await post("who handles the review routine and how often does it run?");
+    const toOps = await routeMessage(
+      { db: f.db, strategy: answered({ [f.agent.handle]: 0.1, ops: 0.9 }), policy },
+      { orgId: f.org.id, messageId: other.id },
+    );
+    expect(toOps.selected).toEqual([]);
+  });
+
   test("a quote reply to an agent goes to that agent, who the router saw answer under the earlier message", async () => {
     f = await setup();
     const ops = await createAgent(

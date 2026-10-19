@@ -563,8 +563,13 @@ export async function routeMessage(
     (quotedAgentId !== null || isShortFollowUp(message.body)) &&
     picked.length < 2 &&
     !clearlyAnother;
-  // Another agent already answered this in the thread: don't pile on with a second answer.
-  const duplicate = !followUp && (result.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
+  // Another agent already answered this in the thread: don't pile on with a second answer. Not when the
+  // person asks the agent they are talking to again ("e qual o intervalo dessa sua rotina?" right after
+  // Theo mentioned it, 2026-10-19): its own earlier answer is no reason for silence.
+  const duplicate =
+    !followUp &&
+    !(continuityAgentId !== null && picked.includes(continuityAgentId)) &&
+    (result.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
   const selected = followUp && continuityAgentId ? [continuityAgentId] : duplicate ? [] : picked;
   const runs = await db.transaction(async (tx) => {
     const [decision] = await tx
