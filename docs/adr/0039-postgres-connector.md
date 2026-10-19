@@ -1,0 +1,95 @@
+# 0039. A native Postgres connector: agents read with SQL, writes always ask
+
+- Status: Proposed
+- Date: 2026-10-19
+- Planning: D56
+- Extends: ADR 0015 (Tool Gateway and approvals), ADR 0016 (connectors), ADR 0007 (credentials), ADR 0037 (reads never ask)
+- Out of scope: MySQL, SQL Server, BigQuery and other warehouses (the same shape later, one driver each); databases only reachable from a private network (see "Private networks")
+
+## Context
+
+People want agents that answer from their own data: "how many orders yesterday", "which customers churned this month", "why is this user stuck". Today the only path is a custom MCP connector pointing at a public HTTPS SQL server, and the Supabase preset (`execute_sql` with `read_only=true`, `packages/engine/src/connectors/presets.ts`). Most small companies have a plain Postgres (Railway, Neon, RDS, Render, a VPS) and no MCP server in front of it, so they can't connect at all.
+
+What we already have:
+
+- The Tool Gateway takes any number of `ToolSource`s (`createToolGateway({ sources })`, `packages/engine/src/tools/types.ts`). Sources only offer tools; the gateway alone decides (scopes from `agent_scopes`, re-read per call; sensitive calls become approvals with the exact parameters and an action hash; D53).
+- Per-org encrypted credentials (`sealSecret`, ADR 0007) and connector connections (`connector_connections`).
+- The address guard used for MCP URLs (`isBlockedAddress`, `assertPublicHttpsUrl` in `net-guard.ts`).
+- The `postgres` driver is already a dependency (`packages/db`), and tests run on PGlite.
+
+So the plumbing is there. The work is making SQL safe to hand to a model.
+
+## Decision
+
+### A connector that is a `ToolSource`, not an MCP server
+
+- New connector `postgres` in the catalog, category `dev`, auth `connection_string`. The org connects a database once; each agent gets a subset of its scopes (ADR 0016). An org can connect several databases; each is its own connection with its own name ("Production (read replica)", "Analytics").
+- It runs in-process in the server: no MCP hop, no extra service. Its tools go through the same gateway path as every other tool (scopes, audit, outcomes, approvals).
+
+### Every brain gets it the same way
+
+- **Cloud agents** (the engine's tool loop) see the `pg_*` tools like any granted connector tool.
+- **Computer brains** (Claude Code, Codex on a connected computer, ADR 0032) get them through the runner's `agentes` MCP bridge: `bridgeToolsFor` lists the run's gateway tools, connector tools included, and each call comes back to `invokeToolForRun`, i.e. the same gateway, grants, approvals and limits. The SQL still runs from our server, not from the machine; the credential never reaches the machine.
+- What we do not control: a computer brain can also run `psql` or its own tools on that machine with whatever credentials the person keeps there. That path is governed by the machine's command policy and folders (D53, gap 3), not by this connector. The connect screen doesn't change that; it is the person's machine.
+
+### Tools and scopes
+
+| Tool | Scope | Level |
+| --- | --- | --- |
+| `pg_list_tables` (schemas, tables, views, row estimates) | `postgres:read` | read |
+| `pg_describe_table` (columns, types, keys, indexes, comments) | `postgres:read` | read |
+| `pg_query` (one `SELECT`/`WITH` statement, parameters allowed) | `postgres:read` | read, never asks (ADR 0037) |
+| `pg_execute` (one `INSERT`/`UPDATE`/`DELETE`) | `postgres:write` | sensitive: always an approval showing the exact SQL, the parameters and the database |
+
+- No DDL tool (`CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `GRANT`). Changing a schema is a migration in the person's repository, not an agent call.
+- Tool names carry the connection name when an agent has more than one database, so the model can tell them apart.
+
+### Reads can only read
+
+Layered, because no single check is enough:
+
+1. **The database user (strongest).** The connect screen recommends, with the exact SQL to run, a dedicated role with only `SELECT` (and `pg_read_all_data` where available), ideally on a read replica. A connection whose role can write is marked "can change data" in the app; only such a connection can grant `postgres:write`.
+2. **Read-only transaction.** Every read runs as `BEGIN TRANSACTION READ ONLY` … `ROLLBACK`, so even a writable role cannot change data through `pg_query`.
+3. **One statement.** The statement is parsed (a real Postgres parser, not a regex) and must be a single `SELECT`/`WITH`/`EXPLAIN` (no `ANALYZE`). Rejected: multiple statements, `COPY`, `DO`, `CALL`, `SET`/`RESET` of session settings, `LISTEN`/`NOTIFY`, `pg_sleep` and the admin functions (`pg_read_file`, `pg_terminate_backend`, `lo_*`, `dblink*`).
+4. **Limits per call.** `statement_timeout` 15 s (org setting up to 60 s), `idle_in_transaction_session_timeout`, `lock_timeout` 2 s. The server streams rows and stops at 500 rows or 64 KB of text, whichever comes first, and tells the model the result was cut (with the total when cheap). Values longer than 2 KB are truncated; `bytea` is never returned.
+
+Writes (`pg_execute`) run in a normal transaction after approval, with the same timeouts, one statement, and `RETURNING` capped like reads. The approval card shows the SQL and the rows it would touch (`EXPLAIN` estimate). The gateway re-checks the grant and the action hash before executing (D53), and it runs at most once.
+
+### Connection and network
+
+- The connection string (or host, port, database, user, password, `sslmode`) is sealed per org like provider keys (ADR 0007) and never returned to any client; the app shows only host, database and user.
+- **TLS required** by default (`sslmode=require`; `verify-full` when the provider gives a CA). Turning TLS off is an explicit admin choice with a warning.
+- **Address guard:** the host is resolved on every new connection and refused when it points to a private, loopback, link-local or metadata address (`isBlockedAddress`), so an agent can't be used to reach our own network. Re-resolving per connection closes DNS rebinding.
+- **Pool:** at most 2 connections per org connection, opened on first use and closed after 5 minutes idle. `application_name = agentes.chat` so the database owner can see and kill our sessions.
+- "Test connection" in the app runs `select version()` plus a check of what the role can do (to set the "can change data" mark).
+
+### Per-call checks (`checkCall`, D53)
+
+This connector is the second user of the per-call hook proposed in D53 (after GitHub). Optional rules per agent:
+
+- Allowed schemas or tables (the parser lists the relations a statement touches; anything outside is refused).
+- Hidden columns (e.g. `users.password_hash`, `cpf`): refused in `SELECT` lists and `*` expansion is rewritten to exclude them.
+- A daily cap of reads per agent.
+
+### Data and the model
+
+- Query results go to the model provider, like any tool result. The connect screen says so in plain words, next to the hidden-columns setting. This matters for LGPD: the org decides what personal data its agents may read.
+- Results are untrusted content (they may contain text written by end users); they are marked as such in the transcript, like email bodies (ADR 0038).
+- Every call is logged with the SQL, row count, duration and the agent, never the returned rows.
+
+### Private networks
+
+A database without a public address (Railway's internal Postgres, a company LAN, a VPC) is not reachable from our servers, and we will not open tunnels from the Cloud. The path for those is a connected computer inside that network (ADR 0025): the runner opens the connection locally and the same tools run there, with the same checks applied by our gateway. That variant is a follow-up; the connector API is designed so the executor can be the server or a machine.
+
+## Consequences
+
+- Most small companies can let agents answer from their data with one connect screen, without running an MCP server.
+- Safety depends on layers we control (read-only transaction, parser, limits, address guard, approvals) plus one we recommend (a read-only role). The app makes the recommendation concrete and shows when a connection can write.
+- A heavy `SELECT` can still load the person's database within the timeout. We recommend a replica and keep the timeout short.
+- Adds a SQL parser dependency (e.g. `pgsql-ast-parser` or libpg-query's WASM build) to the engine; to be chosen when building, preferring the official parser.
+- Tests: the source, parser rules, limits and approvals run on PGlite with a fake resolver for the address guard; no network.
+
+## Open questions
+
+- Should `pg_execute` exist in the first version, or ship read-only first and add writes after seeing real use? (Proposal: read-only first.)
+- Schema context: should the connector keep a cached summary of tables and comments that goes into the agent's context, so it doesn't call `pg_list_tables` every run?
