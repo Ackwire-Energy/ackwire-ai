@@ -1,11 +1,17 @@
-import type { Credential, Role } from "@agenteschat/client";
+import type { Credential, OrgSettings, Role } from "@agenteschat/client";
 import {
   useAddCredential,
+  useConnections,
   useCredentials,
+  useInvitations,
+  useMachines,
+  useOverview,
   usePlatformKey,
   useRemoveCredential,
   useRotateCredential,
   useSettings,
+  useSkills,
+  useStorage,
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
@@ -22,6 +28,8 @@ import { parseAmount } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
+  CardFooter,
+  CardHeader,
   Chip,
   Dialog,
   DialogBody,
@@ -36,7 +44,7 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -63,19 +71,28 @@ export type SettingsSection =
   | "computers"
   | "usage";
 
-/** The settings sub-nav, in order, with who can open each. */
-export const SETTINGS_SECTIONS: { id: SettingsSection; icon: IconName; allowed: (role: Role) => boolean }[] = [
-  { id: "general", icon: "settings", allowed: () => true },
-  { id: "members", icon: "members", allowed: () => true },
-  { id: "access", icon: "agent", allowed: (r) => can(r, "configure") },
-  { id: "connectors", icon: "link", allowed: () => true },
-  { id: "skills", icon: "document", allowed: (r) => can(r, "configure") },
-  { id: "keys", icon: "approve", allowed: (r) => can(r, "manage_credentials") },
-  { id: "storage", icon: "drive", allowed: (r) => can(r, "configure") },
+type SettingsGroup = "org" | "agents" | "costs";
+
+/** The settings sub-nav (telas/Configuracoes.html), in order and in groups, with who can open each. */
+export const SETTINGS_SECTIONS: {
+  id: SettingsSection;
+  icon: IconName;
+  group: SettingsGroup;
+  allowed: (role: Role) => boolean;
+}[] = [
+  { id: "general", icon: "settings", group: "org", allowed: () => true },
+  { id: "members", icon: "members", group: "org", allowed: () => true },
+  { id: "access", icon: "agent", group: "agents", allowed: (r) => can(r, "configure") },
+  { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
+  { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
   // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
-  { id: "computers", icon: "computer", allowed: (r) => can(r, "read") },
-  { id: "usage", icon: "waiting", allowed: (r) => can(r, "view_usage") },
+  { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
+  { id: "usage", icon: "wallet", group: "costs", allowed: (r) => can(r, "view_usage") },
+  { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "manage_credentials") },
+  { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
 ];
+
+const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
 
@@ -121,25 +138,44 @@ export function SettingsPage({
   return (
     <div className="settings">
       <nav className="settings__nav" aria-label={t("settings.nav")}>
-        <h1 className="settings__title">{t("settings.title")}</h1>
-        <ul>
-          {visible.map((s) => (
-            <li key={s.id}>
-              <Link
-                to="/org/$orgId/settings/$section"
-                params={{ orgId: org.id, section: s.id }}
-                className="settings__link"
-                aria-current={s.id === current ? "page" : undefined}
-              >
-                <Icon name={s.icon} />
-                {t(`settings.section.${s.id}`)}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="settings__head">
+          <h1 className="settings__title">{t("settings.title")}</h1>
+          <span className="settings__org">
+            <OrgMark logo={org.logo} size={18} />
+            <span>{org.name}</span>
+          </span>
+        </div>
+        <div className="settings__groups">
+          {SETTINGS_GROUPS.map((g) => {
+            const items = visible.filter((s) => s.group === g);
+            if (items.length === 0) return null;
+            return (
+              <div key={g} className="settings__group" role="group" aria-labelledby={`settings-group-${g}`}>
+                <span id={`settings-group-${g}`} className="settings__group-label">
+                  {t(`settings.group.${g}`)}
+                </span>
+                <ul>
+                  {items.map((s) => (
+                    <li key={s.id}>
+                      <Link
+                        to="/org/$orgId/settings/$section"
+                        params={{ orgId: org.id, section: s.id }}
+                        className="settings__link"
+                        aria-current={s.id === current ? "page" : undefined}
+                      >
+                        <Icon name={s.icon} size={18} />
+                        {t(`settings.section.${s.id}`)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
       </nav>
       <div className="settings__body">
-        {current !== "members" && (
+        {current !== "members" && current !== "general" && (
           <header className="page__header">
             <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
             <p className="muted" style={{ margin: 0 }}>
@@ -147,12 +183,7 @@ export function SettingsPage({
             </p>
           </header>
         )}
-        {current === "general" && (
-          <>
-            {!can(org.role, "configure") && <p className="page__note">{t("settings.readOnly")}</p>}
-            <OrgSection />
-          </>
-        )}
+        {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
@@ -166,80 +197,290 @@ export function SettingsPage({
   );
 }
 
-function OrgSection() {
+/**
+ * Geral (telas/Configuracoes.html, C with A's rows): the org's rows, the context every agent reads, then a
+ * tile per area with how it is now. Every change saves by itself: name on blur, zone on pick, context
+ * while typing.
+ */
+function GeneralSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const settings = useSettings(org.id);
   const update = useUpdateSettings(org.id);
-  const toast = useToast();
   const editable = can(org.role, "configure");
   const [name, setName] = useState("");
   const [context, setContext] = useState("");
   const [timezone, setTimezone] = useState("");
   const [logo, setLogo] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const loaded = useRef<string | null>(null);
+  const contextTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const contextRef = useRef<HTMLTextAreaElement>(null);
+  // Filled once per org: a refetch after a save must not undo what is being typed.
   useEffect(() => {
-    if (!settings.data) return;
+    if (!settings.data || loaded.current === org.id) return;
+    loaded.current = org.id;
     setName(settings.data.name);
     setContext(settings.data.context);
     setTimezone(settings.data.timezone);
-  }, [settings.data]);
-  const dirty =
-    settings.data &&
-    (name !== settings.data.name || context !== settings.data.context || timezone !== settings.data.timezone);
+  }, [settings.data, org.id]);
+  useEffect(
+    () => () => {
+      clearTimeout(contextTimer.current);
+      clearTimeout(savedTimer.current);
+    },
+    [],
+  );
+
+  const save = (patch: Partial<OrgSettings>) => {
+    if (!editable) return;
+    update.mutate(patch, {
+      onSuccess: () => {
+        setSaved(true);
+        clearTimeout(savedTimer.current);
+        savedTimer.current = setTimeout(() => setSaved(false), 1800);
+      },
+    });
+  };
+  const saveName = () => {
+    const next = name.trim();
+    if (!next) {
+      setName(settings.data?.name ?? "");
+      return;
+    }
+    if (next !== settings.data?.name) save({ name: next });
+  };
+  const changeContext = (value: string) => {
+    setContext(value);
+    clearTimeout(contextTimer.current);
+    contextTimer.current = setTimeout(() => save({ context: value }), 800);
+  };
+  const flushContext = () => {
+    clearTimeout(contextTimer.current);
+    if (settings.data && context !== settings.data.context) save({ context });
+  };
+  const addIdea = (label: string) => {
+    const value = `${context.replace(/\s*$/, "")}${context.trim() ? "\n\n" : ""}${label}: `;
+    changeContext(value);
+    requestAnimationFrame(() => {
+      const el = contextRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(value.length, value.length);
+    });
+  };
+  const ideas = (["who", "now", "never"] as const).map((k) => t(`settings.contextIdeas.${k}`));
+  const missing = ideas.filter((label) => !context.toLowerCase().includes(label.toLowerCase()));
+
   return (
-    <Card aria-labelledby="sec-org">
-      <h2 id="sec-org" className="ac-card__title">
-        {t("settings.orgTitle")}
-      </h2>
-      <form
-        style={{ display: "flex", flexDirection: "column", gap: 12 }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          update.mutate(
-            { name: name.trim(), context, timezone: timezone.trim() },
-            { onSuccess: () => toast.show(t("settings.saved")) },
-          );
-        }}
-      >
-        <div className="row" style={{ gap: 12, alignItems: "center" }}>
-          <OrgMark logo={org.logo} size={48} className="settings__org-logo" />
-          <div className="stack-4" style={{ gap: 2, flex: 1 }}>
-            <span style={{ fontWeight: 600 }}>{t("orgLogo.label")}</span>
-            <span className="small muted">{t("orgLogo.labelHelp")}</span>
-          </div>
-          {editable && (
-            <Button size="sm" type="button" onClick={() => setLogo(true)}>
-              {org.logo ? t("orgLogo.change") : t("orgLogo.add")}
-            </Button>
+    <>
+      <header className="page__header page__header--row">
+        <div className="page__header-text">
+          <h2 className="page-title">{t("settings.section.general")}</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            {t("settings.sectionText.general")}
+          </p>
+        </div>
+        <span className="settings__saved" data-on={saved || undefined} role="status">
+          {saved && (
+            <>
+              <Icon name="check" size={16} />
+              {t("settings.savedShort")}
+            </>
           )}
+        </span>
+      </header>
+      {!editable && <p className="page__note">{t("settings.readOnly")}</p>}
+
+      <Card aria-label={t("settings.orgTitle")}>
+        <div className="settings-rows">
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <span className="settings-row__label">{t("orgLogo.label")}</span>
+              <span className="settings-row__help">{t("orgLogo.labelHelp")}</span>
+            </div>
+            <div className="settings-row__control">
+              <OrgMark logo={org.logo} size={40} className="settings__org-logo" />
+              {editable && (
+                <Button size="sm" type="button" onClick={() => setLogo(true)}>
+                  {org.logo ? t("orgLogo.change") : t("orgLogo.add")}
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label className="settings-row__label" htmlFor="set-name">
+                {t("settings.name")}
+              </label>
+              <span className="settings-row__help">{t("settings.nameHelp")}</span>
+            </div>
+            <div className="settings-row__control">
+              <Input
+                id="set-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={saveName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                readOnly={!editable}
+              />
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <span className="settings-row__label">
+                {t("settings.timezone")}
+              </span>
+              <span className="settings-row__help">{t("settings.timezoneHelp")}</span>
+            </div>
+            <div className="settings-row__control">
+              <ZoneSelect
+                value={timezone || "UTC"}
+                onChange={(zone) => {
+                  setTimezone(zone);
+                  if (zone !== settings.data?.timezone) save({ timezone: zone });
+                }}
+                disabled={!editable}
+                aria-label={t("settings.timezone")}
+              />
+            </div>
+          </div>
         </div>
-        <div className="grid-fields">
-          <Field label={t("settings.name")} id="set-name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} readOnly={!editable} />
-          </Field>
-          <Field label={t("settings.timezone")} id="set-tz" help={t("settings.timezoneHelp")}>
-            <ZoneSelect value={timezone || "UTC"} onChange={setTimezone} disabled={!editable} />
-          </Field>
-        </div>
-        <Field label={t("settings.context")} id="set-ctx" help={t("settings.contextHelp")}>
-          <Textarea rows={6} value={context} onChange={(e) => setContext(e.target.value)} readOnly={!editable} />
-        </Field>
-        {editable && (
-          <div className="row" style={{ justifyContent: "flex-end" }}>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!dirty || !name.trim() || update.isPending}
-              loading={update.isPending}
-            >
-              {t("settings.save")}
-            </Button>
+      </Card>
+
+      <Card aria-labelledby="sec-context">
+        <CardHeader
+          id="sec-context"
+          icon="agent"
+          title={t("settings.contextTitle", { name: name.trim() || org.name })}
+          subtitle={t("settings.contextSubtitle")}
+        />
+        <Textarea
+          ref={contextRef}
+          rows={7}
+          value={context}
+          onChange={(e) => changeContext(e.target.value)}
+          onBlur={flushContext}
+          readOnly={!editable}
+          placeholder={t("settings.contextPlaceholder")}
+          aria-label={t("settings.context")}
+        />
+        {editable && missing.length > 0 && (
+          <div className="settings-ideas">
+            <span>{t("settings.contextMissing")}</span>
+            {missing.map((label) => (
+              <Button key={label} size="sm" variant="ghost" icon="plus" onClick={() => addIdea(label)}>
+                {label}
+              </Button>
+            ))}
           </div>
         )}
-      </form>
+        <CardFooter>{t("settings.contextHelp", { name: name.trim() || org.name })}</CardFooter>
+      </Card>
+
+      <SettingsTiles />
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
-    </Card>
+    </>
+  );
+}
+
+/** "Tudo da organização": a tile per area the person can open, with how it is now. */
+function SettingsTiles() {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const role = org.role;
+  const shown = (id: SettingsSection) => SETTINGS_SECTIONS.some((s) => s.id === id && s.allowed(role));
+  const overview = useOverview(org.id);
+  const invitations = useInvitations(org.id, can(role, "manage_members"));
+  const connections = useConnections(org.id);
+  const skills = useSkills(org.id, shown("skills"));
+  const machines = useMachines(org.id, shown("computers"));
+  const credentials = useCredentials(org.id, shown("keys"));
+  const platform = usePlatformKey(org.id);
+  const storage = useStorage(org.id, shown("storage"));
+
+  const live = (connections.data ?? []).filter((c) => !c.revokedAt);
+  const keys = (credentials.data ?? []).filter((c) => !c.revokedAt);
+  const online = (machines.data ?? []).filter((m) => m.online).length;
+  const pending = invitations.data?.length ?? 0;
+  const state: Partial<Record<SettingsSection, string | undefined>> = {
+    members:
+      overview.data &&
+      [
+        t("settings.tileState.members", { count: overview.data.people }),
+        pending > 0 ? t("settings.tileState.invitations", { count: pending }) : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    access: overview.data && t("settings.tileState.agents", { count: overview.data.agents }),
+    connectors:
+      connections.data &&
+      (live.length === 0
+        ? t("settings.tileState.noConnectors")
+        : [
+            t("settings.tileState.connectors", { count: live.length }),
+            live
+              .slice(0, 3)
+              .map((c) => c.label)
+              .join(", "),
+          ].join(" · ")),
+    skills: skills.data && t("settings.tileState.skills", { count: skills.data.length }),
+    computers:
+      machines.data &&
+      (machines.data.length === 0
+        ? t("settings.tileState.noComputers")
+        : t("settings.tileState.computers", { count: machines.data.length, online })),
+    usage:
+      overview.data &&
+      t("settings.tileState.usage", { percent: formatPercent(i18n.language, overview.data.budgetUsedPercent) }),
+    keys:
+      credentials.data &&
+      (keys.length > 0
+        ? t("settings.tileState.keys", { count: keys.length })
+        : platform.data
+          ? t("settings.tileState.platformKey")
+          : t("settings.tileState.noKeys")),
+    storage: storage.data && t(storage.data.kind === "s3" ? "storage.s3" : "storage.agentes"),
+  };
+  const tiles = SETTINGS_SECTIONS.filter((s) => s.id !== "general" && s.allowed(role));
+  return (
+    <section className="settings-tiles" aria-labelledby="sec-tiles">
+      <h2 id="sec-tiles" className="settings-tiles__title">
+        {t("settings.tilesTitle")}
+      </h2>
+      <div className="settings-tiles__grid">
+        {tiles.map((s) => (
+          <Link
+            key={s.id}
+            to="/org/$orgId/settings/$section"
+            params={{ orgId: org.id, section: s.id }}
+            className="ac-card ac-card--interactive settings-tile"
+          >
+            <div className="ac-card__head">
+              <span className="ac-card__key" aria-hidden="true">
+                <Icon name={s.icon} size={16} />
+              </span>
+              <div className="ac-card__heading">
+                <h3>{t(`settings.section.${s.id}`)}</h3>
+                <p className="ac-card__sub">{t(`settings.tile.${s.id}`)}</p>
+              </div>
+              <Icon name="chevronRight" size={16} className="settings-tile__chevron" />
+            </div>
+            {s.id === "usage" && overview.data && (
+              <Meter
+                value={Math.min(100, overview.data.budgetUsedPercent)}
+                max={100}
+                label={t("settings.section.usage")}
+              />
+            )}
+            <span className="settings-tile__state">{state[s.id] ?? "\u00a0"}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

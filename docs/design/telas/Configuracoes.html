@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configurações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&display=swap">
+<link rel="stylesheet" href="../../../packages/ui/src/styles/index.css">
+<script>{const q=new URLSearchParams(location.hash.slice(1));document.documentElement.dataset.theme=q.get("theme")||"light";}</script>
+<style>
+/*
+  Configurações (2026-10-20): the org settings page made clean, easy and obvious. Real components from
+  packages/ui (index.css: buttons, fields, cards "I · Tato com canto", chips, meter); only the page layout is
+  new. Opens on Geral, the screen the user sent.
+
+  What is wrong today (every option fixes these):
+    - The nav's title takes two big lines; hover and the current page look the same (two items "selected").
+    - Nine loose links with odd icons (Chaves de API = check, Orçamento = clock, Skills = document).
+    - "Geral" + subtitle, then a card titled "Organização": two headings saying the same.
+    - One big form with one save button at the very bottom, gray until you change something.
+    - The context (the most important field: every agent reads it) looks like any other field.
+  Shared fixes: short title with the org under it; nav in three groups; current page = raised key, hover = tint;
+  icons that say what it is; "Habilidades" and "Chaves de IA" instead of jargon (proposal, i18n only).
+
+  Options (prototype bar or #opt=a|b|c):
+    A · Linhas: one card of rows (label left, control right) + a card for the context with writing ideas.
+        Saves by itself ("Salvo" next to the title).
+    B · Identidade: the page starts with the org itself (big logo, name, clock); the context is four short
+        questions instead of a blank box. Saves with a bar that only shows up when something changed.
+    C · Início: Geral becomes the home of settings: identity, context and a tile per area with how it is now
+        ("2 membros · 1 convite", "US$ 12 de 50"). Saves by itself.
+  Also: #theme=dark, #role=member (read only), #sec=<section> (other sections are out of scope here).
+*/
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; }
+.ac-icon { width: 20px; height: 20px; }
+.ic16 { width: 16px; height: 16px; }
+
+/* ---------- prototype bar ---------- */
+.pbar { position: sticky; top: 0; z-index: 20; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 8px 16px;
+  background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); font-size: 13px; }
+.pbar b { font-weight: 650; }
+.pbar .grow { flex: 1; }
+.pseg { display: inline-flex; padding: 3px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 6%, var(--bg)); box-shadow: inset 0 0 0 1px var(--line); gap: 2px; }
+.pseg button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 7px; font-weight: 600; font-size: 12.5px; color: var(--ink2); }
+.pseg button[aria-pressed="true"] { background: var(--raised); color: var(--ink); box-shadow: var(--e1), var(--top); }
+.pnote { color: var(--muted); font-size: 12.5px; max-width: 520px; }
+
+/* ---------- app frame ---------- */
+.app { display: flex; min-height: calc(100vh - 45px); }
+.appbar { flex: 0 0 248px; background: #f8f8f6; border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+[data-theme="dark"] .appbar { background: #121211; }
+.appbar .ghost { height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.appbar .ghost.org { height: 56px; border-radius: 14px; margin-bottom: 8px; }
+.appbar .ghost.w60 { width: 60%; } .appbar .ghost.w80 { width: 80%; } .appbar .ghost.w40 { width: 40%; }
+.appbar .gap { height: 14px; }
+.work { flex: 1; min-width: 0; }
+
+/* ---------- settings layout ---------- */
+.set { display: flex; gap: 40px; max-width: 1080px; margin: 0 auto; padding: 36px 28px 96px; align-items: flex-start; }
+.set__nav { flex: 0 0 216px; position: sticky; top: 72px; display: flex; flex-direction: column; gap: 18px; }
+.set__head { display: flex; flex-direction: column; gap: 6px; padding: 0 10px; }
+.set__title { margin: 0; font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -0.015em; }
+.set__org { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.set__groups { display: flex; flex-direction: column; gap: 18px; }
+.set__group { display: flex; flex-direction: column; gap: 2px; }
+.set__label { padding: 0 10px 4px; font-size: 12px; font-weight: 600; color: var(--faint); }
+.set__link { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: 10px;
+  color: var(--ink2); font-size: 14px; cursor: pointer; transition: background-color .15s, color .15s; }
+.set__link .ac-icon { color: var(--muted); width: 18px; height: 18px; }
+.set__link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
+.set__link[aria-current="page"] { background: linear-gradient(180deg, var(--card-face-top), var(--raised)); box-shadow: var(--card-key); color: var(--ink); font-weight: 600; }
+.set__link[aria-current="page"] .ac-icon { color: var(--ink); }
+.set__link:focus-visible { box-shadow: var(--focus-ring); }
+.set__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.page-head { display: flex; align-items: flex-end; gap: 12px; }
+.page-head h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 700; letter-spacing: -0.02em; }
+.page-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.page-head .grow { flex: 1; min-width: 0; }
+
+.mark { flex: none; display: grid; place-items: center; background: linear-gradient(160deg, #6fae8f, #3f8a68); border-radius: 30% 30% 30% 9%; color: #fff; overflow: hidden; }
+.mark svg { width: 62%; height: 62%; }
+
+.saved { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+  opacity: 0; transform: translateY(2px); transition: opacity .25s, transform .25s var(--out); }
+.saved.on { opacity: 1; transform: none; }
+.saved .ac-icon { width: 16px; height: 16px; color: var(--ok); }
+
+.note { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px 12px 12px 3px; background: var(--card-well); box-shadow: var(--card-well-shadow); color: var(--muted); font-size: 13px; }
+.note .ac-icon { width: 16px; height: 16px; color: var(--faint); }
+
+/* A · rows */
+.rows { display: flex; flex-direction: column; margin: calc(-1 * var(--card-pad)); }
+.srow { display: flex; align-items: center; gap: 20px; padding: 14px var(--card-pad); border-top: 1px solid var(--line); }
+.srow:first-child { border-top: 0; }
+.srow__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.srow__text b { font-size: 14px; font-weight: 600; }
+.srow__text span { font-size: 13px; color: var(--muted); }
+.srow__ctl { flex: 0 0 300px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+.srow__ctl .ac-input, .srow__ctl .ac-select { width: 100%; }
+.zone { position: relative; width: 100%; }
+.zone select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.zone .ac-select__trigger { pointer-events: none; }
+.zone .ac-select__value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zone .soft { color: var(--muted); }
+.zone .ac-icon { width: 16px; height: 16px; color: var(--muted); }
+
+.ctx { min-height: 168px; resize: vertical; padding: 12px 14px; line-height: 1.55; }
+.ideas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ideas > span { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+.idea { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: var(--ink2);
+  background: color-mix(in srgb, var(--ink) 5%, transparent); transition: background-color .15s; }
+.idea:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.idea .ac-icon { width: 14px; height: 14px; color: var(--muted); }
+.idea[data-done] { color: var(--muted); }
+.idea[data-done] .ac-icon { color: var(--ok); }
+
+/* B · identity */
+.ident { display: flex; align-items: center; gap: 20px; }
+.ident__logo { all: unset; position: relative; cursor: pointer; border-radius: 30% 30% 30% 9%; }
+.ident__logo .over { position: absolute; inset: 0; display: grid; place-items: center; border-radius: inherit; background: rgba(0,0,0,.42); color: #fff; opacity: 0; transition: opacity .15s; }
+.ident__logo:hover .over, .ident__logo:focus-visible .over { opacity: 1; }
+.ident__logo:focus-visible { box-shadow: var(--focus-ring); }
+.ident__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ident__name { all: unset; box-sizing: border-box; width: 100%; max-width: 460px; font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.02em; padding: 0 8px; margin-left: -8px; border-radius: 10px; transition: box-shadow .15s, background-color .15s; }
+.ident__name:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.ident__name:focus { background: var(--field-bg); box-shadow: 0 0 0 1px var(--field-line), var(--field-ring); }
+.ident__meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: 13.5px; }
+.clock { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--ink2);
+  background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.clock:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.clock select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.clock .ac-icon { width: 16px; height: 16px; color: var(--muted); }
+.qs { display: flex; flex-direction: column; gap: 16px; }
+.q { display: flex; flex-direction: column; gap: 6px; }
+.q label { font-size: 14px; font-weight: 600; }
+.q label span { font-weight: 400; color: var(--muted); }
+.q textarea { min-height: 64px; resize: vertical; padding: 10px 14px; line-height: 1.5; }
+.savebar { position: sticky; bottom: 20px; align-self: center; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 14px;
+  background: var(--raised); box-shadow: var(--e3, 0 20px 40px -16px rgba(0,0,0,.3)), 0 0 0 1px var(--line); font-size: 13.5px; font-weight: 600;
+  transform: translateY(16px); opacity: 0; pointer-events: none; transition: transform .25s var(--spring), opacity .2s; }
+.savebar.on { transform: none; opacity: 1; pointer-events: auto; }
+
+/* C · home */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.tile { box-sizing: border-box; cursor: pointer; border: 0; font: inherit; color: inherit; text-align: left; gap: 12px; min-height: 128px; }
+.tile .ac-card__heading h3 { font-size: 14.5px; }
+.tile__state { font-size: 13px; color: var(--muted); margin-top: auto; }
+.tile__state b { color: var(--ink); font-weight: 600; }
+.tile .ac-meter { order: 3; height: 6px; }
+.tile .ac-card__head > .ac-icon { color: var(--faint); align-self: flex-start; margin-top: 2px; }
+.tile:focus-visible { box-shadow: var(--focus-ring), var(--card-shadow); }
+.dot-ok { width: 8px; height: 8px; } /* placeholder to keep markup simple */
+.sec-title { margin: 8px 0 -6px; font-size: 13px; font-weight: 600; color: var(--faint); }
+.compact-ident { display: flex; align-items: center; gap: 14px; }
+
+.placeholder { color: var(--muted); font-size: 14px; }
+
+@media (max-width: 900px) { .appbar { display: none; } }
+@media (max-width: 760px) {
+  .set { flex-direction: column; align-items: stretch; gap: 20px; padding: 20px 16px 96px; }
+  .set__nav, .set__body { min-width: 0; max-width: 100%; }
+  .set__nav { position: static; flex: none; width: 100%; gap: 10px; }
+  .set__groups { flex-direction: row; gap: 4px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; }
+  .set__group { flex-direction: row; gap: 4px; }
+  .set__label { display: none; }
+  .set__link { white-space: nowrap; flex: none; }
+  .srow { flex-direction: column; align-items: stretch; gap: 10px; }
+  .srow__ctl { flex: none; justify-content: flex-start; }
+  .ident { align-items: flex-start; }
+  .ident__name { font-size: 22px; line-height: 30px; }
+}
+</style>
+</head>
+<body>
+<div class="pbar" id="pbar"></div>
+<div class="app">
+  <aside class="appbar" aria-hidden="true">
+    <div class="ghost org"></div>
+    <div class="ghost w80"></div><div class="ghost w60"></div><div class="ghost w80"></div><div class="gap"></div>
+    <div class="ghost w40"></div><div class="ghost w60"></div><div class="ghost w80"></div><div class="ghost w60"></div>
+  </aside>
+  <main class="work"><div class="set" id="set"></div></main>
+</div>
+
+<script>
+/* packages/ui/src/icons (generated set), copied as SVG markup. */
+const ICONS={"settings": "<path d=\"M3.5 6h7M15.5 6h1M3.5 14h1M9.5 14h7\"/><circle cx=\"13\" cy=\"6\" r=\"2\"/><circle cx=\"7\" cy=\"14\" r=\"2\"/>", "members": "<circle cx=\"8\" cy=\"7\" r=\"2.8\"/><path d=\"M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4M13.5 4.5a2.6 2.6 0 0 1 0 5M15 12.3c1.1.6 1.8 1.9 2 3.7\"/>", "agent": "<path d=\"M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z\"/><path d=\"M8 8.5v2M12 8.5v2\"/>", "plug": "<path d=\"M7.5 3v4M12.5 3v4M5 7h10v2.5a5 5 0 0 1-10 0zM10 14.5V17\"/>", "key": "<circle cx=\"7\" cy=\"12.5\" r=\"3.2\"/><path d=\"m9.3 10.2 7-7M14 5.5l2.3 2.3M12.3 7.2l1.7 1.7\"/>", "drive": "<path d=\"M3 6.5A2.5 2.5 0 0 1 5.5 4H8l2 2h4.5A2.5 2.5 0 0 1 17 8.5v5a2.5 2.5 0 0 1-2.5 2.5H3z\"/>", "computer": "<rect x=\"3\" y=\"4\" width=\"14\" height=\"9.5\" rx=\"2\"/><path d=\"M7.5 16.5h5M10 13.5v3\"/>", "wallet": "<path d=\"M3.5 6.5a2 2 0 0 1 2-2H15v3\"/><rect x=\"3.5\" y=\"7.5\" width=\"13\" height=\"9\" rx=\"2\"/><path d=\"M13.5 12h.01\"/>", "bulb": "<path d=\"M7.5 15h5M8.3 17.5h3.4M10 2.5a5 5 0 0 0-2.9 9.1v1.7h5.8v-1.7A5 5 0 0 0 10 2.5z\"/>", "check": "<path d=\"m5.5 10.5 3 3 6-7\"/>", "chevronRight": "<path d=\"m8 5 5 5-5 5\"/>", "chevronDown": "<path d=\"m6 8 4 4 4-4\"/>", "plus": "<path d=\"M10 4.5v11M4.5 10h11\"/>", "edit": "<path d=\"M4 16l1-4 8-8 3 3-8 8zM12 5l3 3\"/>", "clock": "<circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"M10 6.5V10l2.5 1.7\"/>", "info": "<circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"M10 9v4.5M10 6.5v.01\"/>", "lock": "<rect x=\"4.5\" y=\"9\" width=\"11\" height=\"8\" rx=\"2\"/><path d=\"M7 9V6.5a3 3 0 0 1 6 0V9\"/>", "arrowRight": "<path d=\"M4 10h12M11 5l5 5-5 5\"/>"};
+</script>
+<script>
+const q = new URLSearchParams(location.hash.slice(1));
+const S = {
+  opt: q.get("opt") || "a",
+  theme: q.get("theme") || "light",
+  role: q.get("role") || "admin",
+  sec: q.get("sec") || "general",
+  saved: { name: "Viajolo", tz: "America/Sao_Paulo", ctx: "Viajolo é um app de viagem (viajolo.example)\ndisponivel para iOS e web" },
+};
+S.draft = { ...S.saved };
+S.qs = { what: S.saved.ctx, who: "", now: "", never: "" };
+S.qsSaved = { ...S.qs };
+
+const ZONES = [
+  ["America/Sao_Paulo", "Horário de Brasília", "UTC−3", -3],
+  ["America/Manaus", "Horário do Amazonas", "UTC−4", -4],
+  ["America/Noronha", "Fernando de Noronha", "UTC−2", -2],
+  ["America/New_York", "Nova York", "UTC−4", -4],
+  ["Europe/Lisbon", "Lisboa", "UTC+1", 1],
+  ["UTC", "UTC", "UTC+0", 0],
+];
+const SECTIONS = [
+  { group: "Organização", items: [
+    { id: "general", icon: "settings", label: "Geral" },
+    { id: "members", icon: "members", label: "Membros e convites" },
+  ]},
+  { group: "Agentes", items: [
+    { id: "access", icon: "agent", label: "Agentes e acesso", admin: true },
+    { id: "connectors", icon: "plug", label: "Conectores" },
+    { id: "skills", icon: "bulb", label: "Habilidades", admin: true },
+    { id: "computers", icon: "computer", label: "Computadores" },
+  ]},
+  { group: "Custos e dados", items: [
+    { id: "usage", icon: "wallet", label: "Orçamento e uso", admin: true },
+    { id: "keys", icon: "key", label: "Chaves de IA", admin: true },
+    { id: "storage", icon: "drive", label: "Armazenamento", admin: true },
+  ]},
+];
+const TILES = {
+  members: { sub: "Quem está na Viajolo", state: "<b>2 membros</b> · 1 convite esperando" },
+  access: { sub: "O que cada agente pode usar", state: "<b>6 agentes</b>" },
+  connectors: { sub: "Apps que os agentes usam", state: "<b>3 conectados</b> · GitHub, Gmail, Linear" },
+  skills: { sub: "O que os agentes sabem fazer", state: "<b>4 habilidades</b>" },
+  computers: { sub: "Onde os agentes trabalham", state: "<b>1 ligado</b> · Mac mini do escritório" },
+  usage: { sub: "Quanto os agentes gastam", state: "<b>US$ 12</b> de US$ 50 este mês", meter: 24 },
+  keys: { sub: "Contas de IA da organização", state: "Usando a chave do agentes.chat" },
+  storage: { sub: "Onde ficam os arquivos", state: "<b>1,2 GB</b> de 10 GB", meter: 12 },
+};
+const QS = [
+  ["what", "O que a Viajolo faz", "Produto, site, onde está disponível."],
+  ["who", "Para quem", "Quem usa e quem paga."],
+  ["now", "O que importa agora", "A prioridade deste mês."],
+  ["never", "O que nunca fazer", "Limites que todo agente respeita."],
+];
+
+const icon = (n, cls = "") => `<svg viewBox="0 0 20 20" class="ac-icon ${cls}" aria-hidden="true">${ICONS[n] || ""}</svg>`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const admin = () => S.role === "admin";
+const mark = (size) => `<span class="mark" style="width:${size}px;height:${size}px"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="13" height="10" rx="3"/><path d="M7.5 6V4.8a1.3 1.3 0 0 1 1.3-1.3h2.4a1.3 1.3 0 0 1 1.3 1.3V6"/><path d="M8 10.5v1.2M12 10.5v1.2"/></svg></span>`;
+const zone = (id) => ZONES.find((z) => z[0] === id) || ZONES[0];
+const nowIn = (off) => { const d = new Date(Date.now() + (off * 60 + new Date().getTimezoneOffset()) * 60000); return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); };
+const zoneOptions = () => ZONES.map((z) => `<option value="${z[0]}" ${z[0] === S.draft.tz ? "selected" : ""}>${z[1]} · ${z[2]}</option>`).join("");
+
+function setHash() {
+  const h = new URLSearchParams({ opt: S.opt, theme: S.theme, role: S.role, sec: S.sec });
+  history.replaceState(null, "", "#" + h);
+  document.documentElement.dataset.theme = S.theme;
+}
+
+function bar() {
+  const seg = (key, opts) => `<span class="pseg">${opts.map(([v, l]) => `<button aria-pressed="${S[key] === v}" data-k="${key}" data-v="${v}">${l}</button>`).join("")}</span>`;
+  const notes = {
+    a: "Linhas: rótulo à esquerda, controle à direita. Salva sozinho.",
+    b: "Identidade: a página começa pela própria org; o contexto vira 4 perguntas. Barra de salvar só quando muda algo.",
+    c: "Início: Geral vira a casa das configurações, com o estado de cada área. Salva sozinho.",
+  };
+  document.getElementById("pbar").innerHTML = `<b>Configurações</b>
+    ${seg("opt", [["a", "A · Linhas"], ["b", "B · Identidade"], ["c", "C · Início"]])}
+    <span class="pnote">${notes[S.opt]}</span><span class="grow"></span>
+    ${seg("role", [["admin", "Admin"], ["member", "Membro"]])}
+    ${seg("theme", [["light", "Claro"], ["dark", "Escuro"]])}`;
+}
+
+function nav() {
+  return `<nav class="set__nav" aria-label="Configurações">
+    <div class="set__head"><h2 class="set__title">Configurações</h2><span class="set__org">${mark(18)} ${esc(S.saved.name)}</span></div>
+    <div class="set__groups">${SECTIONS.map((g) => {
+      const items = g.items.filter((i) => admin() || !i.admin);
+      if (!items.length) return "";
+      return `<div class="set__group"><span class="set__label">${g.group}</span>${items.map((i) =>
+        `<button class="set__link" data-sec="${i.id}" ${S.sec === i.id ? 'aria-current="page"' : ""}>${icon(i.icon)}${i.label}</button>`).join("")}</div>`;
+    }).join("")}</div>
+  </nav>`;
+}
+
+const readOnlyNote = () => admin() ? "" : `<div class="note">${icon("lock")}Só quem administra a organização pode mudar isso.</div>`;
+const savedChip = `<span class="saved" id="saved">${icon("check")}Salvo</span>`;
+
+function zoneControl() {
+  const z = zone(S.draft.tz);
+  return `<label class="zone"><span class="ac-select__trigger"><span class="ac-select__value">${z[1]} <span class="soft">· agora ${nowIn(z[3])}</span></span>${icon("chevronDown")}</span>
+    <select id="tz" aria-label="Fuso horário" ${admin() ? "" : "disabled"}>${zoneOptions()}</select></label>`;
+}
+
+function contextCard(title) {
+  const done = (k) => S.draft.ctx.toLowerCase().includes(k.toLowerCase());
+  const ideas = [["Para quem", "Para quem: "], ["O que importa agora", "O que importa agora: "], ["O que nunca fazer", "Nunca: "]];
+  return `<section class="ac-card" aria-labelledby="ctx-h">
+    <div class="ac-card__head"><span class="ac-card__key">${icon("agent")}</span>
+      <div class="ac-card__heading"><h2 id="ctx-h">${title}</h2><p class="ac-card__sub">Todo agente lê isto antes de cada conversa.</p></div></div>
+    <textarea class="ac-input ctx" id="ctx" ${admin() ? "" : "readonly"} placeholder="Ex.: Somos uma agência de viagens para famílias. Atendemos pelo WhatsApp…">${esc(S.draft.ctx)}</textarea>
+    ${admin() ? `<div class="ideas"><span>Falta dizer:</span>${ideas.map(([l, p]) =>
+      `<button class="idea" data-idea="${esc(p)}" ${done(p.replace(": ", "")) ? "data-done" : ""}>${icon(done(p.replace(": ", "")) ? "check" : "plus")}${l}</button>`).join("")}</div>` : ""}
+    <div class="ac-card__foot">${icon("info")}Escreva como se explicasse a Viajolo para alguém que começou hoje.</div>
+  </section>`;
+}
+
+/* ---------- A · Linhas ---------- */
+function optA() {
+  return `<div class="page-head"><div class="grow"><h1>Geral</h1><p>Nome, fuso e o que todo agente sabe da organização.</p></div>${savedChip}</div>
+    ${readOnlyNote()}
+    <section class="ac-card" aria-label="Organização"><div class="rows">
+      <div class="srow"><div class="srow__text"><b>Logo</b><span>Aparece na barra lateral para todo mundo.</span></div>
+        <div class="srow__ctl">${mark(40)}${admin() ? `<button class="ac-btn ac-btn--sm" data-logo>Trocar</button>` : ""}</div></div>
+      <div class="srow"><div class="srow__text"><b>Nome</b><span>Como a organização aparece para todos.</span></div>
+        <div class="srow__ctl"><input class="ac-input" id="name" value="${esc(S.draft.name)}" ${admin() ? "" : "readonly"} aria-label="Nome"></div></div>
+      <div class="srow"><div class="srow__text"><b>Fuso horário</b><span>Usado nas rotinas e nos resumos.</span></div>
+        <div class="srow__ctl">${zoneControl()}</div></div>
+    </div></section>
+    ${contextCard("O que os agentes sabem da " + esc(S.draft.name || "organização"))}`;
+}
+
+/* ---------- B · Identidade ---------- */
+function optB() {
+  const z = zone(S.draft.tz);
+  const dirty = admin() && (S.draft.name !== S.saved.name || S.draft.tz !== S.saved.tz || QS.some(([k]) => S.qs[k] !== S.qsSaved[k]));
+  const n = [S.draft.name !== S.saved.name, S.draft.tz !== S.saved.tz, ...QS.map(([k]) => S.qs[k] !== S.qsSaved[k])].filter(Boolean).length;
+  return `${readOnlyNote()}
+    <section class="ac-card ac-card--padded" aria-label="Organização"><div class="ident">
+      ${admin() ? `<button class="ident__logo" data-logo aria-label="Trocar logo">${mark(76)}<span class="over">${icon("edit")}</span></button>` : mark(76)}
+      <div class="ident__text">
+        <input class="ident__name" id="name" value="${esc(S.draft.name)}" ${admin() ? "" : "readonly"} aria-label="Nome da organização">
+        <div class="ident__meta">
+          <label class="clock">${icon("clock")}${z[1]} · agora ${nowIn(z[3])}${icon("chevronDown")}<select id="tz" aria-label="Fuso horário" ${admin() ? "" : "disabled"}>${zoneOptions()}</select></label>
+          <span>2 membros · 6 agentes</span>
+        </div>
+      </div>
+    </div></section>
+    <section class="ac-card" aria-labelledby="ctx-h">
+      <div class="ac-card__head"><span class="ac-card__key">${icon("agent")}</span>
+        <div class="ac-card__heading"><h2 id="ctx-h">O que os agentes sabem da ${esc(S.draft.name || "organização")}</h2><p class="ac-card__sub">Todo agente lê isto antes de cada conversa. Responda o que souber; dá para deixar em branco.</p></div></div>
+      <div class="qs">${QS.map(([k, l, help]) => `<div class="q"><label for="q-${k}">${l} <span>· ${help}</span></label>
+        <textarea class="ac-input" id="q-${k}" data-q="${k}" rows="2" ${admin() ? "" : "readonly"}>${esc(S.qs[k])}</textarea></div>`).join("")}</div>
+    </section>
+    <div class="savebar ${dirty ? "on" : ""}" role="status">${n === 1 ? "1 mudança" : n + " mudanças"} não salva${n === 1 ? "" : "s"}
+      <button class="ac-btn ac-btn--ghost ac-btn--sm" data-discard>Descartar</button><button class="ac-btn ac-btn--primary ac-btn--sm" data-save>Salvar</button></div>`;
+}
+
+/* ---------- C · Início ---------- */
+function optC() {
+  const tiles = SECTIONS.flatMap((g) => g.items).filter((i) => i.id !== "general" && (admin() || !i.admin));
+  return `<div class="page-head"><div class="grow"><h1>Geral</h1><p>Como a organização está, e o que todo agente sabe dela.</p></div>${savedChip}</div>
+    ${readOnlyNote()}
+    <section class="ac-card" aria-label="Organização"><div class="compact-ident">
+      ${admin() ? `<button class="ident__logo" data-logo aria-label="Trocar logo">${mark(56)}<span class="over">${icon("edit")}</span></button>` : mark(56)}
+      <div class="ident__text" style="gap:8px">
+        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
+          <input class="ac-input" id="name" value="${esc(S.draft.name)}" ${admin() ? "" : "readonly"} aria-label="Nome" style="flex:1 1 200px">
+          <div style="flex:1 1 240px">${zoneControl()}</div>
+        </div>
+      </div>
+    </div></section>
+    ${contextCard("O que os agentes sabem da " + esc(S.draft.name || "organização"))}
+    <h2 class="sec-title">Tudo da organização</h2>
+    <div class="tiles">${tiles.map((i) => {
+      const t = TILES[i.id];
+      return `<button class="ac-card ac-card--interactive tile" data-sec="${i.id}">
+        <div class="ac-card__head"><span class="ac-card__key">${icon(i.icon)}</span>
+          <div class="ac-card__heading"><h3>${i.label}</h3><p class="ac-card__sub">${t.sub}</p></div>${icon("chevronRight", "ic16")}</div>
+        ${t.meter !== undefined ? `<div class="ac-meter" role="img" aria-label="${t.meter}%"><div class="ac-meter__bar" style="width:${t.meter}%"></div></div>` : ""}
+        <span class="tile__state">${t.state}</span></button>`;
+    }).join("")}</div>`;
+}
+
+function other() {
+  const item = SECTIONS.flatMap((g) => g.items).find((i) => i.id === S.sec);
+  return `<div class="page-head"><div class="grow"><h1>${item.label}</h1><p>${TILES[S.sec]?.sub || ""}</p></div></div>
+    <section class="ac-card"><p class="placeholder" style="margin:0">Esta seção fica como hoje, só com o cabeçalho e o menu novos. Este protótipo é sobre Geral e a navegação.</p>
+    <div class="ac-card__foot">${icon("arrowRight")}<span><button class="ac-btn ac-btn--ghost ac-btn--sm" data-sec="general">Voltar para Geral</button></span></div></section>`;
+}
+
+function render() {
+  setHash(); bar();
+  const visible = SECTIONS.flatMap((g) => g.items).filter((i) => admin() || !i.admin);
+  if (!visible.some((i) => i.id === S.sec)) S.sec = "general";
+  const body = S.sec !== "general" ? other() : S.opt === "a" ? optA() : S.opt === "b" ? optB() : optC();
+  document.getElementById("set").innerHTML = nav() + `<div class="set__body">${body}</div>`;
+}
+
+let savedTimer, saveTimer;
+function autosave() {
+  if (S.opt === "b") { render(); return; }
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    S.saved = { ...S.draft };
+    const el = document.getElementById("saved");
+    if (!el) return;
+    el.classList.add("on"); clearTimeout(savedTimer); savedTimer = setTimeout(() => el.classList.remove("on"), 1800);
+  }, 600);
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.k) { S[b.dataset.k] = b.dataset.v; render(); return; }
+  if (b.dataset.sec) { S.sec = b.dataset.sec; render(); window.scrollTo({ top: 0 }); return; }
+  if (b.dataset.idea !== undefined) {
+    const ta = document.getElementById("ctx");
+    S.draft.ctx = S.draft.ctx.replace(/\s*$/, "") + "\n\n" + b.dataset.idea;
+    render(); const t = document.getElementById("ctx"); t.focus(); t.setSelectionRange(t.value.length, t.value.length); autosave(); return;
+  }
+  if (b.hasAttribute("data-logo")) { b.animate([{ transform: "scale(1)" }, { transform: "scale(.94)" }, { transform: "scale(1)" }], { duration: 220 }); return; }
+  if (b.hasAttribute("data-discard")) { S.draft = { ...S.saved }; S.qs = { ...S.qsSaved }; render(); return; }
+  if (b.hasAttribute("data-save")) { S.saved = { ...S.draft }; S.qsSaved = { ...S.qs }; render(); return; }
+});
+document.addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.id === "name") { S.draft.name = t.value; S.opt === "b" ? refreshBar() : autosave(); }
+  if (t.id === "ctx") { S.draft.ctx = t.value; autosave(); }
+  if (t.dataset.q) { S.qs[t.dataset.q] = t.value; refreshBar(); }
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id === "tz") { S.draft.tz = e.target.value; render(); autosave(); }
+});
+document.addEventListener("focusout", (e) => { if (e.target.id === "name" && S.opt !== "b") render(); });
+// B: keep typing focus; only the save bar updates.
+function refreshBar() {
+  const dirty = S.draft.name !== S.saved.name || S.draft.tz !== S.saved.tz || QS.some(([k]) => S.qs[k] !== S.qsSaved[k]);
+  const n = [S.draft.name !== S.saved.name, S.draft.tz !== S.saved.tz, ...QS.map(([k]) => S.qs[k] !== S.qsSaved[k])].filter(Boolean).length;
+  const bar = document.querySelector(".savebar"); if (!bar) return;
+  bar.classList.toggle("on", dirty);
+  bar.firstChild.textContent = `${n === 1 ? "1 mudança" : n + " mudanças"} não salva${n === 1 ? "" : "s"} `;
+}
+render();
+</script>
+</body>
+</html>

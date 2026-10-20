@@ -3160,29 +3160,60 @@ button.drive-where:focus-visible {
   min-width: 0;
 }
 
-/* Settings: left sub-nav + one section */
+/* Settings (telas/Configuracoes.html): a grouped left sub-nav + one section. */
 .settings {
   display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-  max-width: 1180px;
+  gap: 40px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 36px 28px 96px;
   align-items: flex-start;
 }
 .settings__nav {
-  flex: 0 0 220px;
+  flex: 0 0 216px;
   position: sticky;
   top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
+}
+.settings__head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px;
 }
 .settings__title {
   margin: 0;
   font-size: 20px;
   line-height: 26px;
   font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.settings__org {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.settings__org > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.settings__group-label {
+  display: block;
+  padding: 0 10px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
 }
 .settings__nav ul {
   list-style: none;
@@ -3199,16 +3230,29 @@ button.drive-where:focus-visible {
   min-height: var(--control-h-md);
   padding: 0 10px;
   border-radius: var(--control-r-md);
-  color: var(--ink);
+  color: var(--ink2);
   text-decoration: none;
   font-size: 14px;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
+.settings__link > .ac-icon {
+  color: var(--ink-muted);
+}
+/* Hover is a tint; the current page is a raised key (never the same look). */
 .settings__link:hover {
-  background: var(--surface-raised);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
 }
 .settings__link[aria-current="page"] {
-  background: var(--surface-raised);
+  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised));
+  box-shadow: var(--card-key);
+  color: var(--ink);
   font-weight: 600;
+}
+.settings__link[aria-current="page"] > .ac-icon {
+  color: var(--ink);
 }
 .settings__link:focus-visible {
   outline: none;
@@ -3225,14 +3269,163 @@ button.drive-where:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* "Salvo": shows for a moment after each automatic save. */
+.settings__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity 0.25s,
+    transform 0.25s var(--out);
+}
+.settings__saved[data-on] {
+  opacity: 1;
+  transform: none;
+}
+.settings__saved > .ac-icon {
+  color: var(--ok);
+}
+/* Rows: label and help on the left, the control on the right, hairlines between. */
+.settings-rows {
+  display: flex;
+  flex-direction: column;
+  margin: calc(-1 * var(--card-pad));
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px var(--card-pad);
+  border-top: 1px solid var(--line);
+}
+.settings-row:first-child {
+  border-top: 0;
+}
+.settings-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-row__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.settings-row__help {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.settings-row__control {
+  flex: 0 0 300px;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+.settings-row__control > .ac-input,
+.settings-row__control > .ac-select {
+  flex: 1;
+}
+.settings-ideas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.settings-ideas > span {
+  margin-right: 2px;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.settings-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.settings-tiles__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.settings-tiles__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+.settings-tile {
+  min-height: 128px;
+  color: inherit;
+  text-decoration: none;
+}
+.settings-tile h3 {
+  font-size: 14.5px;
+}
+.settings-tile__chevron {
+  align-self: flex-start;
+  margin-top: 2px;
+  color: var(--faint);
+}
+.settings-tile .ac-meter {
+  height: 6px;
+}
+.settings-tile__state {
+  margin-top: auto;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.settings-tile:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--card-shadow);
+}
 @media (max-width: 760px) {
+  .settings {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+    padding: 20px 16px 96px;
+  }
   .settings__nav {
     position: static;
-    flex: 1 1 100%;
+    flex: none;
+    gap: 10px;
+  }
+  .settings__groups {
+    flex-direction: row;
+    gap: 4px;
+    margin: 0 -16px;
+    padding: 2px 16px 6px;
+    overflow-x: auto;
+  }
+  .settings__group-label {
+    display: none;
   }
   .settings__nav ul {
     flex-direction: row;
-    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .settings__link {
+    flex: none;
+    white-space: nowrap;
+  }
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .settings-row__control {
+    flex: none;
+    justify-content: flex-start;
   }
 }
 
