@@ -1,4 +1,14 @@
+import type { BrainEffort } from "@agenteschat/adapters";
+
 export type BrainKind = "model" | "claude_code" | "codex";
+
+/** The account a computer brain runs with (ADR 0041): a folder on the agent's machine. */
+export interface BrainAccount {
+  id: string;
+  /** What people call it, for messages. */
+  label: string;
+  status: "active" | "signed_out";
+}
 
 /** A tool as the engine offers it to a brain (same data the Tool Gateway lists for the run). */
 export interface BrainTool {
@@ -33,6 +43,10 @@ export interface BrainTurn {
   model?: string;
   /** Computer brains only. */
   session?: BrainSession;
+  /** Computer brains: the account to run with (absent: the computer's own sign-in). */
+  account?: BrainAccount;
+  /** Computer brains: how hard it thinks (absent: the CLI's default). */
+  effort?: BrainEffort;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;
 }

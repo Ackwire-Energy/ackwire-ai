@@ -13,6 +13,7 @@ import {
   type RunnerTools,
 } from "@agenteschat/adapters/machine-protocol";
 import { realFoldersFor } from "./access";
+import type { AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { BrowserManager } from "./browser";
@@ -94,6 +95,8 @@ export interface HandlerContext {
   grants?: string[];
   /** Protocol 12: the agents' browsers (ADR 0040); without it the runner refuses `browser.*`. */
   browser?: BrowserManager;
+  /** Protocol 13: the computer brains' accounts (ADR 0041); without it the runner refuses `account`. */
+  accounts?: AccountManager;
 }
 
 export interface RequestScope {
@@ -278,6 +281,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
   }
   if (req.op === "access.request" || req.op === "access.reduce") return handleAccess(ctx, req);
+  // Protocol 13: accounts belong to the machine, not to an agent.
+  if (req.op === "account") return handleAccount(ctx, req);
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
@@ -377,6 +382,42 @@ async function handleBrowser(
   }
 }
 
+/**
+ * Protocol 13 (ADR 0041): sign-ins and accounts of the computer brains. A new
+ * sign-in is new work (refused while paused); status, list, cancel and remove
+ * still answer.
+ */
+async function handleAccount(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "account" }>,
+): Promise<MachineReplies["account"]> {
+  const accounts = ctx.accounts;
+  if (!accounts) throw new RunnerError("bad_request", "This runner keeps no accounts");
+  switch (req.action) {
+    case "begin":
+      if (ctx.paused?.()) {
+        throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+      }
+      return accounts.begin(req.kind, requireString(req.loginId, "loginId"), req.again === true);
+    case "code":
+      if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");
+      await accounts.code(requireString(req.loginId, "loginId"), requireString(req.aad, "aad"), req.box);
+      return {};
+    case "status":
+      return accounts.status(requireString(req.loginId, "loginId"));
+    case "cancel":
+      await accounts.cancel(requireString(req.loginId, "loginId"));
+      return {};
+    case "list":
+      return { accounts: await accounts.list() };
+    case "remove":
+      await accounts.remove(req.kind, requireString(req.accountId, "accountId"));
+      return {};
+    default:
+      throw new RunnerError("bad_request", "Unknown account action");
+  }
+}
+
 /** Protocol 10: the agent asks for a folder, or the site reduces what the machine allows. */
 async function handleAccess(ctx: HandlerContext, req: AccessRequestOp | AccessReduceOp) {
   if (!ctx.accessOps) throw new RunnerError("bad_request", "This runner keeps no access settings");
@@ -410,8 +451,22 @@ async function doBrainTurn(
     emit: (event) => scope.emit?.({ type: "brain.event", runId, event }),
     ...(ctx.grants ? { grants: ctx.grants } : {}),
   });
+  signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });
   return { runId, final };
+}
+
+/**
+ * A turn in an account that was refused (`not_logged_in`) or is gone
+ * (`account_missing`): its CLI is asked again and the server hears the answer
+ * either way (`accounts.changed`). The machine is the only one that says an
+ * account is signed out or gone; a passing failure leaves it as it was.
+ */
+function signedOut(ctx: HandlerContext, req: { account?: unknown }, final: { type: string; code?: string }) {
+  if (!req.account || final.type !== "error") return;
+  if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
+  ctx.accounts?.invalidate();
+  ctx.accounts?.refresh(true).catch(() => undefined);
 }
 
 /**
@@ -451,6 +506,7 @@ async function doCodexTurn(
         ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
         ...(codex.mcp ? { mcp: codex.mcp } : {}),
         ...(ctx.grants ? { grants: ctx.grants } : {}),
+        ...(ctx.accounts ? { accounts: ctx.accounts } : {}),
       },
       req as unknown as CodexBrainTurnRequest,
       {
@@ -468,6 +524,7 @@ async function doCodexTurn(
   } finally {
     codex.runs.delete(runId);
   }
+  signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });
   return { runId, final };
 }
@@ -515,6 +572,12 @@ function describeOp(req: MachineRequest): string {
     case "secret":
       // Never the value: the action and the name or request.
       return `secret ${req.action} ${"name" in req ? req.name : req.requestId}`;
+    case "account": {
+      // Never the code: the action, the kind and the sign-in or account.
+      const kind = "kind" in req ? ` ${String(req.kind ?? "")}` : "";
+      const id = "loginId" in req ? req.loginId : "accountId" in req ? req.accountId : "";
+      return `account ${String(req.action ?? "")}${kind}${id ? ` ${String(id).slice(0, 8)}` : ""}`;
+    }
     case "task.start":
       return `task.start ${String(req.taskId ?? "")} (${String(req.executor ?? "")})`;
     case "task.status":

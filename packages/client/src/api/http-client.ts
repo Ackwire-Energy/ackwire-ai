@@ -2,6 +2,8 @@ import { steerStore } from "../realtime/steer";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
 import type {
+  AccountLoginStart,
+  AccountLoginStatus,
   ActiveRun,
   Agent,
   AgentAccess,
@@ -540,6 +542,20 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
+      beginAccountLogin: (orgId, machineId, kind, accountId) =>
+        request<AccountLoginStart>(`${org(orgId)}/machines/${enc(machineId)}/account-logins`, {
+          json: { kind, ...(accountId ? { accountId } : {}) },
+        }),
+      sendAccountCode: (orgId, machineId, loginId, box) =>
+        request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}/code`, {
+          json: { box },
+        }),
+      accountLogin: (orgId, machineId, loginId) =>
+        request<AccountLoginStatus>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}`),
+      cancelAccountLogin: (orgId, machineId, loginId) =>
+        request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}`, {
+          method: "DELETE",
+        }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

@@ -11,16 +11,23 @@
  * - `GET    /api/desktop/latest?target=&arch=` → the release, or 404 (`null`)
  * - `GET    …/machines/outages` → `{ outages, targets }` (offline computers agents wait for)
  * - `POST   …/machines/{id}/move-agents` `{ agentIds, target }` → `{ moved, skipped, resumed, stillWaiting }`
+ * - `POST   …/machines/{id}/account-logins` `{ kind }` → 201 `{ loginId, kind, url, publicKey? | userCode?, expiresAt }`
+ * - `POST   …/account-logins/{loginId}/code` `{ box }` → 204; `GET …/account-logins/{loginId}` → `{ state, account? }`
+ * - `DELETE …/account-logins/{loginId}` → 204
+ * Sign-ins wait until a test calls `endLogin()`.
  * Tests add machines with `pair()`, codes with `addDevice()`, a release with `setRelease()`, outages with
  * `setOutages()` and the move's answer with `setMoveResult()`. No machines, codes, release or outages by default.
  */
 import type {
+  AccountLoginStatus,
   ApiClient,
   DesktopRelease,
   DeviceRequest,
   Machine,
+  MachineAccountKind,
   MachineOutages,
   MoveAgentsResult,
+  SecretBox,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError } from "./context";
@@ -44,6 +51,10 @@ export interface FakeMachines {
   setOutages(outages: MachineOutages): void;
   /** What `moveAgents` answers (default: every agent moved, nothing else). */
   setMoveResult(result: MoveAgentsResult | null): void;
+  /** The newest sign-in started (ADR 0041), with the code box sent for it, if any. */
+  lastLogin(): { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean } | undefined;
+  /** The computer finished (or gave up on) a sign-in. */
+  endLogin(loginId: string, status: AccountLoginStatus): void;
 }
 
 let seq = 0;
@@ -56,6 +67,14 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   let release: DesktopRelease | null = null;
   let outages: MachineOutages = { outages: [], targets: [] };
   let moveResult: MoveAgentsResult | null = null;
+  type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
+  const logins: Login[] = [];
+  const loginStatus = new Map<string, AccountLoginStatus>();
+  const login = (loginId: string) => {
+    const l = logins.find((x) => x.loginId === loginId && !x.cancelled);
+    if (!l) throw new MockNotFoundError("Login não encontrado.");
+    return l;
+  };
   const find = (id: string) => {
     const m = machines.find((x) => x.id === id);
     if (!m) throw new MockNotFoundError("Computador não encontrado.");
@@ -157,6 +176,35 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.moveAgents", orgId, machineId, input);
         return clone(moveResult ?? { moved: input.agentIds, skipped: [], resumed: 0, stillWaiting: 0 });
       },
+      beginAccountLogin: async (orgId, machineId, kind) => {
+        log("machines.beginAccountLogin", orgId, machineId, kind);
+        const loginId = `login_${logins.length + 1}`;
+        logins.push({ loginId, kind, box: null, cancelled: false });
+        const expiresAt = new Date(ctx.now().getTime() + 15 * 60_000).toISOString();
+        if (kind === "codex")
+          return { loginId, kind, url: "https://auth.openai.com/codex/device", userCode: "ABCD-1234", expiresAt };
+        // A real one-time key, so the page can seal the code to it.
+        const curve = { name: "ECDH", namedCurve: "P-256" };
+        const eph = (await crypto.subtle.generateKey(curve, true, ["deriveBits"])) as CryptoKeyPair;
+        const raw = new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey));
+        const publicKey = btoa(String.fromCharCode(...raw));
+        return { loginId, kind, url: "https://claude.ai/oauth/authorize?code=true", publicKey, expiresAt };
+      },
+      sendAccountCode: async (orgId, machineId, loginId, box) => {
+        log("machines.sendAccountCode", orgId, machineId, loginId);
+        login(loginId).box = box;
+      },
+      // Asked every 2 s while the block is open: not logged.
+      accountLogin: async (_orgId, _machineId, loginId) => {
+        login(loginId);
+        const waiting: AccountLoginStatus = { state: "waiting" };
+        return clone(loginStatus.get(loginId) ?? waiting);
+      },
+      cancelAccountLogin: async (orgId, machineId, loginId) => {
+        log("machines.cancelAccountLogin", orgId, machineId, loginId);
+        const l = logins.find((x) => x.loginId === loginId);
+        if (l) l.cancelled = true;
+      },
     },
     pair,
     peek: (id) => machines.find((m) => m.id === id),
@@ -174,6 +222,13 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     },
     setMoveResult: (next) => {
       moveResult = next;
+    },
+    lastLogin: () => {
+      const l = logins.at(-1);
+      return l ? { ...l } : undefined;
+    },
+    endLogin: (loginId, status) => {
+      loginStatus.set(loginId, status);
     },
     addDevice: (userCode, input = {}) => {
       const now = ctx.now();

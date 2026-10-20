@@ -1,4 +1,4 @@
-import { BRAIN_PROTOCOL } from "@agenteschat/adapters";
+import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, type BrainEffort, isBrainEffort } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { MODEL_CATALOG } from "@agenteschat/providers";
 import { getAgent } from "./agents";
@@ -6,7 +6,8 @@ import { recordAudit } from "./audit";
 import type { BrainKind } from "./brains/types";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { getMachine, machineOnline } from "./machines";
+import { getMachineAccount, listMachineAccounts, type MachineAccountView } from "./machine-accounts";
+import { getMachine, type MachineRow, machineOnline } from "./machines";
 import {
   type MissionDeps,
   type MissionRow,
@@ -181,6 +182,62 @@ export interface AgentBrainView {
   machines: BrainMachineOptions[];
   /** The caller may change it (an admin or the agent's owner). */
   canEdit: boolean;
+  /** The account its computer brain runs with (ADR 0041); null = the computer's own sign-in. */
+  account: string | null;
+  /** How hard its computer brain thinks; null = the CLI's default. */
+  effort: BrainEffort | null;
+  /** The accounts on the agent's computer, both kinds ([] without a computer). */
+  accounts: MachineAccountView[];
+  /** Who connected the agent's computer: only they add accounts or pick one. */
+  accountsOwner: { id: string; name: string } | null;
+  /** The caller is that person and the computer's runner knows accounts. */
+  canManageAccounts: boolean;
+  /** The computer's runner knows accounts (protocol 13). */
+  accountsSupported: boolean;
+}
+
+/** The account part of the brain view. */
+interface BrainAccounts {
+  accounts: MachineAccountView[];
+  accountsOwner: { id: string; name: string } | null;
+  canManageAccounts: boolean;
+  accountsSupported: boolean;
+}
+
+const NO_ACCOUNTS: BrainAccounts = {
+  accounts: [],
+  accountsOwner: null,
+  canManageAccounts: false,
+  accountsSupported: false,
+};
+
+/** The accounts on the agent's computer, its owner, and whether the caller may manage them. */
+async function brainAccounts(
+  db: Database,
+  userId: string,
+  orgId: string,
+  machine: Pick<MachineRow, "id" | "protocol" | "pairedByUserId"> | null,
+): Promise<BrainAccounts> {
+  if (!machine) return NO_ACCOUNTS;
+  const supported = machine.protocol >= ACCOUNTS_PROTOCOL;
+  const [accounts, owner] = await Promise.all([
+    listMachineAccounts({ db }, orgId, machine.id),
+    machine.pairedByUserId
+      ? db
+          .select({ id: schema.users.id, name: schema.users.name })
+          .from(schema.users)
+          .where(eq(schema.users.id, machine.pairedByUserId))
+          .then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
+  ]);
+  const mine = machine.pairedByUserId === userId;
+  return {
+    // The emails are the computer owner's: everyone else sees the account names only.
+    accounts: mine ? accounts : accounts.map((a) => ({ ...a, email: null })),
+    accountsOwner: owner,
+    canManageAccounts: supported && mine,
+    accountsSupported: supported,
+  };
 }
 
 interface BrainDeps {
@@ -223,9 +280,17 @@ async function agentMachine(db: Database, orgId: string, machineId: string | nul
 }
 
 function view(
-  agent: { id: string; brain: string; brainModel: string | null; brainFallback: boolean },
+  agent: {
+    id: string;
+    brain: string;
+    brainModel: string | null;
+    brainFallback: boolean;
+    brainAccountId: string | null;
+    brainEffort: string | null;
+  },
   machine: MachineLike | null,
   machines: BrainMachineOptions[],
+  accounts: BrainAccounts,
 ): AgentBrainView {
   const brain = brainOf(agent.brain);
   return {
@@ -238,7 +303,19 @@ function view(
     options: brainOptions(machine),
     machines,
     canEdit: true,
+    account: agent.brainAccountId,
+    effort: isBrainEffort(agent.brainEffort) ? agent.brainEffort : null,
+    ...accounts,
   };
+}
+
+/** Postgres `foreign_key_violation`, as the driver raises it or wrapped by Drizzle (`cause`). */
+function isForeignKeyViolation(error: unknown): boolean {
+  for (let e: unknown = error, depth = 0; e && typeof e === "object" && depth < 3; depth++) {
+    if ((e as { code?: unknown }).code === "23503") return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 /** `GET …/agents/{id}/brain`: the choice, the computer and what it can offer. */
@@ -249,11 +326,13 @@ export async function getAgentBrain(
   agentId: string,
 ): Promise<AgentBrainView> {
   const { agent, admin } = await agentBrainAccess(deps.db, userId, orgId, agentId);
-  const [machine, machines] = await Promise.all([
-    agentMachine(deps.db, orgId, agent.machineId),
+  const machineLook = agentMachine(deps.db, orgId, agent.machineId);
+  const [machine, machines, accounts] = await Promise.all([
+    machineLook,
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
+    machineLook.then((m) => brainAccounts(deps.db, userId, orgId, m)),
   ]);
-  return view(agent, machine, machines);
+  return view(agent, machine, machines, accounts);
 }
 
 export interface AgentBrainInput {
@@ -267,6 +346,15 @@ export interface AgentBrainInput {
    * risk. Required when switching to a computer brain; we never block it.
    */
   acceptPlanTerms?: unknown;
+  /**
+   * The account its computer brain runs with (ADR 0041): an account on the
+   * agent's computer of the brain's kind, or null for the computer's own
+   * sign-in. Only the person who connected the computer changes it. Omitted =
+   * keep it (cleared when the brain kind changes).
+   */
+  account?: unknown;
+  /** `low`…`max`, or null for the CLI's default. Omitted = keep it. */
+  effort?: unknown;
 }
 
 /** `PUT …/agents/{id}/brain` (an admin or the agent's owner). Audited. */
@@ -321,12 +409,40 @@ export async function setAgentBrain(
           ? null
           : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
-  if (!changed && model === agent.brainModel && fallback === agent.brainFallback) return view(agent, machine, machines);
+  if (input.effort !== undefined && input.effort !== null && !isBrainEffort(input.effort)) {
+    throw new ValidationError("Choose low, medium, high, xhigh or max", "brain.invalid_effort");
+  }
+  const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffort | null);
+  const account = await nextBrainAccount(deps.db, userId, orgId, agent, brain, changed, machine, input.account);
+  const accounts = await brainAccounts(deps.db, userId, orgId, machine);
+  if (
+    !changed &&
+    model === agent.brainModel &&
+    fallback === agent.brainFallback &&
+    account === agent.brainAccountId &&
+    effort === agent.brainEffort
+  ) {
+    return view(agent, machine, machines, accounts);
+  }
   const [row] = await deps.db
     .update(schema.agents)
-    .set({ brain, brainModel: model, brainFallback: fallback, updatedAt: new Date() })
+    .set({
+      brain,
+      brainModel: model,
+      brainFallback: fallback,
+      brainAccountId: account,
+      brainEffort: effort,
+      updatedAt: new Date(),
+    })
     .where(and(eq(schema.agents.id, agentId), eq(schema.agents.orgId, orgId)))
-    .returning();
+    .returning()
+    .catch((error: unknown) => {
+      // The account was removed meanwhile (the computer, its owner): the same answer as a stale choice.
+      if (account && isForeignKeyViolation(error)) {
+        throw new ValidationError("That account is no longer on this computer", "account.invalid");
+      }
+      throw error;
+    });
   caches.agents.delete(`${orgId}:${agentId}`);
   await recordAudit(deps.db, {
     orgId,
@@ -334,12 +450,67 @@ export async function setAgentBrain(
     action: "agent.brain",
     target: { type: "agent", id: agentId },
     details: {
-      from: { brain: from, model: agent.brainModel, fallback: agent.brainFallback },
-      to: { brain, model, fallback },
+      from: {
+        brain: from,
+        model: agent.brainModel,
+        fallback: agent.brainFallback,
+        account: agent.brainAccountId,
+        effort: agent.brainEffort,
+      },
+      to: { brain, model, fallback, account, effort },
       ...(changed && isComputerBrain(brain) ? { acceptedPlanTerms: true } : {}),
     },
   });
-  return view(row ?? { ...agent, brain, brainModel: model, brainFallback: fallback }, machine, machines);
+  const next = row ?? {
+    ...agent,
+    brain,
+    brainModel: model,
+    brainFallback: fallback,
+    brainAccountId: account,
+    brainEffort: effort,
+  };
+  // The account's `usedBy` changed with it.
+  const fresh = account !== agent.brainAccountId ? await brainAccounts(deps.db, userId, orgId, machine) : accounts;
+  return view(next, machine, machines, fresh);
+}
+
+/**
+ * The account the agent will run with (ADR 0041 §4): kept when nothing asks
+ * otherwise, cleared when the brain kind changes; picking or clearing one is
+ * for the person who connected the computer only, and the account must be on
+ * the agent's computer and of the brain's kind.
+ */
+async function nextBrainAccount(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agent: { brainAccountId: string | null },
+  brain: BrainKind,
+  changed: boolean,
+  machine: MachineRow | null,
+  input: unknown,
+): Promise<string | null> {
+  const kept = changed ? null : agent.brainAccountId;
+  if (input === undefined) return kept;
+  if (input !== null && typeof input !== "string") {
+    throw new ValidationError("Choose an account on the agent's computer", "account.invalid");
+  }
+  const wanted = input || null;
+  if (wanted === kept) return kept;
+  if (!machine || machine.pairedByUserId !== userId) {
+    throw new ForbiddenError(
+      "Only the person who connected the agent's computer can choose its account",
+      "account.not_owner",
+    );
+  }
+  if (wanted === null) return null;
+  const row = isComputerBrain(brain) ? await getMachineAccount(db, orgId, machine.id, wanted) : null;
+  if (!row || row.kind !== brain) {
+    throw new ValidationError("Choose an account of this brain on the agent's computer", "account.invalid", {
+      brain,
+    });
+  }
+  return row.id;
 }
 
 // ── Missions ────────────────────────────────────────────────────────────────

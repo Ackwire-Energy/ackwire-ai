@@ -1001,6 +1001,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           model,
           effectiveModel: brain === "model" ? null : (model ?? option?.defaultModel ?? null),
           fallback: input.fallback ?? b.fallback,
+          // ADR 0041: another brain kind starts on the computer's own account.
+          account: input.account !== undefined ? input.account : changed ? null : b.account,
+          effort: input.effort !== undefined ? input.effort : b.effort,
         };
         brains.set(agentId, next);
         return structuredClone(next);
@@ -1634,6 +1637,12 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     ],
     machines: [],
     canEdit: true,
+    account: null,
+    effort: null,
+    accounts: [],
+    accountsOwner: { id: "u-walter", name: "Walter Caldas" },
+    canManageAccounts: true,
+    accountsSupported: true,
     ...patch,
   };
   // The computers the person may give the agent: the MacBook, with what it offers.

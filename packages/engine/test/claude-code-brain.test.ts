@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import {
+  ACCOUNTS_PROTOCOL,
   BRAIN_PROTOCOL,
   brainTopic,
   createMemoryPubSub,
@@ -261,6 +262,51 @@ test("not reachable: each reason ends the turn at once, retryable, without calli
   expect(await collect(brainWith(pubsub, hub).run(turn({ session: undefined }), io()))).toEqual([
     expect.objectContaining({ code: "no_session", retryable: true }),
   ]);
+});
+
+test("accounts (ADR 0041): the account and effort go to a runner that knows them; a signed-out account ends the turn", async () => {
+  const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";
+  const account = { id: ACCOUNT, label: "Trabalho", status: "active" as const };
+  const sent = async (s: MachineStatus, over: Partial<BrainTurn>) => {
+    const pubsub = createMemoryPubSub();
+    const { hub, calls } = fakeHub(pubsub, { status: s });
+    const events = await collect(brainWith(pubsub, hub).run(turn(over), io()));
+    return {
+      events,
+      request: calls[0]?.request as (MachineRequest & { account?: string; effort?: string }) | undefined,
+    };
+  };
+
+  // Protocol 13: both go with the turn.
+  const current = await sent(status({ protocol: ACCOUNTS_PROTOCOL }), { account, effort: "high" });
+  expect(current.request).toMatchObject({ op: "brain.turn", account: ACCOUNT, effort: "high" });
+  // Without them, nothing is added.
+  const plain = await sent(status({ protocol: ACCOUNTS_PROTOCOL }), {});
+  expect(plain.request && "account" in plain.request).toBe(false);
+  expect(plain.request && "effort" in plain.request).toBe(false);
+
+  // An older runner never sees them: the effort is dropped, an account can't run there.
+  const oldEffort = await sent(status(), { effort: "high" });
+  expect(oldEffort.request && "effort" in oldEffort.request).toBe(false);
+  const oldAccount = await sent(status(), { account });
+  expect(oldAccount.request).toBeUndefined();
+  expect(oldAccount.events).toEqual([
+    expect.objectContaining({ type: "error", code: "runner_outdated", retryable: true }),
+  ]);
+
+  // A signed-out account: not logged in, naming it, without calling the machine.
+  const out = await sent(status({ protocol: ACCOUNTS_PROTOCOL }), { account: { ...account, status: "signed_out" } });
+  expect(out.request).toBeUndefined();
+  expect(out.events).toEqual([expect.objectContaining({ type: "error", code: "not_logged_in", retryable: true })]);
+  expect((out.events[0] as { message: string }).message).toContain('"Trabalho"');
+
+  // With an account, the computer's own sign-in doesn't matter (the account's status decides).
+  const ownSignedOut = status({
+    protocol: ACCOUNTS_PROTOCOL,
+    executors: { claude: { version: "2.1", loggedIn: false }, detectedAt: new Date().toISOString() },
+  });
+  expect(claudeCodeAvailability(ownSignedOut)?.type).toBe("error");
+  expect(claudeCodeAvailability(ownSignedOut, account)).toBeNull();
 });
 
 test("a failed request becomes the turn's error (offline and old runners may fall back; a timeout doesn't)", async () => {

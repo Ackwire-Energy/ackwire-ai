@@ -9846,6 +9846,123 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
+/* "Quem pensa" (telas/ContaClaude.html "Nova"): the opened brain's rows, each with a dropdown of one width. */
+.agp-brainrows {
+  display: flex;
+  flex-direction: column;
+}
+.agp-brainrows > .ac-setrow {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.agp-brainrows > .ac-setrow:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+.agp-brainrows > .ac-setrow:last-child {
+  padding-bottom: 0;
+}
+.agp-brainrows__sel {
+  width: 260px;
+}
+@media (max-width: 640px) {
+  .agp-brainrows > .ac-setrow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .agp-brainrows .ac-setrow__end,
+  .agp-brainrows__sel {
+    width: 100%;
+  }
+}
+/* "Adicionar conta": the provider's own sign-in, in numbered steps. */
+.agp-addacct {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.agp-addacct:focus {
+  outline: none;
+}
+.agp-addacct__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.agp-addacct__head > b {
+  font-size: 15px;
+  font-weight: 650;
+}
+.agp-addacct__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.agp-addacct__step > i {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 650;
+}
+.agp-addacct__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.agp-addacct__text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code) {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.agp-addacct__paste,
+.agp-addacct__code {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0;
+}
+.agp-addacct__paste .ac-input {
+  flex: 1;
+  min-width: 160px;
+}
+.agp-addacct__code output {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  user-select: all;
+}
+.agp-addacct__wait {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+@media (max-width: 640px) {
+  .agp-addacct__step {
+    flex-wrap: wrap;
+  }
+}
 
 /* Tabs: they stick to the top while the page scrolls. */
 .agp-tabs .ac-tabs {

@@ -2,7 +2,10 @@ import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  type AccountKind,
   type AgentScope,
+  isAccountId,
+  isAccountKind,
   MACHINE_PROTOCOL_VERSION,
   type MachineAgent,
   type MachineOs,
@@ -22,6 +25,7 @@ import {
   type ControlConfigPatch,
   type ControlEvent,
   type ControlJob,
+  type ControlReplies,
   type ControlStatus,
 } from "@agenteschat/adapters/runner-control";
 import {
@@ -39,6 +43,7 @@ import {
   TOOL_NAMES,
   writeAgents,
 } from "./access";
+import { AccountManager } from "./accounts";
 import { ActivityLog } from "./activity";
 import { BrainManager } from "./brain";
 import { BrowserManager } from "./browser";
@@ -218,6 +223,8 @@ export interface DaemonOptions {
   dial?: Dial;
   fetch?: FetchFn;
   executors?: () => RunnerInfo["executors"];
+  /** How the accounts' CLIs start (default `claude` / `codex`). */
+  accountCommands?: Partial<Record<AccountKind, string[]>>;
   now?: () => number;
   watch?: boolean;
   caffeinate?: boolean;
@@ -262,6 +269,8 @@ export class RunnerDaemon implements RequestObserver {
   private readonly self: { command: string[]; compiled: boolean };
   private readonly executors: () => NonNullable<RunnerInfo["executors"]>;
   private readonly now: () => number;
+  /** The computer brains' accounts (ADR 0041): machine-wide, kept across pairings and sessions. */
+  readonly accounts: AccountManager;
 
   constructor(private readonly opts: DaemonOptions) {
     this.activity = new ActivityLog(opts.home);
@@ -271,6 +280,18 @@ export class RunnerDaemon implements RequestObserver {
     this.self = opts.self ?? { command: selfCommand(proc), compiled: isCompiled(proc) };
     const exec = opts.executors ?? cachedExecutors();
     this.executors = () => exec() ?? {};
+    this.accounts = new AccountManager({
+      root: path.join(opts.home, "accounts"),
+      orgId: () => this.config?.orgId,
+      log: opts.log,
+      ...(opts.accountCommands ? { commands: opts.accountCommands } : {}),
+      onChange: () => {
+        this.queueStatus();
+        // The server learns at once (a sign-in or removal from the desktop app, a status that changed).
+        const accounts = this.accounts.snapshot();
+        if (accounts) this.send({ type: "accounts.changed", accounts });
+      },
+    });
   }
 
   get home() {
@@ -335,6 +356,7 @@ export class RunnerDaemon implements RequestObserver {
     const s = this.session;
     this.session = null;
     if (s) await this.closeSession(s);
+    await this.accounts.close().catch(() => undefined);
     await this.chain.catch(() => undefined);
     this.startWaiter?.({ exitCode: 0, reason: "stopped", message: "stopped" });
     this.startWaiter = null;
@@ -555,6 +577,7 @@ export class RunnerDaemon implements RequestObserver {
       mcp: mcpCommand,
       idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
       maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
+      accounts: this.accounts,
       log,
     });
     const codexRuns = new Map<string, McpTaskInfo>();
@@ -596,11 +619,18 @@ export class RunnerDaemon implements RequestObserver {
         reduce: (req) => this.accessReduce(req),
       },
       browser,
+      accounts: this.accounts,
     };
+    // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
+    // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
+    this.accounts.refresh(true).catch(() => undefined);
     const connection = new RunnerConnection({
       url: connectUrl(config.server),
       token: config.token,
-      info: () => ({ ...this.info(workspaceReal), browser: browser.info() }),
+      info: () => {
+        const accounts = this.accounts.snapshot();
+        return { ...this.info(workspaceReal), browser: browser.info(), ...(accounts ? { accounts } : {}) };
+      },
       executors: () => this.helloExecutors(),
       context,
       mcp,
@@ -846,6 +876,42 @@ export class RunnerDaemon implements RequestObserver {
     const out = await s.browser.stop({ id: agentId, handle: agent?.handle ?? "agent" });
     this.browsersChanged();
     return out;
+  }
+
+  // ── Accounts (ADR 0041) ────────────────────────────────────────────────────
+
+  /** The app's account list: every account on this computer with its CLI's status. */
+  async accountsList(): Promise<ControlReplies["accounts.list"]> {
+    return { accounts: await this.accounts.list() };
+  }
+
+  /**
+   * The app's "Adicionar conta": the CLI's sign-in starts here, opens this
+   * computer's browser and finishes by itself; the app polls `account.status`.
+   */
+  async accountBegin(kind: AccountKind): Promise<ControlReplies["account.begin"]> {
+    if (!isAccountKind(kind)) throw new ControlError("bad_request", "Unknown account kind");
+    const loginId = crypto.randomUUID();
+    const r = await this.accounts.begin(kind, loginId);
+    return { loginId, url: r.url ?? "", ...(r.userCode ? { userCode: r.userCode } : {}) };
+  }
+
+  accountStatus(loginId: string): ControlReplies["account.status"] {
+    if (!isAccountId(loginId)) throw new ControlError("bad_request", "Invalid sign-in id");
+    const r = this.accounts.status(loginId);
+    return {
+      state: r.state ?? "failed",
+      ...(r.account ? { account: r.account } : {}),
+      ...(r.error ? { error: r.error } : {}),
+    };
+  }
+
+  async accountCancel(loginId: string): Promise<ControlReplies["account.cancel"]> {
+    return { canceled: await this.accounts.cancel(loginId) };
+  }
+
+  async accountRemove(kind: AccountKind, accountId: string): Promise<ControlReplies["account.remove"]> {
+    return { removed: await this.accounts.remove(kind, accountId) };
   }
 
   // ── Pause ──────────────────────────────────────────────────────────────────

@@ -1,10 +1,12 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -95,6 +97,44 @@ export const machines = pgTable(
     deletedAt: timestamp({ withTimezone: true }),
   },
   (t) => [unique().on(t.orgId, t.id), index().on(t.orgId)],
+);
+
+/**
+ * Accounts of the computer brains on a machine (ADR 0041): a folder on the
+ * computer (`<runner home>/accounts/<kind>/<id>`) where Claude Code or Codex
+ * keeps its own sign-in. Nothing secret here: what the CLI's status command
+ * says (email, plan) and whether it is still signed in. `id` is the folder's
+ * name (made by the server, or by the desktop app's runner), so it is unique
+ * per organization; the runner's `hello.accounts` keeps the rows in sync.
+ */
+export const machineAccounts = pgTable(
+  "machine_accounts",
+  {
+    id: uuid().notNull(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    machineId: uuid().notNull(),
+    /** `claude_code` or `codex` (validated in code). */
+    kind: text().notNull(),
+    /** What people call it ("Trabalho"); the email when nobody named it. */
+    label: text().notNull(),
+    email: text(),
+    /** `pro`, `max`, `team`, `plus`… as the CLI says. */
+    plan: text(),
+    /** `active` or `signed_out` (the CLI refused the sign-in, or said it isn't signed in). */
+    status: text().notNull().default("active"),
+    /** Who added it from the app; null when the runner reported it first (the desktop app). */
+    createdBy: text().references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.id] }),
+    foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }).onDelete("cascade"),
+    index().on(t.orgId, t.machineId),
+  ],
 );
 
 /**

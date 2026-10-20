@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { AgentBrain, MachineAccount } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -32,6 +33,13 @@ const dialog = async (word: string, title: string) => {
 const brainDialog = () => dialog("Mudar quem pensa", "Quem pensa");
 const card = (d: HTMLElement, name: RegExp) =>
   within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name });
+/** Opens one of the opened brain's dropdowns and picks an option. */
+const pick = async (d: HTMLElement, select: string, option: RegExp) => {
+  const trigger = within(d).getByRole("combobox", { name: select });
+  trigger.focus();
+  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  await click(screen().getByRole("option", { name: option }));
+};
 /** A connected MacBook with Claude Code and Codex; its browser as given. */
 const pairMac = (api: ReturnType<typeof createFakeApi>, browser: boolean) =>
   fakeMachinesOf.get(api)?.pair({
@@ -76,7 +84,7 @@ describe("the sentence under the name", () => {
 });
 
 describe("Quem pensa (its dialog)", () => {
-  test("three cards with their portraits and where each runs; the organization's model and key under it", async () => {
+  test("three brains in a list with their portraits and where each runs; the organization's model and key under it", async () => {
     await open();
     const d = await brainDialog();
     const rows = within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getAllByRole("radio");
@@ -92,13 +100,13 @@ describe("Quem pensa (its dialog)", () => {
       "codex",
     ]);
     // The agent is on the cloud: a plan brain says where it will go, before it is chosen.
-    expect(rows.map((r) => r.querySelector(".ac-optrow__foot")?.textContent)).toEqual([
+    expect(rows.map((r) => r.querySelector(".ac-optrow__side")?.textContent)).toEqual([
       "Pago pela organização",
       "Vai para o MacBook",
       "Vai para o MacBook",
     ]);
     const more = d.querySelector(".ac-optrow__more") as HTMLElement;
-    expect(within(more).getByRole("group", { name: "Modelo" })).toBeTruthy();
+    expect(within(more).getByRole("combobox", { name: "Modelo" })).toBeTruthy();
     expect(within(more).getByRole("combobox", { name: "Chave" })).toBeTruthy();
     expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -108,9 +116,10 @@ describe("Quem pensa (its dialog)", () => {
     const d = await brainDialog();
     await click(card(d, /^Claude Code/));
     expect(d.textContent).toContain("O plano do Claude é seu, pessoal.");
-    await click(within(within(d).getByRole("radiogroup", { name: "Modelo" })).getByRole("radio", { name: /^Opus/ }));
-    const off = within(d).getByRole("radiogroup", { name: "Se o MacBook estiver desligado" });
-    await click(within(off).getByRole("radio", { name: /^Espera o MacBook ligar/ }));
+    // The agent moves to the MacBook: its accounts there aren't offered yet.
+    expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
+    await pick(d, "Modelo", /^Opus/);
+    await pick(d, "Se o MacBook desligar", /^Espera o MacBook ligar/);
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
     expect(callOrder(state)).toEqual(["sandbox.setTarget", "agents.setBrain"]);
@@ -130,7 +139,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(sentence().textContent).toContain("Pensa com Codex · GPT-6 Sol");
     const d = await brainDialog();
     expect(card(d, /^Codex/).getAttribute("aria-checked")).toBe("true");
-    await click(within(within(d).getByRole("radiogroup", { name: "Modelo" })).getByRole("radio", { name: /Luna/ }));
+    await pick(d, "Modelo", /Luna/);
     expect(d.textContent).not.toContain("é seu, pessoal");
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
@@ -154,7 +163,126 @@ describe("Quem pensa (its dialog)", () => {
     expect(codex.hasAttribute("disabled")).toBe(true);
     expect(codex.textContent).toContain("Não está instalado no MacBook.");
     expect(codex.querySelector("canvas.ac-brain")?.getAttribute("data-state")).toBe("off");
-    expect(codex.querySelector(".ac-optrow__foot")?.textContent).toBe("Nenhum computador tem");
+    expect(codex.querySelector(".ac-optrow__side")?.textContent).toBe("Nenhum computador tem");
+  });
+});
+
+describe("Quem pensa: the account on the computer and the effort (ADR 0041)", () => {
+  const work: MachineAccount = {
+    id: "acct_work",
+    kind: "claude_code",
+    label: "Trabalho",
+    email: "walt@acme.com",
+    plan: "Team",
+    status: "active",
+    usedBy: ["Theo"],
+  };
+  /** Ada thinks with Claude Code on the MacBook, which has the given accounts. */
+  async function onMac(patch: Partial<AgentBrain> = {}) {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () =>
+      fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", accounts: [work], ...patch });
+    await open(state, api);
+    return { state, api };
+  }
+
+  test("the sentence names the account when the computer has more than one; Usar saves the account and the effort", async () => {
+    const { state } = await onMac();
+    expect(sentence().textContent).toContain("Pensa com Claude Code · Sonnet · Conta deste MacBook");
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    expect(account.textContent).toContain("Conta deste MacBook");
+    expect(d.textContent).toContain("Quem paga o uso");
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    const options = screen().getAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual([
+      "Conta deste MacBookA que já está no MacBook",
+      "Trabalho · Teamwalt@acme.com · também Theo",
+      "Adicionar conta",
+    ]);
+    await click(screen().getByRole("option", { name: /^Trabalho · Team/ }));
+    await pick(d, "Esforço", /^Alto/);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toEqual({
+      brain: "claude_code",
+      model: null,
+      fallback: true,
+      effort: "high",
+      account: "acct_work",
+    });
+  });
+
+  test("only the computer's owner changes the account; an old app on the computer shows nothing about it", async () => {
+    await onMac({ canManageAccounts: false });
+    let d = await brainDialog();
+    expect(within(d).getByRole("combobox", { name: "Conta do Claude" }).hasAttribute("disabled")).toBe(true);
+    expect(d.textContent).toContain("Só Walter troca");
+    cleanup();
+    await onMac({ accountsSupported: false });
+    expect(sentence().textContent).not.toContain("Conta deste MacBook");
+    d = await brainDialog();
+    expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
+    expect(within(d).getByRole("combobox", { name: "Esforço" })).toBeTruthy();
+  });
+
+  test("a signed-out account says so and offers to sign in again", async () => {
+    await onMac({ account: "acct_work", accounts: [{ ...work, status: "signed_out" }] });
+    const d = await brainDialog();
+    expect(d.textContent).toContain("Saiu da conta, entre de novo");
+    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(screen().getByRole("option", { name: /^Entrar de novo/ })).toBeTruthy();
+  });
+
+  test("Adicionar conta: Claude's own page, the code goes to the computer; Voltar stops the sign-in", async () => {
+    const { state, api } = await onMac();
+    const d = await brainDialog();
+    await pick(d, "Conta do Claude", /^Adicionar conta/);
+    await settle(6);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const login = fakeMachinesOf.get(api)?.lastLogin();
+    expect(login?.kind).toBe("claude_code");
+    expect(within(block).getByRole("link", { name: "Entrar com Claude" }).getAttribute("href")).toBe(
+      "https://claude.ai/oauth/authorize?code=true",
+    );
+    expect(block.textContent).toContain("O agentes.chat nunca vê a senha nem o acesso.");
+    expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
+    await click(within(block).getByRole("button", { name: "Voltar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "machines.cancelAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      login?.loginId,
+    ]);
+    expect(within(d).getByRole("combobox", { name: "Conta do Claude" })).toBeTruthy();
+  });
+
+  test("Adicionar conta (Codex): the code to type there; once the computer signs in, the account is chosen", async () => {
+    const codex: MachineAccount = { ...work, id: "acct_codex", kind: "codex", label: "Pessoal", plan: "Plus" };
+    const { state, api } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [] });
+    // The computer finishes the first sign-in as soon as the page asks.
+    fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: codex });
+    const d = await brainDialog();
+    await pick(d, "Conta do Codex", /^Adicionar conta/);
+    await settle(8);
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "codex",
+    ]);
+    expect(within(d).queryByRole("region", { name: "Adicionar conta do Codex" })).toBeNull();
+    expect(within(d).getByRole("combobox", { name: "Conta do Codex" }).textContent).toContain("Pessoal · Plus");
+    expect(d.textContent).toContain("A conta Pessoal entrou no MacBook. Clique em Usar para salvar.");
+    expect(state.calls.some((c) => c.method === "machines.cancelAccountLogin")).toBe(false);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toEqual({ brain: "codex", model: null, fallback: true, account: "acct_codex" });
   });
 });
 

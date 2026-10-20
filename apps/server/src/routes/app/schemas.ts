@@ -1,3 +1,4 @@
+import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
 import { z } from "@hono/zod-openapi";
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
@@ -353,6 +354,26 @@ export const BrainOption = z
   })
   .openapi("BrainOption");
 
+export const BrainEffort = z.enum(BRAIN_EFFORTS).openapi("BrainEffort", {
+  description: "How hard a computer brain thinks (Claude Code `--effort`; Codex maps `xhigh` and `max` to `high`).",
+});
+
+export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
+
+export const MachineAccount = z
+  .object({
+    id: z.uuid(),
+    kind: AccountKind,
+    label: z.string(),
+    email: z.string().nullable(),
+    plan: z.string().nullable().openapi({ description: "`pro`, `max`, `team`, `plus`… as the CLI says." }),
+    status: z.enum(["active", "signed_out"]),
+    usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it." }),
+  })
+  .openapi("MachineAccount", {
+    description: "An account of a computer brain on a connected computer (ADR 0041). Metadata only, never a sign-in.",
+  });
+
 export const AgentBrain = z
   .object({
     agentId: z.uuid(),
@@ -371,6 +392,18 @@ export const AgentBrain = z
           "Every computer the caller may give the agent (admins: all; its owner: the ones they connected), with what each offers.",
       }),
     canEdit: z.boolean(),
+    account: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
+    effort: BrainEffort.nullable().openapi({ description: "Null = the CLI's default." }),
+    accounts: z.array(MachineAccount).openapi({ description: "The accounts on the agent's computer, both kinds." }),
+    accountsOwner: z
+      .object({ id: z.string(), name: z.string() })
+      .nullable()
+      .openapi({ description: "Who connected the agent's computer: only they add accounts or pick one." }),
+    canManageAccounts: z.boolean(),
+    accountsSupported: z.boolean().openapi({ description: "The computer's runner knows accounts (protocol 13)." }),
   })
   .openapi("AgentBrain");
 

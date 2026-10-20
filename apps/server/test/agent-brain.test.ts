@@ -96,6 +96,15 @@ test("agent brain: defaults, who may, the plan warning, what the computer has, m
   expect(first.status).toBe(200);
   const fresh = (await first.json()) as Brain;
   expect(fresh).toMatchObject({ brain: "model", model: null, effectiveModel: null, fallback: true, computer: null });
+  // Accounts (ADR 0041): none without a computer.
+  expect(fresh).toMatchObject({
+    account: null,
+    effort: null,
+    accounts: [],
+    accountsOwner: null,
+    canManageAccounts: false,
+    accountsSupported: false,
+  });
   expect(fresh.options.map((o) => [o.kind, o.available, o.reason ?? null])).toEqual([
     ["model", true, null],
     ["claude_code", false, "no_computer"],

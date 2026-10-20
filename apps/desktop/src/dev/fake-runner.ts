@@ -4,7 +4,7 @@
  * (two organizations, one with a logo, agents at work, a folder request), so every screen can be seen
  * without the Tauri shell. Never part of the real app's behaviour: the host picks it only outside Tauri.
  */
-import type { RunnerAccess, RunnerPause } from "@agenteschat/adapters/machine-protocol";
+import type { RunnerAccess, RunnerAccountInfo, RunnerPause } from "@agenteschat/adapters/machine-protocol";
 import {
   type ActivityEntry,
   CONTROL_PROTOCOL_VERSION,
@@ -223,6 +223,17 @@ export class FakeRunner {
   private pairTimers: ReturnType<typeof setTimeout>[] = [];
   private tick: ReturnType<typeof setInterval> | null = null;
   private machineName = "MacBook de Você";
+  /** Added Claude/Codex accounts (ADR 0041) and sign-ins in progress: done ~6 s after `account.begin`. */
+  private accounts: RunnerAccountInfo[] = [
+    {
+      id: "4b1f2c3d-0000-4000-8000-000000000001",
+      kind: "claude_code",
+      loggedIn: true,
+      email: "voce@acme.com",
+      plan: "team",
+    },
+  ];
+  private logins = new Map<string, { kind: RunnerAccountInfo["kind"]; doneAt: number }>();
 
   constructor(
     readonly homeId: string,
@@ -426,6 +437,39 @@ export class FakeRunner {
         this.emit({ kind: "access.changed", access: s.access });
         return reply({ access: s.access });
       }
+      case "accounts.list":
+        return reply({ accounts: this.accounts });
+      case "account.begin": {
+        const loginId = crypto.randomUUID();
+        this.logins.set(loginId, { kind: msg.kind, doneAt: Date.now() + 6000 });
+        return reply(
+          msg.kind === "codex"
+            ? { loginId, url: "https://auth.openai.com/codex/device", userCode: "K7QF-4ZPXM" }
+            : { loginId, url: "https://claude.ai/oauth/authorize?code=true" },
+        );
+      }
+      case "account.status": {
+        const login = this.logins.get(msg.loginId);
+        if (!login) return fail("not_found", "no such sign-in");
+        if (Date.now() < login.doneAt) return reply({ state: "waiting" });
+        this.logins.delete(msg.loginId);
+        const account: RunnerAccountInfo = {
+          id: msg.loginId,
+          kind: login.kind,
+          loggedIn: true,
+          email: login.kind === "codex" ? "voce@exemplo.com" : "voce.freela@exemplo.com",
+          plan: login.kind === "codex" ? "plus" : "pro",
+        };
+        this.accounts.push(account);
+        return reply({ state: "done", account });
+      }
+      case "account.cancel":
+        return reply({ canceled: this.logins.delete(msg.loginId) });
+      case "account.remove": {
+        const before = this.accounts.length;
+        this.accounts = this.accounts.filter((a) => !(a.id === msg.accountId && a.kind === msg.kind));
+        return reply({ removed: this.accounts.length < before });
+      }
       case "shutdown":
         return reply({ stopping: true });
     }
@@ -449,7 +493,10 @@ export class FakeRunner {
       version: VERSION,
       protocol: MACHINE_PROTOCOL,
       paused: this.paused,
-      executors: { claude: { version: "2.1.4 (Claude Code)", loggedIn: true, authMethod: "claude.ai", plan: "max" } },
+      executors: {
+        claude: { version: "2.1.4 (Claude Code)", loggedIn: true, authMethod: "claude.ai", plan: "max" },
+        codex: { version: "codex-cli 0.46.0" },
+      },
       workspace: this.config.workspace,
       agents: s?.agents ?? [],
       access: s?.access,

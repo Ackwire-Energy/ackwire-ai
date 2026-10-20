@@ -1,11 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   type CodexBrainEvent,
   CodexEventMapper,
   CodexThreads,
   codexBridgeOverrides,
+  codexEffort,
+  codexThreadKey,
   codexThreadsFile,
   codexTurnArgs,
   codexVersionOk,
@@ -309,3 +311,98 @@ test.skipIf(!posix)("refuses an old or missing Codex without starting it; bad re
   expect(await errorCode(() => handleCodexBrainTurn(ctx, { ...req, mcp: { token: "" } }, scope))).toBe("bad_request");
   expect(await errorCode(() => handleCodexBrainTurn(ctx, { ...req, cwd: "nope" }, scope))).toBe("not_found");
 });
+
+// ── Accounts and effort (protocol 13, ADR 0041) ──────────────────────────────
+
+const ACCOUNT = "0193ffff-0000-7000-8000-000000000002";
+
+test("effort: model_reasoning_effort, with xhigh and max as high; nothing for an unknown level", () => {
+  expect(["low", "medium", "high", "xhigh", "max"].map((e) => codexEffort(e as never))).toEqual([
+    "low",
+    "medium",
+    "high",
+    "high",
+    "high",
+  ]);
+  const args = (effort?: string) =>
+    codexTurnArgs({ cwd: "/w", lastFile: "/l.txt", runId: RUN, model: "gpt-5.5", effort: effort as never });
+  const max = args("max");
+  expect(max[max.indexOf('model_reasoning_effort="high"') - 1]).toBe("-c");
+  expect(args("low")).toContain('model_reasoning_effort="low"');
+  expect(args("turbo").some((a) => a.startsWith("model_reasoning_effort"))).toBe(false);
+  expect(args().some((a) => a.startsWith("model_reasoning_effort"))).toBe(false);
+  // Before resume and the stdin dash, like every option.
+  expect(args("medium").slice(-1)).toEqual(["-"]);
+});
+
+test("a not-logged-in Codex is not_logged_in (the server marks the account signed out)", () => {
+  const m = new CodexEventMapper({ cwd: "/w" });
+  m.event({ type: "turn.failed", error: { message: "Not logged in. Run `codex login`." } });
+  expect(m.finish({ exitCode: 1, sessionId: SESSION })).toEqual([
+    { type: "error", code: "not_logged_in", message: "Not logged in. Run `codex login`.", retryable: true },
+  ]);
+});
+
+test.skipIf(!posix)(
+  "an account turn runs with CODEX_HOME at the account's folder and keeps its own thread; a missing one fails",
+  async () => {
+    const root = tempDir("brain-codex-");
+    dirs.push(root);
+    const fake = path.join(root, "fake");
+    const ws = path.join(root, "ws");
+    const home = path.join(root, "home");
+    const accountDir = path.join(root, "account");
+    for (const d of [fake, ws, home, accountDir]) mkdirSync(d, { recursive: true });
+    const bin = path.join(fake, "codex");
+    writeFileSync(
+      bin,
+      [
+        "#!/bin/sh",
+        `printf "%s" "$CODEX_HOME" > "${fake}/home"`,
+        `for a in "$@"; do printf "%s\\n" "$a"; done > "${fake}/args"`,
+        "cat > /dev/null",
+        `cat <<'EOF'\n${TURN1.join("\n")}\nEOF`,
+      ].join("\n"),
+    );
+    chmodSync(bin, 0o755);
+    const ctx = {
+      workspaceReal: ws,
+      exec: true,
+      runnerHome: home,
+      codexVersion: () => "codex-cli 0.163.0",
+      bin,
+      accounts: { accountDir: (kind: string, id: string) => (kind === "codex" && id === ACCOUNT ? accountDir : null) },
+    };
+    const req = {
+      runId: RUN,
+      kind: "codex" as const,
+      session: { id: SESSION, resume: false },
+      system: "You are Dev.",
+      prompt: "hi",
+      mcp: { token: "tok" },
+      agent: AGENT,
+      account: ACCOUNT,
+      effort: "xhigh" as const,
+    };
+    const events: CodexBrainEvent[] = [];
+    await handleCodexBrainTurn(ctx, req, { signal: new AbortController().signal, emit: (e) => events.push(e) });
+    expect(events.at(-1)).toMatchObject({ type: "done", text: "pong" });
+    expect(readFileSync(path.join(fake, "home"), "utf8")).toBe(accountDir);
+    expect(readFileSync(path.join(fake, "args"), "utf8").split("\n")).toContain('model_reasoning_effort="high"');
+    // The thread is this account's: the machine's own sign-in won't resume it.
+    const threads = new CodexThreads(codexThreadsFile(home));
+    expect(threads.get(codexThreadKey(SESSION, ACCOUNT))).toBe(THREAD);
+    expect(threads.get(SESSION)).toBeUndefined();
+
+    events.length = 0;
+    rmSync(path.join(fake, "home"), { force: true });
+    await handleCodexBrainTurn(
+      { ...ctx, accounts: { accountDir: () => null } },
+      { ...req, runId: RUN.replace(/1$/, "3") },
+      { signal: new AbortController().signal, emit: (e) => events.push(e) },
+    );
+    expect(events).toMatchObject([{ type: "error", code: "account_missing", retryable: false }]);
+    expect(existsSync(path.join(fake, "home"))).toBe(false);
+  },
+  15_000,
+);

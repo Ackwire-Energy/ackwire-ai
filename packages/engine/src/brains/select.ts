@@ -1,13 +1,13 @@
-import { BRAIN_PROTOCOL } from "@agenteschat/adapters";
+import { BRAIN_PROTOCOL, type BrainEffort, isBrainEffort } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
 import { missionTurnFor } from "../missions-engine";
 import type { AgentRun } from "../runs";
-import { brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
+import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
-import type { BrainKind, BrainSession } from "./types";
+import type { BrainAccount, BrainKind, BrainSession } from "./types";
 
 const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex"];
 const kindOf = (v: unknown): BrainKind => (KINDS.includes(v as BrainKind) ? (v as BrainKind) : "model");
@@ -34,14 +34,22 @@ export function brainFor(
   return mission?.brain ?? kindOf(agent.brain);
 }
 
-/** Plan limits seen on this process (`limit` events), by machine and brain: until when they hold. */
+/** Plan limits seen on this process (`limit` events), by machine, brain and account: until when they hold. */
 const planLimits = new Map<string, number>();
-const limitKey = (machineId: string, kind: BrainKind) => `${machineId}:${kind}`;
+/** No account: the computer's own sign-in. Each account (ADR 0041) has its own plan, so its own limit. */
+const limitKey = (machineId: string, kind: BrainKind, accountId?: string) =>
+  `${machineId}:${kind}:${accountId ?? "own"}`;
 
 /** A computer brain hit its plan limit (until `resetsAt`, or an hour when unknown). */
-export function notePlanLimit(machineId: string, kind: BrainKind, resetsAt?: string, now = Date.now()) {
+export function notePlanLimit(
+  machineId: string,
+  kind: BrainKind,
+  resetsAt?: string,
+  now = Date.now(),
+  accountId?: string,
+) {
   const until = resetsAt ? Date.parse(resetsAt) : Number.NaN;
-  planLimits.set(limitKey(machineId, kind), Number.isFinite(until) && until > now ? until : now + 3600_000);
+  planLimits.set(limitKey(machineId, kind, accountId), Number.isFinite(until) && until > now ? until : now + 3600_000);
 }
 
 /** Tests: forget the plan limits seen. */
@@ -65,22 +73,26 @@ export function computerBrainUnavailable(
   machineId: string | null,
   status: MachineStatus | null,
   now = Date.now(),
+  /** The agent's account (ADR 0041): it decides the sign-in instead of the computer's own. */
+  account?: BrainAccount,
 ): BrainUnavailability | null {
   if (kind === "model") return null;
   const name = kind === "codex" ? "Codex" : "Claude Code";
   if (!machineId) return { code: "no_computer", message: `The agent has no computer for ${name}.` };
-  const limited = planLimits.get(limitKey(machineId, kind));
+  const limited = planLimits.get(limitKey(machineId, kind, account?.id));
   if (limited && limited > now) {
     return {
       code: "plan_limit",
-      message: `${name}${status ? ` on ${status.name}` : ""} reached its plan limit.`,
+      message: account
+        ? `The ${name} account "${account.label}"${status ? ` on ${status.name}` : ""} reached its plan limit.`
+        : `${name}${status ? ` on ${status.name}` : ""} reached its plan limit.`,
       resetsAt: new Date(limited).toISOString(),
     };
   }
   // Paused by its owner (ADR 0036 §6): like offline, until the pause ends (a known end: try again then).
   const pausedUntil = status?.online && status.paused?.until ? { resetsAt: status.paused.until } : {};
   if (kind === "claude_code") {
-    const e = claudeCodeAvailability(status);
+    const e = claudeCodeAvailability(status, account);
     if (e?.type !== "error") return null;
     return { code: e.code, message: e.message, ...(e.code === "machine_paused" ? pausedUntil : {}) };
   }
@@ -106,7 +118,7 @@ export function computerBrainUnavailable(
   if (codex && !codexVersionOk(codex.version)) {
     return { code: "codex_too_old", message: `Codex on ${status.name} is too old; update it there.` };
   }
-  return null;
+  return accountUnavailable(status, account, "codex");
 }
 
 /** Brain errors that mean "not now on this computer": they fall back, or the message waits. */
@@ -134,6 +146,10 @@ export interface BrainPlan {
   missionId?: string;
   /** Set when the computer brain can't take the turn now. */
   unavailable?: BrainUnavailability;
+  /** The agent's account for this brain on this computer (ADR 0041); absent: the computer's own sign-in. */
+  account?: BrainAccount;
+  /** How hard the computer brain thinks; absent: the CLI's default. */
+  effort?: BrainEffort;
 }
 
 /** What a Claude Code brain's model is when nobody chose one (Codex: its own default). */
@@ -152,6 +168,46 @@ export function brainModelFor(
   if (kind === "model") return undefined;
   const agentModel = kindOf(agent.brain) === kind ? (agent.brainModel ?? undefined) : undefined;
   return mission?.model ?? agentModel ?? DEFAULT_MODELS[kind];
+}
+
+/**
+ * The agent's account and effort apply to its own brain on its own computer:
+ * not to a mission that thinks with another brain, nor on the mission's
+ * computer when it is another one. A removed account is no account.
+ */
+async function brainAccountFor(
+  db: Executor,
+  agent: Pick<Agent, "orgId" | "brain" | "brainAccountId" | "machineId">,
+  kind: BrainKind,
+  machineId: string | null,
+): Promise<BrainAccount | undefined> {
+  if (!agent.brainAccountId || !machineId || machineId !== agent.machineId || kindOf(agent.brain) !== kind) {
+    return undefined;
+  }
+  const { machineAccounts } = schema;
+  const [row] = await db
+    .select({
+      id: machineAccounts.id,
+      label: machineAccounts.label,
+      status: machineAccounts.status,
+      kind: machineAccounts.kind,
+    })
+    .from(machineAccounts)
+    .where(
+      and(
+        eq(machineAccounts.orgId, agent.orgId),
+        eq(machineAccounts.id, agent.brainAccountId),
+        eq(machineAccounts.machineId, machineId),
+      ),
+    );
+  if (!row || row.kind !== kind) return undefined;
+  return { id: row.id, label: row.label, status: row.status === "signed_out" ? "signed_out" : "active" };
+}
+
+/** The agent's effort when it thinks with its own brain (a mission's other brain: the CLI's default). */
+export function brainEffortFor(agent: Pick<Agent, "brain" | "brainEffort">, kind: BrainKind): BrainEffort | undefined {
+  if (kind === "model" || kindOf(agent.brain) !== kind) return undefined;
+  return isBrainEffort(agent.brainEffort) ? agent.brainEffort : undefined;
 }
 
 /** A conversation's session is picked up again only this soon after its last turn (its prompt cache is gone after). */
@@ -265,8 +321,13 @@ export async function resolveBrain(
   if (kind === "model") return { kind, ...base };
   const model = brainModelFor(kind, agent, mission);
   const machineId = mission?.session?.machineId ?? agent.machineId ?? null;
-  const status = machineId && deps.machines ? await deps.machines.status(machineId).catch(() => null) : null;
-  const unavailable = machineId && !deps.machines ? null : computerBrainUnavailable(kind, machineId, status);
+  const [status, account] = await Promise.all([
+    machineId && deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
+    brainAccountFor(deps.db, agent, kind, machineId),
+  ]);
+  const effort = brainEffortFor(agent, kind);
+  const unavailable =
+    machineId && !deps.machines ? null : computerBrainUnavailable(kind, machineId, status, Date.now(), account);
   const session: BrainSession | undefined =
     mission?.session ??
     (machineId
@@ -282,5 +343,7 @@ export async function resolveBrain(
     ...(model ? { model } : {}),
     ...(session ? { session } : {}),
     ...(unavailable ? { unavailable } : {}),
+    ...(account ? { account } : {}),
+    ...(effort ? { effort } : {}),
   };
 }

@@ -1,5 +1,7 @@
 import type {
   AccessInput,
+  AccountLoginStart,
+  AccountLoginStatus,
   ActiveRun,
   Agent,
   AgentAccess,
@@ -78,6 +80,7 @@ import type {
   Machine,
   MachineAccess,
   MachineAccessReduce,
+  MachineAccountKind,
   MachineOutages,
   MachineTask,
   MailAccount,
@@ -398,6 +401,19 @@ export interface ApiClient {
     outages(orgId: string): Promise<MachineOutages>;
     /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
     moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
+    /** ADR 0041 §2: the computer starts the provider's own sign-in (its owner only). */
+    /** `accountId`: sign in again to that (signed out) account instead of adding a new one. */
+    beginAccountLogin(
+      orgId: string,
+      machineId: string,
+      kind: MachineAccountKind,
+      accountId?: string,
+    ): Promise<AccountLoginStart>;
+    /** Claude Code: the code Claude showed, sealed in the browser to the computer's key (`sealSecret`). */
+    sendAccountCode(orgId: string, machineId: string, loginId: string, box: SecretBox): Promise<void>;
+    accountLogin(orgId: string, machineId: string, loginId: string): Promise<AccountLoginStatus>;
+    /** Gives up on a sign-in (Voltar, the dialog closed): the computer stops it. */
+    cancelAccountLogin(orgId: string, machineId: string, loginId: string): Promise<void>;
   };
   skills: {
     /** The org library. */

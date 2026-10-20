@@ -110,6 +110,16 @@ export class ControlServer {
         return d.reconnect();
       case "browser.stop":
         return d.browserStop(str(m.agentId));
+      case "accounts.list":
+        return d.accountsList();
+      case "account.begin":
+        return d.accountBegin(m.kind);
+      case "account.status":
+        return d.accountStatus(str(m.loginId));
+      case "account.cancel":
+        return d.accountCancel(str(m.loginId));
+      case "account.remove":
+        return d.accountRemove(m.kind, str(m.accountId));
       case "shutdown":
         return { stopping: true };
       default:

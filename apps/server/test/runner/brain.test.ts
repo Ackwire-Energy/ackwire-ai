@@ -591,3 +591,63 @@ test("a conversation that moves to a checkout keeps its Claude Code session (the
   // No projects folder: nothing happens.
   carryClaudeSession(path.join(home, "nope"), "/w", session);
 });
+
+// ── Accounts and effort (protocol 13, ADR 0041) ──────────────────────────────
+
+const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+
+test("command line: --effort for a known level only", () => {
+  const base = {
+    session: SESSION(1),
+    resume: false,
+    strictMcp: true,
+    promptTool: false,
+    permissionMode: "acceptEdits" as const,
+  };
+  expect(claudeBrainArgs({ ...base, effort: "high" }).join(" ")).toContain("--effort high");
+  expect(claudeBrainArgs({ ...base, effort: "max" }).join(" ")).toContain("--effort max");
+  expect(claudeBrainArgs({ ...base, effort: "turbo" as never })).not.toContain("--effort");
+  expect(claudeBrainArgs(base)).not.toContain("--effort");
+});
+
+test.if(posix)(
+  "an account turn runs in its folder (CLAUDE_CONFIG_DIR), a new session there; a change restarts the process",
+  async () => {
+    const accountDir = tempDir("claude-account-");
+    dirs.push(accountDir);
+    const { spawns, turn } = setup({
+      accounts: { accountDir: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? accountDir : null) },
+    });
+    const logged = () => spawns() as unknown as { args: string[]; configDir: string | null }[];
+    // The conversation ran before in another home: in a fresh account folder it starts a new session.
+    const a = await turn(1, "first", { account: ACCOUNT, session: { id: SESSION(1), resume: true } });
+    expect(a.final).toMatchObject({ type: "done" });
+    expect(logged()[0]?.configDir).toBe(accountDir);
+    expect(logged()[0]?.args.slice(-2)).toEqual(["--session-id", SESSION(1)]);
+    // Same account and effort: the same process.
+    await turn(2, "second", { account: ACCOUNT });
+    expect(logged()).toHaveLength(1);
+    // Another effort: a new process (resumed: it answered in this account).
+    const c = await turn(3, "third", { account: ACCOUNT, effort: "low" });
+    expect(c.final).toMatchObject({ type: "done" });
+    expect(logged()).toHaveLength(2);
+    expect(logged()[1]?.args.join(" ")).toContain("--effort low");
+    expect(logged()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+    // Back on the machine's own sign-in: a new process, not in the account's folder.
+    await turn(4, "fourth");
+    expect(logged()).toHaveLength(3);
+    expect(logged()[2]?.configDir).not.toBe(accountDir);
+  },
+);
+
+test.if(posix)("an account that isn't on the computer is account_missing, never another account", async () => {
+  const { spawns, turn } = setup({ accounts: { accountDir: () => null } });
+  const r = await turn(1, "hi", { account: ACCOUNT });
+  expect(r.final).toMatchObject({ type: "error", code: "account_missing", retryable: false });
+  expect((r.final as { message: string }).message).toContain("isn't on this computer");
+  expect(spawns()).toHaveLength(0);
+  // Without accounts at all, the same; a malformed id is a bad request.
+  const bare = setup();
+  expect((await bare.turn(2, "hi", { account: ACCOUNT })).final).toMatchObject({ code: "account_missing" });
+  expect((await bare.turn(3, "hi", { account: "../../x" })).final).toMatchObject({ code: "bad_request" });
+});

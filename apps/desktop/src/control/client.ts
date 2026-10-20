@@ -56,9 +56,19 @@ interface Pending {
   timer: unknown;
 }
 
-/** Timeouts by request: sign-in and shutdown reply at once; activity and diagnostics read files. */
+/**
+ * Timeouts by request: sign-in and shutdown reply at once; activity and diagnostics read files;
+ * the accounts ask each CLI, and `account.begin` waits for the CLI to print its sign-in link.
+ */
 const DEFAULT_TIMEOUT_MS = 10_000;
-const SLOW: Partial<Record<ControlRequest["type"], number>> = { diagnostics: 20_000, activity: 15_000 };
+const SLOW: Partial<Record<ControlRequest["type"], number>> = {
+  diagnostics: 20_000,
+  activity: 15_000,
+  "accounts.list": 20_000,
+  "account.begin": 30_000,
+  // The CLI's sign-out alone may take 10 s before the folder goes.
+  "account.remove": 20_000,
+};
 
 export class ControlClient {
   private seq = 0;

@@ -3,7 +3,14 @@ import type { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
+import {
+  type AccountKind,
+  type AgentScope,
+  type BrainEffort,
+  isAccountId,
+  isBrainEffort,
+} from "@agenteschat/adapters/machine-protocol";
+import { ACCOUNT_MISSING_MESSAGE } from "./accounts";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { cachedExecutors, resolveCommand } from "./executors";
@@ -34,6 +41,10 @@ import { agentSecrets } from "./secrets";
  *   the MCP bridge needs `default_tools_approval_mode="approve"` or every tool
  *   without `readOnlyHint` is denied. The token reaches the bridge through
  *   the env (`env_vars`, or `bearer_token_env_var` for an HTTP bridge), never argv.
+ * - ADR 0041: a turn with an `account` runs with `CODEX_HOME` set to that
+ *   account's folder (missing: `account_missing`, never another account); its
+ *   threads are remembered per account. `effort` is `-c model_reasoning_effort`
+ *   (`xhigh` and `max` are `high`).
  */
 
 /** Same as the engine's `CODEX_MIN_VERSION` (`packages/engine/src/missions.ts`): the release verified on a real machine. */
@@ -80,6 +91,15 @@ export interface CodexBrainTurnRequest {
   prompt: string;
   mcp: { token: string; url?: string };
   agent?: AgentScope;
+  /** Protocol 13: the account folder to run in (`accounts/codex/<id>`); absent: the machine's own sign-in. */
+  account?: string;
+  /** Protocol 13: how hard it thinks. */
+  effort?: BrainEffort;
+}
+
+/** Codex's `model_reasoning_effort` for a brain effort (it has no `xhigh` or `max`). */
+export function codexEffort(effort: BrainEffort): "low" | "medium" | "high" {
+  return effort === "low" || effort === "medium" ? effort : "high";
 }
 
 /** `codex-cli 0.163.0` → true from `CODEX_MIN_VERSION` on. */
@@ -95,7 +115,11 @@ export function codexVersionOk(version: string | undefined): boolean {
   return true;
 }
 
-/** Our session id → Codex thread id, kept across runner restarts (written whole, then renamed). */
+/**
+ * Our session id → Codex thread id, kept across runner restarts (written
+ * whole, then renamed). A session in an account folder is keyed
+ * `<account>:<session>` (`codexThreadKey`): a thread lives in one Codex home.
+ */
 export class CodexThreads {
   private map: Record<string, string> | null = null;
 
@@ -136,6 +160,10 @@ export class CodexThreads {
     renameSync(tmp, this.file);
   }
 }
+
+/** The threads file's key for a session (in an account: that account's thread, never the machine's). */
+export const codexThreadKey = (sessionId: string, account?: string) =>
+  account ? `${account}:${sessionId}` : sessionId;
 
 /** Where the threads live in the runner home. */
 export const codexThreadsFile = (runnerHome: string) => path.join(runnerHome, "brain", "codex-threads.json");
@@ -181,6 +209,8 @@ export function codexTurnArgs(input: {
   mcp?: { command?: string[]; url?: string };
   /** Protocol 10: folders allowed for the agent besides its own (its sandbox's writable roots). */
   writableRoots?: string[];
+  /** Protocol 13: `-c model_reasoning_effort` (anything else is left out). */
+  effort?: BrainEffort;
 }): string[] {
   const instructions = input.instructions?.trim();
   return [
@@ -196,6 +226,9 @@ export function codexTurnArgs(input: {
     ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
     ...(instructions && !input.thread ? ["-c", `developer_instructions=${JSON.stringify(instructions)}`] : []),
     ...(input.mcp ? codexBridgeOverrides({ runId: input.runId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
+    ...(isBrainEffort(input.effort)
+      ? ["-c", `model_reasoning_effort=${JSON.stringify(codexEffort(input.effort))}`]
+      : []),
     ...(input.model ? ["-m", input.model] : []),
     "-o",
     input.lastFile,
@@ -211,6 +244,9 @@ function unwrapShell(command: string) {
 }
 
 const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit/i;
+/** Codex can't authenticate (signed out, a revoked or expired sign-in). */
+const CODEX_AUTH =
+  /not logged in|codex login|401 unauthorized|refresh token (?:was )?(?:expired|revoked|already used)|access token could not be refreshed/i;
 
 /**
  * `codex exec --json` lines → brain events, plus what the turn's end needs
@@ -353,6 +389,10 @@ export class CodexEventMapper {
       if (USAGE_LIMIT.test(problem)) {
         return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem }];
       }
+      // The server marks an account signed out on this code (ADR 0041).
+      if (CODEX_AUTH.test(problem)) {
+        return [{ type: "error", code: "not_logged_in", message: problem, retryable: true }];
+      }
       return [{ type: "error", code: "codex_failed", message: problem, ...(this.failed ? {} : { retryable: true }) }];
     }
     const text = this.answer ?? this.clean(input.lastFile?.trim() ?? "");
@@ -398,6 +438,9 @@ export async function runCodexTurn(
     mcp: { token: string; url?: string };
     /** Protocol 10: folders allowed for the agent besides its own. */
     writableRoots?: string[];
+    /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
+    account?: { id: string; home: string };
+    effort?: BrainEffort;
   },
   opts: CodexTurnOptions,
 ): Promise<void> {
@@ -412,7 +455,8 @@ export async function runCodexTurn(
     return fail("codex_too_old", `Codex here is ${version}; agents need ${CODEX_MIN_VERSION} or newer.`);
   }
 
-  const thread = opts.threads.get(input.sessionId);
+  const threadKey = codexThreadKey(input.sessionId, input.account?.id);
+  const thread = opts.threads.get(threadKey);
   mkdirSync(opts.workDir, { recursive: true });
   const lastFile = path.join(opts.workDir, "last.txt");
   rmSync(lastFile, { force: true });
@@ -425,6 +469,7 @@ export async function runCodexTurn(
     ...(thread ? { thread } : {}),
     mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
     ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
+    ...(input.effort ? { effort: input.effort } : {}),
   });
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -432,6 +477,8 @@ export async function runCodexTurn(
     [CODEX_MCP_ENV[0]]: input.mcp.token,
     ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
     ...(opts.runnerHome ? { [CODEX_MCP_ENV[2]]: opts.runnerHome } : {}),
+    // ADR 0041: the account's folder is this turn's Codex home.
+    ...(input.account ? { CODEX_HOME: input.account.home } : {}),
   };
   const mapper = new CodexEventMapper({
     cwd: input.cwd,
@@ -459,7 +506,7 @@ export async function runCodexTurn(
   const lines = createInterface({ input: child.stdout as NonNullable<ChildProcess["stdout"]> });
   (lines as unknown as EventEmitter).on("line", (line: string) => {
     for (const event of mapper.line(line)) opts.emit(event);
-    if (mapper.thread) opts.threads.set(input.sessionId, mapper.thread);
+    if (mapper.thread) opts.threads.set(threadKey, mapper.thread);
   });
   child.stdin?.on("error", () => {});
   child.stdin?.end(input.prompt);
@@ -533,6 +580,8 @@ export interface CodexBrainContext {
   bin?: string;
   /** Protocol 10: folders allowed for the agent besides its own (real paths). */
   grants?: string[];
+  /** Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`. */
+  accounts?: { accountDir(kind: AccountKind, id: string): string | null };
 }
 
 const threadStores = new Map<string, CodexThreads>();
@@ -569,6 +618,18 @@ export async function handleCodexBrainTurn(
     if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
     cwd = resolved.abs;
   }
+  // ADR 0041: the account's folder or nothing (never the machine's own sign-in instead).
+  let account: { id: string; home: string } | undefined;
+  const accountId: unknown = req.account;
+  if (accountId !== undefined && accountId !== null && accountId !== "") {
+    if (!isAccountId(accountId)) throw new RunnerError("bad_request", "Invalid account id");
+    const home = ctx.accounts?.accountDir("codex", accountId);
+    if (!home) {
+      scope.emit({ type: "error", code: "account_missing", message: ACCOUNT_MISSING_MESSAGE.codex, retryable: false });
+      return;
+    }
+    account = { id: accountId, home };
+  }
   // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
   const writableRoots = [...(cwd !== folder ? [folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
   const secrets = await agentSecrets(ctx.secretsDir, req.agent);
@@ -585,6 +646,8 @@ export async function handleCodexBrainTurn(
       prompt: typeof req.prompt === "string" ? req.prompt : "",
       mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
       ...(writableRoots.length ? { writableRoots } : {}),
+      ...(account ? { account } : {}),
+      ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
     },
     {
       threads,

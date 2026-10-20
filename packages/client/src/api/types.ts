@@ -1965,6 +1965,8 @@ export type MachineEvent =
       paused?: MachinePause | null;
       /** `true`: what it allows changed; refetch the list (each person sees only what they may). */
       access?: MachineAccess | null | true;
+      /** `true`: its Claude Code / Codex accounts changed (ADR 0041); refetch the agents' brain settings. */
+      accounts?: true;
     }
   /** ADR 0036: a new pause state or access reported by the machine (also accepted inside `machine.updated`). */
   | { type: "machine.state"; machineId: string; paused?: MachinePause | null }
@@ -2787,6 +2789,36 @@ export interface AgentBrain {
   /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
   machines: { machineId: string; name: string; online: boolean; options: BrainOption[] }[];
   canEdit: boolean;
+  /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
+  account: string | null;
+  /** How much it thinks before answering; null = the brain's default. */
+  effort: BrainEffort | null;
+  /** The accounts added on the agent's computer (both kinds); "Conta deste computador" isn't listed. */
+  accounts: MachineAccount[];
+  /** Whose subscriptions those are (the computer's owner); null without a computer. */
+  accountsOwner: { id: string; name: string } | null;
+  /** The viewer owns the computer: only they add accounts and pick an agent's. */
+  canManageAccounts: boolean;
+  /** False while the app on the computer is too old for accounts (nothing about them shows). */
+  accountsSupported: boolean;
+}
+
+/** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
+export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+export type MachineAccountKind = "claude_code" | "codex";
+
+/** ADR 0041 §3: a Claude Code or Codex account signed in on a connected computer (metadata only). */
+export interface MachineAccount {
+  id: string;
+  kind: MachineAccountKind;
+  label: string;
+  email: string | null;
+  /** "Pro", "Max", "Team"… as the provider reports it. */
+  plan: string | null;
+  status: "active" | "signed_out";
+  /** Names of the agents that think with it. */
+  usedBy: string[];
 }
 
 export interface AgentBrainInput {
@@ -2795,6 +2827,29 @@ export interface AgentBrainInput {
   fallback?: boolean;
   /** The person confirmed the personal-subscription warning (switching to Claude Code or Codex). */
   acceptPlanTerms?: boolean;
+  /** Only the computer's owner; null = "Conta deste computador". */
+  account?: string | null;
+  effort?: BrainEffort | null;
+}
+
+/** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */
+export interface AccountLoginStart {
+  loginId: string;
+  kind: MachineAccountKind;
+  /** The provider's own page (Claude's sign-in, or the device page for Codex). */
+  url: string;
+  /** Claude Code: the computer's one-time key the pasted code is sealed to. */
+  publicKey?: string;
+  /** Codex: the one-time code to type on the device page. */
+  userCode?: string;
+  expiresAt: string;
+}
+
+/** `GET …/account-logins/{loginId}`. */
+export interface AccountLoginStatus {
+  state: "waiting" | "done" | "failed" | "expired";
+  account?: MachineAccount;
+  error?: string;
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */

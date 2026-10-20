@@ -104,7 +104,10 @@ export function createPermissionToolSource(): ToolSource {
           const id = String(input.permission ?? "");
           // Read again: it may have been turned on (or the connector removed) while the card waited.
           const wanted = (await missingPermissions(c)).find((m) => m.id === id);
-          if (!wanted) return { content: `Nothing to turn on: ${labels.get(id) ?? id} is already on for you, or no longer exists.` };
+          if (!wanted)
+            return {
+              content: `Nothing to turn on: ${labels.get(id) ?? id} is already on for you, or no longer exists.`,
+            };
           await grantScopes(c.db, c.orgId, c.agentId, [{ connectionId: wanted.connectionId, scope: wanted.scope }]);
           return {
             content: `Turned on: ${wanted.label}. Its tools are yours from your next step; carry on with the request.`,

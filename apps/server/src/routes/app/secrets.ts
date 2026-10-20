@@ -50,7 +50,7 @@ const SecretRequest = z
   })
   .openapi("SecretRequest");
 
-const SecretBox = z
+export const SecretBox = z
   .object({
     v: z.literal(1),
     epk: z.string().max(200),

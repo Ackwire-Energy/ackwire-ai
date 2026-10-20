@@ -15,6 +15,8 @@ export interface OptionListItem<V extends string> {
   disabled?: boolean;
   /** Cards only: at the bottom of the card (a chip with where it runs). */
   foot?: ReactNode;
+  /** Rows only: quiet words at the row's end (where it runs). Hidden on narrow screens. */
+  side?: ReactNode;
   /** Its settings, under the row while it is the one chosen, aligned with the row's text. */
   children?: ReactNode;
 }
@@ -76,6 +78,7 @@ export function OptionList<V extends string>({
         {o.description && <span className="ac-optrow__desc">{o.description}</span>}
       </span>
       {cards && o.foot && <span className="ac-optrow__foot">{o.foot}</span>}
+      {!cards && !tiles && o.side && <span className="ac-optrow__side">{o.side}</span>}
     </RRadioGroup.Item>
   );
   const chosen = options.find((o) => o.value === value);

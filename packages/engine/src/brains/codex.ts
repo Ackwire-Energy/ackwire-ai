@@ -9,6 +9,7 @@ import {
 import type { MachineCaller } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
+import { accountFields, accountUnavailable } from "./claude-code";
 import { computerPrompt } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 
@@ -163,6 +164,11 @@ export class CodexBrain implements Brain {
       };
       return;
     }
+    const account = accountUnavailable(status, turn.account, "codex");
+    if (account) {
+      yield { type: "error", code: account.code, message: account.message, retryable: true };
+      return;
+    }
 
     const [mcp, agent, code] = await Promise.all([
       this.deps.mcp(turn),
@@ -179,6 +185,7 @@ export class CodexBrain implements Brain {
       prompt: computerPrompt(turn),
       mcp,
       ...(agent ? { agent } : {}),
+      ...accountFields(status.protocol, turn),
     };
 
     const events = channel<BrainEvent>();

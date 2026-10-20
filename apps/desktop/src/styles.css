@@ -744,6 +744,26 @@ body[data-window="popover"] {
   font-weight: 600;
   color: var(--muted);
 }
+/* "Adicionar conta" (Preferências > Ferramentas): the waiting line and Codex's code inside a dialog. */
+.dk-acct-wait {
+  margin-top: 4px;
+}
+.dk-acct-code {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.dk-acct-code .dk-code {
+  font-size: 38px;
+}
+.dk-acct-who {
+  margin: 0;
+  color: var(--muted);
+}
+.dk-acct-who b {
+  color: var(--ink);
+}
 .dk-fail {
   margin-top: 22px;
   display: flex;

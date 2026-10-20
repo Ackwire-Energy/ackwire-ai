@@ -43,6 +43,20 @@ fn is_site_url(url: &str) -> bool {
     url == SITE || url.starts_with("https://agentes.chat/") || url.starts_with("https://agentes.chat?")
 }
 
+/// The providers' own sign-in pages the runner gets from `claude auth login` / `codex login --device-auth`
+/// (ADR 0041): the account dialog's "Abrir o link" when the browser didn't open by itself.
+fn is_sign_in_url(url: &str) -> bool {
+    if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    const PREFIXES: &[&str] = &[
+        "https://claude.com/cai/oauth/authorize?",
+        "https://claude.ai/oauth/authorize?",
+        "https://auth.openai.com/codex/device",
+    ];
+    PREFIXES.iter().any(|p| url.starts_with(p))
+}
+
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
 /// (with the open-window dot, clickable); with all of them closed it lives in the menu bar only.
 const APP_WINDOWS: &[&str] = &["welcome", "prefs"];
@@ -147,8 +161,8 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn open_external(app: AppHandle, url: String) -> Result<(), String> {
-    if !is_site_url(&url) {
-        return Err("only agentes.chat links open from the app".into());
+    if !is_site_url(&url) && !is_sign_in_url(&url) {
+        return Err("only agentes.chat and sign-in links open from the app".into());
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }

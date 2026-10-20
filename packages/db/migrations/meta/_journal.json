@@ -589,6 +589,13 @@
       "when": 1792520000000,
       "tag": "0083_computer_scopes_default",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1792530000000,
+      "tag": "0084_machine_accounts",
+      "breakpoints": true
     }
   ]
 }
