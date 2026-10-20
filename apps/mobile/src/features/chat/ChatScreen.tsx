@@ -577,9 +577,11 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const [waiting, setWaiting] = useState<ReadonlySet<string>>(() => new Set());
   const post = usePostMessage(orgId, channelId, {
     me: { id: meId ?? "" },
-    // An agent DM: "pensando…" at once, on the message the agent answers.
+    // An agent DM: "pensando…" at once, on the message the agent answers. Not when it went into the work
+    // already going (the server steered it: no second run, its block says "lê na próxima pausa").
     onSent: (message) => {
-      if (dmAgentId) live.expect(message.threadId ?? message.id, [dmAgentId]);
+      const steered = Array.isArray(message.meta?.steeredRunIds) && message.meta.steeredRunIds.length > 0;
+      if (dmAgentId && !steered) live.expect(message.threadId ?? message.id, [dmAgentId]);
     },
     onFailed: (error, { clientId }) => {
       if (error instanceof ApiError) {

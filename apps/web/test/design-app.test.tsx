@@ -99,7 +99,7 @@ describe("work summary", () => {
     expect(head.getAttribute("aria-expanded")).toBe("true");
     expect(head.textContent).toContain("2 passos · himetrica, Drive · 12 s");
     const work = head.closest(".ac-work") as HTMLElement;
-    expect(within(work).getByText("Consultou o himetrica")).toBeTruthy();
+    expect(within(work).getByText("Consultou o Himetrica")).toBeTruthy();
     expect(within(work).getByText("Escreveu no Drive")).toBeTruthy();
   });
 });

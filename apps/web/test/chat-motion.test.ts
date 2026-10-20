@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Message } from "@agenteschat/client";
+import type { LiveWork, Message } from "@agenteschat/client";
 import { applyChannelEvent, emptyStreams, runsInChannel } from "@agenteschat/client";
 import {
   type ActivityEntry,
@@ -79,18 +79,17 @@ describe("smooth reveal of streamed text", () => {
 describe("the card's turning phrase (CardTrabalhando.html, A)", () => {
   const name = () => "Theo";
   const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "theo", lastSeq: 0 } as const;
-  const call = (since: number, running = true) =>
-    ({
-      kind: "call",
-      id: "k1",
-      tool: "browser_read",
-      connector: null,
-      detail: null,
-      code: null,
-      output: [],
-      running,
-      since,
-    }) as const;
+  const call = (since: number, running = true): LiveWork => ({
+    kind: "call",
+    id: "k1",
+    tool: "browser_read",
+    connector: null,
+    detail: null,
+    code: null,
+    output: [],
+    running,
+    since,
+  });
 
   test("nothing done yet: who it is, then light lines that move on each round", () => {
     const runs = [{ ...base, status: "running" as const, text: "" }];
@@ -183,7 +182,7 @@ describe("humanized activity", () => {
     expect(activityText(t, [])).toBe("");
     expect(activityText(t, [entry("Theo", { kind: "thinking" })])).toBe("Theo está trabalhando…");
     expect(activityText(t, [entry("Theo", toolActivity("himetrica_get_events"))])).toBe(
-      "Theo está consultando o himetrica…",
+      "Theo está consultando o Himetrica…",
     );
     expect(activityText(t, [entry("Theo", toolActivity("create_issue"))])).toBe("Theo está criando uma tarefa…");
     expect(activityText(t, [entry("Theo", toolActivity("list_artifacts"))])).toBe("Theo está lendo o Drive…");

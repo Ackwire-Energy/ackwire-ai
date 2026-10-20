@@ -326,7 +326,13 @@ export function groupActivities(entries: ActivityEntry[]): ActivityGroup[] {
 }
 
 /** "trabalhando", "consultando o GitHub". */
-export const activityVerb = (t: TFunction, a: Activity) => t(`chat.activity.${a.kind}`, { app: a.app ?? "" });
+export const activityVerb = (t: TFunction, a: Activity) => t(`chat.activity.${a.kind}`, { app: appLabel(a) });
+
+/** The app as people read it: a connector's slug ("himetrica") starts with a capital ("Himetrica"). */
+export const appLabel = (a: { kind: string; app?: string }) => {
+  const app = a.app ?? "";
+  return a.kind === "consulting" ? app.charAt(0).toUpperCase() + app.slice(1) : app;
+};
 
 /** Wraps a name in the sentence (the bar shows names in bold); plain text by default. */
 export type MarkName = (name: string) => string;

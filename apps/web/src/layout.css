@@ -6912,6 +6912,10 @@ button.live-call__head:hover {
   overflow: hidden;
   border-radius: inherit;
 }
+/* Dark: the band stays a hint, so the words keep their contrast. */
+[data-theme="dark"] .ac-typing__sky {
+  opacity: 0.45;
+}
 
 /* The workspace opening */
 .sky-boot {

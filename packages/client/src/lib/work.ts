@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
-import { type ActivityKind, toolActivity } from "./activity";
+import { type ActivityKind, appLabel, toolActivity } from "./activity";
 import { joinNames } from "./format";
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
@@ -184,9 +184,9 @@ export function workHeader(t: TFunction, w: { steps: number; connectors: string[
   };
 }
 
-/** "Consultou o himetrica", "Atualizou o plano", and for an unknown tool "Usou a ferramenta send email". */
+/** "Consultou o Himetrica", "Atualizou o plano", and for an unknown tool "Usou a ferramenta send email". */
 export function stepLabel(t: TFunction, s: WorkItem) {
-  return t(`chat.work.step.${s.kind}`, { app: s.app ?? "", tool: toolLabel(s.tool) });
+  return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolLabel(s.tool) });
 }
 
 /**

@@ -120,7 +120,17 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Fragment, memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  memo,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
@@ -214,6 +224,39 @@ import {
   useTypingSender,
 } from "@/realtime/context";
 import { ThreadPage } from "./ThreadPage";
+
+/** One clock for every "· 12 s" on screen: the block and the card above the box never differ by a second. */
+const secondClock = (() => {
+  let now = Date.now();
+  let timer: ReturnType<typeof setInterval> | null = null;
+  const subs = new Set<() => void>();
+  return {
+    subscribe(fn: () => void) {
+      subs.add(fn);
+      if (!timer) {
+        now = Date.now();
+        timer = setInterval(() => {
+          now = Date.now();
+          for (const f of subs) f();
+        }, 1000);
+      }
+      return () => {
+        subs.delete(fn);
+        if (subs.size === 0 && timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      };
+    },
+    get: () => now,
+  };
+})();
+const still = () => () => {};
+/** The shared clock while `active` (else it holds still). */
+const useSecond = (active: boolean) => useSyncExternalStore(active ? secondClock.subscribe : still, secondClock.get);
+
+/** Live statuses of a run still at work on its conversation (a new message steers into it). */
+const WORKING: ReadonlySet<string> = new Set(["thinking", "queued", "running", "waiting_approval"]);
 
 /** Header and empty state of a channel, or of a DM (same layout). */
 export interface ChannelChrome {
@@ -554,7 +597,19 @@ function ChannelView({
         : chrome?.dmAgentId && !chrome.locked
           ? [chrome.dmAgentId]
           : [];
-      if (agents.length > 0) live.expect(channel.id, local.id, agents);
+      // An agent already at work here takes the message into that work ("lê na próxima pausa"): the
+      // server starts no second run, so no second "pensando…" (a DM: any of its runs here; a thread: there).
+      const atWork = (agentId: string) =>
+        Object.values(live.get().streams.runs).some(
+          (r) =>
+            !r.provisional &&
+            r.agentId === agentId &&
+            r.channelId === channel.id &&
+            WORKING.has(r.status) &&
+            (chrome?.dmAgentId ? true : Boolean(local.threadId) && r.threadId === local.threadId),
+        );
+      const fresh = agents.filter((id) => !atWork(id));
+      if (fresh.length > 0) live.expect(channel.id, local.id, fresh);
     },
     onSent: (message, local) => {
       if (local.clientId) outbox.remove(local.clientId);
@@ -976,7 +1031,8 @@ function ChannelView({
   }, [lastKey, slotsKey]);
 
   // Which agents' blocks are on screen: the line above the composer speaks only for those out of view.
-  const inView = useBlocksInView(scroller, slotsKey);
+  // By run: a "pensando…" hands its block (same key) to the real run, and that run must count as in view.
+  const inView = useBlocksInView(scroller, slots.map((x) => x.runId).join(" "));
   const outOfView = useMemo(() => (runId: string) => !inView.has(runId), [inView]);
   /** "Ver" on that line: back to the agent's block. */
   const seeRun = (runId: string) => {
@@ -2130,12 +2186,7 @@ const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 function RunClock({ run }: { run: LiveRun }) {
   const { t, i18n } = useTranslation();
   const working = run.status === "thinking" || run.status === "queued" || run.status === "running";
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!working) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [working]);
+  const now = useSecond(working);
   const started = run.startedAt ?? now;
   if (!working) {
     const at = new Date(started).toISOString();
@@ -2432,23 +2483,19 @@ function ActivityBar({
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const [now, setNow] = useState(() => Date.now());
   const all = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
   const runs = all.filter((r) => r.status !== "failed" && r.status !== "canceled");
+  const typing = useLive((s) => s.typing[channelId]);
+  // Ticks while someone is on it (a question out counts: seen on the last render).
+  const asking = useRef(false);
+  const now = useSecond(runs.length > 0 || Boolean(typing) || asking.current);
   // An agent asking another one: "Dev está perguntando ao Infra… 0:12" (its run pauses meanwhile).
   const consults = useLive(
     (s) => consultsIn(s.consults, channelId, now).filter((c) => visible?.current(c) ?? true),
     sameList,
   );
-  const typing = useLive((s) => s.typing[channelId]);
+  asking.current = consults.length > 0;
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id);
-  const ticking = Boolean(typing) || consults.length > 0 || runs.length > 0;
-  useEffect(() => {
-    if (!ticking) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [ticking]);
   const entries = barEntries(
     runs,
     ids,
