@@ -44,6 +44,7 @@ What the CLIs do (checked 2026-10-20, Claude Code 2.1.304, Codex 0.163.0):
    - Codex: the link and the code to type there, with a line saying the person started this sign-in from agentes.chat (Codex warns against codes "a website gave you").
 4. The runner watches the CLI. When it exits signed in, it runs the status command in that folder and answers with metadata only: email and plan. The server stores the account and tells the page (realtime), which picks it.
 5. A sign-in expires in 15 minutes; the process is killed and the folder removed.
+6. **Entrar de novo** on a signed-out account signs in again to that same account (`begin` with `again`): same id and folder, the agents keep it, and a failed retry leaves the folder as it was.
 
 From the desktop app the same op runs locally: the CLI opens the computer's browser and finishes by itself.
 
@@ -60,7 +61,7 @@ The subscription is personal: only the **computer's owner** adds or removes acco
 ### 5. A turn
 
 - `BrainTurnRequest` gains `account?: string` and `effort?: string`.
-- Account: the runner sets `CLAUDE_CONFIG_DIR` / `CODEX_HOME` to that folder (and looks up sessions there). A missing folder fails the turn with `account_missing`; a refused sign-in marks the account `signed_out`. **It never falls back to another account**; the model fallback (`brainFallback`) behaves as for any brain failure.
+- Account: the runner sets `CLAUDE_CONFIG_DIR` / `CODEX_HOME` to that folder (and looks up sessions there). A missing folder fails the turn with `account_missing`; a refused sign-in fails it with `not_logged_in`. Either way the runner asks the CLI again and reports the accounts (`accounts.changed`): only the computer says an account is signed out or gone, so a passing failure never sticks. **It never falls back to another account**; the model fallback (`brainFallback`) behaves as for any brain failure.
 - Effort: `--effort <level>` (Claude Code), `-c model_reasoning_effort="<level>"` (Codex; `xhigh` and `max` map to `high`). The page offers Baixo, Médio, Alto, Máximo (`low`, `medium`, `high`, `max`). Effort for the organization's model brain (provider effort parameters through the Model Gateway) comes later.
 - A live process is keyed by (agent, session, account, effort).
 - Plan limit events carry the account, so the page says which account hit its limit.
