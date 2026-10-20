@@ -3189,7 +3189,7 @@ function ChannelDetails({
   channel: Channel;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
@@ -3200,6 +3200,8 @@ function ChannelDetails({
   const [q, setQ] = useState("");
   const [topic, setTopic] = useState(channel.topic);
   const [adding, setAdding] = useState(false);
+  // Who is about to be removed: asked first, in a dialog of its own.
+  const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
   useEffect(() => {
     if (open) setTopic(channel.topic);
   }, [open, channel.topic]);
@@ -3208,8 +3210,12 @@ function ChannelDetails({
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
   };
   const remove = useMutation({
-    mutationFn: (member: { userId: string } | { agentId: string }) => api.chat.removeMember(org.id, channel.id, member),
-    onSuccess: refresh,
+    mutationFn: (r: { kind: "person" | "agent"; id: string }) =>
+      api.chat.removeMember(org.id, channel.id, r.kind === "agent" ? { agentId: r.id } : { userId: r.id }),
+    onSuccess: () => {
+      refresh();
+      setRemoving(null);
+    },
   });
   const autoReply = useMutation({
     mutationFn: async ({ agentId, on }: { agentId: string; on: boolean }) => {
@@ -3242,7 +3248,7 @@ function ChannelDetails({
   return (
     <>
       <Dialog
-        open={open && !adding}
+        open={open && !adding && !removing}
         onOpenChange={onOpenChange}
         title={t("channel.detailsTitle", { channel: channel.name })}
         description={editable ? undefined : channel.topic || t("channel.noTopic")}
@@ -3297,28 +3303,42 @@ function ChannelDetails({
                     id={`auto-${r.id}`}
                     aria-label={t("channelMembers.autoReplyFor", { name: r.name })}
                     checked={Boolean(r.autoReply)}
-                    disabled={!editable || autoReply.isPending}
+                    disabled={!editable || (autoReply.isPending && autoReply.variables?.agentId === r.id)}
                     onCheckedChange={(on) => autoReply.mutate({ agentId: r.id, on })}
                   />
                   {t("channelMembers.autoReply")}
                 </label>
               )}
-              {editable && (
+              {/* Not on my own row: removing myself from my own list reads as a mistake. */}
+              {editable && !(r.kind === "person" && r.id === me.user.id) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   iconOnly
                   icon="close"
                   aria-label={t("channelMembers.remove", { name: r.name })}
-                  disabled={remove.isPending}
-                  loading={remove.isPending}
-                  onClick={() => remove.mutate(r.kind === "agent" ? { agentId: r.id } : { userId: r.id })}
+                  onClick={() => setRemoving({ kind: r.kind, id: r.id, name: r.name })}
                 />
               )}
             </div>
           ))}
         </DialogSearchList>
         <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
+      </Dialog>
+      <Dialog
+        open={open && Boolean(removing)}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        title={t("channelMembers.removeTitle", { name: removing?.name ?? "", channel: channel.name })}
+        description={t(removing?.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody")}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setRemoving(null)}>{t("common.cancel")}</Button>
+          <Button variant="danger" loading={remove.isPending} onClick={() => removing && remove.mutate(removing)}>
+            {t("channelMembers.removeConfirm")}
+          </Button>
+        </DialogFooter>
       </Dialog>
       <AddMembersDialog
         open={open && adding}

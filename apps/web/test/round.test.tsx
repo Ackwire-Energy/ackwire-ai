@@ -128,13 +128,19 @@ describe("Detalhes do canal: membros", () => {
       { channelId: ENG_ID, autoReply: false },
       { channelId: GENERAL_ID, autoReply: true },
     ]);
+    // Not on my own row; on another, it asks first.
+    expect(within(dialog).queryByRole("button", { name: "Remover Walter" })).toBeNull();
     await click(within(dialog).getByRole("button", { name: "Remover João" }));
+    const confirm = screen().getByRole("dialog", { name: "Remover João de #eng?" });
+    expect(state.calls.find((c) => c.method === "chat.removeMember")).toBeUndefined();
+    await click(within(confirm).getByRole("button", { name: "Remover" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "chat.removeMember")?.args).toEqual([
       ORG_ID,
       ENG_ID,
       { userId: "u-joao" },
     ]);
+    dialog = screen().getByRole("dialog", { name: "#eng" });
     await click(within(dialog).getByRole("button", { name: "Adicionar" }));
     const add = screen().getByRole("dialog", { name: "Adicionar a #eng" });
     // Only who isn't in the channel.
