@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
 import { getChannelCached } from "./context";
@@ -128,6 +128,19 @@ export interface ToolSideEffects {
   deniedRepo?: string;
 }
 
+type ArtifactLink = { id: string; version: number };
+
+/** Adds files to the reply's cards: one per file, its newest version in the first one's place. */
+function withArtifacts(list: ArtifactLink[] | undefined, more: ArtifactLink[]): ArtifactLink[] {
+  const out = [...(list ?? [])];
+  for (const a of more) {
+    const i = out.findIndex((x) => x.id === a.id);
+    if (i < 0) out.push(a);
+    else if (a.version >= (out[i] as ArtifactLink).version) out[i] = a;
+  }
+  return out;
+}
+
 /**
  * Moves what a tool returned (`output.data`) onto `t`. Returns the memory
  * update, if any, for the caller to announce (`memory.updated`).
@@ -135,7 +148,7 @@ export interface ToolSideEffects {
 export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown> | undefined): MemoryUpdate | null {
   if (!data) return null;
   const artifact = data.artifact as { id: string; version: number } | undefined;
-  if (artifact) t.artifacts = [...(t.artifacts ?? []), artifact];
+  if (artifact) t.artifacts = withArtifacts(t.artifacts, [artifact]);
   const link = data.missionLink as { missionId: string; threadId: string } | undefined;
   if (link?.missionId && link.threadId) t.missionLink = link;
   if (data.reacted) t.reacted = true;
@@ -150,7 +163,7 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
 /** Adds side effects gathered elsewhere (the bridge's) onto `t`. */
 export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null | undefined) {
   if (!e) return;
-  if (e.artifacts?.length) t.artifacts = [...(t.artifacts ?? []), ...e.artifacts];
+  if (e.artifacts?.length) t.artifacts = withArtifacts(t.artifacts, e.artifacts);
   if (e.memoryUpdates?.length) t.memoryUpdates = [...(t.memoryUpdates ?? []), ...e.memoryUpdates];
   if (e.missionLink) t.missionLink = e.missionLink;
   if (e.reacted) t.reacted = true;
@@ -206,6 +219,18 @@ async function recordBridgeEffects(
       .where(eq(agentRuns.id, run.id));
   });
   if (update) await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
+}
+
+/**
+ * The run's transcript to store from the engine's own copy. The bridge keeps a
+ * computer brain's side effects on the row (`bridgeEffects`) while the engine
+ * holds that copy, so a save never writes the key from memory: a stale copy
+ * would bring files it already took back (the same file twice on the reply) or
+ * drop ones kept since. The row's value stays as it is.
+ */
+export function storedTranscript(t: object): SQL {
+  const { [BRIDGE_EFFECTS]: _kept, ...rest } = t as Record<string, unknown>;
+  return sql`(${JSON.stringify(rest)}::jsonb || jsonb_strip_nulls(jsonb_build_object(${BRIDGE_EFFECTS}::text, ${agentRuns.transcript} -> ${BRIDGE_EFFECTS}::text)))`;
 }
 
 /** Takes (and clears) the side effects the bridge kept for this run (`recordBridgeEffects`). */

@@ -72,6 +72,7 @@ import {
   mergeToolEffects,
   type RunToolScope,
   replyThreadOf,
+  storedTranscript,
   takeBridgeEffects,
   waitOf,
 } from "./run-tools";
@@ -562,10 +563,12 @@ async function executeRunInner(
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx
       .update(agentRuns)
-      .set({ transcript: t as unknown as Record<string, unknown>, updatedAt: new Date() })
+      .set({ transcript: storedTranscript(t), updatedAt: new Date() })
       .where(eq(agentRuns.id, run.id));
 
   let transcript = run.transcript as unknown as Transcript | null;
+  // What the bridge kept stays on the row until taken (`takeBridgeEffects`); this copy never carries it.
+  if (transcript) delete (transcript as unknown as Record<string, unknown>).bridgeEffects;
   if (!transcript) {
     const contextDeps = deps.context;
     const pending: { label: string; reason: string }[] = deps.tools
@@ -771,7 +774,7 @@ async function executeRunInner(
       await addRunStep(tx, run, "error", { reason: "canceled", byUserId: by, messageId: m.id });
       await tx
         .update(agentRuns)
-        .set({ replyMessageId: m.id, transcript: t as unknown as Record<string, unknown>, updatedAt: new Date() })
+        .set({ replyMessageId: m.id, transcript: storedTranscript(t), updatedAt: new Date() })
         .where(eq(agentRuns.id, run.id));
       return m;
     });
@@ -897,7 +900,7 @@ async function executeRunInner(
     t.waitingForBrain = { kind: from, machineId, code: u.code, waitId: Bun.randomUUIDv7() };
     await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
-      transcript: t as unknown as Record<string, unknown>,
+      transcript: storedTranscript(t),
       waitingMachineId: machineId,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
@@ -968,7 +971,7 @@ async function executeRunInner(
     t.postedUpTo = t.messages.length;
     await db
       .update(agentRuns)
-      .set({ transcript: t as unknown as Record<string, unknown>, updatedAt: new Date() })
+      .set({ transcript: storedTranscript(t), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, ["waiting_approval", "waiting_input"])));
     if (message) {
       const [view] = await withWikiLinks(db, run.orgId, [messageView(message)]);
@@ -1011,7 +1014,7 @@ async function executeRunInner(
       const done = await transitionRun(tx, run.id, "running", "done", {
         replyMessageId: m.id,
         error: null,
-        transcript: t as unknown as Record<string, unknown>,
+        transcript: storedTranscript(t),
       });
       if (!done) throw new PermanentJobError("run changed state while executing");
       return m;
@@ -1042,7 +1045,7 @@ async function executeRunInner(
     t.waitingForBrain = { kind: from, machineId, code: "machine_dropped", waitId };
     await addRunStep(db, run, "error", { reason: "brain_dropped", code: "machine_offline", executed });
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
-      transcript: t as unknown as Record<string, unknown>,
+      transcript: storedTranscript(t),
       waitingMachineId: machineId,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
@@ -1181,7 +1184,7 @@ async function executeRunInner(
         // Only while the run is running: never over the pending calls of a bridged pause.
         await db
           .update(agentRuns)
-          .set({ transcript: transcript as unknown as Record<string, unknown>, updatedAt: new Date() })
+          .set({ transcript: storedTranscript(transcript), updatedAt: new Date() })
           .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")))
           .catch(() => {});
         // Tools already ran in this computer turn (their side effects happened; they aren't in the
@@ -1540,7 +1543,7 @@ async function executeRunInner(
         const done = await transitionRun(tx, run.id, "running", "done", {
           ...(message ? { replyMessageId: message.id } : {}),
           error: null,
-          transcript: t as unknown as Record<string, unknown>,
+          transcript: storedTranscript(t),
         });
         if (!done) throw new PermanentJobError("run changed state while executing");
         return message;

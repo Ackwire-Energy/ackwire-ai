@@ -1,4 +1,4 @@
-import { and, type Executor, eq, schema, sql } from "@agenteschat/db";
+import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
 
 const { agentRuns, agentRunSteps } = schema;
 
@@ -91,7 +91,8 @@ export async function transitionRun(
   patch: {
     error?: string | null;
     replyMessageId?: string;
-    transcript?: Record<string, unknown>;
+    /** A plain object, or `storedTranscript` (keeps what the bridge left on the row). */
+    transcript?: Record<string, unknown> | SQL;
     /** Waiting for this computer to come back (ADR 0032 §5); cleared by any move out of `waiting_input`. */
     waitingMachineId?: string | null;
   } = {},

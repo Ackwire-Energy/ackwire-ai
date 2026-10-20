@@ -14,17 +14,19 @@ export const KIND_ICON = {
 
 export const isArtifactKind = (v: unknown): v is ArtifactKind => ARTIFACT_KINDS.includes(v as ArtifactKind);
 
-/** `message.meta.artifacts` entries we can show. */
+/** `message.meta.artifacts` entries we can show: each file once, at its newest version (where it first came). */
 export function artifactRefs(meta: Record<string, unknown> | undefined): ArtifactRef[] {
   const list = meta?.artifacts;
   if (!Array.isArray(list)) return [];
-  return list.filter(
-    (r): r is ArtifactRef =>
-      Boolean(r) &&
-      typeof r === "object" &&
-      typeof r.id === "string" &&
-      (typeof r.version === "number" || r.deleted === true),
-  );
+  const byId = new Map<string, ArtifactRef>();
+  for (const r of list) {
+    if (!r || typeof r !== "object" || typeof r.id !== "string") continue;
+    if (typeof r.version !== "number" && r.deleted !== true) continue;
+    const seen = byId.get(r.id) as { version?: number } | undefined;
+    // Same file again: the newer version wins, in the first one's place.
+    if (!seen || (typeof r.version === "number" && r.version >= (seen.version ?? 0))) byId.set(r.id, r as ArtifactRef);
+  }
+  return [...byId.values()];
 }
 
 // ── Diffs ────────────────────────────────────────────────────────────────────
