@@ -3,6 +3,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type ReactNode,
+  useEffect,
   useId,
   useImperativeHandle,
   useLayoutEffect,
@@ -503,9 +504,13 @@ export function Composer({
   const showChoice = Boolean(choice) && Boolean(value.trim()) && !disabled;
   const [chosen, setChosen] = useState<SendChoice>("join");
   const [pressed, setPressed] = useState(false);
+  // The press flash; cleared if the composer goes away first (a stop that ends the run unmounts it).
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => clearTimeout(pressTimer.current ?? undefined), []);
   const press = () => {
     setPressed(true);
-    setTimeout(() => setPressed(false), 160);
+    clearTimeout(pressTimer.current ?? undefined);
+    pressTimer.current = setTimeout(() => setPressed(false), 160);
   };
   const stop = () => {
     if (!working) return;
