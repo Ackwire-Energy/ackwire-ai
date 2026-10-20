@@ -33,9 +33,10 @@ const LEFT_OUT_ICON: Record<LeftOutKind, IconName> = {
 export type ImportChoice = ImportSource | "none" | null;
 
 /**
- * Onboarding step "Trazer seus agentes" (docs/design/telas/OnboardingV2.html):
- * pick the source, drop the file or paste a GitHub link, then see what was
- * found (agents to bring, checked) and what doesn't come along.
+ * Onboarding step "Trazer seus agentes" (docs/design/telas/OnboardingEtapas.html):
+ * pick the source, drop the file or paste a GitHub link under the cards, then
+ * see what was found (agents to bring, checked) and what doesn't come along.
+ * Not using another app is "Pular esta etapa".
  */
 export function OnboardingImport({
   source,
@@ -74,13 +75,6 @@ export function OnboardingImport({
             <span className="ac-option__desc">{t(`onboarding.import.${s}Desc`)}</span>
           </OptionCard>
         ))}
-        <OptionCard stacked pressed={source === "none"} onClick={() => onSource("none")} className="onb__choice">
-          <span className="onb__ic" aria-hidden="true">
-            <Icon name="plus" />
-          </span>
-          <span className="ac-option__title">{t("onboarding.import.none")}</span>
-          <span className="ac-option__desc">{t("onboarding.import.noneDesc")}</span>
-        </OptionCard>
       </div>
 
       {source &&

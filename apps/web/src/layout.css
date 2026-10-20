@@ -7741,9 +7741,10 @@ a.machine-row__name:hover {
   text-underline-offset: 2px;
 }
 
-/* ---------- Onboarding (docs/design/telas/OnboardingV2.html) ----------
- * A rail like the app's sidebar (its surface, the steps), the sky only as a
- * horizon rising from its bottom with the guide on it; the step on the right. */
+/* ---------- Onboarding (docs/design/telas/OnboardingEtapas.html) ----------
+ * A rail like the app's sidebar (its surface, the steps), a strip of pixel sky
+ * on top for the progress and the sky as a horizon at its bottom; on the right,
+ * one calm screen per step hosted by an agent of the team. */
 .onb {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -7782,22 +7783,46 @@ a.machine-row__name:hover {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+}
+.onb__steps li {
+  position: relative;
+}
+/* The thread joining the markers, filled up to where you are. */
+.onb__steps li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 21px;
+  top: 40px;
+  bottom: -8px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--line2);
+}
+.onb__steps li[data-done]:not(:last-child)::after {
+  background: color-mix(in srgb, var(--ok) 55%, transparent);
 }
 .onb__step {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
+  min-height: 52px;
   padding: 8px 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   background: transparent;
-  color: var(--muted);
+  color: var(--faint);
   font: inherit;
-  font-weight: 500;
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.onb__steps li[data-done] .onb__step {
+  color: var(--ink2);
 }
 .onb__step:hover:not(:disabled):not([aria-current="step"]) {
   background: var(--plate);
@@ -7809,8 +7834,7 @@ a.machine-row__name:hover {
 .onb__step[aria-current="step"] {
   background: var(--raised);
   color: var(--ink);
-  font-weight: 600;
-  box-shadow: var(--e1);
+  box-shadow: var(--card-shadow);
 }
 .onb__step:focus-visible {
   outline: none;
@@ -7823,59 +7847,278 @@ a.machine-row__name:hover {
   display: grid;
   place-items: center;
   border-radius: 8px 8px 8px 3px;
-  background: var(--plate);
-  font-size: 13px;
-  font-weight: 600;
+  background: var(--side);
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+  font-size: 12px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .onb__steps li[data-done] .onb__n {
+  background: linear-gradient(180deg, var(--surface-raised), var(--card-key-bottom));
+  box-shadow: var(--card-key);
+  color: var(--ok);
+}
+.onb__step[aria-current="step"] .onb__n {
   background: var(--ink);
   color: var(--bg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.onb__step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
 }
 .onb__step-name {
-  min-width: 0;
+  font-size: 14px;
+  font-weight: 550;
 }
-.onb__opt {
-  margin-left: auto;
-  font-size: 11px;
+.onb__step[aria-current="step"] .onb__step-name {
+  font-weight: 650;
+}
+.onb__step-sub {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 450;
+  color: var(--faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Progress at the top of the rail: a line of text over a strip of pixel sky. */
+.onb__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px;
+}
+.onb__progress-text {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.onb__progress-count {
   font-weight: 500;
   color: var(--faint);
 }
-.onb__guide {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
+.onb__progress-sky {
+  position: relative;
+  display: block;
+  height: 27px;
+  overflow: hidden;
+  border-radius: 9px 9px 9px 3px;
+  background: var(--sunken);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--e1);
 }
-.onb__bubble {
-  margin: 0;
-  padding: 11px 13px;
-  border-radius: 14px 14px 14px 4px;
-  background: var(--raised);
-  box-shadow: var(--e2);
-  color: var(--ink2);
-  font-size: 13px;
-  line-height: 1.45;
-}
-.onb__guide .onb__guide-agent {
-  align-self: center;
-  width: 72px;
-  height: 72px;
+.onb__progress-sky .ac-sky {
+  position: absolute;
+  inset: 0;
 }
 .onb__main {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   min-width: 0;
 }
+/* One calm column per step, centered: the host asks, the answer, one big action. */
 .onb__body {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
   width: 100%;
-  max-width: 860px;
-  padding: 40px clamp(16px, 5vw, 64px) 32px;
+  max-width: 600px;
+  margin: auto 0;
+  padding: 48px clamp(16px, 4vw, 32px) 64px;
+  animation: onb-in 0.36s var(--out) both;
+}
+@keyframes onb-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.onb__back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  margin: -16px 0 -8px -8px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.onb__back:hover:not(:disabled) {
+  background: var(--plate);
+  color: var(--ink);
+}
+.onb__back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.onb__ask {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.onb__host {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+/* A host agent that just arrived pops in. */
+.onb__host[data-fresh] .ac-avatar {
+  animation: onb-pop 0.5s var(--spring) both;
+}
+@keyframes onb-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.onb__host-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.onb__bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 16px 20px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 6px;
+  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
+  box-shadow: var(--card-shadow);
+  animation: onb-in 0.3s var(--out) 0.08s both;
+}
+.onb__intro {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.onb__ask .onb__title {
+  font-family: inherit;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.onb__ask .onb__lead {
+  margin-top: 4px;
+  font-size: 14px;
+}
+.onb__answer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: onb-in 0.36s var(--out) 0.12s both;
+}
+.onb__ws {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.onb__big.ac-input {
+  height: var(--control-h-lg);
+  font-size: 17px;
+}
+textarea.onb__big.ac-input {
+  height: auto;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.onb__help {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--faint);
+}
+.onb__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.onb__link:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+.onb__starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.onb__starter {
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.onb__money {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  color: var(--muted);
+  font-size: 14px;
+}
+.onb__money[data-invalid] {
+  box-shadow:
+    var(--card-well-shadow),
+    0 0 0 1px var(--danger);
+}
+.onb__money input {
+  width: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 650;
+  text-align: right;
+  outline: none;
+}
+/* The step's action: one big button; "Pular esta etapa" right under it. */
+.onb__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  animation: onb-in 0.36s var(--out) 0.16s both;
+}
+.onb__actions > .ac-btn--ghost {
+  align-self: center;
 }
 .onb__head {
   display: flex;
@@ -7912,37 +8155,19 @@ a.machine-row__name:hover {
 .onb__error {
   color: var(--danger);
 }
-.onb__foot {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px clamp(16px, 5vw, 64px);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
-}
-.onb__hint {
-  margin-right: auto;
-  color: var(--muted);
-  font-size: 13px;
-}
 .onb__logo {
   flex: none;
-  width: 84px;
-  height: 84px;
+  width: 56px;
+  height: 56px;
   display: grid;
   place-items: center;
   padding: 0;
   border: 1.5px dashed var(--line2);
-  border-radius: 18px;
+  border-radius: 16px 16px 16px 4px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  overflow: hidden;
 }
 .onb__logo:hover {
   background: var(--plate);
@@ -7950,6 +8175,16 @@ a.machine-row__name:hover {
 .onb__logo:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+.onb__logo-letter {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #4b93ff, #2b74e6);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
 }
 .onb__choices {
   display: grid;
@@ -8218,8 +8453,11 @@ a.machine-row__name:hover {
     min-width: 0;
     flex: 1;
   }
-  .onb__guide,
+  .onb__progress,
   .onb__horizon {
+    display: none;
+  }
+  .onb__steps li::after {
     display: none;
   }
   .onb__steps {
@@ -8229,10 +8467,10 @@ a.machine-row__name:hover {
   }
   .onb__step {
     width: auto;
+    min-height: 0;
     padding: 4px;
   }
-  .onb__step-name,
-  .onb__opt {
+  .onb__step-text {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -8242,7 +8480,11 @@ a.machine-row__name:hover {
     white-space: nowrap;
   }
   .onb__body {
+    margin: 0;
     padding-top: 24px;
+  }
+  .onb__ask .onb__title {
+    font-size: 18px;
   }
 }
 
