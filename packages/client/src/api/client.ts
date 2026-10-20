@@ -402,7 +402,13 @@ export interface ApiClient {
     /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
     moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
     /** ADR 0041 §2: the computer starts the provider's own sign-in (its owner only). */
-    beginAccountLogin(orgId: string, machineId: string, kind: MachineAccountKind): Promise<AccountLoginStart>;
+    /** `accountId`: sign in again to that (signed out) account instead of adding a new one. */
+    beginAccountLogin(
+      orgId: string,
+      machineId: string,
+      kind: MachineAccountKind,
+      accountId?: string,
+    ): Promise<AccountLoginStart>;
     /** Claude Code: the code Claude showed, sealed in the browser to the computer's key (`sealSecret`). */
     sendAccountCode(orgId: string, machineId: string, loginId: string, box: SecretBox): Promise<void>;
     accountLogin(orgId: string, machineId: string, loginId: string): Promise<AccountLoginStatus>;

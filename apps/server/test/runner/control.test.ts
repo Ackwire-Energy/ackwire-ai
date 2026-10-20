@@ -728,7 +728,12 @@ test.if(process.platform !== "win32")(
     writeFileSync(path.join(dir, "signed-in"), "");
     const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
     const s = await c.connect();
-    expect(s.of("hello")[0]).toMatchObject({ accounts: [{ id: existing, kind: "codex", loggedIn: true }] });
+    // The first look never delays connecting: in `hello` if it was quick, else right after as `accounts.changed`.
+    const reported = () =>
+      (s.of("accounts.changed").at(-1) as { accounts?: unknown } | undefined)?.accounts ??
+      (s.of("hello")[0] as { accounts?: unknown } | undefined)?.accounts;
+    await waitFor(() => reported() !== undefined);
+    expect(reported()).toMatchObject([{ id: existing, kind: "codex", loggedIn: true }]);
     expect(await c.data({ type: "accounts.list" })).toEqual({
       accounts: [{ id: existing, kind: "codex", loggedIn: true }],
     });

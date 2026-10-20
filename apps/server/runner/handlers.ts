@@ -398,7 +398,7 @@ async function handleAccount(
       if (ctx.paused?.()) {
         throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
       }
-      return accounts.begin(req.kind, requireString(req.loginId, "loginId"));
+      return accounts.begin(req.kind, requireString(req.loginId, "loginId"), req.again === true);
     case "code":
       if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");
       await accounts.code(requireString(req.loginId, "loginId"), requireString(req.aad, "aad"), req.box);
@@ -457,12 +457,14 @@ async function doBrainTurn(
 }
 
 /**
- * A turn in an account that turned out signed out: its CLI is asked again and
- * the server hears the answer either way (the server marks the account signed
- * out; a passing failure must be able to bring it back).
+ * A turn in an account that was refused (`not_logged_in`) or is gone
+ * (`account_missing`): its CLI is asked again and the server hears the answer
+ * either way (`accounts.changed`). The machine is the only one that says an
+ * account is signed out or gone; a passing failure leaves it as it was.
  */
 function signedOut(ctx: HandlerContext, req: { account?: unknown }, final: { type: string; code?: string }) {
-  if (!req.account || final.type !== "error" || final.code !== "not_logged_in") return;
+  if (!req.account || final.type !== "error") return;
+  if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
   ctx.accounts?.invalidate();
   ctx.accounts?.refresh(true).catch(() => undefined);
 }

@@ -453,9 +453,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const accountKind = kind === "claude_code" || kind === "codex" ? kind : null;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
   const computerName = view.computer?.name ?? "";
-  const accounts = [...view.accounts, ...added.filter((a) => !view.accounts.some((v) => v.id === a.id))].filter(
-    (a) => a.kind === accountKind,
-  );
+  // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
+  const accounts = [
+    ...view.accounts.map((v) => added.find((a) => a.id === v.id) ?? v),
+    ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
+  ].filter((a) => a.kind === accountKind);
   const current = accounts.find((a) => a.id === account) ?? null;
   const signedOut = current?.status === "signed_out";
   const accountChanged = accountsOn && account !== view.account;
@@ -755,9 +757,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     machineId={view.computer.machineId}
                     kind={accountKind}
                     computer={computerName}
+                    again={signedOut ? current?.id : undefined}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {
-                      setAdded((list) => (list.some((x) => x.id === a.id) ? list : [...list, a]));
+                      setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);
                       setAccount(a.id);
                       setArrived(a);
                       setAdding(false);
@@ -818,6 +821,8 @@ function AddAccount(props: {
   machineId: string;
   kind: MachineAccountKind;
   computer: string;
+  /** Sign in again to this account (it was signed out): same account, same agents. */
+  again?: string;
   onBack: () => void;
   onAdded: (account: MachineAccount) => void;
 }) {
@@ -830,6 +835,7 @@ function AddAccountFlow({
   machineId,
   kind,
   computer,
+  again,
   onBack,
   onAdded,
   onRetry,
@@ -837,6 +843,7 @@ function AddAccountFlow({
   machineId: string;
   kind: MachineAccountKind;
   computer: string;
+  again?: string;
   onBack: () => void;
   onAdded: (account: MachineAccount) => void;
   onRetry: () => void;
@@ -863,7 +870,7 @@ function AddAccountFlow({
   const result = status.data;
   useEffect(() => {
     let gone = false;
-    api.machines.beginAccountLogin(org.id, machineId, kind).then(
+    api.machines.beginAccountLogin(org.id, machineId, kind, again).then(
       (l) => {
         if (gone) {
           void api.machines.cancelAccountLogin(org.id, machineId, l.loginId).catch(() => undefined);

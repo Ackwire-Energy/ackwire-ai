@@ -6,11 +6,12 @@ import {
   accountCodeAad,
   isAccountId,
   isAccountKind,
+  MAX_MACHINE_ACCOUNTS,
   type PubSub,
   parseSecretBox,
   type RunnerAccountInfo,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -18,7 +19,7 @@ import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import { getMachine, MachineOfflineError, type MachineRow, publishMachineUpdated } from "./machines";
 import { can, requirePermission } from "./organizations";
 
-const { machineAccounts, agents } = schema;
+const { machineAccounts, agents, machines } = schema;
 
 /*
  * Accounts of the computer brains on a connected computer (ADR 0041): a
@@ -133,8 +134,11 @@ const publishAccountsChanged = (pubsub: PubSub | undefined, orgId: string, machi
  * `hello.accounts` (protocol 13): the machine says which accounts it has.
  * New ones are added (named after their email, nobody as creator), known ones
  * get their email, plan and status, and the ones it no longer has are removed
- * (their agents go back to the computer's own sign-in). An id that already
- * belongs to another machine of the organization is ignored.
+ * (their agents go back to the computer's own sign-in). An id that belongs to
+ * a disconnected machine of the organization (this computer, paired again as a
+ * new one) moves here with its name; one that belongs to a live machine is
+ * ignored. A list as long as `MAX_MACHINE_ACCOUNTS` may be cut, so nothing is
+ * removed from it.
  */
 export async function syncMachineAccounts(
   deps: MachineAccountDeps,
@@ -151,7 +155,8 @@ export async function syncMachineAccounts(
       .from(machineAccounts)
       .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.machineId, machineId)));
     let changed = false;
-    const gone = existing.filter((r) => !reported.has(r.id)).map((r) => r.id);
+    const complete = accounts.length < MAX_MACHINE_ACCOUNTS;
+    const gone = complete ? existing.filter((r) => !reported.has(r.id)).map((r) => r.id) : [];
     const released = await releaseAgents(tx, orgId, gone, now);
     if (gone.length > 0) {
       await tx
@@ -184,7 +189,29 @@ export async function syncMachineAccounts(
           })
           .onConflictDoNothing()
           .returning({ id: machineAccounts.id });
-        if (inserted.length > 0) changed = true;
+        if (inserted.length > 0) {
+          changed = true;
+          continue;
+        }
+        // Taken: by a machine that was disconnected (this computer before it was paired again), it comes here.
+        const moved = await tx
+          .update(machineAccounts)
+          .set({ machineId, kind: a.kind, email: a.email ?? null, plan: a.plan ?? null, status, updatedAt: now })
+          .where(
+            and(
+              eq(machineAccounts.orgId, orgId),
+              eq(machineAccounts.id, a.id),
+              inArray(
+                machineAccounts.machineId,
+                tx
+                  .select({ id: machines.id })
+                  .from(machines)
+                  .where(and(eq(machines.orgId, orgId), isNotNull(machines.deletedAt))),
+              ),
+            ),
+          )
+          .returning({ id: machineAccounts.id });
+        if (moved.length > 0) changed = true;
         continue;
       }
       if (row.kind !== a.kind) continue;
@@ -202,20 +229,6 @@ export async function syncMachineAccounts(
   });
   forgetAgents(orgId, released);
   if (changed) await publishAccountsChanged(deps.pubsub, orgId, machineId);
-}
-
-/** A turn with this account was refused by the CLI (`not_logged_in`, `account_missing`): it shows as signed out. */
-export async function markAccountSignedOut(
-  deps: { db: Executor; pubsub?: PubSub },
-  orgId: string,
-  accountId: string,
-) {
-  const rows = await deps.db
-    .update(machineAccounts)
-    .set({ status: "signed_out", updatedAt: new Date() })
-    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, accountId)))
-    .returning({ machineId: machineAccounts.machineId });
-  if (rows[0]) await publishAccountsChanged(deps.pubsub, orgId, rows[0].machineId);
 }
 
 /** A turn ran with it (best effort, after the turn). */
@@ -331,12 +344,27 @@ export async function beginAccountLogin(
   orgId: string,
   machineId: string,
   kind: unknown,
+  /** Sign in again to this account (signed out): same id, same folder, the agents that use it keep it. */
+  accountId?: string,
 ): Promise<AccountLoginView> {
   if (!isAccountKind(kind)) throw new ValidationError("Choose claude_code or codex", "account.invalid_kind");
   const machine = await liveOwnedMachine(deps, userId, orgId, machineId);
-  const loginId = crypto.randomUUID();
+  if (accountId !== undefined) {
+    const existing = isAccountId(accountId) ? await getMachineAccount(deps.db, orgId, machine.id, accountId) : null;
+    if (!existing || existing.kind !== kind) {
+      throw new ValidationError("That account isn't on this computer", "account.invalid");
+    }
+  }
+  const again = accountId !== undefined;
+  const loginId = again ? accountId : crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ACCOUNT_LOGIN_TTL_MS).toISOString();
-  const reply = await deps.hub.call(machine.id, { op: "account", action: "begin", kind, loginId });
+  const reply = await deps.hub.call(machine.id, {
+    op: "account",
+    action: "begin",
+    kind,
+    loginId,
+    ...(again ? { again: true } : {}),
+  });
   // Only a provider page the person can open: never another scheme.
   let url: URL | null = null;
   try {
@@ -544,10 +572,9 @@ export async function removeMachineAccount(
   machineId: string,
   accountId: string,
 ) {
-  const owned = await ownedMachine(deps.db, userId, orgId, machineId);
-  const account = await getMachineAccount(deps.db, orgId, owned.id, accountId);
-  if (!account) throw new NotFoundError("Account not found", "account.not_found");
   const machine = await liveOwnedMachine(deps, userId, orgId, machineId);
+  const account = await getMachineAccount(deps.db, orgId, machine.id, accountId);
+  if (!account) throw new NotFoundError("Account not found", "account.not_found");
   const kind: AccountKind = isAccountKind(account.kind) ? account.kind : "claude_code";
   try {
     await deps.hub.call(machine.id, { op: "account", action: "remove", kind, accountId: account.id });

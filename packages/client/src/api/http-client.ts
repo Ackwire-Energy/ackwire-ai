@@ -542,8 +542,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
-      beginAccountLogin: (orgId, machineId, kind) =>
-        request<AccountLoginStart>(`${org(orgId)}/machines/${enc(machineId)}/account-logins`, { json: { kind } }),
+      beginAccountLogin: (orgId, machineId, kind, accountId) =>
+        request<AccountLoginStart>(`${org(orgId)}/machines/${enc(machineId)}/account-logins`, {
+          json: { kind, ...(accountId ? { accountId } : {}) },
+        }),
       sendAccountCode: (orgId, machineId, loginId, box) =>
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}/code`, {
           json: { box },

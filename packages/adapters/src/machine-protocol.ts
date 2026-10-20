@@ -145,7 +145,8 @@ export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
  * expires after `ACCOUNT_LOGIN_TTL_MS`.
  */
 export type AccountRequest =
-  | { action: "begin"; kind: AccountKind; loginId: string }
+  /** `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure. */
+  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
@@ -153,6 +154,8 @@ export type AccountRequest =
   | { action: "remove"; kind: AccountKind; accountId: string };
 
 export const ACCOUNT_LOGIN_TTL_MS = 15 * 60_000;
+/** Accounts per machine: the runner adds no more, and a list this long is never taken as complete by the server. */
+export const MAX_MACHINE_ACCOUNTS = 100;
 /** The AAD that binds a sealed Claude sign-in code to its sign-in and organization. */
 export const accountCodeAad = (loginId: string, orgId: string) => `${loginId}|${orgId}|account`;
 
@@ -955,10 +958,10 @@ export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerIn
   return out;
 }
 
-/** `hello.accounts` (protocol 13): at most 50, ids and kinds checked, short words only. */
+/** `hello.accounts` (protocol 13): at most `MAX_MACHINE_ACCOUNTS`, ids and kinds checked, short words only. */
 export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
   const out: RunnerAccountInfo[] = [];
-  for (const a of v.slice(0, 50)) {
+  for (const a of v.slice(0, MAX_MACHINE_ACCOUNTS)) {
     if (!isObject(a) || !isAccountId(a.id) || !isAccountKind(a.kind)) continue;
     const email = isString(a.email) && a.email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(a.email) ? a.email : undefined;
     const plan = isString(a.plan) && /^[\w.-]{1,40}$/.test(a.plan) ? a.plan : undefined;

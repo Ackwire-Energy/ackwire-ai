@@ -411,7 +411,7 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
   expect(computerBrainUnavailable("claude_code", machineId, statusOf(machineId))?.code).toBe("plan_limit");
 });
 
-test("the agent's account and effort reach its turn; a refused sign-in marks the account signed out and falls back", async () => {
+test("the agent's account and effort reach its turn; a refused sign-in falls back and the computer decides the status", async () => {
   f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
   const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";
   const machineId = await computerAgent(f, { brainEffort: "high" });
@@ -436,15 +436,16 @@ test("the agent's account and effort reach its turn; a refused sign-in marks the
   await drainOutbox(f.db, handlers);
 
   expect(seen[0]).toMatchObject({ account: { id: ACCOUNT, label: "Trabalho", status: "active" }, effort: "high" });
+  // The server never marks it by itself: the computer asks the CLI again and reports (`accounts.changed`).
   const [account] = await f.db.select().from(schema.machineAccounts);
-  expect(account?.status).toBe("signed_out");
+  expect(account?.status).toBe("active");
   const runs = await f.db.select().from(schema.agentRuns);
   expect(runs.map((r) => r.status)).toEqual(["done"]);
 
-  // The next turn knows before asking the computer: the API answers again, the brain isn't called.
+  // Until the computer says otherwise, the next turn asks it again (and falls back again).
   await post(f, "@dev de novo");
   await drainOutbox(f.db, handlers);
-  expect(seen.length).toBe(1);
+  expect(seen.length).toBe(2);
   const after = await f.db.select().from(schema.agentRuns);
   expect(after.map((r) => r.status)).toEqual(["done", "done"]);
 });

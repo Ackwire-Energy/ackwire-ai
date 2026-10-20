@@ -108,12 +108,17 @@ export function machineAccountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Start signing in an account on the computer, through the provider's own CLI there",
-      request: { params: MachineParams, body: body(z.object({ kind: AccountKind })) },
+      request: {
+        params: MachineParams,
+        // `accountId`: sign in again to that account (it was signed out) instead of adding one.
+        body: body(z.object({ kind: AccountKind, accountId: z.string().uuid().optional() })),
+      },
       responses: { 201: json(AccountLogin, "Started"), ...errors, ...offline },
     }),
     async (c) => {
       const { orgId, machineId } = c.req.valid("param");
-      const login = await beginAccountLogin(withHub(), c.get("user").id, orgId, machineId, c.req.valid("json").kind);
+      const { kind, accountId } = c.req.valid("json");
+      const login = await beginAccountLogin(withHub(), c.get("user").id, orgId, machineId, kind, accountId);
       return c.json(login, 201);
     },
   );

@@ -11,6 +11,7 @@ import {
   accountCodeAad,
   isAccountId,
   isAccountKind,
+  MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
   type RunnerAccountInfo,
   type WireSecretBox,
@@ -264,6 +265,8 @@ interface Login {
   error?: string;
   startedAt: number;
   timer: ReturnType<typeof setTimeout> | null;
+  /** Signing in again to an existing account: its folder is never removed by this sign-in. */
+  again: boolean;
   /** `begin` waits on this for the printed URL. */
   watch?: () => void;
 }
@@ -310,28 +313,47 @@ export class AccountManager {
    * Starts the CLI's sign-in in a new folder named `loginId` (the account id
    * once it is signed in) and waits for what the person needs.
    */
-  async begin(kind: AccountKind, loginId: string): Promise<MachineReplies["account"]> {
+  /**
+   * Starts the CLI's sign-in in a new folder named `loginId`, or (`again`) in
+   * the existing account `loginId` that was signed out: same account, same
+   * agents, and its folder stays if this sign-in fails.
+   */
+  async begin(kind: AccountKind, loginId: string, again = false): Promise<MachineReplies["account"]> {
     if (this.closed) throw new RunnerError("internal", "The runner is stopping");
     if (!isAccountKind(kind)) throw new RunnerError("bad_request", "Unknown account kind");
     if (!isAccountId(loginId)) throw new RunnerError("bad_request", "Invalid sign-in id");
-    if (this.logins.has(loginId) || ACCOUNT_KINDS.some((k) => existsSync(this.dirOf(k, loginId)))) {
+    if (this.logins.get(loginId)?.state === "waiting") {
       throw new RunnerError("bad_request", "This sign-in already exists");
+    }
+    const dir = this.dirOf(kind, loginId);
+    if (again) {
+      if (!existsSync(dir) || existsSync(path.join(dir, SIGNING_IN))) {
+        throw new RunnerError("not_found", "That account is no longer on this computer");
+      }
+    } else {
+      if (this.logins.has(loginId) || ACCOUNT_KINDS.some((k) => existsSync(this.dirOf(k, loginId)))) {
+        throw new RunnerError("bad_request", "This sign-in already exists");
+      }
+      if ((await this.list().catch(() => [])).length >= MAX_MACHINE_ACCOUNTS) {
+        throw new RunnerError("bad_request", "This computer already has too many accounts; remove one first");
+      }
     }
     // Claude Code: the key the browser seals the pasted code to (the private half stays in memory).
     const pair = kind === "claude_code" ? await generateSecretKeyPair() : undefined;
-    const dir = this.dirOf(kind, loginId);
-    for (const d of [this.opts.root, path.dirname(dir)]) {
-      await mkdir(d, { recursive: true, mode: 0o700 });
-      await chmod(d, 0o700).catch(() => undefined);
+    if (!again) {
+      for (const d of [this.opts.root, path.dirname(dir)]) {
+        await mkdir(d, { recursive: true, mode: 0o700 });
+        await chmod(d, 0o700).catch(() => undefined);
+      }
+      // Not recursive: two sign-ins with one id can't both create it.
+      await mkdir(dir, { mode: 0o700 }).catch((err: unknown) => {
+        if (errnoCode(err) === "EEXIST") throw new RunnerError("bad_request", "This sign-in already exists");
+        throw err;
+      });
+      await chmod(dir, 0o700).catch(() => undefined);
+      // Until it signs in: a runner that dies mid sign-in leaves this behind, and the list skips (then clears) it.
+      await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
     }
-    // Not recursive: two sign-ins with one id can't both create it.
-    await mkdir(dir, { mode: 0o700 }).catch((err: unknown) => {
-      if (errnoCode(err) === "EEXIST") throw new RunnerError("bad_request", "This sign-in already exists");
-      throw err;
-    });
-    await chmod(dir, 0o700).catch(() => undefined);
-    // Until it signs in: a runner that dies mid sign-in leaves this behind, and the list skips (then clears) it.
-    await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
 
     const command = this.command(kind);
     const [file, ...pre] = command;
@@ -348,7 +370,7 @@ export class AccountManager {
         shell: process.platform === "win32" && command.length === 1,
       });
     } catch (err) {
-      await rm(dir, { recursive: true, force: true });
+      if (!again) await rm(dir, { recursive: true, force: true });
       const why = err instanceof Error ? err.message : String(err);
       throw new RunnerError("internal", `${LABEL[kind]} couldn't start: ${why}`);
     }
@@ -363,6 +385,7 @@ export class AccountManager {
       exited: false,
       startedAt: Date.now(),
       timer: null,
+      again,
     };
     this.logins.set(loginId, login);
     const onData = (chunk: string) => {
@@ -527,7 +550,7 @@ export class AccountManager {
             : `${LABEL[login.kind]} couldn't sign in${login.code ? " with that code" : ""}${safe ? `: ${safe}` : ""}`,
         );
       }
-      await rm(login.dir, { recursive: true, force: true }).catch(() => undefined);
+      if (!login.again) await rm(login.dir, { recursive: true, force: true }).catch(() => undefined);
     })();
   }
 
@@ -552,7 +575,7 @@ export class AccountManager {
       }, 3000);
       t.unref?.();
     }
-    await rm(login.dir, { recursive: true, force: true }).catch(() => undefined);
+    if (!login.again) await rm(login.dir, { recursive: true, force: true }).catch(() => undefined);
   }
 
   // ── Accounts ───────────────────────────────────────────────────────────────
@@ -572,10 +595,16 @@ export class AccountManager {
   private async lookAll(): Promise<RunnerAccountInfo[]> {
     const found: { kind: AccountKind; id: string }[] = [];
     for (const kind of ACCOUNT_KINDS) {
-      const entries = await readdir(path.join(this.opts.root, kind), { withFileTypes: true }).catch(() => []);
+      // No folder yet: no accounts. Any other failure fails the look (the server must never read it as "none left").
+      const entries = await readdir(path.join(this.opts.root, kind), { withFileTypes: true }).catch((err: unknown) => {
+        if (errnoCode(err) === "ENOENT") return [];
+        throw err;
+      });
       for (const e of entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
         if (!e.isDirectory() || !isAccountId(e.name)) continue;
-        if (this.logins.get(e.name)?.state === "waiting") continue; // still signing in
+        // A new account still signing in isn't one yet; one signing in again still is (listed as it is now).
+        const login = this.logins.get(e.name);
+        if (login?.state === "waiting" && !login.again) continue;
         // A sign-in that never finished (the runner stopped meanwhile): not an account; gone once it would have expired.
         const marker = path.join(this.opts.root, kind, e.name, SIGNING_IN);
         const started = await stat(marker).catch(() => null);
@@ -588,7 +617,7 @@ export class AccountManager {
         found.push({ kind, id: e.name });
       }
     }
-    return Promise.all(found.map((a) => this.lookUp(a.kind, a.id)));
+    return Promise.all(found.slice(0, MAX_MACHINE_ACCOUNTS).map((a) => this.lookUp(a.kind, a.id)));
   }
 
   /** Every account on this machine with its status (cached for `ACCOUNTS_TTL_MS`). */

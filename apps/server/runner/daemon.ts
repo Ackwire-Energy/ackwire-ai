@@ -190,27 +190,6 @@ function shortTime(iso: string, now = Date.now()) {
   return `${d.toLocaleString("en", { month: "short" })} ${d.getDate()} ${hm}`;
 }
 
-/** How long a session waits for the first look at the accounts before saying `hello` without them. */
-const ACCOUNTS_HELLO_WAIT_MS = 5000;
-
-/** Waits for `p` at most `ms` (its result or failure doesn't matter here). */
-function settleWithin(p: Promise<unknown>, ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    const t = setTimeout(resolve, ms);
-    t.unref?.();
-    p.then(
-      () => {
-        clearTimeout(t);
-        resolve();
-      },
-      () => {
-        clearTimeout(t);
-        resolve();
-      },
-    );
-  });
-}
-
 const firstLine = (s: string, max = 120) => {
   const t = s.replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max)}…` : t;
@@ -642,8 +621,9 @@ export class RunnerDaemon implements RequestObserver {
       browser,
       accounts: this.accounts,
     };
-    // `hello` lists the accounts: the first look (each runs its CLI) gets a few seconds before connecting.
-    await settleWithin(this.accounts.list(), ACCOUNTS_HELLO_WAIT_MS);
+    // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
+    // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
+    this.accounts.refresh(true).catch(() => undefined);
     const connection = new RunnerConnection({
       url: connectUrl(config.server),
       token: config.token,

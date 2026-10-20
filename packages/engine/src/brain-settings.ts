@@ -309,6 +309,15 @@ function view(
   };
 }
 
+/** Postgres `foreign_key_violation`, as the driver raises it or wrapped by Drizzle (`cause`). */
+function isForeignKeyViolation(error: unknown): boolean {
+  for (let e: unknown = error, depth = 0; e && typeof e === "object" && depth < 3; depth++) {
+    if ((e as { code?: unknown }).code === "23503") return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 /** `GET …/agents/{id}/brain`: the choice, the computer and what it can offer. */
 export async function getAgentBrain(
   deps: BrainDeps,
@@ -317,11 +326,13 @@ export async function getAgentBrain(
   agentId: string,
 ): Promise<AgentBrainView> {
   const { agent, admin } = await agentBrainAccess(deps.db, userId, orgId, agentId);
-  const [machine, machines] = await Promise.all([
-    agentMachine(deps.db, orgId, agent.machineId),
+  const machineLook = agentMachine(deps.db, orgId, agent.machineId);
+  const [machine, machines, accounts] = await Promise.all([
+    machineLook,
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
+    machineLook.then((m) => brainAccounts(deps.db, userId, orgId, m)),
   ]);
-  return view(agent, machine, machines, await brainAccounts(deps.db, userId, orgId, machine));
+  return view(agent, machine, machines, accounts);
 }
 
 export interface AgentBrainInput {
@@ -424,7 +435,14 @@ export async function setAgentBrain(
       updatedAt: new Date(),
     })
     .where(and(eq(schema.agents.id, agentId), eq(schema.agents.orgId, orgId)))
-    .returning();
+    .returning()
+    .catch((error: unknown) => {
+      // The account was removed meanwhile (the computer, its owner): the same answer as a stale choice.
+      if (account && isForeignKeyViolation(error)) {
+        throw new ValidationError("That account is no longer on this computer", "account.invalid");
+      }
+      throw error;
+    });
   caches.agents.delete(`${orgId}:${agentId}`);
   await recordAudit(deps.db, {
     orgId,
