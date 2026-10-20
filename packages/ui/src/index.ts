@@ -198,6 +198,9 @@ export {
   type RecurrencePickerProps,
 } from "./components/RecurrencePicker";
 export {
+  BrowserMark,
+  type BrowserPixelKind,
+  BrowserStrip,
   CriteriaPixels,
   ExpiryFuse,
   PageSilhouette,

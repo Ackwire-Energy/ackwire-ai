@@ -319,6 +319,91 @@ export function RunKey({ status }: { status: RunPixelStatus | "next" }) {
 }
 
 /**
+ * An agent's browser steps in pixels (telas/NavegadorResumo.html, B): one dithered column per
+ * step in the agent's tones, as a routine's runs. The height says what it was: an open the whole
+ * column, reading most of it, an action a stub, a print two cells; a failure the whole column in
+ * the danger tone.
+ */
+export type BrowserPixelKind = "open" | "read" | "act" | "shot" | "failed";
+
+function browserPalette(el: Element, color: AgentColor): Record<BrowserPixelKind, string[]> {
+  const t = bodyTones(color).map((x) => x ?? "#888888");
+  const raised = token(el, "--raised", "#ffffff");
+  const danger = token(el, "--danger", "#b42a20");
+  const at = (i: number) => t[i] ?? "#888888";
+  return {
+    open: [at(0), at(1), at(2)],
+    read: [at(1), at(2), at(3)],
+    act: [at(2), at(3), at(4)],
+    shot: [mixHex(at(3), raised, 0.35), at(4)],
+    failed: [danger, danger, mixHex(danger, raised, 0.45)],
+  };
+}
+
+const BROWSER_HEIGHT: Record<BrowserPixelKind, number> = { open: 1, read: 0.7, act: 0.4, shot: 0, failed: 1 };
+const browserRows = (kind: BrowserPixelKind, rows: number) =>
+  kind === "shot" ? 2 : Math.max(3, Math.round(BROWSER_HEIGHT[kind] * rows));
+
+/** The steps in order, oldest left (the card's header). */
+export function BrowserStrip({
+  kinds,
+  color = "sky",
+  className,
+}: {
+  kinds: BrowserPixelKind[];
+  color?: AgentColor;
+  className?: string;
+}) {
+  const W = 3;
+  const GAP = 1;
+  const ROWS = 10;
+  const width = Math.max(1, kinds.length * (W + GAP) - GAP);
+  const ref = useCanvas((ctx, canvas) => {
+    const pal = browserPalette(canvas, color);
+    ctx.clearRect(0, 0, width, ROWS);
+    kinds.forEach((k, i) => {
+      column(ctx, i * (W + GAP), W, browserRows(k, ROWS), ROWS - 1, pal[k]);
+    });
+  }, false);
+  return (
+    <canvas
+      ref={ref}
+      className={cx("ac-run-strip", className)}
+      width={width}
+      height={ROWS}
+      style={{ width: width * CELL, height: ROWS * CELL }}
+    />
+  );
+}
+
+/** One step's column, marking its line in the list. */
+export function BrowserMark({
+  kind,
+  color = "sky",
+  className,
+}: {
+  kind: BrowserPixelKind;
+  color?: AgentColor;
+  className?: string;
+}) {
+  const W = 3;
+  const ROWS = 7;
+  const ref = useCanvas((ctx, canvas) => {
+    ctx.clearRect(0, 0, W, ROWS);
+    column(ctx, 0, W, browserRows(kind, ROWS), ROWS - 1, browserPalette(canvas, color)[kind]);
+  }, false);
+  return (
+    <canvas
+      ref={ref}
+      className={cx("ac-run-mark", className)}
+      width={W}
+      height={ROWS}
+      style={{ width: W * CELL, height: ROWS * CELL }}
+    />
+  );
+}
+
+/**
  * Acceptance criteria as pixel blocks (telas/Issues.html): one block per
  * criterion, done ones dithered in the assignee's tones (an agent's color;
  * a person or nobody: neutral ink), open ones a dotted outline.

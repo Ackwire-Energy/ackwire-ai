@@ -83,3 +83,47 @@ export function browserTrailHref(site: string | null): string | null {
   if (!site || !/^[a-z0-9.-]+(:\d+)?(\/[^\s]*)?$/i.test(site)) return null;
   return `https://${site}`;
 }
+
+/**
+ * What a step was, for its pixel column (telas/NavegadorResumo.html, B): an open is the whole
+ * column, reading most of it, an action a stub, a print two cells; a failure the whole column in red.
+ */
+export type BrowserTrailKind = "open" | "read" | "act" | "shot" | "failed";
+
+export function browserTrailKind(s: Pick<BrowserTrailStep, "tool" | "failed">): BrowserTrailKind {
+  if (s.failed) return "failed";
+  if (OPENS.has(s.tool)) return "open";
+  if (s.tool === "browser_read") return "read";
+  if (s.tool === "browser_screenshot") return "shot";
+  return "act";
+}
+
+/** One line of the list: a step, or two that alternate ("Leu a página e clicou"), `times` in a row. */
+export interface BrowserTrailLine {
+  steps: BrowserTrailStep[];
+  times: number;
+}
+
+const sameStep = (a: BrowserTrailStep | undefined, b: BrowserTrailStep | undefined) =>
+  Boolean(a && b && a.tool === b.tool && a.failed === b.failed && a.detail === b.detail);
+
+/** How many times `steps[i, i + n)` repeats from `i` on. */
+function repeats(steps: BrowserTrailStep[], i: number, n: number) {
+  let k = 1;
+  while (steps.slice(i, i + n).every((s, j) => sameStep(s, steps[i + k * n + j]))) k++;
+  return k;
+}
+
+/** A page's steps as lines, repeats folded: a pair that alternates first, then the same step in a row. */
+export function browserTrailLines(steps: BrowserTrailStep[]): BrowserTrailLine[] {
+  const lines: BrowserTrailLine[] = [];
+  let i = 0;
+  while (i < steps.length) {
+    const pair = i + 1 < steps.length && !sameStep(steps[i], steps[i + 1]) ? repeats(steps, i, 2) : 1;
+    const n = pair >= 2 ? 2 : 1;
+    const times = n === 2 ? pair : repeats(steps, i, 1);
+    lines.push({ steps: steps.slice(i, i + n), times });
+    i += n * times;
+  }
+  return lines;
+}

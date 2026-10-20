@@ -1268,3 +1268,33 @@
 .brw-trail__page ol li.is-failed > .ac-icon {
   color: var(--danger);
 }
+/* NavegadorResumo.html, B: the steps as pixel columns in the header, one column marking each line. */
+.brw-ac__tx small.brw-trail__sum {
+  gap: 8px;
+}
+.brw-trail__sum .ac-run-strip {
+  flex: none;
+}
+.brw-trail .brw-ac__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.brw-trail__site > small {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 400;
+  flex: none;
+}
+.brw-trail__mark {
+  justify-self: center;
+}
+.brw-trail__times {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--ink2);
+  background: var(--plate);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+}

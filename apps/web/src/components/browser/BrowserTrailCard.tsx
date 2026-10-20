@@ -2,26 +2,35 @@ import {
   type BrowserTrailStep,
   browserTrailHosts,
   browserTrailHref,
+  browserTrailKind,
+  browserTrailLines,
   browserTrailPages,
   browserTrailSpanMs,
 } from "@agenteschat/client";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatDuration } from "@agenteschat/client/lib/work";
-import { Button, Icon, PageSilhouette, SkyStrip } from "@agenteschat/ui";
+import { BrowserMark, BrowserStrip, Button, Icon, PageSilhouette, SkyStrip } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
-import { iconOf, stepText, useHeldTakeover } from "./BrowserCard";
+import { stepText, useHeldTakeover } from "./BrowserCard";
 import "./browser.css";
+
+/** A step in the person's words, from the saved trail. */
+const said = (t: TFunction, s: BrowserTrailStep) =>
+  stepText(t, { id: "", tool: s.tool, detail: s.detail, running: false });
+const lower = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
 
 /**
  * Where the agent browsed, on its message after the run (telas/NavegadorDepois.html, A with
- * "Página em silhueta"): the closed card stays, still, with a drawn page (never a picture of
- * the real one, ADR 0040 §7), when it ended and how many steps on which sites. Opening it lists
- * the steps by page, each site openable in the person's own browser.
+ * "Página em silhueta"; telas/NavegadorResumo.html, B): the closed card stays, still, with a drawn
+ * page (never a picture of the real one, ADR 0040 §7), where it browsed, its steps as pixel columns
+ * in the agent's tones (as a routine's runs) and how long. Opening it lists the steps by page,
+ * repeats folded into one line, each site openable in the person's own browser.
  */
 export function BrowserTrailCard({
   agentId,
@@ -53,19 +62,21 @@ export function BrowserTrailCard({
   if (!last || held) return null;
   const time = formatTime(i18n.language, last.at);
   const by = stopped?.byUserId ?? null;
+  // Done needs no line (the message has its time); stopped says who and when.
   const ended = !stopped
-    ? t("browser.after.doneAt", { time })
+    ? null
     : by === me.user.id
       ? t("browser.after.stoppedByYou", { time })
       : by && dir.memberById.get(by)
         ? t("browser.after.stoppedBy", { person: dir.memberById.get(by)?.name, time })
         : t("browser.after.stoppedAt", { time });
   const hosts = browserTrailHosts(steps);
+  const title = hosts.length
+    ? t("browser.after.title", { sites: joinNames(hosts, t("newAgent.and")) })
+    : t("browser.after.titleNoSite");
   const count = t("chat.work.steps", { count: steps.length });
   const duration = formatDuration(t, browserTrailSpanMs(steps));
-  const summary = hosts.length
-    ? t("browser.after.summary", { steps: count, sites: joinNames(hosts, t("newAgent.and")), duration })
-    : t("browser.after.summaryNoSite", { steps: count, duration });
+  const summary = t("browser.after.summaryNoSite", { steps: count, duration });
   const group = t("browser.inCard.group", g);
   const toggle = open ? t("browser.after.hideSteps") : t("browser.after.showSteps");
 
@@ -91,12 +102,17 @@ export function BrowserTrailCard({
         </button>
         <button type="button" className="brw-ac__tt" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           <span className="brw-ac__tx">
-            <b>{group}</b>
-            <small>
-              <Icon name={stopped ? "stop" : "power"} size={14} />
-              <span>{ended}</span>
+            <b>{title}</b>
+            <small className="brw-trail__sum">
+              <BrowserStrip kinds={steps.map(browserTrailKind)} color={color} />
+              <span>{summary}</span>
             </small>
-            <span className="brw-ac__hint">{summary}</span>
+            {ended && (
+              <span className="brw-ac__hint">
+                <Icon name="stop" size={14} />
+                {ended}
+              </span>
+            )}
           </span>
         </button>
         <span className="brw-ac__acts">
@@ -126,6 +142,7 @@ export function BrowserTrailCard({
                     {p.host ?? t("browser.after.noSite")}
                     {p.path && <span className="brw-ac__path">{p.path}</span>}
                   </span>
+                  {p.steps[0] && <small>{formatTime(i18n.language, p.steps[0].at)}</small>}
                   {href && (
                     <a
                       className="brw-trail__ext"
@@ -140,14 +157,25 @@ export function BrowserTrailCard({
                   )}
                 </span>
                 <ol>
-                  {p.steps.map((s, j) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: steps are a fixed list from the message
-                    <li key={j} className={s.failed ? "is-failed" : undefined}>
-                      <Icon name={s.failed ? "alert" : iconOf(s.tool)} size={14} />
-                      <span>{stepText(t, { id: "", tool: s.tool, detail: s.detail, running: false })}</span>
-                      <small>{formatTime(i18n.language, s.at)}</small>
-                    </li>
-                  ))}
+                  {browserTrailLines(p.steps).map((line, j) => {
+                    const [a, b] = line.steps;
+                    if (!a) return null;
+                    const text = b
+                      ? t("browser.after.pair", { a: said(t, a), b: lower(said(t, b)) })
+                      : a.failed
+                        ? t("browser.after.failed", { step: said(t, a) })
+                        : said(t, a);
+                    return (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: lines are a fixed list from the message
+                      <li key={j} className={a.failed ? "is-failed" : undefined}>
+                        <BrowserMark kind={browserTrailKind(a)} color={color} className="brw-trail__mark" />
+                        <span>{text}</span>
+                        {line.times > 1 && (
+                          <b className="brw-trail__times">{t("browser.after.times", { count: line.times })}</b>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ol>
               </li>
             );
