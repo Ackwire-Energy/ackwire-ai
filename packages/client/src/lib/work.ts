@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Run, RunStep } from "../api/types";
-import type { LiveCode, LiveOutput } from "../realtime/streams";
+import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
 import { type ActivityKind, toolActivity } from "./activity";
 import { joinNames } from "./format";
 
@@ -15,6 +15,8 @@ export interface WorkItem {
   tool: string;
   ms: number | null;
   failed: boolean;
+  /** How many calls in a row this line stands for (five "Usou o navegador" are one line). */
+  count: number;
   /** The code it ran (`run_code`, skill scripts: `input.code`/`input.command`) and what came out. */
   code?: LiveCode;
   output?: LiveOutput[];
@@ -92,13 +94,29 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       typeof input.code === "string" ? input.code : typeof input.command === "string" ? input.command : null;
     const content = typeof result?.data.content === "string" ? result.data.content : "";
     const failed = result?.data.isError === true;
+    const ms = result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null;
+    // The same thing again, with nothing said in between and no code to show: one line, not five.
+    const prev = items[items.length - 1];
+    if (
+      prev &&
+      source === null &&
+      !prev.code &&
+      sameActivity(prev, { kind: a.kind, app: a.app, tool: name }) &&
+      narration[narration.length - 1]?.at !== items.length
+    ) {
+      prev.count += 1;
+      prev.ms = prev.ms !== null && ms !== null ? prev.ms + ms : (prev.ms ?? ms);
+      prev.failed ||= failed;
+      continue;
+    }
     items.push({
       key: id,
       kind: a.kind,
       app: a.app,
       tool: name,
-      ms: result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null,
+      ms,
       failed,
+      count: 1,
       ...(source !== null
         ? {
             code: {
@@ -124,6 +142,31 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
         ? Math.max(0, time(last.createdAt) - time(first.createdAt))
         : null;
   return { steps: items, narration, connectors, durationMs };
+}
+
+/** Calls that read as the same line ("Usou o navegador"); an unknown tool's line names the tool. */
+export const sameActivity = (
+  a: { kind: ActivityKind; app?: string; tool: string },
+  b: { kind: ActivityKind; app?: string; tool: string },
+) => a.kind === b.kind && (a.app ?? "") === (b.app ?? "") && (a.kind !== "usingTool" || a.tool === b.tool);
+
+/** How many tool calls the work stands for (folded lines count each call). */
+export const workCalls = (w: Work) => w.steps.reduce((n, s) => n + s.count, 0);
+
+/**
+ * The live work with repeats folded: a call followed by the same kind of call (no code or output to
+ * show) is dropped, so five browser steps and the one running read as "Usando o navegador…".
+ */
+export function foldLiveWork(work: LiveWork[]): LiveWork[] {
+  const plain = (w: LiveWork | undefined) =>
+    w?.kind === "call" && !w.code && w.output.length === 0
+      ? { ...toolActivity(w.tool, w.connector, w.detail), tool: w.tool }
+      : null;
+  return work.filter((w, i) => {
+    const a = plain(w);
+    const b = plain(work[i + 1]);
+    return !(a && b && sameActivity(a, b));
+  });
 }
 
 /** "12 s", "3 min". */

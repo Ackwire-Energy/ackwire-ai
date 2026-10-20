@@ -165,6 +165,25 @@ describe("short follow-ups without a mention", () => {
     expect(several.runs.map((r) => r.agentId).sort()).toEqual([f.agent.id, qa.id].sort());
   });
 
+  test("a short message the router hears as for a person wakes nobody, even right after an agent spoke", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Oi!"] }) });
+    await post("@dev tá acordado?");
+    await drainOutbox(f.db, f.handlers); // Dev answers in the thread
+    const quiet: RouterStrategy = {
+      name: "fixed",
+      async decide(input) {
+        return { agents: input.candidates.map((c) => ({ agentId: c.agentId, score: 0.1 })), needsAgent: 0.05 };
+      },
+    };
+    const greeting = await post("boa noite walter");
+    const routed = await routeMessage(
+      { db: f.db, strategy: quiet, policy },
+      { orgId: f.org.id, messageId: greeting.id },
+    );
+    expect(routed.continuityAgentId).toBe(f.agent.id);
+    expect(routed.runs).toEqual([]);
+  });
+
   test("go to the agent that spoke right before; a name the router is sure of goes to that agent", async () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy feito."] }) });
     const qa = await addQa();

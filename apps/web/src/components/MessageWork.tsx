@@ -1,6 +1,13 @@
 import { useRun } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { formatDuration, stepLabel, workFromSteps, workHeader, workMeta } from "@agenteschat/client/lib/work";
+import {
+  formatDuration,
+  stepLabel,
+  workCalls,
+  workFromSteps,
+  workHeader,
+  workMeta,
+} from "@agenteschat/client/lib/work";
 import { WorkSummary } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,7 +37,7 @@ export function MessageWork({
   // Nothing to say: the server says it used no tools.
   if (compact && compact.steps === 0) return null;
   const header = work
-    ? workHeader(t, { steps: work.steps.length, connectors: work.connectors, durationMs: work.durationMs })
+    ? workHeader(t, { steps: workCalls(work), connectors: work.connectors, durationMs: work.durationMs })
     : compact
       ? workHeader(t, compact)
       : null;

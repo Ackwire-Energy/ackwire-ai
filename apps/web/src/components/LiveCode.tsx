@@ -2,6 +2,7 @@ import type { LiveCode, LiveOutput, LiveWork } from "@agenteschat/client";
 import { activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
 import { nearBottom } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { foldLiveWork } from "@agenteschat/client/lib/work";
 import { Button, Icon, Spinner } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -263,7 +264,7 @@ export function LiveWorkList({
   if (work.length === 0) return null;
   return (
     <div className="live-work">
-      {work.map((w, i) =>
+      {foldLiveWork(work).map((w, i) =>
         w.kind === "say" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: narration lines in order
           <p key={`say-${i}`} className="live-work__say">

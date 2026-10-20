@@ -548,6 +548,8 @@ export async function routeMessage(
   // A short follow-up without a mention ("and now?"), or a quote reply to an agent, goes only to the agent
   // the person was talking to, unless the router heard it as for several agents, or (not quoting) clearly
   // for another one ("tem sim ada, tenta dnv" right after Theo spoke: a name beats who spoke last).
+  // A short message the router heard as for nobody stays with people ("boa noite walter" right after
+  // Ada spoke, 2026-10-19: Ada reacted to a greeting meant for a person).
   const scoreOf = (agentId: string | null) =>
     Math.max(0, ...result.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
   const clearlyAnother =
@@ -560,7 +562,7 @@ export async function routeMessage(
     );
   const followUp =
     continuityAgentId !== null &&
-    (quotedAgentId !== null || isShortFollowUp(message.body)) &&
+    (quotedAgentId !== null || (isShortFollowUp(message.body) && picked.length > 0)) &&
     picked.length < 2 &&
     !clearlyAnother;
   // Another agent already answered this in the thread: don't pile on with a second answer. Not when the
