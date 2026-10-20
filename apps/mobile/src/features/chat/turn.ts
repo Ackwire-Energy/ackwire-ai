@@ -41,6 +41,16 @@ export function turnItems(r: Pick<LiveRun, "work" | "status">): TurnItem[] {
   });
 }
 
+/**
+ * How long after it starts the block waits before it shows anything of its own (1.2–2 s, one per run):
+ * a reply in the same instant reads as a machine; the line above the box already says it works.
+ */
+export function openerDelayMs(runId: string) {
+  let h = 0;
+  for (const ch of runId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return 1200 + (h % 800);
+}
+
 /** How many generic openers there are (`mobile.chat.turn.opener0`…): one per run, always the same. */
 export const OPENERS = 3;
 

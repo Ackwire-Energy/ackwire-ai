@@ -204,11 +204,14 @@ describe("live row in the timeline", () => {
       },
     });
 
-  test("one block from the start: it stays last while it works; a later message goes above it", async () => {
+  test("one block after a moment: it stays last while it works; a later message goes above it", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
-    // Before any word: the block is there, opening as if it had answered (the bar says it works).
+    // Right after it starts: no block yet, a moment as a person would take (the bar says it works).
+    expect(row()).toBeNull();
+    // Then it opens as if it had answered.
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
     expect(row().textContent).toMatch(/Deixa eu ver…|Já vejo isso…|Um instante…/);
     expect(row().textContent).not.toContain("pensando");
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });

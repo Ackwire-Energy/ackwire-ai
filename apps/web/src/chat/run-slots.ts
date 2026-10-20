@@ -115,6 +115,26 @@ export const OPENERS = 3;
  * the first thing it said (out of its work list), or a generic phrase with an ellipsis until then
  * (`opener`, which of `OPENERS`). Nothing when its words already arrive or it stopped or failed first.
  */
+/**
+ * How long after it starts the block waits before it shows anything of its own (1.2–2 s, one per run):
+ * a reply in the same instant reads as a machine; the bar above the composer already says it works.
+ */
+export function openerDelayMs(runId: string) {
+  return 1200 + (hashOf(runId) % 800);
+}
+
+/** Nothing of its own yet: no words, no steps, still at work (the block waits for its opener's delay). */
+export const saysNothingYet = (r: Pick<LiveRun, "status" | "text" | "work">) =>
+  r.text.length === 0 &&
+  (r.work ?? []).length === 0 &&
+  (r.status === "thinking" || r.status === "queued" || r.status === "running");
+
+function hashOf(s: string) {
+  let h = 0;
+  for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h;
+}
+
 export function openerOf(r: Pick<LiveRun, "runId" | "status" | "text" | "work">): {
   said: string | null;
   opener: number | null;
@@ -124,9 +144,7 @@ export function openerOf(r: Pick<LiveRun, "runId" | "status" | "text" | "work">)
   const first = work.find((w) => w.kind === "say");
   if (first?.kind === "say") return { said: first.text, opener: null, work: work.filter((w) => w !== first) };
   const generic = r.text.length === 0 && r.status !== "canceled" && r.status !== "failed";
-  let h = 0;
-  for (const ch of r.runId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return { said: null, opener: generic ? h % OPENERS : null, work };
+  return { said: null, opener: generic ? hashOf(r.runId) % OPENERS : null, work };
 }
 
 /** " · 4 s" shows from 2 s on: minutes and seconds past a minute. */

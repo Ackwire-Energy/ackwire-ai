@@ -37,6 +37,7 @@ import { markedParts, markName, stoppableInLine, workingEntries } from "./logic"
 import { MessageText } from "./MessageText";
 import {
   fadeTail,
+  openerDelayMs,
   pruneMarks,
   type RevealMark,
   recentTurn,
@@ -89,6 +90,17 @@ export const TurnRow = memo(function TurnRow({
   useEffect(() => {
     rememberTurn(run.runId, { items, quotes, at: Date.now() });
   }, [run.runId, signature]);
+  // Just started and nothing of its own yet: it waits a moment, as a person would before answering.
+  const [mountedAt] = useState(() => Date.now());
+  const [, wake] = useState(0);
+  const dueAt = (since ?? mountedAt) + openerDelayMs(run.runId);
+  const quiet = live && items.length === 0 && !run.text && Date.now() < dueAt;
+  useEffect(() => {
+    if (!quiet) return;
+    const timer = setTimeout(() => wake((n) => n + 1), Math.max(0, dueAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [quiet, dueAt]);
+  if (quiet) return null;
 
   return (
     <View style={styles.msg}>

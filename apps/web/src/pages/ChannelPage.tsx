@@ -153,10 +153,12 @@ import {
   drawsBehind,
   elapsedParts,
   nextSlots,
+  openerDelayMs,
   openerOf,
   type RunSlot,
   SLOT_HOLD_MS,
   sameSlots,
+  saysNothingYet,
 } from "@/chat/run-slots";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { AgentActionReceipts } from "@/components/AgentActions";
@@ -2161,8 +2163,12 @@ function RunBlock({
     () => (live ? liveMessageOf(live) : null),
     [liveId, liveAgent, liveChannel, liveThread, liveStart],
   );
+  // Just started and nothing of its own yet: it waits a moment, as a person would before answering.
+  const quiet = Boolean(live && saysNothingYet(live));
+  const due = useDue(liveStart ?? null, live ? openerDelayMs(live.runId) : 0, quiet);
   const shown = message ?? placeholder;
   if (!shown || (live && !opens && !drawsBehind(live))) return null;
+  if (live && !message && quiet && !due) return null;
   const together = message
     ? grouped
     : Boolean(placeholder && groupsWith(after, placeholder.author, placeholder.createdAt));
@@ -2391,6 +2397,20 @@ function SteerLine({ steer }: { steer: SteerState }) {
 }
 
 /** Shows only after `ms` while `on` ("enviando" waits half a second: most sends never show it). */
+/** True from `from + ms` on (now when `from` is unknown, i.e. counted from the mount), while `on`. */
+function useDue(from: number | null, ms: number, on: boolean) {
+  const [start] = useState(() => Date.now());
+  const at = (from ?? start) + ms;
+  const [, tick] = useState(0);
+  const wait = at - Date.now();
+  useEffect(() => {
+    if (!on || wait <= 0) return;
+    const timer = setTimeout(() => tick((n) => n + 1), wait);
+    return () => clearTimeout(timer);
+  }, [on, wait]);
+  return !on || wait <= 0;
+}
+
 function useAfter(ms: number, on: boolean) {
   const [late, setLate] = useState(false);
   useEffect(() => {
