@@ -20,7 +20,7 @@ import {
 } from "@agenteschat/client";
 import { relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { browserTimezone, onceParts, timezoneLabel, timezoneName } from "@agenteschat/client/lib/routines";
+import { browserTimezone, onceParts, timezoneName } from "@agenteschat/client/lib/routines";
 import {
   Button,
   Checkbox,
@@ -40,8 +40,6 @@ import {
   Input,
   Menu,
   MenuItem,
-  RadioCard,
-  RadioGroup,
   RecurrencePicker,
   type RecurrenceRule,
   RunKey,
@@ -1127,7 +1125,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   const apiRule = kind === "schedule" && !once ? toApiRule(rule) : null;
   const described = useRuleDescribe(org.id, open ? apiRule : null);
   const info = described.data?.ok ? described.data : null;
-  // The picker opens on demand ("Ajustar dias e horários"); the sentence and next runs always show.
+  // The picker opens on demand ("Ajustar"); the sentence and next runs always show.
   const [pickerOpen, setPickerOpen] = useState(false);
   const upcoming = info?.nextRuns.length
     ? info.nextRuns.slice(0, 3).map((iso) => runLabel(i18n.language, iso, rule.timezone))
@@ -1194,7 +1192,8 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     if (active !== r.active) patch.active = active;
     return patch;
   };
-  const help = () => {
+  // Only a phrase that wasn't understood says something here; the sentence above already says what was.
+  const phraseError = () => {
     if (phraseFailed && parsed.data && !parsed.data.ok) {
       const tt = t as unknown as (k: string, o: Record<string, unknown>) => string;
       const code = parsed.data.code;
@@ -1202,12 +1201,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
         ? tt(`routines.form.parseError.${code.replace(/\./g, "_")}`, { defaultValue: parsed.data.error })
         : parsed.data.error;
     }
-    if (!info) return "";
-    return t("routines.form.parsed", {
-      // The sentence from the rule, in the UI language (the server's description is English).
-      description: ruleSentence(t, i18n.language, rule, new Date(), false),
-      timezone: timezoneLabel(rule.timezone, undefined, i18n.language),
-    });
+    return undefined;
   };
   /** A starting point: what to do, a name and when (the phrase is read by the server, like a typed one). */
   const applyPreset = (p: (typeof PRESETS)[number]) => {
@@ -1371,24 +1365,25 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
           <Field label={editing ? t("routines.form.title") : t("routines.form.name")} id="nr-name">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <RadioGroup
-            value={kind}
-            onValueChange={(v) => setKind(v as "schedule" | "event" | "email")}
-            aria-label={t("routines.form.when")}
-            className={cx("grid-fields", hasMail && "grid-fields--3")}
-          >
-            <RadioCard value="schedule" id="nr-k-time" checked={kind === "schedule"} title={t("routines.form.time")} />
-            <RadioCard value="event" id="nr-k-event" checked={kind === "event"} title={t("routines.form.onEvent")} />
-            {hasMail && (
-              <RadioCard value="email" id="nr-k-email" checked={kind === "email"} title={t("mail.routine.onEmail")} />
-            )}
-          </RadioGroup>
+          <div className="routine-kind">
+            <span className="ac-field__label">{t("routines.form.when")}</span>
+            <Segmented
+              label={t("routines.form.when")}
+              value={kind}
+              onValueChange={setKind}
+              options={[
+                { value: "schedule" as const, label: t("routines.form.kind.schedule") },
+                { value: "event" as const, label: t("routines.form.kind.event") },
+                ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
+              ]}
+            />
+          </div>
           {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
           {kind === "schedule" && (
             <div className="routine-when">
               <div className="routine-when__head">
                 <span className="routine-when__sentence" aria-live="polite">
-                  {ruleSentence(t, i18n.language, rule)}
+                  {ruleSentence(t, i18n.language, rule, new Date(), false)}
                 </span>
                 <Button
                   type="button"
@@ -1402,7 +1397,16 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
                 </Button>
               </div>
               {!pickerOpen && upcoming.length > 0 && (
-                <span className="small muted">{t("routines.form.nextRuns", { list: upcoming.join(" · ") })}</span>
+                <div className="ac-recur__upcoming">
+                  <span className="ac-recur__label">{t("routines.form.next")}</span>
+                  <ol>
+                    {upcoming.map((label) => (
+                      <li key={label} className="tabular">
+                        {label}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               )}
               {pickerOpen && (
                 <RecurrencePicker
@@ -1417,24 +1421,21 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             </div>
           )}
           {kind === "schedule" && (
-            <Field label={t("routines.form.timezone")} id="nr-zone">
-              <ZoneSelect value={zone} onChange={setZone} />
-            </Field>
+            <>
+              {!once && (
+                <Field label={t("routines.form.frequency")} id="nr-when" error={phraseError()}>
+                  <Input
+                    value={phrase}
+                    onChange={(e) => typePhrase(e.target.value)}
+                    placeholder={t("recurrence.phrasePlaceholder")}
+                  />
+                </Field>
+              )}
+              <Field label={t("routines.form.timezone")} id="nr-zone">
+                <ZoneSelect value={zone} onChange={setZone} />
+              </Field>
+            </>
           )}
-          {kind === "schedule" && !once ? (
-            <Field
-              label={t("routines.form.frequency")}
-              id="nr-when"
-              help={phraseFailed ? undefined : help()}
-              error={phraseFailed ? help() : undefined}
-            >
-              <Input
-                value={phrase}
-                onChange={(e) => typePhrase(e.target.value)}
-                placeholder={t("recurrence.phrasePlaceholder")}
-              />
-            </Field>
-          ) : null}
           {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
             <p className="routine-utc-hint small">
               <Icon name="waiting" size={14} />

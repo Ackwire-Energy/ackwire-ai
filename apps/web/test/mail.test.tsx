@@ -372,7 +372,7 @@ describe("Rotinas: quando chegar um email", () => {
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
     await settle(4);
-    await click(within(dialog).getByRole("radio", { name: "Quando chegar um email" }));
+    await click(within(dialog).getByRole("radio", { name: "Email" }));
     await settle(4);
     expect(within(dialog).getByRole("combobox", { name: "Caixa de email" }).textContent).toContain("ana@icloud.com");
     expect(within(dialog).getByRole("combobox", { name: "Pasta" }).textContent).toContain("Caixa de entrada");

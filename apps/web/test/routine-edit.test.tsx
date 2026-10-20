@@ -43,7 +43,7 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     expect((within(dialog).getByLabelText("O que fazer") as HTMLTextAreaElement).value).toContain("Resuma o que");
     expect((within(dialog).getByLabelText("Título") as HTMLInputElement).value).toBe("Resumo da semana");
     expect((within(dialog).getByLabelText("Frequência") as HTMLInputElement).value).toBe("toda segunda às 9h");
-    expect(dialog.textContent).toContain("Toda semana, seg, às 09:00 · horário de Brasília (UTC−3)");
+    expect(dialog.textContent).toContain("Toda semana, seg, às 09:00");
     await type(within(dialog).getByLabelText("Frequência"), "dias úteis às 8h30");
     await settle(4);
     await click(within(dialog).getByRole("button", { name: "Salvar" }));

@@ -6612,22 +6612,37 @@ button.live-call__head:hover {
   justify-content: center;
   padding: 4px;
 }
-/* A routine's "when": the sentence, "Ajustar dias e horários" and the next runs; the picker on demand. */
+/* A routine's "when": Horário / Evento / Email, then one quiet panel with the
+   sentence, "Ajustar" and the next runs; the picker opens inside it. */
+.routine-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
 .routine-when {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--sunken);
 }
 .routine-when__head {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 12px;
+  align-items: flex-start;
+  gap: 12px;
 }
 .routine-when__sentence {
-  flex: 1 1 220px;
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
   font-weight: 600;
   color: var(--ink);
+  text-wrap: pretty;
+}
+.routine-when__head .ac-btn {
+  flex-shrink: 0;
 }
 /* "Responde sem menção" in the channel's member list: the v2 switch with its label. */
 .member-row__switch {

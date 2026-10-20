@@ -308,7 +308,7 @@ describe("Rotinas", () => {
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
     await settle(4);
-    expect(dialog.textContent).toContain("Toda semana, seg, às 09:00 · horário de Brasília (UTC−3)");
+    expect(dialog.textContent).toContain("Toda semana, seg, às 09:00");
     // The zone has its own select, so the person can change it.
     expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain(
       "Horário de Brasília · UTC−3",
@@ -335,7 +335,7 @@ describe("Rotinas", () => {
     await go("routines");
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
-    await click(within(dialog).getByRole("radio", { name: "Quando algo acontecer" }));
+    await click(within(dialog).getByRole("radio", { name: "Evento" }));
     expect(dialog.textContent).toContain("Vem pelos conectores da Acme.");
     await pick(within(dialog).getByRole("combobox", { name: "Evento" }), "Deploy concluído");
     await type(within(dialog).getByLabelText("O que fazer"), "Confira os erros depois do deploy.");
