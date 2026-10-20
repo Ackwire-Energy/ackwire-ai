@@ -47,12 +47,13 @@ export function Notch() {
   const host = useHost();
   const snap = useSnapshot();
   const homes = pairedHomes(snap);
-  const state = notchStateOf(homes);
+  const [now, setNow] = useState(() => Date.now());
+  // The clock below re-renders it while it shows, so a browser left idle drops out on its own.
+  const state = notchStateOf(homes, now);
   const [info, setInfo] = useState<NotchInfo | null>(null);
   const [mode, setMode] = useState<Mode>("closed");
   const [done, setDone] = useState<Done | null>(null);
   const [bodyHeight, setBodyHeight] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
   const body = useRef<HTMLDivElement>(null);
   const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ControlBrowser, ControlJob, ControlStatus } from "@agenteschat/adapters/runner-control";
 import {
+  BROWSER_BUSY_MS,
   DONE_MIN_MS,
   elapsedClock,
   finishedOf,
@@ -66,6 +67,15 @@ describe("notchStateOf", () => {
     const s = notchStateOf([home({ browsers: [using] }, [job({ kind: "brain", summary: "pensando" })])]);
     expect(s.work).toHaveLength(1);
     expect(s.work[0]).toMatchObject({ browser: true, where: "app.acme.example", agent: { name: "Dev" } });
+  });
+  test("a browser left open after its run isn't work: the notch goes idle", () => {
+    const actedAt = "2026-10-20T15:00:00Z";
+    const at = Date.parse(actedAt);
+    const browsers = [{ ...using, actedAt }];
+    expect(notchStateOf([home({ browsers })], at + 30_000).kind).toBe("working");
+    expect(notchStateOf([home({ browsers })], at + BROWSER_BUSY_MS).kind).toBe("idle");
+    // A person's turn still shows, however long ago the agent acted.
+    expect(notchStateOf([home({ browsers: [{ ...asking, actedAt }] })], at + BROWSER_BUSY_MS).kind).toBe("needs");
   });
   test("a person needed wins, even paused", () => {
     const s = notchStateOf([home({ browsers: [asking], paused: { paused: true, until: null } })]);

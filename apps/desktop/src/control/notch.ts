@@ -1,4 +1,4 @@
-import type { ControlJob } from "@agenteschat/adapters/runner-control";
+import type { ControlBrowser, ControlJob } from "@agenteschat/adapters/runner-control";
 import { browserRowState, browsersOf } from "./browser";
 import type { Home } from "./store";
 
@@ -50,11 +50,23 @@ const jobWork = (h: NotchHome, j: ControlJob): NotchWork => ({
   startedAt: j.startedAt,
 });
 
-export function notchStateOf(homes: readonly NotchHome[]): NotchState {
+/**
+ * A browser counts as work this long after the agent's last command (it thinks between steps). Open
+ * alone isn't work: the runner keeps it up 15 min idle, and the notch stayed on after the run.
+ */
+export const BROWSER_BUSY_MS = 90_000;
+
+const browserBusy = (b: ControlBrowser, now: number) => {
+  if (b.handoff || b.mode === "control" || !b.actedAt) return true;
+  const at = Date.parse(b.actedAt);
+  return !Number.isFinite(at) || now - at < BROWSER_BUSY_MS;
+};
+
+export function notchStateOf(homes: readonly NotchHome[], now = Date.now()): NotchState {
   const work: NotchWork[] = [];
   const help: NotchHelp[] = [];
   for (const h of homes) {
-    const browsers = browsersOf(h.status);
+    const browsers = browsersOf(h.status).filter((b) => browserBusy(b, now));
     const inBrowser = new Set(browsers.map((b) => b.agentId));
     for (const b of browsers) {
       const state = browserRowState(b);

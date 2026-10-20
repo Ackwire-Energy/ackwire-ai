@@ -47,6 +47,8 @@ export interface ControlBrowser {
   host?: string;
   /** What the agent did last, as a key the app words (`reading`, `clicking`, `filling`…). */
   doing?: ControlBrowserDoing;
+  /** When the agent last ran a command in it (ISO); absent: older runner. Open isn't busy: it stays up 15 min idle. */
+  actedAt?: string;
   /** Someone is watching (`watch`) or driving (`control`) its live view. */
   mode?: "watch" | "control";
   /** A request waiting for a person, or a person in control. */

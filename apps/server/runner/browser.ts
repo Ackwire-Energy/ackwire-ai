@@ -641,6 +641,8 @@ interface Session {
   /** For the desktop app: the page's host, what the agent did last, and the conversation it was for. */
   host?: string;
   doing?: ControlBrowserDoing;
+  /** When the agent's last command ran (not a person's input or a viewer). */
+  actedAt?: number;
   link?: string;
 }
 
@@ -1373,6 +1375,7 @@ export class BrowserManager {
     if (isLink(link)) session.link = link;
     const doing = DOING[command];
     if (doing) session.doing = doing;
+    session.actedAt = this.now();
     const url =
       answer.success && isRecord(answer.data) && typeof answer.data.url === "string"
         ? answer.data.url
@@ -1422,6 +1425,7 @@ export class BrowserManager {
         open,
         ...(host ? { host } : {}),
         ...(s?.doing ? { doing: s.doing } : {}),
+        ...(s?.actedAt ? { actedAt: new Date(s.actedAt).toISOString() } : {}),
         ...(s?.stream ? { mode: s.stream.mode } : {}),
         ...(handoff ? { handoff: { ...handoff } } : {}),
         ...(s?.link ? { link: s.link } : {}),
