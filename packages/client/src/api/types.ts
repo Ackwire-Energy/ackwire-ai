@@ -303,6 +303,8 @@ export interface ActiveRun {
   /** Last sign of life from the worker. */
   heartbeatAt?: string | null;
   createdAt?: string;
+  /** Messages sent to it while it works that it hasn't read yet (the others steered into it, it read). */
+  pendingMessageIds?: string[];
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -3232,6 +3234,8 @@ export interface WorkingRun {
   createdAt: string;
   /** What it works on: the thread's title, else its first message (≤ 80 chars). */
   label: string | null;
+  /** Messages sent to it while it works that it hasn't read yet. */
+  pendingMessageIds?: string[];
 }
 
 /** A one-off reminder in a conversation (`reminders.*`; also a routine in Rotinas). */

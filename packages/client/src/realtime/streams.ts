@@ -21,8 +21,31 @@ export interface RunSteeredEvent {
   /** The run's agent (receipts: it is on this message now). */
   agentId?: string;
   messageId: string;
-  /** The new message asked it to stop: the run is wrapping up. */
+  /** Sent with "Parar e mandar": the run stops its current step and reads it now. */
+  now?: boolean;
+  /** The new message asked it to stop: the run is wrapping up (may come in a second event). */
   stop?: boolean;
+}
+
+/** `agent.run.read`: the run read these messages sent while it worked ("Leu seu recado"). */
+export interface RunReadEvent {
+  type: "agent.run.read";
+  channelId: string;
+  threadId: string | null;
+  runId: string;
+  agentId: string;
+  messageIds: string[];
+}
+
+/** `run.continued`: "Continuar" under the stopped reply `messageId`; `newRunId` picks up where `runId` stopped. */
+export interface RunContinuedEvent {
+  type: "run.continued";
+  channelId: string;
+  threadId: string | null;
+  agentId?: string;
+  runId: string;
+  newRunId: string;
+  messageId: string;
 }
 
 /** `agent.narration`: the text of model call `turn` was narration (said before tool calls), not the answer. */
@@ -128,12 +151,17 @@ export interface LiveRun {
   work?: LiveWork[];
   /** That call's output so far (`agent.tool.output`), in order. */
   output?: LiveOutput[];
+  /** Messages sent with "Parar e mandar" it hasn't read yet. */
+  steerNow?: string[];
 }
 
 export type LiveWork =
   | { kind: "say"; text: string; turn?: number }
-  /** A new message reached the running task ("Nova mensagem de Walter"). */
-  | { kind: "steer"; messageId: string }
+  /**
+   * The running task read a message sent while it worked ("Leu seu recado"); `now`: it stopped
+   * to read it ("Parou para ler seu recado").
+   */
+  | { kind: "steer"; messageId: string; now?: boolean }
   | {
       kind: "call";
       id: string;
@@ -319,6 +347,8 @@ type StreamEvent =
   | AgentToolOutputEvent
   | RunCanceledEvent
   | RunSteeredEvent
+  | RunReadEvent
+  | RunContinuedEvent
   | AgentNarrationEvent;
 
 /** Adds what the agent said (or replaces the line of the same turn: `agent.narration` is the final word). */
@@ -342,14 +372,31 @@ export function applyChannelEvent(state: StreamsState, event: StreamEvent, now =
 function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
   switch (event.type) {
     case "agent.run.steered": {
+      // Only noted here: it shows in the work once read (`agent.run.read`), under the message until then.
       const r = state.runs[event.runId];
       if (!r) return state;
-      // Text so far is narration: the answer continues after the new message.
+      if (event.stop) return { ...state, runs: { ...state.runs, [event.runId]: { ...r, stopping: true } } };
+      if (!event.now || r.steerNow?.includes(event.messageId)) return state;
+      const steerNow = [...(r.steerNow ?? []), event.messageId];
+      return { ...state, runs: { ...state.runs, [event.runId]: { ...r, steerNow } } };
+    }
+    case "agent.run.read": {
+      const r = state.runs[event.runId];
+      if (!r) return state;
+      const seen = new Set((r.work ?? []).flatMap((w) => (w.kind === "steer" ? [w.messageId] : [])));
+      const fresh = event.messageIds.filter((id) => !seen.has(id));
+      if (fresh.length === 0) return state;
+      // Text so far is narration: the answer continues after the message it read.
       const said = r.text.trim();
       const work: LiveWork[] = [
         ...(said ? say(r.work ?? [], said, r.turn) : (r.work ?? [])),
-        { kind: "steer", messageId: event.messageId },
+        ...fresh.map((messageId) => ({
+          kind: "steer" as const,
+          messageId,
+          ...(r.steerNow?.includes(messageId) ? { now: true } : {}),
+        })),
       ];
+      const steerNow = (r.steerNow ?? []).filter((id) => !fresh.includes(id));
       return {
         ...state,
         runs: {
@@ -357,11 +404,19 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
           [event.runId]: {
             ...r,
             work,
+            steerNow,
             ...(said ? { text: "", status: "thinking" as const } : {}),
-            ...(event.stop ? { stopping: true } : {}),
           },
         },
       };
+    }
+    case "run.continued": {
+      // The stopped row (if still here) gives way to the run that picks up, a normal live run.
+      const s = state.runs[event.runId] ? finish(state, event.runId) : state;
+      if (s.runs[event.newRunId] || s.finished[event.newRunId] || !event.agentId) return s;
+      // Flat conversations (DMs) have no thread: `null`, like the run's other events.
+      const where = { channelId: event.channelId, threadId: event.threadId as string, agentId: event.agentId };
+      return upsert(s, { ...where, runId: event.newRunId }, { status: "thinking", triggerMessageId: event.messageId });
     }
     case "agent.narration": {
       if (state.finished[event.runId]) return state;

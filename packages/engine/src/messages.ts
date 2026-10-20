@@ -18,7 +18,7 @@ import { type AgentActionView, actionsFor } from "./agent-actions";
 import { getAgentCached } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
-import { cancelRun } from "./cancel";
+import { cancelRun, interruptRun } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
@@ -595,6 +595,19 @@ async function markOpenedByReply(db: Database, reply: Message, userId: string): 
   return marked.length > 0;
 }
 
+/** Stop checks still being judged (they run after the post returns). */
+const stopChecks = new Set<Promise<unknown>>();
+
+function trackStopCheck(check: Promise<unknown>) {
+  const tracked = check.catch(() => undefined).finally(() => stopChecks.delete(tracked));
+  stopChecks.add(tracked);
+}
+
+/** Resolves once every stop check started so far is judged (and its cancel done): for tests and shutdown. */
+export async function stopChecksSettled() {
+  while (stopChecks.size > 0) await Promise.all([...stopChecks]);
+}
+
 /**
  * A person posts in a channel: org membership, channel membership and the
  * `post` permission are checked, then message + outbox event commit together,
@@ -621,6 +634,11 @@ export async function postPersonMessage(
      * panel and the channel shows one line (`threads.opened_by_reply_at`). Needs `threadId`.
      */
     openThread?: boolean;
+    /**
+     * "Parar e mandar": when the message goes into an agent's task in progress, its current model
+     * call stops and it reads the message now (instead of at its next step).
+     */
+    steer?: "now";
   },
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
@@ -705,14 +723,12 @@ export async function postPersonMessage(
     });
   }
   if (steered.length > 0) {
-    // Delivered to the agent's task in progress (it reads it at its next step); a plain "stop",
-    // in any language, cancels it instead (the judge decides; short messages only).
+    // Delivered to the agent's task in progress: it reads it at its next step, or now ("Parar e mandar").
+    const now = input.steer === "now";
+    const steeredIds = steered.map((s) => s.id);
+    const activeRuns = await deps.db.select().from(agentRuns).where(inArray(agentRuns.id, steeredIds));
     for (const s of steered) {
-      const agentName = (await getAgentCached(deps.db, orgId, s.agentId))?.name ?? "the agent";
-      const stop = deps.judge
-        ? await isStopRequest(deps.judge, { orgId, text: message.body, agentName }).catch(() => false)
-        : false;
-      const [active] = await deps.db.select().from(agentRuns).where(eq(agentRuns.id, s.id));
+      const active = activeRuns.find((r) => r.id === s.id);
       const threadId =
         active && !(channel.kind === "dm" && active.threadRootId === active.triggerMessageId)
           ? active.threadRootId
@@ -724,9 +740,10 @@ export async function postPersonMessage(
         runId: s.id,
         agentId: s.agentId,
         messageId: message.id,
-        ...(stop ? { stop: true } : {}),
+        ...(now ? { now: true as const } : {}),
       });
-      if (stop) await cancelRun(deps, userId, orgId, s.id).catch(() => undefined);
+      // Its model call stops and the loop reads the message at once (a running tool finishes first).
+      if (now && active?.status === "running") await interruptRun(deps.pubsub, s.id, message.id);
       // Parked waiting for its computer: look again now. Back (or never really away): the run resumes
       // and reads this message with the rest; still away: it parks again quietly (one answer later).
       else if (active?.status === "waiting_input" && active.waitingMachineId) {
@@ -738,6 +755,27 @@ export async function postPersonMessage(
           dedupeKey: `agent_run.execute:${s.id}:steer:${message.id}`,
           maxAttempts: 4,
         }).catch(() => undefined);
+      }
+      // A plain "stop", in any language, cancels the task instead (the judge decides; short messages
+      // only). Never in the way of the send: judged after the response, the app hears `stop` then.
+      const judge = deps.judge;
+      if (judge) {
+        const judgeStop = async () => {
+          const agentName = (await getAgentCached(deps.db, orgId, s.agentId))?.name ?? "the agent";
+          const stop = await isStopRequest(judge, { orgId, text: message.body, agentName }).catch(() => false);
+          if (!stop) return;
+          await publishChannelEvent(deps.pubsub, {
+            type: "agent.run.steered",
+            channelId,
+            threadId,
+            runId: s.id,
+            agentId: s.agentId,
+            messageId: message.id,
+            stop: true,
+          });
+          await cancelRun(deps, userId, orgId, s.id);
+        };
+        trackStopCheck(judgeStop());
       }
     }
   }

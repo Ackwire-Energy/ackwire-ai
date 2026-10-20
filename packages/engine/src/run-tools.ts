@@ -70,7 +70,10 @@ export function replyThreadOf(
   topTrigger: Pick<Message, "meta"> | null,
 ): string | null {
   const topLevel = run.threadRootId === run.triggerMessageId;
-  const flat = topLevel && (channelKind === "dm" || channelKind === "forum" || Boolean(topTrigger?.meta.routine));
+  // A run that continues a stopped reply in the main timeline ("Continuar") answers there too.
+  const flatHere = channelKind === "dm" || channelKind === "forum";
+  const flatTrigger = Boolean(topTrigger?.meta.routine || topTrigger?.meta.canceled);
+  const flat = topLevel && (flatHere || flatTrigger);
   return flat ? null : run.threadRootId;
 }
 

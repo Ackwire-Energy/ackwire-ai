@@ -94,6 +94,9 @@ export function chatRoutes(deps: AppDeps) {
                     .string()
                     .nullable()
                     .openapi({ description: "What it works on: the thread's title, else its first message (≤ 80)." }),
+                  pendingMessageIds: z.array(z.uuid()).openapi({
+                    description: "Messages sent to it while it works that it hasn't read yet.",
+                  }),
                 })
                 .openapi("WorkingRun"),
             ),
@@ -233,6 +236,10 @@ export function chatRoutes(deps: AppDeps) {
                 startedAt: z.string().nullable(),
                 heartbeatAt: z.string().nullable().openapi({ description: "Last sign of life of its worker." }),
                 createdAt: z.string(),
+                pendingMessageIds: z.array(z.uuid()).openapi({
+                  description:
+                    "Messages sent while it works that it hasn't read yet. A message whose `meta.steeredRunIds` names a run that is not here, or is here without it in this list, was read.",
+                }),
               }),
             ),
           }),
@@ -322,6 +329,10 @@ export function chatRoutes(deps: AppDeps) {
             openThread: z.boolean().optional().openapi({
               description:
                 'Sent from the thread panel ("Responder"), with `threadId`: the thread gets `openedByReplyAt`, so from this reply on the channel shows one line instead of its replies.',
+            }),
+            steer: z.literal("now").optional().openapi({
+              description:
+                "Sent while an agent works here (it goes into its task): stop its current model call and read this message now. Without it, the agent reads it at its next step.",
             }),
             clientId: z
               .string()

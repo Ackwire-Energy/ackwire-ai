@@ -6,6 +6,7 @@ import {
   cancelRun,
   canTalkTo,
   canViewCost,
+  continueRun,
   getOrgSettings,
   getRun,
   inviteMany,
@@ -761,6 +762,28 @@ export function managementRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/runs/{runId}/continue",
+      tags: ["Usage"],
+      security,
+      summary:
+        "Continue a run a person stopped (same people as stopping it): a new run of the agent picks up where it stopped",
+      description:
+        "Only for a run stopped by a person while it worked; once per stopped reply (`meta.canceled.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
+      request: { params: OrgParams.extend({ runId: z.uuid() }) },
+      responses: { 200: json(z.object({ runId: z.uuid() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, runId } = c.req.valid("param");
+      const result = await continueRun({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runId);
+      // Wake the workers now instead of waiting for the poll.
+      deps.wakeWorkers?.();
+      return c.json(result, 200);
     },
   );
 

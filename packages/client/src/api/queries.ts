@@ -384,7 +384,7 @@ export function usePostMessage(
   const key = keys.messages(orgId, channelId);
   return useMutation({
     meta: { silent: true },
-    mutationFn: ({ body, clientId, threadId, meta }: PostInput) => {
+    mutationFn: ({ body, clientId, threadId, meta, steer }: PostInput) => {
       // The server builds the real meta from these (it checks the quoted message and the files).
       const replyTo = replyOf(meta)?.messageId;
       const attachments = artifactRefs(meta).map((r) => r.id);
@@ -395,6 +395,7 @@ export function usePostMessage(
         ...(replyTo ? { replyTo } : {}),
         ...(attachments.length > 0 ? { attachments } : {}),
         ...(threadId && meta?.[OPEN_THREAD] === true ? { openThread: true } : {}),
+        ...(steer ? { steer } : {}),
       });
     },
     onMutate: ({ body, clientId, threadId, meta }) => {
@@ -449,13 +450,34 @@ interface PostInput {
   clientId: string;
   threadId?: string | null;
   meta?: Record<string, unknown>;
+  /** "Parar e mandar": an agent working here stops its current step and reads it now. */
+  steer?: "now";
 }
 
-/** `send(body)` for a new message; `retry(local)` for one that failed (same quote and files). */
+/** How a message goes out while an agent works: joins its task (default) or stops it to read now. */
+export interface SendOptions {
+  steer?: "now";
+}
+
+/**
+ * `send(body)` for a new message; `retry(local)` for one that failed (same quote and files).
+ * `send(body, threadId, { steer: "now" })` ("Parar e mandar"): `steer` may come in the third
+ * argument (it never reaches the optimistic copy's meta) or in `options`. A retry joins the task.
+ */
 export function sendHelpers(mutation: ReturnType<typeof usePostMessage>) {
   return {
-    send: (body: string, threadId?: string | null, meta?: Record<string, unknown>) =>
-      mutation.mutate({ body, clientId: newClientId(), threadId, meta }),
+    send: (body: string, threadId?: string | null, meta?: Record<string, unknown>, options: SendOptions = {}) => {
+      const given: Record<string, unknown> = meta ?? {};
+      const { steer: inMeta, ...rest } = given;
+      const steer = options.steer ?? (inMeta === "now" ? "now" : undefined);
+      mutation.mutate({
+        body,
+        clientId: newClientId(),
+        threadId,
+        meta: meta ? rest : undefined,
+        ...(steer ? { steer } : {}),
+      });
+    },
     retry: (local: Message) =>
       mutation.mutate({
         body: local.body,

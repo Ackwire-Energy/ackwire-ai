@@ -1,6 +1,7 @@
 import { type Database, rowsOf, schema, sql } from "@agenteschat/db";
 import { replyExcerpt } from "./messages";
 import { requirePermission } from "./organizations";
+import { pendingIds } from "./recovery";
 
 const { agentRuns, channels, channelMembers, threads, messages } = schema;
 
@@ -23,6 +24,8 @@ export interface WorkingRun {
   createdAt: string;
   /** What it works on, in a few words: the thread's title, else its first message (plain text). */
   label: string | null;
+  /** Messages sent to it while it works that it hasn't read yet. */
+  pendingMessageIds: string[];
 }
 
 /**
@@ -48,9 +51,11 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
     name: string;
     title: string | null;
     root_body: string | null;
+    pending: string[] | string | null;
   }>(
     await db.execute(sql`select r.id, r.agent_id, r.channel_id, r.status, r.thread_root_id, r.trigger_message_id,
-        r.started_at, r.created_at, c.kind, c.name, t.title, root.body as root_body
+        r.started_at, r.created_at, c.kind, c.name, t.title, root.body as root_body,
+        array_to_json(r.pending_message_ids) as pending
       from ${agentRuns} r
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
         and c.archived_at is null and c.kind in ('channel', 'dm')
@@ -81,6 +86,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
       startedAt: iso(r.started_at),
       createdAt: iso(r.created_at) as string,
       label: label || null,
+      pendingMessageIds: pendingIds(r.pending),
     };
   });
 }

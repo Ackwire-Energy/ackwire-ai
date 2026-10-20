@@ -223,8 +223,8 @@ export function toolActivity(
 /** An agent's run is in the timeline (its first words arrived, or it failed): not in the bar. */
 /**
  * The run has its own row in the timeline: it wrote something, ended badly,
- * or took a new message into the task (`agent.run.steered`: the row stays put
- * with "Nova mensagem de…" even though its text so far became narration).
+ * or read a message sent while it worked (`agent.run.read`: the row stays put
+ * with "Leu seu recado" even though its text so far became narration).
  */
 export const isWriting = (r: LiveRun) =>
   r.status === "failed" ||

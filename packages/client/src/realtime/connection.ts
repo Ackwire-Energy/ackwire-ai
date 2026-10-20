@@ -1,5 +1,6 @@
 import type { ChannelEvent, UserEvent } from "../api/types";
 import { type BrowserWatcher, createBrowserWatches } from "../browser/watches";
+import { steerStore } from "./steer";
 
 /**
  * WebSocket client for `/api/ws?orgId=` (apps/server/src/realtime/ws.ts,
@@ -266,6 +267,8 @@ export class RealtimeConnection {
     if (frame.type === "event" && "scope" in frame) {
       for (const l of this.userListeners) l(frame.event);
     } else if (frame.type === "event") {
+      // "lê na próxima pausa" / "leu" under your messages: one store for every screen (`useSteerState`).
+      steerStore.apply(frame.event);
       const set = this.listeners.get(frame.channelId);
       if (!set) return;
       for (const l of [...set]) l(frame.event);

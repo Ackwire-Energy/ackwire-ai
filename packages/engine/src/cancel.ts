@@ -65,12 +65,66 @@ export async function drainLocalRuns(ms: number, options: { graceMs?: number } =
   return interrupted;
 }
 
-/** Each worker process listens, so a cancel reaches the instance that runs it. */
+/** Cross-instance: "stop and send" (`steer: "now"`) cuts the run's current model call short; the run goes on. */
+export const RUN_INTERRUPT_TOPIC = "system:run-interrupt";
+
+/**
+ * The model call in flight of each run executing here: aborting it ends only
+ * that turn (its text so far is kept), never the run nor a tool that runs.
+ * `hasRead`: whether the run already read that message (then there is nothing to interrupt for).
+ */
+const turns = new Map<string, { controller: AbortController; hasRead(messageId: string): boolean }>();
+
+export function registerTurnAbort(runId: string, hasRead: (messageId: string) => boolean) {
+  const controller = new AbortController();
+  turns.set(runId, { controller, hasRead });
+  return controller;
+}
+
+export function unregisterTurnAbort(runId: string, controller: AbortController) {
+  if (turns.get(runId)?.controller === controller) turns.delete(runId);
+}
+
+/** Aborts the run's current model call if it runs here and hasn't read `messageId` yet. */
+export function interruptLocalTurn(runId: string, messageId: string) {
+  const turn = turns.get(runId);
+  if (!turn || turn.controller.signal.aborted || turn.hasRead(messageId)) return false;
+  turn.controller.abort(new Error("turn interrupted"));
+  return true;
+}
+
+/**
+ * A person asked the run to stop and read their message now: the instance
+ * executing it aborts the current model call, and the loop reads the message
+ * right away. Between calls (a tool runs, it waits for a person) nothing is
+ * cut: the message is read at the next step, as any other.
+ */
+export async function interruptRun(pubsub: PubSub | undefined, runId: string, messageId: string) {
+  if (interruptLocalTurn(runId, messageId)) return;
+  if (pubsub) await pubsub.publish(RUN_INTERRUPT_TOPIC, { type: "run.interrupt", runId, messageId }).catch(() => {});
+}
+
+/** Each worker process listens, so a cancel (or an interrupt) reaches the instance that runs it. */
 export function listenForRunCancels(pubsub: PubSub) {
-  return pubsub.subscribe(RUN_CANCEL_TOPIC, (event) => {
+  const offCancel = pubsub.subscribe(RUN_CANCEL_TOPIC, (event) => {
     if (typeof event.runId === "string") abortLocalRun(event.runId);
   });
+  const offInterrupt = pubsub.subscribe(RUN_INTERRUPT_TOPIC, (event) => {
+    if (typeof event.runId === "string" && typeof event.messageId === "string")
+      interruptLocalTurn(event.runId, event.messageId);
+  });
+  return () => {
+    offCancel();
+    offInterrupt();
+  };
 }
+
+/**
+ * Who asked for the run: the trigger's author, or, for a run that continues a stopped one
+ * (its trigger is the stopped reply), who pressed "Continuar".
+ */
+const continuedBy = sql`${messages.meta}->'canceled'->>'continuedByUserId'`;
+export const runRequester = sql<string | null>`coalesce(${messages.authorUserId}, ${continuedBy})`;
 
 /** Who canceled (stored on the run as `canceled_by:{userId}`). */
 export const canceledBy = (error: string | null | undefined) =>
@@ -99,7 +153,7 @@ export async function cancelRun(
     .select({
       run: agentRuns,
       ownerUserId: agents.ownerUserId,
-      requester: messages.authorUserId,
+      requester: runRequester,
       channelKind: channels.kind,
     })
     .from(agentRuns)

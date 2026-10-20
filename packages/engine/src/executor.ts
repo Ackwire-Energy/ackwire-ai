@@ -22,7 +22,9 @@ import {
   RUN_HEARTBEAT_MS,
   RunInterruptedError,
   registerRunAbort,
+  registerTurnAbort,
   unregisterRunAbort,
+  unregisterTurnAbort,
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
@@ -180,6 +182,11 @@ export interface Transcript {
    * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off.
    */
   interruptedTurn?: { prompt: string; executed: string[]; drops: number };
+  /**
+   * This run continues one a person stopped ("Continuar"): the line a computer brain reads first
+   * (the model brain reads it at the end of `messages`). Taken by the first turn.
+   */
+  continued?: { prompt: string };
   /** The GitHub repository this run last worked in (`owner/name`), for "Trabalhando em" and Atividade. */
   repo?: string;
   /** A GitHub repository the run was refused (not in the agent's list): Atividade offers to add it. */
@@ -762,6 +769,9 @@ async function executeRunInner(
     ]
       .filter(Boolean)
       .join("\n\n");
+    // Cut mid-stream: what it was writing stays in the transcript too ("Continuar" picks up from there).
+    if (partial.trim() && t.messages.at(-1)?.role !== "assistant")
+      t.messages.push({ role: "assistant", content: [{ type: "text", text: partial.trim() }] });
     const note = `_Stopped${person ? ` by ${person.name}` : ""}._`;
     const message = await db.transaction(async (tx) => {
       const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
@@ -784,10 +794,16 @@ async function executeRunInner(
     await finished("canceled");
   };
 
-  /** Appends them to the conversation as "New message from …" (a step records it), so the model reads them next. Returns the text. */
+  /** Messages this run already read (a "stop and send" for one of them has nothing to interrupt). */
+  const readIds = new Set<string>();
+  /**
+   * Appends them to the conversation as "New message from …" (a step records it), so the model
+   * reads them next, and tells the channel they were read ("Ada leu"). Returns the text.
+   */
   const deliverSteering = async (): Promise<string | null> => {
     const ids = await takeSteering();
     if (ids.length === 0) return null;
+    for (const id of ids) readIds.add(id);
     const rows = await db
       .select({
         id: schema.messages.id,
@@ -816,7 +832,38 @@ async function executeRunInner(
     appendUserText(t, text);
     await saveTranscript(db, t);
     later(() => addRunStep(db, run, "context", { steeredMessageIds: rows.map((m) => m.id) }));
+    await publishChannelEvent(deps.pubsub, {
+      type: "agent.run.read",
+      ...where,
+      messageIds: rows.map((m) => m.id),
+    });
     return text;
+  };
+
+  /**
+   * A person asked it to stop and read their message now: the model call was cut short. What it
+   * wrote so far stays as this turn's text (narration, like text before a tool call), the turn
+   * counts, and the loop goes on: the next call reads the message.
+   */
+  const interruptedTurn = async (turn: number, partial: string) => {
+    const t = transcript as Transcript;
+    const said = partial.trim();
+    if (said) t.messages.push({ role: "assistant", content: [{ type: "text", text: said }] });
+    const [counted] = await Promise.all([
+      db
+        .update(agentRuns)
+        .set({ turns: sql`${agentRuns.turns} + 1`, transcript: storedTranscript(t), updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id))
+        .returning(),
+      addRunStep(db, run, "model_call", {
+        turn,
+        stopReason: "interrupted",
+        ...(said ? { narration: said.slice(0, 4000) } : {}),
+      }),
+    ]);
+    if (counted[0]) run = counted[0];
+    if (said)
+      await publishChannelEvent(deps.pubsub, { type: "agent.narration", ...where, turn, text: said.slice(0, 4000) });
   };
 
   /** Moves what a tool returned onto the transcript (cards for the next post) and tells the channel about memory. */
@@ -840,7 +887,9 @@ async function executeRunInner(
   /** What a computer brain reads next when it isn't the trigger: results after a pause, new messages. */
   let nextPrompt: string | null = transcript.interruptedTurn
     ? interruptedTurnPrompt(transcript.interruptedTurn, resumeText)
-    : resumeText;
+    : (resumeText ?? transcript.continued?.prompt ?? null);
+  // Read once: a later pause of this run resumes with its own text.
+  delete transcript.continued;
   let computerTurns = 0;
 
   /** The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the computer. */
@@ -1100,8 +1149,11 @@ async function executeRunInner(
           holdBack: viaRoutine ? ROUTINE_NO_REPLY : undefined,
         },
       );
+      // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
+      // message at once. Computer brains run tools inside their turn, so they read it at the next step.
+      const turnAbort = plan.kind === "model" ? registerTurnAbort(run.id, (id) => readIds.has(id)) : null;
       const io: BrainIO = {
-        signal,
+        signal: turnAbort ? AbortSignal.any([signal, turnAbort.signal]) : signal,
         // Brains that run a tool inline (not by yielding `tool_call`). The model brain doesn't; computer
         // brains go through the runner bridge. Both take the bridge's path: a gated call suspends the run,
         // side effects wait for the end of the turn (`takeBridgeEffects`).
@@ -1171,6 +1223,10 @@ async function executeRunInner(
         if (await isCanceled()) return stopCanceled(deltas.text());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
+        if (turnAbort?.signal.aborted) {
+          await interruptedTurn(turn, deltas.text());
+          continue;
+        }
         if (turnPlan.kind !== "model") {
           // What the bridge kept during this turn (cards, a reaction) is the engine's now.
           mergeToolEffects(transcript, await takeBridgeEffects(db, run.id).catch(() => null));
@@ -1230,6 +1286,8 @@ async function executeRunInner(
         if (options.finalAttempt) return fail(`gave_up: ${error instanceof Error ? error.message : String(error)}`);
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
         throw error;
+      } finally {
+        if (turnAbort) unregisterTurnAbort(run.id, turnAbort);
       }
       await deltas.flush();
       prof.mark(`model#${run.turns + 1}`);
@@ -1995,6 +2053,42 @@ const withCode = (meta: Record<string, unknown> | undefined, code: ReturnType<ty
 /** The quiet note on a reply the model brain gave for an unavailable computer brain (`meta.brainFallback`). */
 const withFallback = (t: Transcript, meta: Record<string, unknown> | undefined) =>
   t.fallback ? { ...(meta ?? {}), brainFallback: t.fallback } : meta;
+
+/**
+ * The conversation a "Continuar" run starts from: the stopped run's messages (what it wrote
+ * before the stop is in them), calls it never ran closed as not run, and `line` from the person.
+ * Everything in it was already shown, so nothing of it is posted again.
+ */
+export function continuedTranscript(stopped: Transcript, line: string): Transcript {
+  const t: Transcript = {
+    system: stopped.system,
+    messages: structuredClone(stopped.messages),
+    postedUpTo: 0,
+    postedCount: 0,
+    deltaSeq: 0,
+    ...(stopped.repo ? { repo: stopped.repo } : {}),
+  };
+  const last = t.messages.at(-1);
+  const unanswered =
+    last?.role === "assistant" && typeof last.content !== "string"
+      ? last.content.flatMap((b) => (b.type === "tool_use" ? [b.id] : []))
+      : [];
+  if (unanswered.length > 0) {
+    t.messages.push({
+      role: "user",
+      content: unanswered.map((toolUseId) => ({
+        type: "tool_result" as const,
+        toolUseId,
+        content: "Not run: a person stopped you before it ran.",
+        isError: true,
+      })),
+    });
+  }
+  appendUserText(t, line);
+  t.postedUpTo = t.messages.length;
+  t.continued = { prompt: line };
+  return t;
+}
 
 /** Adds text to the conversation as the person's side (joined to a last user message, never two in a row). */
 function appendUserText(t: Transcript, text: string) {

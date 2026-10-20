@@ -273,6 +273,12 @@ export interface ApiClient {
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /** "Parar": stops a run (the person who started it, the agent's owner, admins). */
     cancelRun(orgId: string, runId: string): Promise<void>;
+    /**
+     * "Continuar" under a reply a person stopped (same people as `cancelRun`): a new run picks up
+     * where it stopped. 409 `run.not_continuable` (already continued, not stopped by a person) or
+     * `run.agent_busy` (the agent already works in that conversation).
+     */
+    continueRun(orgId: string, runId: string): Promise<{ runId: string }>;
     /** Runs still active in a channel (reconciles the live rows); `null` while the server lacks the endpoint. */
     activeRuns(orgId: string, channelId: string): Promise<ActiveRun[] | null>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
@@ -313,6 +319,8 @@ export interface ApiClient {
         attachments?: string[];
         /** Sent from the thread panel ("Responder"), with `threadId`: the thread gets `openedByReplyAt`. */
         openThread?: boolean;
+        /** "Parar e mandar": an agent working here stops its current step and reads this now. */
+        steer?: "now";
       },
     ): Promise<Message>;
     reactions(orgId: string, messageId: string): Promise<ReactionCount[]>;

@@ -1,3 +1,4 @@
+import { steerStore } from "../realtime/steer";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
 import type {
@@ -367,10 +368,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
       cancelRun: (orgId, runId) => request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: {} }),
+      continueRun: (orgId, runId) =>
+        request<{ runId: string }>(`${org(orgId)}/runs/${enc(runId)}/continue`, { json: {} }),
       activeRuns: async (orgId, channelId) => {
+        const askedAt = Date.now();
         const res = await nullOn(404, () =>
           request<{ runs: ActiveRun[] }>(`${org(orgId)}/channels/${enc(channelId)}/active-runs`),
         );
+        // What the agents working here haven't read yet ("lê na próxima pausa" after a reload).
+        if (res) steerStore.reconcile(channelId, res.runs, askedAt);
         return res ? res.runs : null;
       },
       usage: async (orgId) => {
@@ -415,14 +421,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             : `${org(orgId)}/channels/${enc(channelId)}/members/people/${enc(member.userId)}`,
           { method: "DELETE" },
         ),
-      messages: async (orgId, channelId, options = {}) =>
-        (
-          await request<{ messages: Message[] }>(`${org(orgId)}/channels/${enc(channelId)}/messages`, {
-            query: { threadId: options.threadId, before: options.before, limit: options.limit },
-          })
-        ).messages,
-      post: (orgId, channelId, input) =>
-        request<Message>(`${org(orgId)}/channels/${enc(channelId)}/messages`, { json: input }),
+      messages: async (orgId, channelId, options = {}) => {
+        const path = `${org(orgId)}/channels/${enc(channelId)}/messages`;
+        const query = { threadId: options.threadId, before: options.before, limit: options.limit };
+        const { messages } = await request<{ messages: Message[] }>(path, { query });
+        steerStore.seed(channelId, messages);
+        return messages;
+      },
+      post: async (orgId, channelId, input) => {
+        const message = await request<Message>(`${org(orgId)}/channels/${enc(channelId)}/messages`, { json: input });
+        steerStore.seed(channelId, [message]);
+        return message;
+      },
     },
     approvals: {
       list: async (orgId, filter = {}) =>

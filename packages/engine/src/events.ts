@@ -153,7 +153,9 @@ export type ChannelEvent =
   /**
    * A person's message went to the agent's task already in progress (one
    * active run per agent and conversation): it reads it at its next step.
-   * `stop`: the message asked to stop, and the run is being canceled.
+   * `now`: the person asked it to stop and read it now ("Parar e mandar"): its current model
+   * call is cut short. `stop`: the message asked to stop, and the run is being canceled (it can
+   * arrive in a second event, after the stop judge).
    */
   | {
       type: "agent.run.steered";
@@ -162,7 +164,30 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       messageId: string;
+      now?: true;
       stop?: boolean;
+    }
+  /** The run read these messages sent while it worked (they are in its conversation now): "Ada leu". */
+  | {
+      type: "agent.run.read";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageIds: string[];
+    }
+  /**
+   * A person pressed "Continuar" under a stopped reply (`messageId`): `newRunId` picks up where
+   * `runId` stopped (its reply's `meta.canceled.continuedRunId`), so every app hides the button.
+   */
+  | {
+      type: "run.continued";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      newRunId: string;
+      messageId: string;
     }
   /** A person stopped the run (`POST …/runs/{id}/cancel`): drop "pensando…" now; its text so far follows as a message. */
   | {

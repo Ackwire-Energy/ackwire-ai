@@ -54,7 +54,7 @@ Run lint, typecheck, tests and boundaries before declaring work done.
 - Auth: `apps/server/src/auth.ts` (Better Auth at `/api/auth/*`). Orgs, roles, invitations, sign-up policy: `packages/engine/src/organizations.ts`.
 - WebSocket: `apps/server/src/realtime/ws.ts` (`/api/ws?orgId=`; subscribe per channel; events in `packages/engine/src/events.ts`).
 - Workers: `apps/server/src/workers.ts`. Job handlers: `packages/engine/src/jobs.ts`; outbox: `outbox.ts`.
-- Agent flow: `messages.ts` (post + mentions + outbox) → `dispatch.ts` (runs, hop limit) → `executor.ts` (context from `context.ts`, gateway, deltas, persist) with states in `runs.ts`.
+- Agent flow: `messages.ts` (post + mentions + outbox) → `dispatch.ts` (runs, hop limit) → `executor.ts` (context from `context.ts`, gateway, deltas, persist) with states in `runs.ts`. Cancel and "stop and send" (turn interrupt) in `cancel.ts`, "Continuar" in `continue-run.ts`; read receipts for messages sent mid-run: `packages/client/src/realtime/steer.ts` (D62).
 - Credentials and crypto: `packages/engine/src/credentials.ts`, `crypto.ts`. Model catalog and prices: `packages/providers/src/catalog.ts`; Anthropic adapter `anthropic.ts`; fake for tests `fake.ts` (`@agenteschat/providers/testing`).
 - Adapters (search, pub/sub, presence, rate limiter, key wrapper, platform credentials): `packages/adapters/src`. Module API: `packages/modules/src/index.ts`.
 - DB schema: `packages/db/src/schema/*`; migrations `packages/db/migrations` (0000 is hand-edited for `messages` partitioning, ADR 0009). Import Drizzle operators from `@agenteschat/db`, never `drizzle-orm` directly.

@@ -12,6 +12,7 @@ import {
   grantScopes,
   listMessages,
   postPersonMessage,
+  stopChecksSettled,
   type ToolSource,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -236,8 +237,8 @@ describe("one active run per agent and conversation", () => {
     f = await setup({
       judge: (kind, _id, state) => (kind === "stop_request" && state.message === "para" ? 0.95 : 0),
       toolSources: [
-        slowTool(() =>
-          postPersonMessage(
+        slowTool(async () => {
+          await postPersonMessage(
             { db: f.db, pubsub: f.pubsub, judge: f.context.judge },
             f.owner.id,
             f.org.id,
@@ -246,8 +247,10 @@ describe("one active run per agent and conversation", () => {
               body: "para",
               threadId,
             },
-          ),
-        ),
+          );
+          // The stop is judged after the post returns (the send never waits for it).
+          await stopChecksSettled();
+        }),
       ],
       reply: (_req: ModelRequest, call: number) =>
         call === 1 ? { chunks: [], toolUses: [{ name: "build", input: {} }] } : { chunks: ["não deveria"] },

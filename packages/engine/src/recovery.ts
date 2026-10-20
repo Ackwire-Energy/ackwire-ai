@@ -216,9 +216,10 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     heartbeat_at: string | Date | null;
     created_at: string | Date;
     kind: string;
+    pending: string[] | string | null;
   }>(
     await db.execute(sql`select r.id, r.agent_id, r.status, r.thread_root_id, r.trigger_message_id, r.started_at,
-        r.heartbeat_at, r.created_at, c.kind
+        r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending
       from ${agentRuns} r join ${channels} c on c.id = r.channel_id
       where r.org_id = ${orgId}::uuid and r.channel_id = ${channelId}::uuid
         and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
@@ -236,5 +237,11 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     startedAt: iso(r.started_at),
     heartbeatAt: iso(r.heartbeat_at),
     createdAt: iso(r.created_at) as string,
+    // Sent while it works and not read yet ("lê na próxima pausa"); the rest it already read.
+    pendingMessageIds: pendingIds(r.pending),
   }));
 }
+
+/** `array_to_json(uuid[])`: parsed by the driver, or still text. */
+export const pendingIds = (v: string[] | string | null): string[] =>
+  Array.isArray(v) ? v : typeof v === "string" ? (JSON.parse(v) as string[]) : [];
