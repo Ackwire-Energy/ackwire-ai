@@ -1,0 +1,1731 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editar agente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Doto:ROND,wght@100,600&family=Martian+Mono:wght@400&display=swap">
+<script>{const q=new URLSearchParams(location.hash.slice(1));document.documentElement.dataset.theme=q.get("theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}</script>
+<style>
+/*
+  Prototype v3: the whole agent profile. Round 2 approved the "Frase" (2026-10-19): the agent's setup as a
+  sentence with tappable words, each opening one simple question; changes apply at once with Desfazer; the
+  page solves dependencies (Claude Code moves the agent to the computer that has it) and says it BEFORE.
+  This round takes that to the rest of the profile.
+
+  v4 (2026-10-19, feedback "a frase podia ficar em cima do conteúdo; exagerou nas frases, nem tudo são frases"):
+  only the Work sentence stays a sentence, right under the name, on every tab. The rest of Perfil is plain UI:
+  apps as tiles (level on each, + Liberar app), skills as toggles, people as rows with avatars, cost as a big
+  number + pixel meter (the limit is a link), routines with on/off switches. The v3 notes below describe the
+  popovers, which stay the same.
+
+  Today: 6 tabs, and Visão geral repeats Configurações and Ferramentas e acesso read-only ("Mudar acessos"
+  jumps to another tab). Now: 4 tabs.
+    Perfil      what was Visão geral + Configurações + Ferramentas e acesso, as one sheet of sentences:
+                Trabalho  "Pensa com [Claude Code] no [MacBook do Walter] e [navega em sites]."
+                Pessoas   "Responde a [todos da organização] em [#conteudo e #geral]. [Você] é responsável…"
+                Acesso    "Pode usar [GitHub], [Notion · só lê] e [Google Drive] [+]." + "Sabe [roteiros…]."
+                Custo     "Gasta até [US$ 40 por mês]." + a pixel meter, the 80% mark
+                Rotinas   "Tem 2 rotinas: [Resumo da semana · segunda, 9h] e … [+]"
+                Above: "Esperando você" (approvals, proposals) only when there is something. No recent work: that is Atividade.
+    Instruções  the text as a document; the agent's proposal on top (Ver → Acrescentar / Recusar). Long text
+                keeps an explicit Salvar (⌘S), only shown when something changed.
+    Memória, Atividade  unchanged this round.
+  Identity lives on the hero: click the name or the role to rename; click the agent for "Mudar o jeito"
+  (color, head, eyes, drawn by the engine). "…": copy @, pause, archive.
+  Per-app access is one question per app (Ler e mudar / Só ler / Nada); the fine tuning per tool stays a link.
+  Members see the same sentences as plain text (no buttons) and who can change them.
+
+  Prototype bar: Admin | Membro, "No Mac, navegador" off/on (watch the page update), Recomeçar, theme.
+  Deep links: #tab=perfil|instrucoes &role=admin|member &mac=off|on &theme=light|dark.
+  Agents come only from packages/ui/src/agent/engine.js (serve the repo root over http).
+*/
+:root{
+  --bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--glass:rgba(255,255,255,.72);--line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#76766f;--plate:rgba(127,127,127,.1);
+  --ok:#1f7a45;--ok-soft:#e3f2e8;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b4352b;--danger-soft:#fbe6e3;
+  --agent:#0063d1;--agent-soft:#e3eefd;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 8px 20px -6px rgba(23,23,22,.12),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.30),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sky-ink:#04203f;--sky-ink2:rgba(4,32,63,.74);--sky-glass:rgba(241,248,255,.76);--sky-line:rgba(4,32,63,.12);
+  --term:#141413;--term-ink:#d6d6d2;--term-dim:#8b8b85;--term-ok:#5fc48a;--term-sel:rgba(255,255,255,.08);
+  --sans:"Onest",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--dot:"Doto",monospace;--mono:"Martian Mono",ui-monospace,monospace;color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--glass:rgba(30,30,28,.72);--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;--plate:rgba(127,127,127,.14);
+  --ok:#5fc48a;--ok-soft:#14281c;--warn:#e0a84a;--warn-soft:#33260e;--danger:#ef7c70;--danger-soft:#3a1714;
+  --agent:#5aa8ff;--agent-soft:#11253f;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);--top:inset 0 1px 0 rgba(255,255,255,.06);
+  --term:#080807;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+html{overflow-anchor:none}
+body{margin:0;color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum";overflow-x:hidden}
+h1,h2,h3,p{margin:0}
+button,input,textarea{font:inherit;color:inherit}
+a{color:inherit}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+svg.i.sm{width:14px;height:14px}
+canvas.av{display:block;flex:none}
+canvas.orbit{display:inline-block;flex:none;image-rendering:pixelated;vertical-align:middle}
+:focus-visible{outline:2px solid #3d8bff;outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@keyframes popin{from{opacity:0;transform:translateY(-4px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}}
+@keyframes blinkc{50%{opacity:0}}
+@keyframes shim{to{background-position:-200% 0}}
+
+/* ---------- Prototype bar (not product) ---------- */
+.pbar{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.pbar .lbl{font-size:11.5px;font-weight:600;color:var(--faint);letter-spacing:.04em;text-transform:uppercase}
+.pbar .grow{flex:1}
+.views{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0;max-width:100%}
+.views::-webkit-scrollbar{display:none}
+.stp{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 6px;border-radius:999px;color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none;transition:background .15s,color .15s}
+.stp .n{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;background:var(--sunken);color:var(--faint)}
+.stp:hover{background:var(--plate);color:var(--ink)}
+.stp[aria-current="step"]{background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink)}
+.stp[aria-current="step"] .n{background:var(--ink);color:var(--bg)}
+.pbar .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---------- Shell: sidebar | page ---------- */
+.app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:calc(100vh - 45px)}
+.app.bare{grid-template-columns:minmax(0,1fr)}
+.app.bare .side{display:none}
+.side{position:sticky;top:45px;height:calc(100vh - 45px);overflow:hidden;padding:18px 12px;display:flex;flex-direction:column;gap:14px;background:var(--sunken);border-right:1px solid var(--line);isolation:isolate}
+.side canvas.sky{position:absolute;inset:auto 0 0 0;width:100%;height:22%;image-rendering:pixelated;pointer-events:none;z-index:-1}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:300;font-size:20px;letter-spacing:-.02em;padding:0 6px}
+.brand i{font-style:normal;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:.62em;color:var(--muted)}
+.find{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-radius:11px;background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--faint);font-size:13px}
+.find .kbd{margin-left:auto}
+.nav{display:flex;flex-direction:column;gap:1px}
+.nav .cap{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:10px 8px 4px}
+.nav a{display:flex;align-items:center;gap:9px;height:32px;padding:0 8px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:500;font-size:13.5px}
+.nav a:hover{background:var(--plate);color:var(--ink)}
+.nav a[aria-current="page"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top);font-weight:600}
+.nav a .n{margin-left:auto;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:12px;color:var(--muted)}
+.nav .agent-slot{width:18px;height:18px;display:grid;place-items:center;flex:none}
+.page{min-width:0;display:flex;flex-direction:column;align-items:center;padding:0 clamp(16px,3vw,36px) 120px}
+.wrap{width:100%;max-width:1080px}
+.topbar{display:flex;align-items:center;gap:10px;height:58px}
+.crumbs{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13.5px;min-width:0;flex-wrap:nowrap;overflow:hidden}
+.crumbs a{text-decoration:none;white-space:nowrap}
+.crumbs a:hover{color:var(--ink)}
+.crumbs b{color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{all:unset;box-sizing:border-box;cursor:pointer;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:var(--muted);transition:background .15s,color .15s,transform .18s var(--spring)}
+.iconbtn:hover{background:var(--plate);color:var(--ink)}
+.iconbtn:active{transform:scale(.94)}
+
+/* ---------- Controls (design system v2, from AgentePerfil) ---------- */
+.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;font-weight:600;font-size:14px;letter-spacing:-.005em;background:var(--raised);box-shadow:var(--e1),var(--top);white-space:nowrap;transition:transform .18s var(--spring),box-shadow .18s var(--out),filter .15s,background .15s,color .15s,opacity .15s}
+.btn:hover{box-shadow:var(--e2),var(--top)}
+.btn:active{transform:scale(.97) translateY(.5px)}
+.btn.primary{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)),var(--ink));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn[aria-disabled="true"]{opacity:.45;cursor:default;transform:none;filter:none}
+.btn.ghost{background:transparent;box-shadow:none;color:var(--muted)}
+.btn.ghost:hover{background:var(--plate);color:var(--ink)}
+.btn.danger{color:var(--danger)}
+.btn.danger.solid{color:#fff;background:linear-gradient(180deg,#c9473c,#a8322a);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 6px 14px -6px rgba(168,50,42,.6)}
+.btn.sm{height:30px;padding:0 10px;font-size:12.5px;border-radius:9px;gap:6px}
+.btn.icon{width:40px;padding:0}
+.kbd{font-family:var(--sans);font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:rgba(127,127,127,.22);opacity:.8;box-shadow:inset 0 -1px 0 rgba(0,0,0,.14)}
+.card{background:var(--raised);border-radius:20px;box-shadow:var(--e1),var(--top);padding:18px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.label{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+.help{color:var(--muted);font-size:12.5px}
+.faint{color:var(--faint)}
+.input{display:flex;align-items:center;gap:6px;height:42px;padding:0 12px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow .15s}
+.input:focus-within{box-shadow:inset 0 0 0 1px var(--line2),0 0 0 3px color-mix(in srgb,var(--ink) 10%,transparent)}
+.input input{all:unset;flex:1;min-width:0;height:100%}
+.input.mono input{font-family:var(--mono);font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--sunken);color:var(--muted);white-space:nowrap;max-width:100%}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.busy{background:var(--agent-soft);color:var(--agent)}
+.chip.line{background:transparent;box-shadow:inset 0 0 0 1px var(--line2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tog{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px 0 10px;border-radius:999px;font-weight:600;font-size:13px;background:var(--raised);color:var(--muted);box-shadow:var(--e1),var(--top);transition:transform .18s var(--spring),background .15s,color .15s,box-shadow .15s;flex:none}
+.tog:hover{color:var(--ink)}
+.tog:active{transform:scale(.96)}
+.tog .box{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line2);transition:background .15s}
+.tog .box svg{width:11px;height:11px;stroke-width:2.6;opacity:0}
+.tog[aria-pressed="true"]{color:var(--ink);box-shadow:0 0 0 1.5px var(--ink),var(--top)}
+.tog[aria-pressed="true"] .box{background:var(--ink);color:var(--bg);box-shadow:none}
+.tog[aria-pressed="true"] .box svg{opacity:1}
+.tog.sm{height:30px;font-size:12.5px;padding:0 11px 0 8px}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06);position:relative;flex:none;max-width:100%}
+.seg button{all:unset;position:relative;z-index:1;cursor:pointer;height:30px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;transition:color .2s}
+.seg button[aria-pressed="true"]{color:var(--ink)}
+.seg button:hover{color:var(--ink)}
+.seg .pill{position:absolute;top:0;left:0;height:30px;border-radius:9px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .32s var(--spring),width .32s var(--spring)}
+.seg.sm button{height:26px;padding:0 10px;font-size:12.5px}
+.seg.sm .pill{height:26px}
+.seg.xs button{height:24px;padding:0 9px;font-size:12px}
+.seg.xs .pill{height:24px}
+.menu{position:fixed;z-index:60;min-width:220px;border-radius:16px;padding:6px;background:color-mix(in srgb,var(--raised) 92%,transparent);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3);animation:popin .22s var(--spring) both}
+.mi{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:6px 10px;border-radius:10px}
+.mi:hover{background:rgba(127,127,127,.13)}
+.mi.danger{color:var(--danger)}
+.msep{height:1px;margin:6px 8px;background:var(--line)}
+.pa{width:30px;height:30px;border-radius:50%;flex:none;display:inline-grid;place-items:center;font-weight:650;font-size:12px;background:linear-gradient(160deg,#e9e9e5,#d9d9d4);color:#2a2a28}
+:root[data-theme="dark"] .pa{background:linear-gradient(160deg,#3a3a37,#2a2a28);color:#efefec}
+.pa.sm{width:22px;height:22px;font-size:10px}
+.ib{width:30px;height:30px;border-radius:10px 10px 10px 4px;display:grid;place-items:center;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2);flex:none}
+.note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--plate);color:var(--muted);font-size:13px}
+.note b{color:var(--ink);font-weight:600}
+.note svg{margin-top:2px}
+.logo{width:36px;height:36px;border-radius:11px 11px 11px 4px;display:grid;place-items:center;flex:none;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2);color:var(--ink2)}
+.logo.soft{background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ch{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.ch h2{font-size:15px;font-weight:650;letter-spacing:-.01em;display:flex;gap:8px;align-items:center;min-width:0}
+.ch .act{margin-left:auto;display:flex;gap:6px;align-items:center}
+.ch .help{margin-left:auto}
+.eyebrow{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lead{color:var(--muted);max-width:62ch}
+.lock{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--faint);white-space:nowrap}
+.readonly{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted);font-size:13px;margin-bottom:14px}
+.readonly svg{margin-top:2px}
+.readonly b{color:var(--ink);font-weight:600}
+.crow{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap;min-width:0}
+.crow:first-child{border-top:0;padding-top:2px}
+.crow:last-child{padding-bottom:2px}
+.crow .t{flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.crow .n{font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.crow .d{color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.crow .end{display:flex;gap:6px;align-items:center;margin-left:auto}
+.crow.nw{flex-wrap:nowrap}
+.crow.nw .t{flex:1 1 auto}
+.crow .under{flex-basis:100%;padding-left:48px;display:flex;flex-direction:column;gap:8px}
+.crow.changed{margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:12px;background:var(--plate);border-top-color:transparent}
+.crow.changed + .crow{border-top-color:transparent}
+.crow.gone{opacity:.55}
+.more{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:var(--muted);margin-top:12px}
+.more:hover{color:var(--ink)}
+.kv{display:flex;flex-direction:column;gap:12px}
+.kv > div{display:flex;flex-direction:column;gap:3px}
+.kv .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.kv .v{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kv .v span{font-weight:500;color:var(--muted)}
+.tag{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:650;background:var(--ink);color:var(--bg);white-space:nowrap}
+.tag svg{width:11px;height:11px;stroke-width:2.2}
+.undo{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--muted);padding:2px 6px;border-radius:7px}
+.undo:hover{background:var(--plate);color:var(--ink)}
+.who{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.who .avs{display:inline-flex;align-items:center}
+.who .avs{gap:4px}
+/* Rows with a description of several lines: the tile sits with the name, not in the middle. */
+.crow.top{align-items:flex-start}
+.crow.top .logo{margin-top:2px}
+.crow.top .end{align-self:center}
+.crow .d.ag{margin-top:4px}
+
+/* ---------- Paths and commands (the only mono on the page) ---------- */
+.path{all:unset;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--ink2);overflow-wrap:anywhere;border-radius:6px;padding:1px 4px;margin:0 -4px;transition:background .15s}
+.path:hover{background:var(--plate)}
+code{font-family:var(--mono);font-size:11px;padding:1px 5px;border-radius:6px;background:var(--sunken);color:var(--ink2);white-space:nowrap}
+code.wrap{white-space:normal;overflow-wrap:anywhere}
+.cmd{display:flex;align-items:flex-start;gap:10px;padding:10px 10px 10px 14px;border-radius:14px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);min-width:0}
+.cmd .tx{flex:1;min-width:0;font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;padding-top:3px}
+.cmd .tx .pr{color:var(--faint);user-select:none}
+.cmd .tx .arg{color:var(--muted);white-space:nowrap}
+.cmd .btn{flex:none}
+.cmd.copied .btn{color:var(--ok)}
+.cmdlbl{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.cmdlbl svg{color:var(--faint)}
+
+/* ---------- Computer page ---------- */
+.cfg{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
+.subnav{position:sticky;top:110px;display:flex;flex-direction:column;gap:2px}
+.subnav a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:500;font-size:13.5px}
+.subnav a:hover{background:var(--plate);color:var(--ink)}
+.subnav a[aria-current="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top);font-weight:600}
+.mhead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.mhead .big{width:56px;height:56px;border-radius:17px 17px 17px 6px;display:grid;place-items:center;background:var(--raised);box-shadow:var(--e2),var(--top);color:var(--ink2);flex:none}
+.mhead .big svg{width:26px;height:26px;stroke-width:1.5}
+.mhead .t{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.mhead h1{font-family:var(--display);font-weight:300;font-size:40px;letter-spacing:-.03em;line-height:1}
+.mhead .acts{display:flex;gap:8px;align-items:center}
+.tools .crow .logo svg{width:18px;height:18px}
+.honest{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--ink2)}
+.honest svg{color:var(--warn);margin-top:2px}
+
+/* ---------- Agent page (from AgentePerfil, trimmed) ---------- */
+.cover{position:relative;height:190px;border-radius:24px;overflow:hidden;isolation:isolate;box-shadow:var(--e1)}
+.cover canvas.sky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;z-index:-1}
+.state{position:absolute;top:14px;left:14px;display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:4px 11px 4px 9px;border-radius:999px;font-size:12.5px;font-weight:650;color:var(--sky-ink);background:var(--sky-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 0 0 1px var(--sky-line);max-width:calc(100% - 28px)}
+.state .sub{font-weight:500;color:var(--sky-ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ident{display:flex;align-items:flex-end;gap:16px;padding:16px 4px 4px;flex-wrap:wrap}
+.ident .whoami{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.ident h1{font-family:var(--display);font-weight:300;font-size:44px;letter-spacing:-.03em;line-height:1;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.ident h1 .handle{font-family:var(--sans);font-size:15px;font-weight:500;letter-spacing:0;color:var(--muted)}
+.ident .acts{display:flex;gap:8px;align-items:center}
+.tabsbar{position:sticky;top:45px;z-index:20;margin:14px -8px 0;padding:0 8px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.tabs::-webkit-scrollbar{display:none}
+.tab{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:7px;height:48px;padding:0 12px;font-weight:600;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.view{padding-top:22px;animation:fi .3s var(--out) both}
+.pend{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--sunken);margin-top:4px}
+.waitline{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.shimmer{background:linear-gradient(90deg,var(--faint) 0%,var(--ink2) 50%,var(--faint) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shim 1.6s linear infinite}
+
+
+/* ---------- This prototype ---------- */
+:root{--bg:#fff;--sunken:#f6f6f3;--sel:#2f7cf6;
+  --card-face-top:#fff;--card-shadow:0 0 0 1px rgba(23,23,22,.08),inset 0 1px 0 #fff,inset 0 -1px 0 rgba(23,23,22,.06),0 1px 2px rgba(23,23,22,.06),0 12px 28px -14px rgba(23,23,22,.18);
+  --card-key-bottom:#f5f5f2;--card-key:0 0 0 1px rgba(23,23,22,.09),inset 0 1px 0 #fff,inset 0 -1px 0 rgba(23,23,22,.08),0 1px 2px rgba(23,23,22,.08);
+  --card-well:#f6f6f3;--card-well-shadow:inset 0 1px 2px rgba(23,23,22,.07),inset 0 0 0 1px rgba(23,23,22,.05),0 1px 0 #fff}
+:root[data-theme="dark"]{--bg:#0f0f0e;--sunken:#0a0a09;
+  --card-face-top:#232322;--card-shadow:0 0 0 1px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.08),inset 0 -1px 0 rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.5),0 14px 30px -12px rgba(0,0,0,.75);
+  --card-key-bottom:#1f1f1e;--card-key:0 0 0 1px rgba(255,255,255,.09),inset 0 1px 0 rgba(255,255,255,.1),inset 0 -1px 0 rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.5);
+  --card-well:#121211;--card-well-shadow:inset 0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.04),0 1px 0 rgba(255,255,255,.05)}
+.app{min-height:calc(100vh - 45px)}
+.card{border-radius:20px 20px 20px 4px;background:linear-gradient(180deg,var(--card-face-top),var(--raised) 64px);box-shadow:var(--card-shadow);padding:20px}
+.key{width:32px;height:32px;border-radius:10px 10px 10px 3px;display:grid;place-items:center;flex:none;background:linear-gradient(180deg,var(--raised),var(--card-key-bottom));box-shadow:var(--card-key);color:var(--ink2)}
+.col1{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.gtitle{font-size:12.5px;font-weight:600;color:var(--faint);padding:10px 4px 0}
+
+/* ---------- The sentence ---------- */
+.scard{padding:28px 28px 22px}
+.sentence{font-family:var(--display);font-weight:300;font-size:30px;line-height:1.75;letter-spacing:-.02em;color:var(--ink2);text-wrap:pretty}
+.tok{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 10px 0 11px;margin:0 2px;border-radius:13px 13px 13px 4px;vertical-align:3px;background:linear-gradient(180deg,var(--raised),var(--card-key-bottom));box-shadow:var(--card-key);font-family:var(--sans);font-size:18px;font-weight:600;letter-spacing:-.015em;color:var(--ink);white-space:nowrap;transition:transform .2s var(--spring),box-shadow .2s var(--out)}
+.tok:hover{transform:translateY(-1px);box-shadow:var(--card-key),0 6px 14px -6px rgba(0,0,0,.18)}
+.tok:active{transform:translateY(0) scale(.98)}
+.tok svg.i{width:18px;height:18px}
+.tok .cv{width:14px;height:14px;color:var(--faint);margin-left:-2px}
+.tok[aria-expanded="true"]{box-shadow:0 0 0 2px var(--ink),var(--card-key)}
+.tok.off{color:var(--muted);font-weight:500}
+.tok.wait{color:var(--ink2)}
+.tok.glow{animation:glow 1.4s var(--out)}
+@keyframes glow{0%{box-shadow:0 0 0 3px var(--ok),var(--card-key)}100%{box-shadow:0 0 0 0 transparent,var(--card-key)}}
+.sline{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--muted)}
+.sline svg{color:var(--faint)}
+.sline.warn svg{color:var(--warn)}
+
+/* ---------- Rows (settings, direction lista) ---------- */
+.rows{display:flex;flex-direction:column;margin:-6px -8px}
+.rowb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 10px;border-radius:12px;transition:background .15s}
+.rowb + .rowb,.rowb + .rowx,.rowx + .rowb{box-shadow:0 -1px 0 var(--line)}
+.rowb:hover{background:var(--plate);box-shadow:none}
+.rowb:hover + .rowb{box-shadow:none}
+.rowb[aria-expanded="true"]{background:var(--plate)}
+.rowb .k{font-weight:600;font-size:14.5px;letter-spacing:-.01em;flex:none}
+.rowb .ic{width:30px;height:30px;border-radius:9px 9px 9px 3px;display:grid;place-items:center;flex:none;background:linear-gradient(180deg,var(--raised),var(--card-key-bottom));box-shadow:var(--card-key);color:var(--ink2)}
+.rowb .v{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;min-width:0;text-align:right}
+.rowb .v b{color:var(--ink);font-weight:600}
+.rowb .v span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rowb .chev{color:var(--faint);flex:none}
+.rowb.danger .k{color:var(--danger)}
+.rowb.glow{animation:rglow 1.4s var(--out)}
+@keyframes rglow{0%{background:var(--ok-soft)}100%{}}
+.rowx{padding:4px 10px 12px 52px}
+
+/* ---------- Popover / sheet ---------- */
+.pscrim{position:fixed;inset:0;z-index:55;background:transparent;animation:fade .2s both}
+.pop{position:fixed;z-index:60;width:400px;max-width:calc(100vw - 32px);border-radius:18px 18px 18px 5px;background:color-mix(in srgb,var(--raised) 96%,transparent);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3);padding:8px;animation:popin .22s var(--spring) both}
+.pop h3{font-size:15px;font-weight:650;letter-spacing:-.01em;padding:10px 12px 8px}
+.opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:12px;align-items:flex-start;width:100%;padding:11px 12px;border-radius:12px;transition:background .12s}
+.opt:hover{background:var(--plate)}
+.opt .ic{width:34px;height:34px;border-radius:10px 10px 10px 3px;display:grid;place-items:center;flex:none;background:linear-gradient(180deg,var(--raised),var(--card-key-bottom));box-shadow:var(--card-key);color:var(--ink2)}
+.opt .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-top:1px}
+.opt .t b{font-weight:600;font-size:14.5px;letter-spacing:-.01em;display:flex;align-items:center;gap:6px}
+.opt .t span{color:var(--muted);font-size:13px;line-height:1.4}
+.opt .t .also{display:flex;align-items:center;gap:5px;color:var(--ink2);font-weight:500}
+.opt .t .also svg{color:var(--faint)}
+.opt .t .also.warn{color:var(--warn)}
+.opt .t .also.warn svg{color:var(--warn)}
+.opt .rad{width:20px;height:20px;border-radius:50%;flex:none;margin-top:7px;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--bg);transition:background .15s}
+.opt .rad svg{width:12px;height:12px;stroke-width:2.8;opacity:0}
+.opt[aria-checked="true"] .rad{background:var(--ink);box-shadow:none}
+.opt[aria-checked="true"] .rad svg{opacity:1}
+.opt[aria-disabled="true"]{cursor:default}
+.opt[aria-disabled="true"]:hover{background:transparent}
+.opt[aria-disabled="true"] .ic,.opt[aria-disabled="true"] .t b{opacity:.45}
+.opt[aria-disabled="true"] .rad{opacity:.35}
+.osub{margin:0 12px 8px 58px;display:flex;flex-direction:column;gap:10px;animation:fi .2s var(--out) both}
+.osub .ln{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.osub .ln .seg{margin-left:auto}
+.ask{padding:12px;border-radius:12px 12px 12px 3px;background:var(--warn-soft);display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.45;color:var(--ink2)}
+.ask b{color:var(--ink);font-weight:650}
+.ask .row{gap:8px}
+.pop.sheet{left:0!important;right:0;top:auto!important;bottom:0;width:auto;max-width:none;border-radius:24px 24px 0 0;padding:6px 8px 28px;animation:sheet .32s var(--out) both}
+.pop.sheet::before{content:"";display:block;width:38px;height:5px;border-radius:99px;background:var(--line2);margin:4px auto 6px}
+@keyframes sheet{from{transform:translateY(100%)}}
+.pscrim.dim{background:rgba(0,0,0,.32)}
+
+/* ---------- The Mac guide (show, don't tell) ---------- */
+.guide{margin-top:20px;padding:16px;border-radius:16px 16px 16px 4px;background:var(--card-well);box-shadow:var(--card-well-shadow);animation:fi .3s var(--out) both}
+.guide .gh{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.guide .gh b{font-weight:650;font-size:14.5px;letter-spacing:-.01em}
+.guide .gh .live{margin-left:auto}
+.gsteps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.gs{display:flex;flex-direction:column;gap:8px;min-width:0}
+.gs p{font-size:13px;color:var(--ink2);display:flex;gap:8px;align-items:baseline}
+.gs p i{font-style:normal;width:18px;height:18px;border-radius:50%;flex:none;display:inline-grid;place-items:center;font-size:11px;font-weight:650;background:var(--ink);color:var(--bg);transform:translateY(-1px)}
+.shot{position:relative;height:118px;border-radius:12px 12px 12px 3px;background:var(--raised);box-shadow:var(--e1);overflow:hidden;font-size:11px;color:var(--ink2)}
+.gs.on .shot{box-shadow:0 0 0 2px var(--sel),var(--e1)}
+.mbar{display:flex;align-items:center;justify-content:flex-end;gap:9px;height:24px;padding:0 10px;background:color-mix(in srgb,var(--ink) 6%,var(--raised));font-weight:600;font-size:10.5px;color:var(--muted)}
+.mbar .sq{width:11px;height:11px;border-radius:3px;background:color-mix(in srgb,var(--ink) 22%,transparent)}
+.mbar .me{display:grid;place-items:center;width:20px;height:18px;border-radius:5px}
+.gs.on .mbar .me,.mbar .me.hit{background:color-mix(in srgb,var(--sel) 25%,transparent);box-shadow:0 0 0 1.5px var(--sel)}
+.mmenu{position:absolute;right:30px;top:28px;width:128px;padding:4px;border-radius:8px;background:var(--raised);box-shadow:var(--e2)}
+.mmenu div{padding:3px 7px;border-radius:5px;white-space:nowrap}
+.mmenu .hl{background:var(--sel);color:#fff}
+.mmenu hr{border:0;height:1px;background:var(--line);margin:3px 4px}
+.mwin{position:absolute;inset:10px;border-radius:9px;background:var(--raised);box-shadow:var(--e2);overflow:hidden}
+.mwin .bar{display:flex;align-items:center;gap:4px;height:18px;padding:0 7px;background:color-mix(in srgb,var(--ink) 5%,var(--raised));font-size:9.5px;font-weight:600;color:var(--muted)}
+.mwin .bar i{width:6px;height:6px;border-radius:50%;background:color-mix(in srgb,var(--ink) 20%,transparent)}
+.mwin .bar span{margin-left:6px}
+.mwin .r{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--line)}
+.mwin .r:first-of-type{border-top:0}
+.msw{width:22px;height:13px;border-radius:99px;background:color-mix(in srgb,var(--ink) 18%,transparent);position:relative;flex:none}
+.msw::after{content:"";position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:#fff;box-shadow:0 1px 1px rgba(0,0,0,.2);transition:transform .3s var(--spring)}
+.msw.on{background:var(--ok)}
+.msw.on::after{transform:translateX(9px)}
+.mwin .r.hl{background:color-mix(in srgb,var(--sel) 10%,transparent);font-weight:600}
+.r.hl .msw.flip{animation:flip 3s infinite}
+.r.hl .msw.flip::after{animation:flipk 3s infinite}
+@keyframes flip{0%,40%{background:color-mix(in srgb,var(--ink) 18%,transparent)}55%,100%{background:var(--ok)}}
+@keyframes flipk{0%,40%{transform:none}55%,100%{transform:translateX(9px)}}
+.cursor{position:absolute;width:12px;height:12px;pointer-events:none}
+.cursor svg{width:14px;height:14px;fill:var(--ink);stroke:var(--raised);stroke-width:1.5}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--faint)}
+.gfoot{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--muted)}
+
+/* Toast with undo */
+.toast{position:fixed;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100% - 32px);bottom:22px;z-index:50;display:flex;gap:10px;align-items:center;padding:8px 8px 8px 14px;border-radius:14px 14px 14px 4px;background:var(--ink);color:var(--bg);font-size:13.5px;font-weight:600;box-shadow:var(--e3);animation:popin .25s var(--spring) both}
+.toast svg{color:var(--term-ok)}
+.toast .u{all:unset;cursor:pointer;padding:5px 10px;border-radius:9px;background:color-mix(in srgb,var(--bg) 16%,transparent);font-weight:650}
+.toast .u:hover{background:color-mix(in srgb,var(--bg) 26%,transparent)}
+.toast.noundo{padding-right:14px}
+.ph-out{color:var(--muted);text-align:center;padding:60px 0;font-size:13.5px}
+.chip .dotc{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.chip .dotc.on{background:var(--ok)}
+
+@media (max-width:860px){
+  .gsteps{grid-template-columns:minmax(0,1fr)}
+  .shot{height:110px}
+}
+@media (max-width:640px){
+  .page{padding:0 16px 120px}
+  .cover{height:140px;border-radius:20px}
+  .ident h1{font-size:34px}
+  .card{padding:16px}
+  .scard{padding:20px 18px 16px}
+  .sentence{font-size:23px;line-height:1.85}
+  .tok{height:38px;font-size:16px;padding:0 8px 0 9px;white-space:normal;text-align:left}
+  .pbar .grow{display:none}
+  .rowb .v{max-width:55%}
+}
+
+/* ---------- v3: the whole profile ---------- */
+.ficha{padding:4px 28px}
+.fb{display:grid;align-items:start;grid-template-columns:104px minmax(0,1fr);gap:8px 16px;padding:24px 0;border-top:1px solid var(--line)}
+.fb:first-child{border-top:0}
+.fb .lbl2{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--faint);padding-top:10px}
+.fb .lbl2 svg{color:var(--faint)}
+.fb .sentence{font-size:23px;line-height:1.9}
+.fb .sline{margin-top:6px}
+.tok{height:36px;font-size:16px}
+.tok.add{width:38px;padding:0;justify-content:center;color:var(--muted)}
+.tok.add svg.i{width:16px;height:16px}
+.tok.ro{cursor:default;background:transparent;box-shadow:none;padding:0;margin:0;height:auto;vertical-align:baseline;font-size:inherit;font-family:var(--display);font-weight:400;color:var(--ink)}
+.tok.ro:hover{transform:none;box-shadow:none}
+.tok.ro svg.i{display:none}
+.tok .lvl{font-weight:500;color:var(--muted)}
+.meter{display:grid;grid-template-columns:repeat(40,1fr);gap:2px;max-width:420px;margin-top:4px}
+.meter i{height:8px;border-radius:2px;background:color-mix(in srgb,var(--ink) 9%,transparent)}
+.meter i.on{background:var(--amber,#c07d0b)}
+.meter i.mk{box-shadow:inset 0 0 0 1px var(--warn)}
+.note-ro{display:flex;gap:10px;align-items:center;padding:12px 16px;border-radius:14px 14px 14px 4px;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted);font-size:13.5px}
+.note-ro b{color:var(--ink);font-weight:600}
+
+/* Waiting for you + recent work */
+.wrow{display:flex;align-items:center;gap:12px;padding:10px 4px;border-top:1px solid var(--line);min-width:0}
+.wrow:first-of-type{border-top:0}
+.wrow .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.wrow .t b{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrow .t span{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chd{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.chd h2{font-size:15px;font-weight:650;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.chd .act{margin-left:auto}
+.cnt{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--ink);color:var(--bg);font-size:11.5px;font-weight:650}
+
+/* Hero inline editing */
+.editable{all:unset;cursor:text;border-radius:10px;padding:0 6px;margin:0 -6px;transition:background .15s;display:inline-flex;align-items:baseline;gap:10px}
+.editable:hover{background:var(--plate)}
+.editable .pen{opacity:0;color:var(--faint);transition:opacity .15s;align-self:center}
+.editable:hover .pen{opacity:1}
+.ident input.name{all:unset;font-family:var(--display);font-weight:300;font-size:44px;letter-spacing:-.03em;line-height:1;width:7ch;border-bottom:2px solid var(--ink)}
+.ident input.role{all:unset;font-size:15px;color:var(--ink2);border-bottom:1.5px solid var(--ink);width:16ch}
+.lookbtn{all:unset;cursor:pointer;position:absolute;inset:auto auto 8px 0;width:150px;height:150px}
+.lookbtn .hint{position:absolute;left:24px;bottom:-2px;opacity:0;transition:opacity .15s;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:99px;font-size:12px;font-weight:650;color:var(--sky-ink);background:var(--sky-glass);box-shadow:0 0 0 1px var(--sky-line);white-space:nowrap}
+.lookbtn:hover .hint,.lookbtn:focus-visible .hint{opacity:1}
+
+/* Popover extras */
+.pop .lead2{color:var(--muted);font-size:13px;padding:0 12px 8px;margin-top:-4px}
+.opt.multi .rad{border-radius:6px}
+.opt.danger .t b{color:var(--danger)}
+.opt.plain{align-items:center}
+.opt.plain .ic{width:30px;height:30px}
+.pfoot{all:unset;cursor:pointer;display:flex;align-items:center;gap:6px;margin:4px 12px 6px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted);width:calc(100% - 24px);box-sizing:border-box}
+.pfoot:hover{color:var(--ink)}
+.pfoot .chev{margin-left:auto}
+.people{display:flex;flex-wrap:wrap;gap:6px}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;padding:2px 12px 10px}
+.swc{all:unset;cursor:pointer;width:30px;height:30px;border-radius:10px 10px 10px 3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 0 1px rgba(0,0,0,.08);transition:transform .18s var(--spring)}
+.swc:hover{transform:translateY(-1px)}
+.swc[aria-pressed="true"]{box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--ink)}
+.looks{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:2px 12px 10px}
+.lk{all:unset;cursor:pointer;height:64px;border-radius:12px 12px 12px 3px;display:grid;place-items:end center;padding-bottom:6px;box-sizing:border-box;background:var(--sunken);overflow:hidden;transition:box-shadow .15s}
+.lk:hover{box-shadow:inset 0 0 0 1px var(--line2)}
+.lk[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--ink)}
+.psec{font-size:12.5px;font-weight:600;color:var(--faint);padding:6px 12px 6px}
+
+/* Instructions */
+.doc{display:flex;flex-direction:column;gap:14px}
+.doc textarea{all:unset;box-sizing:border-box;width:100%;min-height:380px;font-size:15px;line-height:1.7;color:var(--ink2);white-space:pre-wrap;field-sizing:content}
+.prop{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:14px 14px 14px 4px;background:var(--agent-soft)}
+.prop .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.prop .top b{font-weight:650}
+.prop .top .act{margin-left:auto;display:flex;gap:6px}
+.dl{font-size:14px;line-height:1.6;padding:6px 10px;border-radius:8px;background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ink)}
+.dl::before{content:"+ ";color:var(--ok);font-weight:700}
+
+@media (max-width:640px){
+  .ficha{padding:0 16px}
+  .fb{grid-template-columns:minmax(0,1fr);padding:18px 0}
+  .fb .lbl2{padding-top:0}
+  .fb .sentence{font-size:21px}
+  .ident input.name{font-size:34px}
+}
+
+/* ---------- v4: one sentence on top, the rest as real UI ---------- */
+.hsent{padding:14px 4px 4px;max-width:900px}
+.hsent .sentence{font-size:24px;line-height:1.25;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.hsent .tok{margin:0;vertical-align:0}
+.hsent .punct{margin-left:-8px}
+.hsent .guide{max-width:820px}
+.pgrid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start}
+.pgrid .span2{grid-column:1/-1}
+.pcol{display:flex;flex-direction:column;gap:16px;min-width:0}
+.chd .key{width:28px;height:28px}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.apptile{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px;border-radius:14px 14px 14px 4px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .18s var(--spring),box-shadow .15s;min-width:0}
+.apptile:hover{transform:translateY(-1px);box-shadow:var(--e2),var(--top)}
+.apptile[aria-expanded="true"]{box-shadow:0 0 0 1.5px var(--ink),var(--e2)}
+.apptile.ro{cursor:default}
+.apptile.ro:hover{transform:none;box-shadow:var(--e1),var(--top)}
+.apptile b{font-weight:600;font-size:14px}
+.apptile .lv{font-size:12px;font-weight:600;color:var(--muted)}
+.apptile .lv.write{color:var(--ok)}
+.apptile.add{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--muted);justify-content:center;align-items:center;min-height:0;gap:6px}
+.apptile.add:hover{color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink2)}
+.apptile.glow{animation:rglow 1.4s var(--out)}
+.prows{display:flex;flex-direction:column;margin:0 -8px}
+.prow{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;min-height:50px;padding:8px;border-radius:12px;transition:background .15s}
+.prow + .prow{box-shadow:0 -1px 0 var(--line)}
+.prow:hover,.prow[aria-expanded="true"]{background:var(--plate);box-shadow:none}
+.prow.ro{cursor:default}
+.prow.ro:hover{background:transparent}
+.prow .k{font-size:13.5px;color:var(--muted);flex:none}
+.prow .v{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0;justify-content:flex-end;flex-wrap:wrap}
+.prow .v b{font-weight:600;font-size:14px}
+.prow .chev{color:var(--faint);flex:none}
+.prow.glow{animation:rglow 1.4s var(--out)}
+.avs{display:inline-flex;flex:none;flex-wrap:nowrap;align-items:center}
+.avs .pa{width:26px;height:26px;font-size:9.5px;border-radius:50%;flex:none;letter-spacing:-.02em;white-space:nowrap;box-shadow:0 0 0 2px var(--raised)}
+.avs .pa + .pa{margin-left:-5px}
+.avs .pa.more{background:var(--sunken);color:var(--muted);font-size:9.5px;line-height:1;display:inline-grid;place-items:center;align-self:center}
+.big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:2px 0 12px}
+.big .num{font-family:var(--display);font-weight:300;font-size:44px;letter-spacing:-.03em;line-height:1}
+.big .of{color:var(--muted);font-size:14px;display:inline-flex;align-items:baseline;gap:4px}
+.lnk{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--ink);border-radius:7px;padding:1px 5px;margin:0 -2px;box-shadow:inset 0 -1.5px 0 var(--line2)}
+.lnk:hover{background:var(--plate)}
+.lnk.glow{animation:rglow 1.4s var(--out)}
+.rrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.rrow:first-of-type{border-top:0;padding-top:0}
+.rrow .key{width:30px;height:30px}
+.rrow .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.rrow .t b{font-weight:600;font-size:14px}
+.rrow .t span{color:var(--muted);font-size:12.5px}
+.rrow.off .t b{color:var(--muted)}
+.sw{all:unset;box-sizing:border-box;position:relative;flex:none;width:40px;height:24px;border-radius:999px;cursor:pointer;background:color-mix(in srgb,var(--ink) 18%,transparent);box-shadow:inset 0 1px 2px rgba(0,0,0,.12);transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .3s var(--spring)}
+.sw[aria-checked="true"]{background:var(--ink)}
+.sw[aria-checked="true"]::after{transform:translateX(16px)}
+.card > .chd + .rrow{border-top:0;padding-top:0}
+@media (max-width:860px){.pgrid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.hsent .sentence{font-size:20px}.big .num{font-size:36px}}
+
+/* The model inside the chosen brain: a label and a segmented control that fills the text column. */
+.mrow{display:flex;align-items:center;gap:12px}
+.mrow > span{font-size:13px;color:var(--muted);flex:none;width:52px}
+.seg.full{display:flex;flex:1;min-width:0}
+.seg.full button{flex:1;justify-content:center}
+.osub{margin-right:12px}
+
+/* ---------- v5: dialogs for the three big choices ---------- */
+.dscrim{position:fixed;inset:0;z-index:70;background:rgba(10,10,9,.36);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:fade .2s both}
+.dlg{position:fixed;z-index:71;left:0;right:0;top:6vh;margin:0 auto;width:min(760px,calc(100% - 32px));max-height:88vh;display:flex;flex-direction:column;border-radius:24px 24px 24px 6px;background:var(--raised);box-shadow:var(--e3);animation:popin .26s var(--spring) both;overflow:hidden}
+.dh{display:flex;align-items:flex-start;gap:14px;padding:22px 20px 14px 24px}
+.dh .key{width:40px;height:40px}
+.dh .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.dh h2{font-family:var(--display);font-weight:300;font-size:28px;letter-spacing:-.03em;line-height:1.05}
+.dh .t span{color:var(--muted);font-size:13.5px}
+.db{overflow:auto;padding:6px 24px 22px;display:flex;flex-direction:column;gap:16px}
+.df{display:flex;align-items:center;gap:8px;padding:14px 20px 14px 24px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--sunken) 60%,var(--raised))}
+.df .pv{flex:1;min-width:0;color:var(--muted);font-size:13.5px}
+.df .pv b{color:var(--ink);font-weight:600}
+.eng{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ec{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px;border-radius:16px 16px 16px 4px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .18s var(--spring),box-shadow .15s}
+.ec:hover{transform:translateY(-1px);box-shadow:var(--e2),var(--top)}
+.ec[aria-checked="true"]{box-shadow:0 0 0 2px var(--ink),var(--e2)}
+.ec b{font-weight:650;font-size:15px;letter-spacing:-.01em;margin-top:6px;display:flex;align-items:center;gap:6px}
+.ec .d{color:var(--muted);font-size:13px;line-height:1.4}
+.ec .chip.where{margin-top:auto}
+.ec .ok,.pcc .ok{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--bg);opacity:0;transform:scale(.6);transition:opacity .15s,transform .25s var(--spring)}
+.ec .ok svg,.pcc .ok svg{width:13px;height:13px;stroke-width:2.6}
+.ec[aria-checked="true"] .ok,.pcc[aria-checked="true"] .ok{opacity:1;transform:none}
+.ekey{width:44px;height:44px;border-radius:13px 13px 13px 4px;display:grid;place-items:center;flex:none;background:linear-gradient(180deg,var(--raised),var(--card-key-bottom));box-shadow:var(--card-key);color:var(--ink2)}
+.ekey svg{width:22px;height:22px;stroke-width:1.6}
+.detail{display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:16px 16px 16px 4px;background:var(--card-well);box-shadow:var(--card-well-shadow);animation:fi .25s var(--out) both}
+.mg{display:flex;flex-direction:column;gap:4px}
+.mg.off{opacity:.8}
+.mgh{display:flex;align-items:center;gap:8px;padding:0 2px 6px}
+.mgh b{font-weight:650;font-size:13.5px}
+.mr{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:var(--raised);box-shadow:var(--e1);transition:box-shadow .15s}
+.mr:hover{box-shadow:var(--e2)}
+.mr[aria-checked="true"]{box-shadow:0 0 0 1.5px var(--ink),var(--e1)}
+.mr .rad{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--bg)}
+.mr .rad svg{width:12px;height:12px;stroke-width:2.8;opacity:0}
+.mr[aria-checked="true"] .rad{background:var(--ink);box-shadow:none}
+.mr[aria-checked="true"] .rad svg{opacity:1}
+.mr .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.mr .t b{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
+.mr .t span{color:var(--muted);font-size:12.5px}
+.rec{font-size:11px;font-weight:650;color:var(--ok);background:var(--ok-soft);padding:1px 7px;border-radius:99px}
+.tier{display:inline-flex;align-items:center;gap:3px;flex:none}
+.tier i{width:7px;height:7px;border-radius:2px;background:color-mix(in srgb,var(--ink) 12%,transparent)}
+.tier i.on{background:var(--ink2)}
+.tier span{margin-left:5px;font-size:12px;color:var(--muted);width:40px}
+.pcs{display:flex;flex-direction:column;gap:8px}
+.pcc{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:flex;align-items:flex-start;gap:14px;padding:14px 48px 14px 14px;border-radius:16px 16px 16px 4px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:box-shadow .15s}
+.pcc:hover{box-shadow:var(--e2),var(--top)}
+.pcc[aria-checked="true"]{box-shadow:0 0 0 2px var(--ink),var(--e2)}
+.pcc .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.pcc .t b{font-weight:650;font-size:15px}
+.pcc .t > span{color:var(--muted);font-size:13px}
+.pcc .ok{top:50%;margin-top:-11px}
+.has{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px}
+.has span{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600}
+.has .y{color:var(--ink2)}
+.has .y svg{color:var(--ok)}
+.has .w{color:var(--warn)}
+.has .n{color:var(--faint);font-weight:500;text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--faint) 50%,transparent)}
+.sites{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sites .chip{height:30px;padding-right:4px}
+.sites .x{all:unset;cursor:pointer;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:var(--faint)}
+.sites .x:hover{background:var(--plate);color:var(--ink)}
+.detail .guide{margin-top:0;background:var(--raised);box-shadow:var(--e1)}
+.detail .ask{padding:12px 14px}
+@media (max-width:640px){
+  .dlg{top:auto;bottom:0;width:100%;max-height:92vh;border-radius:24px 24px 0 0;animation:sheet .32s var(--out) both}
+  .eng{grid-template-columns:minmax(0,1fr)}
+  .ec{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .ec b{margin-top:0}
+  .df{flex-wrap:wrap}
+  .df .pv{flex-basis:100%}
+}
+
+/* Connector list (v5) */
+.clist{display:flex;flex-direction:column}
+.crow2{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);min-width:0}
+.crow2:first-child{border-top:0;padding-top:2px}
+.crow2 .key{width:34px;height:34px}
+.crow2 .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.crow2 .t b{font-weight:600;font-size:14.5px}
+.crow2 .t span{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow2 .iconbtn{width:30px;height:30px}
+.crow2.add{cursor:pointer;margin:0 -8px;padding:10px 8px;border-radius:12px;border-top-color:transparent;box-shadow:0 -1px 0 var(--line)}
+.crow2.add:hover{background:var(--plate)}
+.crow2.add .key{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--muted)}
+.crow2.add .chev{color:var(--faint)}
+.crow2.glow{animation:rglow 1.4s var(--out)}
+/* Avatar stack */
+.stk{display:inline-flex;align-items:center;flex:none}
+.stk i{font-style:normal;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:650;line-height:1;letter-spacing:-.02em;color:var(--person-ink,#2a2a28);background:linear-gradient(160deg,#e9e9e5,#d9d9d4);box-shadow:0 0 0 2px var(--raised);position:relative}
+:root[data-theme="dark"] .stk i{background:linear-gradient(160deg,#3a3a37,#2a2a28);color:#efefec}
+.stk i + i{margin-left:-4px}
+.stk i.more{background:var(--sunken);color:var(--muted);font-weight:600}
+.ec .chip.where{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.stk i.more{padding-bottom:1px;font-size:9px}
+.dotc{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none;display:inline-block}
+.dotc.on{background:var(--ok)}
+.pcc .also{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--warn);margin-top:2px}
+.pcc .also svg{color:var(--warn)}
+
+/* v6: portraits in the dialogs, tiles in the detail */
+canvas.port{image-rendering:pixelated;display:block;flex:none}
+.eport{display:grid;place-items:center;width:84px;height:84px;margin:-4px 0 0 -6px;border-radius:18px 18px 18px 5px;background:var(--card-well);box-shadow:var(--card-well-shadow)}
+.eport.sm{width:64px;height:64px;margin:0;border-radius:15px 15px 15px 4px}
+
+.mtiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mtile{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 12px 12px 14px;border-radius:14px 14px 14px 4px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:box-shadow .15s,transform .18s var(--spring);min-width:0}
+.mtile:hover{transform:translateY(-1px);box-shadow:var(--e2),var(--top)}
+.mtile[aria-checked="true"]{box-shadow:0 0 0 2px var(--ink),var(--e2)}
+.mtile canvas.port{margin:-4px -2px -4px -6px}
+.mtile .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mtile .t b{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mtile .t span{color:var(--muted);font-size:12.5px;line-height:1.35}
+.mtile .rad{width:20px;height:20px;border-radius:50%;flex:none;align-self:flex-start;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--bg)}
+.mtile .rad svg{width:12px;height:12px;stroke-width:2.8;opacity:0}
+.mtile[aria-checked="true"] .rad{background:var(--ink);box-shadow:none}
+.mtile[aria-checked="true"] .rad svg{opacity:1}
+.pnote{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.4;color:var(--muted)}
+.pnote svg{color:var(--warn);margin-top:1px;flex:none}
+.pnote b{color:var(--ink);font-weight:600}
+@media (max-width:640px){.mtiles{grid-template-columns:minmax(0,1fr)}}
+
+/* Chosen = relief, never a dark border (packages/ui tokens.css --chosen-*): sinks in light, rises in dark,
+   and in dark the other options of the group step back. */
+:root{--chosen-bg:var(--sunken);--chosen-shadow:inset 0 2px 5px rgba(23,23,22,.16),inset 0 1px 1.5px rgba(23,23,22,.12),inset 0 0 0 1px var(--line),0 1px 0 rgba(255,255,255,.7);--chosen-lift:none;--unchosen-shadow:inset 0 0 0 1px var(--line)}
+:root[data-theme="dark"]{--chosen-bg:color-mix(in srgb,#fff 7%,var(--raised));--chosen-shadow:0 0 0 1px rgba(255,255,255,.1),0 14px 28px -8px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.12);--chosen-lift:translateY(-2px)}
+.ec[aria-checked="true"],.mtile[aria-checked="true"],.mr[aria-checked="true"],.pcc[aria-checked="true"],
+.tok[aria-expanded="true"],.apptile[aria-expanded="true"]{background:var(--chosen-bg);box-shadow:var(--chosen-shadow);transform:var(--chosen-lift)}
+.ec[aria-checked="true"]:hover,.mtile[aria-checked="true"]:hover,.pcc[aria-checked="true"]:hover{box-shadow:var(--chosen-shadow);transform:var(--chosen-lift)}
+/* Side by side, a lifted tile would leave its row. */
+.mtiles .mtile[aria-checked="true"]{transform:none}
+:root[data-theme="dark"] :is(.eng,.mtiles,.pcs,.mg):has(> [aria-checked="true"]) > :is(.ec,.mtile,.pcc,.mr):not([aria-checked="true"]){background:transparent;box-shadow:var(--unchosen-shadow)}
+.ec b .chip{margin:0}
+/* The status chip sits on each card's floor, on one line across the row; on the sunk (chosen) card it stays raised. */
+.eng{align-items:stretch}
+.ec{height:100%}
+.ec .chip.where{margin-top:auto;position:relative;top:4px}
+.ec .d{margin-bottom:8px}
+.ec[aria-checked="true"] .chip.where:not(.warn){background:var(--raised);box-shadow:var(--e1)}
+/* The pencil shows on hover without taking room: the name and the handle keep their normal gap. */
+.editable{position:relative;gap:0}
+.editable .pen{position:absolute;left:100%;top:50%;margin:-8px 0 0 6px;pointer-events:none}
+.ident h1{gap:14px}
+/* The name: the hover background says it is editable; a pencil there would sit on the handle. */
+[data-edit="name"] .pen{display:none}
+/* Connector mark (CatalogoConectores.html): neutral tile, radius 30%, the brand logo as a mask in its color. */
+.ci{--s:40px;position:relative;width:var(--s);height:var(--s);border-radius:calc(var(--s) * .3);flex:none;display:grid;place-items:center;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line),var(--top)}
+.ci i{width:calc(var(--s) * .5);height:calc(var(--s) * .5);background:var(--c,var(--ink));-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
+/* Name and handle stacked: the big name, the handle and role right under it (side by side never lined up). */
+.ident h1{flex-direction:column;align-items:flex-start;gap:6px}
+.ident h1 .handle{display:block;line-height:1.3}
+.ident h1 .handle .editable{font-size:15px}
+.ident{padding-top:18px}
+.crow2.add .key{border-radius:30%}
+/* v7: one pattern for every setting */
+.dlg.sm{width:min(560px,calc(100% - 32px))}
+.dh .ci{margin-top:0}
+.sbody{display:flex;flex-direction:column;gap:2px;margin:0 -8px}
+.sbody .opt[aria-checked="true"]{background:var(--chosen-bg);box-shadow:var(--chosen-shadow)}
+.sbody .swatches,.sbody .looks,.sbody .psec{padding-left:8px;padding-right:8px}
+.lookprev{display:grid;place-items:end center;height:150px;margin:0 8px 8px;border-radius:16px 16px 16px 4px;background:var(--card-well);box-shadow:var(--card-well-shadow);overflow:hidden;padding-bottom:10px}
+.btnrow{cursor:pointer;margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:12px;transition:background .15s}
+.btnrow:hover{background:var(--plate)}
+.crow2 .chev{color:var(--faint);flex:none}
+.lvchip{font-size:12.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.lvchip.write{color:var(--ink2)}
+.sens{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink2);padding:4px 2px}
+.sens svg{color:var(--ok)}
+.mtile .key{width:34px;height:34px}
+.btn.danger{color:var(--danger)}
+.df .pv .btn{margin-left:-8px}
+/* Actions live on the sky, next to the agent: one group in the cover's corner. */
+.coveracts{position:absolute;right:14px;bottom:14px;display:flex;gap:6px;z-index:2}
+.coveracts .btn{height:36px}
+.coveracts .btn.icon{width:36px}
+.coveracts .glass{color:var(--sky-ink);background:var(--sky-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 0 0 1px var(--sky-line)}
+.coveracts .glass:hover{background:color-mix(in srgb,var(--sky-glass) 70%,#fff)}
+/* Framed list, as in the workspace settings (.ac-list / .ac-list__row) */
+.alist{display:flex;flex-direction:column;border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top);overflow:hidden}
+.arow{display:flex;align-items:center;gap:12px;padding:10px 16px;min-width:0}
+.arow + .arow{border-top:1px solid var(--line)}
+.arow .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.arow .nm{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;flex-wrap:wrap}
+.arow .t > span:last-child{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arow .acts{display:flex;gap:6px;flex:none}
+.arow .ci svg.i{width:18px;height:18px;color:var(--ink2)}
+.arow.glow{animation:rglow 1.4s var(--out)}
+.ci.pa40{--s:40px;font-size:12px;font-weight:650;color:var(--ink2)}
+.card > .chd + .alist{margin-top:4px}
+/* Exactly the workspace settings list (packages/ui .ac-list/.ac-list__row, layout.css .connected-row,
+   .connector-icon--lg, .ac-chip): no variations of our own. */
+.alist{border-radius:14px;background:var(--raised);box-shadow:var(--e1),var(--top);overflow:hidden}
+.arow{gap:14px;padding:10px 16px;min-height:64px}
+.arow .ci{--s:44px;width:44px;height:44px;border-radius:10px;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2)}
+.arow .ci i{width:58%;height:58%}
+.arow .ci svg.i{width:20px;height:20px}
+.arow .nm{font-size:14.5px;font-weight:600;gap:8px}
+.arow .t > span:last-child{font-size:13px}
+.achip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:999px;background:var(--sunken);color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap}
+.achip svg.i{width:14px;height:14px}
+.arow .acts .btn.ghost{color:var(--muted)}
+/* Connector rows as in the app today */
+.lvrow{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+.card > .chd + .lvrow{border-top:0;padding-top:4px}
+.lvrow .ci{--s:40px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--line2)}
+.lvrow .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.lvrow .t b{font-weight:600;font-size:15px}
+.lvrow .tools{color:var(--muted);font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lvrow .asks{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:6px}
+.askchip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-size:12.5px;font-weight:600}
+.lvrow .seg{flex:none}
+.lvrow.glow{animation:rglow 1.4s var(--out)}
+.connmore{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;margin-top:10px;padding:14px 16px;border-radius:14px;box-shadow:inset 0 0 0 1.5px var(--line2);border:0;outline:1.5px dashed var(--line2);outline-offset:-1.5px;color:var(--muted);font-weight:600;font-size:14px}
+.connmore{box-shadow:none}
+.connmore span{margin-left:auto;font-weight:500;font-size:13px}
+.connmore:hover{color:var(--ink);background:var(--plate)}
+@media (max-width:640px){.lvrow{flex-wrap:wrap}.lvrow .seg{margin-left:54px}}
+/* Dialogs stay neutral: every chip is the app's neutral chip; state is said in words and icons, not colors. */
+.dlg .chip,.dlg .chip.ok,.dlg .chip.warn,.dlg .chip.line{background:var(--sunken);color:var(--ink2);box-shadow:none}
+.dlg .ec[aria-checked="true"] .chip.where{background:var(--raised);box-shadow:inset 0 0 0 1px var(--line)}
+.dlg .rec{background:var(--sunken);color:var(--muted)}
+.dlg .has .y svg,.dlg .has .w,.dlg .has .w svg{color:var(--ink2)}
+.dlg .has .w{color:var(--muted)}
+.dlg .pcc .also,.dlg .pcc .also svg,.dlg .opt .t .also.warn,.dlg .opt .t .also.warn svg{color:var(--ink2)}
+.dlg .sens svg{color:var(--muted)}
+.dlg .pnote svg{color:var(--muted)}
+.dlg .tier i.on{background:var(--muted)}
+</style>
+</head>
+<body>
+<div class="pbar" id="pbar"></div>
+<div class="app bare"><main class="page" id="page"></main></div>
+<div id="layer"></div>
+<script type="module">
+import { drawBrain } from "../../../packages/ui/src/brain/portrait.js";
+import { drawComputer } from "../../../packages/ui/src/computer/portrait.js";
+import { drawAgent, idlePose, drawAccessory, spriteGrid, spriteBody, bodyTones, ACCESSORY_REACH, AGENT_GRADIENTS, mixHex } from "../../../packages/ui/src/agent/engine.js";
+const AGENTS = {
+  bento: { name: "Bento", handle: "bento", role: "Conteúdo", look: { color: "amber", eyes: "round", accessory: "cap" } },
+  logo: { name: "agentes", look: { color: "sky", eyes: "round", accessory: "none" } },
+};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const P = {
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>', down: '<path d="m6 9 6 6 6-6"/>', right: '<path d="M9 6l6 6-6 6"/>', left: '<path d="M15 6l-6 6 6 6"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  hash: '<path d="M9 4 7 20M17 4l-2 16M4 9h16M3.5 15h16"/>',
+  user: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  users: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.6c1.6.6 2.6 2.1 3 4.4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>',
+  pen: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+  shield: '<path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/>',
+  code: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
+  pulse: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  chip: '<rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 2.5V6M15 2.5V6M9 18v3.5M15 18v3.5M2.5 9H6M2.5 15H6M18 9h3.5M18 15h3.5"/>',
+  wallet: '<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v4"/><rect x="4" y="9" width="16" height="11" rx="2.5"/><path d="M16 14.5h.01"/>',
+  book: '<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3V4.5Z"/><path d="M5 17a3 3 0 0 1 3-3h9"/>',
+  plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v4"/>',
+  chat: '<path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z"/>',
+  sparkle: '<path d="M12 3.5 13.8 9 19.5 11 13.8 13 12 18.5 10.2 13 4.5 11 10.2 9Z"/>',
+  folder: '<path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>',
+  folderLock: '<path d="M11 19.5H5.5a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1.5"/><rect x="13.5" y="15" width="7" height="5.5" rx="1.3"/><path d="M15 15v-1.3a2 2 0 0 1 4 0V15"/>',
+  issue: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  terminal: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m7.5 10 2.5 2-2.5 2M12.5 14.5h4"/>',
+  computer: '<rect x="3.5" y="4.5" width="17" height="11.5" rx="2.5"/><path d="M8.5 20h7M12 16v4"/>',
+  more: '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  alert: '<path d="M12 4 2.8 19.5h18.4Z"/><path d="M12 10v4M12 17h.01"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  power: '<path d="M12 3.5v8"/><path d="M7.2 6.5a7.5 7.5 0 1 0 9.6 0"/>',
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
+  home: '<path d="M4 11 12 4l8 7v8.5a.5.5 0 0 1-.5.5H15v-6H9v6H4.5a.5.5 0 0 1-.5-.5Z"/>',
+  inbox: '<path d="M4 13.5 6.5 5h11l2.5 8.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M4 13.5h4.5l1 2h5l1-2H20"/>',
+  routine: '<path d="M20 11a8 8 0 0 0-14.3-4.9M4 13a8 8 0 0 0 14.3 4.9"/><path d="M4 4v4h4M20 20v-4h-4"/>',
+  ok: '<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/>',
+  dash: '<path d="M7 12h10"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>',
+  cloud: '<path d="M7 18.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7 9.5a4.5 4.5 0 0 0 0 9Z"/>',
+  asterisk: '<path d="M12 4v16M5.1 8l13.8 8M18.9 8 5.1 16"/>',
+  hex: '<path d="M12 3.5 19.5 7.8v8.4L12 20.5l-7.5-4.3V7.8Z"/><path d="M9 10.5 11 12l-2 1.5M13 14h2.5"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  keyboard: '<rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 10h.01M10.5 10h.01M14 10h.01M17.5 10h.01M8 14h8"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/>',
+};
+const I = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+
+/* ================= Agents (only from the engine) ================= */
+const DPR = Math.min(2, devicePixelRatio || 1);
+const RCH = ACCESSORY_REACH;
+const live = [];
+function avatar(look, size, seed = Math.random() * 5, opts = {}) {
+  const cv = document.createElement("canvas");
+  cv.className = "av";
+  const w = size * (1 + RCH.left + RCH.right), h = size * (1 + RCH.top + RCH.bottom);
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+  if (opts.tight !== false) cv.style.margin = `${-size * RCH.top}px ${-size * RCH.right}px ${-size * RCH.bottom}px ${-size * RCH.left}px`;
+  live.push({ cv, look, size, seed, opts });
+  return cv;
+}
+function drawOne(a, t, pose, extra = {}) {
+  const c = a.cv.getContext("2d"), s = a.size * DPR, L = a.look;
+  c.clearRect(0, 0, a.cv.width, a.cv.height);
+  const lift = (extra.lift ?? 0) * s;
+  drawAgent(c, RCH.left * s, RCH.top * s - lift, s, {
+    color: L.color, eyes: L.eyes, cells: a.size <= 28 ? 10 : a.size <= 60 ? 16 : 22, pose,
+    after: L.accessory && L.accessory !== "none" ? (cx, side, frame) => drawAccessory(cx, side, L.accessory, frame, t, extra.active) : undefined,
+  });
+}
+/* The agent asking for a folder looks toward the card while it waits; writes once it continues. */
+function poseFor(a, t) {
+  const mode = a.opts.mode;
+  if (mode === "writing") return { writing: true, turn: [0.3 + 0.08 * Math.sin(t * 0.7), 0.18], squash: Math.sin(t * 5) * 0.12 };
+  if (mode === "waiting") { const p = idlePose(t, a.seed, { every: 7, expressions: ["closed"] }); p.turn = [-0.5, -0.35]; return p; }
+  if (a.opts.still) return { turn: [0.15, 0.05] };
+  return idlePose(t, a.seed, { every: 11, expressions: ["happy", "wink"] });
+}
+function hydrate(root) {
+  for (const el of $$("[data-av]", root)) {
+    const id = el.dataset.av, size = Number(el.dataset.size || 20);
+    el.replaceWith(avatar(AGENTS[id].look, size, Math.random() * 5, { tight: el.dataset.tight !== "0", mode: el.dataset.mode, still: el.dataset.still === "1" }));
+  }
+  for (const cv of $$("canvas.orbit", root)) {
+    const size = Number(cv.dataset.size || 14);
+    cv.style.width = cv.style.height = size + "px"; cv.width = cv.height = Math.round(size * DPR);
+  }
+}
+const av = (id, size = 18, extra = "") => `<span data-av="${id}" data-size="${size}" ${extra}></span>`;
+/* Loading: the 3×3 pixel orbit from Carregando.html (direction A), in the agent's own tones. */
+const orbit = (color = "amber", size = 14) => `<canvas class="orbit" data-color="${color}" data-size="${size}" aria-hidden="true"></canvas>`;
+const RING = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function drawOrbit(cv, now) {
+  const ctx = cv.getContext("2d"), cell = cv.width / 3, gap = Math.max(1, Math.round(cell * 0.14));
+  const tn0 = bodyTones(cv.dataset.color), tn = Array.isArray(tn0) ? tn0 : Object.values(tn0);
+  const dark = document.documentElement.dataset.theme === "dark";
+  const faint = mixHex(tn[tn.length - 1] ?? "#999999", dark ? "#000000" : "#ffffff", dark ? 0.55 : 0.45);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const head = reduce ? 0 : Math.floor(now / 110) % 8;
+  RING.forEach(([x, y], i) => {
+    const age = (head - i + 8) % 8;
+    ctx.fillStyle = age === 0 ? tn[0] : age === 1 ? tn[Math.min(1, tn.length - 1)] : age === 2 ? tn[Math.min(2, tn.length - 1)] : faint;
+    ctx.globalAlpha = age <= 2 ? 1 : dark ? 0.5 : 0.9;
+    ctx.fillRect(x * cell + gap / 2, y * cell + gap / 2, cell - gap, cell - gap);
+  });
+  ctx.globalAlpha = 1;
+}
+
+/* ================= Skies (agent page cover; sidebar horizon) ================= */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const rgb = (h) => { const n = parseInt(h.slice(1, 7), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+function ramp(c) {
+  const [top, bot] = AGENT_GRADIENTS[c] ?? AGENT_GRADIENTS.sky, deep = mixHex(bot, "#000000", 0.42);
+  return [deep, mixHex(deep, bot, 0.5), bot, mixHex(bot, top, 0.5), top, mixHex(top, "#ffffff", 0.4), mixHex(top, "#ffffff", 0.7), mixHex(top, "#ffffff", 0.9)];
+}
+const SPR = spriteGrid(9);
+function paintSky(cv, t, o) {
+  const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const PX = 4, W = Math.ceil(r.width / PX), H = Math.ceil(r.height / PX);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; cv._img = null; }
+  const c = cv.getContext("2d");
+  const img = cv._img || (cv._img = c.createImageData(W, H)), d = img.data;
+  const pal = o.palette.map((p) => (Array.isArray(p) ? p : rgb(p))), n = pal.length - 1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let f = o.base(x / W, y / H, t);
+    f = f < 0 ? 0 : f > 1 ? 1 : f;
+    const k = f * n, lo = Math.floor(k), col = pal[Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+  }
+  if (o.sprites) {
+    cv._sp ??= [];
+    while (cv._sp.length < o.sprites) cv._sp.push({ x: Math.random(), y: o.minY + Math.random() * (1 - o.minY), v: 0.012 + Math.random() * 0.02, b: Math.random() * 5 });
+    const body = rgb(o.spriteBody || "#04203f");
+    for (const sp of cv._sp) {
+      sp.y -= sp.v * 0.04 * (o.speed || 1); if (sp.y < o.minY) { sp.y = 1.05; sp.x = Math.random(); }
+      if (o.avoid && Math.abs((sp.x * (W - 9) + 4.5) / W - o.avoid[0]) < o.avoid[2]) continue;
+      const ox = Math.round(sp.x * (W - 9)), oy = Math.round(sp.y * H), blink = (t + sp.b) % 4 < 0.12;
+      for (let j = 0; j < 9; j++) for (let i2 = 0; i2 < 9; i2++) {
+        const ch = SPR[j][i2]; if (ch === ".") continue;
+        const X = ox + i2, Y = oy + j; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+        const o2 = (Y * W + X) * 4, col = ch === "o" && !blink ? [255, 255, 255] : body;
+        d[o2] = col[0]; d[o2 + 1] = col[1]; d[o2 + 2] = col[2];
+      }
+    }
+  }
+  c.putImageData(img, 0, 0);
+}
+function coverSky(t) {
+  const cv = $("#coverSky"); if (!cv || !cv.offsetParent) return;
+  const r = cv.getBoundingClientRect(), ag = $("#heroAgent")?.getBoundingClientRect();
+  const ax = ag ? (ag.left + ag.width / 2 - r.left) / r.width : 0.1, color = AGENTS.bento.look.color;
+  paintSky(cv, t, { palette: ramp(color), sprites: 5, speed: 1, minY: 0.05, spriteBody: spriteBody(color), avoid: [ax, 0, 0.09], base: (u, v, t2) => {
+    const dx = (u - ax) * 2.2 * (r.width / 900), dy = (v - 0.84) * 1.3;
+    return 0.86 - 0.22 * u - 0.46 * v + 0.42 * Math.exp(-(dx * dx + dy * dy) / 0.14) + 0.06 * Math.sin(u * 5 + t2 * 0.6);
+  } });
+}
+function sideSky(t) {
+  const cv = $("#sideSky"); if (!cv || !cv.offsetParent) return;
+  const surface = getComputedStyle($(".side")).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
+  const sky = ["#a6cfff", "#78b4ff", "#4b93ff", "#2b74e6"].map(rgb);
+  const tones = [surface, ...[0.18, 0.4, 0.65].map((k) => surface.map((v, i) => Math.round(v + (sky[0][i] - v) * k))), ...sky];
+  paintSky(cv, t, { palette: tones, sprites: 2, minY: 0.5, spriteBody: "#04203f", base: (u, v, t2) => {
+    const top = 1 - 0.62 * (0.82 + 0.18 * Math.sin(u * 4 + t2 * 0.5));
+    const e = Math.max(0, Math.min(1, (v - top) / (1 - top)));
+    return e * e * (3 - 2 * e) * 0.9;
+  } });
+}
+let lastF = 0;
+function frame(now) {
+  if (now - lastF > 40) {
+    lastF = now;
+    const t = now / 1000;
+    for (let i = live.length - 1; i >= 0; i--) {
+      const a = live[i];
+      if (!a.cv.isConnected) { live.splice(i, 1); continue; }
+      drawOne(a, t, poseFor(a, t), { active: a.opts.mode === "writing" });
+    }
+    for (const cv of $$("canvas.orbit")) drawOrbit(cv, now);
+    coverSky(t); sideSky(t);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+P.globe = '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.5 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.5-3.5-8.5s1-5.9 3.5-8.5Z"/>';
+P.globeOff = '<circle cx="12" cy="12" r="8.5"/><path d="M5 5l14 14"/>';
+P.server = '<rect x="4" y="4.5" width="16" height="6.5" rx="2"/><rect x="4" y="13" width="16" height="6.5" rx="2"/><path d="M7.5 7.8h.01M7.5 16.2h.01"/>';
+P.archive = '<rect x="3.5" y="4.5" width="17" height="4.5" rx="1.5"/><path d="M5 9v9.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4"/>';
+P.reset = '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/>';
+P.org = '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8.5 8h2M13.5 8h2M8.5 12h2M13.5 12h2M10 20.5v-4h4v4"/>';
+P.ptr = '<path d="M5 3l14 8-6 1.5L10 19Z"/>';
+P.pause = '<path d="M9 5v14M15 5v14"/>';
+P.wand = '<path d="m4 20 11-11M14 4v3M18.5 5.5l-2 2M20 10h-3"/>';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const list = (a) => (a.length <= 1 ? a.join("") : a.slice(0, -1).join(", ") + " e " + a.at(-1));
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+
+/* ================= Data ================= */
+const PCS = {
+  cloud: { name: "Nuvem", in: "na", icon: "cloud", online: true, line: "Um computador nosso, só do Bento" },
+  mac: { name: "MacBook do Walter", in: "no", icon: "computer", online: true, line: "Seu · ligado agora" },
+  srv: { name: "Servidor do escritório", in: "no", icon: "server", online: false, line: "Da Marina · desligado agora" },
+};
+const BRAINS = {
+  claude: { name: "Claude Code", icon: "asterisk", plan: "Claude", company: "Anthropic", line: "Usa o seu plano do Claude" },
+  codex: { name: "Codex", icon: "hex", plan: "ChatGPT", company: "OpenAI", line: "Usa o seu plano do ChatGPT" },
+  model: { name: "Modelo da organização", icon: "org", line: "Pago pela organização, conta no orçamento" },
+};
+const MODELS = { model: [["sonnet", "Sonnet"], ["opus", "Opus"], ["haiku", "Haiku"], ["sol", "GPT-6 Sol"], ["luna", "GPT-6 Luna"]], claude: [["opus", "Opus"], ["sonnet", "Sonnet"]], codex: [["sol", "GPT-6 Sol"], ["luna", "GPT-6 Luna"]] };
+const HAS = { cloud: [], mac: ["claude"], srv: ["codex"] };
+const PEOPLE = {
+  walter: { name: "Walter Caldas", first: "Walter", ini: "WC", role: "Admin", you: true },
+  marina: { name: "Marina Lopes", first: "Marina", ini: "ML", role: "Admin" },
+  rafa: { name: "Rafa Souza", first: "Rafa", ini: "RS", role: "Membro" },
+  julia: { name: "Júlia Prado", first: "Júlia", ini: "JP", role: "Membro" },
+};
+const CHANNELS = { conteudo: 8, geral: 14, marketing: 5, produto: 7, suporte: 4 };
+const APPS = {
+  github: { name: "GitHub", icon: "code", file: "github", sens: "merge e deploy" },
+  notion: { name: "Notion", icon: "book", file: "notion" },
+  drive: { name: "Google Drive", icon: "folder", file: "googledrive", c: "#4285F4" },
+  gmail: { name: "Gmail", icon: "inbox", file: "gmail", c: "#EA4335", sens: "enviar email" },
+  linear: { name: "Linear", icon: "issue", file: "linear", c: "#5E6AD2" },
+};
+const SKILLS = { roteiro: ["Roteiros de vídeo", "TikTok, Reels e Shorts"], revisao: ["Revisão de texto", "Tom, clareza e erros"], seo: ["SEO", "Títulos e palavras-chave"], planilha: ["Planilhas", "Ler e montar tabelas"] };
+const ROUTINES = [["Resumo da semana", "segunda, 9h"], ["Checar menções", "todo dia, 18h"]];
+const COLORS = Object.keys(AGENT_GRADIENTS);
+const ACCS = ["none", "cap", "hat", "headphones", "beanie", "crown", "flower", "antenna"];
+const EYES = ["round", "dots", "wide", "happy", "sleepy"];
+const ORG_BUDGET = 50, SPENT = 12;
+const INSTR = `Você escreve roteiros e posts para as redes da Viajolo.
+
+Tom: leve, direto, sem clichê de viagem. Frases curtas.
+Sempre que citar um lugar, confira no Google Maps se ainda está aberto.
+Roteiros de TikTok têm no máximo 45 segundos e começam com um gancho nos 2 primeiros.
+Antes de publicar qualquer coisa, peça o ok do Walter.`;
+const PROPOSAL = ["Quando o roteiro for sobre comida, cite o preço médio por pessoa.", "Evite a palavra “imperdível”: o time pediu duas vezes."];
+
+const START = {
+  pc: "cloud", brain: "model", model: "sonnet", fallback: true, browser: "off", sites: [],
+  name: "Bento", role: "Conteúdo", look: { color: "amber", eyes: "round", accessory: "cap" },
+  audience: "all", people: [], channels: ["conteudo", "geral"], owner: "walter",
+  apps: { github: "write", notion: "read", drive: "write", gmail: "none", linear: "none" },
+  skills: ["roteiro", "revisao"], budget: 40, paused: false,
+};
+
+const brainOk = (k, pc) => k === "model" || HAS[pc].includes(k);
+const homeOf = (k) => (k === "claude" ? "mac" : "srv");
+const browserCan = (pc) => pc !== "cloud";
+const browserReady = (pc) => pc === "srv" || (pc === "mac" && S.mac === "on");
+
+/* ================= State ================= */
+const S = { tab: "perfil", role: "admin", mac: "off", cur: null, accepted: new Set(), hist: [], pop: null, ask: null, glow: null, toast: null, editing: null, instr: INSTR, instrSaved: INSTR, prop: "closed", waiting: true };
+function fromHash() {
+  const q = new URLSearchParams(location.hash.slice(1));
+  S.tab = ["perfil", "instrucoes", "memoria", "atividade"].includes(q.get("tab")) ? q.get("tab") : "perfil";
+  S.role = q.get("role") === "member" ? "member" : "admin";
+  S.mac = q.get("mac") === "on" ? "on" : "off";
+  if (q.get("theme")) document.documentElement.dataset.theme = q.get("theme");
+  S.cur = structuredClone(START); S.accepted = new Set(); S.hist = []; S.pop = null; S.ask = null; S.toast = null; S.editing = null;
+  S.instr = S.instrSaved = INSTR; S.prop = "closed"; S.waiting = true; S.routinesOff = new Set(); S.dlg = null;
+}
+const setQ = (k, v, push) => { const q = new URLSearchParams(location.hash.slice(1)); q.set(k, v); if (push) location.hash = q.toString(); else history.replaceState(null, "", "#" + q); };
+/* Inside a settings dialog, everything reads and writes its draft; "Usar" applies it. */
+const C = () => (S.dlg?.kind === "simple" ? S.dlg.draft : S.cur);
+/* The viewer: Walter as admin, Rafa as a member. */
+const isYou = (id) => id === (S.role === "admin" ? "walter" : "rafa");
+const ed = () => S.role === "admin";
+const at = (pc) => `${PCS[pc].in} ${PCS[pc].name}`;
+const nm = () => C().name || "Bento";
+
+function apply(patch, msg, glow, keepPop = false) {
+  if (S.dlg?.kind === "simple") { Object.assign(S.dlg.draft, structuredClone(patch)); renderLayer(); return; }
+  S.hist.push(structuredClone(C()));
+  S.cur = { ...structuredClone(C()), ...patch };
+  if (!keepPop) { S.pop = null; S.ask = null; }
+  S.glow = glow ?? null;
+  render(); if (msg) toast(msg, true);
+}
+
+/* ---------- Work (approved round 2) ---------- */
+function brainAlso(k) {
+  if (k === C().brain || k === "model" || brainOk(k, C().pc)) return null;
+  const home = homeOf(k);
+  return { text: `Passa para o ${PCS[home].name}`, warn: !PCS[home].online };
+}
+function pcAlso(pc) {
+  if (pc === C().pc) return [];
+  const out = [];
+  if (C().brain !== "model" && !brainOk(C().brain, pc)) out.push(`Volta para o modelo da organização (${BRAINS[C().brain].name} não está lá)`);
+  if (C().browser !== "off" && !browserCan(pc)) out.push("Deixa de navegar em sites");
+  if (!PCS[pc].online) out.push("Está desligado: até ligar, o Bento espera");
+  return out;
+}
+function chooseBrain(k) {
+  if (k === C().brain) { S.pop = null; render(); return; }
+  if (k !== "model" && !S.accepted.has(k)) { S.ask = k; renderLayer(); return; }
+  const pc = brainOk(k, C().pc) ? C().pc : homeOf(k);
+  apply({ brain: k, model: MODELS[k][0][0], pc }, k === "model" ? `O ${nm()} agora usa o modelo da organização.` : `O ${nm()} agora pensa com ${BRAINS[k].name}${pc !== C().pc ? " " + at(pc) : ""}.`, pc !== C().pc ? "pc" : "brain");
+}
+function choosePc(pc) {
+  if (pc === C().pc) { S.pop = null; render(); return; }
+  const p = { pc };
+  if (C().brain !== "model" && !brainOk(C().brain, pc)) { p.brain = "model"; p.model = "sonnet"; }
+  if (C().browser !== "off" && !browserCan(pc)) p.browser = "off";
+  apply(p, `O ${nm()} agora trabalha ${at(pc)}.`, "pc");
+}
+function chooseBrowser(v) {
+  if (v === C().browser) { S.pop = null; render(); return; }
+  const p = { browser: v };
+  let moved = false;
+  if (v !== "off" && !browserCan(C().pc)) { p.pc = "mac"; moved = true; if (C().brain !== "model" && !brainOk(C().brain, "mac")) { p.brain = "model"; p.model = "sonnet"; } }
+  const pc = p.pc ?? C().pc;
+  apply(p, v === "off" ? `O ${nm()} não navega mais em sites.` : browserReady(pc) ? `O ${nm()} já pode navegar em sites${moved ? " " + at(pc) : ""}.` : "Falta 1 passo no MacBook. Mostro aqui como.", moved ? "pc" : "browser");
+}
+
+/* ================= Pieces ================= */
+const seg = (attr, l, value, cls = "xs") => `<div class="seg ${cls}">${l.map(([v, t]) => `<button ${attr}="${v}" aria-pressed="${v === value}">${t}</button>`).join("")}</div>`;
+const orbitC = (size = 14) => `<canvas class="orbit" data-color="sky" data-size="${size}" aria-hidden="true"></canvas>`;
+const waiting = () => C().browser !== "off" && !browserReady(C().pc);
+/* A word in a sentence: a button for who can change it, plain bold text for everyone else. */
+function tok(id, icon, words, cls = "") {
+  if (!ed()) return `<span class="tok ro">${words}</span>`;
+  return `<button class="tok ${cls} ${S.glow === id ? "glow" : ""}" data-open="${id}" data-anchor="${id}" aria-haspopup="dialog" aria-expanded="${S.pop === id}">${icon}${words}${cls.includes("add") ? "" : I("down", "cv")}</button>`;
+}
+const addTok = (id, label) => (ed() ? ` <button class="tok add ${S.glow === id ? "glow" : ""}" data-open="${id}" data-anchor="${id}" aria-label="${label}" aria-expanded="${S.pop === id}">${I("plus")}</button>` : "");
+
+function guide() {
+  return `<div class="guide" role="group" aria-label="Falta 1 passo no MacBook">
+    <div class="gh"><span class="key">${I("computer")}</span><b>Falta 1 passo, no próprio MacBook</b><span class="live">${orbitC()}Esperando</span></div>
+    <div class="gsteps">
+      <div class="gs" data-gs="0"><div class="shot"><div class="mbar"><span class="sq"></span><span class="sq"></span><span class="me">${av("logo", 12, 'data-tight="1"')}</span><span>14:32</span></div><div class="cursor" style="right:34px;top:16px">${I("ptr")}</div></div><p><i>1</i>Clique no ícone do agentes, lá em cima</p></div>
+      <div class="gs" data-gs="1"><div class="shot"><div class="mbar"><span class="sq"></span><span class="sq"></span><span class="me hit">${av("logo", 12, 'data-tight="1"')}</span><span>14:32</span></div><div class="mmenu"><div>Abrir agentes</div><hr><div class="hl">Preferências…</div><div>Pausar</div><hr><div>Sair</div></div></div><p><i>2</i>Preferências</p></div>
+      <div class="gs" data-gs="2"><div class="shot"><div class="mwin"><div class="bar"><i></i><i></i><i></i><span>Ferramentas</span></div><div class="r"><span>Claude Code</span><span class="msw on"></span></div><div class="r"><span>Comandos</span><span class="msw on"></span></div><div class="r hl"><span>Navegador</span><span class="msw flip"></span></div></div></div><p><i>3</i>Ligue o Navegador</p></div>
+    </div>
+    <div class="gfoot">${I("check", "sm")}Pronto. Esta página percebe sozinha, não precisa recarregar.</div>
+  </div>`;
+}
+
+/* ================= Perfil: the agent in sentences ================= */
+function blockWork() {
+  const c = C();
+  const mW = MODELS[c.brain].find((m) => m[0] === c.model)?.[1] ?? "";
+  const bW = c.brain === "model" ? `o modelo da organização <span class="lvl">· ${mW}</span>` : `${BRAINS[c.brain].name} <span class="lvl">· ${mW}</span>`;
+  const wW = c.browser === "off" ? "não navega em sites" : !browserReady(c.pc) ? "vai navegar em sites" : c.browser === "any" ? "navega em sites" : "navega em alguns sites";
+  const offline = c.pc !== "cloud" && !PCS[c.pc].online ? `<div class="sline warn">${I("alert", "sm")}O ${PCS[c.pc].name} está desligado. O ${nm()} volta a responder quando ele ligar.</div>` : "";
+  return `<p class="sentence">Pensa com ${tok("brain", I(c.brain === "model" ? "org" : BRAINS[c.brain].icon), bW)} ${PCS[c.pc].in} ${tok("pc", I(PCS[c.pc].icon), PCS[c.pc].name)} e ${tok("browser", waiting() ? orbitC(16) : I(c.browser === "off" ? "globeOff" : "globe"), wW, c.browser === "off" ? "off" : waiting() ? "wait" : "")}<span class="punct">.</span></p>
+    ${offline}${waiting() && ed() ? guide() : ""}`;
+}
+function audienceWords(c) {
+  if (c.audience === "all") return "todos da organização";
+  if (c.audience === "owner") return c.owner ? `só ${c.owner === "walter" ? "você" : "o " + PEOPLE[c.owner].first}` : "ninguém";
+  const ids = [...new Set([c.owner, ...c.people].filter(Boolean))];
+  return ids.length ? list(ids.map((id) => (isYou(id) ? "você" : PEOPLE[id].first))) : "ninguém";
+}
+function meter(spent, limit) {
+  const n = 40, on = Math.round((spent / limit) * n), mk = Math.round(0.8 * n) - 1;
+  return `<div class="meter" aria-label="US$ ${spent} de ${limit}">${Array.from({ length: n }, (_, i) => `<i class="${i < on ? "on" : ""} ${i === mk ? "mk" : ""}"></i>`).join("")}</div>`;
+}
+/* A row that opens a question (admins), or just shows the value (members). */
+function prow(id, k, value) {
+  const inner = `<span class="k">${k}</span><span class="v">${value}</span>${ed() ? I("right", "chev") : ""}`;
+  return ed() ? `<button class="prow ${S.glow === id ? "glow" : ""}" data-open="${id}" data-anchor="${id}" aria-expanded="${S.pop === id}">${inner}</button>` : `<div class="prow ro">${inner}</div>`;
+}
+const pa = (id, cls = "") => `<span class="pa ${cls}" title="${PEOPLE[id].name}">${PEOPLE[id].ini}</span>`;
+function cardPeople() {
+  const c = C();
+  const ids = c.audience === "all" ? Object.keys(PEOPLE) : [...new Set([c.owner, ...(c.audience === "some" ? c.people : [])].filter(Boolean))];
+  const avs = `<span class="stk">${ids.slice(0, 3).map((id, i) => `<i style="z-index:${5 - i}" title="${PEOPLE[id].name}">${PEOPLE[id].ini}</i>`).join("")}${c.audience === "all" ? '<i class="more">+11</i>' : ""}</span>`;
+  const who = c.audience === "all" ? "Todos da organização" : c.audience === "owner" ? "Só o responsável" : list(ids.map((id) => (isYou(id) ? "você" : PEOPLE[id].first)));
+  const ownerName = c.owner ? (isYou(c.owner) ? `${PEOPLE[c.owner].first} (você)` : PEOPLE[c.owner].name) : "Sem responsável";
+  const row = (id, lead, title, sub, right = "") => `<div class="arow ${S.glow === id ? "glow" : ""}">${lead}<span class="t"><span class="nm">${title}</span><span>${sub}</span></span>${right}${ed() ? `<span class="acts"><button class="btn sm" data-open="${id}">Mudar</button></span>` : ""}</div>`;
+  return `<section class="card"><div class="chd"><span class="key">${I("users")}</span><h2>Pessoas</h2></div>
+    <div class="alist">
+      ${row("audience", `<span class="ci" style="--s:40px">${I("users")}</span>`, "Quem conversa", who, avs)}
+      ${row("channels", `<span class="ci" style="--s:40px">${I("hash")}</span>`, "Canais", c.channels.length ? c.channels.map((x) => "#" + x).join(", ") : "Nenhum: só por @bento")}
+      ${row("owner", c.owner ? `<span class="ci pa40">${PEOPLE[c.owner].ini}</span>` : `<span class="ci" style="--s:40px">${I("user")}</span>`, "Responsável", `${ownerName} · aprova o que for sensível`)}
+    </div></section>`;
+}
+/* Conectores: exactly as the app has it today (AccessTab "Conectores da <org>"): one level per app, chosen
+   in the row (Sem acesso · Ler · Ler e escrever), the tools under the name, what asks for approval as
+   chips, and "Conectar outro app" at the end. No dialog. */
+const TOOLS = {
+  github: ["Get file", "List pull requests", "Create pull request", "Search code", "List issues"],
+  notion: ["Search pages", "Get page", "Create page", "Update page"],
+  drive: ["Search files", "Get file", "Create file", "Share file"],
+  gmail: ["Search emails", "Get email", "Send email", "Create draft"],
+  linear: ["List issues", "Create issue", "Update issue"],
+};
+const ASKS = { github: ["Merge pull request", "Deploy"], drive: ["Share file"], gmail: ["Send email"], notion: [], linear: [] };
+function cardAccess() {
+  const c = C();
+  const row = (k) => {
+    const lv = c.apps[k], a = APPS[k];
+    const sub = lv === "none" ? "Sem acesso." : TOOLS[k].join(" · ");
+    const asks = lv === "write" ? ASKS[k].map((x) => `<span class="askchip">${I("lock", "sm")}${x} pede aprovação</span>`).join("") : "";
+    const ctl = ed() ? seg(`data-lvl${k}`, [["none", "Sem acesso"], ["read", "Ler"], ["write", "Ler e escrever"]], lv, "sm") : `<span class="achip">${lv === "none" ? "Sem acesso" : lv === "read" ? "Ler" : "Ler e escrever"}</span>`;
+    return `<div class="lvrow ${S.glow === "app:" + k ? "glow" : ""}">${ci(k, 40)}<div class="t"><b>${a.name}</b><span class="tools">${sub}</span>${asks ? `<span class="asks">${asks}</span>` : ""}</div>${ctl}</div>`;
+  };
+  return `<section class="card"><div class="chd"><span class="key">${I("plug")}</span><h2>Conectores da Viajolo</h2><span class="act"><span class="help">Um nível por app</span></span></div>
+    ${Object.keys(APPS).map(row).join("")}
+    ${ed() ? `<button class="connmore" data-noop>${I("plug", "sm")}Conectar outro app<span>abre Conectores</span></button>` : ""}</section>`;
+}
+function cardSkills() {
+  const c = C();
+  const skills = Object.entries(SKILLS).map(([k, [n]]) => (ed() ? `<button class="tog sm" data-skill="${k}" aria-pressed="${c.skills.includes(k)}"><span class="box">${I("check")}</span>${n}</button>` : c.skills.includes(k) ? `<span class="chip">${I("sparkle", "sm")}${n}</span>` : "")).join("");
+  return `<section class="card"><div class="chd"><span class="key">${I("sparkle")}</span><h2>Sabe fazer</h2><span class="act"><button class="btn sm ghost" data-noop>Biblioteca${I("right", "sm")}</button></span></div><div class="chips">${skills}</div></section>`;
+}
+function cardMoney() {
+  const c = C(), limit = c.budget ?? ORG_BUDGET, pct = Math.round((SPENT / limit) * 100);
+  const who = c.owner ? (isYou(c.owner) ? "você" : "o " + PEOPLE[c.owner].first) : "os admins";
+  return `<section class="card"><div class="chd"><span class="key">${I("wallet")}</span><h2>Custo em outubro</h2></div>
+    <div class="big"><span class="num">US$ ${SPENT}</span><span class="of">de ${ed() ? `<button class="lnk ${S.glow === "budget" ? "glow" : ""}" data-open="budget" data-anchor="budget">US$ ${limit}${I("down", "sm")}</button>` : `US$ ${limit}`}</span></div>
+    ${meter(SPENT, limit)}
+    <div class="sline">${pct}% usado · em 80%, avisa ${who}</div></section>`;
+}
+function cardRoutines() {
+  const rows = ROUTINES.map(([n, w], i) => {
+    const off = S.routinesOff?.has(i);
+    return `<div class="arow"><span class="ci" style="--s:40px">${I("routine")}</span><span class="t"><span class="nm">${n}${off ? '<span class="achip">Pausada</span>' : ""}</span><span>${w}</span></span>${ed() ? `<span class="acts"><button class="sw" role="switch" aria-checked="${!off}" data-routine="${i}" aria-label="${n}"></button></span>` : ""}</div>`;
+  }).join("");
+  return `<section class="card"><div class="chd"><span class="key">${I("clock")}</span><h2>Rotinas</h2>${ed() ? `<span class="act"><button class="btn sm" data-noop>${I("plus", "sm")}Nova rotina</button></span>` : ""}</div><div class="alist">${rows}</div></section>`;
+}
+function viewPerfil() {
+  const wait = S.waiting && ed() ? `<section class="card span2"><div class="chd"><h2>Esperando você <span class="cnt">2</span></h2></div>
+      <div class="wrow"><span class="ib">${I("globe")}</span><div class="t"><b>Publicar “7 cafés em Curitiba” no blog</b><span>No WordPress · pediu há 5 min</span></div><button class="btn sm" data-noop>Revisar</button></div>
+      <div class="wrow"><span class="ib">${I("pen")}</span><div class="t"><b>Propõe 2 linhas novas nas instruções</b><span>Aprendeu com o time esta semana</span></div><button class="btn sm" data-tab="instrucoes">Ver</button></div></section>` : "";
+  return `<div class="pgrid">${wait}
+    <div class="span2">${cardAccess()}</div>
+    <div class="pcol">${cardPeople()}${cardSkills()}</div>
+    <div class="pcol">${cardMoney()}${cardRoutines()}</div></div>`;
+}
+/* The sentence: on top of every tab, right under the name. */
+function headSentence() {
+  return `<div class="hsent">${blockWork()}</div>`;
+}
+
+/* ================= Instruções ================= */
+function viewInstr() {
+  const dirty = S.instr !== S.instrSaved;
+  const prop = S.prop === "done" || !ed() ? "" : `<div class="prop"><div class="top">${av("bento", 22)}<b>O ${nm()} propõe 2 linhas novas</b><span class="help">aprendeu com o time esta semana</span>
+      <span class="act">${S.prop === "open" ? `<button class="btn sm ghost" data-propno>Recusar</button><button class="btn sm primary" data-propyes>Acrescentar</button>` : `<button class="btn sm" data-propopen>Ver</button>`}</span></div>
+      ${S.prop === "open" ? PROPOSAL.map((l) => `<div class="dl">${l}</div>`).join("") : ""}</div>`;
+  return `<div class="col1">${prop}<section class="card doc">
+    <div class="chd"><h2>${I("pen", "sm")}O que o ${nm()} faz e como</h2><span class="act">${dirty ? `<span class="row" style="gap:6px"><button class="btn sm ghost" data-instrundo>Desfazer</button><button class="btn sm primary" data-instrsave>Salvar<span class="kbd">⌘S</span></button></span>` : `<span class="help">Salvo</span>`}</span></div>
+    ${ed() ? `<textarea id="instr" spellcheck="false">${esc(S.instr)}</textarea>` : `<div style="white-space:pre-wrap;font-size:15px;line-height:1.7;color:var(--ink2)">${esc(S.instr)}</div>`}
+  </section></div>`;
+}
+
+/* ================= Popovers ================= */
+const ic = (n) => `<span class="ic">${I(n)}</span>`;
+/* A connector's mark: the neutral tile of telas/CatalogoConectores.html with the brand's own logo in its color. */
+const ci = (k, size = 36) => `<span class="ci" style="--s:${size}px"><i style="--m:url(../../../apps/web/public/connectors/${APPS[k].file}.svg);${APPS[k].c ? `--c:${APPS[k].c}` : ""}"></i></span>`;
+const opt = (attr, val, checked, icon, title, line, extra = "", cls = "") => `<button class="opt ${cls}" role="${cls.includes("multi") ? "checkbox" : "radio"}" aria-checked="${checked}" ${attr}="${val}">${icon}<span class="t"><b>${title}</b>${line ? `<span>${line}</span>` : ""}${extra}</span><span class="rad">${I("check")}</span></button>`;
+const also = (t, warn) => `<span class="also ${warn ? "warn" : ""}">${I(warn ? "alert" : "arrow", "sm")}${t}</span>`;
+function popBrain() {
+  const c = C();
+  return `<h3>Quem pensa pelo ${nm()}?</h3>${["claude", "codex", "model"].map((k) => {
+    const b = BRAINS[k], a = brainAlso(k), on = c.brain === k, asking = S.ask === k;
+    return opt("data-brain", k, on, ic(b.icon), `${b.name}${k === "codex" ? '<span class="chip line" style="height:19px;font-size:11px">Em teste</span>' : ""}`, b.line, a ? also(a.text + (a.warn ? ", desligado agora" : ""), a.warn) : "")
+      + (asking ? `<div class="osub"><div class="ask"><span><b>O plano do ${b.plan} é seu, pessoal.</b> Usar para responder outras pessoas pode ir contra as regras da ${b.company}.</span><span class="row"><button class="btn sm primary" data-accept="${k}">Usar meu plano</button><button class="btn sm ghost" data-cancelask>Agora não</button></span></div></div>` : "")
+      + (on && !asking ? `<div class="osub"><div class="mrow"><span>Modelo</span>${seg("data-model", MODELS[k], c.model, "sm full")}</div></div>` : "");
+  }).join("")}`;
+}
+const popPc = () => `<h3>Onde o ${nm()} trabalha?</h3>${Object.entries(PCS).map(([id, p]) => opt("data-pc", id, C().pc === id, ic(p.icon), p.name, p.line, pcAlso(id).map((a) => also(a, true)).join(""))).join("")}`;
+function popBrowser() {
+  const c = C(), move = !browserCan(c.pc);
+  const pending = c.pc === "mac" ? !browserReady("mac") : move && S.mac !== "on";
+  const extra = c.browser === "off" ? (move ? also(`Passa para o ${PCS.mac.name}${c.brain !== "model" && !brainOk(c.brain, "mac") ? " e volta para o modelo da organização" : ""}`) : "") + (pending ? `<span class="also">${I("info", "sm")}Depois, 1 passo no Mac. Eu mostro como.</span>` : "") : "";
+  return `<h3>O ${nm()} pode navegar em sites?</h3>${opt("data-browser", "any", c.browser === "any", ic("globe"), "Sim, em qualquer site", "Para pesquisar, abrir páginas e preencher formulários", extra)}${opt("data-browser", "only", c.browser === "only", ic("lock"), "Sim, só em alguns", "Você escolhe quais", extra)}${opt("data-browser", "off", c.browser === "off", ic("globeOff"), "Não", "Ele trabalha sem abrir sites")}`;
+}
+function popAudience() {
+  const c = C();
+  const ownName = c.owner ? (isYou(c.owner) ? "Você" : PEOPLE[c.owner].first) : "Ninguém, sem responsável";
+  const some = c.audience === "some" ? `<div class="osub"><div class="people">${Object.entries(PEOPLE).filter(([id]) => id !== c.owner).map(([id, p]) => `<button class="tog sm" data-person="${id}" aria-pressed="${c.people.includes(id)}"><span class="box">${I("check")}</span>${isYou(id) ? "Você" : p.first}</button>`).join("")}</div></div>` : "";
+  return `<h3>Quem pode falar com o ${nm()}?</h3>${opt("data-aud", "all", c.audience === "all", ic("users"), "Todos da organização", "Qualquer pessoa chama por @bento")}${opt("data-aud", "owner", c.audience === "owner", ic("user"), "Só o responsável", ownName)}${opt("data-aud", "some", c.audience === "some", ic("users"), "Algumas pessoas", "Você escolhe quem")}${some}`;
+}
+const popChannels = () => `<h3>Em quais canais o ${nm()} fica?</h3><p class="lead2">Ele lê e responde nos canais marcados.</p>${Object.entries(CHANNELS).map(([ch, n]) => opt("data-ch", ch, C().channels.includes(ch), ic("hash"), ch, `${n} pessoas`, "", "multi plain")).join("")}`;
+function popOwner() {
+  const c = C();
+  return `<h3>Quem é responsável pelo ${nm()}?</h3><p class="lead2">Recebe os pedidos de aprovação e o aviso de orçamento.</p>${Object.entries(PEOPLE).map(([id, p]) => opt("data-owner", id, c.owner === id, `<span class="ic" style="background:none;box-shadow:none"><span class="pa">${p.ini}</span></span>`, isYou(id) ? `${p.first} (você)` : p.name, p.role, "", "plain")).join("")}${opt("data-owner", "", c.owner === null, ic("users"), "Sem responsável", "Os admins cuidam", "", "plain")}`;
+}
+function popApp(k) {
+  const a = APPS[k], lv = C().apps[k];
+  return `<h3>O que o ${nm()} pode fazer no ${a.name}?</h3>
+    ${opt("data-lvl", "write", lv === "write", ic("pen"), "Ler e mudar", a.sens ? `${cap(a.sens)} sempre ${a.sens.includes(" e ") ? "pedem" : "pede"} o seu ok` : "O que for sensível pede o seu ok")}
+    ${lv === "write" && k === "github" ? `<div class="osub"><div class="ln">Repositórios<button class="btn sm" data-noop style="margin-left:auto">Todos${I("right", "sm")}</button></div></div>` : ""}
+    ${opt("data-lvl", "read", lv === "read", ic("eye"), "Só ler", "Consulta, sem mudar nada")}
+    ${opt("data-lvl", "none", lv === "none", ic("x"), "Nada", "Tira o acesso ao " + a.name)}
+    <button class="pfoot" data-noop>${I("settings", "sm")}Ajuste fino, ferramenta por ferramenta${I("right", "chev")}</button>`;
+}
+function popAddApp() {
+  const off = Object.keys(APPS).filter((k) => C().apps[k] === "none");
+  return `<h3>Liberar mais um app</h3><p class="lead2">Começa só lendo. Você muda depois.</p>${off.map((k) => `<button class="opt plain" data-addapp="${k}"><span class="ic" style="background:none;box-shadow:none">${ci(k, 34)}</span><span class="t"><b>${APPS[k].name}</b><span>Já conectado na organização</span></span></button>`).join("")}<button class="pfoot" data-noop>${I("plus", "sm")}Conectar outro app${I("right", "chev")}</button>`;
+}
+const popSkills = () => `<h3>O que o ${nm()} sabe fazer?</h3><p class="lead2">Habilidades da biblioteca da organização.</p>${Object.entries(SKILLS).map(([k, [n, d]]) => opt("data-skill", k, C().skills.includes(k), ic("sparkle"), n, d, "", "multi plain")).join("")}<button class="pfoot" data-noop>${I("plus", "sm")}Criar uma habilidade${I("right", "chev")}</button>`;
+const popBudget = () => `<h3>Quanto o ${nm()} pode gastar por mês?</h3><p class="lead2">Já usou US$ ${SPENT} em outubro. Ao chegar no limite, ele para e avisa.</p>${[20, 40, 100].map((v) => opt("data-budget", v, C().budget === v, ic("wallet"), `US$ ${v}`, v === 20 ? "Tarefas leves" : v === 40 ? "Uso do dia a dia" : "Trabalho pesado, todo dia", "", "plain")).join("")}${opt("data-budget", "org", C().budget === null, ic("org"), `O padrão da organização (US$ ${ORG_BUDGET})`, "Muda junto se o padrão mudar", "", "plain")}`;
+function popLook() {
+  const c = C(), L = c.look;
+  const variant = (patch) => { const id = "v" + Math.random().toString(36).slice(2, 8); AGENTS[id] = { look: { ...L, ...patch } }; return av(id, 30, 'data-tight="0" data-still="1"'); };
+  return `<h3>O jeito do ${nm()}</h3>
+    <div class="psec">Cor</div><div class="swatches">${COLORS.map((col) => `<button class="swc" data-color="${col}" aria-pressed="${L.color === col}" aria-label="${col}" style="background:linear-gradient(160deg,${AGENT_GRADIENTS[col][0]},${AGENT_GRADIENTS[col][1]})"></button>`).join("")}</div>
+    <div class="psec">Na cabeça</div><div class="looks">${ACCS.map((a) => `<button class="lk" data-acc="${a}" aria-pressed="${L.accessory === a}" aria-label="${a}">${variant({ accessory: a })}</button>`).join("")}</div>
+    <div class="psec">Olhos</div><div class="looks" style="grid-template-columns:repeat(5,1fr)">${EYES.map((e) => `<button class="lk" data-eyes="${e}" aria-pressed="${L.eyes === e}" aria-label="${e}" style="height:56px">${variant({ eyes: e, accessory: "none" })}</button>`).join("")}</div>`;
+}
+const popMore = () => `<button class="opt plain" data-copy>${ic("copy")}<span class="t"><b>Copiar @bento</b></span></button>
+  ${ed() ? `<button class="opt plain" data-pause>${ic(C().paused ? "sparkle" : "pause")}<span class="t"><b>${C().paused ? "Voltar a trabalhar" : "Pausar o " + nm()}</b><span>${C().paused ? "" : "Para de responder até você voltar"}</span></span></button>
+  <button class="opt plain danger" data-noop>${ic("archive")}<span class="t"><b>Arquivar o ${nm()}</b><span>Some da lista; o histórico fica</span></span></button>` : ""}`;
+function popBody(id) {
+  if (id === "brain") return popBrain();
+  if (id === "pc") return popPc();
+  if (id === "browser") return popBrowser();
+  if (id === "audience") return popAudience();
+  if (id === "channels") return popChannels();
+  if (id === "owner") return popOwner();
+  if (id === "addapp") return popAddApp();
+  if (id === "skills") return popSkills();
+  if (id === "budget") return popBudget();
+  if (id === "look") return popLook();
+  if (id === "more") return popMore();
+  if (id.startsWith("app:")) return popApp(id.slice(4));
+  return "";
+}
+
+
+/* ================= Portraits (telas/IconesMotor.html, IconesComputador.html), drawn by packages/ui ================= */
+const BRAIN_KIND = { model: "agent", claude: "claude_code", codex: "codex" };
+const PC_KIND = { cloud: "cloud", mac: "mac", srv: "linux" };
+const port = (type, kind, state, size) => `<canvas class="port" width="48" height="48" style="width:${size}px;height:${size}px" data-type="${type}" data-kind="${kind}" data-state="${state}" aria-hidden="true"></canvas>`;
+(function portLoop(now) {
+  const t = now / 1000, dark = document.documentElement.dataset.theme === "dark";
+  for (const cv of $$("canvas.port")) {
+    const ctx = cv.getContext("2d");
+    if (cv.dataset.type === "brain") drawBrain(ctx, cv.dataset.kind, cv.dataset.state, { dark, t, agentLook: S.cur?.look });
+    else drawComputer(ctx, cv.dataset.kind, cv.dataset.state, { dark, t });
+  }
+  setTimeout(() => requestAnimationFrame(portLoop), 90);
+})(0);
+
+/* ================= Dialogs for the three big choices (v5) ================= */
+/* The organization's models come from the catalog (packages/providers/src/catalog.ts), grouped by company. */
+const ORG_MODELS = [
+  { id: "sonnet", p: "anthropic", name: "Claude Sonnet 5.5", d: "Bom em quase tudo, sem pesar no orçamento", tier: 2, rec: true },
+  { id: "opus", p: "anthropic", name: "Claude Opus 5.5", d: "O mais capaz, para trabalho difícil", tier: 3 },
+  { id: "haiku", p: "anthropic", name: "Claude Haiku 5.5", d: "Rápido e barato, para tarefas simples", tier: 1 },
+  { id: "sol", p: "openai", name: "GPT-6 Sol", d: "Pensa antes de responder", tier: 2, rec: true },
+  { id: "luna", p: "openai", name: "GPT-6 Luna", d: "Rápido e barato", tier: 1 },
+];
+const COMPANIES = { anthropic: { name: "Anthropic", key: true }, openai: { name: "OpenAI", key: true }, google: { name: "Google", key: false } };
+const tierDots = (n) => `<span class="tier" title="${["", "Mais barato", "Custo médio", "Mais caro"][n]}">${[1, 2, 3].map((i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}<span>${["", "barato", "médio", "caro"][n]}</span></span>`;
+
+function openDlg(kind) {
+  const c = C();
+  S.dlg = { kind, brain: c.brain, model: c.model, fallback: c.fallback, pc: c.pc, browser: c.browser, sites: [...(c.sites ?? [])], site: "" };
+  S.pop = null; render();
+}
+const D = () => S.dlg;
+function dlgShell(icon, title, sub, body, preview, primary, extraLeft = "", size = "") {
+  return `<div class="dscrim" data-dclose></div>
+  <div class="dlg ${size}" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+    <div class="dh">${icon.startsWith("<") ? icon : `<span class="key">${I(icon)}</span>`}<div class="t"><h2 id="dlgT">${title}</h2><span>${sub}</span></div><button class="iconbtn" data-dclose aria-label="Fechar">${I("x")}</button></div>
+    <div class="db">${body}</div>
+    <div class="df"><div class="pv">${extraLeft || preview}</div><button class="btn ghost" data-dclose>Cancelar</button>${primary}</div>
+  </div>`;
+}
+
+/* ---- Quem pensa ---- */
+function dlgBrain() {
+  const d = D(), c = C();
+  const cardFor = (k) => {
+    const b = BRAINS[k];
+    const target = k === "model" ? null : brainOk(k, c.pc) ? c.pc : homeOf(k);
+    const tn = target ? PCS[target].name.split(" ")[0] : "";
+    const warn = k !== "model" && !PCS[brainOk(k, c.pc) ? c.pc : homeOf(k)].online;
+    const st = warn ? "off" : d.brain === k ? "working" : "idle";
+    return `<button class="ec" role="radio" aria-checked="${d.brain === k}" data-dbrain="${k}">
+      <span class="eport">${port("brain", BRAIN_KIND[k], st, 72)}</span>
+      <b>${k === "model" ? "Modelo da organização" : b.name}${k === "codex" ? ' <span class="chip line" style="height:19px;font-size:11px">Em teste</span>' : ""}</b>
+      <span class="d">${k === "model" ? "Claude ou GPT, pela chave da organização" : b.line}</span>
+      <span class="chip where ${warn ? "warn" : ""}">${I(k === "model" ? "org" : warn ? "alert" : PCS[target].icon, "sm")}${k === "model" ? "Pago pela organização" : warn ? `${tn} desligado` : target === c.pc ? `No ${tn}` : `Vai para o ${tn}`}</span>
+      <span class="ok">${I("check")}</span></button>`;
+  };
+  let detail;
+  if (d.brain === "model") {
+    detail = Object.entries(COMPANIES).map(([p, co]) => {
+      const ms = ORG_MODELS.filter((m) => m.p === p);
+      const head = `<div class="mgh"><b>${co.name}</b>${co.key ? `<span class="chip ok">${I("key", "sm")}Chave da organização</span>` : `<span class="chip line">${I("key", "sm")}Sem chave</span><button class="btn sm" data-noop style="margin-left:auto">Adicionar chave</button>`}</div>`;
+      if (!co.key) return `<div class="mg off">${head}<p class="help">Com uma chave do ${co.name}, os modelos Gemini aparecem aqui.</p></div>`;
+      return `<div class="mg">${head}${ms.map((m) => `<button class="mr" role="radio" aria-checked="${d.model === m.id}" data-dmodel="${m.id}"><span class="rad">${I("check")}</span><span class="t"><b>${m.name}${m.rec ? ' <span class="rec">Recomendado</span>' : ""}</b><span>${m.d}</span></span>${tierDots(m.tier)}</button>`).join("")}</div>`;
+    }).join("");
+  } else {
+    const k = d.brain, b = BRAINS[k], pc = brainOk(k, c.pc) ? c.pc : homeOf(k);
+    const ms = MODELS[k];
+    const pcN = PCS[pc].name.split(" ")[0];
+    const org = ORG_MODELS.find((m) => m.id === "sonnet");
+    detail = `<div class="mg"><div class="mgh"><b>Modelo</b><span class="help">do seu plano do ${b.plan}</span></div>
+      <div class="mtiles">${ms.map(([id, l], i) => `<button class="mtile" role="radio" aria-checked="${d.model === id}" data-dmodel="${id}"><span class="t"><b>${l}${i === 0 ? '<span class="rec">Recomendado</span>' : ""}</b><span>${i === 0 ? "O mais capaz do plano" : "Mais rápido, gasta menos do plano"}</span></span><span class="rad">${I("check")}</span></button>`).join("")}</div></div>
+      <div class="mg"><div class="mgh"><b>Se o ${pcN} estiver desligado</b></div>
+      <div class="mtiles">
+        <button class="mtile" role="radio" aria-checked="${d.fallback}" data-dfallback="on">${port("brain", "agent", "idle", 44)}<span class="t"><b>Responde pela organização</b><span>Com ${org.name.replace("Claude ", "")}, conta no orçamento</span></span><span class="rad">${I("check")}</span></button>
+        <button class="mtile" role="radio" aria-checked="${!d.fallback}" data-dfallback="off">${port("pc", PC_KIND[pc], "offline", 44)}<span class="t"><b>Espera o ${pcN} ligar</b><span>Avisa quem chamou que vai demorar</span></span><span class="rad">${I("check")}</span></button>
+      </div></div>`;
+  }
+  const preview = `Pensa com <b>${d.brain === "model" ? (ORG_MODELS.find((m) => m.id === d.model)?.name ?? "") : BRAINS[d.brain].name + " · " + (MODELS[d.brain].find((m) => m[0] === d.model)?.[1] ?? "")}</b>${d.brain !== "model" && !brainOk(d.brain, c.pc) ? ` no <b>${PCS[homeOf(d.brain)].name}</b>` : ""}.`;
+  const plan = d.brain !== "model" && !S.accepted.has(d.brain) && d.brain !== c.brain;
+  const same = d.brain === c.brain && d.model === c.model && d.fallback === c.fallback;
+  const left = plan ? `<span class="pnote">${I("alert", "sm")}<span><b>O plano do ${BRAINS[d.brain].plan} é seu, pessoal.</b> Responder outras pessoas com ele pode ir contra as regras da ${BRAINS[d.brain].company}.</span></span>` : preview;
+  return dlgShell("sparkle", `Quem pensa pelo ${nm()}?`, "Escolha o cérebro e o modelo. O computador se ajusta sozinho.", `<div class="eng">${["model", "claude", "codex"].map(cardFor).join("")}</div><div class="detail">${detail}</div>`, left,
+    `<button class="btn primary" data-dok ${same ? 'aria-disabled="true"' : ""}>${plan ? `Usar meu plano do ${BRAINS[d.brain].plan}` : "Usar"}</button>`);
+}
+
+/* ---- Onde trabalha ---- */
+function dlgPc() {
+  const d = D(), c = C();
+  const has = (pc) => [
+    ["Claude Code", brainOk("claude", pc)],
+    ["Codex", brainOk("codex", pc)],
+    ["Navegador", browserCan(pc) ? (browserReady(pc) ? true : "wait") : false],
+  ];
+  const rows = Object.entries(PCS).map(([id, p]) => {
+    const also = pcAlso(id);
+    return `<button class="pcc" role="radio" aria-checked="${d.pc === id}" data-dpc="${id}">
+      <span class="eport sm">${port("pc", PC_KIND[id], p.online ? "online" : "offline", 56)}</span>
+      <span class="t"><b>${p.name}</b><span class="row" style="gap:6px"><span class="dotc ${p.online ? "on" : ""}"></span>${p.line}</span>
+        <span class="has">${has(id).map(([n, v]) => `<span class="${v === true ? "y" : v === "wait" ? "w" : "n"}">${I(v === true ? "check" : v === "wait" ? "clock" : "x", "sm")}${n}${v === "wait" ? " (falta ligar)" : ""}</span>`).join("")}</span>
+        ${d.pc === id && id !== c.pc ? also.map((a) => `<span class="also warn">${I("alert", "sm")}${a}</span>`).join("") : ""}</span>
+      <span class="ok">${I("check")}</span></button>`;
+  }).join("");
+  return dlgShell("computer", `Onde o ${nm()} trabalha?`, "É onde ele roda programas e guarda os arquivos dele.", `<div class="pcs">${rows}</div>`, "",
+    `<button class="btn primary" data-dok ${d.pc === c.pc ? 'aria-disabled="true"' : ""}>Usar ${d.pc === "cloud" ? "a Nuvem" : "o " + PCS[d.pc].name.split(" ")[0]}</button>`,
+    `<button class="btn ghost sm" data-noop>${I("plus", "sm")}Conectar um computador</button>`);
+}
+
+/* ---- Navegador ---- */
+function dlgBrowser() {
+  const d = D(), c = C();
+  const pc = d.browser !== "off" && !browserCan(c.pc) ? "mac" : c.pc;
+  const card = (v, icon, t, line) => `<button class="ec" role="radio" aria-checked="${d.browser === v}" data-dbrowser="${v}"><span class="ekey">${I(icon)}</span><b>${t}</b><span class="d">${line}</span><span class="ok">${I("check")}</span></button>`;
+  let detail = "";
+  if (d.browser === "only") detail += `<div class="mg"><div class="mgh"><b>Sites liberados</b><span class="help">${d.sites.length || "nenhum ainda"}</span></div>
+      <div class="sites">${d.sites.map((s) => `<span class="chip">${I("globe", "sm")}${s}<button class="x" data-drmsite="${s}" aria-label="Tirar ${s}">${I("x", "sm")}</button></span>`).join("")}
+      <span class="input" style="height:34px;flex:1;min-width:180px"><input id="dsite" placeholder="Colar um site, ex.: notion.so" value="${esc(d.site)}"></span></div></div>`;
+  if (d.browser !== "off" && pc !== c.pc) detail += `<div class="sline">${I("arrow", "sm")}O ${nm()} passa para o <b style="color:var(--ink);margin-left:4px">${PCS[pc].name}</b>, onde tem navegador.</div>`;
+  if (d.browser !== "off" && !browserReady(pc)) detail += guide();
+  if (d.browser !== "off") detail += `<div class="sline">${I("lock", "sm")}Cada agente tem o próprio navegador. Ele fica logado nos sites que você entrar por ele.</div>`;
+  const same = d.browser === c.browser && JSON.stringify(d.sites) === JSON.stringify(c.sites ?? []);
+  return dlgShell("globe", `O ${nm()} pode navegar em sites?`, "Para pesquisar, abrir páginas e preencher formulários.", `<div class="eng">${card("any", "globe", "Qualquer site", "Bom para pesquisar")}${card("only", "lock", "Só alguns sites", "Você escolhe quais")}${card("off", "globeOff", "Não navega", "Trabalha sem abrir sites")}</div>${detail ? `<div class="detail">${detail}</div>` : ""}`, "",
+    `<button class="btn primary" data-dok ${same ? 'aria-disabled="true"' : ""}>Usar</button>`);
+}
+/* ---- Every other setting: the same dialog, one question, a draft and Usar ---- */
+const SENSITIVE = { github: ["Fazer merge de um pull request", "Fazer deploy", "Apagar uma branch"], gmail: ["Enviar um email"], drive: ["Compartilhar um arquivo"], notion: ["Apagar uma página"], linear: ["Apagar uma issue"] };
+const SIMPLE = {
+  audience: ["users", () => `Quem conversa com o ${nm()}?`, "Quem pode chamar e falar com ele."],
+  channels: ["hash", () => `Em quais canais o ${nm()} fica?`, "Ele lê e responde nos canais marcados."],
+  owner: ["user", () => `Quem é responsável pelo ${nm()}?`, "Recebe os pedidos de aprovação e o aviso de orçamento."],
+  budget: ["wallet", () => `Quanto o ${nm()} pode gastar por mês?`, `Já usou US$ ${SPENT} em outubro. No limite, ele para e avisa.`],
+  look: ["wand", () => `O jeito do ${nm()}`, "Cor, o que vai na cabeça e os olhos."],
+  addapp: ["plug", () => "Liberar um app", "Começa só lendo. Você muda depois."],
+};
+const strip = (html) => html.replace(/<h3>[\s\S]*?<\/h3>/, "").replace(/<p class="lead2">[\s\S]*?<\/p>/, "");
+function dlgAppBody(k) {
+  const a = APPS[k], lv = C().apps[k];
+  const tile = (v, icon, t, sub) => `<button class="mtile" role="radio" aria-checked="${lv === v}" data-lvl="${v}"><span class="key">${I(icon)}</span><span class="t"><b>${t}</b><span>${sub}</span></span><span class="rad">${I("check")}</span></button>`;
+  return `<div class="mtiles">${tile("read", "eye", "Só lê", "Consulta, sem mudar nada")}${tile("write", "pen", "Lê e muda", "Cria e edita; o sensível pede o seu ok")}</div>
+    <div class="detail">
+      ${k === "github" ? `<div class="mg"><div class="mgh"><b>Repositórios</b></div><button class="mr" data-noop><span class="t"><b>Todos os repositórios</b><span>Os 12 que a organização conectou</span></span>${I("right", "sm")}</button></div>` : ""}
+      <div class="mg"><div class="mgh"><b>Sempre pede o seu ok</b><span class="help">mesmo em Lê e muda</span></div>
+        ${(SENSITIVE[k] ?? ["O que for sensível"]).map((x) => `<div class="sens">${I("shield", "sm")}${x}</div>`).join("")}</div>
+      <button class="mr" data-noop><span class="t"><b>Ajuste fino</b><span>Liga e desliga cada ferramenta do ${a.name}</span></span>${I("right", "sm")}</button>
+    </div>`;
+}
+function dlgSimple() {
+  const d = D(), id = d.id;
+  const same = JSON.stringify(d.draft) === JSON.stringify(S.cur);
+  if (id.startsWith("app:")) {
+    const k = id.slice(4), a = APPS[k], isNew = S.cur.apps[k] === "none";
+    return dlgShell(ci(k, 40), `${a.name} no ${nm()}`, isNew ? "Começa só lendo. Escolha e clique em Usar." : "O que ele pode fazer lá.", dlgAppBody(k), "",
+      `<button class="btn primary" data-dok ${same ? 'aria-disabled="true"' : ""}>${isNew ? "Liberar" : "Usar"}</button>`,
+      isNew ? "" : `<button class="btn ghost sm danger" data-revoke="${k}">${I("x", "sm")}Tirar o acesso</button>`, "sm");
+  }
+  const [icon, title, sub] = SIMPLE[id];
+  let body = strip(popBody(id));
+  if (id === "look") body = `<div class="lookprev">${av("lookprev", 88, 'data-tight="0"')}</div>` + body;
+  const primary = id === "addapp" ? "" : `<button class="btn primary" data-dok ${same ? 'aria-disabled="true"' : ""}>Usar</button>`;
+  return dlgShell(icon, title(), sub, `<div class="sbody">${body}</div>`, "", primary, "", "sm");
+}
+const SIMPLE_DONE = { audience: "Quem conversa com ele mudou.", channels: "Canais atualizados.", owner: "Responsável atualizado.", budget: "Limite atualizado.", look: "O jeito mudou." };
+function dlgBody() { return D().kind === "simple" ? dlgSimple() : D().kind === "brain" ? dlgBrain() : D().kind === "pc" ? dlgPc() : dlgBrowser(); }
+function dlgOk() {
+  if (D().kind === "simple") {
+    const d = D(); S.dlg = null;
+    const k = d.id.startsWith("app:") ? d.id.slice(4) : null;
+    const msg = k ? (S.cur.apps[k] === "none" ? `O ${nm()} agora ${d.draft.apps[k] === "write" ? "lê e muda" : "lê"} o ${APPS[k].name}.` : `${APPS[k].name}: ${d.draft.apps[k] === "write" ? "lê e muda" : "só lê"}.`) : SIMPLE_DONE[d.id];
+    apply(d.draft, msg, k ? d.id : d.id);
+    return;
+  }
+  const d = D(), c = C();
+  S.dlg = null;
+  if (d.kind === "brain") {
+    if (d.brain !== "model") S.accepted.add(d.brain);
+    const pc = brainOk(d.brain, c.pc) ? c.pc : homeOf(d.brain);
+    const name = d.brain === "model" ? ORG_MODELS.find((m) => m.id === d.model)?.name : BRAINS[d.brain].name;
+    apply({ brain: d.brain, model: d.model, fallback: d.fallback, pc }, `O ${nm()} agora pensa com ${name}${pc !== c.pc ? " " + at(pc) : ""}.`, pc !== c.pc ? "pc" : "brain");
+  } else if (d.kind === "pc") choosePc(d.pc);
+  else {
+    const p = { browser: d.browser, sites: d.sites };
+    if (d.browser !== "off" && !browserCan(c.pc)) { p.pc = "mac"; if (c.brain !== "model" && !brainOk(c.brain, "mac")) { p.brain = "model"; p.model = "sonnet"; } }
+    const pc = p.pc ?? c.pc;
+    apply(p, d.browser === "off" ? `O ${nm()} não navega mais em sites.` : browserReady(pc) ? `O ${nm()} já pode navegar em sites.` : "Falta 1 passo no MacBook. Mostro aqui como.", p.pc ? "pc" : "browser");
+  }
+}
+function dlgClick(el) {
+  const d = D(); if (!d) return false;
+  if (el.matches("[data-dclose]")) { S.dlg = null; renderLayer(); return true; }
+  if (el.dataset.dbrain) { const k = el.dataset.dbrain; if (k !== d.brain) { d.brain = k; d.model = k === C().brain ? C().model : MODELS[k][0][0]; } renderLayer(); return true; }
+  if (el.dataset.dmodel) { d.model = el.dataset.dmodel; renderLayer(); return true; }
+  if (el.dataset.dfallback) { d.fallback = el.dataset.dfallback === "on"; renderLayer(); return true; }
+  if (el.dataset.dpc) { d.pc = el.dataset.dpc; renderLayer(); return true; }
+  if (el.dataset.dbrowser) { d.browser = el.dataset.dbrowser; renderLayer(); return true; }
+  if (el.dataset.drmsite) { d.sites = d.sites.filter((s) => s !== el.dataset.drmsite); renderLayer(); return true; }
+  if (el.dataset.revoke) { const k = el.dataset.revoke; S.dlg = null; apply({ apps: { ...S.cur.apps, [k]: "none" } }, `Tirou o ${APPS[k].name} do ${nm()}.`); return true; }
+  if (el.matches("[data-dok]")) { if (el.getAttribute("aria-disabled") !== "true") dlgOk(); return true; }
+  return false;
+}
+function addSite() {
+  const d = D(); if (!d) return;
+  const v = (d.site || "").trim().toLowerCase().replace(/^[a-z]+:\/\//, "").replace(/\/.*$/, "");
+  if (v && !d.sites.includes(v)) d.sites.push(v);
+  d.site = ""; renderLayer(); $("#dsite")?.focus();
+}
+
+/* ================= Page ================= */
+const TABS = [["perfil", "Perfil"], ["instrucoes", "Instruções"], ["memoria", "Memória"], ["atividade", "Atividade"]];
+function viewPage() {
+  const c = C();
+  AGENTS.bento.look = c.look;
+  const name = S.editing === "name" ? `<input class="name" id="ename" value="${esc(c.name)}" maxlength="40" aria-label="Nome">` : ed() ? `<button class="editable" data-edit="name" title="Mudar o nome">${esc(c.name)}${I("pen", "pen")}</button>` : esc(c.name);
+  const role = S.editing === "role" ? `<input class="role" id="erole" value="${esc(c.role)}" maxlength="60" aria-label="Função">` : ed() ? `<button class="editable" data-edit="role" title="Mudar a função" style="font-size:15px;color:var(--muted)">@bento · ${esc(c.role)}${I("pen", "pen sm")}</button>` : `@bento · ${esc(c.role)}`;
+  const state = c.paused ? `${I("pause", "sm")}Pausado<span class="sub">· Não responde até alguém voltar</span>` : `${I("check", "sm")}Disponível<span class="sub">· Responde quando chamam por @bento</span>`;
+  return `<div class="wrap">
+    <div class="topbar"><nav class="crumbs" aria-label="Caminho"><a href="#" data-noop>Agentes</a><span aria-hidden="true">/</span><b>${esc(nm())}</b></nav></div>
+    <header>
+      <div class="cover" id="cover"><canvas class="sky" id="coverSky" aria-hidden="true"></canvas>
+        <span class="state">${state}</span>
+        <div class="coveracts"><button class="btn primary" data-noop>${I("chat", "sm")}Conversar</button><button class="btn icon glass" data-open="more" data-anchor="more" aria-label="Mais ações">${I("more")}</button></div>
+        <span id="heroAgent" style="position:absolute;left:${innerWidth <= 640 ? 20 : 44}px;bottom:0"></span>
+        ${ed() ? `<button class="lookbtn" data-open="look" data-anchor="look" aria-label="Mudar o jeito" style="left:${innerWidth <= 640 ? 10 : 30}px"><span class="hint">${I("wand", "sm")}Mudar o jeito</span></button>` : ""}</div>
+      <div class="ident"><div class="whoami"><h1>${name}<span class="handle">${role}</span></h1></div>
+</div>
+      ${headSentence()}
+    </header>
+    <div class="tabsbar"><div class="tabs" role="tablist">${TABS.map(([id, l]) => `<button class="tab" role="tab" data-tab="${id}" aria-selected="${S.tab === id}">${l}${id === "perfil" && S.waiting && ed() ? ' <span class="cnt">2</span>' : ""}</button>`).join("")}</div></div>
+    <section class="view" style="animation:none">${S.tab === "perfil" ? viewPerfil() : S.tab === "instrucoes" ? viewInstr() : `<p class="ph-out">Memória e Atividade não mudam nesta rodada.</p>`}</section>
+  </div>`;
+}
+function renderBar() {
+  $("#pbar").innerHTML = `<span class="lbl">Perfil do agente</span>
+    <div class="views">${seg("data-role", [["admin", "Admin"], ["member", "Membro"]], S.role)}</div>
+    <span class="grow"></span>
+    <div class="ctl"><span class="lbl">No Mac, navegador</span>${seg("data-mac", [["off", "Desligado"], ["on", "Ligado"]], S.mac)}
+    <button class="btn sm ghost" data-reset>${I("reset", "sm")}Recomeçar</button>
+    <button class="iconbtn" data-theme aria-label="Tema">${I(document.documentElement.dataset.theme === "dark" ? "sun" : "moon")}</button></div>`;
+}
+function renderLayer() {
+  const L = $("#layer"), sheet = innerWidth <= 640;
+  L.innerHTML = (S.pop ? `<div class="pscrim ${sheet ? "dim" : ""}" data-close></div><div class="pop ${sheet ? "sheet" : ""}" role="dialog" aria-modal="true" id="pop">${popBody(S.pop)}</div>` : "")
+    + (S.dlg ? dlgBody() : "")
+    + (S.toast ? `<div class="toast ${S.toast.undo ? "" : "noundo"}" role="status">${I("check", "sm")}<span>${esc(S.toast.msg)}</span>${S.toast.undo ? '<button class="u" data-undo>Desfazer</button>' : ""}</div>` : "");
+  if (S.dlg?.kind === "simple") AGENTS.lookprev = { look: S.dlg.draft.look };
+  hydrate(L); placePills(L); positionPop();
+}
+function positionPop() {
+  if (!S.pop || innerWidth <= 640) return;
+  const a = $(`[data-anchor="${S.pop}"]`), p = $("#pop");
+  if (!a || !p) return;
+  const r = a.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  let left = S.pop === "more" ? r.right - w : r.left;
+  left = Math.max(16, Math.min(left, innerWidth - w - 16));
+  let top = r.bottom + 8;
+  if (top + h > innerHeight - 12) top = Math.max(12, r.top - h - 8);
+  p.style.left = left + "px"; p.style.top = top + "px";
+}
+function render() {
+  if (S.dlg?.kind === "simple") { renderLayer(); return; }
+  const y = scrollY;
+  renderBar();
+  const main = $("#page");
+  main.innerHTML = viewPage();
+  const size = innerWidth <= 640 ? 78 : 112;
+  const cv = avatar(C().look, size, 0.7, { tight: false });
+  cv.style.marginBottom = -size * RCH.bottom + size * 0.04 + "px";
+  $("#heroAgent").append(cv);
+  hydrate(main); placePills(main);
+  scrollTo(0, y);
+  renderLayer();
+  requestAnimationFrame(positionPop);
+  if (S.editing) { const i = $(S.editing === "name" ? "#ename" : "#erole"); i?.focus(); i?.select(); }
+  S.glow = null;
+}
+function placePills(root = document) {
+  for (const sg of $$(".seg", root)) {
+    let pill = $(".pill", sg);
+    if (!pill) { pill = document.createElement("span"); pill.className = "pill"; sg.prepend(pill); }
+    const on = $('button[aria-pressed="true"]', sg);
+    if (!on) { pill.style.opacity = 0; continue; }
+    pill.style.opacity = 1; pill.style.width = on.offsetWidth + "px"; pill.style.height = on.offsetHeight + "px";
+    pill.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+  }
+}
+function toast(msg, undo = false) { S.toast = { msg, undo }; renderLayer(); clearTimeout(toast.h); toast.h = setTimeout(() => { S.toast = null; renderLayer(); }, 5000); }
+setInterval(() => {
+  const steps = $$("[data-gs]"); if (!steps.length) return;
+  const n = (Number(steps[0].dataset.tick ?? -1) + 1) % 3;
+  steps.forEach((s, i) => { s.classList.toggle("on", i === n); s.dataset.tick = n; });
+}, 1400);
+
+/* ================= Events ================= */
+function commitEdit() {
+  const k = S.editing; if (!k) return;
+  const v = ($(k === "name" ? "#ename" : "#erole")?.value ?? "").trim();
+  S.editing = null;
+  if (!v || v === C()[k]) { render(); return; }
+  apply({ [k]: v }, k === "name" ? `Agora se chama ${v}.` : "Função atualizada.");
+}
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("button, a, [data-close]"); if (!el) return;
+  if (S.editing && !el.matches("#ename,#erole")) commitEdit();
+  if (S.dlg && dlgClick(el)) return;
+  if (el.dataset.revoke) { const k = el.dataset.revoke; apply({ apps: { ...S.cur.apps, [k]: "none" } }, `Tirou o ${APPS[k].name} do ${nm()}.`); return; }
+  if (el.dataset.noop !== undefined) { e.preventDefault(); if (el.closest(".pop")) toast("Fora deste protótipo."); return; }
+  if (el.matches("[data-close]")) { S.pop = null; S.ask = null; render(); return; }
+  if (el.dataset.role) { S.role = el.dataset.role; setQ("role", S.role); S.pop = null; render(); return; }
+  if (el.dataset.mac) {
+    const was = S.mac; S.mac = el.dataset.mac; setQ("mac", S.mac);
+    const live = was !== "on" && S.mac === "on" && C().pc === "mac" && C().browser !== "off";
+    S.glow = live ? "browser" : null; render();
+    if (live) toast(`O MacBook liberou. O ${nm()} já navega em sites.`);
+    return;
+  }
+  if (el.matches("[data-reset]")) { fromHash(); render(); return; }
+  if (el.matches("[data-theme]")) { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark"; setQ("theme", r.dataset.theme); render(); return; }
+  if (el.dataset.tab) { S.tab = el.dataset.tab; setQ("tab", S.tab); S.pop = null; render(); return; }
+  if (el.dataset.edit) { S.editing = el.dataset.edit; render(); return; }
+  if (el.dataset.open) {
+    if (el.dataset.open.startsWith("routine") || el.dataset.open === "addroutine") { toast("Abre em Rotinas."); return; }
+    if (["brain", "pc", "browser"].includes(el.dataset.open)) { openDlg(el.dataset.open); return; }
+    if (el.dataset.open !== "more") { S.pop = null; S.dlg = { kind: "simple", id: el.dataset.open, draft: structuredClone(S.cur) }; renderLayer(); return; }
+    S.pop = S.pop === el.dataset.open ? null : el.dataset.open; S.ask = null; render(); return;
+  }
+  /* work */
+  if (el.dataset.brain) { chooseBrain(el.dataset.brain); return; }
+  if (el.dataset.accept) { S.accepted.add(el.dataset.accept); chooseBrain(el.dataset.accept); return; }
+  if (el.matches("[data-cancelask]")) { S.ask = null; renderLayer(); return; }
+  if (el.dataset.pc) { choosePc(el.dataset.pc); return; }
+  if (el.dataset.browser) { chooseBrowser(el.dataset.browser); return; }
+  if (el.dataset.model) { apply({ model: el.dataset.model }, `Modelo: ${MODELS[C().brain].find((m) => m[0] === el.dataset.model)[1]}.`, null, true); return; }
+  /* people */
+  if (el.dataset.aud) { const v = el.dataset.aud; apply({ audience: v }, v === "some" ? null : `Agora responde a ${audienceWords({ ...C(), audience: v })}.`, "audience", v === "some"); return; }
+  if (el.dataset.person) { const id = el.dataset.person, p = C().people.includes(id) ? C().people.filter((x) => x !== id) : [...C().people, id]; apply({ people: p }, `Agora responde a ${audienceWords({ ...C(), people: p })}.`, "audience", true); return; }
+  if (el.dataset.ch) { const ch = el.dataset.ch, on = C().channels.includes(ch); const n = on ? C().channels.filter((x) => x !== ch) : [...C().channels, ch]; apply({ channels: n }, on ? `Saiu do #${ch}.` : `Entrou no #${ch}.`, "channels", true); return; }
+  if (el.dataset.owner !== undefined) { const v = el.dataset.owner || null; if (v === C().owner) { S.pop = null; render(); return; } apply({ owner: v, people: C().people.filter((x) => x !== v) }, v ? `${isYou(v) ? "Você é" : PEOPLE[v].first + " é"} responsável pelo ${nm()}.` : "Sem responsável: os admins cuidam.", "owner"); return; }
+  /* access */
+  { const lk = Object.keys(el.dataset).find((x) => x.startsWith("lvl") && x.length > 3); if (lk) { const k = lk.slice(3); const v = el.dataset[lk]; if (v !== C().apps[k]) apply({ apps: { ...C().apps, [k]: v } }, v === "none" ? `${APPS[k].name}: sem acesso.` : v === "read" ? `${APPS[k].name}: ler.` : `${APPS[k].name}: ler e escrever.`, "app:" + k); return; } }
+  if (el.dataset.lvl) { const k = (S.dlg?.id ?? S.pop).slice(4), v = el.dataset.lvl; apply({ apps: { ...C().apps, [k]: v } }, v === "none" ? `Tirou o ${APPS[k].name}.` : v === "read" ? `No ${APPS[k].name}, só lê.` : `No ${APPS[k].name}, lê e muda.`, v === "none" ? null : "app:" + k, v === "write" && k === "github"); return; }
+  if (el.dataset.addapp && S.dlg) { const k = el.dataset.addapp; S.dlg.id = "app:" + k; S.dlg.draft.apps[k] = "read"; renderLayer(); return; }
+  if (el.dataset.addapp) { const k = el.dataset.addapp; apply({ apps: { ...C().apps, [k]: "read" } }, `O ${nm()} agora lê o ${APPS[k].name}.`, "app:" + k); return; }
+  if (el.dataset.skill) { const k = el.dataset.skill, on = C().skills.includes(k); apply({ skills: on ? C().skills.filter((x) => x !== k) : [...C().skills, k] }, on ? `Tirou ${SKILLS[k][0]}.` : `Agora sabe ${SKILLS[k][0].toLowerCase()}.`, "skills", true); return; }
+  if (el.dataset.budget) { const v = el.dataset.budget === "org" ? null : Number(el.dataset.budget); apply({ budget: v }, `Limite: US$ ${v ?? ORG_BUDGET} por mês.`, "budget"); return; }
+  if (el.dataset.routine) { const i = Number(el.dataset.routine); S.routinesOff.has(i) ? S.routinesOff.delete(i) : S.routinesOff.add(i); render(); toast(S.routinesOff.has(i) ? `${ROUTINES[i][0]} pausada.` : `${ROUTINES[i][0]} voltou.`); return; }
+  /* look */
+  if (el.dataset.color) { apply({ look: { ...C().look, color: el.dataset.color } }, null, null, true); return; }
+  if (el.dataset.acc) { apply({ look: { ...C().look, accessory: el.dataset.acc } }, null, null, true); return; }
+  if (el.dataset.eyes) { apply({ look: { ...C().look, eyes: el.dataset.eyes } }, null, null, true); return; }
+  /* more */
+  if (el.matches("[data-copy]")) { S.pop = null; render(); toast("@bento copiado."); return; }
+  if (el.matches("[data-pause]")) { apply({ paused: !C().paused }, C().paused ? `O ${nm()} voltou a trabalhar.` : `O ${nm()} está pausado.`); return; }
+  /* instructions */
+  if (el.matches("[data-propopen]")) { S.prop = "open"; render(); return; }
+  if (el.matches("[data-propno]")) { S.prop = "done"; S.waiting = false; render(); toast(`Recusado. O ${nm()} guardou o motivo.`); return; }
+  if (el.matches("[data-propyes]")) { S.instr = S.instrSaved = S.instrSaved + "\n" + PROPOSAL.join("\n"); S.prop = "done"; S.waiting = false; render(); toast("2 linhas acrescentadas às instruções.", false); return; }
+  if (el.matches("[data-instrsave]")) { S.instrSaved = S.instr; render(); toast("Instruções salvas."); return; }
+  if (el.matches("[data-instrundo]")) { S.instr = S.instrSaved; render(); return; }
+  if (el.matches("[data-undo]")) { const prev = S.hist.pop(); if (prev) { S.cur = prev; S.toast = null; render(); } return; }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "dsite" && S.dlg) { S.dlg.site = e.target.value; return; }
+  if (e.target.id === "instr") { const was = S.instr === S.instrSaved; S.instr = e.target.value; if (was !== (S.instr === S.instrSaved)) { const pos = e.target.selectionStart; render(); const t = $("#instr"); t.focus(); t.setSelectionRange(pos, pos); } }
+});
+document.addEventListener("keydown", (e) => {
+  if (S.editing && e.key === "Enter") { e.preventDefault(); commitEdit(); return; }
+  if (S.editing && e.key === "Escape") { S.editing = null; render(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && S.tab === "instrucoes" && S.instr !== S.instrSaved) { e.preventDefault(); $("[data-instrsave]")?.click(); return; }
+  if (S.dlg && e.key === "Enter" && e.target.id === "dsite") { e.preventDefault(); addSite(); return; }
+  if (e.key === "Escape" && S.dlg) { S.dlg = null; renderLayer(); return; }
+  if (e.key === "Escape" && S.pop) { S.pop = null; S.ask = null; render(); }
+});
+addEventListener("hashchange", () => { fromHash(); render(); });
+addEventListener("resize", () => { placePills(); if (S.pop) renderLayer(); });
+addEventListener("scroll", () => positionPop(), { passive: true });
+fromHash();
+render();
+document.fonts?.ready.then(() => placePills());
+</script>
+</body>
+</html>
