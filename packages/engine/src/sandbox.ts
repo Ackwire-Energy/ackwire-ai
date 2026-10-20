@@ -34,7 +34,7 @@ import { effectiveAgentBudget, monthStartUtc } from "./usage";
 
 const { sandboxes, orgSandboxSettings, sandboxUsageDays, usageRecords, agentBudgetPeriods } = schema;
 
-/** The scope of the sandbox tools: never granted by default, and not covered by "all tools" (D30). */
+/** The scope of the sandbox tools: on by default (D61), and not covered by "all tools" (D30). */
 export const SANDBOX_SCOPE = "sandbox:run";
 
 export const SANDBOX_LIMITS = {

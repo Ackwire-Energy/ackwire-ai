@@ -70,7 +70,23 @@ function sandboxSetup(exec?: NonNullable<Parameters<typeof createFakeSandboxProv
 }
 
 describe("access", () => {
-  test("off by default, not part of 'all tools', granted only explicitly", async () => {
+  test("new agents get the computer and the browser (D61)", async () => {
+    f = await setup({ reply: () => ({ chunks: ["ok"] }) });
+    const agent = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Ops", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const scopes = await f.db
+      .select({ scope: schema.agentScopes.scope })
+      .from(schema.agentScopes)
+      .where(eq(schema.agentScopes.agentId, agent.id));
+    expect(scopes.map((s) => s.scope)).toEqual(expect.arrayContaining(["sandbox:run", "browser:use"]));
+  });
+
+  test("revocable, not part of 'all tools'", async () => {
     const provider = sandboxSetup();
     f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
     const ctx = await runCtx();
@@ -543,7 +559,7 @@ describe("the agent's computer API", () => {
     expect(view.error?.message).toBe("computador quota exceeded in ~");
   });
 
-  test("granted but no provider on the server: the prompt says the sandbox is off", async () => {
+  test("granted but no provider on the server: the prompt doesn't mention the sandbox", async () => {
     let prompt = "";
     f = await setup({
       contextTools: true,
@@ -554,7 +570,7 @@ describe("the agent's computer API", () => {
     });
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
     await runCtx();
-    expect(prompt).toContain("Run code (sandbox): granted to you, but the code environment is turned off");
+    expect(prompt).not.toContain("Run code (sandbox)");
   });
 });
 

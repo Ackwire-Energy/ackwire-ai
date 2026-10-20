@@ -2053,7 +2053,7 @@ export const ptBR = {
     sandbox_run: {
       label: "Rodar código",
       description:
-        "Rodar código e scripts de skills no computador do agente (isolado, sem segredos, arquivos guardados entre conversas); custa tempo de máquina. Nunca vem ligado por padrão.",
+        "Rodar código e scripts de skills no computador do agente (isolado, sem segredos, arquivos guardados entre conversas); custa tempo de máquina.",
     },
     github_git_read: {
       label: "Clonar repositórios (git)",

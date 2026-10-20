@@ -395,8 +395,8 @@ const slug = (s: string) =>
     .slice(0, 60) || "file";
 
 /**
- * Sandbox tools through the Tool Gateway (scope `sandbox:run`, never on by
- * default and not part of "all tools"): `run_code`, `write_file`,
+ * Sandbox tools through the Tool Gateway (scope `sandbox:run`, on by
+ * default (D61) and not part of "all tools"): `run_code`, `write_file`,
  * `read_file`, `list_files`, `export_file` (text to a native Drive kind),
  * `upload_file` (any file or folder as is, ADR 0025), `import_file` (from
  * the Drive) and `run_skill_script`. One computer per agent, shared

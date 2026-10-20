@@ -76,12 +76,10 @@ import {
   waitOf,
 } from "./run-tools";
 import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, transitionRun } from "./runs";
-import { SANDBOX_SCOPE } from "./sandbox";
 import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
 import { enabledSkills } from "./skills";
 import { FIND_AGENT_TOOL } from "./team";
 import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
-import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
@@ -573,16 +571,6 @@ async function executeRunInner(
     const pending: { label: string; reason: string }[] = deps.tools
       ? await pendingConnectors(db, run.orgId, new Set(tools.map((t) => t.name))).catch(() => [])
       : [];
-    // Granted code sandbox, but it is off (no provider on this server, or turned off by the org): say so.
-    if (deps.tools && !tools.some((t) => t.scope === SANDBOX_SCOPE)) {
-      const keys = await grantedScopeKeys(db, run.orgId, run.agentId).catch(() => new Set<string>());
-      if (keys.has(grantKey(null, SANDBOX_SCOPE))) {
-        pending.push({
-          label: "Run code (sandbox)",
-          reason: "granted to you, but the code environment is turned off in this organization or on this server",
-        });
-      }
-    }
     // Skills: only names and descriptions here; the body loads with `load_skill` (progressive disclosure).
     const skillList = tools.some((t) => t.name === "load_skill") ? await enabledSkills(db, run.orgId, agent.id) : [];
     const readsWiki = tools.some((t) => t.name === "read_wiki_page");

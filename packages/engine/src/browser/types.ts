@@ -5,7 +5,7 @@
  */
 import type { BrowserFrameMetadata } from "@agenteschat/adapters";
 
-/** The scope of the browser tools: never granted by default, and not covered by "all tools". */
+/** The scope of the browser tools: on by default (D61), and not covered by "all tools". */
 export const BROWSER_SCOPE = "browser:use";
 
 /** The tools agents get with `browser:use`, the same for every brain. */

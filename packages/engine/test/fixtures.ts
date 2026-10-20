@@ -10,7 +10,7 @@ import {
   type RealtimeEvent,
   type SandboxProvider,
 } from "@agenteschat/adapters";
-import { type Database, schema } from "@agenteschat/db";
+import { type Database, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
 import {
@@ -178,6 +178,12 @@ export async function setup(
     },
     { model: "claude-sonnet-5-5" },
   );
+  // New agents get their computer by default (D61); tests that use it grant it themselves.
+  await db
+    .delete(schema.agentScopes)
+    .where(
+      sql`${schema.agentScopes.agentId} = ${agent.id} and ${schema.agentScopes.scope} in ('sandbox:run', 'browser:use')`,
+    );
   await addChannelMember(db, owner.id, org.id, general.id, { agentId: agent.id });
 
   const provider: FakeProvider = createFakeProvider(options.reply);

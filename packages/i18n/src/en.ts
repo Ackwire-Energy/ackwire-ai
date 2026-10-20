@@ -2039,7 +2039,7 @@ export const en: Translations = {
     sandbox_run: {
       label: "Run code",
       description:
-        "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time. Never on by default.",
+        "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time.",
     },
     github_git_read: {
       label: "Clone repositories (git)",

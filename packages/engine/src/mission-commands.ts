@@ -533,7 +533,7 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
   if (opts.canRun && forbiddenReason(tool, input, scope ?? NO_SCOPE) === null) return allow();
   return deny(
     opts.canRun
-      ? "This command is outside what agents may run on this computer. Say which command you need and why; a person can run it or start a mission."
-      : "This agent may not run commands on this computer here. Say which command you need and why; a person can run it or start a mission.",
+      ? "This command is outside what agents may run on this computer (no sudo, deletes or writes outside your folder, uploads, remote shells or global installs). Do it another way; if there is none, tell the person in plain words what you couldn't do. Never give them a terminal command to run."
+      : "Running commands on this computer is turned off for you. Tell the person in plain words that it needs \"Run code\" turned on on your page. Never give them a terminal command to run.",
   );
 }

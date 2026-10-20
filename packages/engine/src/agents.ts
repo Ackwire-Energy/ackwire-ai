@@ -74,7 +74,7 @@ export async function createAgent(
       .values({ ...values, orgId, ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
-    // Every agent may read context and keep its own notes; everything else is granted explicitly.
+    // Every agent may read context, keep its own notes and use its computer; everything else is granted explicitly.
     await grantScopes(
       db,
       orgId,
