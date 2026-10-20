@@ -94,11 +94,10 @@ describe("Quem pensa (its dialog)", () => {
       "CodexEm teste",
     ]);
     expect(rows[0]?.getAttribute("aria-checked")).toBe("true");
-    expect(rows.map((r) => r.querySelector("canvas.ac-brain")?.getAttribute("data-kind"))).toEqual([
-      "agent",
-      "claude_code",
-      "codex",
-    ]);
+    // The organization's model is the agent itself; the computer brains are their makers' marks.
+    expect(rows[0]?.querySelector("canvas.ac-brain")?.getAttribute("data-kind")).toBe("agent");
+    expect(rows[1]?.querySelector(".ac-brand--claude")).not.toBeNull();
+    expect(rows[2]?.querySelector(".ac-brand--openai")).not.toBeNull();
     // The agent is on the cloud: a plan brain says where it will go, before it is chosen.
     expect(rows.map((r) => r.querySelector(".ac-optrow__side")?.textContent)).toEqual([
       "Pago pela organização",
@@ -162,7 +161,7 @@ describe("Quem pensa (its dialog)", () => {
     const codex = card(await brainDialog(), /^Codex/);
     expect(codex.hasAttribute("disabled")).toBe(true);
     expect(codex.textContent).toContain("Não está instalado no MacBook.");
-    expect(codex.querySelector("canvas.ac-brain")?.getAttribute("data-state")).toBe("off");
+    expect(codex.querySelector(".ac-brand--off")).not.toBeNull();
     expect(codex.querySelector(".ac-optrow__side")?.textContent).toBe("Nenhum computador tem");
   });
 });

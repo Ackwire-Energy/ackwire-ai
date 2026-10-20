@@ -69,6 +69,7 @@ export {
 export {
   BRAIN_ICONS,
   BrainIcon,
+  BrainLogo,
   BrainPortrait,
   type BrainPortraitKind,
   type BrainPortraitProps,

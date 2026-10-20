@@ -358,6 +358,55 @@ textarea.ac-input {
   filter: grayscale(1);
   opacity: 0.5;
 }
+/* BrainLogo (telas/LogosCerebro.html, A): the maker's official mark on a tile. Claude's orange is the brand's. */
+.ac-brand {
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top);
+}
+.ac-brand--tile {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px 14px 14px 4px;
+}
+.ac-brand--tile svg {
+  width: 26px;
+  height: 26px;
+}
+.ac-brand--sm {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 4px;
+}
+.ac-brand--sm svg {
+  width: 16px;
+  height: 16px;
+}
+.ac-brand--claude {
+  background: #f5ede6;
+}
+.ac-brand--claude svg {
+  fill: #d97757;
+}
+.ac-brand--openai {
+  background: #fff;
+}
+.ac-brand--openai svg {
+  fill: var(--ink);
+}
+[data-theme="dark"] .ac-brand--claude {
+  background: #3a2a22;
+}
+[data-theme="dark"] .ac-brand--openai {
+  background: #0e0e0d;
+}
+.ac-brand--off {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
 /* Engine line icons (BrainIcon, executor marks): each engine's accent; working writes / looks around. */
 .ac-icon .ac-brain-cc {
   stroke: #c0603a;

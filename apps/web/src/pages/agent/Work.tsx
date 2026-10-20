@@ -27,12 +27,12 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { computerKind, computerState } from "@agenteschat/client/lib/machines";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import { modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import {
+  BrainLogo,
   BrainPortrait,
   Button,
   ComputerPortrait,
@@ -563,11 +563,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   };
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
-  const accountIcon = accountKind ? (
-    <span className="newag__ib">
-      <Icon name={BRAIN_ICON[accountKind]} size={16} />
-    </span>
-  ) : null;
+  const accountIcon = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
   const accountOptions: SelectOption[] = [
     {
       value: HERE,
@@ -737,13 +733,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             const off = k !== "model" && !where?.online;
             return {
               value: k,
-              leading: (
-                <BrainPortrait
-                  kind={engineOfBrain(k)}
-                  state={off ? "off" : kind === k ? "working" : "idle"}
-                  agent={draft.look}
-                />
-              ),
+              // The computer brains by their makers' marks; thinking through the organization, the agent itself.
+              leading:
+                k === "model" ? (
+                  <BrainPortrait kind="agent" state={kind === k ? "working" : "idle"} agent={draft.look} />
+                ) : (
+                  <BrainLogo kind={k} off={off} />
+                ),
               title: k === "model" ? t("agentPage.work.brain.model") : t(`brain.card.${k}`),
               tag: k === "codex" ? t("brain.testing") : undefined,
               description: k !== "model" && !where ? reason(k) : t(`agentPage.work.brain.${k}Text`),
