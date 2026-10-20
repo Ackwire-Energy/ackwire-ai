@@ -328,7 +328,8 @@ describe("agent page: activity", () => {
     await go("?tab=activity", state);
     const runs = screen().getByRole("region", { name: "Execuções" });
     expect(runs.textContent).toContain("@ada o login está devolvendo 401");
-    expect(runs.textContent).toContain("1.240 tokens");
+    // New input, cached and output tokens per run (the 1.240 of the run, split).
+    expect(runs.textContent).toContain("1.140 entrada · 0 cache · 100 saída");
     expect(within(runs).getByRole("region", { name: "Hoje" })).toBeTruthy();
     const filters = within(runs).getByRole("radiogroup", { name: "Filtrar execuções" });
     await click(within(filters).getByRole("radio", { name: /^Falhas/ }));
