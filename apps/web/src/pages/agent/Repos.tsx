@@ -315,34 +315,6 @@ export function RepoDialog({
   );
 }
 
-/** The header chip: where the agent works on GitHub ("acme/loja +1", "Todos os repositórios"); opens its access. */
-export function RepoHeaderChip() {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const { saved, resources, goTo } = useAgentEdit();
-  const listing = useGitHubRepos(org.id);
-  const github = resources.find((r) => r.kind === "connector" && r.connector === "github");
-  const r = saved.repos;
-  if (!github || !r || (saved.levels?.[github.id] ?? "none") === "none") return null;
-  const ok = r.list.filter((e) => repoExists(listing.data, e));
-  const first = ok[0];
-  if (r.mode === "some" && !first) return null;
-  return (
-    <button
-      type="button"
-      className="ac-chip agp-chipbtn"
-      title={t("repos.headerTitle", {
-        list: r.mode === "all" ? t("repos.all") : ok.map((e) => repoName(t, e)).join(", "),
-      })}
-      onClick={() => goTo("access")}
-    >
-      <Icon name={r.mode === "all" || !first ? "globe" : entryIcon(first, false)} size={14} />
-      {r.mode === "all" || !first ? t("repos.all") : repoName(t, first)}
-      {ok.length > 1 && <span className="muted">+{ok.length - 1}</span>}
-    </button>
-  );
-}
-
 /** "· 2 repositórios" / "· todos os repositórios" after GitHub's level in Visão geral. */
 export function useRepoSuffix() {
   const { t } = useTranslation();

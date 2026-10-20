@@ -371,12 +371,6 @@
   .agp-name {
     font-size: 34px;
   }
-  .agp-acts {
-    width: 100%;
-  }
-  .agp-acts .agp-chat {
-    flex: 1;
-  }
   .agp-tabs .ac-tab {
     height: 44px;
     padding: 0 10px;

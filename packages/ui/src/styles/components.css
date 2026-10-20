@@ -6274,3 +6274,59 @@ label.ac-setrow__title {
 .ac-mo__group > hr.ac-menu__separator {
   border: 0;
 }
+
+/* Carousel (telas/PerfilAgente.html): one row that slides item by item; the arrows step back when it all fits. */
+.ac-carousel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ac-carousel__track {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.ac-carousel__track::-webkit-scrollbar {
+  display: none;
+}
+.ac-carousel__track > * {
+  flex: none;
+  scroll-snap-align: start;
+}
+.ac-carousel__arrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    opacity 0.15s;
+}
+.ac-carousel__arrow:hover:not(:disabled) {
+  color: var(--ink);
+}
+.ac-carousel__arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ac-carousel__arrow:focus-visible {
+  outline: none;
+  box-shadow: var(--e1), var(--field-ring);
+}
+.ac-carousel--fits .ac-carousel__arrow {
+  display: none;
+}

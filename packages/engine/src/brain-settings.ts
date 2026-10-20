@@ -1,5 +1,5 @@
 import { BRAIN_PROTOCOL } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { MODEL_CATALOG } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
@@ -162,6 +162,11 @@ export interface BrainComputer {
   online: boolean;
 }
 
+/** A computer the caller may give the agent, with what it offers (the page moves the agent to one that has a brain). */
+export interface BrainMachineOptions extends BrainComputer {
+  options: BrainOption[];
+}
+
 export interface AgentBrainView {
   agentId: string;
   brain: BrainKind;
@@ -172,6 +177,8 @@ export interface AgentBrainView {
   fallback: boolean;
   computer: BrainComputer | null;
   options: BrainOption[];
+  /** Every computer the caller may give the agent (admins: all; its owner: the ones they connected), with its options. */
+  machines: BrainMachineOptions[];
   /** The caller may change it (an admin or the agent's owner). */
   canEdit: boolean;
 }
@@ -185,10 +192,28 @@ async function agentBrainAccess(db: Database, userId: string, orgId: string, age
   const membership = await requirePermission(db, userId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== userId) {
+  const admin = can(membership.role, "manage_agents");
+  if (!admin && agent.ownerUserId !== userId) {
     throw new ForbiddenError("Only an admin or the agent's owner can see who thinks for it", "agent.not_owner");
   }
-  return agent;
+  return { agent, admin };
+}
+
+/** The computers the caller may give the agent (the same rule as `setAgentComputerTarget`), with their options. */
+async function candidateMachines(
+  db: Database,
+  userId: string,
+  orgId: string,
+  admin: boolean,
+  current: string | null,
+): Promise<BrainMachineOptions[]> {
+  const rows = await db
+    .select()
+    .from(schema.machines)
+    .where(and(eq(schema.machines.orgId, orgId), isNull(schema.machines.deletedAt)));
+  return rows
+    .filter((m) => admin || m.pairedByUserId === userId || m.id === current)
+    .map((m) => ({ machineId: m.id, name: m.name, online: machineOnline(m), options: brainOptions(m) }));
 }
 
 async function agentMachine(db: Database, orgId: string, machineId: string | null) {
@@ -200,6 +225,7 @@ async function agentMachine(db: Database, orgId: string, machineId: string | nul
 function view(
   agent: { id: string; brain: string; brainModel: string | null; brainFallback: boolean },
   machine: MachineLike | null,
+  machines: BrainMachineOptions[],
 ): AgentBrainView {
   const brain = brainOf(agent.brain);
   return {
@@ -210,6 +236,7 @@ function view(
     fallback: agent.brainFallback,
     computer: machine ? { machineId: machine.id, name: machine.name, online: machineOnline(machine) } : null,
     options: brainOptions(machine),
+    machines,
     canEdit: true,
   };
 }
@@ -221,8 +248,12 @@ export async function getAgentBrain(
   orgId: string,
   agentId: string,
 ): Promise<AgentBrainView> {
-  const agent = await agentBrainAccess(deps.db, userId, orgId, agentId);
-  return view(agent, await agentMachine(deps.db, orgId, agent.machineId));
+  const { agent, admin } = await agentBrainAccess(deps.db, userId, orgId, agentId);
+  const [machine, machines] = await Promise.all([
+    agentMachine(deps.db, orgId, agent.machineId),
+    candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
+  ]);
+  return view(agent, machine, machines);
 }
 
 export interface AgentBrainInput {
@@ -246,7 +277,7 @@ export async function setAgentBrain(
   agentId: string,
   input: AgentBrainInput,
 ): Promise<AgentBrainView> {
-  const agent = await agentBrainAccess(deps.db, userId, orgId, agentId);
+  const { agent, admin } = await agentBrainAccess(deps.db, userId, orgId, agentId);
   const from = brainOf(agent.brain);
   if (input.brain !== undefined && !isBrainKind(input.brain)) {
     throw new ValidationError("Choose model, claude_code or codex", "brain.invalid");
@@ -256,7 +287,10 @@ export async function setAgentBrain(
   }
   const brain = (input.brain as BrainKind | undefined) ?? from;
   const changed = brain !== from;
-  const machine = await agentMachine(deps.db, orgId, agent.machineId);
+  const [machine, machines] = await Promise.all([
+    agentMachine(deps.db, orgId, agent.machineId),
+    candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
+  ]);
   if (changed && isComputerBrain(brain)) {
     if (input.acceptPlanTerms !== true) {
       throw new ValidationError(
@@ -287,7 +321,7 @@ export async function setAgentBrain(
           ? null
           : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
-  if (!changed && model === agent.brainModel && fallback === agent.brainFallback) return view(agent, machine);
+  if (!changed && model === agent.brainModel && fallback === agent.brainFallback) return view(agent, machine, machines);
   const [row] = await deps.db
     .update(schema.agents)
     .set({ brain, brainModel: model, brainFallback: fallback, updatedAt: new Date() })
@@ -305,7 +339,7 @@ export async function setAgentBrain(
       ...(changed && isComputerBrain(brain) ? { acceptedPlanTerms: true } : {}),
     },
   });
-  return view(row ?? { ...agent, brain, brainModel: model, brainFallback: fallback }, machine);
+  return view(row ?? { ...agent, brain, brainModel: model, brainFallback: fallback }, machine, machines);
 }
 
 // ── Missions ────────────────────────────────────────────────────────────────

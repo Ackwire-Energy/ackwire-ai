@@ -8,21 +8,14 @@ import {
   type AgentAppearance,
   Avatar,
   agentGradient,
-  Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  type Expression,
+  Carousel,
   Field,
   Icon,
-  prefersReducedMotion,
-  randomAppearance,
   Select,
   type SelectOption,
-  SkyGlow,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { QUICK_BUDGETS, readBudget } from "@/lib/new-agent";
@@ -88,6 +81,33 @@ const TIER_KEY = { 1: "agentPage.tier.1", 2: "agentPage.tier.2", 3: "agentPage.t
 
 type LookPickProps = { look: Required<AgentAppearance>; onPick: (patch: LookPatch) => void };
 
+/** The choices of a look row: wrapping ("Criar agente") or one sliding row (the agent's settings). */
+function ChoiceRow({
+  label,
+  carousel,
+  acc,
+  children,
+}: {
+  label: string;
+  carousel?: boolean;
+  acc?: boolean;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  if (carousel)
+    return (
+      <Carousel label={label} previousLabel={t("look.previous")} nextLabel={t("look.next")} className="newag__car">
+        {children}
+      </Carousel>
+    );
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset
+    <div className={acc ? "newag__opts newag__opts--acc" : "newag__opts"} role="group" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
 /** Color swatches, eyes and an accessory, each a live symbol. `onPick` gets what changed. */
 export function LookPicker({ look, onPick }: LookPickProps) {
   const { t } = useTranslation();
@@ -137,11 +157,10 @@ function ColorChoices({ look, onPick }: LookPickProps) {
   );
 }
 
-function EyesChoices({ look, onPick }: LookPickProps) {
+function EyesChoices({ look, onPick, carousel }: LookPickProps & { carousel?: boolean }) {
   const { t } = useTranslation();
   return (
-    // biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset
-    <div className="newag__opts" role="group" aria-label={t("look.eyes")}>
+    <ChoiceRow label={t("look.eyes")} carousel={carousel}>
       {AGENT_EYES.map((e) => (
         <button
           key={e}
@@ -156,15 +175,14 @@ function EyesChoices({ look, onPick }: LookPickProps) {
           {t(`look.eyesNames.${e}`)}
         </button>
       ))}
-    </div>
+    </ChoiceRow>
   );
 }
 
-function AccessoryChoices({ look, onPick }: LookPickProps) {
+function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel?: boolean }) {
   const { t } = useTranslation();
   return (
-    // biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset
-    <div className="newag__opts newag__opts--acc" role="group" aria-label={t("look.accessory")}>
+    <ChoiceRow label={t("look.accessory")} carousel={carousel} acc>
       {AGENT_ACCESSORIES.map((a) => (
         <button
           key={a}
@@ -183,130 +201,38 @@ function AccessoryChoices({ look, onPick }: LookPickProps) {
           {t(`look.accessories.${a}`)}
         </button>
       ))}
-    </div>
+    </ChoiceRow>
   );
-}
-
-/** "Âmbar · Redondo · Gorro": the look in words (no accessory, no third part). */
-export function lookSummary(t: TFunction, look: Required<AgentAppearance>) {
-  return [
-    t(`look.colors.${look.color}`),
-    t(`look.eyesNames.${look.eyes}`),
-    ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
-  ].join(" · ");
 }
 
 /**
- * The look as one row (the live agent, the look in words, "Mudar aparência"); the choices live in a
- * dialog with a big preview, so the settings page stays short.
+ * The look right on the agent's settings (telas/PerfilAgente.html): the colors, then the eyes and what it
+ * wears as one sliding row each, so the section stays short. Each pick shows at once.
  */
-export function LookField({
+export function LookRows({
   look,
-  name,
   onChange,
 }: {
   look: Required<AgentAppearance>;
-  name: string;
   onChange: (look: Required<AgentAppearance>) => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const pick = (patch: LookPatch) => onChange({ ...look, ...patch });
   return (
-    <div className="look-field">
-      <span className="look-field__avatar">
-        <AgentAvatar size="lg" name={name} appearance={look} />
-      </span>
-      <span className="look-field__text">
-        <span className="newag__label">{t("agentPage.fields.look")}</span>
-        <span className="small muted">{lookSummary(t, look)}</span>
-      </span>
-      <Button size="sm" icon="agent" onClick={() => setOpen(true)}>
-        {t("look.change")}
-      </Button>
-      {open && <LookDialog look={look} name={name} onClose={() => setOpen(false)} onSave={onChange} />}
+    <div className="agp-look">
+      <div className="agp-look__row">
+        <span className="newag__label">{t("look.color")}</span>
+        <ColorChoices look={look} onPick={pick} />
+      </div>
+      <div className="agp-look__row">
+        <span className="newag__label">{t("look.eyes")}</span>
+        <EyesChoices look={look} onPick={pick} carousel />
+      </div>
+      <div className="agp-look__row">
+        <span className="newag__label">{t("look.onHead")}</span>
+        <AccessoryChoices look={look} onPick={pick} carousel />
+      </div>
     </div>
-  );
-}
-
-/** Pick color, eyes and accessory with a big live preview that reacts; "Usar" applies, Cancelar drops it. */
-export function LookDialog({
-  look,
-  name,
-  onClose,
-  onSave,
-}: {
-  look: Required<AgentAppearance>;
-  name: string;
-  onClose: () => void;
-  onSave: (look: Required<AgentAppearance>) => void;
-}) {
-  const { t } = useTranslation();
-  const [draft, setDraft] = useState(look);
-  const [face, setFace] = useState<Expression | undefined>(undefined);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const react = (expression: Expression, ms: number) => {
-    if (prefersReducedMotion()) return;
-    setFace(expression);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setFace(undefined), ms);
-  };
-  const pick = (patch: LookPatch) => {
-    setDraft((d) => ({ ...d, ...patch }));
-    if (patch.color) react("happy", 1100);
-    else if (patch.eyes) react("wink", 700);
-    else if (patch.accessory && patch.accessory !== "none") react("happy", 900);
-  };
-  const changed = draft.color !== look.color || draft.eyes !== look.eyes || draft.accessory !== look.accessory;
-  return (
-    <Dialog
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title={t("look.dialogTitle", { name })}
-      closeLabel={t("common.close")}
-      width={560}
-      className="look-dialog"
-    >
-      {/* One column: the agent big on its sky, then every choice in view (no tabs), each one live. */}
-      <DialogBody className="look-dialog__body">
-        <div className="look-dialog__hero">
-          <SkyGlow color={draft.color} surface="--surface-raised" className="look-dialog__sky" />
-          <AgentAvatar size="xl" name={name} appearance={draft} expression={face} />
-        </div>
-        <div className="look-dialog__who">
-          <span className="look-dialog__id">
-            <b>{name}</b>
-            <span className="small muted">{lookSummary(t, draft)}</span>
-          </span>
-          <Button
-            size="sm"
-            icon="shuffle"
-            onClick={() => {
-              setDraft((d) => ({ ...d, ...randomAppearance(d) }) as Required<AgentAppearance>);
-              react("dizzy", 1000);
-            }}
-          >
-            {t("newAgent.shuffle")}
-          </Button>
-        </div>
-        <div className="look-dialog__rows newag__look">
-          <LookPicker look={draft} onPick={pick} />
-        </div>
-      </DialogBody>
-      <DialogFooter>
-        <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button
-          variant="primary"
-          disabled={!changed}
-          onClick={() => {
-            onSave(draft);
-            onClose();
-          }}
-        >
-          {t("look.use")}
-        </Button>
-      </DialogFooter>
-    </Dialog>
   );
 }
 
@@ -498,11 +424,6 @@ export function ModelCards({
       )}
     </div>
   );
-}
-
-/** The current model, read-only (a cost tier, never money). */
-export function ModelCardView({ model, all, money }: { model: Model; all: Model[]; money: boolean }) {
-  return <ModelCard model={model} provider={model.provider} available all={all} money={money} />;
 }
 
 /** "US$ [  ]" with quick amounts; empty = the workspace default. */

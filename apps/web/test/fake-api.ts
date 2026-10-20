@@ -1596,7 +1596,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
 
 /** The brain view the fake starts every agent with (tests may replace `api.agents.brain`). */
 export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {}): AgentBrain {
-  return {
+  const brain: AgentBrain = {
     agentId,
     brain: "model",
     model: null,
@@ -1627,7 +1627,12 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
         defaultModel: "gpt-6-sol",
       },
     ],
+    machines: [],
     canEdit: true,
     ...patch,
   };
+  // The computers the person may give the agent: the MacBook, with what it offers.
+  if (patch.machines) return brain;
+  const computer = brain.computer ?? { machineId: "machine_1", name: "MacBook", online: true };
+  return { ...brain, machines: [{ ...computer, options: brain.options }] };
 }

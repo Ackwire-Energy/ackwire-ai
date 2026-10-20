@@ -58,13 +58,12 @@ describe("the agent's look", () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api: createFakeApi(state) });
     await settle(8);
-    // The choices live in a dialog with a big preview; Cor, Olhos and Acessório all in view there.
-    await click(screen().getByRole("button", { name: "Mudar aparência" }));
-    const look = screen().getByRole("dialog");
-    await click(within(within(look).getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
-    await click(within(within(look).getByRole("group", { name: "Olhos" })).getByRole("button", { name: /Felizes/ }));
-    await click(within(within(look).getByRole("group", { name: "Acessório" })).getByRole("button", { name: /Coroa/ }));
-    await click(within(look).getByRole("button", { name: "Usar esta aparência" }));
+    // In place (telas/PerfilAgente.html): the colors, then the eyes and what it wears as one sliding row each.
+    const page = screen();
+    await click(within(page.getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
+    await click(within(page.getByRole("group", { name: "Olhos" })).getByRole("button", { name: /Felizes/ }));
+    await click(within(page.getByRole("group", { name: "Acessório" })).getByRole("button", { name: /Coroa/ }));
+    expect(document.querySelector(".ac-carousel")).not.toBeNull();
     // The agent on the cover is the draft.
     const cover = document.querySelector(".agp-cover .ac-avatar") as HTMLElement;
     expect(cover.getAttribute("data-eyes")).toBe("happy");

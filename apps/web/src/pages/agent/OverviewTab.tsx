@@ -2,11 +2,9 @@ import {
   useAgentDetail,
   useAgentSkills,
   useChannels,
-  useModels,
   useProposals,
   useRoutines,
   useRuns,
-  useSettings,
   useUsage,
 } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
@@ -15,7 +13,6 @@ import { Avatar, Button, Card, CardFooter, Chip, Icon, Meter } from "@agentescha
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ResourceIcon, resourceName, useConnectedById } from "@/components/AccessLevels";
-import { agentBrainLine } from "@/components/AgentBrain";
 import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -38,9 +35,7 @@ export function OverviewTab() {
   const channels = useChannels(org.id);
   const skills = useAgentSkills(org.id, agent.id);
   const routines = useRoutines(org.id);
-  const models = useModels();
   const usage = useUsage(org.id);
-  const settings = useSettings(org.id);
   const items = useConnectedById();
   const repoSuffix = useRepoSuffix();
   const pending = (proposals.data ?? []).filter(
@@ -56,19 +51,10 @@ export function OverviewTab() {
   const enabledSkills = (skills.data ?? []).filter((s) => s.enabled);
   const mine = (routines.data ?? []).filter((r) => r.agentId === agent.id);
   const recent = (runs.data ?? []).slice(0, 4);
-  const modelLabel = models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model;
   const used = detail.data?.budgetUsedPercent ?? 0;
   const spent = usage.data?.find((u) => u.agentId === agent.id)?.costUsd;
   const limit = detail.data?.monthlyBudgetUsd ?? detail.data?.defaultBudgetUsd;
-  const ownKey = detail.data?.credentialId && detail.data.credentialId !== settings.data?.defaultCredentialId;
-  const keyLabel = ownKey
-    ? t("agent.ownKey")
-    : agent.hasCredential
-      ? t("agent.withOrgKey", { org: org.name })
-      : t("agent.withPlatformKey");
   const decides = viewer !== "member";
-  // Like the DM header: "Claude Code · Sonnet no mac", or the API's model and key.
-  const brainLine = agentBrainLine(t, agent, `${modelLabel} · ${keyLabel}`);
   return (
     <>
       <ReadOnlyNote />
@@ -360,22 +346,20 @@ export function OverviewTab() {
             )}
           </Card>
 
-          <Card as="section" className="agp-card" aria-labelledby="ov-brain">
+          {/* Who thinks is the sentence under the name; here, the money. */}
+          <Card as="section" className="agp-card" aria-labelledby="ov-budget">
             <CardHead
-              id="ov-brain"
-              icon="bulb"
-              title={t("agentPage.overview.brainBudget")}
+              id="ov-budget"
+              icon="wallet"
+              title={t("agentPage.settings.budget")}
               action={
-                can("brain") || can("model") ? (
-                  <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "brain")}>
+                can("budget") ? (
+                  <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "budget")}>
                     {t("agentPage.change")}
                   </Button>
                 ) : null
               }
             />
-            <span className="agp-chips">
-              <Chip icon={brainLine.icon}>{brainLine.text}</Chip>
-            </span>
             <div className="agp-budget">
               <span className="small muted">
                 {viewer === "admin" && spent !== undefined && limit !== undefined

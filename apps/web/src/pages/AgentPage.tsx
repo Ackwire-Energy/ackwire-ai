@@ -1,18 +1,14 @@
-import type { Agent, AgentAudience, AgentBrain, AgentDetail, AgentInput, AgentSkill } from "@agenteschat/client";
+import type { Agent, AgentAudience, AgentDetail, AgentInput, AgentSkill } from "@agenteschat/client";
 import {
   keys,
   useAgentAccess,
-  useAgentBrain,
   useAgentDetail,
   useAgentRepos,
   useAgentSkills,
-  useComputer,
   useCredentials,
-  useMachines,
   useModels,
   useProposals,
   useRuns,
-  useSetComputerTarget,
   useSettings,
   useUpdateAgent,
 } from "@agenteschat/client";
@@ -40,8 +36,6 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { resourceName, useConnectedById, useSetLevels } from "@/components/AccessLevels";
 import { audienceValid } from "@/components/AgentAudience";
-import { brainSummary, PlanTermsDialog } from "@/components/AgentBrain";
-import { CLOUD, machineOf } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -50,7 +44,6 @@ import {
   AGENT_TABS,
   type AgentSection,
   type AgentTab,
-  type BrainChoice,
   budgetValue,
   canEdit,
   changedKeys,
@@ -63,7 +56,6 @@ import {
   lineChanges,
   revertKey,
   type Saved,
-  termsPending,
   thisMonth,
   type Viewer,
 } from "@/lib/agent-edit";
@@ -81,6 +73,7 @@ import { useVisibleChannels } from "./agent/pieces";
 import { RepoDialog } from "./agent/Repos";
 import { SaveBar } from "./agent/SaveBar";
 import { SettingsTab } from "./agent/SettingsTab";
+import { type WorkDialog, WorkDialogs } from "./agent/Work";
 
 const fullLook = (a: AgentAppearance | undefined): Look => ({
   color: a?.color ?? BLANK_LOOK.color,
@@ -137,19 +130,17 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
   const access = useAgentAccess(org.id, agent.id);
   const repos = useAgentRepos(org.id, agent.id);
   const library = useAgentSkills(org.id, agent.id);
-  const computer = useComputer(org.id, agent.id, viewer !== "member");
-  const machines = useMachines(org.id, viewer !== "member");
-  const brain = useAgentBrain(org.id, agent.id, viewer !== "member");
   const proposals = useProposals(org.id);
   const runs = useRuns(org.id, agent.id, viewer !== "member");
   const visible = useVisibleChannels();
   const items = useConnectedById();
   const update = useUpdateAgent(org.id, agent.id);
   const setLevels = useSetLevels();
-  const setTarget = useSetComputerTarget(org.id);
   const [edits, setEdits] = useState<Edits>({});
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  /** The dialog of the sentence under the name that is open (who thinks, where it works, the browser). */
+  const [work, setWork] = useState<WorkDialog | null>(null);
   /** The repositories picker: open, with a repository to add ("Liberar"). */
   const [picking, setPicking] = useState<{ add?: string } | null>(null);
   const top = useRef<HTMLDivElement>(null);
@@ -183,23 +174,8 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
       skills: library.data ? sortIds(library.data.filter((s) => s.enabled).map((s) => s.id)) : undefined,
       channels:
         d && visible.ready ? sortIds(d.channels.map((c) => c.id).filter((id) => visibleIds.has(id))) : undefined,
-      machine: computer.data ? machineOf(computer.data) : undefined,
-      brain: brain.data
-        ? { brain: brain.data.brain, model: brain.data.model, fallback: brain.data.fallback }
-        : undefined,
     };
-  }, [
-    agent,
-    admin,
-    detail.data,
-    settings.data,
-    access.data,
-    repos.data,
-    library.data,
-    computer.data,
-    brain.data,
-    visible,
-  ]);
+  }, [agent, admin, detail.data, settings.data, access.data, repos.data, library.data, visible]);
 
   /* ---------- The draft ---------- */
 
@@ -221,8 +197,6 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
     repos: edits.repos ?? saved.repos,
     skills: edits.skills ?? saved.skills,
     channels: edits.channels ?? saved.channels,
-    machine: edits.machine ?? saved.machine,
-    brain: edits.brain ?? saved.brain,
   };
 
   /* ---------- What changed, said in words ---------- */
@@ -258,11 +232,6 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
     ids.length
       ? ids.map((id) => `#${visible.list.find((c) => c.id === id)?.name ?? ""}`).join(", ")
       : t("agentPage.none");
-  const machineText = (id: string) =>
-    id === CLOUD
-      ? t("computer.target.cloud")
-      : ((machines.data ?? []).find((m) => m.id === id)?.name ??
-        (computer.data?.target?.kind === "machine" ? computer.data.target.name : id));
   const modelText = (id: string) => models.data?.models.find((m) => m.id === id)?.label ?? id;
   const resourceById = new Map(resources.map((r) => [r.id, r]));
 
@@ -347,20 +316,9 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
           was: channelText(saved.channels ?? []),
           now: channelText(draft.channels ?? []),
         };
-      case "brain":
-        return {
-          ...base,
-          label: label("brain"),
-          was: saved.brain ? brainSummary(t, saved.brain, brain.data?.options) : "",
-          now: draft.brain ? brainSummary(t, draft.brain, brain.data?.options) : "",
-        };
       default:
-        return {
-          ...base,
-          label: label("machine"),
-          was: machineText(saved.machine ?? CLOUD),
-          now: machineText(draft.machine ?? CLOUD),
-        };
+        // The computer and who thinks are saved by their own dialogs (the sentence under the name).
+        return { ...base, label: label(field), was: "", now: "" };
     }
   });
   const byKey = new Map(changes.map((c) => [c.key, c]));
@@ -408,23 +366,10 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
 
   /* ---------- Saving ---------- */
 
-  /** A switch to Claude Code or Codex that reached the draft unconfirmed: the warning, before anything is saved. */
-  const [termsAsk, setTermsAsk] = useState<"claude_code" | "codex" | null>(null);
-
-  const save = async (opts: { termsAccepted?: boolean } = {}) => {
+  const save = async () => {
     if (saving || !dirty) return;
     if (problem) {
       toast.show(problem, "error");
-      return;
-    }
-    const brainDraft = draft.brain && opts.termsAccepted ? { ...draft.brain, termsAccepted: true } : draft.brain;
-    if (
-      fields.has("brain") &&
-      brainDraft &&
-      brainDraft.brain !== "model" &&
-      termsPending(saved.brain?.brain, brainDraft)
-    ) {
-      setTermsAsk(brainDraft.brain);
       return;
     }
     setSaving(true);
@@ -536,41 +481,6 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         fail(e, true);
       }
     }
-    // 5. The computer.
-    if (!failed && fields.has("machine")) {
-      try {
-        await setTarget.mutateAsync({
-          agentId: agent.id,
-          machineId: draft.machine === CLOUD ? null : (draft.machine ?? null),
-        });
-        done.push("machine");
-      } catch (e) {
-        fail(e, true);
-      }
-    }
-    // 6. Who thinks (after the computer: what it offers depends on it).
-    if (!failed && fields.has("brain") && brainDraft) {
-      const next: BrainChoice = brainDraft;
-      try {
-        const view = await api.agents.setBrain(org.id, agent.id, {
-          brain: next.brain,
-          model: next.brain === "model" ? null : next.model,
-          fallback: next.fallback,
-          // Only once the person confirmed the warning (when choosing it, or on save).
-          ...(next.brain !== "model" && next.brain !== saved.brain?.brain && next.termsAccepted === true
-            ? { acceptPlanTerms: true }
-            : {}),
-        });
-        qc.setQueryData<AgentBrain>(keys.agentBrain(org.id, agent.id), view);
-        // Headers and cards show who thinks (`Agent.brain`).
-        void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
-        done.push("brain");
-      } catch (e) {
-        fail(e, true);
-      }
-    }
-    // A new computer changes what can think.
-    if (done.includes("machine")) void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, agent.id) });
     setEdits((e) => dropFields(e, done));
     setSaving(false);
     if (!failed) toast.show(t("agent.savedToast", agentGrammar(t, draft.name.trim() || agent.name)));
@@ -677,6 +587,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
       setPicking({ add });
     },
     ownerFirst,
+    openWork: setWork,
   };
 
   return (
@@ -721,16 +632,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         />
       )}
 
-      <PlanTermsDialog
-        brain={termsAsk}
-        onCancel={() => setTermsAsk(null)}
-        onConfirm={() => {
-          const draftBrain = draft.brain;
-          setTermsAsk(null);
-          if (draftBrain) set("brain", { ...draftBrain, termsAccepted: true });
-          void save({ termsAccepted: true });
-        }}
-      />
+      <WorkDialogs open={work} onClose={() => setWork(null)} />
 
       <Dialog
         open={blocker.status === "blocked"}

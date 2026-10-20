@@ -74,42 +74,42 @@ describe("agent page: tabs and the URL", () => {
     expect(screen().getByRole("article", { name: "Atualizar as instruções da Ada" })).toBeTruthy();
   });
 
-  test("the cover: status, numbers on the sky (money for admins), Conversar, Editar opens Configurações", async () => {
-    const { router } = await go();
+  test("the cover: status, numbers and the actions on the sky; the name, its @ and the sentence under it", async () => {
+    await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
-    expect(hero.textContent).toContain("Esperando aprovação");
+    const cover = hero.querySelector(".agp-cover") as HTMLElement;
+    expect(cover.textContent).toContain("Esperando aprovação");
     // The fake agent waits for an approval: the line under the status counts the requests.
-    expect(hero.textContent).toContain("1 pedido");
-    expect(hero.textContent).toContain("US$ 12,30");
-    expect(hero.textContent).toContain("de US$ 40");
-    expect(hero.textContent).toContain("Responsável: João");
-    expect(within(hero).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
+    expect(cover.textContent).toContain("1 pedido");
+    expect(cover.textContent).toContain("US$ 12,30");
+    expect(cover.textContent).toContain("de US$ 40");
+    expect(within(cover).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
     );
-    await click(within(hero).getByRole("button", { name: "Editar" }));
-    expect(router.state.location.search).toMatchObject({ tab: "settings", sec: "identity" });
-    expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("Ada");
+    expect(within(cover).getByRole("button", { name: "Mais ações" })).toBeTruthy();
+    expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada");
+    expect(hero.querySelector(".agp-handle")?.textContent).toContain("@ada");
+    // No chips under the name: the sentence says what it works with.
+    expect(hero.querySelector(".agp-meta")).toBeNull();
+    expect(hero.querySelector(".agp-work__sentence")?.textContent).toContain("Pensa com o modelo da organização");
   });
 });
 
-describe("agent page: who thinks on the overview", () => {
-  test("the API: its model and key in one line; Mudar opens Quem pensa", async () => {
+describe("agent page: the budget on the overview", () => {
+  test("who thinks is the sentence under the name; the overview keeps the money, Mudar opens Orçamento", async () => {
     const { router } = await go("?tab=overview");
-    const card = screen().getByRole("region", { name: "Quem pensa e orçamento" });
-    expect(card.textContent).not.toContain("Modelo e orçamento");
-    expect(card.querySelector(".ac-chip")?.textContent).toContain(" · ");
+    expect(screen().queryByRole("region", { name: "Quem pensa e orçamento" })).toBeNull();
+    const card = screen().getByRole("region", { name: "Orçamento" });
     await click(within(card).getByRole("button", { name: "Mudar" }));
-    expect(router.state.location.search).toMatchObject({ tab: "settings", sec: "brain" });
-    expect(document.getElementById("agp-sec-brain")).not.toBeNull();
+    expect(router.state.location.search).toMatchObject({ tab: "settings", sec: "budget" });
   });
 
-  test("a computer thinks: the line from the DM header", async () => {
-    const state = seedState();
+  test("a member reads who thinks from the agent (no computer)", async () => {
+    const state = asMember();
     const ada = state.agents.find((a) => a.id === ADA_ID);
-    if (ada) ada.brain = { kind: "claude_code", model: "Sonnet", computer: "mac" };
-    await go("?tab=overview", state);
-    const card = screen().getByRole("region", { name: "Quem pensa e orçamento" });
-    expect(card.textContent).toContain("Claude Code · Sonnet no mac");
+    if (ada) ada.brain = { kind: "claude_code", model: "Sonnet" };
+    await go("", state);
+    expect(document.querySelector(".agp-work__sentence")?.textContent).toBe("Pensa com Claude Code · Sonnet.");
   });
 });
 
@@ -137,10 +137,8 @@ describe("agent page: who edits what", () => {
     const { state } = await go("?tab=settings", asOwner());
     expect(screen().queryByLabelText("Nome")).toBeNull();
     expect(document.body.textContent).toContain("Você é responsável da Ada");
-    await click(screen().getByRole("button", { name: "Mudar aparência" }));
-    const look = screen().getByRole("dialog");
-    await click(within(within(look).getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
-    await click(within(look).getByRole("button", { name: "Usar esta aparência" }));
+    // The look is right on the page: colors, then the eyes and what it wears as sliding rows.
+    await click(within(screen().getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
     expect(saveBar()?.textContent).toContain("1 alteração");
     await openTab(/^Instruções/);
     expect(screen().queryByRole("textbox", { name: "Instruções" })).toBeNull();
@@ -196,15 +194,12 @@ describe("agent page: inline editing and the save bar", () => {
       .find((r) => r.getAttribute("aria-checked") !== "true") as HTMLElement;
     await click(other);
     await openTab(/^Configurações/);
-    // The model cards sit under "Modelo (API)" in "Quem pensa", once it loads.
-    await settle(4);
-    await click(screen().getByRole("button", { name: /^Claude Opus/ }));
     await type(screen().getByRole("textbox", { name: /^Orçamento mensal/ }), "55,5");
     await click(screen().getByRole("checkbox", { name: "#general" }));
-    expect(saveBar()?.textContent).toContain("5 alterações");
+    expect(saveBar()?.textContent).toContain("4 alterações");
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
     await settle(8);
-    expect(updates(state)).toEqual([{ model: "claude-opus-5-5", monthlyBudgetUsd: 55.5 }]);
+    expect(updates(state)).toEqual([{ monthlyBudgetUsd: 55.5 }]);
     const writes = state.calls.filter((c) => c.method === "access.set");
     expect(writes).toHaveLength(1);
     expect((writes[0]?.args[2] as { connectors: Record<string, boolean> } | undefined)?.connectors).toEqual({

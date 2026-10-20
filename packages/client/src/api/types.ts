@@ -2774,6 +2774,8 @@ export interface AgentBrain {
   fallback: boolean;
   computer: { machineId: string; name: string; online: boolean } | null;
   options: BrainOption[];
+  /** Every computer the caller may give the agent, with what each offers ("Vai para o Mac mini"). */
+  machines: { machineId: string; name: string; online: boolean; options: BrainOption[] }[];
   canEdit: boolean;
 }
 

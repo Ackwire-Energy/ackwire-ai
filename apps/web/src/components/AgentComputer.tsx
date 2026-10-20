@@ -302,12 +302,6 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
 
 export const CLOUD = "cloud";
 
-/** The computer an agent uses, as a picker value: `"cloud"` or the machine's id. */
-export const machineOf = (pc: AgentComputer | undefined) => {
-  const target = targetOf(pc);
-  return target.kind === "machine" ? target.machineId : CLOUD;
-};
-
 /**
  * "Computador: Nuvem | <máquina>". Admins pick any machine; the agent's
  * owner, the ones they paired (the server checks again). Offline machines

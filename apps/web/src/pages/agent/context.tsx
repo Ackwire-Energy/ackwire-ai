@@ -5,7 +5,7 @@ import type { RepoChoice } from "@agenteschat/client/lib/repos";
 import { Button, CardHeader, Icon, type IconName } from "@agenteschat/ui";
 import { createContext, type ReactNode, useContext } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentSection, AgentTab, BrainChoice, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
+import type { AgentSection, AgentTab, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
 
 /** One unsaved change, as the save bar and the cards say it. */
 export interface Change {
@@ -34,8 +34,6 @@ export interface Draft {
   repos: RepoChoice | undefined;
   skills: string[] | undefined;
   channels: string[] | undefined;
-  machine: string | undefined;
-  brain: BrainChoice | undefined;
 }
 
 export interface AgentEdit {
@@ -62,6 +60,8 @@ export interface AgentEdit {
   pickRepos: (add?: string) => void;
   /** "João" (the saved owner's first name), or null. */
   ownerFirst: string | null;
+  /** Opens a dialog of the sentence under the name (who thinks, where it works, the browser); each saves at once. */
+  openWork: (dialog: "brain" | "computer" | "browser") => void;
 }
 
 const Ctx = createContext<AgentEdit | null>(null);

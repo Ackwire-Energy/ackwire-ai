@@ -1,23 +1,20 @@
-import { useAgentDetail, useChannels, useDms, useMemory, useModels, useRuns, useUsage } from "@agenteschat/client";
-import { audienceSummary } from "@agenteschat/client/lib/audience";
+import { useAgentDetail, useChannels, useDms, useMemory, useRuns, useUsage } from "@agenteschat/client";
 import { formatMonth, formatPercent, formatUsd } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { type AgentColor, Button, Chip, Icon, type IconName, Menu, MenuItem, Meter } from "@agenteschat/ui";
+import { type AgentColor, Button, Icon, type IconName, Menu, MenuItem, Meter } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { agentBrainLine } from "@/components/AgentBrain";
 import { usd } from "@/components/AgentFields";
 import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { AgentCover } from "@/components/Sky";
-import { useDirectory } from "@/hooks/useDirectory";
 import { thisMonth } from "@/lib/agent-edit";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
 import { useAgentEdit } from "./context";
-import { RepoHeaderChip } from "./Repos";
+import { WorkSentence } from "./Work";
 
 const LIVE = new Set(["running", "queued", "thinking", "waiting_approval"]);
 
@@ -154,26 +151,21 @@ function Stats() {
 }
 
 /**
- * The cover: the agent on its own-color sky with its status and key numbers;
- * then its name, @, role, chips and the actions.
+ * The cover: the agent on its own-color sky with its status, key numbers and
+ * the actions in its corner; then its name, @ and role, and what it works with
+ * as one sentence (telas/PerfilAgente.html).
  */
 export function AgentHero({ onArchive }: { onArchive: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const toast = useToast();
-  const models = useModels();
-  const { agent, draft, viewer, goTo, can, saved } = useAgentEdit();
+  const { agent, draft, viewer, goTo, saved, openWork } = useAgentEdit();
   const detail = useAgentDetail(org.id, agent.id);
   const status = useStatus();
   const narrow = useMediaQuery("(max-width: 900px)");
   const busy = status.kind === "working";
   const name = draft.name.trim() || agent.name;
-  const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
-  const modelLabel = models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model;
-  // Who thinks: "Claude Code · Sonnet no mac" when a computer brain answers, else the API model.
-  const thinks = agentBrainLine(t, agent, modelLabel);
   const channelNames = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
   const home = channelNames[0];
   const g = agentGrammar(t, agent.name);
@@ -198,43 +190,19 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
         </span>
         <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} className="agp-cover__agent" />
         {!narrow && <Stats />}
-      </div>
-      <div className="agp-ident">
-        <div className="agp-who">
-          <div className="agp-title">
-            <h1 className="agp-name">{name}</h1>
-            <span className="agp-handle">
-              @{agent.handle}
-              {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
-            </span>
-          </div>
-          <div className="agp-meta">
-            <Chip icon="person">{owner ? t("agent.ownerLine", { name: owner.name }) : t("agent.noOwnerLine")}</Chip>
-            <Chip icon={thinks.icon}>{thinks.text}</Chip>
-            <Chip icon="message">{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</Chip>
-            {channelNames.slice(0, 2).map((c) => (
-              <Chip key={c.id} icon="channel">
-                {c.name}
-              </Chip>
-            ))}
-            <RepoHeaderChip />
-          </div>
-        </div>
-        <div className="agp-acts">
-          <Button asChild variant="primary" className="agp-chat">
+        <div className="agp-cover__acts">
+          <Button asChild variant="primary" size="sm" className="agp-chat">
             <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+              <Icon name="message" size={14} />
               {t("agent.chat")}
             </Link>
           </Button>
-          {can("look") && (
-            <Button icon="edit" onClick={() => goTo("settings", "identity")}>
-              {t("agent.edit")}
-            </Button>
-          )}
           <Menu
             align="end"
             label={t("agent.moreActions")}
-            trigger={<Button iconOnly icon="more" aria-label={t("agent.moreActions")} />}
+            trigger={
+              <Button size="sm" iconOnly icon="more" className="agp-glass" aria-label={t("agent.moreActions")} />
+            }
           >
             {home && (
               <MenuItem
@@ -280,6 +248,16 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
               </MenuItem>
             )}
           </Menu>
+        </div>
+      </div>
+      <div className="agp-ident">
+        <div className="agp-who">
+          <h1 className="agp-name">{name}</h1>
+          <span className="agp-handle">
+            @{agent.handle}
+            {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
+          </span>
+          <WorkSentence onOpen={openWork} />
         </div>
       </div>
       {narrow && <Stats />}

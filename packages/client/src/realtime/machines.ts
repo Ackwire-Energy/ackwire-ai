@@ -82,9 +82,11 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   if (e.type === "machine.status" || e.type === "machine.deleted" || e.type === "machine.agents_moved") {
     void qc.invalidateQueries({ queryKey: keys.machineOutages(orgId) });
   }
-  // Whether agents can use their browser (ADR 0040) follows the computer: its switch, a reconnect, a move.
-  if (e.type !== "machine.state" && e.type !== "machine.updated") {
+  // Whether agents can use their browser (ADR 0040) and what can think for them follow the computer: its
+  // switches (the app's Ferramentas: `machine.updated` with `access`), a reconnect, a move. No reload needed.
+  if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined) {
     void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
+    void qc.invalidateQueries({ predicate: (q) => isAgentBrainKey(q.queryKey, orgId) });
   }
   switch (e.type) {
     case "machine.status": {
@@ -134,6 +136,10 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   return true;
 }
 
+/** `keys.agentBrain(orgId, *)`: "Quem pensa" of any agent of the org. */
+const isAgentBrainKey = (key: readonly unknown[], orgId: string) =>
+  key[0] === "org" && key[1] === orgId && key[2] === "agent" && key[4] === "brain";
+
 /**
  * `agent.computer`: a full view (`computer`), or only `target` when someone
  * switched computers. A target-only event keeps the cached status and
@@ -154,4 +160,7 @@ export function applyComputerEvent(qc: QueryClient, orgId: string, event: { type
     void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
   }
   void qc.invalidateQueries({ queryKey: key });
+  // A new computer changes what can think and whether the browser is there.
+  void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, e.agentId) });
+  void qc.invalidateQueries({ queryKey: keys.agentBrowser(orgId, e.agentId) });
 }

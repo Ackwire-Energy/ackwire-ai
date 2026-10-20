@@ -75,6 +75,7 @@ export {
   type BrainPortraitState,
 } from "./components/Brain";
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
+export { Carousel, type CarouselProps } from "./components/Carousel";
 export {
   Checkbox,
   CheckboxPill,

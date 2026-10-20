@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { QueryClient } from "@tanstack/react-query";
+import { keys } from "../src/api/keys";
 import {
   allowFolderCommand,
   computerKind,
@@ -13,7 +15,7 @@ import {
   normalizeUserCode,
   shellQuote,
 } from "../src/lib/machines";
-import { accessOf, pauseOf } from "../src/realtime/machines";
+import { accessOf, applyComputerEvent, applyMachineEvent, pauseOf } from "../src/realtime/machines";
 
 describe("connected computers helpers (ADR 0036)", () => {
   test("device codes: normalized for the API, shown with a dot to compare", () => {
@@ -97,5 +99,28 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(computerState({ online: true, paused: { until: "2026-01-01T00:00:00Z" } }, Date.parse("2026-02-01"))).toBe(
       "online",
     );
+  });
+
+  test("the browser and who thinks refetch when the computer allows something new, or the agent moves", () => {
+    const qc = new QueryClient();
+    const browser = keys.agentBrowser("o1", "a1");
+    const brain = keys.agentBrain("o1", "a1");
+    const stale = () => [browser, brain].map((k) => qc.getQueryState(k)?.isInvalidated ?? false);
+    const fresh = () => {
+      qc.setQueryData(browser, { available: false });
+      qc.setQueryData(brain, { brain: "model" });
+    };
+    fresh();
+    // A rename alone changes neither.
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", name: "Mac" } as { type: string });
+    expect(stale()).toEqual([false, false]);
+    // The person turned the browser on in the app's Ferramentas: no reload needed.
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", access: true } as { type: string });
+    expect(stale()).toEqual([true, true]);
+    fresh();
+    applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1", target: { kind: "cloud" } } as {
+      type: string;
+    });
+    expect(stale()).toEqual([true, true]);
   });
 });

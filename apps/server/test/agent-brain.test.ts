@@ -23,6 +23,7 @@ interface Brain {
   fallback: boolean;
   computer: { machineId: string; name: string; online: boolean } | null;
   options: { kind: string; available: boolean; reason?: string; experimental: boolean; models: { value: string }[] }[];
+  machines: { machineId: string; name: string; online: boolean; options: { kind: string; available: boolean }[] }[];
   canEdit: boolean;
 }
 
@@ -119,6 +120,11 @@ test("agent brain: defaults, who may, the plan warning, what the computer has, m
 
   // With a computer: Claude Code (a runner that doesn't list its CLIs is assumed to have it), no Codex.
   const mac = await pairMac(api);
+  // Before it is chosen, the page already knows what each computer offers (the agent moves to one that has it).
+  const before = (await (await api(`/agents/${agentId}/brain`)).json()) as Brain;
+  expect(before.computer).toBeNull();
+  expect(before.machines.map((m) => m.name)).toEqual(["mac"]);
+  expect(before.machines[0]?.options.find((o) => o.kind === "claude_code")?.available).toBe(true);
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
   const withMac = (await (await api(`/agents/${agentId}/brain`)).json()) as Brain;
   expect(withMac.computer?.name).toBe("mac");
