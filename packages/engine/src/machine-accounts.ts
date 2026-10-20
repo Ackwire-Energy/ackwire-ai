@@ -383,7 +383,7 @@ export async function beginAccountLogin(
   } catch {
     url = null;
   }
-  if (!url || url.protocol !== "https:") {
+  if (url?.protocol !== "https:") {
     await deps.hub.call(machine.id, { op: "account", action: "cancel", loginId }).catch(() => undefined);
     throw new ConflictError("The computer couldn't start the sign-in", "account.begin_failed", { name: machine.name });
   }

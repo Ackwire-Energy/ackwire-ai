@@ -104,7 +104,7 @@ describe("agent page: GitHub repositories", () => {
         .getAttribute("aria-checked"),
     ).toBe("true");
     await click(within(dialog).getByRole("checkbox", { name: /acme\/api/ }));
-    await click(within(dialog).getByRole("button", { name: "Usar estes" }));
+    await click(within(dialog).getByRole("button", { name: /^Usar \d+ repositórios?$/ }));
     expect(screen().queryByRole("dialog", { name: "Repositórios da Ada" })).toBeNull();
     expect(row.textContent).toContain("Começa por acme/app quando ninguém diz qual.");
     expect(saveBar()?.textContent).toContain("Repositórios do GitHub");
@@ -124,13 +124,11 @@ describe("agent page: GitHub repositories", () => {
     await click(within(row).getByRole("button", { name: "Mudar" }));
     const dialog = screen().getByRole("dialog", { name: "Repositórios da Ada" });
     await click(within(dialog).getByRole("checkbox", { name: /acme\/app/ }));
-    await click(within(dialog).getByRole("button", { name: "Usar estes" }));
+    // Nothing that still exists is chosen: the dialog's button says so and can't be used.
+    expect(within(dialog).getByRole("button", { name: "Escolha pelo menos um" }).hasAttribute("disabled")).toBe(true);
+    await click(within(dialog).getByRole("button", { name: "Cancelar" }));
     // The one that no longer exists stays until someone removes it.
     expect(row.textContent).toContain("acme/legacy não existe mais");
-    // "Antes: acme/app e acme/legacy" still names it; the chips don't.
-    const chips = row.querySelector(".agp-chips") as HTMLElement;
-    expect(chips.textContent).toContain("acme/legacy");
-    expect(chips.textContent).not.toContain("acme/app");
   });
 
   test("a refused repository in Atividade: Liberar opens the picker with it checked", async () => {

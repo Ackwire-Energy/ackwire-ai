@@ -137,15 +137,21 @@ describe("conversations load fast", () => {
     proto.scrollIntoView = function (this: HTMLElement) {
       scrolled.push(this.getAttribute("data-message-id") ?? "");
     };
+    // The highlight lasts a couple of seconds: seen at any point, not only at the end (a slow CI).
+    let highlighted = false;
+    const watch = new MutationObserver(() => {
+      if (document.querySelector('[data-message-id="h-10"].ac-msg--focus')) highlighted = true;
+    });
+    watch.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
     try {
       await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}?m=h-10`, { api: createFakeApi(state) });
       await settle(12);
       // h-10 isn't in the latest page (h-30…h-129): one older page brings it.
       expect(document.body.textContent).toContain("Mensagem antiga 10");
       expect(scrolled).toContain("h-10");
-      const el = document.querySelector('[data-message-id="h-10"]');
-      expect(el?.classList.contains("ac-msg--focus")).toBe(true);
+      expect(highlighted).toBe(true);
     } finally {
+      watch.disconnect();
       proto.scrollIntoView = before;
     }
   });

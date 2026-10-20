@@ -202,12 +202,7 @@ function AccountRows({
         </label>
       )}
       {repos.map((r) => (
-        <label
-          key={r.fullName}
-          htmlFor={id(r.fullName)}
-          className="scope-row"
-          data-off={all || wholeOn || undefined}
-        >
+        <label key={r.fullName} htmlFor={id(r.fullName)} className="scope-row" data-off={all || wholeOn || undefined}>
           <Checkbox
             id={id(r.fullName)}
             checked={all || covers(list, r.fullName)}

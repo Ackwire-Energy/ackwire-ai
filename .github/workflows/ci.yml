@@ -12,7 +12,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       # A manual run checks everything (the groups below stay so a filter can come back later).
@@ -46,8 +46,8 @@ jobs:
       # files sometimes never came up, and the whole step hung until the timeout.
       - name: Test (backend)
         if: (success() || failure()) && (steps.changed.outputs.shared == 'true' || steps.changed.outputs.backend == 'true')
-        # The backend suite takes 8–10 minutes on a runner; 10 left no room.
-        timeout-minutes: 15
+        # The backend suite takes about 15 minutes on a runner (2026-10-20) and grows.
+        timeout-minutes: 25
         shell: bash
         run: |
           set -o pipefail
