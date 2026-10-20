@@ -17,11 +17,14 @@ import {
   type BrowserManagerOptions,
   CHROME_ARGS,
   chromeLabel,
+  chromeLaunchArgs,
+  chromeUserAgent,
   defaultMaxSessions,
   domainAllowed,
   findChrome,
   type InputState,
   isWebPage,
+  type OwnChrome,
   relayCommands,
   type StreamSocket,
 } from "../../runner/browser";
@@ -42,6 +45,37 @@ interface Logged {
   stdin: string;
 }
 
+/** A Chrome the fake "starts": records its command line, answers on a port, and quits when killed. */
+interface FakeChrome {
+  exe: string;
+  args: string[];
+  profile: string;
+  port: number;
+  killed: boolean;
+}
+
+function fakeChromes() {
+  const started: FakeChrome[] = [];
+  const start = async (exe: string, args: string[], profile: string): Promise<OwnChrome> => {
+    const c: FakeChrome = { exe, args, profile, port: 9300 + started.length, killed: false };
+    started.push(c);
+    let quit = () => {};
+    const exited = new Promise<void>((resolve) => {
+      quit = () => resolve();
+    });
+    return {
+      pid: 40_000 + started.length,
+      port: c.port,
+      kill: () => {
+        c.killed = true;
+        quit();
+      },
+      exited,
+    };
+  };
+  return { started, start };
+}
+
 function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string, string> = {}) {
   const ws = tempDir();
   const home = tempDir("runner-home-");
@@ -52,6 +86,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
   process.env.FAKE_AB_STATE = stateFile;
   const frames: RunnerFrame[] = [];
   const sockets: FakeSocket[] = [];
+  const chromes = fakeChromes();
   const manager = new BrowserManager({
     home,
     log: () => {},
@@ -61,7 +96,9 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
     },
     secret: async (_agent, name) => secrets[name] ?? null,
     command: [process.execPath, FAKE],
-    chrome: () => "/fake/chrome",
+    chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
+    startChrome: chromes.start,
+    isOurChrome: async () => false,
     connectStream: (url) => {
       const s = new FakeSocket(url);
       sockets.push(s);
@@ -94,7 +131,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
     const cur = existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, "utf8")) : {};
     writeFileSync(stateFile, JSON.stringify({ ...cur, ...patch }));
   };
-  return { ws, home, manager, frames, sockets, folder, act, logged, page };
+  return { ws, home, manager, frames, sockets, folder, act, logged, page, chromes: chromes.started };
 }
 
 class FakeSocket implements StreamSocket {
@@ -258,28 +295,68 @@ test("relay input: clicks as input_mouse, keys through press (chords), text inse
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
-test.if(posix)("commands run in the agent's own session and profile, with our flags", async () => {
+test.if(posix)("the runner starts the agent's Chrome itself and every command connects to it", async () => {
   const t = setup();
   expect(await t.act("open", ["https://shop.example.com"])).toMatchObject({ success: true });
+  // One Chrome for Testing, on the agent's profile, with our flags and none of the automation markers.
+  expect(t.chromes).toHaveLength(1);
+  const chrome = t.chromes[0] as FakeChrome;
+  const profile = path.join(await t.folder(), ".agentes", "browser");
+  expect(chrome.exe).toBe("/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome");
+  expect(chrome.profile).toBe(profile);
+  for (const f of CHROME_ARGS) expect(chrome.args).toContain(f);
+  expect(chrome.args).toContain("--headless=new");
+  expect(chrome.args).toContain("--disable-blink-features=AutomationControlled");
+  expect(chrome.args).toContain("--remote-debugging-port=0");
+  expect(chrome.args).toContain(`--user-data-dir=${profile}`);
+  expect(chrome.args.some((a) => a.includes("enable-automation"))).toBe(false);
+  const ua = chrome.args.find((a) => a.startsWith("--user-agent="));
+  expect(ua).toContain("Chrome/155.0.0.0");
+  expect(ua).not.toContain("Headless");
+
   const [call] = t.logged();
   const args = call?.args ?? [];
   const flag = (name: string) => args[args.indexOf(name) + 1];
+  expect(flag("--cdp")).toBe(String(chrome.port));
   expect(flag("--session")).toBe("agent-01a142cb");
-  expect(flag("--profile")).toBe(path.join(await t.folder(), ".agentes", "browser"));
   expect(flag("--config")).toBe(path.join(t.home, "browser", "config.json"));
   expect(flag("--namespace")).toMatch(/^agentes-[0-9a-f]{8}$/);
   expect(args).toContain("--json");
   expect(args).toContain("--content-boundaries");
   expect(args).toContain("--no-webmcp");
-  // Always our Chrome for Testing, with its background updates off.
-  expect(flag("--executable-path")).toBe("/fake/chrome");
-  expect(flag("--args")).toBe(CHROME_ARGS.join(","));
+  // agent-browser never launches a Chrome of its own.
+  expect(args).not.toContain("--executable-path");
+  expect(args).not.toContain("--profile");
+  expect(args).not.toContain("--args");
   expect(args.slice(-2)).toEqual(["open", "https://shop.example.com"]);
   expect(readFileSync(path.join(t.home, "browser", "config.json"), "utf8").trim()).toBe("{}");
-  // Another agent: another session and profile.
+  // The same Chrome for the next command; its pid is remembered for a crash.
+  await t.act("click", ["@e1"]);
+  expect(t.chromes).toHaveLength(1);
+  expect(JSON.parse(readFileSync(path.join(t.home, "browser", "chromes.json"), "utf8"))).toEqual([
+    { pid: 40_001, profile },
+  ]);
+  // Another agent: its own Chrome, session and profile.
   await t.act("open", ["https://a.example"], { agent: ops });
   const other = t.logged().at(-1)?.args ?? [];
   expect(other[other.indexOf("--session") + 1]).toBe("agent-9f00aa11");
+  expect(t.chromes).toHaveLength(2);
+  expect(other[other.indexOf("--cdp") + 1]).toBe(String(t.chromes[1]?.port));
+});
+
+test("a normal Chrome user agent for the platform, and the whole launch line", () => {
+  const exe = "/h/.agent-browser/browsers/chrome-155.0.8059.84/chrome-mac-arm64/Google Chrome for Testing";
+  expect(chromeUserAgent(exe, "darwin")).toBe(
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+  );
+  expect(chromeUserAgent(exe, "win32")).toContain("Windows NT 10.0; Win64; x64");
+  expect(chromeUserAgent(exe, "linux")).toContain("X11; Linux x86_64");
+  expect(chromeUserAgent("/usr/bin/chrome", "linux")).toBeNull();
+  const args = chromeLaunchArgs(exe, "/p", "darwin", "pt-BR");
+  expect(args).toContain("--lang=pt-BR");
+  expect(args).toContain("--user-data-dir=/p");
+  expect(args.at(-1)).toBe("about:blank");
+  expect(chromeLaunchArgs("/usr/bin/chrome", "/p", "linux", null).some((a) => a.startsWith("--user-agent"))).toBe(false);
 });
 
 test.if(posix)("flags that reach outside the agent's browser, and unknown commands, are refused", async () => {
@@ -297,10 +374,12 @@ test.if(posix)("flags that reach outside the agent's browser, and unknown comman
   expect(t.logged()).toHaveLength(0);
 });
 
-test.if(posix)("reads never launch a blank browser: they say it isn't open", async () => {
+test.if(posix)("reads never start a browser: they say it isn't open", async () => {
   const t = setup();
   expect(await t.act("snapshot")).toMatchObject({ success: false, error: expect.stringContaining("isn't open") });
-  expect(t.logged().map((c) => c.args.slice(-2).join(" "))).toEqual(["stream status"]);
+  // No Chrome started, and agent-browser never asked (it would launch one of its own).
+  expect(t.chromes).toHaveLength(0);
+  expect(t.logged()).toHaveLength(0);
   await t.act("open", ["https://shop.example.com"]);
   expect(await t.act("snapshot", ["-i"])).toMatchObject({ success: true, data: { snapshot: expect.any(String) } });
 });
@@ -420,12 +499,71 @@ test.if(posix)("a secret is typed through stdin into a password field only, and 
   expect(t.logged().filter((c) => c.args.includes("batch")).length).toBe(typedBefore);
 });
 
-test.if(posix)("stop closes the agent's browser; a second stop finds nothing", async () => {
+test.if(posix)("stop closes the agent's browser and its Chrome; a second stop finds nothing", async () => {
   const t = setup();
   await t.act("open", ["https://a.example"]);
   expect(await t.manager.stop(dev)).toEqual({ stopped: true });
   expect(t.logged().at(-1)?.args.at(-1)).toBe("close");
+  expect(t.chromes[0]?.killed).toBe(true);
+  expect(JSON.parse(readFileSync(path.join(t.home, "browser", "chromes.json"), "utf8"))).toEqual([]);
   expect(await t.manager.stop(dev)).toEqual({ stopped: false });
+  // The agent's own close stops its Chrome too; the next page starts a new one on the same profile.
+  await t.act("open", ["https://a.example"]);
+  expect(await t.act("close")).toMatchObject({ success: true });
+  expect(t.chromes[1]?.killed).toBe(true);
+  await t.act("open", ["https://b.example"]);
+  expect(t.chromes).toHaveLength(3);
+  expect(t.chromes[2]?.profile).toBe(t.chromes[0]?.profile);
+});
+
+test.if(posix)("an idle browser's Chrome stops, but not while someone watches or a help request is open", async () => {
+  let now = 1_000_000;
+  const t = setup({ now: () => now, idleMs: 60_000 });
+  await t.act("open", ["https://a.example"]);
+  await t.act("open", ["https://b.example"], { agent: ops });
+  t.manager.setHandoff(ops.id, { status: "pending" });
+  now += 61_000;
+  await t.manager.sweep();
+  expect(t.chromes[0]?.killed).toBe(true);
+  expect(t.chromes[1]?.killed).toBe(false);
+  t.manager.setHandoff(ops.id, null);
+  await t.manager.sweep();
+  expect(t.chromes[1]?.killed).toBe(true);
+});
+
+test.if(posix)("the runner stopping stops its Chromes; one a crashed run left is stopped on the next start", async () => {
+  const t = setup();
+  await t.act("open", ["https://a.example"]);
+  await t.manager.close();
+  expect(t.chromes[0]?.killed).toBe(true);
+
+  // A leftover in chromes.json: stopped only when it is still that Chrome (a reused pid is left alone).
+  const home = tempDir("runner-home-");
+  dirs.push(home);
+  mkdirSync(path.join(home, "browser"), { recursive: true });
+  writeFileSync(
+    path.join(home, "browser", "chromes.json"),
+    JSON.stringify([
+      { pid: 999_999_901, profile: "/x/.agentes/browser" },
+      { pid: 999_999_902, profile: "/y/.agentes/browser" },
+    ]),
+  );
+  const asked: number[] = [];
+  const manager = new BrowserManager({
+    home,
+    log: () => {},
+    send: () => true,
+    secret: async () => null,
+    command: [process.execPath, FAKE],
+    chrome: () => null,
+    isOurChrome: async (pid) => {
+      asked.push(pid);
+      return false;
+    },
+  });
+  await manager.closeAll();
+  expect(asked).toEqual([999_999_901, 999_999_902]);
+  expect(JSON.parse(readFileSync(path.join(home, "browser", "chromes.json"), "utf8"))).toEqual([]);
 });
 
 // ── Live view ────────────────────────────────────────────────────────────────

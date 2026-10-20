@@ -24,6 +24,7 @@ const VALUED = new Set([
   "--screenshot-dir",
   "--executable-path",
   "--args",
+  "--cdp",
 ]);
 const rest = [];
 for (let i = 0; i < argv.length; i++) {
