@@ -117,7 +117,9 @@ describe("calendar", () => {
     const range = await calendarRange(deps, bia.id, f.org.id, "2026-10-19T00:00:00Z", "2026-10-23T00:00:00Z");
     expect(range.events.map((e) => e.title)).toEqual(["Planejamento"]);
     expect(range.deadlines.map((d) => [d.number, d.date])).toEqual([[1, "2026-10-21"]]);
-    expect(range.routines.length).toBe(4); // one a day
+    // One a day, counted in a week that is always ahead (today's 9:00 may already be past).
+    const ahead = await calendarRange(deps, bia.id, f.org.id, "2099-01-05T00:00:00Z", "2099-01-09T00:00:00Z");
+    expect(ahead.routines.length).toBe(4);
     expect(
       (await calendarRange(deps, outsider.id, f.org.id, "2026-10-19T00:00:00Z", "2026-10-23T00:00:00Z")).events,
     ).toEqual([]);

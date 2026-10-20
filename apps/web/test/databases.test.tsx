@@ -39,8 +39,9 @@ describe("Conectores → Banco de dados", () => {
     const { api } = databaseApi();
     const dialog = await openCatalog(api);
     await click(
-      within(within(dialog).getByRole("group", { name: "Categorias" })).getByRole("button", {
-        name: "Desenvolvimento",
+      // The categories are a segmented control, each with its count ("Desenvolvimento 3").
+      within(within(dialog).getByRole("radiogroup", { name: "Categorias" })).getByRole("radio", {
+        name: /^Desenvolvimento/,
       }),
     );
     const card = within(dialog).getByRole("button", { name: "Banco de dados" });

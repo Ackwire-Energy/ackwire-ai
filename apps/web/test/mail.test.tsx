@@ -58,8 +58,9 @@ describe("Conectores → Email", () => {
   test("the Email group: Gmail, Outlook, iCloud and Outro email, each with how it connects", async () => {
     const { api } = mailApi();
     const dialog = await openCatalog(api);
-    const cats = within(dialog).getByRole("group", { name: "Categorias" });
-    await click(within(cats).getByRole("button", { name: "Email" }));
+    // The categories are a segmented control, each with its count ("Email 4").
+    const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
+    await click(within(cats).getByRole("radio", { name: /^Email/ }));
     const names = [...dialog.querySelectorAll(".catalog-tile__name")].map((el) => el.textContent);
     expect(names).toEqual(["Gmail", "Outlook", "iCloud", "Outro email", "Não achou?"]);
     const gmail = within(dialog).getByRole("button", { name: "Gmail" });
@@ -80,7 +81,7 @@ describe("Conectores → Email", () => {
     const dialog = await openCatalog(createFakeApi(state));
     expect(within(dialog).queryByRole("button", { name: "Gmail" })).toBeNull();
     expect(
-      within(within(dialog).getByRole("group", { name: "Categorias" })).queryByRole("button", { name: "Email" }),
+      within(within(dialog).getByRole("radiogroup", { name: "Categorias" })).queryByRole("radio", { name: /^Email/ }),
     ).toBeNull();
   });
 

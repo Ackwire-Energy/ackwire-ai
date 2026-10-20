@@ -56,7 +56,8 @@ test("computer API: settings, the agent's computer, and the access tree shows 'R
     builtins: { scope: string; label: string; state: string; tools: { name: string }[] }[];
   };
   const sandbox = tree.builtins.find((b) => b.scope === "sandbox:run");
-  expect(sandbox).toMatchObject({ label: "Run code", state: "off" });
+  // On by default for every agent (D61).
+  expect(sandbox).toMatchObject({ label: "Run code", state: "granted" });
   expect(sandbox?.tools.map((x) => x.name)).toContain("run_code");
 });
 
