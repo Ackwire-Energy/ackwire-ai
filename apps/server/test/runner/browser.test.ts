@@ -863,19 +863,19 @@ test.skipIf(!posix)(
     await t.manager.act(dev, await t.folder(), {
       op: "browser.act",
       command: "open",
-      args: ["https://web.viajolo.example/login"],
+      args: ["https://app.acme.example/login"],
       timeoutSeconds: 30,
       link: "/org/o1/c/c1",
     });
     await t.act("click", ["@e3"]);
     expect(t.manager.states()).toEqual([
-      { agentId: dev.id, open: true, host: "web.viajolo.example", doing: "clicking", link: "/org/o1/c/c1" },
+      { agentId: dev.id, open: true, host: "app.acme.example", doing: "clicking", link: "/org/o1/c/c1" },
     ]);
     expect(changes).toBeGreaterThan(0);
 
     // The server says a person was asked; then that one is in control; a link elsewhere is dropped.
-    t.manager.setHandoff(dev.id, { status: "pending", request: "Entrar no Viajolo", link: "https://evil.example/x" });
-    expect(t.manager.states()[0]?.handoff).toEqual({ status: "pending", request: "Entrar no Viajolo" });
+    t.manager.setHandoff(dev.id, { status: "pending", request: "Entrar na Acme", link: "https://evil.example/x" });
+    expect(t.manager.states()[0]?.handoff).toEqual({ status: "pending", request: "Entrar na Acme" });
     t.manager.setHandoff(dev.id, { status: "active", controller: "Walter", link: "/org/o1/c/c1?m=h1" });
     expect(t.manager.states()[0]?.handoff).toEqual({
       status: "active",

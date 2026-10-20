@@ -35,7 +35,7 @@ export interface ControlBrowser {
   agentId: string;
   /** The session is up (it answered recently, or someone is watching it). */
   open: boolean;
-  /** The page's host (`web.viajolo.example`), when known. */
+  /** The page's host (`app.acme.example`), when known. */
   host?: string;
   /** What the agent did last, as a key the app words (`reading`, `clicking`, `filling`…). */
   doing?: ControlBrowserDoing;

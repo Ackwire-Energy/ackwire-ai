@@ -460,13 +460,13 @@ describe("the agent is in its browser", () => {
 describe("the agent's site for the card", () => {
   test("a computer brain's prefixed calls are steps by their plain names; the site comes from the frame, else the latest open", () => {
     const steps = browserSteps([
-      { kind: "call", id: "1", tool: "mcp__agentes__browser_open", detail: "viajolo.example", running: false },
+      { kind: "call", id: "1", tool: "mcp__agentes__browser_open", detail: "acme.example", running: false },
       { kind: "call", id: "2", tool: "mcp__agentes__browser_click", detail: null, running: true },
     ] as never);
     expect(steps.map((s) => s.tool)).toEqual(["browser_open", "browser_click"]);
-    expect(browserSiteUrl(null, steps)).toBe("viajolo.example");
-    expect(browserSiteUrl("about:blank", steps)).toBe("viajolo.example");
-    expect(browserSiteUrl("https://www.viajolo.example/pt", steps)).toBe("https://www.viajolo.example/pt");
+    expect(browserSiteUrl(null, steps)).toBe("acme.example");
+    expect(browserSiteUrl("about:blank", steps)).toBe("acme.example");
+    expect(browserSiteUrl("https://www.acme.example/pt", steps)).toBe("https://www.acme.example/pt");
     expect(browserSiteUrl(null, [])).toBeNull();
   });
 });

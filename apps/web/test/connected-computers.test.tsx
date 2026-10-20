@@ -445,9 +445,9 @@ describe("Configurações → Computadores", () => {
 describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
   // The server sends `path` and `computer`; the agent is the note's author.
   const params = {
-    path: "/Users/walter/Projects/viajolo-v5",
+    path: "/Users/walter/Projects/loja-v5",
     computer: "MacBook do Walter",
-    command: "agentes-runner folders allow /Users/walter/Projects/viajolo-v5 --agent ada",
+    command: "agentes-runner folders allow /Users/walter/Projects/loja-v5 --agent ada",
   };
   const post = (state: ReturnType<typeof seedState>, id: string, bodyCode: string, bodyParams: object) => {
     const base = state.messages[0] as (typeof state.messages)[number];
@@ -471,11 +471,11 @@ describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
     await settle(10);
     const ask = document.querySelector('[data-message-id="m-ask"]') as HTMLElement;
     expect(ask.textContent).toContain(
-      "Ada pediu a pasta viajolo-v5 no MacBook do Walter — esperando a resposta no computador",
+      "Ada pediu a pasta loja-v5 no MacBook do Walter — esperando a resposta no computador",
     );
     expect(ask.querySelector(".machine-command__code")?.textContent).toBe(params.command);
     const ok = document.querySelector('[data-message-id="m-ok"]') as HTMLElement;
-    expect(ok.textContent).toContain("Liberado: Ada já pode usar viajolo-v5 no MacBook do Walter");
+    expect(ok.textContent).toContain("Liberado: Ada já pode usar loja-v5 no MacBook do Walter");
     expect(ok.querySelector(".machine-command__code")).toBeNull();
   });
 
@@ -486,14 +486,14 @@ describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
     });
     expect(taskNoticeOf({ bodyCode: "machine_access_maybe" })).toBeNull();
     const en = createI18n("en");
-    expect(en.t("missions.notice.machine_access_denied", { ...params, agent: "Ada", folder: "viajolo-v5" })).toBe(
-      "Declined: Ada won't use viajolo-v5 on MacBook do Walter",
+    expect(en.t("missions.notice.machine_access_denied", { ...params, agent: "Ada", folder: "loja-v5" })).toBe(
+      "Declined: Ada won't use loja-v5 on MacBook do Walter",
     );
   });
 });
 
 describe("the computer page: pause, folders and tools (ADR 0036)", () => {
-  const VIAJOLO = "/Users/walter/Projects/viajolo-v5";
+  const LOJA = "/Users/walter/Projects/loja-v5";
   const DOCS = "/Users/walter/Documents";
   const mac = (over: Partial<Machine> = {}): Partial<Machine> & { name: string } => ({
     name: "MacBook do Walter",
@@ -502,7 +502,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }],
     access: {
       folders: [
-        { path: VIAJOLO, agents: [ADA_ID] },
+        { path: LOJA, agents: [ADA_ID] },
         { path: DOCS, agents: [] },
       ],
       tools: { claude: true, codex: false, commands: true },
@@ -546,20 +546,20 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
 
   test("owner: folders with the agents that use them; Remover (one agent, everyone) calls reduce", async () => {
     const { state, m } = await open();
-    const viajolo = folderRow(VIAJOLO);
-    expect(viajolo.textContent).toContain("viajolo-v5");
-    expect(viajolo.querySelector("code")?.textContent).toBe(VIAJOLO);
-    expect(viajolo.textContent).toContain("Quem usa viajolo-v5: Ada");
+    const loja = folderRow(LOJA);
+    expect(loja.textContent).toContain("loja-v5");
+    expect(loja.querySelector("code")?.textContent).toBe(LOJA);
+    expect(loja.textContent).toContain("Quem usa loja-v5: Ada");
     expect(folderRow(DOCS).textContent).toContain("Nenhum agente usa ainda");
 
-    let menu = await openMenu(within(viajolo).getByRole("button", { name: "Ações de viajolo-v5" }));
+    let menu = await openMenu(within(loja).getByRole("button", { name: "Ações de loja-v5" }));
     await click(within(menu).getByRole("menuitem", { name: "Só para Ada" }));
-    let dialog = screen().getByRole("dialog", { name: "Tirar viajolo-v5 de Ada?" });
+    let dialog = screen().getByRole("dialog", { name: "Tirar loja-v5 de Ada?" });
     await click(within(dialog).getByRole("button", { name: "Remover" }));
     await settle(4);
-    expect(reduceCalls(state)[0]).toEqual([ORG_ID, m.id, { removeFolder: { path: VIAJOLO, agentId: ADA_ID } }]);
-    expect(document.body.textContent).toContain("Ada não usa mais viajolo-v5.");
-    expect(folderRow(VIAJOLO).textContent).toContain("Nenhum agente usa ainda");
+    expect(reduceCalls(state)[0]).toEqual([ORG_ID, m.id, { removeFolder: { path: LOJA, agentId: ADA_ID } }]);
+    expect(document.body.textContent).toContain("Ada não usa mais loja-v5.");
+    expect(folderRow(LOJA).textContent).toContain("Nenhum agente usa ainda");
 
     menu = await openMenu(within(folderRow(DOCS)).getByRole("button", { name: "Ações de Documents" }));
     await click(within(menu).getByRole("menuitem", { name: "Remover para todos" }));
@@ -600,14 +600,14 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
   test("read-only for someone who is neither an admin nor who connected it", async () => {
     const { state } = await open({ canManage: false, workspace: null, pairedBy: { id: "u-joao", name: "João" } });
     expect(document.body.textContent).toContain("Só João e os admins mudam o que este computador libera.");
-    expect(screen().queryByRole("button", { name: "Ações de viajolo-v5" })).toBeNull();
+    expect(screen().queryByRole("button", { name: "Ações de loja-v5" })).toBeNull();
     expect(screen().queryByRole("button", { name: /^Desligar/ })).toBeNull();
     expect(screen().queryByRole("button", { name: /^Ações de MacBook/ })).toBeNull();
     expect(screen().getByRole("region", { name: "Para liberar mais" }).textContent).toContain(
       "Só João libera, no próprio computador.",
     );
     // Still sees what is allowed.
-    expect(folderRow(VIAJOLO).textContent).toContain("Quem usa viajolo-v5: Ada");
+    expect(folderRow(LOJA).textContent).toContain("Quem usa loja-v5: Ada");
     expect(reduceCalls(state)).toEqual([]);
   });
 
@@ -624,12 +624,12 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(document.body.textContent).toContain("Este computador ainda não informou o que libera.");
     expect(screen().queryByRole("region", { name: "Ferramentas" })).toBeNull();
     const tools = { claude: true, codex: true, commands: false };
-    const access = { folders: [{ path: VIAJOLO, agents: [ADA_ID] }], tools };
+    const access = { folders: [{ path: LOJA, agents: [ADA_ID] }], tools };
     // The server says only "it changed" (`access: true`): the page refetches what this person may see.
     machines.patch(m.id, { access });
     await act(async () => socket.push(orgEvent({ type: "machine.updated", machineId: m.id, access: true })));
     await settle(4);
-    expect(folderRow(VIAJOLO)).not.toBeNull();
+    expect(folderRow(LOJA)).not.toBeNull();
     expect(screen().getByRole("region", { name: "Ferramentas" })).toBeTruthy();
   });
 
@@ -652,8 +652,8 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     const section = document.querySelector("[data-agent-folders]") as HTMLElement;
     expect(section.textContent).toContain("Pastas no computador");
     expect(section.textContent).toContain("Além da própria pasta, usa estas no MacBook do Walter:");
-    expect(section.textContent).toContain("viajolo-v5");
-    expect(section.querySelector("code")?.textContent).toBe(VIAJOLO);
+    expect(section.textContent).toContain("loja-v5");
+    expect(section.querySelector("code")?.textContent).toBe(LOJA);
     // Allowed on the machine but not for Ada.
     expect(section.textContent).not.toContain(DOCS);
     expect(section.textContent).toContain("Liberar outra pasta é no próprio computador");

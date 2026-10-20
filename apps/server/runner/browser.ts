@@ -667,7 +667,7 @@ const DOING: Record<string, ControlBrowserDoing> = {
   tab: "tabs",
 };
 
-/** `https://web.viajolo.example/trips` → `web.viajolo.example`; null for anything that isn't a web page. */
+/** `https://app.acme.example/trips` → `app.acme.example`; null for anything that isn't a web page. */
 export function pageHost(url: string): string | null {
   try {
     const u = new URL(url);

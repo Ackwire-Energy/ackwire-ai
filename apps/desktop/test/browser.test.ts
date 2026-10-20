@@ -25,15 +25,15 @@ const status = (browsers: ControlBrowser[], over: Partial<ControlStatus> = {}): 
 const using: ControlBrowser = {
   agentId: "a1",
   open: true,
-  host: "web.viajolo.example",
+  host: "app.acme.example",
   doing: "filling",
   link: "/org/o1/c/c1",
 };
 const asking: ControlBrowser = {
   agentId: "a1",
   open: true,
-  host: "web.viajolo.example",
-  handoff: { status: "pending", request: "Entrar no Viajolo", link: "/org/o1/c/c1?m=h1" },
+  host: "app.acme.example",
+  handoff: { status: "pending", request: "Entrar na Acme", link: "/org/o1/c/c1?m=h1" },
 };
 const job: ControlJob = { id: "j", kind: "brain", summary: "pensando", startedAt: "2026-10-19T20:00:00Z" };
 const home = (s: ControlStatus, jobs: ControlJob[] = []): TrayInput => ({ running: true, status: s, jobs });
@@ -62,7 +62,7 @@ describe("the agent's row", () => {
     });
     expect(browserRowState(asking)).toEqual({
       kind: "needs",
-      request: "Entrar no Viajolo",
+      request: "Entrar na Acme",
       link: "/org/o1/c/c1?m=h1",
     });
   });

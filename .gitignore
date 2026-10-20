@@ -10,3 +10,6 @@ coverage/
 .claude/
 *.local.json
 packages/engine/eval/out/
+
+# Design prototypes stay local (never in the repo).
+docs/design/telas/

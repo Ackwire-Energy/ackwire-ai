@@ -216,14 +216,14 @@ describe("receipts under the agent's reply (FazerDesfazer A/B)", () => {
 describe("mission proposed already investigated", () => {
   test("findings with icons per kind, refs as code chips linked to the repo, the decision highlighted, plan, Ajustar / Começar and the note", async () => {
     const state = seedState();
-    state.agentRepos = { [ADA_ID]: ["acme/viajolo-ios"] };
+    state.agentRepos = { [ADA_ID]: ["acme/loja-ios"] };
     const api = createFakeApi(state);
     const mission = await api.missions.create(ORG_ID, {
       agentId: ADA_ID,
       goal: "Mostrar o pedido de avaliação no momento certo",
       title: "Mostrar o pedido de avaliação no momento certo",
       channelId: ENG_ID,
-      folder: "/Users/ada/code/viajolo-ios",
+      folder: "/Users/ada/code/loja-ios",
     });
     const get = api.missions.get;
     api.missions.get = async (o, id) => ({
@@ -285,7 +285,7 @@ describe("mission proposed already investigated", () => {
     const refs = [...(items[0] as HTMLElement).querySelectorAll(".mi-ref")] as HTMLAnchorElement[];
     expect(refs.map((r) => r.textContent)).toEqual(["ReviewPrompt.swift:41", "App/SubscriptionFlow.swift:88"]);
     expect(refs[1]?.getAttribute("href")).toBe(
-      "https://github.com/acme/viajolo-ios/blob/HEAD/App/SubscriptionFlow.swift#L88",
+      "https://github.com/acme/loja-ios/blob/HEAD/App/SubscriptionFlow.swift#L88",
     );
     expect(refs[0]?.getAttribute("href")).toContain("https://github.com/search?q=");
     expect(card.textContent).toContain("Plano · 3 itens");

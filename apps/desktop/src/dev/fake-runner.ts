@@ -68,7 +68,7 @@ export function acmeSeed(): FakeOrgSeed {
         agent: who(dev),
         kind: "exec",
         summary: "Rodando os testes",
-        where: "viajolo-v5",
+        where: "loja-v5",
         command: "bun test",
         startedAt: minutesAgo(2),
       },
@@ -83,7 +83,7 @@ export function acmeSeed(): FakeOrgSeed {
     ],
     access: {
       folders: [
-        { path: "/Users/voce/Projects/Personal/viajolo-v5", agents: ["ag_dev"] },
+        { path: "/Users/voce/Projects/Personal/loja-v5", agents: ["ag_dev"] },
         { path: "/Users/voce/Documents/Roteiros", agents: ["ag_bento"] },
       ],
       tools: { claude: true, codex: false, commands: true },
@@ -95,7 +95,7 @@ export function acmeSeed(): FakeOrgSeed {
         kind: "command",
         summary: "bun test",
         command: "bun test",
-        where: "viajolo-v5",
+        where: "loja-v5",
         result: "running",
       },
       {
@@ -113,7 +113,7 @@ export function acmeSeed(): FakeOrgSeed {
         kind: "command",
         summary: "git diff main…feat/checkout",
         command: "git diff main…feat/checkout",
-        where: "viajolo-v5",
+        where: "loja-v5",
         result: "ok",
       },
       {
@@ -128,7 +128,7 @@ export function acmeSeed(): FakeOrgSeed {
         agent: who(i % 2 ? dev : ada),
         kind: "file" as const,
         summary: `read src/file-${i}.ts`,
-        where: "viajolo-v5",
+        where: "loja-v5",
         result: "ok" as const,
       })),
     ],
@@ -136,8 +136,8 @@ export function acmeSeed(): FakeOrgSeed {
       {
         requestId: "req_1",
         agent: { id: "ag_bento", name: "Bento" },
-        path: "/Users/voce/Projects/Personal/viajolo-v5/roteiros",
-        reason: "Preciso dos roteiros que estão no viajolo-v5 para montar o vídeo de Curitiba.",
+        path: "/Users/voce/Projects/Personal/loja-v5/roteiros",
+        reason: "Preciso dos roteiros que estão no loja-v5 para montar o vídeo de Curitiba.",
         at: minutesAgo(1),
         expiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
       },

@@ -199,8 +199,8 @@ describe("the card's title", () => {
     expect(titleKind({ inControl: false, ask: null, host: "", opening: true })).toBe("opening");
     // A frame arrived (no longer opening) without an address yet: never stuck on "Abrindo".
     expect(titleKind({ inControl: false, ask: null, host: "", opening: false })).toBe("agent");
-    expect(titleKind({ inControl: false, ask: null, host: "viajolo.example", opening: false })).toBe("host");
-    expect(titleKind({ inControl: true, ask: "Entrar no painel", host: "viajolo.example", opening: false })).toBe("ask");
-    expect(titleKind({ inControl: true, ask: null, host: "viajolo.example", opening: false })).toBe("host");
+    expect(titleKind({ inControl: false, ask: null, host: "acme.example", opening: false })).toBe("host");
+    expect(titleKind({ inControl: true, ask: "Entrar no painel", host: "acme.example", opening: false })).toBe("ask");
+    expect(titleKind({ inControl: true, ask: null, host: "acme.example", opening: false })).toBe("host");
   });
 });

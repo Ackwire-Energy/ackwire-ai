@@ -24,16 +24,16 @@ test("an entity profile: a note that restates an older one replaces it; only the
   let profile = "";
   profile = mergeProfileNote(
     profile,
-    "Analytics tool used to check review_prompt events for viajolo-app; currently unavailable to theo.",
+    "Analytics tool used to check review_prompt events for loja-app; currently unavailable to theo.",
   );
   profile = mergeProfileNote(profile, "App metrics tool Theo tracks.");
   profile = mergeProfileNote(
     profile,
-    "Analytics tool used to check review_prompt events for viajolo-app; working again.",
+    "Analytics tool used to check review_prompt events for loja-app; working again.",
   );
   expect(profile.split("\n")).toEqual([
     "- App metrics tool Theo tracks.",
-    "- Analytics tool used to check review_prompt events for viajolo-app; working again.",
+    "- Analytics tool used to check review_prompt events for loja-app; working again.",
   ]);
   const topics = [
     "pricing",
