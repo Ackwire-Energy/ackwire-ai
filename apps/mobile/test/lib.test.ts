@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readDeleteResponse } from "../src/features/account/result";
 import { chooseOrg } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
-import { deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
+import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { createSocketFactory } from "../src/lib/socket";
 import { authErrorKey, isEmail } from "../src/lib/validate";
 import { ICON_NAMES } from "../src/ui/icons.data";
@@ -32,6 +32,17 @@ describe("push payload", () => {
     expect(quietWhileOpen({ orgId: "o2", channelId: "c1" }, open)).toBe(false);
     expect(quietWhileOpen({ orgId: "o1", kind: "approval" }, open)).toBe(false);
     expect(quietWhileOpen({ orgId: "o1", channelId: "c1" }, null)).toBe(false);
+  });
+
+  test("the conversation on screen: a blur after the next screen took over doesn't clear it", () => {
+    const open = createHolder<{ orgId: string; channelId: string }>();
+    const releaseA = open.hold({ orgId: "o1", channelId: "c1" });
+    // The thread of the same channel focuses first, then the channel blurs.
+    const releaseB = open.hold({ orgId: "o1", channelId: "c1" });
+    releaseA();
+    expect(open.get()).toEqual({ orgId: "o1", channelId: "c1" });
+    releaseB();
+    expect(open.get()).toBeNull();
   });
 });
 

@@ -54,8 +54,10 @@ export function nextSlots(
   const out: RunSlot[] = [];
   for (const s of prev) {
     const r = byRun.get(s.runId) ?? takeover.get(s.key);
-    // Its final message is in the timeline: the message takes the block's place (same key).
-    if (opts.landed(r?.runId ?? s.runId)) continue;
+    // Gone, and its final message is in the timeline: the message takes the block's place (same key).
+    // A run still live keeps its block even if a message of it landed (text before an approval card or a
+    // question, then resumed after the answer).
+    if (!r && opts.landed(s.runId)) continue;
     if (r) {
       out.push({ key: s.key, runId: r.runId, agentId: r.agentId, provisional: Boolean(r.provisional), goneAt: null });
       continue;
@@ -64,7 +66,7 @@ export function nextSlots(
     if (!s.provisional && opts.expected(s.runId) && opts.now - goneAt < SLOT_HOLD_MS) out.push({ ...s, goneAt });
   }
   for (const r of live) {
-    if (placed.has(r.runId) || opts.landed(r.runId)) continue;
+    if (placed.has(r.runId)) continue;
     out.push({
       key: slotKeyOf(r.runId),
       runId: r.runId,
@@ -72,6 +74,23 @@ export function nextSlots(
       provisional: Boolean(r.provisional),
       goneAt: null,
     });
+  }
+  return out;
+}
+
+/**
+ * Which timeline row is drawn under its run's block key: a run can post more than one message (text
+ * before an approval, the card, the final reply), and only its last one takes the block's place (keys
+ * stay unique). A run still live keeps the key for its block, so none of its messages take it.
+ */
+export function blockRowByRun(
+  items: readonly { kind: string; key: string; message?: { agentRunId?: string | null } }[],
+  liveRunIds: ReadonlySet<string>,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const item of items) {
+    const runId = item.kind === "message" ? item.message?.agentRunId : null;
+    if (runId && !liveRunIds.has(runId)) out.set(runId, item.key);
   }
   return out;
 }

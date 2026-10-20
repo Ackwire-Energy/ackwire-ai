@@ -1,4 +1,3 @@
-import { ApiError } from "@agenteschat/client";
 import { useSyncExternalStore } from "react";
 
 /**
@@ -44,7 +43,8 @@ export function useQueued(clientId: string | undefined) {
 export const browserOffline = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 /**
- * A failed send that is the network's fault (no answer from the server at all, or the browser is
- * offline), not the server refusing it: it waits for the connection instead of failing.
+ * A failed send that is the network's fault (no answer from the server at all: `fetch` throws a
+ * `TypeError`, or the browser is offline), not the server refusing it nor a bug: it waits for the
+ * connection instead of failing.
  */
-export const failedOffline = (error: unknown) => browserOffline() || !(error instanceof ApiError);
+export const failedOffline = (error: unknown) => browserOffline() || error instanceof TypeError;

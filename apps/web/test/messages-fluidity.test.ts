@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ChannelEvent, Message } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
 import { failedOffline, outbox } from "@/chat/outbox";
@@ -61,6 +62,9 @@ describe("sent while offline", () => {
   test("a network failure waits for the connection; a refusal by the server does not", () => {
     expect(failedOffline(new TypeError("Failed to fetch"))).toBe(true);
     expect(failedOffline(new ApiError(503, "unavailable", "Try again"))).toBe(false);
+    // Any other error (a bug, a parse failure) is not the network: it fails, it does not wait.
+    expect(failedOffline(new Error("boom"))).toBe(false);
+    expect(failedOffline(new SyntaxError("Unexpected token"))).toBe(false);
   });
 
   test("the outbox keeps what waits, by client id", () => {
@@ -73,6 +77,20 @@ describe("sent while offline", () => {
     expect(outbox.has("c1")).toBe(false);
     expect(seen).toEqual([1, 0]);
     off();
+  });
+});
+
+describe("'Continuar' refused: the reason in the person's language", () => {
+  test("not continuable, the agent busy, not allowed", () => {
+    expect(errorText(t, new ApiError(409, "run.not_continuable", "This task can't be continued"))).toBe(
+      "Esta resposta não pode mais ser continuada.",
+    );
+    expect(errorText(t, new ApiError(409, "run.agent_busy", "busy"))).toContain("já está trabalhando");
+    expect(errorText(t, new ApiError(403, "run.continue_forbidden", "no"))).toContain("dono do agente");
+    const en = createI18n("en");
+    expect(errorText(en.t.bind(en) as TFunction, new ApiError(409, "run.agent_busy", "busy"))).toContain(
+      "already working",
+    );
   });
 });
 

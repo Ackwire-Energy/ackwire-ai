@@ -1152,6 +1152,11 @@ async function executeRunInner(
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
       // message at once. Computer brains run tools inside their turn, so they read it at the next step.
       const turnAbort = plan.kind === "model" ? registerTurnAbort(run.id, (id) => readIds.has(id)) : null;
+      // A message to read now landed after the steering was taken above: read it first, no call spent.
+      if (turnAbort?.signal.aborted) {
+        unregisterTurnAbort(run.id, turnAbort);
+        continue;
+      }
       const io: BrainIO = {
         signal: turnAbort ? AbortSignal.any([signal, turnAbort.signal]) : signal,
         // Brains that run a tool inline (not by yielding `tool_call`). The model brain doesn't; computer

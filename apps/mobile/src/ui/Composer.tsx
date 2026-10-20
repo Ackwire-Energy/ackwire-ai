@@ -35,11 +35,16 @@ export interface ComposerMentionState {
  */
 export type SendHow = "join" | "now";
 
-/** An agent at work in the conversation: the empty field's button stops it; with text, the choice shows. */
+/**
+ * An agent at work in the conversation: with text, the choice shows (to anyone who writes there); the empty
+ * field's button stops it, only for who may stop it (`stop` is left out otherwise).
+ */
 export interface ComposerWorking {
-  /** The stop button's label ("Parar o Theo"). */
-  stopLabel: string;
-  onStop: () => void;
+  stop?: {
+    /** The stop button's label ("Parar o Theo"). */
+    label: string;
+    onStop: () => void;
+  };
 }
 
 export interface ComposerProps {
@@ -108,8 +113,8 @@ export function Composer({
   const [how, setHow] = useState<SendHow>("join");
   const has = text.trim().length > 0;
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
-  const stopMode = Boolean(working) && !has;
-  const button = has || Boolean(working);
+  const stopMode = Boolean(working?.stop) && !has;
+  const button = has || stopMode;
   // The send arrow and the stop square swap in place (one turns away as the other turns in).
   const mode = useSharedValue(stopMode ? 1 : 0);
   useEffect(() => {
@@ -149,9 +154,9 @@ export function Composer({
       send();
       return;
     }
-    if (!working) return;
+    if (!working?.stop) return;
     haptics.firm();
-    working.onStop();
+    working.stop.onStop();
   };
 
   const pick = (handle: string) => {
@@ -271,7 +276,7 @@ export function Composer({
                 haptic={false}
                 onPress={press}
                 accessibilityRole="button"
-                accessibilityLabel={stopMode && working ? working.stopLabel : t("mobile.a11y.send")}
+                accessibilityLabel={stopMode && working?.stop ? working.stop.label : t("mobile.a11y.send")}
                 hitSlop={6}
                 style={[styles.send, { backgroundColor: colors.ink }]}
               >

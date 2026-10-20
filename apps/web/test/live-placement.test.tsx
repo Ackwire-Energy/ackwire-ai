@@ -14,7 +14,7 @@ import {
   steerStore,
 } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { elapsedParts, nextSlots, runPhase, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
+import { blockRowByRun, elapsedParts, nextSlots, runPhase, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -70,6 +70,32 @@ describe("one block per answer (run-slots)", () => {
       opts(),
     );
     expect(sameSlots(slots, again)).toBe(true);
+  });
+
+  test("a run resumed after an approval or a question gets its block back (its card already landed)", () => {
+    let slots = nextSlots([], [{ runId: "r1", agentId: "ada" }], opts());
+    // The approval card landed and the run left the live store: the card takes the block's place.
+    slots = nextSlots(slots, [], opts({ landed: ["r1"] }));
+    expect(slots).toEqual([]);
+    // Approved: the same run works again, its card still in the timeline.
+    slots = nextSlots(slots, [{ runId: "r1", agentId: "ada" }], opts({ landed: ["r1"] }));
+    expect(slots.map((s) => s.runId)).toEqual(["r1"]);
+    // Still live on the next pass, even with a message of it in the timeline.
+    expect(nextSlots(slots, [{ runId: "r1", agentId: "ada" }], opts({ landed: ["r1"] }))).toEqual(slots);
+    // Done: its final message lands and takes the block's place.
+    expect(nextSlots(slots, [], opts({ landed: ["r1"] }))).toEqual([]);
+  });
+
+  test("a run with many messages: only its last one takes the block's key, none while it is live", () => {
+    const row = (key: string, agentRunId: string | null) => ({ kind: "message", key, message: { agentRunId } });
+    const items = [row("m1", "r1"), { kind: "day", key: "d" }, row("m2", null), row("m3", "r1"), row("m4", "r2")];
+    expect(blockRowByRun(items, new Set())).toEqual(
+      new Map([
+        ["r1", "m3"],
+        ["r2", "m4"],
+      ]),
+    );
+    expect(blockRowByRun(items, new Set(["r1"]))).toEqual(new Map([["r2", "m4"]]));
   });
 
   test("the header word and the elapsed time", () => {

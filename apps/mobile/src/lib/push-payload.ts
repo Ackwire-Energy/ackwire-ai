@@ -46,6 +46,24 @@ export function quietWhileOpen(data: PushData, open: { orgId: string; channelId:
   return data.channelId === open.channelId && (!data.orgId || data.orgId === open.orgId);
 }
 
+/**
+ * Who holds a value (the conversation on screen): `hold` sets it and returns the release, which clears it
+ * only if it still holds that same value. A screen that loses focus after the next one took over (React
+ * Navigation may blur the old one after focusing the new one) doesn't wipe the new one's value.
+ */
+export function createHolder<T extends object>() {
+  let current: T | null = null;
+  return {
+    get: () => current,
+    hold(value: T) {
+      current = value;
+      return () => {
+        if (current === value) current = null;
+      };
+    },
+  };
+}
+
 /** The body of `POST /api/app/push/devices`. */
 export function deviceBody(token: string, platform: string, locale: string) {
   return { token, platform: platform === "ios" ? "ios" : "android", locale };

@@ -4,7 +4,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { API_URL } from "@/config";
 import { authedFetch } from "./auth";
-import { deviceBody, devicePath, quietWhileOpen, readPushData } from "./push-payload";
+import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "./push-payload";
 import { readValue, STORED, writeValue } from "./storage";
 
 /**
@@ -12,18 +12,17 @@ import { readValue, STORED, writeValue } from "./storage";
  * the first screen), registers the Expo push token with the server, and removes it on sign-out.
  */
 
-/** The conversation on screen (the chat screen sets it while focused). */
-let openConversation: { orgId: string; channelId: string } | null = null;
+/** The conversation on screen (the chat screen holds it while focused). */
+const openConversation = createHolder<{ orgId: string; channelId: string }>();
 
-export function setOpenConversation(open: { orgId: string; channelId: string } | null) {
-  openConversation = open;
-}
+/** This screen's conversation is on screen; the returned release clears it only if no other screen took over. */
+export const holdOpenConversation = (open: { orgId: string; channelId: string }) => openConversation.hold(open);
 
 /** Notifications shown while the app is open: a banner, no sound; nothing for the conversation on screen. */
 export function configureForegroundPush() {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
-      const quiet = quietWhileOpen(readPushData(notification.request.content.data), openConversation);
+      const quiet = quietWhileOpen(readPushData(notification.request.content.data), openConversation.get());
       return { shouldShowBanner: !quiet, shouldShowList: !quiet, shouldPlaySound: false, shouldSetBadge: false };
     },
   });

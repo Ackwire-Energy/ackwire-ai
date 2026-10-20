@@ -375,8 +375,11 @@ export function usePostMessage(
     mentioned?: (body: string) => string[];
     onSent?: (message: Message, local: Message) => void;
     onOptimistic?: (local: Message) => void;
-    /** The server refused it (the message turns "failed" with a retry either way). */
-    onFailed?: (error: unknown) => void;
+    /**
+     * The server refused it, or no answer came (the message turns "failed" with a retry either way).
+     * `clientId` is the failed message's (its optimistic copy's).
+     */
+    onFailed?: (error: unknown, failed: { clientId: string }) => void;
   },
 ) {
   const api = useApi();
@@ -427,7 +430,7 @@ export function usePostMessage(
       if (ctx?.local) options.onSent?.(echoed, ctx.local);
     },
     onError: (error, { clientId }) => {
-      options.onFailed?.(error);
+      options.onFailed?.(error, { clientId });
       qc.setQueryData<Message[]>(key, (list) =>
         list?.map((m) => (m.local && m.clientId === clientId ? { ...m, local: "failed" as const } : m)),
       );

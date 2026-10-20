@@ -94,6 +94,27 @@ describe("Parar is immediate (telas/Mensagens.html)", () => {
     expect(again.at(-1)?.steer).toBeUndefined();
   });
 
+  test("a member who may not stop it still chooses 'Parar e mandar'; there is no stop button", async () => {
+    const { state, ev } = await open((s) => {
+      const o = s.me?.organizations[0];
+      if (o) o.role = "member";
+    });
+    // Someone else's message started it, on an agent owned by João.
+    await ev({ type: "agent.run", ...ids, threadId: "m-someone", status: "running" });
+    await settle(2);
+    expect(screen().queryByRole("button", { name: "Parar a Ada" })).toBeNull();
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    await act(async () => fireEvent.change(box, { target: { value: "olha o refresh" } }));
+    expect(screen().getByRole("radiogroup", { name: "Como mandar enquanto a Ada trabalha" })).toBeTruthy();
+    await act(async () => fireEvent.keyDown(box, { key: "Enter", ctrlKey: true }));
+    await settle(3);
+    const posts = state.calls.filter((c) => c.method === "chat.post").map((c) => c.args[2] as { steer?: string });
+    expect(posts.at(-1)?.steer).toBe("now");
+    await esc();
+    await settle(2);
+    expect(cancels(state)).toHaveLength(0);
+  });
+
   test("the context line: code for N min, a tool, writing, thinking", () => {
     const i18n = createI18n("pt-BR");
     const t = i18n.t.bind(i18n) as TFunction;

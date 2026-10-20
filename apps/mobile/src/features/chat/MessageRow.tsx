@@ -1,5 +1,4 @@
 import {
-  ApiError,
   browserHandoffOf,
   type Message,
   type ThreadInfo,
@@ -9,6 +8,7 @@ import {
   useSteerState,
   useToggleReaction,
 } from "@agenteschat/client";
+import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
@@ -397,9 +397,13 @@ function StoppedLine({
       .then(({ runId: newRunId }) => cacheContinued(qc, orgId, m.channelId, m.id, newRunId))
       .catch((err: unknown) => {
         setBusy(false);
-        // Already continued (or it can't be): the event or a refetch hides the button.
-        if (err instanceof ApiError && err.status === 409) return;
-        toast({ title: t("mobile.chat.stopped.failed"), icon: "x" });
+        // Refused for a reason it can say (already continued, the agent busy here, not allowed): say it.
+        // The event or a refetch hides the button when it has no job left.
+        const code = errorCode(err);
+        toast({
+          title: code && CONTINUE_ERRORS.has(code) ? errorText(t, err) : t("mobile.chat.stopped.failed"),
+          icon: "x",
+        });
       });
   };
   return (

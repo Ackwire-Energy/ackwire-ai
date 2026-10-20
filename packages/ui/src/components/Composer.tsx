@@ -121,8 +121,8 @@ export interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
   /**
-   * Called with the trimmed text on Enter (Shift+Enter adds a line) or the send button. While `working`,
-   * `opts.interrupt` says whether the person chose "Parar e mandar".
+   * Called with the trimmed text on Enter (Shift+Enter adds a line) or the send button. While `working`
+   * or with a `choice`, `opts.interrupt` says whether the person chose "Parar e mandar".
    */
   onSend: (text: string, opts?: { interrupt?: boolean }) => void;
   /** Accessible name of the text box, e.g. "Mensagem para #eng". */
@@ -167,7 +167,10 @@ export interface ComposerProps {
   sendBlocked?: boolean;
   /** An agent is working in this conversation (send ↔ stop). */
   working?: ComposerWorking | null;
-  /** With `working` and text: the choice row above the box. */
+  /**
+   * While an agent works here and there is text: the choice row above the box. Given on its own (without
+   * `working`) to whoever may write but not stop it: they choose too, there is just no stop button.
+   */
   choice?: ComposerChoice;
 }
 
@@ -497,7 +500,7 @@ export function Composer({
   const ready = Boolean(value.trim() || canSendEmpty) && !disabled && !sendBlocked;
   // An agent at work and nothing to send: the send button is the stop button.
   const stopMode = Boolean(working) && !disabled && !value.trim() && !canSendEmpty;
-  const showChoice = Boolean(working && choice) && Boolean(value.trim()) && !disabled;
+  const showChoice = Boolean(choice) && Boolean(value.trim()) && !disabled;
   const [chosen, setChosen] = useState<SendChoice>("join");
   const [pressed, setPressed] = useState(false);
   const press = () => {
@@ -511,7 +514,7 @@ export function Composer({
   };
   const send = (alt = false) => {
     if (!ready) return;
-    if (working) onSend(value.trim(), { interrupt: showChoice && sendChoice(chosen, alt) === "interrupt" });
+    if (working || choice) onSend(value.trim(), { interrupt: showChoice && sendChoice(chosen, alt) === "interrupt" });
     else onSend(value.trim());
     setChosen("join");
     // Keep typing: focus stays in the box (also after clicking the send button).

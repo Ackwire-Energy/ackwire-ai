@@ -61,7 +61,17 @@ const KNOWN = {
   "mission.needs_computer": "errors.mission.needsComputer",
   "mission.unavailable": "errors.mission.unavailable",
   "mission.machine_changed": "errors.mission.machineChanged",
+  "run.not_continuable": "errors.run.notContinuable",
+  "run.agent_busy": "errors.run.agentBusy",
+  "run.continue_forbidden": "errors.run.continueForbidden",
 } as const;
+
+/** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */
+export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
+  "run.not_continuable",
+  "run.agent_busy",
+  "run.continue_forbidden",
+]);
 
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 

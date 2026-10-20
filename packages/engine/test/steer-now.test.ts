@@ -135,6 +135,47 @@ describe('"Parar e mandar" (steer: "now")', () => {
     expect(usage).toHaveLength(2);
   });
 
+  test("landing after the steering was taken but before the next call starts: that call reads it", async () => {
+    let threadId = "";
+    let built = false;
+    let steeredId = "";
+    // The next turn lists its tools after taking the steering and before the model call: the message
+    // lands right in that window.
+    const source: ToolSource = {
+      name: "slow",
+      tools: async () => {
+        if (built && !steeredId) steeredId = (await ask("para, usa a dev", { threadId, steer: "now" })).id;
+        return [
+          {
+            name: "build",
+            description: "Build the project",
+            scope: "",
+            inputSchema: { type: "object", properties: {}, additionalProperties: false },
+            async execute() {
+              built = true;
+              return { content: "build ok" };
+            },
+          },
+        ];
+      },
+    };
+    f = await setup({
+      toolSources: [source],
+      reply: (_req: ModelRequest, call: number) =>
+        call === 1 ? { chunks: ["Compilando."], toolUses: [{ name: "build", input: {} }] } : { chunks: ["Na dev."] },
+    });
+    const question = await ask("@dev compila");
+    threadId = question.id;
+    await drainOutbox(f.db, f.handlers);
+
+    expect(steeredId).not.toBe("");
+    const [run] = await runs();
+    expect(run?.status).toBe("done");
+    // No call was spent without it: the second (and last) call already has the message.
+    expect(f.provider.calls).toHaveLength(2);
+    expect(JSON.stringify(f.provider.calls[1]?.request.messages.at(-1))).toContain("para, usa a dev");
+  });
+
   test("while it is queued (or waits), nothing is cut: it reads the message when it starts", async () => {
     f = await setup({ reply: () => ({ chunks: ["Ok."] }) });
     const question = await ask("@dev prepara o relatório");

@@ -9,6 +9,7 @@ import {
   type ScrollRow,
   type TurnKey,
   turnKeys,
+  turnRowByRun,
   unseenBelow,
 } from "../../src/features/chat/scroll";
 
@@ -100,8 +101,15 @@ describe("turnKeys", () => {
   test("the real run takes the key of the guessed 'pensando…' once the guess is gone", () => {
     const guessed = turnKeys(none, [run("p:theo", "theo", "t1", true)]);
     const real = turnKeys(guessed, [run("r1")]);
-    expect(real.get("r1")?.key).toBe("turn-p:theo");
+    expect(real.get("r1")?.key).toBe(guessed.get("p:theo")?.key);
+    expect(real.get("r1")?.key).toStartWith("turn-p:theo");
     expect(real.has("p:theo")).toBe(false);
+  });
+  test("the same agent asked again in the same thread: a new guess, a new key", () => {
+    const guessed = turnKeys(none, [run("p:theo", "theo", "t1", true)]);
+    const real = turnKeys(guessed, [run("r1")]);
+    const again = turnKeys(real, [run("p:theo", "theo", "t1", true)]);
+    expect(again.get("p:theo")?.key).not.toBe(real.get("r1")?.key);
   });
   test("while the guess is still shown, or for another agent, the run gets its own key", () => {
     const guessed = turnKeys(none, [run("p:theo", "theo", "t1", true)]);
@@ -110,7 +118,23 @@ describe("turnKeys", () => {
   });
   test("a guess in another thread of the same conversation still hands over (a DM's flat reply)", () => {
     const guessed = turnKeys(none, [run("p:theo", "theo", "m1", true)]);
-    expect(turnKeys(guessed, [run("r1", "theo", "t9")]).get("r1")?.key).toBe("turn-p:theo");
+    expect(turnKeys(guessed, [run("r1", "theo", "t9")]).get("r1")?.key).toBe(guessed.get("p:theo")?.key);
+  });
+});
+
+describe("turnRowByRun", () => {
+  const msg = (key: string, agentRunId: string | null) => ({ kind: "message", key, message: { agentRunId } });
+  const rows = [msg("m1", "r1"), { kind: "day", key: "d" }, msg("m2", null), msg("m3", "r1"), msg("m4", "r2")];
+  test("only a run's last message takes its block key", () => {
+    expect(turnRowByRun(rows, new Set())).toEqual(
+      new Map([
+        ["r1", "m3"],
+        ["r2", "m4"],
+      ]),
+    );
+  });
+  test("none while the run still draws its own block", () => {
+    expect(turnRowByRun(rows, new Set(["r1"]))).toEqual(new Map([["r2", "m4"]]));
   });
 });
 
@@ -138,8 +162,17 @@ describe("runsToShow", () => {
     const again = runsToShow(late.held, late.shown, [], new Set(), HOLD_FINISHED_RUN_MS + 2);
     expect(again.shown).toEqual([]);
   });
-  test("a run whose message is already listed never shows (no duplicate reply)", () => {
-    expect(runsToShow(none, [], [run("1")], new Set(["1"]), 0).shown).toEqual([]);
+  test("a run resumed after an approval or a question shows again, though its card is listed", () => {
+    // The card landed and the run left the live store: its block goes (the card takes its place).
+    const gone = runsToShow(none, [run("1")], [], new Set(["1"]), 0);
+    expect(gone.shown).toEqual([]);
+    // Approved: the same run works again, its card still in the list.
+    const resumed = runsToShow(gone.held, gone.shown, [run("1")], new Set(["1"]), 100);
+    expect(resumed.shown).toEqual([run("1")]);
+    // Done: its reply is listed and the run left the store: no block, nothing held.
+    const done = runsToShow(resumed.held, resumed.shown, [], new Set(["1"]), 200);
+    expect(done.shown).toEqual([]);
+    expect(done.held.size).toBe(0);
   });
   test("a run that wrote nothing is not held", () => {
     const first = runsToShow(none, [run("1")], [], new Set(), 0, HOLD_FINISHED_RUN_MS, () => false);

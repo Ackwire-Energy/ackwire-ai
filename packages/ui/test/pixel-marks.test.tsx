@@ -55,10 +55,13 @@ describe("Composer while an agent works", () => {
   function Box({
     initial = "",
     working,
+    choice = working ? CHOICE : null,
     sent,
   }: {
     initial?: string;
     working: ComposerWorking | null;
+    /** The app gives it while an agent works (default: with `working`). */
+    choice?: typeof CHOICE | null;
     sent: Array<[string, { interrupt?: boolean } | undefined]>;
   }) {
     const [value, setValue] = useState(initial);
@@ -73,7 +76,7 @@ describe("Composer while an agent works", () => {
         label="Mensagem"
         sendLabel="Enviar"
         working={working}
-        choice={CHOICE}
+        {...(choice ? { choice } : {})}
       />
     );
   }
@@ -125,5 +128,20 @@ describe("Composer while an agent works", () => {
     render(<Box initial="oi" working={null} sent={sent} />);
     await act(async () => fireEvent.keyDown(body().getByRole("textbox", { name: "Mensagem" }), { key: "Enter" }));
     expect(sent).toEqual([["oi", undefined]]);
+  });
+
+  test("someone who may not stop the agent still chooses; there is just no stop button", async () => {
+    const sent: Array<[string, { interrupt?: boolean } | undefined]> = [];
+    render(<Box working={null} choice={CHOICE} sent={sent} />);
+    const box = body().getByRole("textbox", { name: "Mensagem" });
+    // Empty box: the button sends (dim), it never turns into stop.
+    expect(body().getByRole("button", { name: "Enviar" }).getAttribute("data-mode")).toBe("send");
+    await act(async () => fireEvent.change(box, { target: { value: "para e olha isso" } }));
+    expect(body().getByRole("radiogroup", { name: "Ao mandar" })).toBeTruthy();
+    await act(async () => fireEvent.keyDown(box, { key: "Enter", ctrlKey: true }));
+    expect(sent.at(-1)).toEqual(["para e olha isso", { interrupt: true }]);
+    await act(async () => fireEvent.change(box, { target: { value: "junta" } }));
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    expect(sent.at(-1)).toEqual(["junta", { interrupt: false }]);
   });
 });

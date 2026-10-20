@@ -98,6 +98,9 @@ export interface TurnKey {
   provisional: boolean;
 }
 
+/** Each guessed "pensando…" gets a fresh key (the same agent asked again in the same thread is a new block). */
+let guessSeq = 0;
+
 /**
  * Keys for the agents' blocks, kept across renders: a run keeps its key; a real run takes the key of the
  * "pensando…" guessed on send for the same agent there (the same thread, else the same conversation) once
@@ -111,7 +114,8 @@ export function turnKeys(
   const live = new Set(runs.map((r) => r.runId));
   for (const r of runs) {
     if (next.has(r.runId)) continue;
-    let key = `turn-${r.runId}`;
+    // A guess's id repeats (`pending:<agent>:<thread>`) and the key it hands over stays with that reply.
+    let key = r.provisional ? `turn-${r.runId}:${++guessSeq}` : `turn-${r.runId}`;
     if (!r.provisional) {
       const guesses = [...next].filter(
         ([id, k]) => k.provisional && !live.has(id) && k.agentId === r.agentId && k.channelId === r.channelId,
@@ -133,6 +137,23 @@ export function turnKeys(
   return next;
 }
 
+/**
+ * Which saved message takes its run's block key: a run can post more than one (text before an approval,
+ * the card, the reply), and only its last one does (keys stay unique). None while the run still draws its
+ * own block.
+ */
+export function turnRowByRun(
+  rows: readonly { kind: string; key: string; message?: { agentRunId?: string | null } }[],
+  drawn: ReadonlySet<string>,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    const runId = r.kind === "message" ? r.message?.agentRunId : null;
+    if (runId && !drawn.has(runId)) out.set(runId, r.key);
+  }
+  return out;
+}
+
 export interface HeldRun<R> {
   run: R;
   until: number;
@@ -149,8 +170,9 @@ export interface RunsShown<R> {
 /**
  * The agents' blocks to draw. A run that leaves the list usually has its saved message a moment later
  * (separate updates), so its block stays, with its last words, until a message with that run arrives or
- * `holdMs` passes (only the runs `holds` keeps: one that wrote nothing just goes). A run whose message is
- * already in the list never draws (no duplicate reply).
+ * `holdMs` passes (only the runs `holds` keeps: one that wrote nothing just goes). A run still in the live
+ * store always draws, even if a message of it is listed: the store drops a run when its message comes, so
+ * one that is there again was resumed (after an approval or a question) and works on under its card.
  */
 export function runsToShow<R extends { runId: string }>(
   held: ReadonlyMap<string, HeldRun<R>>,
@@ -161,7 +183,7 @@ export function runsToShow<R extends { runId: string }>(
   holdMs = HOLD_FINISHED_RUN_MS,
   holds: (run: R) => boolean = () => true,
 ): RunsShown<R> {
-  const live = writing.filter((r) => !arrived.has(r.runId));
+  const live = writing;
   const writingIds = new Set(writing.map((r) => r.runId));
   const next = new Map<string, HeldRun<R>>();
   for (const [id, h] of held) {

@@ -27,7 +27,9 @@ export function registerRunAbort(runId: string) {
 }
 
 export function unregisterRunAbort(runId: string, controller: AbortController) {
-  if (active.get(runId) === controller) active.delete(runId);
+  if (active.get(runId) !== controller) return;
+  active.delete(runId);
+  missedInterrupts.delete(runId);
 }
 
 /** Aborts the run if it executes here. */
@@ -75,9 +77,25 @@ export const RUN_INTERRUPT_TOPIC = "system:run-interrupt";
  */
 const turns = new Map<string, { controller: AbortController; hasRead(messageId: string): boolean }>();
 
+/**
+ * "Stop and send" for a run executing here while no model call is registered (a tool runs, or the loop is
+ * between taking the steering and starting the next call): the next call checks them when it registers,
+ * so a message that landed just after the steering was taken still cuts that call short.
+ */
+const missedInterrupts = new Map<string, Set<string>>();
+
+/**
+ * The next model call of the run. Already aborted if an interrupt came in between for a message the run
+ * hasn't read (the caller then reads it before calling the model).
+ */
 export function registerTurnAbort(runId: string, hasRead: (messageId: string) => boolean) {
   const controller = new AbortController();
   turns.set(runId, { controller, hasRead });
+  const missed = missedInterrupts.get(runId);
+  if (missed) {
+    missedInterrupts.delete(runId);
+    if ([...missed].some((id) => !hasRead(id))) controller.abort(new Error("turn interrupted"));
+  }
   return controller;
 }
 
@@ -88,7 +106,15 @@ export function unregisterTurnAbort(runId: string, controller: AbortController) 
 /** Aborts the run's current model call if it runs here and hasn't read `messageId` yet. */
 export function interruptLocalTurn(runId: string, messageId: string) {
   const turn = turns.get(runId);
-  if (!turn || turn.controller.signal.aborted || turn.hasRead(messageId)) return false;
+  if (!turn) {
+    // Executing here between two model calls: the next one checks it (read by then, nothing is cut).
+    if (!active.has(runId)) return false;
+    const missed = missedInterrupts.get(runId) ?? new Set<string>();
+    missed.add(messageId);
+    missedInterrupts.set(runId, missed);
+    return true;
+  }
+  if (turn.controller.signal.aborted || turn.hasRead(messageId)) return false;
   turn.controller.abort(new Error("turn interrupted"));
   return true;
 }
