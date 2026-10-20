@@ -24,6 +24,8 @@ import {
   Avatar,
   Button,
   Card,
+  CardFooter,
+  CardHeader,
   ComputerPortrait,
   Field,
   Icon,
@@ -45,7 +47,7 @@ import { PlanTermsDialog } from "@/components/AgentBrain";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImport";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
-import { OnboardingHorizon, WelcomeSky } from "@/components/Sky";
+import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
@@ -73,8 +75,18 @@ export const PRESET_LOOK: Record<Preset, Required<AgentAppearance>> = {
   lia: { color: "rose", eyes: "dots", accessory: "flower" },
   atlas: { color: "amber", eyes: "round", accessory: "antenna" },
 };
-/** The agent guiding the onboarding from the rail. */
+/** The agent guiding the onboarding (always on the team: "Eu já estou aqui"). */
 const GUIDE: Preset = "ada";
+/** Who hosts each step: the agent asking its question (introducing itself the first time). */
+const HOST: Record<OnboardingStepId, Preset> = {
+  workspace: "ada",
+  context: "lia",
+  import: "theo",
+  computer: "atlas",
+  agents: "ada",
+  team: "theo",
+  done: "ada",
+};
 /** How long the guide keeps writing after a keystroke, and smiling after a step. */
 const TYPING_MS = 900;
 const HAPPY_MS = 1600;
@@ -122,7 +134,12 @@ function useGuideMood() {
   };
 }
 
-/** docs/design/telas/OnboardingV2.html — the steps on a rail; the guide on the sky rising from its bottom. */
+/**
+ * docs/design/telas/OnboardingEtapas.html — the steps on a rail (the pixel sky
+ * on top fills as they get done); each step is one calm screen hosted by an
+ * agent of the team, who asks in a speech bubble (introducing itself the first
+ * time); one big action under the answer, "Pular esta etapa" on optional steps.
+ */
 export function OnboardingPage() {
   const { t } = useTranslation();
   const api = useApi();
@@ -135,9 +152,12 @@ export function OnboardingPage() {
   const [index, setIndex] = useState(0);
   const [reached, setReached] = useState(0);
   const [done, setDone] = useState<Set<OnboardingStepId>>(new Set());
+  // The step where each host agent first showed up (it introduces itself there only).
+  const [metAt, setMetAt] = useState<Partial<Record<Preset, OnboardingStepId>>>({});
   // Workspace
   const [org, setOrg] = useState("");
   const [zone, setZone] = useState(() => browserTimezone() ?? "UTC");
+  const [zoneOpen, setZoneOpen] = useState(false);
   const [logo, setLogo] = useState<{ imageBase64: string; contentType: string } | null>(null);
   const [logoDirty, setLogoDirty] = useState(false);
   const [logoOpen, setLogoOpen] = useState(false);
@@ -145,6 +165,7 @@ export function OnboardingPage() {
   // Context
   const [context, setContext] = useState("");
   const [savedContext, setSavedContext] = useState("");
+  const contextBox = useRef<HTMLTextAreaElement>(null);
   // An Obsidian vault for the wiki: read in step 2, imported when it continues.
   const vault = useVaultReader([]);
   const [vaultPages, setVaultPages] = useState<number | null>(null);
@@ -153,10 +174,11 @@ export function OnboardingPage() {
   const [imported, setImported] = useState<ImportResult | null>(null);
   const [importPick, setImportPick] = useState<Set<string>>(new Set());
   const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>([]);
-  // Agents and key
-  const [chosen, setChosen] = useState<Set<Preset>>(new Set([GUIDE]));
+  // Agents and key: first who joins, then (when nothing else thinks for them) the key.
+  const [chosen, setChosen] = useState<Set<Preset>>(new Set(PRESETS));
+  const [agentsPhase, setAgentsPhase] = useState<"pick" | "key">("pick");
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
-  // The workspace key: a provider's key (required), or the platform key where the server offers one.
+  // The workspace key: a provider's key, or the platform key where the server offers one.
   const [key, setKey] = useState<ProviderId | "platform">("anthropic");
   const [apiKey, setApiKey] = useState("");
   const [advanced, setAdvanced] = useState(false);
@@ -166,6 +188,8 @@ export function OnboardingPage() {
   const [keyTouched, setKeyTouched] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
   const [platform, setPlatform] = useState(false);
+  // The monthly budget of every agent (US$, API usage only); null = the workspace default as it is.
+  const [budget, setBudget] = useState<string | null>(null);
   // Computer (before the agents): with one connected, the model step can pick its Claude Code.
   const [computer, setComputer] = useState<Computer>(null);
   const [machine, setMachine] = useState<Machine | null>(null);
@@ -184,12 +208,14 @@ export function OnboardingPage() {
     desc: t(`onboarding.presets.${p}.desc`),
   });
   const createdPresets = PRESETS.filter((p) => agentIds[p]);
-  /** The import in use (none after "Começar do zero" or picking another source). */
+  /** The import in use (none after picking another source). */
   const active = imported && importFrom === imported.source ? imported : null;
   /** An imported agent's identity across files: the source, the files and its key. */
   const importKey = (key: string) => `${active?.source}:${active?.files.join(",")}:${key}`;
   const pickedImports = active ? active.agents.filter((a) => importPick.has(a.key)) : [];
   const chosenCount = chosen.size + pickedImports.length;
+  /** Who joins besides the guide (it is "already here" in the copy). */
+  const joining = chosenCount - (chosen.has(GUIDE) ? 1 : 0);
   const crew: CrewMember[] = [
     ...createdPresets.map((p) => ({
       key: p,
@@ -201,6 +227,15 @@ export function OnboardingPage() {
   ];
   const ready = validInvites(invites);
   const toSend = ready.filter((i) => !sent.has(i.email));
+  /** Agents think through the connected computer's Claude Code: then the API key is optional. */
+  const thinksOnComputer = computer === "machine" && machine !== null && brain === "claude_code";
+  const needsKey = !keySaved && !thinksOnComputer;
+
+  // The host of this step meets you here the first time.
+  const host = HOST[step.id];
+  useEffect(() => {
+    setMetAt((m) => (m[host] ? m : { ...m, [host]: step.id }));
+  }, [host, step.id]);
 
   const saveWorkspace = useMutation({
     mutationFn: async () => {
@@ -287,11 +322,22 @@ export function OnboardingPage() {
     readImport.reset();
   };
 
+  // The workspace default budget, shown (and changed) next to the key.
+  const settings = useQuery({
+    queryKey: ["onboarding", "settings", created?.orgId],
+    queryFn: () => api.orgs.settings(created?.orgId ?? ""),
+    enabled: Boolean(created) && step.id === "agents",
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const budgetValue = budget ?? (settings.data?.defaultAgentBudgetUsd?.toString() || "");
+  const budgetOk = budgetValue === "" || (Number.isFinite(Number(budgetValue)) && Number(budgetValue) >= 0);
+
   const saveAgents = useMutation({
     mutationFn: async () => {
       if (!created) return;
       const provider = key === "platform" ? "anthropic" : key;
-      if (key !== "platform" && !keySaved) {
+      // No key needed when the agents think on the connected computer; one pasted is still saved.
+      if (key !== "platform" && !keySaved && apiKey.trim()) {
         const cred = await api.agents.addCredential(created.orgId, {
           provider: key,
           label: providerLabel(key),
@@ -303,6 +349,9 @@ export function OnboardingPage() {
         // Every agent, the router, summaries and reflection use the workspace default key.
         await api.orgs.updateSettings(created.orgId, { defaultCredentialId: cred.id });
         setKeySaved(true);
+      }
+      if (budget !== null && budgetOk && budget !== "" && Number(budget) !== settings.data?.defaultAgentBudgetUsd) {
+        await api.orgs.updateSettings(created.orgId, { defaultAgentBudgetUsd: Number(budget) });
       }
       const list = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
       const ids = { ...agentIds };
@@ -412,6 +461,7 @@ export function OnboardingPage() {
     const next = Math.max(0, Math.min(total - 1, i));
     setIndex(next);
     setReached((r) => Math.max(r, next));
+    setAgentsPhase("pick");
     if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
       try {
         window.scrollTo({ top: 0 });
@@ -434,7 +484,14 @@ export function OnboardingPage() {
         // The vault goes in the background: the next steps don't wait for the attachments.
         if (vault.report && vaultPages === null && !importWiki.isPending) importWiki.mutate();
       }
-      if (step.id === "agents") await saveAgents.mutateAsync();
+      if (step.id === "agents") {
+        // Without a computer that thinks for them, the agents need a key: its own screen first.
+        if (agentsPhase === "pick" && needsKey) {
+          setAgentsPhase("key");
+          return;
+        }
+        await saveAgents.mutateAsync();
+      }
       if (step.id === "computer") await saveComputer.mutateAsync();
       if (step.id === "team") await sendInvites.mutateAsync();
     } else if (step.id === "computer") {
@@ -461,39 +518,73 @@ export function OnboardingPage() {
   const keyOk = key === "platform" || keySaved || keyLooksValid(key, apiKey);
   const blocked =
     (step.id === "workspace" && !org.trim()) ||
-    (step.id === "agents" && (chosenCount === 0 || !keyOk)) ||
-    (step.id === "computer" && computer === null);
+    (step.id === "agents" && agentsPhase === "key" && (!keyOk || !budgetOk)) ||
+    (step.id === "import" && !active) ||
+    (step.id === "computer" && (computer === null || (computer === "machine" && !machine)));
 
-  /** The heading's step (the last one has its own welcome card). */
-  const head = step.id === "done" ? null : step.id;
-  const eyebrow = step.optional
-    ? t("onboarding.stepOfOptional", { n: index + 1, total })
-    : t("onboarding.stepOf", { n: index + 1, total });
+  // What the rail shows under each done step.
+  const railValue: Partial<Record<OnboardingStepId, string>> = {
+    workspace: org.trim() || undefined,
+    context: context.trim() ? t("onboarding.railValue.context") : undefined,
+    import: pickedImports.length
+      ? joinNames(
+          pickedImports.map((a) => a.name),
+          t("newAgent.and"),
+        )
+      : t("onboarding.railValue.skipped"),
+    computer:
+      computer === "cloud"
+        ? t("onboarding.done.computerCloud")
+        : computer === "machine" && machine
+          ? machine.name
+          : t("onboarding.railValue.skipped"),
+    agents: crew.length
+      ? joinNames(
+          crew.map((c) => c.name),
+          t("newAgent.and"),
+        )
+      : undefined,
+    team: sent.size ? t("onboarding.railValue.invites", { count: sent.size }) : t("onboarding.railValue.later"),
+  };
+
+  // The question: the step's, or the key's on the agents' second screen.
+  const metNames = (["lia", "theo", "atlas"] as Preset[])
+    .filter((p) => metAt[p] && chosen.has(p))
+    .map((p) => presetInfo(p).name);
+  const ask =
+    step.id === "done"
+      ? null
+      : step.id === "agents" && agentsPhase === "key"
+        ? { title: t("onboarding.keyStep.title"), lead: t("onboarding.keyStep.lead") }
+        : {
+            title:
+              step.id === "agents" && active?.agents.length
+                ? t("onboarding.agents.importedTitle")
+                : t(`onboarding.${step.id}.title`),
+            lead:
+              step.id === "agents" && metNames.length
+                ? t("onboarding.agents.leadMet", { names: joinNames(metNames, t("newAgent.and")) })
+                : t(`onboarding.${step.id}.lead`),
+          };
+  const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
   const primaryLabel =
     step.id === "done"
       ? t("onboarding.done.open")
-      : step.id === "team" && toSend.length > 0
-        ? t("onboarding.team.inviteAndContinue")
-        : t("common.continue");
-  const showSkip =
-    step.id === "computer" ||
-    (step.id === "import" && importFrom !== null && importFrom !== "none") ||
-    (step.id === "team" && toSend.length > 0);
-  const hint =
-    step.id === "workspace"
-      ? t("onboarding.workspace.hint")
-      : step.id === "context"
-        ? t("onboarding.context.hint")
-        : step.id === "import" && active
-          ? t("onboarding.import.hint")
-          : step.id === "agents"
-            ? chosenCount > 0
-              ? t("onboarding.agents.count", { count: chosenCount })
-              : t("onboarding.agents.none")
-            : step.id === "team" && ready.length > 0
-              ? t("onboarding.team.ready", { count: ready.length })
-              : "";
+      : step.id === "computer" && computer === "cloud"
+        ? t("onboarding.actions.useCloud")
+        : step.id === "agents" && agentsPhase === "pick" && !needsKey && joining > 0
+          ? t("onboarding.actions.create", { count: joining })
+          : step.id === "agents" && agentsPhase === "key" && joining > 0
+            ? t("onboarding.actions.saveAndCreate", { count: joining })
+            : step.id === "team" && toSend.length > 0
+              ? t("onboarding.actions.invite", { count: toSend.length })
+              : t("onboarding.actions.continue");
+  const showSkip = step.optional && !(step.id === "agents" && agentsPhase === "key");
+  const back = () => {
+    if (step.id === "agents" && agentsPhase === "key") setAgentsPhase("pick");
+    else go(index - 1);
+  };
 
   return (
     <div className="onb">
@@ -501,6 +592,19 @@ export function OnboardingPage() {
         <span className="onb__brand">
           <Logo size={22} />
         </span>
+        <div className="onb__progress">
+          <span className="onb__progress-text">
+            <span>
+              {done.size >= total - 1
+                ? t("onboarding.progress.done")
+                : t("onboarding.progress.left", { count: total - 1 - done.size })}
+            </span>
+            <span className="onb__progress-count">
+              {t("onboarding.progress.count", { n: done.size, total: total - 1 })}
+            </span>
+          </span>
+          <OnboardingProgress progress={done.size / (total - 1)} />
+        </div>
         <StepRail
           label={t("onboarding.stepsLabel")}
           current={index}
@@ -513,78 +617,97 @@ export function OnboardingPage() {
             done: done.has(s.id),
             disabled: i > reached || busy || (created === null && i > 0),
             optional: s.optional,
+            value: railValue[s.id],
           }))}
         />
-        <div className="onb__guide">
-          <p className="onb__bubble" role="status" aria-live="polite">
-            {t(`onboarding.guide.${step.id}`)}
-          </p>
-          <AgentAvatar
-            name={t(`onboarding.presets.${GUIDE}.name`)}
-            appearance={PRESET_LOOK[GUIDE]}
-            size="lg"
-            className="onb__guide-agent"
-            state={guide.typing ? "writing" : undefined}
-            expression={guide.happy ? "happy" : undefined}
-          />
-        </div>
         <OnboardingHorizon progress={done.size / (total - 1)} />
       </aside>
 
-      <main className="onb__main" onInput={guide.onTyping}>
-        <div className="onb__body">
-          {head && (
-            <header className="onb__head">
-              <p className="onb__eyebrow">{eyebrow}</p>
-              <h1 className="onb__title">
-                {head === "agents" && active?.agents.length
-                  ? t("onboarding.agents.importedTitle")
-                  : t(`onboarding.${head}.title`)}
-              </h1>
-              <p className="onb__lead">{t(`onboarding.${head}.lead`)}</p>
-            </header>
+      <main
+        className="onb__main"
+        onInput={guide.onTyping}
+        onKeyDown={(e) => {
+          // Enter continues (the big button shows ↵), except where Enter means something else.
+          const el = e.target as HTMLElement;
+          if (e.key !== "Enter" || e.defaultPrevented || e.nativeEvent.isComposing) return;
+          // In the context box Enter is a new line; ⌘/Ctrl+Enter continues there.
+          if (el.closest("textarea") && !(e.metaKey || e.ctrlKey)) return;
+          if (el.closest("button, a, [role='dialog'], [role='listbox'], [role='combobox']")) return;
+          if (blocked || busy) return;
+          e.preventDefault();
+          void advance().catch(() => {});
+        }}
+      >
+        <div className="onb__body" key={`${step.id}-${agentsPhase}`}>
+          {(index > 0 || agentsPhase === "key") && (
+            <button type="button" className="onb__back" onClick={back} disabled={busy}>
+              <Icon name="chevronLeft" size={16} />
+              {t("onboarding.back")}
+            </button>
+          )}
+
+          {ask && (
+            <HostAsk
+              name={presetInfo(host).name}
+              appearance={PRESET_LOOK[host]}
+              initials={host === "atlas" ? "At" : undefined}
+              fresh={metAt[host] === undefined || metAt[host] === step.id}
+              typing={guide.typing}
+              happy={guide.happy}
+              intro={intro}
+              title={ask.title}
+              lead={ask.lead}
+            />
           )}
 
           {step.id === "workspace" && (
-            <Card as="div">
-              <div className="row" style={{ gap: 14, alignItems: "center", flexWrap: "nowrap" }}>
+            <div className="onb__answer">
+              <div className="onb__ws">
                 <button
                   type="button"
                   className="onb__logo"
                   aria-label={logo ? t("onboarding.workspace.logoChange") : t("onboarding.workspace.logoPick")}
+                  title={t("onboarding.workspace.logoHelp")}
                   onClick={() => setLogoOpen(true)}
                 >
                   {logo ? (
                     <OrgMark logo={`data:${logo.contentType};base64,${logo.imageBase64}`} size={56} />
+                  ) : org.trim() ? (
+                    <span className="onb__logo-letter">{org.trim().charAt(0).toUpperCase()}</span>
                   ) : (
                     <Icon name="upload" />
                   )}
                 </button>
-                <span className="stack-4" style={{ minWidth: 0 }}>
-                  <span className="onb__label">{t("onboarding.workspace.logo")}</span>
-                  <span className="small muted">{t("onboarding.workspace.logoHelp")}</span>
-                </span>
-              </div>
-              <Field label={t("onboarding.workspace.name")} id="org-name">
                 <Input
+                  className="onb__big"
+                  aria-label={t("onboarding.workspace.name")}
                   value={org}
                   onChange={(e) => setOrg(e.target.value)}
                   placeholder={t("onboarding.workspace.namePlaceholder")}
                   autoFocus
                 />
-              </Field>
-              <Field
-                label={t("onboarding.workspace.timezone")}
-                id="org-zone"
-                help={t("onboarding.workspace.timezoneHelp")}
-              >
-                <ZonePicker
+              </div>
+              {zoneOpen ? (
+                <Field
+                  label={t("onboarding.workspace.timezone")}
                   id="org-zone"
-                  value={zone}
-                  onChange={setZone}
-                  suggested={[browserTimezone() ?? "", "UTC"].filter(Boolean)}
-                />
-              </Field>
+                  help={t("onboarding.workspace.timezoneHelp")}
+                >
+                  <ZonePicker
+                    id="org-zone"
+                    value={zone}
+                    onChange={setZone}
+                    suggested={[browserTimezone() ?? "", "UTC"].filter(Boolean)}
+                  />
+                </Field>
+              ) : (
+                <p className="onb__help">
+                  {t("onboarding.workspace.zone", { zone })} ·{" "}
+                  <button type="button" className="onb__link" onClick={() => setZoneOpen(true)}>
+                    {t("onboarding.workspace.zoneChange")}
+                  </button>
+                </p>
+              )}
               <ImageCropDialog
                 open={logoOpen}
                 onClose={() => setLogoOpen(false)}
@@ -605,83 +728,137 @@ export function OnboardingPage() {
                 onSaved={() => setLogoOpen(false)}
                 onRemoved={() => setLogoOpen(false)}
               />
-            </Card>
+            </div>
           )}
 
           {step.id === "context" && (
-            <Card as="div">
-              <Field label={t("onboarding.context.label")} id="org-ctx" help={t("onboarding.context.help")}>
-                <Textarea
-                  rows={7}
-                  value={context}
-                  onChange={(e) => setContext(e.target.value)}
-                  placeholder={t("onboarding.context.placeholder", { org: orgName })}
-                />
-              </Field>
-            </Card>
+            <div className="onb__answer">
+              <Textarea
+                ref={contextBox}
+                className="onb__big"
+                rows={6}
+                aria-label={t("onboarding.context.label")}
+                value={context}
+                onChange={(e) => setContext(e.target.value)}
+                placeholder={t("onboarding.context.placeholder", { org: orgName })}
+                autoFocus
+              />
+              <div className="onb__starters">
+                {(["sell", "who", "rules"] as const).map((k) => (
+                  <Button
+                    key={k}
+                    size="sm"
+                    variant="ghost"
+                    icon="plus"
+                    className="onb__starter"
+                    onClick={() => {
+                      const text = t(`onboarding.context.starters.${k}.text`);
+                      const next = context.trim() ? `${context.replace(/\s*$/, "")}\n${text}` : text;
+                      setContext(next);
+                      requestAnimationFrame(() => {
+                        const box = contextBox.current;
+                        box?.focus();
+                        box?.setSelectionRange(next.length, next.length);
+                      });
+                    }}
+                  >
+                    {t(`onboarding.context.starters.${k}.label`)}
+                  </Button>
+                ))}
+              </div>
+              <VaultCard reader={vault} />
+            </div>
           )}
-          {step.id === "context" && <VaultCard reader={vault} />}
 
           {step.id === "import" && (
-            <OnboardingImport
-              source={importFrom}
-              onSource={(s) => {
-                setImportFrom(s);
-                if (s !== imported?.source) readImport.reset();
-              }}
-              result={imported}
-              picked={importPick}
-              onPick={(key, on) =>
-                setImportPick((p) => {
-                  const next = new Set(p);
-                  if (on) next.add(key);
-                  else next.delete(key);
-                  return next;
-                })
-              }
-              reading={readImport.isPending}
-              error={importError}
-              onFiles={(files) => readImport.mutate({ files })}
-              onLink={(url) => readImport.mutate({ url })}
-              onReset={resetImport}
-            />
+            <div className="onb__answer">
+              <OnboardingImport
+                source={importFrom}
+                onSource={(s) => {
+                  setImportFrom(s);
+                  if (s !== imported?.source) readImport.reset();
+                }}
+                result={imported}
+                picked={importPick}
+                onPick={(key, on) =>
+                  setImportPick((p) => {
+                    const next = new Set(p);
+                    if (on) next.add(key);
+                    else next.delete(key);
+                    return next;
+                  })
+                }
+                reading={readImport.isPending}
+                error={importError}
+                onFiles={(files) => readImport.mutate({ files })}
+                onLink={(url) => readImport.mutate({ url })}
+                onReset={resetImport}
+              />
+            </div>
           )}
 
-          {step.id === "agents" && (
-            <>
+          {step.id === "computer" && created && (
+            <div className="onb__answer">
+              <ComputerStep
+                orgId={created.orgId}
+                computer={computer}
+                cloudAvailable={cloudAvailable}
+                machine={machine}
+                onChoose={(c) => {
+                  setComputer(c);
+                  if (c !== "machine") {
+                    setMachine(null);
+                    setBrain("model");
+                  }
+                }}
+                onPaired={(m) => {
+                  setMachine(m);
+                  // Thinking on the computer is what spares the key; the plan warning comes first.
+                  setAskingTerms(true);
+                }}
+              />
+              <PlanTermsDialog
+                brain={askingTerms ? "claude_code" : null}
+                onCancel={() => setAskingTerms(false)}
+                onConfirm={() => {
+                  setBrain("claude_code");
+                  setAskingTerms(false);
+                }}
+              />
+            </div>
+          )}
+
+          {step.id === "agents" && agentsPhase === "pick" && (
+            <div className="onb__answer">
               {active && active.agents.length > 0 && (
-                <>
-                  <h2 className="onb__group">{t("onboarding.agents.imported")}</h2>
-                  {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-                  <div className="grid-options" role="group" aria-label={t("onboarding.agents.importedLabel")}>
-                    {active.agents.map((a) => (
-                      <OptionCard
-                        key={a.key}
-                        agent
-                        pressed={importPick.has(a.key)}
-                        onClick={() =>
-                          setImportPick((p) => {
-                            const next = new Set(p);
-                            if (next.has(a.key)) next.delete(a.key);
-                            else next.add(a.key);
-                            return next;
-                          })
-                        }
-                      >
-                        <AgentAvatar name={a.name} appearance={a.appearance} />
-                        <span className="ac-option__text">
-                          <span className="ac-option__title">{a.role ? `${a.name} · ${a.role}` : a.name}</span>
-                          {a.description && <span className="ac-option__desc">{a.description}</span>}
-                        </span>
-                      </OptionCard>
-                    ))}
-                  </div>
-                  <h2 className="onb__group">{t("onboarding.agents.ready")}</h2>
-                </>
+                // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+                <div className="grid-options" role="group" aria-label={t("onboarding.agents.importedLabel")}>
+                  {active.agents.map((a) => (
+                    <OptionCard
+                      key={a.key}
+                      agent
+                      pressed={importPick.has(a.key)}
+                      onClick={() =>
+                        setImportPick((p) => {
+                          const next = new Set(p);
+                          if (next.has(a.key)) next.delete(a.key);
+                          else next.add(a.key);
+                          return next;
+                        })
+                      }
+                    >
+                      <AgentAvatar name={a.name} appearance={a.appearance} />
+                      <span className="ac-option__text">
+                        <span className="ac-option__title">{a.role ? `${a.name} · ${a.role}` : a.name}</span>
+                        {a.description && <span className="ac-option__desc">{a.description}</span>}
+                      </span>
+                    </OptionCard>
+                  ))}
+                </div>
               )}
               {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
               <div className="grid-options" role="group" aria-label={t("onboarding.agents.listLabel")}>
-                {PRESETS.map((p) => {
+                {PRESETS.filter((p) => p !== GUIDE).map((p) => {
                   const info = presetInfo(p);
                   return (
                     <OptionCard
@@ -722,12 +899,6 @@ export function OnboardingPage() {
                   </div>
                   {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
                   <div className="grid-options grid-options--sm" role="group" aria-label={t("onboarding.brain.title")}>
-                    <OptionCard pressed={brain === "model"} onClick={() => setBrain("model")}>
-                      <span className="ac-option__text">
-                        <span className="ac-option__title">{t("onboarding.brain.model")}</span>
-                        <span className="ac-option__desc">{t("onboarding.brain.modelDesc")}</span>
-                      </span>
-                    </OptionCard>
                     <OptionCard
                       pressed={brain === "claude_code"}
                       onClick={() => brain !== "claude_code" && setAskingTerms(true)}
@@ -737,6 +908,12 @@ export function OnboardingPage() {
                           {t("onboarding.brain.claudeCode", { computer: machine.name })}
                         </span>
                         <span className="ac-option__desc">{t("onboarding.brain.claudeCodeDesc")}</span>
+                      </span>
+                    </OptionCard>
+                    <OptionCard pressed={brain === "model"} onClick={() => setBrain("model")}>
+                      <span className="ac-option__text">
+                        <span className="ac-option__title">{t("onboarding.brain.model")}</span>
+                        <span className="ac-option__desc">{t("onboarding.brain.modelDesc")}</span>
                       </span>
                     </OptionCard>
                   </div>
@@ -750,124 +927,115 @@ export function OnboardingPage() {
                   />
                 </Card>
               )}
-              <KeySection
-                title={t("onboarding.workspaceKeyTitle")}
-                help={t("onboarding.workspaceKeyHelp")}
-                saved={keySaved}
-              >
-                {/* Once saved (back from a later step), the key stays; Settings changes it. */}
-                {!keySaved && (
-                  // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
-                  <div className="grid-options grid-options--sm" role="group" aria-label={t("onboarding.provider")}>
-                    {PROVIDERS.map((p) => (
-                      <OptionCard key={p.id} pressed={key === p.id} onClick={() => setKey(p.id)}>
-                        <span className="ac-option__title">{p.label}</span>
-                      </OptionCard>
-                    ))}
-                    {platform && (
-                      <OptionCard pressed={key === "platform"} onClick={() => setKey("platform")}>
-                        <span className="ac-option__text">
-                          <span className="ac-option__title">{t("onboarding.platformChoice")}</span>
-                          <span className="ac-option__desc">{t("onboarding.platformKeyDesc")}</span>
-                        </span>
-                      </OptionCard>
-                    )}
-                  </div>
-                )}
-                {key !== "platform" && !keySaved && (
-                  <>
-                    <Field
-                      label={t("onboarding.keyFor", { provider: providerLabel(key) })}
-                      id="key-value"
-                      error={keyTouched && !keyOk ? t(`onboarding.keyInvalid.${key}`) : undefined}
-                    >
-                      <Input
-                        type="password"
-                        placeholder={PROVIDERS.find((p) => p.id === key)?.placeholder}
-                        autoComplete="off"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        onBlur={() => setKeyTouched(apiKey.trim().length > 0)}
-                      />
-                    </Field>
-                    <div>
-                      <Button variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
-                        <Icon
-                          name="chevronDown"
-                          size={16}
-                          style={advanced ? { transform: "rotate(180deg)" } : undefined}
-                        />
-                        {t("onboarding.advanced")}
-                      </Button>
-                    </div>
-                    {advanced && key === "anthropic" && (
-                      <Field
-                        label={t("onboarding.anthropicWorkspace")}
-                        id="key-ws"
-                        help={t("onboarding.anthropicWorkspaceHelp")}
-                      >
-                        <Input
-                          value={workspaceId}
-                          onChange={(e) => setWorkspaceId(e.target.value)}
-                          autoComplete="off"
-                        />
-                      </Field>
-                    )}
-                    {advanced && key === "openai" && (
-                      <div className="grid-fields">
-                        <Field label={t("onboarding.openaiOrg")} id="key-org" help={t("onboarding.optional")}>
-                          <Input value={openaiOrg} onChange={(e) => setOpenaiOrg(e.target.value)} placeholder="org-…" />
-                        </Field>
-                        <Field label={t("onboarding.openaiProject")} id="key-project" help={t("onboarding.optional")}>
-                          <Input
-                            value={openaiProject}
-                            onChange={(e) => setOpenaiProject(e.target.value)}
-                            placeholder="proj_…"
-                          />
-                        </Field>
-                      </div>
-                    )}
-                  </>
-                )}
-                {models.data && (
-                  <span className="small muted">
-                    {t("onboarding.suggestedModel", {
-                      model:
-                        models.data.models.find(
-                          (m) =>
-                            m.id ===
-                            suggestModel(
-                              models.data.models,
-                              key === "platform" ? "anthropic" : key,
-                              models.data.defaultModel,
-                            ),
-                        )?.label ?? "",
-                    })}
-                  </span>
-                )}
-              </KeySection>
-            </>
+            </div>
           )}
 
-          {step.id === "computer" && created && (
-            <ComputerStep
-              orgId={created.orgId}
-              computer={computer}
-              cloudAvailable={cloudAvailable}
-              machine={machine}
-              onChoose={(c) => {
-                setComputer(c);
-                if (c !== "machine") {
-                  setMachine(null);
-                  setBrain("model");
-                }
-              }}
-              onPaired={setMachine}
-            />
+          {step.id === "agents" && agentsPhase === "key" && (
+            <div className="onb__answer">
+              {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+              <div className="grid-options grid-options--sm" role="group" aria-label={t("onboarding.provider")}>
+                {PROVIDERS.map((p) => (
+                  <OptionCard key={p.id} pressed={key === p.id} onClick={() => setKey(p.id)}>
+                    <span className="ac-option__title">{p.label}</span>
+                  </OptionCard>
+                ))}
+                {platform && (
+                  <OptionCard pressed={key === "platform"} onClick={() => setKey("platform")}>
+                    <span className="ac-option__text">
+                      <span className="ac-option__title">{t("onboarding.platformChoice")}</span>
+                      <span className="ac-option__desc">{t("onboarding.platformKeyDesc")}</span>
+                    </span>
+                  </OptionCard>
+                )}
+              </div>
+              {key !== "platform" && (
+                <>
+                  <Field
+                    label={t("onboarding.keyFor", { provider: providerLabel(key) })}
+                    id="key-value"
+                    error={keyTouched && !keyOk ? t(`onboarding.keyInvalid.${key}`) : undefined}
+                  >
+                    <Input
+                      className="onb__big"
+                      type="password"
+                      placeholder={PROVIDERS.find((p) => p.id === key)?.placeholder}
+                      autoComplete="off"
+                      autoFocus
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      onBlur={() => setKeyTouched(apiKey.trim().length > 0)}
+                    />
+                  </Field>
+                  <div>
+                    <Button variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
+                      <Icon
+                        name="chevronDown"
+                        size={16}
+                        style={advanced ? { transform: "rotate(180deg)" } : undefined}
+                      />
+                      {t("onboarding.advanced")}
+                    </Button>
+                  </div>
+                  {advanced && key === "anthropic" && (
+                    <Field
+                      label={t("onboarding.anthropicWorkspace")}
+                      id="key-ws"
+                      help={t("onboarding.anthropicWorkspaceHelp")}
+                    >
+                      <Input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} autoComplete="off" />
+                    </Field>
+                  )}
+                  {advanced && key === "openai" && (
+                    <div className="grid-fields">
+                      <Field label={t("onboarding.openaiOrg")} id="key-org" help={t("onboarding.optional")}>
+                        <Input value={openaiOrg} onChange={(e) => setOpenaiOrg(e.target.value)} placeholder="org-…" />
+                      </Field>
+                      <Field label={t("onboarding.openaiProject")} id="key-project" help={t("onboarding.optional")}>
+                        <Input
+                          value={openaiProject}
+                          onChange={(e) => setOpenaiProject(e.target.value)}
+                          placeholder="proj_…"
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </>
+              )}
+              <p className="onb__help">
+                {models.data &&
+                  t("onboarding.suggestedModel", {
+                    model:
+                      models.data.models.find(
+                        (m) =>
+                          m.id ===
+                          suggestModel(
+                            models.data.models,
+                            key === "platform" ? "anthropic" : key,
+                            models.data.defaultModel,
+                          ),
+                      )?.label ?? "",
+                  })}{" "}
+                <button
+                  type="button"
+                  className="onb__link"
+                  onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
+                >
+                  {t("onboarding.keyStep.useComputer")}
+                </button>
+              </p>
+              <BudgetCard
+                value={budgetValue}
+                invalid={!budgetOk}
+                platform={key === "platform"}
+                onChange={(v) => setBudget(v)}
+              />
+            </div>
           )}
 
           {step.id === "team" && created && (
-            <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
+            <div className="onb__answer">
+              <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
+            </div>
           )}
 
           {step.id === "done" && (
@@ -879,57 +1047,110 @@ export function OnboardingPage() {
               wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
             />
           )}
-        </div>
 
-        <footer className="onb__foot">
-          {hint && <span className="onb__hint">{hint}</span>}
-          {index > 0 && (
-            <Button variant="ghost" onClick={() => go(index - 1)} disabled={busy}>
-              {t("common.back")}
+          <div className="onb__actions">
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              kbd={["↵"]}
+              onClick={() => void advance().catch(() => {})}
+              disabled={blocked || busy}
+              loading={busy}
+            >
+              {primaryLabel}
             </Button>
-          )}
-          {showSkip && (
-            <Button variant="ghost" size="lg" onClick={() => void advance(true).catch(() => {})} disabled={busy}>
-              {t("onboarding.skip")}
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => void advance().catch(() => {})}
-            disabled={blocked || busy}
-            loading={busy}
-          >
-            {primaryLabel}
-          </Button>
-        </footer>
+            {showSkip && (
+              <Button variant="ghost" onClick={() => void advance(true).catch(() => {})} disabled={busy}>
+                {t("onboarding.skip")}
+              </Button>
+            )}
+          </div>
+        </div>
       </main>
     </div>
   );
 }
 
-/** The model key, under the agents. */
-function KeySection({
+/** The step's host: the agent (popping in the first time) and its speech bubble with the question. */
+function HostAsk({
+  name,
+  appearance,
+  initials,
+  fresh,
+  typing,
+  happy,
+  intro,
   title,
-  help,
-  saved,
-  children,
+  lead,
 }: {
+  name: string;
+  appearance: AgentAppearance;
+  initials?: string;
+  /** First time this agent shows up: it pops in and introduces itself. */
+  fresh: boolean;
+  typing: boolean;
+  happy: boolean;
+  intro: string | null;
   title: string;
-  help: string;
-  saved: boolean;
-  children: ReactNode;
+  lead: string;
+}) {
+  return (
+    <header className="onb__ask">
+      <span className="onb__host" data-fresh={fresh || undefined}>
+        <AgentAvatar
+          name={name}
+          initials={initials}
+          appearance={appearance}
+          size="lg"
+          state={typing ? "writing" : undefined}
+          expression={happy || fresh ? "happy" : undefined}
+        />
+        <span className="onb__host-name">{name}</span>
+      </span>
+      <div className="onb__bubble">
+        {intro && <p className="onb__intro">{intro}</p>}
+        <h1 className="onb__title">{title}</h1>
+        <p className="onb__lead">{lead}</p>
+      </div>
+    </header>
+  );
+}
+
+/** The monthly budget of every agent: what the API usage may cost, and who charges it. */
+function BudgetCard({
+  value,
+  invalid,
+  platform,
+  onChange,
+}: {
+  value: string;
+  invalid: boolean;
+  platform: boolean;
+  onChange: (v: string) => void;
 }) {
   const { t } = useTranslation();
   return (
-    <Card as="section" aria-labelledby="key-title">
-      <div className="stack-4">
-        <h2 id="key-title" className="section-title">
-          {title}
-        </h2>
-        <span className="small muted">{saved ? t("onboarding.keySaved") : help}</span>
-      </div>
-      {children}
+    <Card as="section" aria-labelledby="budget-title">
+      <CardHeader
+        icon="wallet"
+        id="budget-title"
+        title={t("onboarding.budget.title")}
+        subtitle={t("onboarding.budget.sub")}
+        action={
+          <span className="onb__money" data-invalid={invalid || undefined}>
+            <span aria-hidden="true">US$</span>
+            <input
+              inputMode="decimal"
+              aria-label={t("onboarding.budget.label")}
+              value={value}
+              onChange={(e) => onChange(e.target.value.replace(",", "."))}
+            />
+            <span aria-hidden="true">{t("onboarding.budget.perMonth")}</span>
+          </span>
+        }
+      />
+      <CardFooter>{platform ? t("onboarding.budget.notePlatform") : t("onboarding.budget.noteKey")}</CardFooter>
     </Card>
   );
 }
@@ -941,7 +1162,6 @@ function ChoiceCard({
   title,
   desc,
   pressed,
-  tag,
   disabled,
   onClick,
 }: {
@@ -951,13 +1171,11 @@ function ChoiceCard({
   title: string;
   desc: string;
   pressed: boolean;
-  tag?: string;
   disabled?: boolean;
   onClick: () => void;
 }) {
   const body = (
     <>
-      {tag && <span className="onb__tag">{tag}</span>}
       {art ? (
         <span className="onb__art">{art}</span>
       ) : (
@@ -1032,7 +1250,6 @@ function ComputerStep({
           art={<ComputerPortrait kind="cloud" state={cloudAvailable ? "online" : "offline"} />}
           title={t("onboarding.computer.cloud")}
           desc={cloudAvailable ? t("onboarding.computer.cloudDesc") : t("onboarding.computer.cloudUnavailable")}
-          tag={cloudAvailable ? t("onboarding.computer.recommended") : undefined}
           pressed={computer === "cloud"}
           disabled={!cloudAvailable}
           onClick={() => onChoose("cloud")}

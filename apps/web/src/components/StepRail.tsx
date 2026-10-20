@@ -5,14 +5,18 @@ export interface RailStep {
   name: string;
   done: boolean;
   disabled: boolean;
-  /** Shows the "opcional" tag. */
+  /** Shows the "opcional" line under the name (until there is an answer). */
   optional?: boolean;
+  /** What was answered, under a done step's name (e.g. the workspace name). */
+  value?: string;
 }
 
 /**
  * The numbered steps of a stepped flow on the rail (onboarding, "Criar
- * agente"): the current one raised, done ones with a check, the ones not
- * reached yet disabled. On narrow screens the rail turns into a step bar.
+ * agente"): a line joins the markers and fills up to where you are, the
+ * current one raised, done ones with a check and what was answered under the
+ * name, the ones not reached yet disabled. On narrow screens the rail turns
+ * into a step bar.
  */
 export function StepRail({
   label,
@@ -35,6 +39,7 @@ export function StepRail({
       <ol className="onb__steps">
         {steps.map((s, i) => {
           const done = s.done && i !== current;
+          const sub = done && s.value ? s.value : s.optional && optionalLabel ? optionalLabel : null;
           return (
             <li key={s.id} data-done={done || undefined}>
               <button
@@ -47,11 +52,13 @@ export function StepRail({
                 <span className="onb__n" aria-hidden="true">
                   {done ? <Icon name="check" size={14} /> : i + 1}
                 </span>
-                <span className="onb__step-name">
-                  {s.name}
-                  {done && <span className="ac-visually-hidden"> {doneLabel}</span>}
+                <span className="onb__step-text">
+                  <span className="onb__step-name">
+                    {s.name}
+                    {done && <span className="ac-visually-hidden"> {doneLabel}</span>}
+                  </span>
+                  {sub && <span className="onb__step-sub">{sub}</span>}
                 </span>
-                {s.optional && optionalLabel && <span className="onb__opt">{optionalLabel}</span>}
               </button>
             </li>
           );
