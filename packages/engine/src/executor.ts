@@ -1792,6 +1792,20 @@ interface BrainStep {
 }
 
 /**
+ * A computer brain's answer sometimes starts with a copy of its first words with every space gone,
+ * glued to the real text ("EssepedidoéproTheo,…navegarEsse pedido é pro Theo, …"): that copy is cut.
+ */
+export function dropSquashedEcho(text: string): string {
+  const head = /^\S{20,}/.exec(text)?.[0];
+  if (!head || head.includes("://")) return text;
+  for (let k = head.length; k >= 20; k--) {
+    const rest = text.slice(k);
+    if (rest.replace(/\s+/g, "").startsWith(head.slice(0, k)) && /\s/.test(rest)) return rest.trimStart();
+  }
+  return text;
+}
+
+/**
  * Runs one brain turn: text deltas go to `onDelta` as they arrive, tool calls
  * and usage are collected. An `error` event (or a plan `limit`) becomes a
  * `BrainFailure`; a thrown error propagates as is (model brain: the gateway's
@@ -1837,7 +1851,7 @@ async function thinkOnce(
       );
     } else if (event.type === "error") throw new BrainFailure(event.code, event.message, event.retryable === true);
     // `event.session`: computer brains keep a stable session per conversation (`brainSessionId`); nothing to store.
-    else if (event.type === "done") text = event.text;
+    else if (event.type === "done") text = dropSquashedEcho(event.text);
   }
   if (text === null) throw new Error(`The ${brain.kind} brain ended the turn without an answer`);
   if (brain instanceof ModelBrain && brain.last) {

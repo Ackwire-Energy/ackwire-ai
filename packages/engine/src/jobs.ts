@@ -153,10 +153,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       .where(inArray(schema.agents.id, message.mentionedAgentIds));
     const others = targets.filter((t) => t.id !== message.authorAgentId);
     const scores = new Map<string, number>();
+    // Spoken to by name ("@ada já postei…" opens the message): a reply to it, it answers (hop cap still holds).
+    for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
+    const toJudge = others.filter((t) => !scores.has(t.id));
     let strategy = "mention-judge";
     let error: string | null = null;
     const judge = deps.context ? judgeOf(deps.context) : null;
-    if (judge && others.length > 0) {
+    if (judge && toJudge.length > 0) {
       const [author] = message.authorAgentId
         ? await deps.db
             .select({ handle: schema.agents.handle })
@@ -168,7 +171,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           orgId: message.orgId,
           body: message.body,
           author: author ? `@${author.handle}` : "agent",
-          targets: others.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
+          targets: toJudge.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
         });
         for (const [id, p] of judged) scores.set(id, p);
         strategy = `mention-${judge.name}`;
@@ -446,4 +449,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await consolidateOrg(deps.context, orgOf(job));
     },
   };
+}
+
+/** The message opens by addressing `handle` ("@ada …", after any other leading mentions). */
+export function opensWith(body: string, handle: string): boolean {
+  const lead = /^\s*((?:@[\w.-]+[\s,]*)+)/.exec(body)?.[1] ?? "";
+  return (lead.match(/@([\w.-]+)/g) ?? []).some((m) => m.slice(1).toLowerCase() === handle.toLowerCase());
 }
