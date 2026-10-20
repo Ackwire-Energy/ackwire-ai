@@ -271,7 +271,10 @@ test("accounts (ADR 0041): the account and effort go to a runner that knows them
     const pubsub = createMemoryPubSub();
     const { hub, calls } = fakeHub(pubsub, { status: s });
     const events = await collect(brainWith(pubsub, hub).run(turn(over), io()));
-    return { events, request: calls[0]?.request as (MachineRequest & { account?: string; effort?: string }) | undefined };
+    return {
+      events,
+      request: calls[0]?.request as (MachineRequest & { account?: string; effort?: string }) | undefined,
+    };
   };
 
   // Protocol 13: both go with the turn.
@@ -287,7 +290,9 @@ test("accounts (ADR 0041): the account and effort go to a runner that knows them
   expect(oldEffort.request && "effort" in oldEffort.request).toBe(false);
   const oldAccount = await sent(status(), { account });
   expect(oldAccount.request).toBeUndefined();
-  expect(oldAccount.events).toEqual([expect.objectContaining({ type: "error", code: "runner_outdated", retryable: true })]);
+  expect(oldAccount.events).toEqual([
+    expect.objectContaining({ type: "error", code: "runner_outdated", retryable: true }),
+  ]);
 
   // A signed-out account: not logged in, naming it, without calling the machine.
   const out = await sent(status({ protocol: ACCOUNTS_PROTOCOL }), { account: { ...account, status: "signed_out" } });

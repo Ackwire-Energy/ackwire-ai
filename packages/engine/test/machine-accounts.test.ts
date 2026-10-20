@@ -14,8 +14,8 @@ import { and, eq, schema } from "@agenteschat/db";
 import {
   accountLoginStatus,
   beginAccountLogin,
-  cancelAccountLogin,
   ConflictError,
+  cancelAccountLogin,
   createMachineHub,
   ForbiddenError,
   getAgentBrain,
@@ -306,9 +306,9 @@ test("rename and remove: the owner only; removing signs it out there and release
   expect(
     await renameMachineAccount(deps, admin.id, f.org.id, machineId, CLAUDE_ID, "Meu").catch((e) => e),
   ).toBeInstanceOf(ForbiddenError);
-  expect(await renameMachineAccount(deps, f.owner.id, f.org.id, machineId, CLAUDE_ID, "  ").catch((e) => e)).toBeInstanceOf(
-    ValidationError,
-  );
+  expect(
+    await renameMachineAccount(deps, f.owner.id, f.org.id, machineId, CLAUDE_ID, "  ").catch((e) => e),
+  ).toBeInstanceOf(ValidationError);
   expect(
     await renameMachineAccount(deps, f.owner.id, f.org.id, machineId, CLAUDE_ID, "x".repeat(41)).catch((e) => e),
   ).toBeInstanceOf(ValidationError);

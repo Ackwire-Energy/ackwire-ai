@@ -98,12 +98,20 @@ export async function listMachineAccounts(
     .where(
       and(
         eq(agents.orgId, orgId),
-        inArray(agents.brainAccountId, rows.map((r) => r.id)),
+        inArray(
+          agents.brainAccountId,
+          rows.map((r) => r.id),
+        ),
         isNull(agents.archivedAt),
       ),
     )
     .orderBy(agents.name);
-  return rows.map((r) => accountView(r, using.filter((a) => a.accountId === r.id).map((a) => a.name)));
+  return rows.map((r) =>
+    accountView(
+      r,
+      using.filter((a) => a.accountId === r.id).map((a) => a.name),
+    ),
+  );
 }
 
 async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow) {
@@ -263,7 +271,10 @@ async function ownedMachine(db: Database, userId: string, orgId: string, machine
   const machine = await getMachine(db, orgId, machineId);
   if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
   if (machine.pairedByUserId !== userId) {
-    throw new ForbiddenError("Only the person who connected this computer can manage its accounts", "account.not_owner");
+    throw new ForbiddenError(
+      "Only the person who connected this computer can manage its accounts",
+      "account.not_owner",
+    );
   }
   return machine;
 }
@@ -376,7 +387,8 @@ export async function beginAccountLogin(
     await deps.hub.call(machine.id, { op: "account", action: "cancel", loginId }).catch(() => undefined);
     throw new ConflictError("The computer couldn't start the sign-in", "account.begin_failed", { name: machine.name });
   }
-  const publicKey = typeof reply.publicKey === "string" && PUBLIC_KEY.test(reply.publicKey) ? reply.publicKey : undefined;
+  const publicKey =
+    typeof reply.publicKey === "string" && PUBLIC_KEY.test(reply.publicKey) ? reply.publicKey : undefined;
   const userCode = typeof reply.userCode === "string" && USER_CODE.test(reply.userCode) ? reply.userCode : undefined;
   return {
     loginId,
@@ -525,7 +537,12 @@ export async function cancelAccountLogin(
 // ── Naming and removing ─────────────────────────────────────────────────────
 
 export const cleanAccountLabel = (label: unknown) =>
-  typeof label === "string" ? label.replace(/[\p{Cc}]/gu, " ").replace(/\s+/g, " ").trim() : "";
+  typeof label === "string"
+    ? label
+        .replace(/[\p{Cc}]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+    : "";
 
 /** What people call it (1 to 40 characters). Works with the computer offline. Audited. */
 export async function renameMachineAccount(

@@ -129,7 +129,10 @@ const hostIs = (h: string, domain: string) => h === domain || h.endsWith(`.${dom
  */
 export function parseClaudeLoginUrl(output: string, final = false): string | null {
   const text = stripAnsi(output);
-  return urlsIn(text, (h) => hostIs(h, "claude.com") || hostIs(h, "claude.ai") || hostIs(h, "anthropic.com"), final)[0]?.url ?? null;
+  return (
+    urlsIn(text, (h) => hostIs(h, "claude.com") || hostIs(h, "claude.ai") || hostIs(h, "anthropic.com"), final)[0]
+      ?.url ?? null
+  );
 }
 
 const CODE = /(?:^|[^A-Z0-9-])([A-Z0-9]{4}-[A-Z0-9]{4,6})(?=\s)/;

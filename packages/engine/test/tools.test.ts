@@ -102,7 +102,11 @@ describe("Tool Gateway", () => {
     // The model asks for a tool it was not given: refused by scope, never by prompt.
     expect(await call("github_merge_pr", { repo: "a/b", pr: 1 })).toEqual({
       type: "result",
-      output: { content: "Not allowed: this agent lacks the scope github:pr.merge. If the request needs it, ask for it with request_permission", isError: true },
+      output: {
+        content:
+          "Not allowed: this agent lacks the scope github:pr.merge. If the request needs it, ask for it with request_permission",
+        isError: true,
+      },
     });
     expect(await call("rm_rf", {})).toMatchObject({ output: { isError: true, content: "Unknown tool rm_rf" } });
     expect(await call("github_get_pr", { repo: "a/b" })).toMatchObject({

@@ -417,12 +417,9 @@ function AccountCode({ code }: { code: string }) {
       role="img"
       aria-label={t("desktop.welcome.codeAria", { code: parts.join("").split("").join(" ") })}
     >
-      {parts.map((p, i) => (
-        <span key={`${i}-${p}`}>
-          {i > 0 && <span className="dk-code__dot">·</span>}
-          {p}
-        </span>
-      ))}
+      {parts[0]}
+      {parts.length > 1 && <span className="dk-code__dot">·</span>}
+      {parts.slice(1).join("·")}
     </span>
   );
 }

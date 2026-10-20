@@ -74,6 +74,7 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     name?: unknown;
     paused?: unknown;
     access?: unknown;
+    accounts?: unknown;
   };
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;

@@ -485,7 +485,12 @@ test("the agent's account and effort apply to its own brain; signed out or an ol
   expect(out.unavailable).toMatchObject({ code: "not_logged_in" });
   // A runner older than accounts can't run it.
   await f.db.update(schema.machineAccounts).set({ status: "active" });
-  const old = await resolveBrain({ db: f.db, machines: { status: async (id) => statusOf(id) } }, agent, run, question.id);
+  const old = await resolveBrain(
+    { db: f.db, machines: { status: async (id) => statusOf(id) } },
+    agent,
+    run,
+    question.id,
+  );
   expect(old.unavailable).toMatchObject({ code: "runner_outdated" });
 });
 

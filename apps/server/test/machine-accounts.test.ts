@@ -63,7 +63,13 @@ function fakeRunner() {
           return codes.has(frame.loginId)
             ? ok({
                 state: "done",
-                account: { id: frame.loginId, kind: "claude_code", loggedIn: true, email: "ana@example.com", plan: "max" },
+                account: {
+                  id: frame.loginId,
+                  kind: "claude_code",
+                  loggedIn: true,
+                  email: "ana@example.com",
+                  plan: "max",
+                },
               })
             : ok({ state: "waiting" });
         }
@@ -89,9 +95,9 @@ async function workspace() {
     owner(`/api/app/organizations/${seeded.orgId}${path}`, init);
   const admin = browser(t);
   await signUp(admin, "bia@example.com");
-  const { url } = (await (
-    await api("/invitations", { json: { email: "bia@example.com", role: "admin" } })
-  ).json()) as { url: string };
+  const { url } = (await (await api("/invitations", { json: { email: "bia@example.com", role: "admin" } })).json()) as {
+    url: string;
+  };
   await admin(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
   const asAdmin = (path: string, init?: Parameters<typeof admin>[1]) =>
     admin(`/api/app/organizations/${seeded.orgId}${path}`, init);

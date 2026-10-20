@@ -132,9 +132,7 @@ export const machineAccounts = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.orgId, t.id] }),
-    foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }).onDelete(
-      "cascade",
-    ),
+    foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }).onDelete("cascade"),
     index().on(t.orgId, t.machineId),
   ],
 );

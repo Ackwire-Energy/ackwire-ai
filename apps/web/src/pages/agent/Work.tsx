@@ -889,7 +889,7 @@ function AddAccountFlow({
       running.current = null;
       if (id) void api.machines.cancelAccountLogin(org.id, machineId, id).catch(() => undefined);
     };
-  }, [api, org.id, machineId, kind]);
+  }, [api, org.id, machineId, kind, again]);
   useEffect(() => {
     if (!result || result.state === "waiting") return;
     // Ended on the computer: nothing left to stop.
@@ -948,12 +948,7 @@ function AddAccountFlow({
       ? t("agentPage.work.brain.add.expired")
       : t("agentPage.work.brain.add.failed");
   return (
-    <section
-      ref={box}
-      tabIndex={-1}
-      className="agp-addacct"
-      aria-label={t(`agentPage.work.brain.add.title.${kind}`)}
-    >
+    <section ref={box} tabIndex={-1} className="agp-addacct" aria-label={t(`agentPage.work.brain.add.title.${kind}`)}>
       <div className="agp-addacct__head">
         <b>{t(`agentPage.work.brain.add.title.${kind}`)}</b>
         <Button size="sm" variant="ghost" icon="chevronLeft" onClick={onBack}>

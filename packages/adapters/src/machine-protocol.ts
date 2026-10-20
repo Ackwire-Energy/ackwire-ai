@@ -965,7 +965,13 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
     if (!isObject(a) || !isAccountId(a.id) || !isAccountKind(a.kind)) continue;
     const email = isString(a.email) && a.email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(a.email) ? a.email : undefined;
     const plan = isString(a.plan) && /^[\w.-]{1,40}$/.test(a.plan) ? a.plan : undefined;
-    out.push({ id: a.id, kind: a.kind, loggedIn: a.loggedIn === true, ...(email ? { email } : {}), ...(plan ? { plan } : {}) });
+    out.push({
+      id: a.id,
+      kind: a.kind,
+      loggedIn: a.loggedIn === true,
+      ...(email ? { email } : {}),
+      ...(plan ? { plan } : {}),
+    });
   }
   return out;
 }

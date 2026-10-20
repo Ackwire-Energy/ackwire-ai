@@ -450,7 +450,9 @@ export function agentRoutes(deps: AppDeps) {
               description:
                 "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the person who connected the computer may change it (`account.not_owner`).",
             }),
-            effort: BrainEffort.nullable().optional().openapi({ description: "Null = the CLI's default; omitted = keep." }),
+            effort: BrainEffort.nullable()
+              .optional()
+              .openapi({ description: "Null = the CLI's default; omitted = keep." }),
           }),
         ),
       },
