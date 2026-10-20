@@ -34,12 +34,9 @@
     min-height: 0;
     height: auto;
   }
-  .outages {
-    padding: 8px 12px 0;
-  }
   /* Chat pages hide the bar: the notice keeps clear of the notch itself. */
   .shell:has(.channel__header) .outages {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   /* Menu, the workspace, search. Chat pages put the menu in their own header instead. */
@@ -427,6 +424,12 @@
 @media (max-width: 640px) {
   .outage {
     flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+  .outage__text {
+    flex-direction: column;
+    gap: 0;
+    white-space: normal;
   }
   .outage__crew {
     display: none;

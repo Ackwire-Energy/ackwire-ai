@@ -309,57 +309,61 @@ p {
   height: auto;
 }
 
-/* "O MacBook Air desconectou": a neutral bar on the page, our attention color only on its icon. */
+/* "O MacBook Air desconectou": a thin neutral strip on top of the work area, one line, our attention
+   color only on its icon. Flat (a hairline under it), so nothing below can clip it. */
 .outages {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 16px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
 }
 .outage {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px 10px 14px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  box-shadow: var(--e1), var(--top);
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 10px 6px 16px;
+}
+.outage + .outage {
+  border-top: 1px solid var(--line);
 }
 .outage__icon {
+  flex: none;
   color: var(--attention);
 }
 .outage__text {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .outage__text b {
+  flex: none;
+  max-width: 70%;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .outage__text span {
+  min-width: 0;
   font-size: 13px;
   color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .outage__crew {
   display: inline-flex;
   gap: 2px;
 }
 .outage__acts {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-/* Several at once: the ones after the first stay compact (one line each). */
-.outages[data-count]:not([data-count="1"]) .outage {
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-.outages[data-count]:not([data-count="1"]) .outage__text span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 4px;
 }
 
 /* "Trocar o computador" */
