@@ -106,6 +106,7 @@ export function DmPage({ target }: { target: DmTarget }) {
         header,
         composerTarget: name,
         dmAgentId: agent?.id,
+        dmPersonId: person?.userId,
         locked: agent && !canTalk(agent) ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name) : undefined,
         emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
         emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),

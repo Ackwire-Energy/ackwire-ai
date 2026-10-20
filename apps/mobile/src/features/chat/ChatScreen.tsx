@@ -3,9 +3,7 @@ import {
   type ArtifactDetail,
   type BrowserHandoff,
   type ConnectionStatus,
-  type DirectMessage,
   heldTakeoversHere,
-  keys,
   type LiveRun,
   MESSAGES_PAGE,
   type Message,
@@ -16,6 +14,7 @@ import {
   useChannels,
   useChannelThreads,
   useCreateMission,
+  useDmReads,
   useDms,
   useHeldPlaces,
   useJoinChannel,
@@ -33,9 +32,9 @@ import { listNames } from "@agenteschat/client/lib/activity";
 import { issueTakenOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { can } from "@agenteschat/client/lib/permissions";
+import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
-import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { router, useIsFocused } from "expo-router";
@@ -182,7 +181,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const orgId = useOrgId();
   const meId = useMeId();
   const api = useApi();
-  const qc = useQueryClient();
   const dir = useDirectory();
   const c = useColors();
   const toast = useToast();
@@ -238,6 +236,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       threads.map((q) => q.data),
     );
   }, [isThread, threadId, top.data, threadMessages.data, older, threadsAt]);
+  // A DM with a person: "Visto" under my latest message once they read it (live: `channel.read`).
+  const reads = useDmReads(orgId, channelId, dm?.with.type === "person" && !isThread);
+  const seenId = useMemo(
+    () => (reads.data && meId ? seenMessageId(top.data ?? [], meId, reads.data) : null),
+    [reads.data, top.data, meId],
+  );
 
   // ── Live ──
   const live = useChatLive(orgId, channelId, member);
@@ -545,11 +549,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const lastId = list.at(-1)?.id;
   useEffect(() => {
     if (!member || !lastId || lastId.startsWith("local-")) return;
-    qc.setQueryData<DirectMessage[]>(keys.dms(orgId), (dmList) =>
-      dmList?.map((d) => (d.channelId === channelId ? { ...d, unread: 0 } : d)),
-    );
     markRead(channelId);
-  }, [markRead, qc, orgId, channelId, member, lastId]);
+  }, [markRead, channelId, member, lastId]);
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -957,11 +958,32 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 onRetry={onRetry}
                 offline={Boolean(item.message.clientId && waiting.has(item.message.clientId))}
               />
+              {item.message.id === seenId ? (
+                <Animated.View entering={FadeIn.duration(200)}>
+                  <Text variant="caption" tone="muted" style={styles.seen} accessibilityLiveRegion="polite">
+                    {t("mobile.chat.seen")}
+                  </Text>
+                </Animated.View>
+              ) : null}
             </Animated.View>
           );
       }
     },
-    [when, meId, isThread, linkThreads, onLongPress, onRetry, isFresh, openBrowsers, toggleBrowser, bodyOf, waiting],
+    [
+      when,
+      meId,
+      isThread,
+      linkThreads,
+      onLongPress,
+      onRetry,
+      isFresh,
+      openBrowsers,
+      toggleBrowser,
+      bodyOf,
+      waiting,
+      seenId,
+      t,
+    ],
   );
 
   // Pushes about this conversation stay quiet while it is on screen (no banner, no buzz).
@@ -1260,6 +1282,8 @@ function Connection({ status }: { status: ConnectionStatus }) {
 }
 
 const styles = StyleSheet.create({
+  // "Visto": right under my latest message, at the right edge (the receipts' side).
+  seen: { alignSelf: "flex-end", marginTop: -4, marginBottom: 4, paddingHorizontal: 16 },
   // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
   browserRow: { paddingLeft: 59, paddingRight: 16, paddingBottom: 6 },
   screen: { flex: 1 },

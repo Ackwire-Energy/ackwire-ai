@@ -44,6 +44,7 @@ export const keys = {
   agentForYou: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "for-you"] as const,
   proposals: (orgId: string) => ["org", orgId, "proposals"] as const,
   dms: (orgId: string) => ["org", orgId, "dms"] as const,
+  dmReads: (orgId: string, channelId: string) => ["org", orgId, "dmReads", channelId] as const,
   storage: (orgId: string) => ["org", orgId, "storage"] as const,
   artifacts: (orgId: string) => ["org", orgId, "artifacts"] as const,
   sandbox: (orgId: string) => ["org", orgId, "sandbox"] as const,

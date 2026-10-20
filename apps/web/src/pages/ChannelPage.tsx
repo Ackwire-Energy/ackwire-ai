@@ -35,8 +35,10 @@ import {
   useChannels,
   useChannelThreads,
   useCreateMission,
+  useDmReads,
   useHeldPlaces,
   useJoinChannel,
+  useMarkChannelRead,
   useMessages,
   useMissionControl,
   useModels,
@@ -84,6 +86,7 @@ import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/out
 import { can } from "@agenteschat/client/lib/permissions";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
+import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem, threadRootsToLoad } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
@@ -266,6 +269,8 @@ export interface ChannelChrome {
   composerTarget?: string;
   /** A DM with this agent: it answers every message (optimistic "pensando…" is allowed). */
   dmAgentId?: string;
+  /** A DM with this person: "Visto" under my latest message once they read it. */
+  dmPersonId?: string;
   /** The agent won't answer me: the composer is off and says why ("O Theo só responde a Walter."). */
   locked?: string;
   /** Empty conversation: "Diga oi para o Theo". */
@@ -463,6 +468,12 @@ function ChannelView({
   const isMember = channel.isMember;
   const members = useChannelMembers(org.id, channel.id, isMember);
   const channelMessages = useMessages(org.id, channel.id, isMember);
+  // A DM with a person: "Visto" under my latest message once they read it (live: `channel.read`).
+  const reads = useDmReads(org.id, channel.id, Boolean(chrome?.dmPersonId) && isMember);
+  const seenId = useMemo(
+    () => (reads.data ? seenMessageId(channelMessages.data ?? [], me.user.id, reads.data) : null),
+    [reads.data, channelMessages.data, me.user.id],
+  );
   // Thread view: the thread's root and replies (the channel's page still holds my unsent replies).
   const threadMessages = useThreadMessages(org.id, thread && isMember ? channel.id : undefined, thread?.id ?? "");
   const messages = thread ? threadMessages : channelMessages;
@@ -654,12 +665,13 @@ function ChannelView({
     return () => window.removeEventListener("online", online);
   }, []);
 
-  // Reading the channel marks it read (unread counts in the DM list).
   const api = useApi();
+  // Reading the channel marks it read: the sidebar's badges (channel and DM) clear at once.
+  const markChannelRead = useMarkChannelRead(org.id).mutate;
   const lastId = channelMessages.data?.at(-1)?.id;
   useEffect(() => {
-    if (isMember && lastId) api.dms.markRead(org.id, channel.id).catch(() => {});
-  }, [api, org.id, channel.id, isMember, lastId]);
+    if (isMember && lastId && !lastId.startsWith("local-")) markChannelRead(channel.id);
+  }, [markChannelRead, channel.id, isMember, lastId]);
 
   // The skeleton was on screen: the real messages fade in (once).
   const hadSkeleton = useRef(messages.isLoading);
@@ -1667,6 +1679,7 @@ function ChannelView({
                       divider={divider}
                       channelId={channel.id}
                       runVisible={runVisible}
+                      seenId={thread ? null : seenId}
                     />
                     {!thread && (
                       <ArchivedThreadsNote channelId={channel.id} count={archivedThreads.data?.threads.length ?? 0} />
@@ -1881,6 +1894,7 @@ const Timeline = memo(function Timeline({
   divider,
   channelId,
   runVisible,
+  seenId = null,
 }: {
   items: ReturnType<typeof buildTimeline>;
   /** The first page loaded: rows from then on slide in. */
@@ -1894,6 +1908,8 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string }) => boolean };
+  /** A DM with a person: my message they read last ("Visto" under it). */
+  seenId?: string | null;
 }) {
   const { t, i18n } = useTranslation();
   const models = useModels();
@@ -2020,6 +2036,12 @@ const Timeline = memo(function Timeline({
         />
       ),
     );
+    if (m.id === seenId)
+      rows.push(
+        <p key="dm-seen" className="channel__seen" aria-live="polite">
+          {t("channel.seen")}
+        </p>,
+      );
   }
   for (const slot of slots) {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);

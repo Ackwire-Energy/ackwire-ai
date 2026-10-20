@@ -11338,6 +11338,19 @@ html[data-menu-overlay] .shell {
 }
 
 /* "Novas": where the unseen messages start; it fades a few seconds after the person got there. */
+/* "Visto" under my latest message in a DM with a person, at the right edge like the receipts. */
+.channel__seen {
+  margin: -2px 24px 4px;
+  text-align: right;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .channel__seen {
+    animation: ac-fade-in 200ms ease-out both;
+  }
+}
 .channel__unread {
   display: flex;
   align-items: center;

@@ -18,6 +18,7 @@ import {
   withServerCounts,
 } from "../lib/notifications";
 import { replyOf } from "../lib/reply";
+import { withRead } from "../lib/seen";
 import { upsertMessage } from "../lib/timeline";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
@@ -41,6 +42,8 @@ import type {
   Channel,
   DatabaseActionName,
   DatabaseConnectionInput,
+  DirectMessage,
+  DmRead,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -879,6 +882,28 @@ export const useDms = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.dms(orgId), queryFn: () => api.dms.list(orgId), staleTime: 30_000 });
 };
+
+/** "Visto" in a DM between people: where the others stopped reading (live: `channel.read`). */
+export function useDmReads(orgId: string, channelId: string, enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.dmReads(orgId, channelId),
+    queryFn: () => api.dms.reads(orgId, channelId),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** `channel.read`: someone in a DM read up to a moment ("Visto" moves). */
+export function cacheDmRead(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  event: { channelId: string; userId: string; lastReadAt: string },
+) {
+  qc.setQueryData<DmRead[]>(keys.dmReads(orgId, event.channelId), (reads) =>
+    withRead(reads, { userId: event.userId, lastReadAt: event.lastReadAt }),
+  );
+}
 
 // ── Knowledge (phase 5) ─────────────────────────────────────────────────────
 
@@ -2347,7 +2372,7 @@ function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "ac
   return value as NonNullable<ApiClient[K]>;
 }
 
-/** Marks a channel or DM read now; the channel list shows it with no unread at once. */
+/** Marks a channel or DM read now; the channel and DM lists show it with no unread at once. */
 export function useMarkChannelRead(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2357,6 +2382,9 @@ export function useMarkChannelRead(orgId: string) {
     onMutate: (channelId) => {
       qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
         list?.map((c) => (c.id === channelId ? { ...c, unreadCount: 0 } : c)),
+      );
+      qc.setQueryData<DirectMessage[]>(keys.dms(orgId), (list) =>
+        list?.map((d) => (d.channelId === channelId ? { ...d, unread: 0 } : d)),
       );
     },
     onSettled: () => {

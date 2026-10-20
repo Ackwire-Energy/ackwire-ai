@@ -566,6 +566,8 @@ export const ptBR = {
       writing: "{{name}} escrevendo",
     },
     unreadDivider: "Novas",
+    /** Under my latest message in a DM with a person, once they read it. */
+    seen: "Visto",
     offline: "Sem internet. O que você mandar sai sozinho quando voltar.",
     backOnline: "Conectado de novo",
     sendingOffline: "sai quando a internet voltar",

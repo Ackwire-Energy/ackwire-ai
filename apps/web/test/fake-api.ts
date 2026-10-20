@@ -1314,6 +1314,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return { channelId };
       },
       markRead: async () => {},
+      reads: async () => [],
     },
     questions: {
       // Same rules as the server: the choice must be one of the options; answering twice is 409.

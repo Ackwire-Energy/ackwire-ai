@@ -31,6 +31,7 @@ import {
   type ConnectionStatus,
   type ConsultsState,
   cacheApproval,
+  cacheDmRead,
   cacheForumSuggestion,
   cacheMessage,
   cacheMessageActions,
@@ -655,6 +656,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);
         if (event.suggestion.topicId) void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
       }
+      // A DM between people: the other one read it ("Visto" moves).
+      if (event.type === "channel.read") cacheDmRead(qc, orgId, event);
       // Someone reacted: the pills under that message change for everyone.
       if (event.type === "message.reactions")
         applyReactions(qc, orgId, event.messageId, event.reactions, playAgentReaction);

@@ -52,6 +52,7 @@ import type {
   DesktopRelease,
   DeviceRequest,
   DirectMessage,
+  DmRead,
   DmTarget,
   ForumParticipantsInput,
   ForumPost,
@@ -471,6 +472,8 @@ export interface ApiClient {
     open(orgId: string, target: DmTarget): Promise<{ channelId: string }>;
     /** Marks a channel or DM read up to now. */
     markRead(orgId: string, channelId: string): Promise<void>;
+    /** Where the other people of a DM stopped reading ("Visto"); empty for any other channel. */
+    reads(orgId: string, channelId: string): Promise<DmRead[]>;
   };
   questions: {
     /** Answers an agent's question with a choice or free text. */

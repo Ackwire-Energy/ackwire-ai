@@ -326,6 +326,8 @@ export type ChannelEvent =
     }
   /** A message was unpinned. */
   | { type: "message.unpinned"; channelId: string; messageId: string }
+  /** A person read this DM up to `lastReadAt` (DMs between people only: "Visto"). */
+  | { type: "channel.read"; channelId: string; userId: string; lastReadAt: string }
   /**
    * A thread's state, title or context changed (ADR 0029). `thread` is the fresh view when the
    * server had it (its `canManage` is always false: read yours from the API). `messageIds`: messages
@@ -1078,6 +1080,12 @@ export interface MemoryUpdate {
 export type DmTarget = { agentId: string } | { userId: string };
 
 /** A direct conversation (`GET …/dms`). */
+/** Where another person of a DM stopped reading ("Visto"). */
+export interface DmRead {
+  userId: string;
+  lastReadAt: string;
+}
+
 export interface DirectMessage {
   channelId: string;
   with: { type: AuthorType; id: string; name: string; handle: string | null };

@@ -1,9 +1,11 @@
-import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import type { PubSub } from "@agenteschat/adapters";
+import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import type { Agent } from "./agents";
 import { audienceError, canTalkTo } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
+import { publishChannelEvent } from "./events";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { getMembership, requirePermission } from "./organizations";
 
@@ -248,17 +250,22 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
     .map(({ sortAt: _, ...dm }) => dm);
 }
 
-/** Marks a channel (or DM) read up to now for me. */
+/**
+ * Marks a channel (or DM) read up to now for me. In a DM between people the other one hears it
+ * (`channel.read`): their app says "Visto" under the last message I read.
+ */
 export async function markChannelRead(
   db: Database,
   actorId: string,
   orgId: string,
   channelId: string,
   at = new Date(),
+  pubsub?: PubSub,
 ) {
   const [member] = await db
-    .select({ id: channelMembers.id })
+    .select({ id: channelMembers.id, kind: channels.kind })
     .from(channelMembers)
+    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
     .where(
       and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, actorId)),
     );
@@ -267,6 +274,39 @@ export async function markChannelRead(
     .insert(channelReads)
     .values({ orgId, channelId, userId: actorId, lastReadAt: at })
     .onConflictDoUpdate({ target: [channelReads.channelId, channelReads.userId], set: { lastReadAt: at } });
+  if (member.kind === "dm")
+    await publishChannelEvent(pubsub, {
+      type: "channel.read",
+      channelId,
+      userId: actorId,
+      lastReadAt: at.toISOString(),
+    });
+}
+
+/**
+ * Where the other people of my DM stopped reading ("Visto"). Only in a DM: a channel never shows
+ * who read what. Empty for a DM with an agent (its receipts say it).
+ */
+export async function dmReads(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+): Promise<{ userId: string; lastReadAt: string }[]> {
+  const [member] = await db
+    .select({ kind: channels.kind })
+    .from(channelMembers)
+    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+    .where(
+      and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, actorId)),
+    );
+  if (!member) throw new NotFoundError("Channel not found");
+  if (member.kind !== "dm") return [];
+  const rows = await db
+    .select({ userId: channelReads.userId, lastReadAt: channelReads.lastReadAt })
+    .from(channelReads)
+    .where(and(eq(channelReads.orgId, orgId), eq(channelReads.channelId, channelId), ne(channelReads.userId, actorId)));
+  return rows.map((r) => ({ userId: r.userId, lastReadAt: r.lastReadAt.toISOString() }));
 }
 
 /** The agents of a DM other than the author (who answers without a mention). */

@@ -42,6 +42,7 @@ import type {
   DesktopRelease,
   DeviceRequest,
   DirectMessage,
+  DmRead,
   ForumPost,
   ForumSuggestion,
   ForumTopic,
@@ -495,6 +496,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
       open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
       markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
+      reads: async (orgId, channelId) =>
+        (await request<{ reads: DmRead[] }>(`${org(orgId)}/channels/${enc(channelId)}/reads`)).reads,
     },
     sandbox: {
       settings: (orgId) => request<SandboxSettings>(`${org(orgId)}/sandbox-settings`),

@@ -7,6 +7,7 @@ import {
   type ChannelEvent,
   type ConsultsState,
   cacheApproval,
+  cacheDmRead,
   cacheMessage,
   cacheMessageActions,
   consultsIn,
@@ -157,6 +158,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      break;
+    // A DM between people: the other one read it ("Visto" moves).
+    case "channel.read":
+      cacheDmRead(qc, orgId, event);
       break;
     case "message.pinned":
     case "message.unpinned":

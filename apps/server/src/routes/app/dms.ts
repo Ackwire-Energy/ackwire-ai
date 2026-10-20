@@ -1,4 +1,4 @@
-import { listDms, markChannelRead, openDm } from "@agenteschat/engine";
+import { dmReads, listDms, markChannelRead, openDm } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -33,7 +33,7 @@ const Dm = z
 
 /** Direct conversations (person↔person, person↔agent). In an agent DM the agent answers every message. */
 export function dmRoutes(deps: AppDeps) {
-  const { db } = deps;
+  const { db, adapters } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
 
@@ -92,8 +92,27 @@ export function dmRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
-      await markChannelRead(db, c.get("user").id, orgId, channelId);
+      await markChannelRead(db, c.get("user").id, orgId, channelId, new Date(), adapters.pubsub);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/reads",
+      tags,
+      security,
+      summary: 'Where the other people of a DM stopped reading ("Visto"); empty for any other channel',
+      request: { params: OrgParams.extend({ channelId: z.uuid() }) },
+      responses: {
+        200: json(z.object({ reads: z.array(z.object({ userId: z.string(), lastReadAt: z.string() })) })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      return c.json({ reads: await dmReads(db, c.get("user").id, orgId, channelId) }, 200);
     },
   );
 
