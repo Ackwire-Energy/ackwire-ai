@@ -61,6 +61,15 @@ export function turnOpener(
   return { said: null, opener: generic ? h % OPENERS : null, lines: [...items] };
 }
 
+/**
+ * The blocks drawn now: one at a time, the first at work, so what is on screen never changes order (who
+ * finishes first can't be known). The others are in the line above the box and come in as their saved
+ * reply, like any new message, or as the block once the first is done. A stopped one still shows.
+ */
+export function openingRuns<R extends Pick<LiveRun, "status">>(runs: readonly R[]): R[] {
+  return runs.filter((r, i) => i === 0 || r.status === "canceled");
+}
+
 /** How many steps the block folds into when it is done ("3 passos"). */
 export const turnSteps = (items: readonly TurnItem[]) => items.filter((x) => x.kind === "step").length;
 

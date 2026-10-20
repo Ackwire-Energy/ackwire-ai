@@ -100,6 +100,13 @@ export const sameSlots = (a: RunSlot[], b: RunSlot[]) =>
   a.length === b.length &&
   a.every((s, i) => s.key === b[i]?.key && s.runId === b[i]?.runId && s.goneAt === b[i]?.goneAt);
 
+/**
+ * One block at a time: only the first at work draws, so what is on screen never changes order (who
+ * finishes first can't be known). The others are in the bar above the composer and come in as their
+ * final message, like any new one, or as the block once the first is done. Stopped or failed still show.
+ */
+export const drawsBehind = (r: Pick<LiveRun, "status">) => r.status === "canceled" || r.status === "failed";
+
 /** How many generic openers there are (`run.opener0`…): one per run, always the same. */
 export const OPENERS = 3;
 

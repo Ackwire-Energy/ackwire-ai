@@ -36,6 +36,7 @@ import {
   rememberTurn,
   stoppedOf,
   OPENERS,
+  openingRuns,
   turnItems,
   turnOpener,
   turnPhase,
@@ -479,6 +480,11 @@ describe("an agent's turn as one block", () => {
 
     expect(turnOpener(run({ runId: "w", status: "running", text: "Ontem" }), []).opener).toBeNull();
     expect(turnOpener(run({ runId: "s", status: "canceled" }), []).opener).toBeNull();
+  });
+
+  test("one block at a time: the first at work, plus any stopped one (the order on screen never changes)", () => {
+    const runs = [run({ runId: "a" }), run({ runId: "b", text: "Ontem" }), run({ runId: "c", status: "canceled" })];
+    expect(openingRuns(runs).map((r) => r.runId)).toEqual(["a", "c"]);
   });
 
   test("a stopped run's steps are not running any more", () => {

@@ -121,7 +121,7 @@ import {
   type PlusPick,
   ThreadOptions,
 } from "./sheets";
-import { turnRuns, withOpacity } from "./turn";
+import { openingRuns, turnRuns, withOpacity } from "./turn";
 
 /** A run's messages this recent are asked whether a take over still holds the agent's browser. */
 const HELD_RECENT_MS = 12 * 60 * 60_000;
@@ -423,7 +423,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-        ...runRowsOf(shownRuns),
+        ...runRowsOf(openingRuns(shownRuns)),
       ];
     }
     const hidden = (m: Message) =>
@@ -432,7 +432,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-      ...runRowsOf(shownRuns),
+      ...runRowsOf(openingRuns(shownRuns)),
     ];
   }, [
     isThread,

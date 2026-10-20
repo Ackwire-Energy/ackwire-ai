@@ -151,6 +151,7 @@ import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
   elapsedParts,
+  drawsBehind,
   nextSlots,
   openerOf,
   type RunSlot,
@@ -2062,6 +2063,7 @@ const Timeline = memo(function Timeline({
         key={slot.key}
         runId={slot.runId}
         after={i === 0 ? after : null}
+        opens={i === 0}
         grouped={false}
         entering={blockEnters.current.get(slot.key) ?? false}
         modelLabels={modelLabels}
@@ -2128,6 +2130,7 @@ function RunBlock({
   runId,
   message,
   after,
+  opens = true,
   grouped,
   ...rest
 }: {
@@ -2135,6 +2138,8 @@ function RunBlock({
   message?: MessageType;
   /** At work: the message right above it (the agent's own groups it, as a saved message would). */
   after?: Pick<MessageType, "author" | "createdAt"> | null;
+  /** At work: the first block, the only one drawn while others work too (`drawsBehind`). */
+  opens?: boolean;
   grouped: boolean;
   entering: boolean;
   modelLabels: Map<string, string>;
@@ -2157,7 +2162,7 @@ function RunBlock({
     [liveId, liveAgent, liveChannel, liveThread, liveStart],
   );
   const shown = message ?? placeholder;
-  if (!shown) return null;
+  if (!shown || (live && !opens && !drawsBehind(live))) return null;
   const together = message
     ? grouped
     : Boolean(placeholder && groupsWith(after, placeholder.author, placeholder.createdAt));
