@@ -9547,17 +9547,18 @@ a.machine-row__name:hover {
   position: relative;
   z-index: 1;
   display: grid;
-  place-items: center;
-  width: 92px;
-  height: 92px;
-  margin: -46px auto 0;
-  padding-top: 6px;
-  box-sizing: border-box;
-  border-radius: 30px;
-  background: var(--sunken);
+  width: 96px;
+  height: 96px;
+  margin: -48px auto 0;
+  /* The avatar's own tile (radius 30%) is the face: the ring follows it. */
+  border-radius: 30%;
   box-shadow:
     0 0 0 5px var(--bg),
     var(--e1);
+}
+.agp-face .ac-avatar {
+  width: 100%;
+  height: 100%;
 }
 .agp-ident {
   display: flex;

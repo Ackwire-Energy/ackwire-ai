@@ -192,7 +192,7 @@ export function AgentHero({
       </div>
       {/* In the middle, over the cover's edge, cut out by a ring of the page (telas/AgenteTopo.html, D). */}
       <span className="agp-face">
-        <AgentAvatar agentId={agent.id} appearance={draft.look} size="lg" name={name} />
+        <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} />
       </span>
       <div className="agp-ident">
         <h1 className="agp-name">{name}</h1>
