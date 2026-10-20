@@ -20,7 +20,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
+    runs-on: macos-15-intel
     timeout-minutes: 60
     permissions:
       contents: write
