@@ -15,7 +15,7 @@ const server = () => {
 };
 
 const SUM = "a".repeat(64);
-const ASSETS = "https://api.github.com/repos/wescld/agents.chat/releases/assets";
+const ASSETS = "https://api.github.com/repos/agentes-chat/agentes.chat/releases/assets";
 const asset = (name: string) => ({ name, url: `${ASSETS}/${name}` });
 const release = (version: string, extra: Record<string, unknown> = {}) => ({
   tag_name: `desktop-v${version}`,

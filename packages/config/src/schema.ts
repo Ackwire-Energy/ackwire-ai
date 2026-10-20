@@ -547,7 +547,7 @@ export const envVars = {
     schema: z
       .string()
       .regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/repo")
-      .default("wescld/agents.chat"),
+      .default("agentes-chat/agentes.chat"),
     description: "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app.",
     section: "Sandbox",
   },
