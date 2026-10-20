@@ -1147,6 +1147,8 @@ textarea.ac-input {
 .ac-menu__label {
   display: flex;
   flex-direction: column;
+  /* Beside a leading icon, one line sits in its middle (two lines still read from the top). */
+  align-self: center;
   min-width: 0;
 }
 .ac-menu__leading {
