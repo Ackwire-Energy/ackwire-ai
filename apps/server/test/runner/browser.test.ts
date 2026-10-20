@@ -356,7 +356,9 @@ test("a normal Chrome user agent for the platform, and the whole launch line", (
   expect(args).toContain("--lang=pt-BR");
   expect(args).toContain("--user-data-dir=/p");
   expect(args.at(-1)).toBe("about:blank");
-  expect(chromeLaunchArgs("/usr/bin/chrome", "/p", "linux", null).some((a) => a.startsWith("--user-agent"))).toBe(false);
+  expect(chromeLaunchArgs("/usr/bin/chrome", "/p", "linux", null).some((a) => a.startsWith("--user-agent"))).toBe(
+    false,
+  );
 });
 
 test.if(posix)("flags that reach outside the agent's browser, and unknown commands, are refused", async () => {
@@ -531,40 +533,43 @@ test.if(posix)("an idle browser's Chrome stops, but not while someone watches or
   expect(t.chromes[1]?.killed).toBe(true);
 });
 
-test.if(posix)("the runner stopping stops its Chromes; one a crashed run left is stopped on the next start", async () => {
-  const t = setup();
-  await t.act("open", ["https://a.example"]);
-  await t.manager.close();
-  expect(t.chromes[0]?.killed).toBe(true);
+test.if(posix)(
+  "the runner stopping stops its Chromes; one a crashed run left is stopped on the next start",
+  async () => {
+    const t = setup();
+    await t.act("open", ["https://a.example"]);
+    await t.manager.close();
+    expect(t.chromes[0]?.killed).toBe(true);
 
-  // A leftover in chromes.json: stopped only when it is still that Chrome (a reused pid is left alone).
-  const home = tempDir("runner-home-");
-  dirs.push(home);
-  mkdirSync(path.join(home, "browser"), { recursive: true });
-  writeFileSync(
-    path.join(home, "browser", "chromes.json"),
-    JSON.stringify([
-      { pid: 999_999_901, profile: "/x/.agentes/browser" },
-      { pid: 999_999_902, profile: "/y/.agentes/browser" },
-    ]),
-  );
-  const asked: number[] = [];
-  const manager = new BrowserManager({
-    home,
-    log: () => {},
-    send: () => true,
-    secret: async () => null,
-    command: [process.execPath, FAKE],
-    chrome: () => null,
-    isOurChrome: async (pid) => {
-      asked.push(pid);
-      return false;
-    },
-  });
-  await manager.closeAll();
-  expect(asked).toEqual([999_999_901, 999_999_902]);
-  expect(JSON.parse(readFileSync(path.join(home, "browser", "chromes.json"), "utf8"))).toEqual([]);
-});
+    // A leftover in chromes.json: stopped only when it is still that Chrome (a reused pid is left alone).
+    const home = tempDir("runner-home-");
+    dirs.push(home);
+    mkdirSync(path.join(home, "browser"), { recursive: true });
+    writeFileSync(
+      path.join(home, "browser", "chromes.json"),
+      JSON.stringify([
+        { pid: 999_999_901, profile: "/x/.agentes/browser" },
+        { pid: 999_999_902, profile: "/y/.agentes/browser" },
+      ]),
+    );
+    const asked: number[] = [];
+    const manager = new BrowserManager({
+      home,
+      log: () => {},
+      send: () => true,
+      secret: async () => null,
+      command: [process.execPath, FAKE],
+      chrome: () => null,
+      isOurChrome: async (pid) => {
+        asked.push(pid);
+        return false;
+      },
+    });
+    await manager.closeAll();
+    expect(asked).toEqual([999_999_901, 999_999_902]);
+    expect(JSON.parse(readFileSync(path.join(home, "browser", "chromes.json"), "utf8"))).toEqual([]);
+  },
+);
 
 // ── Live view ────────────────────────────────────────────────────────────────
 
