@@ -316,7 +316,20 @@ export interface ClaudeLaunch {
   addDirs?: string[];
   /** Protocol 13: `--effort` (anything else is left out). */
   effort?: BrainEffort;
+  /**
+   * D60: which settings files load (`--setting-sources`). "project" leaves out the computer owner's own
+   * CLAUDE.md, skills and plugins, which every agent there paid for on every step.
+   */
+  settingSources?: string;
+  /** D60: Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
+  builtinTools?: readonly string[];
 }
+
+/**
+ * Claude Code's own tools a brain keeps (D60): reading, searching, editing and running code in its folder,
+ * and the web. Ours come through MCP. Names Claude Code doesn't know are ignored by it.
+ */
+export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
 
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
 export const fallbackModelFor = (model: string | undefined) => (model && /opus/i.test(model) ? "sonnet" : undefined);
@@ -345,6 +358,8 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.mcpConfigFile ? ["--allowedTools", "mcp__agentes"] : []),
     ...(l.promptTool && l.mcpConfigFile ? ["--permission-prompt-tool", PERMISSION_PROMPT_TOOL] : []),
     ...(l.addDirs ?? []).flatMap((d) => ["--add-dir", d]),
+    ...(l.settingSources ? ["--setting-sources", l.settingSources] : []),
+    ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -892,6 +907,8 @@ export class BrainManager {
             token,
             cwd,
             folders: [...new Set([cwd, ctx.folder])],
+            // D60: our tools always loaded (no ToolSearch call before each one; the list is short since D65).
+            alwaysLoad: true,
           }),
         ),
         { mode: 0o600 },
@@ -935,6 +952,8 @@ export class BrainManager {
       permissionMode: mode === "plan" ? "dontAsk" : "acceptEdits",
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
+      // D60: with the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
+      ...(req.personalMcp !== true ? { settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS } : {}),
     });
     const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
     const live: Live = {

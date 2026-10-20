@@ -12,6 +12,7 @@ import {
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
 import {
+  BRAIN_BUILTIN_TOOLS,
   BrainManager,
   type BrainManagerOptions,
   ClaudeStreamParser,
@@ -233,6 +234,12 @@ test("command line: stream-json both ways, opus falls back to sonnet, strict MCP
   expect(resumed).not.toContain("--strict-mcp-config");
   expect(resumed).not.toContain("--model");
   expect(resumed.slice(-2)).toEqual(["--resume", SESSION(1)]);
+  // D60: only the project's settings and the built-in tools agents use, when asked.
+  expect(args).not.toContain("--setting-sources");
+  const lean = claudeBrainArgs({ ...base, settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS });
+  expect(lean.join(" ")).toContain("--setting-sources project");
+  expect(lean.join(" ")).toContain("--tools Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch");
+  expect(lean.slice(-2)).toEqual(["--session-id", SESSION(1)]);
   expect(fallbackModelFor("claude-opus-5-5")).toBe("sonnet");
   expect(fallbackModelFor("sonnet")).toBeUndefined();
   expect(JSON.parse(userMessageLine("oi"))).toEqual({

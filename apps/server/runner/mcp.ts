@@ -790,6 +790,8 @@ export function claudeMcpConfig(input: {
   /** Where the task runs and the mission folder (plain reads there need no card). */
   cwd?: string;
   folders?: string[];
+  /** D60: Claude Code lists our tools up front instead of behind its ToolSearch. */
+  alwaysLoad?: boolean;
 }) {
   const [command, ...args] = input.command;
   return {
@@ -798,6 +800,7 @@ export function claudeMcpConfig(input: {
         type: "stdio",
         command,
         args: [...args, "mcp", "--task", input.taskId],
+        ...(input.alwaysLoad ? { alwaysLoad: true } : {}),
         env: {
           AGENTES_MCP_TOKEN: input.token,
           AGENTES_MCP_SOCKET: input.socketPath,
