@@ -150,6 +150,7 @@ export function SettingsPage({
             const items = visible.filter((s) => s.group === g);
             if (items.length === 0) return null;
             return (
+              // biome-ignore lint/a11y/useSemanticElements: a labelled group of links in the nav, not form fields
               <div key={g} className="settings__group" role="group" aria-labelledby={`settings-group-${g}`}>
                 <span id={`settings-group-${g}`} className="settings__group-label">
                   {t(`settings.group.${g}`)}
@@ -331,9 +332,7 @@ function GeneralSection() {
           </div>
           <div className="settings-row">
             <div className="settings-row__text">
-              <span className="settings-row__label">
-                {t("settings.timezone")}
-              </span>
+              <span className="settings-row__label">{t("settings.timezone")}</span>
               <span className="settings-row__help">{t("settings.timezoneHelp")}</span>
             </div>
             <div className="settings-row__control">
@@ -445,7 +444,8 @@ function SettingsTiles() {
           : t("settings.tileState.noKeys")),
     storage: storage.data && t(storage.data.kind === "s3" ? "storage.s3" : "storage.agentes"),
   };
-  const tiles = SETTINGS_SECTIONS.filter((s) => s.id !== "general" && s.allowed(role));
+  type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
+  const tiles = SETTINGS_SECTIONS.filter((s): s is Tile => s.id !== "general" && s.allowed(role));
   return (
     <section className="settings-tiles" aria-labelledby="sec-tiles">
       <h2 id="sec-tiles" className="settings-tiles__title">

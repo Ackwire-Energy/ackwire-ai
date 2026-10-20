@@ -25,18 +25,16 @@ const pick = async (dialog: HTMLElement, name: string) => {
 };
 
 describe("Configurações da organização", () => {
-  test("organization context is saved with PATCH /settings", async () => {
+  test("organization context saves by itself with PATCH /settings (no save button)", async () => {
     const { state } = await go();
-    expect(screen().getByRole("heading", { level: 1, name: "Configurações da organização" })).toBeTruthy();
-    const save = screen().getByRole("button", { name: "Salvar organização" });
-    expect(save.hasAttribute("disabled")).toBe(true);
-    await type(screen().getByLabelText("Contexto da organização"), "A Acme faz um app para clínicas.");
-    await click(save);
+    expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Salvar organização" })).toBeNull();
+    const field = screen().getByLabelText("Contexto da organização");
+    await type(field, "A Acme faz um app para clínicas.");
+    await act(async () => fireEvent.blur(field));
     await settle(4);
     expect(state.calls.find((c) => c.method === "orgs.updateSettings")?.args[1]).toMatchObject({
-      name: "Acme",
       context: "A Acme faz um app para clínicas.",
-      timezone: "America/Sao_Paulo",
     });
   });
 
