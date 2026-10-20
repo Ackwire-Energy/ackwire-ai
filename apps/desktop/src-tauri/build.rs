@@ -17,6 +17,9 @@ const COMMANDS: &[&str] = &[
     "autostart_set",
     "notify",
     "update_install",
+    "notch_set",
+    "notch_info",
+    "notch_place",
 ];
 
 fn main() {

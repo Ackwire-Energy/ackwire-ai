@@ -193,6 +193,19 @@ export const desktopPtBR = {
     browserLogins:
       "Os logins que um agente faz ficam salvos neste Mac, na pasta dele. Use só contas de teste ou do próprio agente.",
   },
+  notch: {
+    label: "Agentes no notch",
+    here: "Neste Mac",
+    needs: "{{agent}} precisa de você",
+    inBrowser: "{{agent}} no navegador",
+    done: "{{agent}} terminou",
+    pausedTitle: "Agentes pausados neste Mac",
+    pausedBody: "Nada novo começa aqui até você retomar.",
+    resume: "Retomar",
+    open: "Abrir",
+    openApp: "Abrir agentes",
+    someAgent: "Um agente",
+  },
   prefs: {
     nav: {
       label: "Seções",
@@ -232,6 +245,8 @@ export const desktopPtBR = {
       notifyDesc: "Pastas novas, por exemplo.",
       notifyBrowserTitle: "Avisar quando um agente precisar de você no navegador",
       notifyBrowserDesc: "O pedido já chega no celular e no site; isto avisa também no Mac.",
+      notchTitle: "Mostrar os agentes no notch",
+      notchDesc: "Em MacBooks com notch: quem está trabalhando aparece em volta da câmera.",
     },
     folders: {
       title: "Pastas",

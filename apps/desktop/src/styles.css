@@ -1311,6 +1311,187 @@ body[data-window="popover"] .dk-dev {
   background: var(--sunken);
 }
 
+/* ---------- Notch (telas/NotchAgente.html, "A · Asas") ---------- */
+/* Black like the hardware in both themes; the island is `data-theme="dark"` for the components. */
+body[data-window="notch"] {
+  background: transparent;
+}
+.dk-notch {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+.dk-notch__island {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--dk-notch-w);
+  height: var(--dk-notch-h);
+  border-radius: 0 0 var(--dk-notch-r) var(--dk-notch-r);
+  overflow: hidden;
+  background: #000;
+  color: #f2f2ef;
+  transition:
+    width 0.42s cubic-bezier(0.34, 1.3, 0.5, 1),
+    height 0.42s cubic-bezier(0.34, 1.3, 0.5, 1),
+    border-radius 0.42s cubic-bezier(0.34, 1.3, 0.5, 1),
+    box-shadow 0.3s;
+}
+.dk-notch__island[data-big] {
+  box-shadow: 0 18px 34px -14px rgba(0, 0, 0, 0.55);
+}
+.dk-notch__wing {
+  position: absolute;
+  top: 0;
+  height: var(--dk-notch-top);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1;
+}
+.dk-notch__hit {
+  all: unset;
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+.dk-notch__wing,
+.dk-notch__peek {
+  pointer-events: none;
+}
+.dk-notch__peek button {
+  pointer-events: auto;
+}
+.dk-notch__wing > * {
+  flex: none;
+}
+.dk-notch__wing--l {
+  left: 12px;
+}
+.dk-notch__wing--l > * + * {
+  margin-left: -6px;
+}
+.dk-notch__wing--r {
+  right: 12px;
+}
+.dk-notch__clock {
+  font-size: 12.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: #f2f2ef;
+}
+.dk-notch__row .dk-notch__clock {
+  font-size: 12px;
+  font-weight: 500;
+  color: #7c7c77;
+}
+.dk-notch__ok {
+  color: #5fc48a;
+}
+.dk-notch__warn {
+  color: #e9b04f;
+}
+.dk-notch__muted {
+  color: #a3a39e;
+}
+.dk-notch__peek {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--dk-notch-top);
+  padding: 6px 16px 14px;
+}
+.dk-notch__top {
+  all: unset;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--dk-notch-top);
+  cursor: default;
+}
+.dk-notch__body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--dk-notch-top);
+  padding: 8px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dk-notch__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #7c7c77;
+}
+.dk-notch__line,
+.dk-notch__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.dk-notch__row {
+  padding: 8px;
+  margin: 0 -8px;
+  border-radius: 14px;
+}
+.dk-notch__row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dk-notch__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.dk-notch__text b {
+  font-size: 13.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dk-notch__text small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #a3a39e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dk-notch__foot {
+  display: flex;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.dk-notch__link {
+  all: unset;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #a3a39e;
+}
+.dk-notch__link:hover {
+  color: #f2f2ef;
+}
+.dk-dev__window[data-window="notch"] {
+  background: #7fb0f0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

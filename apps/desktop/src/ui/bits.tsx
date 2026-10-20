@@ -6,6 +6,7 @@ import {
   ComputerPortrait,
   type ComputerState,
   CountChip,
+  type Expression,
   Icon,
   type IconName,
   normalizeAppearance,
@@ -52,13 +53,22 @@ export function AgentFace({
   agent,
   size = "sm",
   state,
+  expression,
 }: {
   agent: { name: string; look?: ControlAgent["look"] };
   size?: "xs" | "sm" | "md" | "lg";
   state?: AgentState;
+  expression?: Expression;
 }) {
   return (
-    <Avatar kind="agent" name={agent.name} size={size} appearance={normalizeAppearance(agent.look)} state={state} />
+    <Avatar
+      kind="agent"
+      name={agent.name}
+      size={size}
+      appearance={normalizeAppearance(agent.look)}
+      state={state}
+      expression={expression}
+    />
   );
 }
 

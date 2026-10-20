@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { BROWSER_NOTIFY_PREF } from "../../control/browser";
+import { NOTCH_PREF } from "../../control/notch";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
 import { SITE_URL } from "../../control/version";
@@ -26,6 +27,8 @@ export function General() {
   const [notify, setNotify] = usePref("notify", true);
   // Off by default: the request already comes by push and in the site's "Esperando você".
   const [notifyBrowser, setNotifyBrowser] = usePref(BROWSER_NOTIFY_PREF, false);
+  // Off by default (telas/NotchAgente.html): the window only exists while it's on.
+  const [notch, setNotch] = usePref(NOTCH_PREF, false);
   const [leaving, setLeaving] = useState<Home | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -199,6 +202,24 @@ export function General() {
           desc={t("desktop.prefs.general.notifyBrowserDesc")}
           htmlFor="notify-browser"
           end={<Switch id="notify-browser" checked={notifyBrowser} onCheckedChange={setNotifyBrowser} />}
+        />
+        <PrefRow
+          title={t("desktop.prefs.general.notchTitle")}
+          desc={t("desktop.prefs.general.notchDesc")}
+          htmlFor="notch"
+          end={
+            <Switch
+              id="notch"
+              checked={notch}
+              onCheckedChange={(on) => {
+                setNotch(on);
+                host.setNotch(on).catch(() => {
+                  setNotch(!on);
+                  toast(t("desktop.common.error"), "alert");
+                });
+              }}
+            />
+          }
         />
       </PrefCard>
 

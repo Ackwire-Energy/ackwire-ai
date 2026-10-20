@@ -2,8 +2,8 @@ import type { HelloLine } from "../control/client";
 import type { TrayState } from "../control/tray";
 
 /** The app's windows (Tauri labels). */
-export type WindowName = "popover" | "welcome" | "prefs";
-export const WINDOW_NAMES: readonly WindowName[] = ["popover", "welcome", "prefs"];
+export type WindowName = "popover" | "welcome" | "prefs" | "notch";
+export const WINDOW_NAMES: readonly WindowName[] = ["popover", "welcome", "prefs", "notch"];
 
 /** One organization home and its runner child, as the Rust side knows it. */
 export interface RunnerInfo {
@@ -18,6 +18,12 @@ export interface RunnerStateChange {
   running: boolean;
   /** The home was deleted (left the organization). */
   removed: boolean;
+}
+
+/** The MacBook's notch, in points. */
+export interface NotchInfo {
+  width: number;
+  height: number;
 }
 
 export interface AppInfo {
@@ -60,6 +66,12 @@ export interface Host {
   notify(title: string, body: string): Promise<void>;
   /** Installs the newer version and relaunches the app; false when there is nothing to install. */
   installUpdate(): Promise<boolean>;
+  /** Creates (on) or destroys (off) the notch window. */
+  setNotch(on: boolean): Promise<void>;
+  /** The notch of this Mac's screen; null without one (an external display alone). */
+  notchInfo(): Promise<NotchInfo | null>;
+  /** Sizes and shows the notch window over the notch (0 × 0 hides it); null when there's no notch. */
+  notchPlace(width: number, height: number): Promise<NotchInfo | null>;
   /** The current window's size in points (the popover follows its content). */
   resize(width: number, height: number): Promise<void>;
 }

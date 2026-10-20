@@ -17,6 +17,7 @@ import {
   newHelpRequests,
   siteLink,
 } from "../control/browser";
+import { NOTCH_PREF } from "../control/notch";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
@@ -59,6 +60,11 @@ export function Popover() {
   useEffect(() => {
     void host.setTrayState(tray).catch(() => {});
   }, [host, tray]);
+
+  // The notch window lives only while it's on (Preferências → Geral): this window starts with the app.
+  useEffect(() => {
+    if (readPref(NOTCH_PREF, false)) void host.setNotch(true).catch(() => {});
+  }, [host]);
 
   // An agent asking for help in its browser: a macOS notification, if the person turned it on
   // (Preferências → Geral; off by default). Requests already there at start don't notify.

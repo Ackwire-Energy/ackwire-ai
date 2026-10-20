@@ -6,6 +6,7 @@ import type { TrayState } from "../control/tray";
 import {
   type AppInfo,
   type Host,
+  type NotchInfo,
   type RunnerInfo,
   type RunnerStateChange,
   WINDOW_NAMES,
@@ -54,6 +55,9 @@ export function createTauriHost(): Host {
     setAutostart: (on) => invoke<void>("autostart_set", { on }),
     notify: (title, body) => invoke<void>("notify", { title, body }),
     installUpdate: () => invoke<boolean>("update_install"),
+    setNotch: (on) => invoke<void>("notch_set", { on }),
+    notchInfo: () => invoke<NotchInfo | null>("notch_info"),
+    notchPlace: (width, height) => invoke<NotchInfo | null>("notch_place", { width, height }),
     resize: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
   };
 }

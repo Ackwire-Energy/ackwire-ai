@@ -189,6 +189,19 @@ export const desktopEn: DesktopTranslations = {
     browserDesc: "Opens websites for the agents in a browser of their own, without your logins.",
     browserLogins: "Logins an agent makes stay on this Mac, in its folder. Use only test accounts or the agent's own.",
   },
+  notch: {
+    label: "Agents in the notch",
+    here: "On this Mac",
+    needs: "{{agent}} needs you",
+    inBrowser: "{{agent}} in the browser",
+    done: "{{agent}} is done",
+    pausedTitle: "Agents paused on this Mac",
+    pausedBody: "Nothing new starts here until you resume.",
+    resume: "Resume",
+    open: "Open",
+    openApp: "Open agentes",
+    someAgent: "An agent",
+  },
   prefs: {
     nav: {
       label: "Sections",
@@ -228,6 +241,8 @@ export const desktopEn: DesktopTranslations = {
       notifyDesc: "New folders, for example.",
       notifyBrowserTitle: "Let me know when an agent needs me in its browser",
       notifyBrowserDesc: "The request already reaches your phone and the site; this also tells you on the Mac.",
+      notchTitle: "Show the agents in the notch",
+      notchDesc: "On MacBooks with a notch: who is working shows around the camera.",
     },
     folders: {
       title: "Folders",

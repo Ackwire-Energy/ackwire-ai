@@ -3,6 +3,7 @@
 //! single instance, start at login, notifications, native dialogs and self-update. Everything else lives in the
 //! runner (TypeScript) and in the web view.
 
+mod notch;
 mod runners;
 mod tray;
 
@@ -259,6 +260,22 @@ async fn update_install(app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Turns the notch on or off (Preferências → Geral; the popover applies the saved choice at start).
+#[tauri::command]
+async fn notch_set(app: AppHandle, on: bool) -> Result<(), String> {
+    notch::set_enabled(&app, on)
+}
+
+#[tauri::command]
+async fn notch_info(app: AppHandle) -> Result<Option<notch::NotchInfo>, String> {
+    notch::info(&app)
+}
+
+#[tauri::command]
+async fn notch_place(app: AppHandle, width: f64, height: f64) -> Result<Option<notch::NotchInfo>, String> {
+    notch::place(&app, width, height)
+}
+
 pub fn run() {
     let app = tauri::Builder::default()
         // First: a second launch only shows the popover of the running app.
@@ -290,7 +307,10 @@ pub fn run() {
             autostart_get,
             autostart_set,
             notify,
-            update_install
+            update_install,
+            notch_set,
+            notch_info,
+            notch_place
         ])
         .on_window_event(|window, event| match event {
             WindowEvent::Focused(false) if window.label() == "popover" => {

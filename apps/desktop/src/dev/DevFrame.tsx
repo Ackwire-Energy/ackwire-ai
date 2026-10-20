@@ -11,6 +11,7 @@ const SIZES: Record<WindowName, { width: number; height: number | "auto" }> = {
   popover: { width: 380, height: "auto" },
   welcome: { width: 680, height: 560 },
   prefs: { width: 860, height: 600 },
+  notch: { width: 480, height: 420 },
 };
 
 export function DevFrame({ host }: { host: FakeHost }) {
@@ -26,7 +27,7 @@ export function DevFrame({ host }: { host: FakeHost }) {
   return (
     <div className="dk-dev">
       <div className="dk-dev__bar">
-        {(["popover", "welcome", "prefs"] as const).map((w) => (
+        {(["popover", "welcome", "prefs", "notch"] as const).map((w) => (
           <button key={w} type="button" aria-pressed={w === name} onClick={() => void host.showWindow(w)}>
             {w}
           </button>

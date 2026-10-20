@@ -15,6 +15,9 @@ export interface FakeHost extends Host {
   setVersion(version: string): void;
 }
 
+/** A 14" MacBook Pro's notch. */
+const FAKE_NOTCH = { width: 186, height: 32 };
+
 export function createFakeHost(initial: WindowName, scenario: "first" | "default"): FakeHost {
   const runners = new Map<string, FakeRunner>();
   const lineListeners = new Set<(homeId: string, line: string) => void>();
@@ -140,6 +143,11 @@ export function createFakeHost(initial: WindowName, scenario: "first" | "default
       await new Promise((r) => setTimeout(r, 1500));
       return false;
     },
+    setNotch: async (on) => {
+      console.info("[fake] notch:", on ? "on" : "off");
+    },
+    notchInfo: async () => FAKE_NOTCH,
+    notchPlace: async () => FAKE_NOTCH,
     resize: async () => {},
     onDev: (cb) => {
       devListeners.add(cb);
