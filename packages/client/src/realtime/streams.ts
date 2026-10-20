@@ -709,6 +709,32 @@ export function dropProvisional(state: StreamsState, threadIds: Set<string>): St
 }
 
 /**
+ * The optimistic message got its server id: its "pensando…" rows move there. The server's run can be
+ * faster than the POST answer (the run starts with the insert); then the real run already shows and the
+ * guess just goes, or the conversation would show the agent twice.
+ */
+export function retargetProvisional(state: StreamsState, fromId: string, toId: string): StreamsState {
+  const runs: Record<string, LiveRun> = {};
+  for (const [id, r] of Object.entries(state.runs)) {
+    if (!(r.provisional && r.threadId === fromId)) {
+      runs[id] = r;
+      continue;
+    }
+    const answered = Object.values(state.runs).some(
+      (o) =>
+        !o.provisional &&
+        o.agentId === r.agentId &&
+        o.channelId === r.channelId &&
+        (o.triggerMessageId === toId || o.threadId === toId || (o.startedAt ?? 0) >= (r.since ?? 0) - 2000),
+    );
+    if (answered) continue;
+    const moved = { ...r, threadId: toId, runId: provisionalId(r.agentId, toId) };
+    runs[moved.runId] = moved;
+  }
+  return { ...state, runs };
+}
+
+/**
  * The living avatar of one run: words arriving → writing; queued/thinking/running → thinking; else idle.
  * Waiting (an approval, an answer, or its computer to come back) is not working: idle.
  */

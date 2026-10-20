@@ -45,13 +45,13 @@ import {
   isActiveStatus,
   isNotificationEvent,
   keys,
-  type LiveRun,
   markStopping,
   RealtimeConnection,
   type ReceiptsState,
   realtimeUrl,
   reconcileRuns,
   refreshMission,
+  retargetProvisional,
   runsInChannel,
   type SocketFactory,
   type StreamsState,
@@ -275,17 +275,10 @@ export function createStreamsStore(
     },
     /** The optimistic message got its server id: move its "pensando…" rows and receipts there. */
     retarget: (fromId: string, toId: string) => {
-      const runs: Record<string, LiveRun> = {};
-      for (const [id, r] of Object.entries(state.streams.runs)) {
-        if (r.provisional && r.threadId === fromId) {
-          const moved = { ...r, threadId: toId, runId: `pending:${r.agentId}:${toId}` };
-          runs[moved.runId] = moved;
-        } else runs[id] = r;
-      }
       const { [fromId]: moving, ...receipts } = state.receipts;
       set({
         ...state,
-        streams: { ...state.streams, runs },
+        streams: retargetProvisional(state.streams, fromId, toId),
         receipts: moving && !receipts[toId] ? { ...receipts, [toId]: moving } : receipts,
       });
     },

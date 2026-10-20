@@ -9,6 +9,7 @@ import {
   parseServerFrame,
   RealtimeConnection,
   realtimeUrl,
+  retargetProvisional,
   runningAgents,
   runsInChannel,
   type Timers,
@@ -176,6 +177,30 @@ describe("live agent runs (streaming)", () => {
     s = applyChannelEvent(s, { type: "agent.run", ...base, status: "failed", error: "budget_exceeded" });
     expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "failed", error: "budget_exceeded" });
     expect(runningAgents(s).size).toBe(0);
+  });
+});
+
+describe("the guessed 'pensando…' when the server is faster than the send", () => {
+  test("the real run already shows: the guess goes instead of moving to the server id", () => {
+    let s = expectReply(emptyStreams, { channelId: "dm", threadId: "local-1", agentId: "theo" }, 1000);
+    // The run starts with the insert, so its event beats the POST answer.
+    s = applyChannelEvent(s, {
+      type: "agent.run",
+      channelId: "dm",
+      threadId: "m1",
+      runId: "r1",
+      agentId: "theo",
+      status: "running",
+    });
+    expect(runsInChannel(s, "dm")).toHaveLength(2);
+    s = retargetProvisional(s, "local-1", "m1");
+    expect(runsInChannel(s, "dm").map((r) => r.runId)).toEqual(["r1"]);
+  });
+
+  test("no run yet: the guess moves to the server id", () => {
+    let s = expectReply(emptyStreams, { channelId: "dm", threadId: "local-1", agentId: "theo" }, 1000);
+    s = retargetProvisional(s, "local-1", "m1");
+    expect(runsInChannel(s, "dm").map((r) => r.runId)).toEqual(["pending:theo:m1"]);
   });
 });
 
