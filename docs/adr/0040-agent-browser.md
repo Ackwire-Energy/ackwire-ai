@@ -132,6 +132,7 @@ A person watching can also **take over** on their own: the same screen; the agen
 
 - Not stored: frames, screenshots (they stay in the agent's folder), the profile and cookies (on the computer), what a person types.
 - Stored: the run's transcript as for any tool (the `browser_*` calls and results), model usage and cost as for any model call, and one record per handoff or take over (who, when, result). No per-action audit table.
+- After the run, the agent's message keeps where it browsed (`meta.browser.steps`: each `browser_*` call's tool, the site of an open without its query string, the time, whether it failed) for the card that stays in the chat (telas/NavegadorDepois.html). It shows a drawn page, never a picture of the real one.
 
 ### 9. Watching and stopping
 

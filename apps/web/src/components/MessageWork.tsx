@@ -1,4 +1,4 @@
-import { useRun } from "@agenteschat/client";
+import { isBrowserTool, useRun } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   formatDuration,
@@ -23,17 +23,27 @@ export function MessageWork({
   runId,
   meta,
   agentName,
+  skipBrowser = false,
 }: {
   runId: string;
   meta: Record<string, unknown> | undefined;
   agentName: string;
+  /** Its browser calls have their own card on the message (`BrowserTrailCard`): left out here. */
+  skipBrowser?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
   const run = useRun(org.id, open ? runId : null);
   const compact = workMeta(meta);
-  const work = run.data ? workFromSteps(run.data.steps, run.data.run) : null;
+  const work = run.data
+    ? workFromSteps(
+        skipBrowser
+          ? run.data.steps.filter((s) => !(s.kind === "tool_call" && isBrowserTool(String(s.data.name ?? ""))))
+          : run.data.steps,
+        run.data.run,
+      )
+    : null;
   // Nothing to say: the server says it used no tools.
   if (compact && compact.steps === 0) return null;
   const header = work

@@ -200,6 +200,7 @@ export {
 export {
   CriteriaPixels,
   ExpiryFuse,
+  PageSilhouette,
   PlanStrip,
   type PlanStripCell,
   planCellPixel,

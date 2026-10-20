@@ -620,3 +620,48 @@ export function SkyStrip({
   }, moving);
   return <canvas ref={ref} className={cx("ac-sky-strip", muted && "is-muted", className)} />;
 }
+
+/** The blocks of a generic page, as fractions of the picture (a bar, a search field, cards, lines). */
+const PAGE_BLOCKS: [number, number, number, number][] = [
+  [0.05, 0.08, 0.22, 0.16],
+  [0.7, 0.08, 0.95, 0.16],
+  [0.25, 0.26, 0.75, 0.38],
+  [0.05, 0.5, 0.3, 0.7],
+  [0.36, 0.5, 0.64, 0.7],
+  [0.7, 0.5, 0.95, 0.7],
+  [0.05, 0.76, 0.3, 0.82],
+  [0.36, 0.76, 0.6, 0.82],
+  [0.7, 0.76, 0.9, 0.82],
+];
+
+/**
+ * The agent's browser after it closed (telas/NavegadorDepois.html, "Página em silhueta"): the
+ * shape of a page, never the real one, fading into the agent's tone toward the bottom. Still.
+ */
+export function PageSilhouette({ color = "sky", className }: { color?: AgentColor; className?: string }) {
+  const ref = useCanvas((ctx, canvas) => {
+    const w = Math.max(16, Math.round(canvas.clientWidth / CELL) || 66);
+    const h = Math.max(10, Math.round(canvas.clientHeight / CELL) || 34);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const dark = document.documentElement.dataset.theme === "dark";
+    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const paper = dark ? "#26252b" : "#e9e8ef";
+    const ink = dark ? "#3b3946" : "#cfcdd9";
+    const tint = dark ? mixHex(bottom, "#0d0d10", 0.6) : mixHex(top, "#ffffff", 0.35);
+    const fade = [paper, mixHex(paper, tint, 0.5), tint];
+    const inBlock = (x: number, y: number) =>
+      PAGE_BLOCKS.some(([x0, y0, x1, y1]) => x >= x0 * w && x < x1 * w && y >= y0 * h && y < y1 * h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const b = BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5;
+        const f = (y / h) * 0.9 + 0.1;
+        const s = f * (fade.length - 1);
+        const i = Math.floor(s);
+        ctx.fillStyle =
+          f > b * 1.2 ? (fade[Math.min(fade.length - 1, s - i > b ? i + 1 : i)] ?? paper) : inBlock(x, y) ? ink : paper;
+        ctx.fillRect(x, y, 1, 1);
+      }
+  }, false);
+  return <canvas ref={ref} className={cx("ac-page-silhouette", className)} aria-hidden="true" />;
+}

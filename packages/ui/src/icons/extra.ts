@@ -184,6 +184,11 @@ export const extraIcons = {
   ],
   /** "Parar" (stop an agent's run). */
   stop: [["rect", { x: "5.5", y: "5.5", width: "9", height: "9", rx: "2" }]],
+  /** NavegadorDepois.html: the agent's browser closed (a power button). */
+  power: [
+    ["path", { d: "M10 3.5v6" }],
+    ["path", { d: "M6.25 6a5.75 5.75 0 1 0 7.5 0" }],
+  ],
   /** "Wiki" (the org's knowledge base). */
   book: [
     [

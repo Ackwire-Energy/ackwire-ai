@@ -2,7 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { postPersonMessage } from "../src";
 import {
+  absorbBrowserCall,
   absorbToolData,
+  BROWSER_TRAIL_MAX,
   mergeToolEffects,
   storedTranscript,
   type ToolSideEffects,
@@ -72,5 +74,31 @@ describe("files a run's tools leave for its reply", () => {
     await save({ system: [], messages: [], postedUpTo: 2, postedCount: 0, deltaSeq: 0, bridgeEffects: kept });
     expect((await stored()).bridgeEffects).toBeUndefined();
     expect(await takeBridgeEffects(fx.db, run.id)).toBeNull();
+  });
+});
+
+describe("where the agent browsed, for the card after the run", () => {
+  const at = new Date("2026-10-20T21:10:00.000Z");
+
+  test("browser calls are kept with the site of an open (no query string); other tools are not", () => {
+    const t: ToolSideEffects = {};
+    const url = "https://www.airbnb.com.br/rooms/1?token=x";
+    absorbBrowserCall(t, { name: "browser_open", input: { url } }, false, at);
+    absorbBrowserCall(t, { name: "mcp__agentes__browser_click", input: { ref: "e2" } }, true, at);
+    absorbBrowserCall(t, { name: "read_file", input: { path: "a.md" } }, false, at);
+    expect(t.browser).toEqual([
+      { tool: "browser_open", detail: "www.airbnb.com.br/rooms/1", at: at.toISOString() },
+      { tool: "browser_click", at: at.toISOString(), failed: true },
+    ]);
+  });
+
+  test("the bridge's calls join the loop's, and only the latest ones are kept", () => {
+    const t: ToolSideEffects = {};
+    absorbBrowserCall(t, { name: "browser_read", input: {} }, false, at);
+    mergeToolEffects(t, {
+      browser: Array.from({ length: BROWSER_TRAIL_MAX }, () => ({ tool: "browser_click", at: at.toISOString() })),
+    });
+    expect(t.browser).toHaveLength(BROWSER_TRAIL_MAX);
+    expect(t.browser?.every((s) => s.tool === "browser_click")).toBe(true);
   });
 });

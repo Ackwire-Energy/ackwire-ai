@@ -7428,6 +7428,18 @@ export const en: Translations = {
       notInControl: "Someone else is in control now.",
       ask: "The request",
     },
+    after: {
+      doneAt: "Finished at {{time}}",
+      stoppedByYou: "You stopped it at {{time}}",
+      stoppedBy: "{{person}} stopped it at {{time}}",
+      stoppedAt: "Stopped at {{time}}",
+      summary: "{{steps}} on {{sites}} · {{duration}}",
+      summaryNoSite: "{{steps}} · {{duration}}",
+      showSteps: "Show the steps",
+      hideSteps: "Hide the steps",
+      openSite: "Open {{site}} in your browser",
+      noSite: "Before opening a page",
+    },
     inCard: {
       expandHint: "Click to expand",
       scrollHint: "Scrolling the page · Esc to leave",

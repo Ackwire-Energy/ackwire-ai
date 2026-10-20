@@ -15,9 +15,11 @@ import type {
 import {
   agentStateOfRun,
   browserHandoffOf,
+  browserTrailOf,
   type ConnectionStatus,
   consultsIn,
   heldRowsIn,
+  isBrowserTool,
   isQuiet,
   keys,
   type LiveRun,
@@ -157,6 +159,7 @@ import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/browser/BrowserCard";
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
+import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
@@ -2740,6 +2743,11 @@ export const TimelineMessage = memo(function TimelineMessage({
   const secretRequest = isSecretRequest(meta.secretRequest) ? meta.secretRequest : null;
   // The agent needs a person in its browser (ADR 0040): the request card.
   const browserHandoff = m.author.type === "agent" ? browserHandoffOf(meta) : null;
+  // Where it browsed (`meta.browser`): the card stays after the run, its steps leave the work list.
+  const browserTrail = useMemo(
+    () => (m.author.type === "agent" ? browserTrailOf(m.meta) : []),
+    [m.author.type, m.meta],
+  );
   // Files an agent made, or a person attached.
   const artifacts = artifactRefs(meta);
   // "Responder": the message this one quotes.
@@ -2790,7 +2798,9 @@ export const TimelineMessage = memo(function TimelineMessage({
     issueWork;
   const feedback = m.author.type === "agent" && !card && !m.local && !live;
   // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
-  const keptWork = seenLive?.work?.length ? seenLive.work : null;
+  const keptAll = seenLive?.work?.length ? seenLive.work : null;
+  const keptWork =
+    keptAll && browserTrail.length > 0 ? keptAll.filter((w) => !(w.kind === "call" && isBrowserTool(w.tool))) : keptAll;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
   const details = [
@@ -2938,7 +2948,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         </>
       ) : (
         <>
-          {keptWork && seenLive ? (
+          {keptWork?.length && seenLive ? (
             <LiveWorkList
               work={keptWork}
               steerNote={steerNote}
@@ -3020,6 +3030,16 @@ export const TimelineMessage = memo(function TimelineMessage({
           {question && <QuestionCard question={question} />}
           {secretRequest && <SecretCard request={secretRequest} />}
           {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+          {browserTrail.length > 0 && m.author.id && !m.local && (
+            <BrowserTrailCard
+              agentId={m.author.id}
+              runId={m.agentRunId ?? null}
+              name={name}
+              steps={browserTrail}
+              stopped={stopped.canceled ? { byUserId: stopped.byUserId } : null}
+              recent={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
+            />
+          )}
           {lastOfRun && m.author.type === "agent" && m.author.id && m.agentRunId && !m.local && (
             <HeldBrowserCard
               agentId={m.author.id}
@@ -3028,8 +3048,13 @@ export const TimelineMessage = memo(function TimelineMessage({
               enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
           )}
-          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptWork && (
-            <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
+          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
+            <MessageWork
+              runId={m.agentRunId}
+              meta={m.meta}
+              agentName={agent?.name ?? name}
+              skipBrowser={browserTrail.length > 0}
+            />
           )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
           {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}

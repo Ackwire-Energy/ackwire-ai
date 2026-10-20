@@ -129,6 +129,46 @@ export interface ToolSideEffects {
   repo?: string;
   /** A GitHub repository the run was refused (not in the agent's list): Atividade offers to add it. */
   deniedRepo?: string;
+  /** Its browser calls since the last post, for the card of where it browsed (`meta.browser`). */
+  browser?: BrowserTrailStep[];
+}
+
+/**
+ * One call in the agent's browser (ADR 0040), as the chat keeps it after the run: the tool, the
+ * site of an open (never the query string, `toolDetail`) and when. Nothing of the page itself.
+ */
+export interface BrowserTrailStep {
+  tool: string;
+  detail?: string;
+  at: string;
+  failed?: true;
+}
+
+/** The most browser steps one message keeps (the latest ones). */
+export const BROWSER_TRAIL_MAX = 200;
+
+/** A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`). */
+const browserTool = (name: string) => {
+  const tool = name.replace(/^mcp__agentes__/, "");
+  return tool.startsWith("browser_") ? tool : null;
+};
+
+const withTrail = (list: BrowserTrailStep[] | undefined, more: BrowserTrailStep[]) =>
+  [...(list ?? []), ...more].slice(-BROWSER_TRAIL_MAX);
+
+/** Adds a browser call to `t`'s trail; any other tool leaves it as it is. */
+export function absorbBrowserCall(
+  t: ToolSideEffects,
+  call: { name: string; input: unknown },
+  failed: boolean,
+  at = new Date(),
+) {
+  const tool = browserTool(call.name);
+  if (!tool) return;
+  const detail = toolDetail(tool, call.input as Record<string, unknown> | undefined);
+  t.browser = withTrail(t.browser, [
+    { tool, ...(detail ? { detail } : {}), at: at.toISOString(), ...(failed ? { failed: true as const } : {}) },
+  ]);
 }
 
 type ArtifactLink = { id: string; version: number };
@@ -173,6 +213,7 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.reported) t.reported = true;
   if (e.repo) t.repo = e.repo;
   if (e.deniedRepo) t.deniedRepo = e.deniedRepo;
+  if (e.browser?.length) t.browser = withTrail(t.browser, e.browser);
 }
 
 const hasEffects = (e: ToolSideEffects) =>
@@ -183,7 +224,8 @@ const hasEffects = (e: ToolSideEffects) =>
       e.reacted ||
       e.reported ||
       e.repo ||
-      e.deniedRepo,
+      e.deniedRepo ||
+      e.browser?.length,
   );
 
 /** The transcript key where the bridge leaves a computer-brain turn's side effects for the engine. */
@@ -200,10 +242,12 @@ async function recordBridgeEffects(
   deps: RunToolsDeps,
   run: AgentRun,
   where: RunWhere,
-  data: Record<string, unknown> | undefined,
+  call: { name: string; input: unknown },
+  outcome: InvokeResult,
 ) {
   const effects: ToolSideEffects = {};
-  const update = absorbToolData(effects, data);
+  const update = outcome.type === "result" ? absorbToolData(effects, outcome.output.data) : null;
+  absorbBrowserCall(effects, call, outcome.type === "result" && outcome.output.isError === true);
   if (!hasEffects(effects)) return;
   await deps.db.transaction(async (tx) => {
     const [row] = await tx
@@ -295,10 +339,14 @@ export async function invokeWithChip(
   // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
   const input = use.input as Record<string, unknown> | undefined;
   const builtIn = scope.turnTools !== null && !(connector || def?.connectionId);
-  const detail = builtIn
-    ? (toolDetail(use.name, input) ??
-      (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
-    : undefined;
+  // The agent browser is ours on every brain: a computer brain's open names its site too.
+  const browser = browserTool(use.name);
+  const detail = browser
+    ? toolDetail(browser, input)
+    : builtIn
+      ? (toolDetail(use.name, input) ??
+        (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
+      : undefined;
   const code = builtIn ? toolCode(use.name, input) : undefined;
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
@@ -412,7 +460,7 @@ export async function invokeToolForRun(
   const outcome = where
     ? await invokeWithChip({ deps, tools, ctx, where, turnTools: null }, use)
     : await tools.invoke(ctx, { toolUseId: call.id, name: call.name, input });
-  if (run && where && outcome.type === "result") await recordBridgeEffects(deps, run, where, outcome.output.data);
+  if (run && where) await recordBridgeEffects(deps, run, where, use, outcome);
   const wait = outcome.type === "result" && !outcome.output.isError ? waitOf(outcome.output.data) : null;
   const suspend = async (pause: RunPause, r: AgentRun): Promise<BridgeCallResult> => {
     const result = await suspendRunForTool(deps, r, { id: call.id, name: call.name }, pause);

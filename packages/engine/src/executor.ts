@@ -66,7 +66,9 @@ import {
 } from "./questions";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
+  absorbBrowserCall,
   absorbToolData,
+  type BrowserTrailStep,
   bodyCode,
   brainToolOf,
   bridgeToolsFor,
@@ -162,6 +164,8 @@ export interface Transcript {
   missionLink?: { missionId: string; threadId: string } | null;
   /** Agents it consulted (`ask_agent`, ADR 0034), not yet shown on a posted message (`meta.consulted`). */
   consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null }[];
+  /** Its browser calls since the last post, for the card of where it browsed (`meta.browser`). */
+  browser?: BrowserTrailStep[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
   /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
@@ -873,7 +877,8 @@ async function executeRunInner(
   };
 
   /** Moves what a tool returned onto the transcript (cards for the next post) and tells the channel about memory. */
-  const absorbToolOutcome = async (outcome: InvokeResult) => {
+  const absorbToolOutcome = async (use: { name: string; input: unknown }, outcome: InvokeResult) => {
+    absorbBrowserCall(transcript as Transcript, use, outcome.type === "result" && outcome.output.isError === true);
     if (outcome.type !== "result") return;
     const update = absorbToolData(transcript as Transcript, outcome.output.data);
     if (update) await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
@@ -1365,7 +1370,7 @@ async function executeRunInner(
           // Canceled during a tool: the rest never run.
           if (signal.aborted) break;
           const outcome = await invokeWithChip(toolScope, use);
-          await absorbToolOutcome(outcome);
+          await absorbToolOutcome(use, outcome);
           if (outcome.type === "approval") {
             calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
             waiting.push(outcome.approval);
@@ -2033,25 +2038,30 @@ function createDeltaPublisher(
 }
 
 /**
- * Moves pending memory updates, artifacts, a proposed mission's link and the
- * agents it consulted onto the message being posted (the "memory updated",
- * file preview, mission link and "message from @agent" cards).
+ * Moves pending memory updates, artifacts, a proposed mission's link, the
+ * agents it consulted and where it browsed onto the message being posted (the
+ * "memory updated", file preview, mission link, "message from @agent" and
+ * browser cards).
  */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
   const files = t.artifacts ?? [];
   const link = t.missionLink ?? null;
   const consulted = t.consulted ?? [];
-  if (updates.length === 0 && files.length === 0 && !link && consulted.length === 0) return undefined;
+  const browser = t.browser ?? [];
+  if (updates.length === 0 && files.length === 0 && !link && consulted.length === 0 && browser.length === 0)
+    return undefined;
   t.memoryUpdates = [];
   t.artifacts = [];
   t.missionLink = null;
   t.consulted = [];
+  t.browser = [];
   const meta: Record<string, unknown> = {};
   if (updates.length > 0) meta.memoryUpdates = updates;
   if (files.length > 0) meta.artifacts = files;
   if (link) meta.missionLink = link;
   if (consulted.length > 0) meta.consulted = consulted;
+  if (browser.length > 0) meta.browser = { steps: browser };
   return meta;
 }
 

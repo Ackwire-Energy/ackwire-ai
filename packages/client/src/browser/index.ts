@@ -8,6 +8,7 @@ import { noteHandoffPlace } from "./held";
 export * from "./held";
 export * from "./input";
 export * from "./live";
+export * from "./trail";
 export * from "./watches";
 
 /**

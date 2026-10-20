@@ -7446,6 +7446,18 @@ export const ptBR = {
       notInControl: "Outra pessoa está no controle agora.",
       ask: "O pedido",
     },
+    after: {
+      doneAt: "Terminou às {{time}}",
+      stoppedByYou: "Você parou às {{time}}",
+      stoppedBy: "{{person}} parou às {{time}}",
+      stoppedAt: "Parado às {{time}}",
+      summary: "{{steps}} em {{sites}} · {{duration}}",
+      summaryNoSite: "{{steps}} · {{duration}}",
+      showSteps: "Ver os passos",
+      hideSteps: "Recolher os passos",
+      openSite: "Abrir {{site}} no seu navegador",
+      noSite: "Antes de abrir uma página",
+    },
     inCard: {
       expandHint: "Clique para expandir",
       scrollHint: "Rolando a página · Esc para sair",

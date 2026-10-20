@@ -5652,6 +5652,12 @@ a.ac-list__row:focus-visible {
 .ac-sky-strip.is-muted {
   filter: saturate(0.35) brightness(1.05);
 }
+.ac-page-silhouette {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
 /* ---------- Menu item hint: the current value of what it opens (telas/MissaoConfig.html) ---------- */
 .ac-menu__hint {
   margin-left: auto;

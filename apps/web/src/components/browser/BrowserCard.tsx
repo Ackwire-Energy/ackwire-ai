@@ -68,7 +68,7 @@ const STEP_ICON = {
 
 type StepTool = keyof typeof STEP_ICON;
 const isStepTool = (tool: string): tool is StepTool => Object.hasOwn(STEP_ICON, tool);
-const iconOf = (tool: string): IconName => (isStepTool(tool) ? STEP_ICON[tool] : "globe");
+export const iconOf = (tool: string): IconName => (isStepTool(tool) ? STEP_ICON[tool] : "globe");
 
 /** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"). */
 export function stepText(t: TFunction, s: BrowserStep): string {

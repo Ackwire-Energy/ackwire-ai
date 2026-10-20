@@ -1156,3 +1156,115 @@
     animation: none;
   }
 }
+
+/* ---------- after the run: where it browsed (telas/NavegadorDepois.html, A + "Página em silhueta") ---------- */
+.brw-trail,
+.brw-ac.brw-trail.is-open {
+  max-width: 600px;
+}
+.brw-trail__shot {
+  display: flex;
+  flex-direction: column;
+  background: var(--sunken);
+}
+.brw-trail__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 13px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--raised) 70%, var(--sunken));
+  border-bottom: 1px solid var(--line);
+}
+.brw-trail__bar i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--line2);
+}
+.brw-trail__bar span {
+  flex: 1;
+  min-width: 0;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 4px;
+  background: var(--plate);
+}
+.brw-trail__shot .ac-page-silhouette {
+  flex: 1;
+  min-height: 0;
+}
+.brw-ac.brw-trail .brw-trail__log {
+  max-height: none;
+  padding: 6px 14px 10px;
+  border-top: 1px solid var(--line);
+}
+.brw-trail__log > li.brw-trail__page {
+  display: block;
+  padding: 4px 0 0;
+  border-top: 0;
+}
+.brw-trail__site {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.brw-trail__site > span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brw-trail__site > .ac-icon {
+  color: var(--muted);
+}
+.brw-trail__ext {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--faint);
+  flex: none;
+}
+.brw-trail__ext:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.brw-trail__ext:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.brw-trail__page ol {
+  margin: 0;
+  padding: 0 0 0 22px;
+}
+.brw-trail__page ol li {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 28px;
+  padding: 0;
+  border-top: 0;
+  color: var(--muted);
+}
+.brw-trail__page ol li > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brw-trail__page ol li small {
+  color: var(--faint);
+  font-size: 12px;
+}
+.brw-trail__page ol li.is-failed,
+.brw-trail__page ol li.is-failed > .ac-icon {
+  color: var(--danger);
+}
