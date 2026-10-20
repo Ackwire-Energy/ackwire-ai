@@ -11213,6 +11213,12 @@ html[data-menu-overlay] .shell {
   height: 17px;
   color: var(--ink-muted);
 }
+/* Agent and person rows: the 24px avatar (accessories need 24) as far in from the left as from top
+   and bottom, centred on the icons above, its name lined up with theirs. */
+.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
+  padding-left: 4px;
+  gap: 7px;
+}
 .sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__more-chevron {
   width: 16px;
   height: 16px;
