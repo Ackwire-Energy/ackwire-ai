@@ -380,7 +380,10 @@ export interface RunSummary {
   /** First part of the message that started the run. */
   what: string;
   turns: number;
+  /** Every input token, cache included. */
   inputTokens: number;
+  /** How much of `inputTokens` was read from the prompt cache. */
+  cachedTokens: number;
   outputTokens: number;
   costNanoUsd: number;
   createdAt: Date;
@@ -421,6 +424,7 @@ export async function listRuns(
     .select({
       runId: usageRecords.runId,
       input: sql<string>`sum(${usageRecords.inputTokens} + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens})`,
+      cached: sql<string>`sum(${usageRecords.cacheReadTokens})`,
       output: sql<string>`sum(${usageRecords.outputTokens})`,
       cost: sql<string>`sum(${usageRecords.costNanoUsd})`,
     })
@@ -454,6 +458,7 @@ export async function listRuns(
       what: (bodies.get(r.triggerMessageId) ?? "").slice(0, 200),
       turns: r.turns,
       inputTokens: Number(u?.input ?? 0),
+      cachedTokens: Number(u?.cached ?? 0),
       outputTokens: Number(u?.output ?? 0),
       costNanoUsd: Number(u?.cost ?? 0),
       createdAt: r.createdAt,

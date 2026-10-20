@@ -144,6 +144,7 @@ describe("agents, runs and usage", () => {
       what: "@dev please check the deploy",
       costNanoUsd: cost,
       inputTokens: 1000,
+      cachedTokens: 0,
       outputTokens: 100,
       turns: 1,
     });

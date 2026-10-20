@@ -10129,7 +10129,7 @@ a.machine-row__name:hover {
 }
 .agp-run {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: start;
   gap: 12px;
   padding: 11px 0;
@@ -10142,6 +10142,7 @@ a.machine-row__name:hover {
   padding-top: 2px;
   color: var(--faint);
   font-size: 12.5px;
+  white-space: nowrap;
 }
 .agp-run__t {
   display: flex;

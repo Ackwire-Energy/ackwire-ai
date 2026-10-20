@@ -790,7 +790,10 @@ export interface Run {
   /** Start of the message that started the run. */
   what: string;
   turns: number;
+  /** Every input token, cache included. */
   inputTokens: number;
+  /** How much of `inputTokens` was read from the prompt cache (older servers: absent). */
+  cachedTokens?: number;
   outputTokens: number;
   createdAt: string;
   finishedAt: string | null;

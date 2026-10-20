@@ -200,6 +200,13 @@ export function ActivityTab() {
                 <ul className="agp-list">
                   {d.runs.map((r) => {
                     const x = extra(r);
+                    // New input apart from what the prompt cache gave back (cheaper), and the output.
+                    const cached = r.cachedTokens ?? 0;
+                    const tokens = (fmt: (locale: string, n: number) => string) => ({
+                      input: fmt(locale, Math.max(0, r.inputTokens - cached)),
+                      cached: fmt(locale, cached),
+                      output: fmt(locale, r.outputTokens),
+                    });
                     return (
                       <li key={r.id} className="agp-run">
                         <time dateTime={r.createdAt}>{formatTime(locale, r.createdAt)}</time>
@@ -236,8 +243,11 @@ export function ActivityTab() {
                               </span>
                             )}
                         </span>
-                        <span className="agp-run__r">
-                          {t("agent.runTokens", { tokens: formatInt(locale, r.inputTokens + r.outputTokens) })}
+                        <span className="agp-run__r" title={t("agent.runTokensTip", tokens(formatInt))}>
+                          {t(
+                            "agent.runTokens",
+                            tokens((l, n) => formatTokensShort(t, l, n)),
+                          )}
                         </span>
                       </li>
                     );
