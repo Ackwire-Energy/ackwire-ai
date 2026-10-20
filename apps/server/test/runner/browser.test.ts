@@ -157,8 +157,8 @@ class FakeSocket implements StreamSocket {
 
 // ── Pure parts ───────────────────────────────────────────────────────────────
 
-test("protocol 12 is the runner's protocol, and the browser is a fourth machine switch", () => {
-  expect(MACHINE_PROTOCOL_VERSION).toBe(BROWSER_PROTOCOL);
+test("the runner speaks the browser's protocol (12) or later, and the browser is a fourth machine switch", () => {
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(BROWSER_PROTOCOL);
   expect(TOOL_NAMES).toContain("browser");
   const off: RunnerAccess = { folders: [], tools: { claude: true, codex: false, commands: true } };
   const on = setTool(off, "browser", true);

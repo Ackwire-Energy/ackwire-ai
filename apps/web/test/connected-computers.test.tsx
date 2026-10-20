@@ -295,8 +295,12 @@ describe("Configurações → Computadores", () => {
     expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args).toEqual([ORG_ID, ADA_ID, m.id]);
     expect(document.body.textContent).toContain("Ada agora usa Escritório.");
     expect(within(card).getByRole("combobox", { name: "Computador de Ada" }).textContent).toContain("Escritório");
+    // The counts sit behind each kind's ⓘ.
     const kinds = screen().getByRole("region", { name: "Onde os agentes trabalham" });
-    expect(kinds.textContent).toContain("1agente usa");
+    const who = within(kinds).getByRole("button", { name: "Quem usa: No seu computador" });
+    who.focus();
+    await act(async () => fireEvent.click(who));
+    expect(screen().getByRole("dialog", { name: "Quem usa: No seu computador" }).textContent).toContain("1 agente usa");
     // The row's portrait is the Mac's.
     expect(document.querySelector(".machine-row canvas.ac-computer")?.getAttribute("data-kind")).toBe("mac");
   });
@@ -661,39 +665,8 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
 });
 
 describe("agent page: which computer", () => {
-  test("Computador: Nuvem | machine, saved with the save bar; on a machine the cloud controls go away", async () => {
-    const state = seedState();
-    const api = createFakeApi(state);
-    const m = fakeMachinesOf.get(api)?.pair({ name: "Escritório" }) as Machine;
-    fakeMachinesOf.get(api)?.pair({ name: "Laptop", online: false });
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=computer`, { api });
-    await settle(8);
-    const pc = screen().getByRole("region", { name: "PC da Ada" });
-    expect(within(pc).getByRole("button", { name: "Ações do PC da Ada" })).toBeTruthy();
-    const trigger = within(pc).getByRole("combobox", { name: "Computador" });
-    expect(trigger.textContent).toContain("Nuvem");
-    trigger.focus();
-    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
-    // Offline machines stay selectable, marked.
-    expect(screen().getByRole("option", { name: /^Laptop \(offline\)/ })).toBeTruthy();
-    await act(async () => fireEvent.click(screen().getByRole("option", { name: /^Escritório/ })));
-    await settle(4);
-    // A draft until Salvar.
-    expect(state.calls.find((c) => c.method === "sandbox.setTarget")).toBeUndefined();
-    expect(pc.textContent).toContain("Antes: Nuvem");
-    await click(
-      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
-    );
-    await settle(6);
-    expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args).toEqual([ORG_ID, ADA_ID, m.id]);
-    expect(document.body.textContent).toContain("Alterações da Ada salvas.");
-    const after = screen().getByRole("region", { name: "PC da Ada" });
-    expect(after.textContent).toContain("Escritório");
-    expect(after.textContent).toContain("Online");
-    expect(after.textContent).toContain("Quem conectou este computador liga, desliga e pausa nele mesmo.");
-    expect(within(after).queryByRole("button", { name: "Ações do PC da Ada" })).toBeNull();
-    expect(after.textContent).not.toContain("GB em disco");
-  });
+  // Picking the computer moved to the page's sentence ("Mudar onde trabalha", saved at once):
+  // apps/web/test/agent-brain.test.tsx covers it.
 
   test("members who don't own the agent don't get the selector", async () => {
     const state = seedState();

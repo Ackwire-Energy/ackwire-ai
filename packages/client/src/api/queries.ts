@@ -427,9 +427,19 @@ export function usePostMessage(
       options.onOptimistic?.(local);
       return { local };
     },
-    onSuccess: (message, { clientId }, ctx) => {
-      const echoed = { ...message, clientId: message.clientId ?? clientId };
+    onSuccess: (message, { clientId, threadId, meta }, ctx) => {
+      // Written in the thread panel: it stays out of the channel while the thread list catches up
+      // (the realtime event may come later, or not at all).
+      const opened = Boolean(threadId) && meta?.[OPEN_THREAD] === true;
+      const echoed = {
+        ...message,
+        clientId: message.clientId ?? clientId,
+        ...(opened ? { meta: { ...message.meta, [OPEN_THREAD]: true } } : {}),
+      };
       cacheMessage(qc, orgId, echoed);
+      if (opened) {
+        void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+      }
       if (ctx?.local) options.onSent?.(echoed, ctx.local);
     },
     onError: (error, { clientId }) => {

@@ -663,5 +663,6 @@ export function PageSilhouette({ color = "sky", className }: { color?: AgentColo
         ctx.fillRect(x, y, 1, 1);
       }
   }, false);
-  return <canvas ref={ref} className={cx("ac-page-silhouette", className)} aria-hidden="true" />;
+  // Decorative (a canvas has nothing to read; the text beside it says what the page is).
+  return <canvas ref={ref} className={cx("ac-page-silhouette", className)} />;
 }

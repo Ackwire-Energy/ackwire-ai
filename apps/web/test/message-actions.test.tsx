@@ -86,8 +86,12 @@ describe("message action bars", () => {
       openThread: true,
     });
     // From my reply on, the thread leaves the channel: one line where it was (pressed while open).
-    const channel = screen().getByRole("region", { name: /Mensagens/ });
-    expect(channel.textContent).not.toContain("vou olhar");
+    // The panel floats over the channel (inside its region): only the channel's own messages count.
+    const channel = screen()
+      .getAllByRole("region", { name: /Mensagens/ })
+      .find((r) => !panel.contains(r)) as HTMLElement;
+    const inChannel = [...channel.querySelectorAll("[data-message-id]")].filter((m) => !panel.contains(m));
+    expect(inChannel.map((m) => m.textContent).join(" ")).not.toContain("vou olhar");
     expect(
       within(channel)
         .getByRole("button", { name: /1 resposta/ })

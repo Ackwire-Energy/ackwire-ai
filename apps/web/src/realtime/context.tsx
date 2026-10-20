@@ -683,6 +683,19 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   }, [connection, enabled, orgId, channelId, qc, streams]);
 }
 
+/** Same items in the same order (lists), or the same keys with the same values (plain objects). */
+function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
+  if (!a || !b || typeof a !== "object" || typeof b !== "object" || Array.isArray(a) || Array.isArray(b)) return false;
+  if (Object.getPrototypeOf(a) !== Object.prototype || Object.getPrototypeOf(b) !== Object.prototype) return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
+  return ka.length === kb.length && ka.every((k) => Object.hasOwn(b, k) && Object.is(ra[k], rb[k]));
+}
+
 /**
  * Subscribes to a slice of the live store; re-renders only when that slice
  * changes (`isEqual`), so a streaming delta re-renders the streaming row, not
@@ -708,9 +721,11 @@ export function useLive<T>(select: (state: LiveState) => T, isEqual: (a: T, b: T
     return store.subscribe(check);
   }, [store]);
   // The selector may read the component's own state (which runs a channel shows): a render checks again.
+  // A selector that builds a new list or object each call (`runsInChannel`) would set it on every render
+  // and never stop: one with the same items counts as unchanged here.
   useEffect(() => {
     const next = selectRef.current(store.get());
-    if (!isEqual(valueRef.current, next)) {
+    if (!isEqual(valueRef.current, next) && !shallowEqual(valueRef.current, next)) {
       valueRef.current = next;
       setValue(() => next);
     }

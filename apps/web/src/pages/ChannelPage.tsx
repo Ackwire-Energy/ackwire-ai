@@ -747,8 +747,8 @@ function ChannelView({
     );
     const inPanel = (m: MessageType) => {
       if (!m.threadId) return false;
-      // My reply on its way from the panel (before the thread says it was opened).
-      if (m.local && m.meta?.[OPEN_THREAD] === true) return true;
+      // My reply from the panel, on its way or just sent (before the thread says it was opened).
+      if (m.meta?.[OPEN_THREAD] === true) return true;
       const at = opened.get(m.threadId)?.openedByReplyAt;
       return Boolean(at && m.createdAt >= at);
     };
