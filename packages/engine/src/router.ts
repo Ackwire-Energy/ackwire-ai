@@ -627,7 +627,7 @@ export async function routeMessage(
       .onConflictDoNothing()
       .returning({ id: routingDecisions.id });
     if (!decision) return null; // another worker routed it first
-    return createAgentRuns(tx, message, selected, "router");
+    return createAgentRuns(tx, message, selected, "router", { joinChannelRun: message.authorType === "person" });
   });
   if (!runs) return { runs: [], skipped: "already_routed" };
   return {

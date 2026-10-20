@@ -150,8 +150,8 @@ import { browserOffline, failedOffline, outbox, useQueued } from "@/chat/outbox"
 import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
-  elapsedParts,
   drawsBehind,
+  elapsedParts,
   nextSlots,
   openerOf,
   type RunSlot,

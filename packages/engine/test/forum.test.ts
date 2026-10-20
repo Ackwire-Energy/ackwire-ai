@@ -590,10 +590,11 @@ describe("from issues, the chat and routines", () => {
 
   test("an agent suggests a topic; only a person opens it (or dismisses it)", async () => {
     f = await setup({ reply: forumReply(), artifactTools: true, forumTools: true });
+    // One after the other (both at once would be one run: the second joins the first while it works).
     for (const body of ["@dev vale um fórum?", "@dev vale um fórum sobre isso?"]) {
       await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+      await drainOutbox(f.db, f.handlers);
     }
-    await drainOutbox(f.db, f.handlers);
     // The cards are in the conversation; no topic exists yet.
     expect(await listForumTopics(f.db, f.owner.id, f.org.id)).toEqual([]);
     const cards = (await f.db.select().from(schema.messages)).filter((m) => m.meta.forumSuggestion);

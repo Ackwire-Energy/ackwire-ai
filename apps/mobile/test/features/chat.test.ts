@@ -31,12 +31,12 @@ import {
 } from "../../src/features/chat/logic";
 import {
   fadeTail,
+  OPENERS,
+  openingRuns,
   pruneMarks,
   recentTurn,
   rememberTurn,
   stoppedOf,
-  OPENERS,
-  openingRuns,
   turnItems,
   turnOpener,
   turnPhase,

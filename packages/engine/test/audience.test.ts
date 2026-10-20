@@ -177,7 +177,10 @@ describe("who can talk to the agent", () => {
         },
         { startRuns: false },
       );
-      return dispatchMentions(f.db, { orgId: f.org.id, messageId: message.id }, { maxHops: 3 });
+      const out = await dispatchMentions(f.db, { orgId: f.org.id, messageId: message.id }, { maxHops: 3 });
+      // Dev answered: its run ends (a second call in the channel would otherwise join it while it works).
+      if (run) await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
+      return out;
     };
     expect((await askFor(bia.id)).runs).toEqual([]);
     expect((await askFor(f.owner.id)).runs.map((r) => r.agentId)).toEqual([ops.id]);

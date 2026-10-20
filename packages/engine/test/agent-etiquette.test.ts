@@ -156,6 +156,8 @@ describe("short follow-ups without a mention", () => {
       { orgId: f.org.id, messageId: followUp.id },
     );
     expect(one.runs.map((r) => r.agentId)).toEqual([f.agent.id]);
+    // Dev answers it (while it works, a new message for Dev would join that run instead).
+    await drainOutbox(f.db, f.handlers);
 
     const both = await post("e agora, vocês dois?");
     const several = await routeMessage(

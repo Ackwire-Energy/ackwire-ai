@@ -103,6 +103,8 @@ test("a new top-level message reads the replies shown under earlier messages, no
     author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
     body: "The clone hung.",
   });
+  // That run answered: it ended (a new message in the channel would otherwise join it while it works).
+  await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.triggerMessageId, earlier.id));
   const trigger = await post("@dev why did it hang?");
   const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   const ctx = await buildRunContext(f.db, runs[0] as NonNullable<(typeof runs)[0]>, f.agent, { maxMessages: 10 });

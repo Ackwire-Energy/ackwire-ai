@@ -3,6 +3,7 @@ import { audienceSql } from "./audience";
 import { dmAgents } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
+import { inChannelRun } from "./run-scope";
 import type { AgentRun } from "./runs";
 
 const { agents, channelMembers, agentRuns } = schema;
@@ -29,6 +30,12 @@ export async function createAgentRuns(
   message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "hop">,
   agentIds: string[],
   trigger: RunTrigger,
+  /**
+   * A person's new message in the channel (the router picked the agent): it also joins the agent's
+   * run that answers in the channel itself (D62), so two people calling one agent get one answer.
+   * Routines, agents' messages and consultations keep one run per message.
+   */
+  options: { joinChannelRun?: boolean } = {},
 ): Promise<AgentRun[]> {
   const created: AgentRun[] = [];
   for (const agentId of agentIds) {
@@ -49,7 +56,12 @@ export async function createAgentRuns(
             eq(agentRuns.channelId, message.channelId),
             inArray(agentRuns.status, ["queued", "running", "waiting_approval", "waiting_input"]),
             sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
-              select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm'))`,
+              select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm')
+              or ${
+                options.joinChannelRun && !message.threadId
+                  ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`
+                  : sql`false`
+              })`,
           ),
         )
         .orderBy(sql`${agentRuns.createdAt} desc`)

@@ -296,13 +296,26 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         return;
       }
       if (message.mentionedAgentIds.length > 0) {
-        // No-op unless inserted elsewhere; never the agents the person only referenced.
+        // No-op unless inserted elsewhere; never the agents the person only referenced, nor the ones whose
+        // run in progress already took this message (steering): once that run ends, a second one would
+        // answer the same message again.
         const referenced = referencedOf(message.meta);
+        const steeredIds = Array.isArray(message.meta.steeredRunIds)
+          ? message.meta.steeredRunIds.filter((v): v is string => typeof v === "string")
+          : [];
+        const steered =
+          steeredIds.length > 0
+            ? (
+                await deps.db
+                  .select({ agentId: schema.agentRuns.agentId })
+                  .from(schema.agentRuns)
+                  .where(and(eq(schema.agentRuns.orgId, message.orgId), inArray(schema.agentRuns.id, steeredIds)))
+              ).map((r) => r.agentId)
+            : [];
+        const skip = new Set([...referenced, ...steered]);
         await dispatchMentions(deps.db, input, {
           maxHops: deps.maxHops,
-          ...(referenced.length > 0
-            ? { onlyAgentIds: message.mentionedAgentIds.filter((id) => !referenced.includes(id)) }
-            : {}),
+          ...(skip.size > 0 ? { onlyAgentIds: message.mentionedAgentIds.filter((id) => !skip.has(id)) } : {}),
         });
         return;
       }

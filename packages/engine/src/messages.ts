@@ -27,6 +27,7 @@ import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { enqueue } from "./outbox";
 import { afterReplyAnswered } from "./questions";
+import { inChannelRun } from "./run-scope";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 
 const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions, threads } = schema;
@@ -425,7 +426,10 @@ export async function insertMessageWithRuns(
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
         -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
-        -- thread, any agent working in that thread (no mention needed to talk to it there).
+        -- thread, any agent working in that thread (no mention needed to talk to it there). A new
+        -- message in the channel joins the agent's run that answers in the channel itself (not one in
+        -- a thread's panel, a range thread or a mission), while it is queued or working (one waiting for
+        -- an approval or an answer would hold the new request): two people calling Ada get one Ada.
         select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
         join ${agents} ra on ra.id = r.agent_id
         where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
@@ -436,7 +440,8 @@ export async function insertMessageWithRuns(
           and (
             (r.agent_id in (select agent_id from answering)
               and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
-                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
+                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')
+                or ${threadId ? sql`false` : sql`(r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`}))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
           )

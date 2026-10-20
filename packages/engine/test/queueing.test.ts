@@ -59,6 +59,45 @@ describe("mid-round queueing (ADR 0029 section 1)", () => {
     expect(thread.at(-1)?.body).toBe("Built, version bumped.");
   });
 
+  test("a new message in the channel calling the agent while it works there joins that run: one agent, not two", async () => {
+    const requests: string[] = [];
+    f = await setup({
+      // While the first answer runs, someone else calls the same agent with a new message in the channel.
+      toolSources: [slowTool(() => post("@dev and fix the login too"))],
+      reply: (req: ModelRequest, call: number) => {
+        requests.push(JSON.stringify(req.messages.at(-1)?.content));
+        return call === 1
+          ? { chunks: ["Building."], toolUses: [{ name: "build", input: {} }] }
+          : { chunks: ["Built, and the login is fixed."] };
+      },
+    });
+    await post("@dev build the project");
+    await drainOutbox(f.db, f.handlers);
+    expect(await runs()).toHaveLength(1);
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toContain("and fix the login too");
+  });
+
+  test("a new message in the channel doesn't join a run working in a thread's panel", async () => {
+    let threadId = "";
+    f = await setup({
+      toolSources: [slowTool(() => post("@dev something else"))],
+      reply: (_req: ModelRequest, call: number) =>
+        call === 1 ? { chunks: ["Building."], toolUses: [{ name: "build", input: {} }] } : { chunks: ["Done."] },
+    });
+    const ask = await post("@dev build the project");
+    threadId = ask.id;
+    // The thread was opened with "Responder": its run answers in the panel, not in the channel.
+    await f.db.insert(schema.threads).values({
+      orgId: f.org.id,
+      channelId: f.general.id,
+      rootMessageId: threadId,
+      openedByReplyAt: new Date(),
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(await runs()).toHaveLength(2);
+  });
+
   test("after the run ended, a new message to the agent starts a run as usual", async () => {
     f = await setup({ reply: (_req, call) => ({ chunks: [call === 1 ? "First." : "Second."] }) });
     const ask = await post("@dev first thing");
