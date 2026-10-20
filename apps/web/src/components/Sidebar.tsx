@@ -441,16 +441,6 @@ export function Sidebar() {
         )}
         <div className="sidebar__me">
           <AccountMenu budgetUsed={budgetUsed} />
-          <Button asChild variant="ghost" size="sm" iconOnly>
-            <Link
-              to="/org/$orgId/settings"
-              params={{ orgId }}
-              aria-label={t("shell.settings")}
-              title={t("shell.settings")}
-            >
-              <Icon name="settings" />
-            </Link>
-          </Button>
         </div>
       </div>
     </nav>

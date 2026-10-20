@@ -86,7 +86,7 @@ const INSET = (FIELD - SEND) / 2;
  * placeholder; with text, the round ink send button pops in. One line keeps "+", text and send on the
  * same center line; longer text grows the pill upward and everything stays at the bottom.
  *
- * While an agent works (Mensagens.html, C): the empty field's button is "Parar" (a 2×2 pixel square), one
+ * While an agent works (Mensagens.html, C): the empty field's button is "Parar" (a rounded square), one
  * tap and it stops, no question asked (what it did stays and can continue); with text, two buttons above
  * the field choose "Juntar ao que está fazendo" (the default) or "Parar e mandar". A light tap on send, a
  * firm one on stop.

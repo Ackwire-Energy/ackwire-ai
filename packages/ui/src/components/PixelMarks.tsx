@@ -4,8 +4,8 @@ import { cx } from "../cx";
 /**
  * Pixel marks that sit next to the PixelSpinner (docs/design/telas/Mensagens.html):
  * `PixelDone`, one green pixel (the spinner grid's center cell) that pops in
- * when a step is done, and `PixelStop`, a 2×2 square that reads as "stop"
- * (one cell dims in turn while an agent works). Pure CSS; still under
+ * when a step is done, and `PixelStop`, a solid rounded square that reads as
+ * "stop" (it breathes while an agent works). Pure CSS; still under
  * prefers-reduced-motion. Decorative unless `label` is given.
  */
 
@@ -39,28 +39,26 @@ export function PixelDone({ size = 14, label, className }: PixelDoneProps) {
 
 export interface PixelStopProps {
   size?: number;
-  /** An agent is working: one cell dims in turn (220 ms each, clockwise from the top-left). */
+  /** An agent is working: the square breathes (a slow fade, 1.6 s). */
   animated?: boolean;
-  /** Stopped (a halted step): every cell dimmed. */
+  /** Stopped (a halted step): dimmed. */
   dim?: boolean;
   label?: string;
   className?: string;
 }
 
-/** Stop: a 2×2 pixel square in the text color. */
+/** Stop: one rounded square in the text color, ~3/4 of the box. */
 export function PixelStop({ size = 13, animated = false, dim = false, label, className }: PixelStopProps) {
-  const { gap } = pixelCell(size, 2);
+  const side = Math.round(size * 0.76);
+  const radius = Math.max(2, Math.round(side * 0.24));
   return (
     <span
       className={cx("ac-pixstop", className)}
       data-animated={animated || undefined}
       data-dim={(!animated && dim) || undefined}
-      style={{ width: size, height: size, "--px-gap": `${gap}px` } as CSSProperties}
+      style={{ width: size, height: size, "--stop-side": `${side}px`, "--stop-radius": `${radius}px` } as CSSProperties}
       {...a11y(label)}
     >
-      <span />
-      <span />
-      <span />
       <span />
     </span>
   );

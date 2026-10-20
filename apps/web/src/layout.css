@@ -3155,9 +3155,11 @@ button.drive-where:focus-visible {
   align-items: center;
   gap: 4px;
 }
-.sidebar__me > button:first-child {
+.sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
+  padding: 10px 14px 10px 10px;
+  border-radius: inherit;
 }
 
 /* Settings (telas/Configuracoes.html): a grouped left sub-nav + one section. */
@@ -7005,8 +7007,8 @@ button.live-call__head:hover {
   overflow: hidden;
   pointer-events: none;
 }
+/* The whole card is the account button (no inner margin it doesn't answer to). */
 .sidebar__me {
-  padding: 6px 6px 6px 8px;
   border-radius: 12px;
   background: var(--glass-solid);
   box-shadow:

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { INK_ALPHAS, inkOrbitCells, orbitCells, orbitHead, RING, STOP_CELLS, stopTurn } from "../src/agent/orbit";
+import { INK_ALPHAS, inkOrbitCells, orbitCells, orbitHead, RING, stopBreath } from "../src/agent/orbit";
 import { agentLayout, framedByDefault, framedLayout, poseFor, seedOf } from "../src/agent/poses";
 
 test("run: writing eyes", () => {
@@ -76,10 +76,9 @@ test("the ink orbit: the head in full ink, a fading trail, the rest faint", () =
   expect(cells[3]?.opacity).toBe(INK_ALPHAS[3]);
 });
 
-test("the 2×2 stop square: one cell dims in turn every 220 ms, none when still", () => {
-  expect(STOP_CELLS).toHaveLength(4);
-  expect(stopTurn(0)).toBe(0);
-  expect(stopTurn(230)).toBe(1);
-  expect(stopTurn(4 * 220)).toBe(0);
-  expect(stopTurn(500, true)).toBe(-1);
+test("the stop square breathes 1 → 0.6 → 1 every 1.6 s, solid when still", () => {
+  expect(stopBreath(0)).toBeCloseTo(1);
+  expect(stopBreath(800)).toBeCloseTo(0.6);
+  expect(stopBreath(1600)).toBeCloseTo(1);
+  expect(stopBreath(800, true)).toBe(1);
 });

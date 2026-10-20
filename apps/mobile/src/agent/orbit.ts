@@ -36,11 +36,6 @@ export const inkOrbitCells = (head: number) =>
     return { x, y, opacity: INK_ALPHAS[age] ?? 0.16 };
   });
 
-/** The 2×2 stop square's cells, clockwise from the top-left; one dims in turn every 220 ms (none when still). */
-export const STOP_CELLS: readonly (readonly [number, number])[] = [
-  [0, 0],
-  [1, 0],
-  [1, 1],
-  [0, 1],
-];
-export const stopTurn = (ms: number, still = false) => (still ? -1 : Math.floor(ms / 220) % 4);
+/** The stop square's opacity: it breathes 1 → 0.6 → 1 every 1.6 s (solid when still). */
+export const stopBreath = (ms: number, still = false) =>
+  still ? 1 : 0.8 + 0.2 * Math.cos((2 * Math.PI * (ms % 1600)) / 1600);

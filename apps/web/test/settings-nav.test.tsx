@@ -71,12 +71,10 @@ describe("finding the settings", () => {
     ]);
   });
 
-  test("a gear next to the account opens the settings", async () => {
+  test("the account card is one button, no gear beside it (settings live in the workspace menu)", async () => {
     await go("issues");
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
-    expect(within(nav).getByRole("link", { name: "Configurações" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/settings`,
-    );
+    expect(within(nav).queryByRole("link", { name: "Configurações" })).toBeNull();
   });
 
   test("every section has its own URL, with the sub-nav marking it", async () => {

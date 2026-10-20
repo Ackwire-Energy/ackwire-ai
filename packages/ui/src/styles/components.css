@@ -900,8 +900,8 @@ textarea.ac-input {
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-full);
-  background: var(--attention-soft);
-  color: var(--attention);
+  background: var(--sunken);
+  color: var(--ink2);
   font-size: 12px;
 }
 
@@ -2751,13 +2751,14 @@ a.ac-list__row:focus-visible {
 /* Stop: a 2×2 pixel square in the text color; while an agent works one cell dims in turn (220 ms each). */
 .ac-pixstop {
   display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: var(--px-gap, 1px);
+  place-items: center;
   flex: none;
   vertical-align: middle;
 }
 .ac-pixstop > span {
+  width: var(--stop-side, 10px);
+  height: var(--stop-side, 10px);
+  border-radius: var(--stop-radius, 2px);
   background: currentColor;
 }
 .ac-pixstop[data-dim] > span {
@@ -2765,25 +2766,12 @@ a.ac-list__row:focus-visible {
 }
 @media (prefers-reduced-motion: no-preference) {
   .ac-pixstop[data-animated] > span {
-    animation: ac-pixstop-turn 880ms steps(1, end) infinite;
-  }
-  /* Clockwise from the top-left: the grid's order is TL, TR, BL, BR. */
-  .ac-pixstop[data-animated] > span:nth-child(2) {
-    animation-delay: 220ms;
-  }
-  .ac-pixstop[data-animated] > span:nth-child(4) {
-    animation-delay: 440ms;
-  }
-  .ac-pixstop[data-animated] > span:nth-child(3) {
-    animation-delay: 660ms;
+    animation: ac-pixstop-breathe 1600ms ease-in-out infinite;
   }
 }
-@keyframes ac-pixstop-turn {
-  0% {
-    opacity: 0.55;
-  }
-  25% {
-    opacity: 1;
+@keyframes ac-pixstop-breathe {
+  50% {
+    opacity: 0.6;
   }
 }
 /* Loading button: the label keeps its width under the spinner. */

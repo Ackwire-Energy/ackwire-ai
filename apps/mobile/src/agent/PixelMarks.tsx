@@ -3,11 +3,11 @@ import { View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useReducedMotion, useTheme } from "@/ui/theme";
 import { useFrameTime } from "./live";
-import { inkOrbitCells, orbitHead, RING, STOP_CELLS, stopTurn } from "./orbit";
+import { inkOrbitCells, orbitHead, RING, stopBreath } from "./orbit";
 
 /**
  * The pixel marks next to the agent's orbit (Mensagens.html): the neutral orbit ("enviando", "lê na próxima
- * pausa"), a finished step's one green pixel, a stopped step's dim block and the composer's 2×2 stop
+ * pausa"), a finished step's one green pixel, a stopped step's dim block and the composer's rounded stop
  * square. Same grid and gaps as `PixelOrbit`; nothing moves with reduced motion.
  */
 
@@ -74,20 +74,23 @@ export function PixelStopped({ size = 14 }: { size?: number }) {
   );
 }
 
-/** "Parar": a 2×2 square (reads as stop); one cell dims in turn while the agent works (`moving`). */
+/** "Parar": one rounded square (reads as stop, ~3/4 of the box); it breathes while the agent works (`moving`). */
 export function PixelStop({ size = 13, color, moving = true }: { size?: number; color: string; moving?: boolean }) {
   const reduced = useReducedMotion();
   const still = reduced || !moving;
   const t = useFrameTime(!still, 0);
-  const turn = stopTurn(t * 1000, still);
+  const side = Math.round(size * 0.76);
   return (
-    <View style={{ width: size, height: size }} {...hidden}>
-      {STOP_CELLS.map(([x, y], i) => (
-        <View
-          key={`${x}-${y}`}
-          style={[cellBox(size, 2, x, y), { backgroundColor: color, opacity: i === turn ? 0.55 : 1 }]}
-        />
-      ))}
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} {...hidden}>
+      <View
+        style={{
+          width: side,
+          height: side,
+          borderRadius: Math.max(2, Math.round(side * 0.24)),
+          backgroundColor: color,
+          opacity: stopBreath(t * 1000, still),
+        }}
+      />
     </View>
   );
 }
