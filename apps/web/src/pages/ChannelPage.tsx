@@ -3329,7 +3329,9 @@ function ChannelDetails({
         open={open && Boolean(removing)}
         onOpenChange={(o) => !o && setRemoving(null)}
         title={t("channelMembers.removeTitle", { name: removing?.name ?? "", channel: channel.name })}
-        description={t(removing?.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody")}
+        description={t(
+          removing?.kind === "agent" ? "channelMembers.removeAgentBody" : "channelMembers.removePersonBody",
+        )}
         closeLabel={t("common.close")}
         width={440}
       >

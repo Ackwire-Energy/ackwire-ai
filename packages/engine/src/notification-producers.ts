@@ -128,9 +128,10 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   };
   const done = new Set<string>(authorUser ? [authorUser] : []);
 
-  // A DM from a person: the other person hears it (an agent's replies in a DM are the conversation itself).
+  // A DM from a person: the other person hears it (an agent's replies in a DM are the conversation itself,
+  // except a message the agent started there on someone's behalf, `send_dm`).
   if (channel.kind === "dm") {
-    if (message.authorType !== "person") return;
+    if (message.authorType !== "person" && !meta.agentDm) return;
     const others = await db
       .select({ userId: channelMembers.userId })
       .from(channelMembers)

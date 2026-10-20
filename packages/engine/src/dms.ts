@@ -84,6 +84,50 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
   return channel;
 }
 
+/**
+ * The DM between a person and an agent, opened by the agent (`send_dm`): created the first time with
+ * both as members, the same conversation the person opens with `openDm`. Who may talk to the agent (D31)
+ * isn't checked: the agent may write to anyone in the organization; the person's replies only get an
+ * answer when they may talk to it.
+ */
+export async function openPersonAgentDm(db: Executor, orgId: string, userId: string, agentId: string) {
+  const dmKey = keyOf([`u:${userId}`, `a:${agentId}`]);
+  const existing = async () =>
+    (
+      await db
+        .select()
+        .from(channels)
+        .where(and(eq(channels.orgId, orgId), eq(channels.dmKey, dmKey)))
+    )[0];
+  const found = await existing();
+  if (found) {
+    if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
+    return found;
+  }
+  const [channel] = await db
+    .insert(channels)
+    .values({
+      orgId,
+      name: `dm-${sha256(`${orgId}|${dmKey}`).slice(0, 20)}`,
+      visibility: "private",
+      kind: "dm",
+      dmKey,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (channel) {
+    await db.insert(channelMembers).values([
+      { orgId, channelId: channel.id, userId },
+      { orgId, channelId: channel.id, agentId },
+    ]);
+    caches.scopes.deletePrefix(`${orgId}:${agentId}:visible`);
+    return channel;
+  }
+  const raced = await existing(); // a concurrent open won the race
+  if (!raced) throw new Error("could not open the conversation");
+  return raced;
+}
+
 /** The DM key of a conversation between two agents (`ask_agent`, ADR 0034): no person in it. */
 export const agentDmKey = (a: string, b: string) => keyOf([`a:${a}`, `a:${b}`]);
 

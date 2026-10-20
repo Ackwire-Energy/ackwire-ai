@@ -1,14 +1,19 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, eq, isNull, schema } from "@agenteschat/db";
+import { and, count, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, shareArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
+import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView } from "./messages";
+import { enqueue } from "./outbox";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
 export const POST_MESSAGE_TOOL = "post_message";
+export const SEND_DM_TOOL = "send_dm";
+/** DMs one run may send: enough to tell a few people, never a mailing. */
+const MAX_DMS_PER_RUN = 5;
 export const REACT_TOOL = "react";
 const MAX_FILES = 10;
 
@@ -25,6 +30,58 @@ async function requesterOf(ctx: ToolContext): Promise<string | null> {
     .from(schema.messages)
     .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
   return m?.userId ?? null;
+}
+
+/**
+ * The person behind this run: who wrote the message that started it, or who made the routine that did
+ * (null for an agent's or a webhook's message).
+ */
+async function personBehind(ctx: ToolContext): Promise<string | null> {
+  const [m] = await ctx.db
+    .select({ userId: schema.messages.authorUserId, meta: schema.messages.meta })
+    .from(schema.messages)
+    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
+  if (m?.userId) return m.userId;
+  const routineId = m?.meta.routineId;
+  if (typeof routineId !== "string") return null;
+  const [routine] = await ctx.db
+    .select({ by: schema.routines.createdByUserId })
+    .from(schema.routines)
+    .where(and(eq(schema.routines.orgId, ctx.orgId), eq(schema.routines.id, routineId)));
+  return routine?.by ?? null;
+}
+
+/** For matching what someone typed against names: lower case, no accents, no leading @. */
+const plain = (v: string) =>
+  v
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim()
+    .replace(/^@/, "");
+
+/**
+ * Who in the organization `who` names: their @handle, email, full name, or a first name only one person
+ * has. Several: the agent asks which one.
+ */
+async function findMember(ctx: ToolContext, who: string) {
+  const people = await ctx.db
+    .select({
+      userId: schema.organizationMembers.userId,
+      handle: schema.organizationMembers.handle,
+      name: schema.users.name,
+      email: schema.users.email,
+    })
+    .from(schema.organizationMembers)
+    .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
+    .where(eq(schema.organizationMembers.orgId, ctx.orgId));
+  const q = plain(who);
+  if (!q) return [];
+  const exact = people.filter(
+    (p) => (p.handle && plain(p.handle) === q) || plain(p.email) === q || plain(p.name) === q,
+  );
+  if (exact.length > 0) return exact;
+  return people.filter((p) => plain(p.name).split(/\s+/)[0] === q.split(/\s+/)[0] && !q.includes(" "));
 }
 
 /**
@@ -142,6 +199,92 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           return {
             content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}. Tell the person it's there.`,
             data: { message: { id: message.id, channelId: channel.id } },
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: SEND_DM_TOOL,
+      description:
+        'Send a direct message to a person in the organization, e.g. "avisa a Thay na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language. Only when someone asked you (or in their routine). If several people match, ask which one. Then reply here saying you sent it.',
+      scope: "",
+      inputSchema: {
+        type: "object",
+        properties: {
+          person: { type: "string", minLength: 1, maxLength: 200 },
+          text: { type: "string", minLength: 1, maxLength: MAX_MESSAGE_LENGTH },
+        },
+        required: ["person", "text"],
+        additionalProperties: false,
+      },
+      describe: (input) => ({
+        title: `Message ${str(input.person).replace(/^@/, "")}`,
+        detail: str(input.text).slice(0, 500) || undefined,
+      }),
+      async execute(input, ctx) {
+        try {
+          const requester = await personBehind(ctx);
+          if (!requester)
+            return { content: "Only a person's request (or their routine) can send a DM.", isError: true };
+          const text = str(input.text).trim();
+          if (!text) return { content: "Give the text to send.", isError: true };
+          const matches = await findMember(ctx, str(input.person));
+          if (matches.length === 0) {
+            return { content: `No one called "${str(input.person)}" in this organization.`, isError: true };
+          }
+          if (matches.length > 1) {
+            const names = matches.map((m) => (m.handle ? `${m.name} (@${m.handle})` : m.name)).join(", ");
+            return { content: `Several people match: ${names}. Ask which one.`, isError: true };
+          }
+          const to = matches[0] as (typeof matches)[number];
+          const { messages } = schema;
+          const [sent] = await ctx.db
+            .select({ n: count() })
+            .from(messages)
+            .where(
+              and(eq(messages.orgId, ctx.orgId), eq(messages.agentRunId, ctx.runId), sql`${messages.meta} ? 'agentDm'`),
+            );
+          if ((sent?.n ?? 0) >= MAX_DMS_PER_RUN) {
+            return { content: `You already sent ${MAX_DMS_PER_RUN} DMs in this turn.`, isError: true };
+          }
+          const dm = await openPersonAgentDm(ctx.db, ctx.orgId, to.userId, ctx.agentId);
+          if (dm.id === ctx.channelId) return { content: "That is this conversation: just reply.", isError: true };
+          const [run] = await ctx.db
+            .select({ hop: schema.agentRuns.hop })
+            .from(schema.agentRuns)
+            .where(eq(schema.agentRuns.id, ctx.runId));
+          const message = await insertMessage(ctx.db, {
+            orgId: ctx.orgId,
+            channelId: dm.id,
+            threadId: null,
+            author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: run?.hop ?? 0 },
+            body: text,
+            // Started by the agent on someone's behalf: the person is notified (an agent's reply isn't).
+            meta: { agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId } },
+          });
+          await enqueue(ctx.db, {
+            orgId: ctx.orgId,
+            kind: "notifications.message",
+            payload: { messageId: message.id },
+            dedupeKey: `notifications.message:${message.id}`,
+            maxAttempts: 4,
+          });
+          await recordAudit(ctx.db, {
+            orgId: ctx.orgId,
+            actor: { type: "agent", id: ctx.agentId },
+            action: "message.sent_dm",
+            target: { type: "message", id: message.id },
+            details: { toUserId: to.userId, fromChannelId: ctx.channelId, requesterUserId: requester },
+          });
+          if (deps.pubsub) {
+            const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
+            if (view) await publishMessageCreated(deps.pubsub, view);
+          }
+          return {
+            content: `Sent to ${to.name} in your DM with them. Tell the person who asked.`,
+            data: { message: { id: message.id, channelId: dm.id } },
           };
         } catch (error) {
           return failed(error);

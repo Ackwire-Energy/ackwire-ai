@@ -99,3 +99,47 @@ test("post_message: from a DM to #general with the file (as a copy); only channe
     content: "No channel #segredo that the person who asked is in.",
   });
 });
+
+test("send_dm: the agent writes to a person in its DM with them, they're notified; several matches ask which one", async () => {
+  const person = "thay";
+  f = await setup({
+    chatTools: true,
+    reply: (req: ModelRequest) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["Feito."] };
+      if (last.includes("avisa")) {
+        return {
+          chunks: [],
+          toolUses: [{ name: "send_dm", input: { person, text: "Oi Thay! O Walter pediu para te avisar do e-mail." } }],
+        };
+      }
+      return { chunks: ["ok"] };
+    },
+  });
+  const thay = await addMember(f.db, f.org.id, "member", "Tháy Lima");
+  const deps = { db: f.db, pubsub: f.pubsub };
+  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev avisa a thay desse email na dm" });
+  await drainOutbox(f.db, f.handlers);
+  expect((await toolResults()).find((r) => r.name === "send_dm")).toMatchObject({ isError: false });
+
+  // The DM between Thay and the agent, with the message from the agent, and a notification for her.
+  const dm = (await f.db.select().from(schema.channels)).find((c) => c.kind === "dm");
+  const members = await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, dm?.id ?? ""));
+  expect(members.map((m) => m.userId ?? m.agentId).sort()).toEqual([thay.id, f.agent.id].sort());
+  const [sent] = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm?.id ?? ""));
+  expect(sent).toMatchObject({ authorType: "agent", authorAgentId: f.agent.id, body: "Oi Thay! O Walter pediu para te avisar do e-mail." });
+  expect(sent?.meta.agentDm).toMatchObject({ requesterUserId: f.owner.id });
+  const notes = await f.db
+    .select()
+    .from(schema.notifications)
+    .where(and(eq(schema.notifications.userId, thay.id), eq(schema.notifications.kind, "dm")));
+  expect(notes).toHaveLength(1);
+
+  // Two people whose first name is the same: the agent is told to ask which one.
+  await addMember(f.db, f.org.id, "member", "Thay Souza");
+  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev avisa a thay de novo" });
+  await drainOutbox(f.db, f.handlers);
+  const results = (await toolResults()).filter((r) => r.name === "send_dm");
+  expect(results.at(-1)).toMatchObject({ isError: true });
+  expect(results.at(-1)?.content).toContain("Several people match");
+});
