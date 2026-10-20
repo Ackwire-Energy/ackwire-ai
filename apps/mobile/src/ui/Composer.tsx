@@ -1,20 +1,22 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Platform,
-  Pressable,
-  Text as RNText,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  type TextStyle,
-  View,
-} from "react-native";
-import Animated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from "react-native-reanimated";
+import { Platform, Text as RNText, ScrollView, StyleSheet, TextInput, type TextStyle, View } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  ZoomIn,
+  ZoomOut,
+} from "react-native-reanimated";
+import { PixelStop } from "@/agent/PixelMarks";
 import { Glass } from "./Glass";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
+import { Segmented } from "./Segmented";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
@@ -27,9 +29,24 @@ export interface ComposerMentionState {
   pick: (handle: string) => void;
 }
 
+/**
+ * How a message goes while an agent works (Mensagens.html, C): "join" reaches it at its next pause, "now"
+ * makes it stop what it is doing and read the message at once. Without an agent at work it is "join".
+ */
+export type SendHow = "join" | "now";
+
+/** An agent at work in the conversation: the empty field's button stops it; with text, the choice shows. */
+export interface ComposerWorking {
+  /** The stop button's label ("Parar o Theo"). */
+  stopLabel: string;
+  onStop: () => void;
+}
+
 export interface ComposerProps {
   placeholder: string;
-  onSend: (text: string) => void;
+  onSend: (text: string, how: SendHow) => void;
+  /** Someone is working here (null otherwise). */
+  working?: ComposerWorking | null;
   onPlus: () => void;
   /**
    * Pills above the field while it is empty; tapping one puts its `text` (default: the `label`) in the field
@@ -63,10 +80,16 @@ const INSET = (FIELD - SEND) / 2;
  * then the field, a raised pill. Empty, it can show who you write to (a small face) before the
  * placeholder; with text, the round ink send button pops in. One line keeps "+", text and send on the
  * same center line; longer text grows the pill upward and everything stays at the bottom.
+ *
+ * While an agent works (Mensagens.html, C): the empty field's button is "Parar" (a 2×2 pixel square), one
+ * tap and it stops, no question asked (what it did stays and can continue); with text, two buttons above
+ * the field choose "Juntar ao que está fazendo" (the default) or "Parar e mandar". A light tap on send, a
+ * firm one on stop.
  */
 export function Composer({
   placeholder,
   onSend,
+  working = null,
   onPlus,
   suggestions,
   inputNativeID,
@@ -82,8 +105,29 @@ export function Composer({
   const [caret, setCaret] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const [focused, setFocused] = useState(false);
+  const [how, setHow] = useState<SendHow>("join");
   const has = text.trim().length > 0;
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
+  const stopMode = Boolean(working) && !has;
+  const button = has || Boolean(working);
+  // The send arrow and the stop square swap in place (one turns away as the other turns in).
+  const mode = useSharedValue(stopMode ? 1 : 0);
+  useEffect(() => {
+    mode.value = reducedMotion ? (stopMode ? 1 : 0) : withSpring(stopMode ? 1 : 0, { damping: 16, stiffness: 320 });
+  }, [stopMode, reducedMotion, mode]);
+  const sendGlyph = useAnimatedStyle(() => ({
+    opacity: 1 - mode.value,
+    transform: [{ scale: 1 - 0.6 * mode.value }, { rotate: `${45 * mode.value}deg` }],
+  }));
+  const stopGlyph = useAnimatedStyle(() => ({
+    opacity: mode.value,
+    transform: [{ scale: 0.4 + 0.6 * mode.value }, { rotate: `${-45 * (1 - mode.value)}deg` }],
+  }));
+  // The choice is per message: back to "join" when the agent is done.
+  const isWorking = Boolean(working);
+  useEffect(() => {
+    if (!isWorking) setHow("join");
+  }, [isWorking]);
 
   const put = (next: string, at = next.length) => {
     setText(next);
@@ -95,8 +139,19 @@ export function Composer({
     const value = text.trim();
     if (!value) return;
     haptics.light();
-    onSend(value);
+    onSend(value, working ? how : "join");
     put("", 0);
+    setHow("join");
+  };
+
+  const press = () => {
+    if (has) {
+      send();
+      return;
+    }
+    if (!working) return;
+    haptics.firm();
+    working.onStop();
   };
 
   const pick = (handle: string) => {
@@ -137,6 +192,23 @@ export function Composer({
           ))}
         </ScrollView>
       ) : null}
+      {working && has && !token ? (
+        <Animated.View
+          entering={reducedMotion ? undefined : FadeInDown.duration(200)}
+          exiting={reducedMotion ? undefined : FadeOut.duration(120)}
+          style={styles.choice}
+          accessibilityLabel={t("mobile.composer.choice")}
+        >
+          <Segmented
+            items={[
+              { key: "join", label: t("mobile.composer.join"), icon: "join" },
+              { key: "now", label: t("mobile.composer.now"), icon: "bolt" },
+            ]}
+            value={how}
+            onChange={(k) => setHow(k === "now" ? "now" : "join")}
+          />
+        </Animated.View>
+      ) : null}
       <View style={styles.row}>
         <PressScale
           to={0.9}
@@ -157,7 +229,7 @@ export function Composer({
             {
               backgroundColor: colors.raised,
               boxShadow: `0px 0px 0px 0.5px ${colors.line2}, 0px 6px 18px -10px rgba(0, 0, 0, 0.25)`,
-              paddingRight: has ? INSET : 14,
+              paddingRight: button ? INSET : 14,
             },
           ]}
         >
@@ -188,21 +260,28 @@ export function Composer({
             accessibilityLabel={placeholder}
             style={[inputText, { color: colors.ink }]}
           />
-          {has ? (
+          {button ? (
             <Animated.View
               entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320)}
               exiting={reducedMotion ? undefined : ZoomOut.duration(120)}
               style={styles.sendBox}
             >
-              <Pressable
-                onPress={send}
+              <PressScale
+                to={0.9}
+                haptic={false}
+                onPress={press}
                 accessibilityRole="button"
-                accessibilityLabel={t("mobile.a11y.send")}
+                accessibilityLabel={stopMode && working ? working.stopLabel : t("mobile.a11y.send")}
                 hitSlop={6}
-                style={({ pressed }) => [styles.send, { backgroundColor: colors.ink, opacity: pressed ? 0.8 : 1 }]}
+                style={[styles.send, { backgroundColor: colors.ink }]}
               >
-                <Icon name="send" size={18} color={colors.bg} />
-              </Pressable>
+                <Animated.View style={[styles.glyph, sendGlyph]}>
+                  <Icon name="send" size={18} color={colors.bg} />
+                </Animated.View>
+                <Animated.View style={[styles.glyph, stopGlyph]}>
+                  <PixelStop size={13} color={colors.bg} moving={stopMode} />
+                </Animated.View>
+              </PressScale>
             </Animated.View>
           ) : null}
         </View>
@@ -262,6 +341,8 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
   },
   face: { height: SEND, justifyContent: "center" },
+  choice: { paddingHorizontal: 4, paddingBottom: 8 },
   sendBox: { width: SEND, height: SEND },
-  send: { width: SEND, height: SEND, borderRadius: SEND / 2, alignItems: "center", justifyContent: "center" },
+  send: { width: SEND, height: SEND, borderRadius: SEND / 2 },
+  glyph: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
 });

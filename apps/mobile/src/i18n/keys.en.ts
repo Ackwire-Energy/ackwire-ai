@@ -99,6 +99,9 @@ export const mobileEn: MobileTranslations = {
   },
   composer: {
     placeholder: "Write a message",
+    join: "Add to what it is doing",
+    now: "Stop and send",
+    choice: "How to send while the agent works",
   },
   search: {
     placeholder: "Search",

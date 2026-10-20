@@ -1,22 +1,49 @@
-import { browserHandoffOf, type Message, type ThreadInfo, useReactions, useToggleReaction } from "@agenteschat/client";
+import {
+  ApiError,
+  browserHandoffOf,
+  type Message,
+  type ThreadInfo,
+  useApi,
+  useContinuedRun,
+  useReactions,
+  useSteerState,
+  useToggleReaction,
+} from "@agenteschat/client";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
+import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
-import { memo, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { CHROME_MAX_SCALE, Count, Icon, Text } from "@/ui";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
+import {
+  CHROME_MAX_SCALE,
+  Count,
+  Icon,
+  InkOrbit,
+  PixelStopped,
+  PressScale,
+  Text,
+  useReducedMotion,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { HandoffCard } from "../browser/HandoffCard";
 import { MessageFiles } from "../files/MessageFiles";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { ApprovalInline, ConsultationCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
+import { FoldingWork } from "./LiveRows";
+import { cacheContinued } from "./live";
 import {
   approvalIdOf,
   artifactsOf,
@@ -32,11 +59,14 @@ import {
 } from "./logic";
 import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
+import { recentTurn, stoppedOf } from "./turn";
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
  * pinned, what it consulted, its text, the cards it carries and the reactions. Long press opens its
- * actions (the screen's sheet).
+ * actions (the screen's sheet). An agent's reply takes its live block's place: the work folds into
+ * "N passos" above the words, and a stopped one says so with "Continuar". Under my own message sent
+ * while an agent works: whether it read it ("lê na próxima pausa", "leu", "parou para ler").
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
@@ -45,6 +75,7 @@ export const MessageRow = memo(function MessageRow({
   thread,
   onLongPress,
   onRetry,
+  offline = false,
 }: {
   message: Message;
   grouped: boolean;
@@ -53,6 +84,8 @@ export const MessageRow = memo(function MessageRow({
   thread?: ThreadInfo;
   onLongPress: (m: Message) => void;
   onRetry?: (m: Message) => void;
+  /** Mine and not sent for lack of internet: it waits and goes by itself when the connection is back. */
+  offline?: boolean;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -78,6 +111,9 @@ export const MessageRow = memo(function MessageRow({
       : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   const steps = isAgent && m.agentRunId ? workStepsOf(meta) : null;
+  const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
+  // This reply just took its live block's place here: the block's work folds away above it.
+  const [folds] = useState(() => Boolean(isAgent && m.agentRunId && recentTurn(m.agentRunId, Date.now())));
   const approvalId = approvalIdOf(meta);
   const review = missionCardRef(meta, "missionReview");
   const decision = missionCardRef(meta, "missionDecision");
@@ -112,10 +148,8 @@ export const MessageRow = memo(function MessageRow({
       <View style={mine ? styles.meEnd : undefined}>
         <Reactions message={m} meId={meId} />
       </View>
-      {m.local === "pending" ? (
-        <Text variant="caption" tone="faint" style={mine ? styles.meStatus : undefined}>
-          {t("mobile.chat.sending")}
-        </Text>
+      {m.local === "pending" || (m.local === "failed" && offline) ? (
+        <Sending offline={offline} end={mine} />
       ) : m.local === "failed" ? (
         <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={8}>
           <Text variant="caption" tone="danger" style={mine ? styles.meStatus : undefined}>
@@ -156,6 +190,7 @@ export const MessageRow = memo(function MessageRow({
           </View>
         ) : null}
         <View style={styles.meCards}>{cards}</View>
+        {m.local ? null : <SteerLine message={m} />}
       </Pressable>
     );
 
@@ -243,6 +278,8 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
+        {folds && m.agentRunId && m.author.id ? <FoldingWork runId={m.agentRunId} agentId={m.author.id} /> : null}
+        {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
         {brainWait ? (
           <BrainWait
             message={m}
@@ -251,7 +288,7 @@ export const MessageRow = memo(function MessageRow({
         ) : body ? (
           <MessageText body={body} muted={m.local === "pending"} selectable={false} />
         ) : null}
-        {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
+        {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
@@ -262,6 +299,137 @@ export const MessageRow = memo(function MessageRow({
     </Pressable>
   );
 });
+
+/** My message on its way: "Enviando" only past half a second; offline, a clock and when it will go. */
+function Sending({ offline, end }: { offline: boolean; end: boolean }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+  if (!offline && !slow) return null;
+  return (
+    <View style={[styles.status, end && styles.statusEnd]}>
+      {offline ? <Icon name="clock" size={12} color={c.faint} /> : <InkOrbit size={10} color={c.faint} />}
+      <Text variant="caption" tone="faint">
+        {offline ? t("mobile.chat.offlineWait") : t("mobile.chat.sending")}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Under my message sent while an agent works (Mensagens.html, C): "{nome} lê na próxima pausa" (the ink
+ * orbit) until it reads it, "{nome} parou para ler" when I asked it to stop and read, then "{nome} leu"
+ * with its small face.
+ */
+function SteerLine({ message: m }: { message: Message }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const c = useColors();
+  const reduced = useReducedMotion();
+  const steer = useSteerState(orgId, m.channelId, m.id);
+  if (!steer) return null;
+  const name = dir.agentById.get(steer.agentId)?.name ?? t("channel.unknownAgent");
+  return (
+    <Animated.View
+      key={steer.state}
+      entering={reduced ? undefined : FadeIn.duration(250)}
+      style={[styles.status, styles.statusEnd]}
+      accessibilityLiveRegion="polite"
+    >
+      {steer.state === "read" ? (
+        <AgentFace agentId={steer.agentId} size={16} live={false} framed={false} />
+      ) : steer.state === "now" ? (
+        <Icon name="bolt" size={12} color={c.muted} />
+      ) : (
+        <InkOrbit size={10} color={c.muted} />
+      )}
+      <Text variant="caption" tone="muted">
+        {t(`mobile.chat.steer.${steer.state}`, { name })}
+      </Text>
+    </Animated.View>
+  );
+}
+
+/**
+ * A reply someone stopped (Mensagens.html): what it wrote stays, with "Parado por você · Continuar"; the
+ * button picks up from where it stopped (a new run) and goes away once it did, for everyone.
+ */
+function StoppedLine({
+  message: m,
+  runId,
+  stopped,
+}: {
+  message: Message;
+  runId: string;
+  stopped: { byUserId: string | null; continuedRunId: string | null };
+}) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const role = useOrg().org?.role;
+  const { colors: c, shadows } = useTheme();
+  const [busy, setBusy] = useState(false);
+  // Continued here or on another device (`run.continued`), or already in the message's meta.
+  const continued = useContinuedRun(m.id) ?? stopped.continuedRunId;
+  const byMe = Boolean(meId) && stopped.byUserId === meId;
+  const by = byMe
+    ? t("mobile.chat.stopped.byYou")
+    : stopped.byUserId
+      ? t("mobile.chat.stopped.by", { name: dir.nameOf({ type: "person", id: stopped.byUserId }) })
+      : t("mobile.chat.stopped.plain");
+  const owner = m.author.id ? dir.agentById.get(m.author.id)?.ownerUserId : null;
+  // Same people who may stop it (the server checks again).
+  const may = byMe || can(role, "manage_agents") || (Boolean(meId) && owner === meId);
+  const open = may && !continued && !busy;
+  const onContinue = () => {
+    setBusy(true);
+    api.agents
+      .continueRun(orgId, runId)
+      .then(({ runId: newRunId }) => cacheContinued(qc, orgId, m.channelId, m.id, newRunId))
+      .catch((err: unknown) => {
+        setBusy(false);
+        // Already continued (or it can't be): the event or a refetch hides the button.
+        if (err instanceof ApiError && err.status === 409) return;
+        toast({ title: t("mobile.chat.stopped.failed"), icon: "x" });
+      });
+  };
+  return (
+    <View style={styles.stopped}>
+      <PixelStopped size={12} />
+      <Text variant="caption" tone="muted">
+        {by}
+      </Text>
+      {open ? (
+        <>
+          <Text variant="caption" tone="faint">
+            ·
+          </Text>
+          <PressScale
+            onPress={onContinue}
+            accessibilityRole="button"
+            style={[styles.continue, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+          >
+            <View style={styles.continueIn}>
+              <Icon name="play" size={12} color={c.ink} />
+              <Text variant="caption" tone="ink" style={styles.medium} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+                {t("mobile.chat.stopped.continue")}
+              </Text>
+            </View>
+          </PressScale>
+        </>
+      ) : null}
+    </View>
+  );
+}
 
 /** A small neutral chip next to the name ("Lembrete", "Rotina · Bom dia"): icon, no colored dot. */
 function Tag({ icon, label }: { icon: "bell" | "clock"; label: string }) {
@@ -365,6 +533,18 @@ const styles = StyleSheet.create({
   meFiles: { alignSelf: "stretch" },
   meCards: { alignSelf: "stretch" },
   meStatus: { marginTop: 4, textAlign: "right" },
+  status: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4, minHeight: 18 },
+  statusEnd: { alignSelf: "flex-end" },
+  stopped: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  continue: {
+    minHeight: 26,
+    borderTopLeftRadius: 9,
+    borderTopRightRadius: 9,
+    borderBottomRightRadius: 9,
+    borderBottomLeftRadius: 3,
+  },
+  continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
+  medium: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
   pin: { alignSelf: "center" },
   routineMark: { width: 32, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },

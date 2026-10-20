@@ -101,6 +101,9 @@ export const mobilePtBR = {
   },
   composer: {
     placeholder: "Escreva uma mensagem",
+    join: "Juntar ao que está fazendo",
+    now: "Parar e mandar",
+    choice: "Como mandar enquanto o agente trabalha",
   },
   search: {
     placeholder: "Buscar",

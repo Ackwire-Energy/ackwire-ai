@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import { Text, useReducedMotion } from "@/ui";
 import { useColors } from "../shared/hooks";
@@ -8,16 +8,19 @@ import { type Inline, parseBlocks } from "./logic";
 /**
  * A message's text: paragraphs, lists, quotes, headings, bold, italic,
  * @mentions and code (mono only for code). While an agent writes, its
- * blue caret blinks at the end.
+ * thin caret blinks at the end, after the words still fading in (`tail`).
  */
 export const MessageText = memo(function MessageText({
   body,
   streaming = false,
+  tail,
   muted = false,
   selectable = true,
 }: {
   body: string;
   streaming?: boolean;
+  /** The newest words, fading in, at the end of the last block (plain text only). */
+  tail?: ReactNode;
   muted?: boolean;
   /**
    * false in chat rows: a long press there opens the message sheet (which has "Copiar texto"), and native
@@ -29,7 +32,13 @@ export const MessageText = memo(function MessageText({
   const blocks = useMemo(() => parseBlocks(body), [body]);
   const tone = muted ? "muted" : "ink";
   const last = blocks.length - 1;
-  const caret = streaming ? <Caret /> : null;
+  const caret =
+    streaming || tail ? (
+      <>
+        {tail}
+        {streaming ? <Caret /> : null}
+      </>
+    ) : null;
   return (
     <View style={styles.wrap}>
       {blocks.map((b, i) => {
@@ -130,7 +139,7 @@ function Spans({ inline }: { inline: Inline[] }) {
   );
 }
 
-/** The agent's caret while it writes (agent blue: the agent's identity); still with reduce motion. */
+/** The agent's thin caret while it writes (agent blue: the agent's identity); still with reduce motion. */
 function Caret() {
   const c = useColors();
   const reduce = useReducedMotion();
@@ -143,7 +152,7 @@ function Caret() {
     const timer = setInterval(() => setOn((v) => !v), 500);
     return () => clearInterval(timer);
   }, [reduce]);
-  return <RNText style={{ color: c.agent, opacity: on ? 1 : 0 }}>{" ▍"}</RNText>;
+  return <RNText style={{ color: c.agent, opacity: on ? 1 : 0 }}>{"\u2009▏"}</RNText>;
 }
 
 const styles = StyleSheet.create({

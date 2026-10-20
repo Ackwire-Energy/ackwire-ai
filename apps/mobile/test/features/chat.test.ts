@@ -29,6 +29,19 @@ import {
   workingEntries,
   workStepsOf,
 } from "../../src/features/chat/logic";
+import {
+  fadeTail,
+  pruneMarks,
+  recentTurn,
+  rememberTurn,
+  stoppedOf,
+  turnItems,
+  turnPhase,
+  turnRuns,
+  turnSteps,
+  withContinued,
+  withOpacity,
+} from "../../src/features/chat/turn";
 import { at, message } from "./fixtures";
 
 describe("timeline", () => {
@@ -172,14 +185,15 @@ describe("working line", () => {
     expect(e?.activity).toEqual({ kind: "consulting", app: "Sentry" });
   });
 
-  test("Parar: only real runs that are not writing yet", () => {
+  test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
     const list = stoppableInLine([
       run({ runId: "p", agentId: "atlas", provisional: true }),
       run({ runId: "r", agentId: "atlas", status: "running" }),
       run({ runId: "w", agentId: "ada", status: "running", text: "Oi" }),
       run({ runId: "a", agentId: "infra", status: "waiting_approval" }),
+      run({ runId: "s", agentId: "infra", status: "canceled", text: "Parei" }),
     ]);
-    expect(list.map((r) => r.runId)).toEqual(["r"]);
+    expect(list.map((r) => r.runId)).toEqual(["r", "w"]);
   });
 
   test("who may stop: admins, the agent's owner, or who sent the message that started it", () => {
@@ -394,5 +408,135 @@ describe("asking an agent to implement an issue", () => {
     expect(standsAlone(line)).toBe(true);
     expect(issueTakenOf({ issueTaken: { issueId: "x" } })).toBeNull();
     expect(issueWorkOf(message({ id: "plain" }).meta)).toBeNull();
+  });
+});
+
+describe("an agent's turn as one block", () => {
+  const run = (over: Partial<LiveRun> & { runId: string }): LiveRun => ({
+    agentId: "theo",
+    channelId: "c1",
+    threadId: "m1",
+    status: "thinking",
+    text: "",
+    lastSeq: 0,
+    ...over,
+  });
+  const call = (id: string, tool: string, running: boolean) => ({
+    kind: "call" as const,
+    id,
+    tool,
+    connector: null,
+    detail: null,
+    code: null,
+    output: [],
+    running,
+  });
+
+  test("the header word: thinking, working on steps, writing, stopped", () => {
+    expect(turnPhase(run({ runId: "a" }))).toBe("thinking");
+    expect(turnPhase(run({ runId: "b", tool: "sentry_list_issues" }))).toBe("working");
+    expect(turnPhase(run({ runId: "c", work: [call("1", "sentry_list_issues", false)] }))).toBe("working");
+    expect(turnPhase(run({ runId: "d", status: "running", text: "Ontem" }))).toBe("writing");
+    expect(turnPhase(run({ runId: "e", status: "canceled", text: "Ontem" }))).toBe("stopped");
+  });
+
+  test("its work in order: steps (running or done), what it said, the messages it read", () => {
+    const items = turnItems(
+      run({
+        runId: "r",
+        work: [
+          call("1", "sentry_list_issues", false),
+          { kind: "say", text: "Vou ver o Drive", turn: 1 },
+          { kind: "steer", messageId: "m2", now: true },
+          call("2", "drive_read", true),
+        ],
+      }),
+    );
+    expect(items.map((x) => x.kind)).toEqual(["step", "say", "read", "step"]);
+    expect(items[0]).toMatchObject({ kind: "step", running: false, activity: { kind: "consulting", app: "Sentry" } });
+    expect(items[2]).toMatchObject({ kind: "read", messageId: "m2", now: true });
+    expect(items[3]).toMatchObject({ kind: "step", running: true });
+    expect(turnSteps(items)).toBe(2);
+  });
+
+  test("a stopped run's steps are not running any more", () => {
+    const items = turnItems(run({ runId: "r", status: "canceled", work: [call("1", "sentry_list_issues", true)] }));
+    expect(items[0]).toMatchObject({ running: false });
+  });
+
+  test("blocks: every run at work (a guess too) and a stopped one; one in its browser has its card", () => {
+    const runs = [
+      run({ runId: "p", provisional: true }),
+      run({ runId: "q", status: "queued" }),
+      run({ runId: "w", status: "running", text: "Oi" }),
+      run({ runId: "s", status: "canceled", text: "Parei" }),
+      run({ runId: "a", status: "waiting_approval" }),
+      run({ runId: "f", status: "failed" }),
+      run({ runId: "b", status: "running" }),
+    ];
+    expect(turnRuns(runs, new Set(["b"])).map((r) => r.runId)).toEqual(["p", "q", "w", "s"]);
+  });
+
+  test("words fade in: the newest pieces are the tail, the rest solid", () => {
+    const text = "Ontem foram 1.284 visitas";
+    // "Ontem " settled long ago, "foram " 140 ms ago, "1.284 " just now.
+    const marks = [
+      { at: 6, t: 0 },
+      { at: 12, t: 860 },
+      { at: 18, t: 1000 },
+    ];
+    const { solid, tail } = fadeTail(text, 18, marks, 1000);
+    expect(solid).toBe(6);
+    expect(tail.map((p) => p.text)).toEqual(["foram ", "1.284 "]);
+    expect(tail[0]?.opacity).toBeCloseTo(0.5, 1);
+    expect(tail[1]?.opacity).toBeCloseTo(0.05, 2);
+    // Settled: everything is solid.
+    expect(fadeTail(text, 18, marks, 2000)).toEqual({ solid: 18, tail: [] });
+  });
+
+  test("a tail with Markdown or a line break doesn't fade (it would read differently once parsed)", () => {
+    const marks = [
+      { at: 3, t: 0 },
+      { at: 9, t: 1000 },
+    ];
+    expect(fadeTail("Oi **bom** dia", 9, marks, 1000)).toEqual({ solid: 9, tail: [] });
+    expect(fadeTail("Oi\nbom dia", 9, marks, 1000)).toEqual({ solid: 9, tail: [] });
+  });
+
+  test("marks: the ones still fading plus the last settled one", () => {
+    const marks = [
+      { at: 3, t: 0 },
+      { at: 6, t: 100 },
+      { at: 9, t: 900 },
+    ];
+    expect(pruneMarks(marks, 1000)).toEqual([
+      { at: 6, t: 100 },
+      { at: 9, t: 900 },
+    ]);
+    expect(pruneMarks(marks, 100)).toEqual(marks);
+  });
+
+  test("the fading ink: hex gets an alpha, rgba is multiplied", () => {
+    expect(withOpacity("#000000", 0.5)).toBe("#00000080");
+    expect(withOpacity("rgba(10, 20, 30, 0.5)", 0.5)).toBe("rgba(10, 20, 30, 0.25)");
+    expect(withOpacity("rgb(1, 2, 3)", 1)).toBe("rgba(1, 2, 3, 1)");
+    expect(withOpacity("red", 0.5)).toBe("red");
+  });
+
+  test("the saved reply finds the work its block showed a moment ago", () => {
+    const items = turnItems(run({ runId: "r9", work: [call("1", "sentry_list_issues", false)] }));
+    rememberTurn("r9", { items, quotes: {}, at: 1000 });
+    expect(recentTurn("r9", 2000)?.items).toEqual(items);
+    expect(recentTurn("r9", 1000 + 60_000)).toBeNull();
+    expect(recentTurn("nope", 2000)).toBeNull();
+  });
+
+  test("a stopped reply: who stopped it and whether it was continued", () => {
+    expect(stoppedOf({ canceled: { byUserId: "u1" } })).toEqual({ byUserId: "u1", continuedRunId: null });
+    expect(stoppedOf({ canceled: true })).toEqual({ byUserId: null, continuedRunId: null });
+    expect(stoppedOf({})).toBeNull();
+    const next = withContinued({ canceled: { byUserId: "u1", text: "Oi" }, other: 1 }, "r2");
+    expect(next).toEqual({ canceled: { byUserId: "u1", text: "Oi", continuedRunId: "r2" }, other: 1 });
+    expect(stoppedOf(next)?.continuedRunId).toBe("r2");
   });
 });

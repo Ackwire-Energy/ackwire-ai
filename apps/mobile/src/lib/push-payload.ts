@@ -37,6 +37,15 @@ export function readPushData(data: unknown): PushData {
   return out;
 }
 
+/**
+ * A push about the conversation open on screen stays quiet (no banner, no sound, no buzz): what it says
+ * is already arriving in front of the person (Mensagens.html).
+ */
+export function quietWhileOpen(data: PushData, open: { orgId: string; channelId: string } | null): boolean {
+  if (!open || !data.channelId) return false;
+  return data.channelId === open.channelId && (!data.orgId || data.orgId === open.orgId);
+}
+
 /** The body of `POST /api/app/push/devices`. */
 export function deviceBody(token: string, platform: string, locale: string) {
   return { token, platform: platform === "ios" ? "ios" : "android", locale };

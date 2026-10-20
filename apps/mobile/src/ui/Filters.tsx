@@ -1,6 +1,7 @@
 import { Pressable, Text as RNText, ScrollView, View } from "react-native";
 import { Count } from "./Count";
 import { haptics } from "./haptics";
+import type { IconName } from "./icons.data";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
@@ -9,6 +10,8 @@ export interface FilterItem {
   key: string;
   label: string;
   count?: number;
+  /** A small icon before the label (Segmented only). */
+  icon?: IconName;
 }
 
 export interface FiltersProps {

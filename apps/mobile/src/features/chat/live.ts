@@ -30,6 +30,7 @@ import {
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { useConnection } from "../shared/hooks";
+import { withContinued } from "./turn";
 
 /**
  * A conversation, live: subscribes to its channel while the screen is open,
@@ -117,6 +118,19 @@ export function cachePinned(qc: QueryClient, orgId: string, channelId: string, m
     const list = data as Message[];
     if (!list.some((m) => m && m.id === messageId)) return data;
     return list.map((m) => (m.id === messageId ? { ...m, pinned } : m));
+  });
+}
+
+/**
+ * A stopped reply was continued (my own "Continuar"; others' arrive as `run.continued`, `useContinuedRun`):
+ * its "Continuar" goes away in every loaded list of the channel (`meta.canceled.continuedRunId`).
+ */
+export function cacheContinued(qc: QueryClient, orgId: string, channelId: string, messageId: string, newRunId: string) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, meta: withContinued(m.meta, newRunId) } : m));
   });
 }
 

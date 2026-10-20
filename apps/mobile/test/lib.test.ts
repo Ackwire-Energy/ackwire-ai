@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readDeleteResponse } from "../src/features/account/result";
 import { chooseOrg } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
-import { deviceBody, devicePath, readPushData } from "../src/lib/push-payload";
+import { deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { createSocketFactory } from "../src/lib/socket";
 import { authErrorKey, isEmail } from "../src/lib/validate";
 import { ICON_NAMES } from "../src/ui/icons.data";
@@ -23,6 +23,15 @@ describe("push payload", () => {
     });
     expect(deviceBody("t", "android", "en").platform).toBe("android");
     expect(devicePath("ExponentPushToken[a b]")).toBe("/api/app/push/devices/ExponentPushToken%5Ba%20b%5D");
+  });
+  test("a push about the conversation on screen stays quiet", () => {
+    const open = { orgId: "o1", channelId: "c1" };
+    expect(quietWhileOpen({ orgId: "o1", channelId: "c1", kind: "message" }, open)).toBe(true);
+    expect(quietWhileOpen({ channelId: "c1" }, open)).toBe(true);
+    expect(quietWhileOpen({ orgId: "o1", channelId: "c2" }, open)).toBe(false);
+    expect(quietWhileOpen({ orgId: "o2", channelId: "c1" }, open)).toBe(false);
+    expect(quietWhileOpen({ orgId: "o1", kind: "approval" }, open)).toBe(false);
+    expect(quietWhileOpen({ orgId: "o1", channelId: "c1" }, null)).toBe(false);
   });
 });
 

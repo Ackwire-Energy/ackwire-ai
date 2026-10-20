@@ -3,10 +3,13 @@ import {
   appendedKeys,
   type HeldRun,
   HOLD_FINISHED_RUN_MS,
+  landsOnDivider,
   lastSeenKey,
   runsToShow,
   type ScrollRow,
-  unreadBelow,
+  type TurnKey,
+  turnKeys,
+  unseenBelow,
 } from "../../src/features/chat/scroll";
 
 describe("appendedKeys", () => {
@@ -28,25 +31,86 @@ describe("appendedKeys", () => {
   });
 });
 
-const row = (key: string, kind: ScrollRow["kind"] = "message", mine = false): ScrollRow => ({ key, kind, mine });
+const row = (key: string, kind: ScrollRow["kind"] = "message", mine = false, who?: string): ScrollRow => ({
+  key,
+  kind,
+  mine,
+  ...(who ? { who } : {}),
+});
 
-describe("unread below", () => {
+describe("what arrived below", () => {
   test("the last message row is where the person read up to", () => {
     expect(lastSeenKey([row("day", "other"), row("a"), row("run-1", "run")])).toBe("a");
     expect(lastSeenKey([row("day", "other")])).toBeNull();
   });
-  test("counts messages and replies from others after the seen one", () => {
-    const rows = [row("a"), row("day2", "other"), row("b"), row("mine", "message", true), row("run-1", "run")];
-    expect(unreadBelow(rows, "a")).toBe(2);
-    expect(unreadBelow(rows, "b")).toBe(1);
+  test("new messages from others after the seen one, who wrote them, who is at work", () => {
+    const rows = [
+      row("a"),
+      row("day2", "other"),
+      row("b", "message", false, "person:marina"),
+      row("mine", "message", true, "person:me"),
+      row("c", "message", false, "agent:ada"),
+      row("d", "message", false, "person:marina"),
+      row("turn-1", "run", false, "agent:theo"),
+    ];
+    expect(unseenBelow(rows, "a")).toEqual({
+      messages: 3,
+      firstKey: "b",
+      authors: ["person:marina", "agent:ada"],
+      working: ["agent:theo"],
+    });
+    expect(unseenBelow(rows, "c").messages).toBe(1);
+    expect(unseenBelow(rows, "c").firstKey).toBe("d");
+  });
+  test("an agent at work below is not a message yet, but the line goes before it", () => {
+    const u = unseenBelow([row("a"), row("turn-1", "run", false, "agent:theo")], "a");
+    expect(u.messages).toBe(0);
+    expect(u.firstKey).toBe("turn-1");
+    expect(u.working).toEqual(["agent:theo"]);
+  });
+  test("my own messages never count", () => {
+    expect(unseenBelow([row("a"), row("mine", "message", true)], "a").firstKey).toBeNull();
   });
   test("nothing seen yet, or the seen row is gone: nothing counts", () => {
-    expect(unreadBelow([row("a"), row("b")], null)).toBe(0);
-    expect(unreadBelow([row("a"), row("b")], "zz")).toBe(0);
+    expect(unseenBelow([row("a"), row("b")], null).messages).toBe(0);
+    expect(unseenBelow([row("a"), row("b")], "zz").firstKey).toBeNull();
   });
-  test("a streaming reply that becomes its message still counts once", () => {
-    expect(unreadBelow([row("a"), row("run-1", "run")], "a")).toBe(1);
-    expect(unreadBelow([row("a"), row("m1")], "a")).toBe(1);
+  test("the pill lands on the line only when it is far from the end", () => {
+    expect(landsOnDivider(5000, 2000, 800)).toBe(true);
+    expect(landsOnDivider(5000, 4500, 800)).toBe(false);
+    expect(landsOnDivider(5000, undefined, 800)).toBe(false);
+  });
+});
+
+describe("turnKeys", () => {
+  const run = (runId: string, agentId = "theo", threadId = "t1", provisional = false) => ({
+    runId,
+    agentId,
+    channelId: "c1",
+    threadId,
+    provisional,
+  });
+  const none = new Map<string, TurnKey>();
+
+  test("a run keeps its key", () => {
+    const first = turnKeys(none, [run("r1")]);
+    expect(first.get("r1")?.key).toBe("turn-r1");
+    expect(turnKeys(first, [run("r1")]).get("r1")?.key).toBe("turn-r1");
+  });
+  test("the real run takes the key of the guessed 'pensando…' once the guess is gone", () => {
+    const guessed = turnKeys(none, [run("p:theo", "theo", "t1", true)]);
+    const real = turnKeys(guessed, [run("r1")]);
+    expect(real.get("r1")?.key).toBe("turn-p:theo");
+    expect(real.has("p:theo")).toBe(false);
+  });
+  test("while the guess is still shown, or for another agent, the run gets its own key", () => {
+    const guessed = turnKeys(none, [run("p:theo", "theo", "t1", true)]);
+    expect(turnKeys(guessed, [run("p:theo", "theo", "t1", true), run("r1")]).get("r1")?.key).toBe("turn-r1");
+    expect(turnKeys(guessed, [run("r2", "ada")]).get("r2")?.key).toBe("turn-r2");
+  });
+  test("a guess in another thread of the same conversation still hands over (a DM's flat reply)", () => {
+    const guessed = turnKeys(none, [run("p:theo", "theo", "m1", true)]);
+    expect(turnKeys(guessed, [run("r1", "theo", "t9")]).get("r1")?.key).toBe("turn-p:theo");
   });
 });
 
@@ -76,6 +140,10 @@ describe("runsToShow", () => {
   });
   test("a run whose message is already listed never shows (no duplicate reply)", () => {
     expect(runsToShow(none, [], [run("1")], new Set(["1"]), 0).shown).toEqual([]);
+  });
+  test("a run that wrote nothing is not held", () => {
+    const first = runsToShow(none, [run("1")], [], new Set(), 0, HOLD_FINISHED_RUN_MS, () => false);
+    expect(first.shown).toEqual([]);
   });
   test("held rows come before the ones still writing", () => {
     const first = runsToShow(none, [run("1"), run("2")], [run("2")], new Set(), 0);

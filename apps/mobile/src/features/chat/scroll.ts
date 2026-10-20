@@ -1,8 +1,9 @@
 /**
  * The conversation list's scroll rules, kept pure so they can be tested: when the list follows new
- * content, which rows just arrived at the bottom (they animate in), how many new messages sit below
- * the person while they read older ones (the "N novas mensagens" pill), and how a finished reply's
- * streaming row waits for its saved message so the swap never leaves an empty frame.
+ * content, which rows just arrived at the bottom (they animate in), what sits below the person while
+ * they read older ones (the "↓ N novas" pill and the "Novas" line), how a finished reply's block waits
+ * for its saved message so the swap never leaves an empty frame, and the keys that keep an agent's
+ * block the same row from "pensando" to its saved reply.
  */
 
 /**
@@ -35,10 +36,12 @@ export function appendedKeys(prev: readonly string[], next: readonly string[]): 
 
 export interface ScrollRow {
   key: string;
-  /** A message or a reply being written (day dividers and markers never count). */
+  /** A message or an agent at work (day dividers and markers never count). */
   kind: "message" | "run" | "other";
   /** Written by the person reading (never counts as new for them). */
   mine?: boolean;
+  /** Who wrote it or is working ("agent:<id>", "person:<id>"): the pill's faces and names. */
+  who?: string;
 }
 
 /** The last message row: where the person has read up to when they are at the end. */
@@ -50,20 +53,84 @@ export function lastSeenKey(rows: readonly ScrollRow[]): string | null {
   return null;
 }
 
-/**
- * New messages and replies below the last one the person saw, theirs left out. If that row is gone
- * (the list was replaced), nothing counts.
- */
-export function unreadBelow(rows: readonly ScrollRow[], seenKey: string | null): number {
-  if (!seenKey) return 0;
+export interface Unseen {
+  /** New messages below (an agent still at work isn't one yet). */
+  messages: number;
+  /** Where the "Novas" line goes: the first new row (message or agent at work). */
+  firstKey: string | null;
+  /** Who wrote the new messages, in order, once each. */
+  authors: string[];
+  /** Who is at work below ("Theo escrevendo"), once each. */
+  working: string[];
+}
+
+/** What arrived below the last row the person saw, theirs left out ("↓ 2 novas · Marina e Ada · Theo escrevendo"). */
+export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null): Unseen {
+  const none: Unseen = { messages: 0, firstKey: null, authors: [], working: [] };
+  if (!seenKey) return none;
   const at = rows.findIndex((r) => r.key === seenKey);
-  if (at < 0) return 0;
-  let n = 0;
+  if (at < 0) return none;
+  const out: Unseen = { ...none, authors: [], working: [] };
   for (let i = at + 1; i < rows.length; i++) {
     const r = rows[i] as ScrollRow;
-    if ((r.kind === "message" || r.kind === "run") && !r.mine) n++;
+    if ((r.kind !== "message" && r.kind !== "run") || r.mine) continue;
+    out.firstKey ??= r.key;
+    if (r.kind === "message") out.messages++;
+    const list = r.kind === "message" ? out.authors : out.working;
+    if (r.who && !list.includes(r.who)) list.push(r.who);
   }
-  return n;
+  return out;
+}
+
+/**
+ * The pill lands on the "Novas" line when it is far from the end (more than 1.2 screens of content below
+ * it), else at the end.
+ */
+export const landsOnDivider = (contentLength: number, dividerAt: number | undefined, viewport: number) =>
+  dividerAt !== undefined && contentLength - dividerAt > viewport * 1.2;
+
+/** An agent's block key, and what lets a guessed "pensando…" hand it to the real run. */
+export interface TurnKey {
+  key: string;
+  agentId: string;
+  channelId: string;
+  threadId: string;
+  provisional: boolean;
+}
+
+/**
+ * Keys for the agents' blocks, kept across renders: a run keeps its key; a real run takes the key of the
+ * "pensando…" guessed on send for the same agent there (the same thread, else the same conversation) once
+ * that guess is gone, so the block doesn't remount; the saved reply then takes its run's key.
+ */
+export function turnKeys(
+  prev: ReadonlyMap<string, TurnKey>,
+  runs: readonly { runId: string; agentId: string; channelId: string; threadId: string; provisional?: boolean }[],
+): Map<string, TurnKey> {
+  const next = new Map(prev);
+  const live = new Set(runs.map((r) => r.runId));
+  for (const r of runs) {
+    if (next.has(r.runId)) continue;
+    let key = `turn-${r.runId}`;
+    if (!r.provisional) {
+      const guesses = [...next].filter(
+        ([id, k]) => k.provisional && !live.has(id) && k.agentId === r.agentId && k.channelId === r.channelId,
+      );
+      const pick = guesses.find(([, k]) => k.threadId === r.threadId) ?? guesses[0];
+      if (pick) {
+        key = pick[1].key;
+        next.delete(pick[0]);
+      }
+    }
+    next.set(r.runId, {
+      key,
+      agentId: r.agentId,
+      channelId: r.channelId,
+      threadId: r.threadId,
+      provisional: Boolean(r.provisional),
+    });
+  }
+  return next;
 }
 
 export interface HeldRun<R> {
@@ -80,9 +147,10 @@ export interface RunsShown<R> {
 }
 
 /**
- * The streaming rows to draw. A run that stops writing usually has its saved message a moment later
- * (separate updates), so its row stays, with its last words, until a message with that run arrives or
- * `holdMs` passes. A run whose message is already in the list never draws (no duplicate reply).
+ * The agents' blocks to draw. A run that leaves the list usually has its saved message a moment later
+ * (separate updates), so its block stays, with its last words, until a message with that run arrives or
+ * `holdMs` passes (only the runs `holds` keeps: one that wrote nothing just goes). A run whose message is
+ * already in the list never draws (no duplicate reply).
  */
 export function runsToShow<R extends { runId: string }>(
   held: ReadonlyMap<string, HeldRun<R>>,
@@ -91,6 +159,7 @@ export function runsToShow<R extends { runId: string }>(
   arrived: ReadonlySet<string>,
   now: number,
   holdMs = HOLD_FINISHED_RUN_MS,
+  holds: (run: R) => boolean = () => true,
 ): RunsShown<R> {
   const live = writing.filter((r) => !arrived.has(r.runId));
   const writingIds = new Set(writing.map((r) => r.runId));
@@ -100,7 +169,7 @@ export function runsToShow<R extends { runId: string }>(
   }
   for (const r of prevShown) {
     // Stopped writing just now (not held before): hold it.
-    if (!writingIds.has(r.runId) && !arrived.has(r.runId) && !held.has(r.runId)) {
+    if (!writingIds.has(r.runId) && !arrived.has(r.runId) && !held.has(r.runId) && holds(r)) {
       next.set(r.runId, { run: r, until: now + holdMs });
     }
   }

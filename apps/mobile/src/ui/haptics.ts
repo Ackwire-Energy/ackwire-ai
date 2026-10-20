@@ -1,9 +1,16 @@
 import * as Haptics from "expo-haptics";
 
-/** Light taps for presses, a success for confirmed holds. Never throws (some devices have no haptics). */
+/**
+ * Light taps for presses (and sending), a firm one for stopping, a success for confirmed holds. Never throws
+ * (some devices have no haptics).
+ */
 export const haptics = {
   light: () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  },
+  /** A firm tap: stopping an agent. */
+  firm: () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => {});
   },
   medium: () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});

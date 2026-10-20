@@ -7,7 +7,7 @@ import type {
   MessagePin,
   ReactionCount,
 } from "@agenteschat/client";
-import { type ActivityEntry, barEntries, isWriting } from "@agenteschat/client/lib/activity";
+import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
 import { isRoutineCall, routineOfMessage } from "@agenteschat/client/lib/routines";
 import { previewOf } from "../shared/logic";
 
@@ -226,12 +226,12 @@ export function workingEntries(
   return barEntries(runs, [], agentName, () => undefined, consults);
 }
 
-/** Still working (thinking, queued or running a tool) and not writing yet: "Parar" in the working line. */
+/**
+ * Still working (thinking, queued, running a tool or writing): what "Parar" stops, right away, also while
+ * the words arrive (Mensagens.html). A guessed "pensando…" has no run to stop yet.
+ */
 export const stoppableInLine = (runs: LiveRun[]) =>
-  runs.filter(
-    (r) =>
-      !r.provisional && !isWriting(r) && (r.status === "thinking" || r.status === "queued" || r.status === "running"),
-  );
+  runs.filter((r) => !r.provisional && (r.status === "thinking" || r.status === "queued" || r.status === "running"));
 
 /**
  * Who may press "Parar" (the web's `useStopRun`): admins, the agent's owner,

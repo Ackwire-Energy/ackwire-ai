@@ -123,6 +123,13 @@ export const ICONS = {
       "M9 5.5a3 3 0 0 0-3 3v.5a3 3 0 0 0-1.5 5.3A3 3 0 0 0 9 18.5h1V5.5ZM15 5.5a3 3 0 0 1 3 3v.5a3 3 0 0 1 1.5 5.3A3 3 0 0 1 15 18.5h-1V5.5Z",
     ),
   ],
+  // From Mensagens.html: talking to an agent while it works, the "↓ novas" pill and the connection banner.
+  bolt: [p("M13 3 5 13.5h6L10 21l8-10.5h-6Z")],
+  join: [p("M5 12h11M12 7l5 5-5 5"), p("M19 5v14")],
+  play: [p("M8 5.5v13l10.5-6.5Z")],
+  eye: [p("M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"), c(12, 12, 2.6)],
+  down: [p("M12 5v14M6 13l6 6 6-6")],
+  wifi: [p("M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"), p("M12 19h.01")],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -12,7 +12,8 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Count, HoldButton, Icon, Text, useToast } from "@/ui";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { Button, Chip, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
 import { approvalRisk } from "../approvals/logic";
 import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "../approvals/parts";
 import { chatHref } from "../links/logic";
@@ -23,6 +24,7 @@ import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { threadFaces } from "./logic";
+import { recentTurn } from "./turn";
 
 /**
  * The cards inside a message: the steps it took (collapsed), the agent it
@@ -32,12 +34,17 @@ import { threadFaces } from "./logic";
 
 // ── Steps ────────────────────────────────────────────────────────────────────
 
-/** "3 passos" under an agent's reply, a quiet pill; opening it loads what it did, one line per step. */
+/**
+ * "3 passos" above an agent's reply, a quiet pill; opening it loads what it did, one line per step. Right
+ * after the reply took its live block's place, it fades in as the work folds away.
+ */
 export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
+  const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
+  const [folding] = useState(() => recentTurn(runId, Date.now()) !== null);
   const run = useRun(orgId, open ? runId : null);
   const work = run.data ? workFromSteps(run.data.steps, run.data.run) : null;
   const lines = work
@@ -56,7 +63,7 @@ export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
       ].sort((a, b) => a.at - b.at)
     : [];
   return (
-    <View style={styles.steps}>
+    <Animated.View entering={folding && !reduced ? FadeIn.duration(400) : undefined} style={styles.steps}>
       <Pressable
         onPress={() => {
           tapHaptic();
@@ -103,7 +110,7 @@ export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
           )}
         </View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
