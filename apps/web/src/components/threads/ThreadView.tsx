@@ -1,14 +1,15 @@
 import type { ThreadInfo } from "@agenteschat/client";
 import { useChannels, useDms, useThreadMutation, useThreadRange } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { formatTime, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
 import { threadTitle, timeSpan } from "@agenteschat/client/lib/threads";
-import { Button, Chip, cx, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
+import { AvatarStack, Button, Chip, cx, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
+import { useActors } from "@/components/actors";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -126,11 +127,13 @@ function ThreadTitle({ thread }: { thread: ThreadInfo }) {
 }
 
 /**
- * The thread's header: back to the channel, the title, who is in it, its state and ⋯. In the panel
- * beside a channel (`onClose`): no way back (the channel is right there), "Abrir em tela cheia" and close.
+ * The thread's header: back to the channel, who is in it (their faces, not a generic icon), the title,
+ * where it lives with its replies and last activity, its state and ⋯. In the panel over a channel
+ * (`onClose`): no way back (the channel is right there), "Abrir em tela cheia" and close.
  */
 export function ThreadHeader({ thread, onClose }: { thread: ThreadInfo; onClose?: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const actors = useActors();
   const { org } = useOrg();
   const toast = useToast();
   const controls = useThreadControls();
@@ -140,6 +143,7 @@ export function ThreadHeader({ thread, onClose }: { thread: ThreadInfo; onClose?
   const channelParams = { orgId: org.id, channelId: thread.channelId };
   const where = useThreadWhere(thread);
   const archived = thread.state === "archived";
+  const people = thread.participants.flatMap((p) => (p.id ? [{ type: p.type, id: p.id }] : []));
   const more = t("threads.view.more");
   return (
     <header className={onClose ? "channel__header thread-head thread-head--panel" : "channel__header thread-head"}>
@@ -157,12 +161,30 @@ export function ThreadHeader({ thread, onClose }: { thread: ThreadInfo; onClose?
           />
         </>
       )}
+      <span className="thread-head__who" aria-hidden="true">
+        {people.length > 0 ? (
+          <AvatarStack>{people.slice(0, 3).map((p) => actors.avatar(p, "sm"))}</AvatarStack>
+        ) : (
+          <Icon name="thread" size={18} />
+        )}
+      </span>
       <div className="thread-head__text">
         <h1 className="channel__title thread-title">
-          <Icon name="thread" size={18} />
           <ThreadTitle thread={thread} />
         </h1>
-        <span className="channel__topic">{who && thread.channelKind !== "dm" ? `${where} · ${who}` : where}</span>
+        <span className="channel__topic thread-head__meta">
+          <span className="thread-head__where">
+            {who && thread.channelKind !== "dm" ? `${where} · ${who}` : where}
+          </span>
+          {thread.replyCount > 0 && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{t("threads.line.replies", { count: thread.replyCount })}</span>
+            </>
+          )}
+          <span aria-hidden="true">·</span>
+          <time dateTime={thread.lastActivityAt}>{relativeTime(t, i18n.language, thread.lastActivityAt)}</time>
+        </span>
       </div>
       {thread.state !== "open" && <ThreadStatusChip thread={thread} />}
       <Menu
