@@ -534,6 +534,6 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
   return deny(
     opts.canRun
       ? "This command is outside what agents may run on this computer (no sudo, deletes or writes outside your folder, uploads, remote shells or global installs). Do it another way; if there is none, tell the person in plain words what you couldn't do. Never give them a terminal command to run."
-      : "Running commands on this computer is turned off for you. Tell the person in plain words that it needs \"Run code\" turned on on your page. Never give them a terminal command to run.",
+      : "Running commands on this computer is turned off for you. If the request needs it, ask for it with request_permission (sandbox:run). Never give the person a terminal command to run.",
   );
 }

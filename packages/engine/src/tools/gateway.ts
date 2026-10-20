@@ -156,7 +156,9 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
         if (!isAllowed(access)) {
           const reason =
-            access === "denied" ? "this tool is turned off for this agent" : `this agent lacks the scope ${tool.scope}`;
+            access === "denied"
+              ? "this tool is turned off for this agent"
+              : `this agent lacks the scope ${tool.scope}. If the request needs it, ask for it with request_permission`;
           return finish({ content: `Not allowed: ${reason}`, isError: true });
         }
       }

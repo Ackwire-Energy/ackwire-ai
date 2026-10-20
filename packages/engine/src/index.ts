@@ -149,6 +149,7 @@ export * from "./team";
 export * from "./thread-assess";
 export * from "./threads";
 export * from "./tools/directory";
+export * from "./tools/permission";
 export * from "./tools/gateway";
 export * from "./tools/json-schema";
 export * from "./tools/schema-compat";

@@ -21,6 +21,7 @@ import {
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
+  createPermissionToolSource,
   createBlobStoreResolver,
   createCalendarToolSource,
   createChatToolSource,
@@ -119,6 +120,8 @@ export async function setup(
     contextTools?: boolean;
     /** Add the built-in `ask_user` tool. */
     askUser?: boolean;
+    /** Add the built-in `request_permission` tool. */
+    permissionTools?: boolean;
     /** Add the built-in `ask_agent` tool. */
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
@@ -249,6 +252,7 @@ export async function setup(
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent ? [createAskAgentToolSource({ pubsub }), createFindAgentToolSource()] : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),

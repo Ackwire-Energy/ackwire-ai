@@ -93,7 +93,7 @@ describe("access", () => {
     expect((await f.tools?.list(ctx))?.map((t) => t.name)).not.toContain("run_code");
     expect(await call(ctx, "run_code", { language: "python", code: "print(1)" })).toMatchObject({
       isError: true,
-      content: "Not allowed: this agent lacks the scope sandbox:run",
+      content: "Not allowed: this agent lacks the scope sandbox:run. If the request needs it, ask for it with request_permission",
     });
     // "All tools" doesn't include running code.
     const all = new Set([grantKey(null, "*")]);

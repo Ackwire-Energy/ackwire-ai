@@ -46,7 +46,7 @@ export function approvalTraits(approval: Pick<Approval, "tool" | "scope" | "para
 }
 
 /** The app's own tools whose approval title it says in the person's language (`approval.titles.*`). */
-const OWN_TITLES = new Set(["run_code", "upload_file", "run_skill_script", "post_message"]);
+const OWN_TITLES = new Set(["run_code", "upload_file", "run_skill_script", "post_message", "request_permission"]);
 
 /** The approval's title: in the person's language for the app's own tools, else the server's (connector) title. */
 export function approvalTitle(t: TFunction, approval: Pick<Approval, "tool" | "title" | "params">): string {
@@ -58,8 +58,17 @@ export function approvalTitle(t: TFunction, approval: Pick<Approval, "tool" | "t
     path: s(p.path),
     skill: s(p.skill),
     channel: s(p.channel).replace(/^#/, ""),
+    permission: permissionLabel(t, s(p.permission), approval.title),
     defaultValue: approval.title,
   });
+}
+
+/** What `request_permission` asks to turn on: a built-in scope in the person's language, a connector by its name. */
+function permissionLabel(t: TFunction, permission: string, title: string) {
+  const fromServer = title.replace(/^Turn on: /, "");
+  if (!permission || permission.startsWith("connector:")) return fromServer;
+  const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  return tt(`scopes.${permission.replace(/[^a-zA-Z0-9]/g, "_")}.label`, { defaultValue: fromServer });
 }
 
 /** "Aprovado por você · agora" / "Recusado por João · ontem 18:02" / "Expirou · ontem". */

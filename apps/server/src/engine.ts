@@ -9,6 +9,7 @@ import {
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
+  createPermissionToolSource,
   createBlobStoreResolver,
   createBrowserHandoffToolSource,
   createBrowserLive,
@@ -203,6 +204,8 @@ export function buildEngine(o: EngineOptions) {
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
+      // Missing something a request needs: ask for it (an approval card) instead of failing.
+      createPermissionToolSource(),
       // The agent browser asks a person for help (ADR 0040 §6).
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
       createAskAgentToolSource({ pubsub: adapters.pubsub }),

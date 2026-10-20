@@ -839,6 +839,7 @@ export const en: Translations = {
       upload_file: "Send {{path}} to the Drive",
       run_skill_script: "Run script {{path}} of the skill {{skill}}",
       post_message: "Post in #{{channel}}",
+      request_permission: "Turn on: {{permission}}",
     },
   },
   notifications: {
@@ -2040,6 +2041,11 @@ export const en: Translations = {
       label: "Run code",
       description:
         "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time.",
+    },
+    browser_use: {
+      label: "Use a browser",
+      description:
+        "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
     },
     github_git_read: {
       label: "Clone repositories (git)",

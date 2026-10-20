@@ -845,6 +845,7 @@ export const ptBR = {
       upload_file: "Enviar {{path}} para o Drive",
       run_skill_script: "Rodar o script {{path}} da skill {{skill}}",
       post_message: "Postar em #{{channel}}",
+      request_permission: "Ligar: {{permission}}",
     },
   },
   notifications: {
@@ -2054,6 +2055,11 @@ export const ptBR = {
       label: "Rodar código",
       description:
         "Rodar código e scripts de skills no computador do agente (isolado, sem segredos, arquivos guardados entre conversas); custa tempo de máquina.",
+    },
+    browser_use: {
+      label: "Usar um navegador",
+      description:
+        "Navegar em sites no navegador próprio do agente, no computador conectado (o login fica salvo por agente). Precisa do navegador ligado nesse computador.",
     },
     github_git_read: {
       label: "Clonar repositórios (git)",
