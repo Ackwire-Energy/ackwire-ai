@@ -100,13 +100,26 @@ export const sameSlots = (a: RunSlot[], b: RunSlot[]) =>
   a.length === b.length &&
   a.every((s, i) => s.key === b[i]?.key && s.runId === b[i]?.runId && s.goneAt === b[i]?.goneAt);
 
-/** The block's header word: "pensando" (nothing yet), "trabalhando" (steps), "escrevendo" (words). */
-export type RunPhase = "thinking" | "working" | "writing";
+/** How many generic openers there are (`run.opener0`…): one per run, always the same. */
+export const OPENERS = 3;
 
-export function runPhase(r: Pick<LiveRun, "text" | "status" | "work" | "tool">): RunPhase {
-  if (r.text.trim().length > 0 && r.status === "running") return "writing";
-  if (r.tool || (r.work ?? []).some((w) => w.kind === "call")) return "working";
-  return "thinking";
+/**
+ * What the block opens with, as if it had answered at once (the bar above the composer says it works):
+ * the first thing it said (out of its work list), or a generic phrase with an ellipsis until then
+ * (`opener`, which of `OPENERS`). Nothing when its words already arrive or it stopped or failed first.
+ */
+export function openerOf(r: Pick<LiveRun, "runId" | "status" | "text" | "work">): {
+  said: string | null;
+  opener: number | null;
+  work: NonNullable<LiveRun["work"]>;
+} {
+  const work = r.work ?? [];
+  const first = work.find((w) => w.kind === "say");
+  if (first?.kind === "say") return { said: first.text, opener: null, work: work.filter((w) => w !== first) };
+  const generic = r.text.length === 0 && r.status !== "canceled" && r.status !== "failed";
+  let h = 0;
+  for (const ch of r.runId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return { said: null, opener: generic ? h % OPENERS : null, work };
 }
 
 /** " · 4 s" shows from 2 s on: minutes and seconds past a minute. */

@@ -11373,41 +11373,6 @@ html[data-menu-overlay] .shell {
 
 /* ── Messages fluidity (telas/Mensagens.html, option C) ── */
 
-/* The block's header while it works: the orbit, "pensando" with a light sweep, how long. */
-.run-clock {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.run-clock__word {
-  color: var(--muted);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .run-clock__word {
-    background: linear-gradient(
-      90deg,
-      var(--muted) 0%,
-      var(--muted) 40%,
-      var(--ink) 50%,
-      var(--muted) 60%,
-      var(--muted) 100%
-    );
-    background-size: 250% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    animation: run-shim 1.8s linear infinite;
-  }
-}
-@keyframes run-shim {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: -150% 0;
-  }
-}
-
 /* Steps: the pixel mark in a fixed 16px box; a stopped step is struck through. */
 .live-call__mark {
   display: inline-grid;

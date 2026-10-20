@@ -90,7 +90,13 @@ import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import { buildTimeline, mergeTimeline, type TimelineItem, threadRootsToLoad } from "@agenteschat/client/lib/timeline";
+import {
+  buildTimeline,
+  groupsWith,
+  mergeTimeline,
+  type TimelineItem,
+  threadRootsToLoad,
+} from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
   Avatar,
@@ -146,8 +152,8 @@ import {
   blockRowByRun,
   elapsedParts,
   nextSlots,
+  openerOf,
   type RunSlot,
-  runPhase,
   SLOT_HOLD_MS,
   sameSlots,
 } from "@/chat/run-slots";
@@ -2014,12 +2020,12 @@ const Timeline = memo(function Timeline({
     const blockKey = m.agentRunId && blockRows.get(m.agentRunId) === item.key ? runKeys.get(m.agentRunId) : undefined;
     rows.push(
       blockKey && m.agentRunId ? (
-        // Seen live: the same block, with its own header (it had one while it worked).
+        // Seen live: the same block, grouped as it was while it worked.
         <RunBlock
           key={blockKey}
           runId={m.agentRunId}
           message={m}
-          grouped={false}
+          grouped={item.grouped}
           entering={false}
           modelLabels={modelLabels}
           contextMark={threadsView?.marks.has(m.id)}
@@ -2046,18 +2052,22 @@ const Timeline = memo(function Timeline({
         </p>,
       );
   }
-  for (const slot of slots) {
+  // The first block at work follows the last message: under the agent's own, it has no header of its own.
+  const lastItem = items.at(-1);
+  const after = lastItem?.kind === "message" ? lastItem.message : null;
+  slots.forEach((slot, i) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
       <RunBlock
         key={slot.key}
         runId={slot.runId}
+        after={i === 0 ? after : null}
         grouped={false}
         entering={blockEnters.current.get(slot.key) ?? false}
         modelLabels={modelLabels}
       />,
     );
-  }
+  });
   for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
   return <>{rows}</>;
 });
@@ -2117,10 +2127,14 @@ function liveMessageOf(r: LiveRun): MessageType {
 function RunBlock({
   runId,
   message,
+  after,
+  grouped,
   ...rest
 }: {
   runId: string;
   message?: MessageType;
+  /** At work: the message right above it (the agent's own groups it, as a saved message would). */
+  after?: Pick<MessageType, "author" | "createdAt"> | null;
   grouped: boolean;
   entering: boolean;
   modelLabels: Map<string, string>;
@@ -2144,8 +2158,17 @@ function RunBlock({
   );
   const shown = message ?? placeholder;
   if (!shown) return null;
+  const together = message
+    ? grouped
+    : Boolean(placeholder && groupsWith(after, placeholder.author, placeholder.createdAt));
   return (
-    <TimelineMessage message={shown} live={live ?? null} seenLive={message ? last.current : undefined} {...rest} />
+    <TimelineMessage
+      message={shown}
+      live={live ?? null}
+      seenLive={message ? last.current : undefined}
+      grouped={together}
+      {...rest}
+    />
   );
 }
 
@@ -2204,32 +2227,17 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
 
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
+/** The generic phrases a block opens with (`openerOf`). */
+const OPENER_KEYS = ["run.opener0", "run.opener1", "run.opener2"] as const;
+
 /**
- * The block's header while it works: the agent's pixel orbit, "pensando" / "trabalhando" /
- * "escrevendo" with the light sweep, and how long it has been at it (from 2 s on).
+ * The block's header: the time it started, as any message. What it is doing and for how long is the
+ * bar's above the composer (saying it twice was noise).
  */
 function RunClock({ run }: { run: LiveRun }) {
-  const { t, i18n } = useTranslation();
-  const working = run.status === "thinking" || run.status === "queued" || run.status === "running";
-  const now = useSecond(working);
-  const started = run.startedAt ?? now;
-  if (!working) {
-    const at = new Date(started).toISOString();
-    return <time dateTime={at}>{formatTime(i18n.language, at)}</time>;
-  }
-  const took = elapsedParts(now - started);
-  return (
-    <span className="run-clock">
-      <AgentSpinner agentId={run.agentId} size={14} />
-      <span className="run-clock__word">{t(`run.state.${runPhase(run)}`)}</span>
-      {took && (
-        <span className="run-clock__time ac-num">
-          {" · "}
-          {took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s })}
-        </span>
-      )}
-    </span>
-  );
+  const { i18n } = useTranslation();
+  const [at] = useState(() => new Date(run.startedAt ?? Date.now()).toISOString());
+  return <time dateTime={at}>{formatTime(i18n.language, at)}</time>;
 }
 
 /** Under a live block: "sem notícias há 4 min · Atualizar", or what it is doing between its steps. */
@@ -2664,6 +2672,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const liveFailed = live?.status === "failed";
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
+  const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
   const queued = useQueued(m.local === "failed" ? (m.clientId ?? undefined) : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
@@ -2817,7 +2826,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       data-live={live?.status}
       // An agent's answer: lands at its start when long (same id as its live block, so only once).
       data-read-id={m.author.type === "agent" && !m.local ? (m.agentRunId ?? m.id) : undefined}
-      grouped={grouped && !live}
+      grouped={grouped}
       entering={entering && !replacesLive}
       streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
       className={cx(local && `ac-msg--local ac-msg--${local}`, contextMark && "msg--context")}
@@ -2910,8 +2919,17 @@ export const TimelineMessage = memo(function TimelineMessage({
     >
       {live ? (
         <>
+          {/* It opens as if it had answered: a generic phrase until the first thing it says takes its place. */}
+          {(opening.said || opening.opener !== null) && (
+            <MessageText>
+              <MessageBody
+                body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
+                resolveMention={dir.mentionName}
+              />
+            </MessageText>
+          )}
           {/* Steps, the messages it read, and each tool call (the same list folds when it is done). */}
-          <LiveWorkList work={live.work ?? []} steerNote={steerNote} agentId={live.agentId} stopped={liveStopped} />
+          <LiveWorkList work={opening.work} steerNote={steerNote} agentId={live.agentId} stopped={liveStopped} />
           {liveFailed && (
             <p className="ac-msg__error" role="alert">
               <Icon name="alert" size={18} />

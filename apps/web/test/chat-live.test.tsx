@@ -102,7 +102,7 @@ describe("typing bar above the composer", () => {
     expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
     expect(typingBar().querySelector(".ac-typing__dots")).toBeNull();
     expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
-    // The words are the bar's; the block in the timeline says "pensando".
+    // The words are the bar's; the block in the timeline opens with a short phrase.
     expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
     const run = { threadId: lastPerson(state)?.id, runId: "r-live", agentId: ATLAS_ID };

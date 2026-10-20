@@ -14,7 +14,7 @@ import {
   steerStore,
 } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { blockRowByRun, elapsedParts, nextSlots, runPhase, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
+import { blockRowByRun, elapsedParts, nextSlots, OPENERS, openerOf, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -98,11 +98,23 @@ describe("one block per answer (run-slots)", () => {
     expect(blockRowByRun(items, new Set(["r1"]))).toEqual(new Map([["r2", "m4"]]));
   });
 
-  test("the header word and the elapsed time", () => {
-    const base = { text: "", status: "running" as const, work: [], tool: null };
-    expect(runPhase(base)).toBe("thinking");
-    expect(runPhase({ ...base, tool: "github_list_prs" })).toBe("working");
-    expect(runPhase({ ...base, text: "Olá" })).toBe("writing");
+  test("it opens with a generic phrase, then the first thing it said; the elapsed time", () => {
+    const base = { runId: "r-1", text: "", status: "running" as const, work: [] };
+    const generic = openerOf(base);
+    expect(generic.said).toBeNull();
+    expect(generic.opener).toBeGreaterThanOrEqual(0);
+    expect(generic.opener).toBeLessThan(OPENERS);
+    const said = openerOf({
+      ...base,
+      work: [
+        { kind: "say" as const, text: "Vou ler o código.", turn: 1 },
+        { kind: "say" as const, text: "Uso as ferramentas.", turn: 2 },
+      ],
+    });
+    expect(said).toMatchObject({ said: "Vou ler o código.", opener: null });
+    expect(said.work).toEqual([{ kind: "say", text: "Uso as ferramentas.", turn: 2 }]);
+    expect(openerOf({ ...base, text: "Olá" }).opener).toBeNull();
+    expect(openerOf({ ...base, status: "canceled" }).opener).toBeNull();
     expect(elapsedParts(1_500)).toBeNull();
     expect(elapsedParts(4_200)).toEqual({ m: 0, s: 4 });
     expect(elapsedParts(75_000)).toEqual({ m: 1, s: 15 });
@@ -196,13 +208,14 @@ describe("live row in the timeline", () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
-    // Before any word: the block is there, "pensando".
-    expect(row().textContent).toContain("pensando");
+    // Before any word: the block is there, opening as if it had answered (the bar says it works).
+    expect(row().textContent).toMatch(/Deixa eu ver…|Já vejo isso…|Um instante…/);
+    expect(row().textContent).not.toContain("pensando");
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
     await settle(2);
     expect(row().classList.contains("ac-msg--grouped")).toBe(false);
     expect(row().textContent).toContain("Ada");
-    expect(row().textContent).toContain("escrevendo");
+    expect(row().textContent).toContain("Olhando o login.");
     await post(ev, "m-later", "Também confere o refresh");
     await settle(3);
     const later = screen().getByText("Também confere o refresh").closest(".ac-msg") as HTMLElement;
