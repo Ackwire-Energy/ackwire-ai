@@ -602,6 +602,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
               channelId: filters.channelId,
               authorType: filters.author?.type,
               authorId: filters.author?.id,
+              changed: filters.changed && filters.author ? "1" : undefined,
             },
           })
         ).artifacts,

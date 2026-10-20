@@ -42,6 +42,7 @@ export function DmPage({ target }: { target: DmTarget }) {
   const agent = "agentId" in target ? dir.agentById.get(target.agentId) : undefined;
   // "Ver perfil": the agent's page in the panel beside the conversation, like a thread's.
   const [profile, setProfile] = useState<{ tab: AgentTab; section?: AgentSection } | null>(null);
+  const [closeRequest, setCloseRequest] = useState(0);
   const person = "userId" in target ? dir.memberById.get(target.userId) : undefined;
   const name = agent?.name ?? person?.name ?? "";
 
@@ -118,7 +119,19 @@ export function DmPage({ target }: { target: DmTarget }) {
         }}
       />
       {agent && profile && (
-        <aside className="thread-panel" aria-label={t("agentPage.panel.label", agentGrammar(t, agent.name))}>
+        <button
+          type="button"
+          className="thread-panel__scrim"
+          tabIndex={-1}
+          aria-label={t("common.close")}
+          onClick={() => setCloseRequest((n) => n + 1)}
+        />
+      )}
+      {agent && profile && (
+        <aside
+          className="thread-panel thread-panel--wide"
+          aria-label={t("agentPage.panel.label", agentGrammar(t, agent.name))}
+        >
           <div className="thread-panel__page">
             <AgentPage
               agentId={agent.id}
@@ -126,6 +139,7 @@ export function DmPage({ target }: { target: DmTarget }) {
               section={profile.section}
               onNavigate={(tab, section) => setProfile({ tab, section })}
               onClose={() => setProfile(null)}
+              closeRequest={closeRequest}
             />
           </div>
         </aside>

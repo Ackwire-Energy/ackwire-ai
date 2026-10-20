@@ -62,20 +62,13 @@ import { useAgentEdit } from "./context";
 import "@/components/browser/browser.css";
 
 /*
- * telas/PerfilAgente.html: what the agent works with, said as one sentence
- * under its name ("Pensa com [Claude Code · Opus] no [Mac mini] e [navega em
- * sites]."). Each word opens its dialog. A choice brings what it depends on
+ * What the agent works with, under its name (telas/AgenteTopo.html, D): where
+ * it works, who thinks and the browser, each opening its dialog. A choice brings what it depends on
  * along (Claude Code moves the agent to a computer that has it) and says so
  * before; "Usar" saves at once, in the right order (computer, then brain).
  */
 
 export type WorkDialog = "brain" | "computer" | "browser";
-
-const BRAIN_ICON: Record<BrainKind, IconName> = {
-  model: "brainAgent",
-  claude_code: "brainClaudeCode",
-  codex: "brainCodex",
-};
 
 /** The browser as the sentence says it: off, waiting for its computer, or on (any site / some). */
 type BrowserWord = "off" | "waiting" | "any" | "only";
@@ -103,39 +96,53 @@ function useWork() {
   return { brain, computer, browser, scopes, machines, granted, machineId, target, browserWord };
 }
 
-/** A word of the sentence: a button for who may change it, plain words for everyone else. */
-function Word({
+/** A cell of "Como trabalha": its icon, what it is, the value; a button for who may change it. */
+function Cell({
   icon,
-  muted,
-  children,
   label,
+  value,
+  more,
+  sub,
+  muted,
+  openLabel,
   onOpen,
 }: {
-  icon: IconName;
-  muted?: boolean;
-  children: ReactNode;
+  icon: ReactNode;
   label: string;
+  value: ReactNode;
+  more?: string | null;
+  sub?: string | null;
+  muted?: boolean;
+  openLabel: string;
   onOpen?: () => void;
 }) {
-  if (!onOpen) return <span className="agp-word agp-word--ro">{children}</span>;
+  const body = (
+    <>
+      <span className="agp-cell__key">{icon}</span>
+      <span className="agp-cell__text">
+        <small>{label}</small>
+        <span className="agp-cell__value" data-muted={muted || undefined}>
+          {value}
+          {more && <span className="agp-cell__more"> · {more}</span>}
+        </span>
+        {sub && <span className="agp-cell__sub">{sub}</span>}
+      </span>
+    </>
+  );
+  if (!onOpen) return <div className="agp-cell agp-cell--ro">{body}</div>;
   return (
-    <button
-      type="button"
-      className="agp-word"
-      data-muted={muted || undefined}
-      aria-haspopup="dialog"
-      aria-label={label}
-      onClick={onOpen}
-    >
-      <Icon name={icon} size={16} />
-      <span className="agp-word__text">{children}</span>
-      <Icon name="chevronDown" size={14} className="agp-word__chev" />
+    <button type="button" className="agp-cell" aria-haspopup="dialog" aria-label={openLabel} onClick={onOpen}>
+      {body}
+      <Icon name="chevronDown" size={14} className="agp-cell__chev" />
     </button>
   );
 }
 
-/** The sentence under the agent's name, and the steps on its computer while the browser waits. */
-export function WorkSentence({ onOpen }: { onOpen: (dialog: WorkDialog) => void }) {
+/**
+ * Como trabalha (telas/AgenteTopo.html, D): where it works, who thinks (with the effort) and the browser
+ * side by side, each opening its dialog; the numbers in the footer. Where comes first: who thinks depends on it.
+ */
+export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
   const { t } = useTranslation();
   const { agent, viewer, saved, can, g } = useAgentEdit();
   const models = useModels();
@@ -155,71 +162,53 @@ export function WorkSentence({ onOpen }: { onOpen: (dialog: WorkDialog) => void 
       : view?.account
         ? (kindAccounts.find((a) => a.id === view.account)?.label ?? null)
         : t("agentPage.work.brain.thisComputer", { computer: view?.computer?.name ?? "" });
-  const brainWords =
-    kind === "model" ? (
-      <>
-        {t("agentPage.work.orgModel")} <span className="agp-word__more">· {orgModel}</span>
-      </>
-    ) : (
-      <>
-        {t(`brain.card.${kind}`)}
-        {(planModel || accountWord) && (
-          <span className="agp-word__more">
-            {planModel && ` · ${planModel}`}
-            {accountWord && ` · ${accountWord}`}
-          </span>
-        )}
-      </>
-    );
+  const effort =
+    kind !== "model" && view
+      ? t("agentPage.work.cell.effort", {
+          level: t(`agentPage.work.brain.efforts.${shownEffort(view.effort)}`).toLowerCase(),
+        })
+      : null;
   const target = work.target;
   const machine = target?.kind === "machine" ? target : null;
   const member = viewer === "member";
-  const components = {
-    brain: (
-      <Word
-        icon={BRAIN_ICON[kind]}
-        label={t("agentPage.work.open.brain")}
-        onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
-      >
-        {brainWords}
-      </Word>
-    ),
-    computer: (
-      <Word
-        icon={machine ? "computer" : "cloud"}
-        label={t("agentPage.work.open.computer")}
-        onOpen={can("machine") ? () => onOpen("computer") : undefined}
-      >
-        {machine ? machine.name : t("agentPage.work.cloud")}
-      </Word>
-    ),
-    browser: (
-      <Word
-        icon={work.browserWord === "off" ? "block" : "globe"}
-        muted={work.browserWord === "off"}
-        label={t("agentPage.work.open.browser")}
-        onOpen={member ? undefined : () => onOpen("browser")}
-      >
-        {t(`agentPage.work.browser.${work.browserWord}`)}
-      </Word>
-    ),
-    end: <span className="agp-work__end" />,
-  };
   const reason = work.browser.data?.reason;
   const steps =
     !member && work.browserWord === "waiting" && machine && (reason === "switched_off" || reason === "not_reported");
   return (
     <div className="agp-work">
-      <p className="agp-work__sentence">
-        {member ? (
-          <Trans i18nKey="agentPage.work.sentenceMember" components={components} />
-        ) : (
-          <Trans
-            i18nKey={machine ? "agentPage.work.sentenceMachine" : "agentPage.work.sentenceCloud"}
-            components={components}
+      <section className="agp-workcard" aria-label={t("agentPage.work.cell.label")}>
+        <div className="agp-cells">
+          {!member && (
+            <Cell
+              icon={<Icon name={machine ? "computer" : "cloud"} size={16} />}
+              label={t(machine ? "agentPage.work.cell.computer" : "agentPage.work.cell.cloud")}
+              value={machine ? machine.name : t("agentPage.work.cloud")}
+              openLabel={t("agentPage.work.open.computer")}
+              onOpen={can("machine") ? () => onOpen("computer") : undefined}
+            />
+          )}
+          <Cell
+            icon={kind === "model" ? <Icon name="brainAgent" size={16} /> : <BrainLogo kind={kind} size="sm" />}
+            label={t("agentPage.work.cell.brain")}
+            value={kind === "model" ? orgModel : t(`brain.card.${kind}`)}
+            more={kind === "model" ? null : [planModel, effort].filter(Boolean).join(" · ") || null}
+            sub={kind === "model" ? t("agentPage.work.orgModel") : accountWord}
+            openLabel={t("agentPage.work.open.brain")}
+            onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
           />
-        )}
-      </p>
+          {!member && (
+            <Cell
+              icon={<Icon name={work.browserWord === "off" ? "block" : "globe"} size={16} />}
+              label={t("agentPage.work.cell.browser")}
+              value={t(`agentPage.work.browser.${work.browserWord}`)}
+              muted={work.browserWord === "off"}
+              openLabel={t("agentPage.work.open.browser")}
+              onOpen={() => onOpen("browser")}
+            />
+          )}
+        </div>
+        {footer && <div className="agp-workcard__foot">{footer}</div>}
+      </section>
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">{t("agentPage.work.offline", { ...g, computer: machine.name })}</SettingNote>
       )}

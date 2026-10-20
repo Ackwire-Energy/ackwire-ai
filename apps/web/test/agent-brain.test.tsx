@@ -25,7 +25,8 @@ async function open(state = seedState(), api = createFakeApi(state)) {
   await settle(8);
   return { state, api };
 }
-const sentence = () => document.querySelector(".agp-work__sentence") as HTMLElement;
+/** "Como trabalha" under the name: where, who thinks, the browser (telas/AgenteTopo.html, D). */
+const sentence = () => screen().getByRole("region", { name: "Como trabalha" });
 const dialog = async (word: string, title: string) => {
   await click(screen().getByRole("button", { name: word }));
   return screen().getByRole("dialog", { name: title });
@@ -50,11 +51,16 @@ const pairMac = (api: ReturnType<typeof createFakeApi>, browser: boolean) =>
     browser: { available: browser, version: browser ? "1" : null, chrome: null, reason: null },
   });
 
-describe("the sentence under the name", () => {
-  test("who thinks, where and the browser, in one sentence; each word opens its dialog", async () => {
+describe("Como trabalha under the name", () => {
+  test("where, who thinks and the browser, in three cells (where first); each opens its dialog", async () => {
     await open();
-    expect(sentence().textContent).toContain("Pensa com o modelo da organização");
-    expect(sentence().textContent).toContain("na Nuvem e não navega em sites.");
+    expect(sentence().textContent).toContain("Trabalha naNuvem");
+    expect(sentence().textContent).toContain("Pensa com");
+    expect(sentence().textContent).toContain("o modelo da organização");
+    expect(sentence().textContent).toContain("Navegadornão navega em sites");
+    expect(sentence().textContent?.indexOf("Trabalha na")).toBeLessThan(
+      sentence().textContent?.indexOf("Pensa com") ?? 0,
+    );
     for (const word of ["Mudar quem pensa", "Mudar onde trabalha", "Mudar o navegador"])
       expect(screen().getByRole("button", { name: word }).getAttribute("aria-haspopup")).toBe("dialog");
     // Configurações no longer has "Quem pensa": it lives in the sentence.
@@ -71,7 +77,7 @@ describe("the sentence under the name", () => {
     const member = seedState();
     if (member.me?.organizations[0]) member.me.organizations[0].role = "member";
     await open(member);
-    expect(sentence().textContent).toContain("Pensa com o modelo da organização");
+    expect(sentence().textContent).toContain("o modelo da organização");
     expect(screen().queryByRole("button", { name: "Mudar quem pensa" })).toBeNull();
     cleanup();
     const owner = seedState();
@@ -135,7 +141,7 @@ describe("Quem pensa (its dialog)", () => {
     const api = createFakeApi(state);
     api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "codex", model: null, effectiveModel: "gpt-6-sol" });
     await open(state, api);
-    expect(sentence().textContent).toContain("Pensa com Codex · GPT-6 Sol");
+    expect(sentence().textContent).toContain("Codex · GPT-6 Sol · esforço médio");
     const d = await brainDialog();
     expect(card(d, /^Codex/).getAttribute("aria-checked")).toBe("true");
     await pick(d, "Modelo", /Luna/);
@@ -188,9 +194,10 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     return { state, api };
   }
 
-  test("the sentence names the account when the computer has more than one; Usar saves the account and the effort", async () => {
+  test("the cell names the account when the computer has more than one; Usar saves the account and the effort", async () => {
     const { state } = await onMac();
-    expect(sentence().textContent).toContain("Pensa com Claude Code · Sonnet · Conta deste MacBook");
+    expect(sentence().textContent).toContain("Claude Code · Sonnet");
+    expect(sentence().textContent).toContain("Conta deste MacBook");
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
     expect(account.textContent).toContain("Conta deste MacBook");

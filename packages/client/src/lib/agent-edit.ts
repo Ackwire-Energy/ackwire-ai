@@ -8,7 +8,7 @@ import { readBudget } from "./new-agent";
  * each platform, which knows the look's types.
  */
 
-export const AGENT_TABS = ["overview", "instructions", "access", "memory", "activity", "settings"] as const;
+export const AGENT_TABS = ["overview", "instructions", "access", "memory", "files", "activity", "settings"] as const;
 export type AgentTab = (typeof AGENT_TABS)[number];
 export const isAgentTab = (v: unknown): v is AgentTab => AGENT_TABS.includes(v as AgentTab);
 

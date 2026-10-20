@@ -816,6 +816,8 @@ export async function listArtifacts(
     kind?: ArtifactKind;
     channelId?: string;
     author?: ArtifactAuthor;
+    /** Made or changed by (any version), e.g. an agent's files on its page. */
+    changedBy?: ArtifactAuthor;
     limit?: number;
     /** Updated at or after this time. */
     since?: Date;
@@ -857,6 +859,9 @@ export async function listArtifacts(
         filters.since ? gte(artifacts.updatedAt, filters.since) : undefined,
         filters.author
           ? and(eq(artifacts.createdByType, filters.author.type), eq(artifacts.createdById, filters.author.id))
+          : undefined,
+        filters.changedBy
+          ? sql`exists (select 1 from ${artifactVersions} where ${artifactVersions.artifactId} = ${artifacts.id} and ${artifactVersions.authorType} = ${filters.changedBy.type} and ${artifactVersions.authorId} = ${filters.changedBy.id})`
           : undefined,
         q ? sql`(${artifacts.title} ilike ${`%${q}%`} or ${artifacts.excerpt} ilike ${`%${q}%`})` : undefined,
       ),

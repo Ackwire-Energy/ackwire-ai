@@ -9525,7 +9525,7 @@ a.machine-row__name:hover {
 }
 .agp-cover {
   position: relative;
-  height: 208px;
+  height: 128px;
   border-radius: 24px;
   overflow: hidden;
   isolation: isolate;
@@ -9542,164 +9542,35 @@ a.machine-row__name:hover {
   width: 100%;
   height: 100%;
 }
-.agp-cover .agp-cover__agent {
-  position: absolute;
-  left: 44px;
-  bottom: -6px;
-  width: 118px;
-  height: 118px;
-}
-.agp-state {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: calc(100% - 28px);
-  min-height: 28px;
-  padding: 4px 11px 4px 9px;
-  border-radius: 999px;
-  background: var(--sky-glass);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 0 0 1px var(--sky-line);
-  color: var(--sky-ink);
-  font-size: 12.5px;
-  font-weight: 650;
-}
-.agp-state__ico {
-  display: inline-flex;
-  color: #0b5bd3;
-}
-.agp-state[data-kind="waiting"] .agp-state__ico {
-  color: #8a5100;
-}
-.agp-state__sub {
-  overflow: hidden;
-  color: var(--sky-ink2);
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.agp-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 12px;
-}
-.agp-bars i {
-  width: 3px;
-  border-radius: 1px;
-  background: #0b5bd3;
-  animation: agp-bar 1s ease-in-out infinite;
-}
-.agp-bars i:nth-child(2) {
-  animation-delay: 0.15s;
-}
-.agp-bars i:nth-child(3) {
-  animation-delay: 0.3s;
-}
-@keyframes agp-bar {
-  0%,
-  100% {
-    height: 4px;
-  }
-  50% {
-    height: 12px;
-  }
-}
-/* Numbers: glass on the sky; neutral cards under the cover on narrow screens. */
-.agp-stats {
-  display: flex;
-  gap: 8px;
-}
-.agp-cover .agp-stats {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-}
-.agp-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 132px;
-  padding: 10px 14px 11px;
-  border-radius: 16px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  color: var(--ink);
-}
-.agp-cover .agp-stat {
-  background: var(--sky-glass);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  box-shadow:
-    0 0 0 1px var(--sky-line),
-    0 10px 24px -14px rgba(4, 32, 63, 0.5);
-  color: var(--sky-ink);
-}
-.agp-stat small {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-.agp-cover .agp-stat small,
-.agp-cover .agp-stat em {
-  color: var(--sky-ink2);
-}
-.agp-stat b {
-  font-family: var(--font-display);
-  font-size: 27px;
-  font-weight: 300;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
-.agp-stat em {
-  margin-left: 6px;
-  color: var(--muted);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  font-style: normal;
-  font-weight: 500;
-  letter-spacing: 0;
-}
-.agp-stat .ac-meter {
-  height: 4px;
-  margin-top: 5px;
-}
-.agp-hero > .agp-stats {
+/* telas/AgenteTopo.html, D: the agent in the middle, over the cover's edge, cut out by a ring of the page. */
+.agp-face {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 12px;
-}
-.agp-hero > .agp-stats .agp-stat {
-  min-width: 0;
-  padding: 10px 12px;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin: -46px auto 0;
+  padding-top: 6px;
+  box-sizing: border-box;
+  border-radius: 30px;
+  background: var(--sunken);
+  box-shadow:
+    0 0 0 5px var(--bg),
+    var(--e1);
 }
 .agp-ident {
   display: flex;
-  flex-wrap: wrap;
-  /* The actions sit in the middle of name + chips, not hanging below the chips. */
-  align-items: center;
-  gap: 16px;
-  padding: 16px 4px 4px;
-}
-.agp-who {
-  flex: 1 1 320px;
-  min-width: 0;
-  display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px 0;
+  text-align: center;
 }
 .agp-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 44px;
+  font-size: 36px;
   font-weight: 300;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -9719,10 +9590,6 @@ a.machine-row__name:hover {
 .agp-chips .ac-chip {
   margin-left: 0;
 }
-/* Conversar and "…" together in the cover's corner, next to the agent; the status leaves them room. */
-.agp-cover .agp-state {
-  max-width: calc(100% - 160px);
-}
 .agp-cover__acts {
   position: absolute;
   top: 14px;
@@ -9738,90 +9605,151 @@ a.machine-row__name:hover {
   color: var(--sky-ink);
 }
 
-/* What it works with, as one sentence: words that open their dialog (telas/PerfilAgente.html). */
+/* Como trabalha (telas/AgenteTopo.html, D): three cells in one card, no shadow, a hairline; the numbers below. */
 .agp-work {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 8px;
+  padding-top: 16px;
 }
-.agp-work__sentence {
+.agp-workcard {
+  padding: 6px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.agp-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.agp-cell {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 10px 10px 12px;
+  border: 0;
+  border-radius: 13px 13px 13px 4px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.agp-cell--ro {
+  grid-template-columns: 30px minmax(0, 1fr);
+  cursor: default;
+}
+.agp-cell:hover:not(.agp-cell--ro) {
+  background: color-mix(in srgb, var(--sunken) 80%, transparent);
+}
+.agp-cell:focus-visible {
+  outline: none;
+  box-shadow: var(--field-ring);
+}
+.agp-cell + .agp-cell::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: -1px;
+  width: 1px;
+  background: var(--line);
+}
+.agp-cell__key {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 3px;
+  background: var(--sunken);
+  color: var(--ink2);
+}
+.agp-cell__key .ac-brand--sm {
+  border-radius: inherit;
+}
+.agp-cell__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.agp-cell__text small {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.agp-cell__value,
+.agp-cell__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agp-cell__value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 21px;
+}
+.agp-cell__value::first-letter {
+  text-transform: uppercase;
+}
+.agp-cell__value[data-muted] {
+  color: var(--muted);
+  font-weight: 500;
+}
+.agp-cell__more {
+  color: var(--muted);
+  font-weight: 500;
+}
+.agp-cell__sub {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 17px;
+}
+.agp-cell__chev {
+  color: var(--faint);
+}
+.agp-workcard__foot {
+  margin: 4px 6px 0;
+  padding: 8px 6px 4px;
+  border-top: 1px solid var(--line);
+}
+.agp-numbers {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
+  gap: 4px 16px;
   margin: 0;
-  color: var(--ink2);
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 300;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
 }
-.agp-work__end {
-  margin-left: -8px;
-}
-.agp-word {
+.agp-number {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: var(--control-h-md, 40px);
-  padding: 0 10px 0 11px;
+  gap: 6px;
+  padding: 2px 4px;
+  margin: 0 -4px;
   border: 0;
-  border-radius: var(--radius-md) var(--radius-md) var(--radius-md) var(--radius-cut);
-  background: linear-gradient(180deg, var(--surface-raised), var(--card-key-bottom));
-  box-shadow: var(--card-key);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    transform 0.2s var(--spring),
-    box-shadow 0.2s var(--out);
 }
-.agp-word:hover {
-  transform: translateY(-1px);
+.agp-number:hover {
+  background: var(--plate, color-mix(in srgb, var(--ink) 6%, transparent));
+  color: var(--ink2);
 }
-.agp-word:active {
-  transform: scale(0.98);
-}
-.agp-word:focus-visible {
-  outline: none;
-  box-shadow: var(--card-key), var(--field-ring);
-}
-.agp-word[data-muted] {
-  color: var(--muted);
-  font-weight: 500;
-}
-.agp-word__more {
-  color: var(--muted);
-  font-weight: 500;
-}
-.agp-word__chev {
+.agp-number .ac-icon {
   color: var(--faint);
 }
-.agp-word--ro {
-  height: auto;
-  padding: 0;
-  background: none;
-  box-shadow: none;
-  cursor: default;
-  font-family: inherit;
-  font-size: inherit;
-  font-weight: 400;
-  color: var(--ink);
-}
-@media (max-width: 640px) {
-  .agp-work__sentence {
-    font-size: 20px;
-  }
-  .agp-word {
-    white-space: normal;
-    text-align: left;
-  }
+.agp-number .ac-meter {
+  width: 40px;
+  height: 4px;
 }
 /* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
 .agp-wdlg__note {
@@ -11624,4 +11552,50 @@ html[data-menu-overlay] .shell {
   .ac-typing__hint {
     display: none;
   }
+}
+
+/* Arquivos on the agent's page (telas/AgenteArquivos.html, A): the Drive's preview, title, one line, Abrir. */
+.agp-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.agp-file:first-child {
+  border-top: 0;
+}
+.agp-file__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.agp-file__text > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agp-file__title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agp-file__title:hover {
+  text-decoration: underline;
+}
+.agp-files__note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
 }

@@ -148,6 +148,8 @@ export function artifactRoutes(deps: AppDeps) {
           channelId: z.uuid().optional(),
           authorType: z.enum(["agent", "person"]).optional(),
           authorId: z.string().optional(),
+          /** With `authorType`/`authorId`: made or changed by them (any version), not only made. */
+          changed: z.literal("1").optional(),
         }),
       },
       responses: { 200: json(z.object({ artifacts: z.array(Artifact) })), ...errors },
@@ -160,7 +162,7 @@ export function artifactRoutes(deps: AppDeps) {
         q: query.q,
         kind: query.kind,
         channelId: query.channelId,
-        author,
+        ...(query.changed ? { changedBy: author } : { author }),
       });
       return c.json({ artifacts: list }, 200);
     },

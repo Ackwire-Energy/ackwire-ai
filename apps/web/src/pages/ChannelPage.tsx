@@ -1870,6 +1870,15 @@ function ChannelView({
           )}
         </Tag>
         {panel && (
+          <button
+            type="button"
+            className="thread-panel__scrim"
+            tabIndex={-1}
+            aria-label={t("common.close")}
+            onClick={() => setPanel(null)}
+          />
+        )}
+        {panel && (
           <aside className="thread-panel" aria-label={t("threads.side.label")}>
             <ThreadPage key={panel.id} threadId={panel.id} reply={panel.reply} onClose={() => setPanel(null)} />
           </aside>

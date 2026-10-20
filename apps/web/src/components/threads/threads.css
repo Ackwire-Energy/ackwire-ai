@@ -907,3 +907,40 @@
   min-height: 0;
   overflow-y: auto;
 }
+/* The agent's page needs more room than a thread: wider, and its narrow rules follow this width. */
+.thread-panel--wide {
+  width: min(900px, calc(100% - 20px));
+  container: agp-side / inline-size;
+}
+@media (max-width: 860px) {
+  .thread-panel--wide {
+    width: auto;
+  }
+}
+/* Under a panel: the conversation dims like under a dialog (.ac-dialog__scrim, e.g. a routine's details),
+   and a click there closes the panel. */
+.thread-panel__scrim {
+  position: absolute;
+  z-index: 29;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(10, 10, 10, 0.4);
+  cursor: default;
+  animation: thread-scrim-in 0.24s var(--out);
+}
+@keyframes thread-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread-panel__scrim {
+    animation: none;
+  }
+}
+@media (max-width: 860px) {
+  .thread-panel__scrim {
+    display: none;
+  }
+}

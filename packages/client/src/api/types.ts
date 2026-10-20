@@ -1291,6 +1291,8 @@ export interface ArtifactFilters {
   kind?: ArtifactKind;
   channelId?: string;
   author?: ArtifactAuthor;
+  /** `author` made or changed it (any version), not only made it. */
+  changed?: boolean;
 }
 
 /** Channel event: an artifact was created or got a new version. */

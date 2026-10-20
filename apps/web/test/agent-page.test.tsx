@@ -52,14 +52,22 @@ const updates = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2]);
 
 describe("agent page: tabs and the URL", () => {
-  test("six tabs; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
+  test("seven tabs; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
     const { router } = await go();
     const tabs = screen().getByRole("tablist", { name: "Seções da Ada" });
     expect(
       within(tabs)
         .getAllByRole("tab")
         .map((t) => t.textContent),
-    ).toEqual(["Visão geral", "Instruções", "Ferramentas e acesso", "Memória1", "Atividade", "Configurações"]);
+    ).toEqual([
+      "Visão geral",
+      "Instruções",
+      "Ferramentas e acesso",
+      "Memória1",
+      "Arquivos",
+      "Atividade",
+      "Configurações",
+    ]);
     expect(screen().getByRole("heading", { level: 1, name: "Ada" })).toBeTruthy();
     await openTab(/^Atividade/);
     expect(router.state.location.search).toMatchObject({ tab: "activity" });
@@ -74,29 +82,40 @@ describe("agent page: tabs and the URL", () => {
     expect(screen().getByRole("article", { name: "Atualizar as instruções da Ada" })).toBeTruthy();
   });
 
-  test("the cover: status, numbers and the actions on the sky; the name, its @ and the sentence under it", async () => {
+  test("the cover with its actions; the agent, name and @ in the middle; Como trabalha with the numbers", async () => {
     await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
     const cover = hero.querySelector(".agp-cover") as HTMLElement;
-    expect(cover.textContent).toContain("Esperando aprovação");
-    // The fake agent waits for an approval: the line under the status counts the requests.
-    expect(cover.textContent).toContain("1 pedido");
-    expect(cover.textContent).toContain("US$ 12,30");
-    expect(cover.textContent).toContain("de US$ 40");
+    // No status pill (telas/AgenteTopo.html, D).
+    expect(hero.textContent).not.toContain("Esperando aprovação");
+    expect(hero.querySelector(".agp-face")).toBeTruthy();
+    const work = within(hero).getByRole("region", { name: "Como trabalha" });
+    expect(work.textContent).toContain("US$ 12,30");
+    expect(work.textContent).toContain("de US$ 40");
     expect(within(cover).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
     );
     expect(within(cover).getByRole("button", { name: "Mais ações" })).toBeTruthy();
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada");
     expect(hero.querySelector(".agp-handle")?.textContent).toContain("@ada");
-    // No chips under the name: the sentence says what it works with.
-    expect(hero.querySelector(".agp-meta")).toBeNull();
-    expect(hero.querySelector(".agp-work__sentence")?.textContent).toContain("Pensa com o modelo da organização");
+    expect(work.textContent).toContain("o modelo da organização");
+  });
+});
+
+describe("agent page: its files", () => {
+  test("Arquivos lists the Drive files it made or changed, filters by kind, and opens one", async () => {
+    await go("?tab=files");
+    const card = screen().getByRole("region", { name: "Arquivos da Ada" });
+    expect(card.textContent).toContain("Corrige o checkout com carrinho vazio");
+    // Another agent's file isn't here.
+    expect(card.textContent).not.toContain("Organograma do time");
+    expect(card.textContent).toContain("Só aparecem arquivos de conversas que você vê.");
+    expect(within(card).getByRole("radiogroup", { name: "Tipo" })).toBeTruthy();
   });
 });
 
 describe("agent page: the budget on the overview", () => {
-  test("who thinks is the sentence under the name; the overview keeps the money, Mudar opens Orçamento", async () => {
+  test("who thinks is under the name; the overview keeps the money, Mudar opens Orçamento", async () => {
     const { router } = await go("?tab=overview");
     expect(screen().queryByRole("region", { name: "Quem pensa e orçamento" })).toBeNull();
     const card = screen().getByRole("region", { name: "Orçamento" });
@@ -109,7 +128,10 @@ describe("agent page: the budget on the overview", () => {
     const ada = state.agents.find((a) => a.id === ADA_ID);
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet" };
     await go("", state);
-    expect(document.querySelector(".agp-work__sentence")?.textContent).toBe("Pensa com Claude Code · Sonnet.");
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(work.textContent).toContain("Pensa comClaude Code · Sonnet");
+    // A member doesn't see where it works or its browser.
+    expect(work.textContent).not.toContain("Trabalha");
   });
 });
 

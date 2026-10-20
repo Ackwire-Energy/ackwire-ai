@@ -66,6 +66,7 @@ import { useToast } from "@/lib/toast";
 import { AccessTab } from "./agent/AccessTab";
 import { ActivityTab } from "./agent/ActivityTab";
 import { type AgentEdit, AgentEditProvider, type Change, type Draft } from "./agent/context";
+import { FilesTab } from "./agent/FilesTab";
 import { AgentHero } from "./agent/Hero";
 import { InstructionsTab } from "./agent/InstructionsTab";
 import { MemoryTab } from "./agent/MemoryTab";
@@ -91,6 +92,8 @@ export interface AgentPageProps {
   onNavigate: (tab: AgentTab, section?: AgentSection) => void;
   /** Shown in the panel beside its DM (like a thread's), not as a page: closes the panel. */
   onClose?: () => void;
+  /** The panel's overlay was clicked (a new number each time): close, asking first when something is unsaved. */
+  closeRequest?: number;
 }
 
 /** docs/design/telas/AgentePerfil.html — the agent on its sky, tabs, inline editing with one save bar. */
@@ -116,7 +119,7 @@ export function AgentPage(props: AgentPageProps) {
   return <AgentProfile key={agent.id} agent={agent} {...props} />;
 }
 
-function AgentProfile({ agent, tab, section, onNavigate, onClose }: AgentPageProps & { agent: Agent }) {
+function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }: AgentPageProps & { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
@@ -517,6 +520,11 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose }: AgentPagePro
   // Closing the panel with unsaved changes asks first, like leaving the page.
   const [closing, setClosing] = useState(false);
   const close = onClose && (() => (dirtyRef.current ? setClosing(true) : onClose()));
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  useEffect(() => {
+    if (closeRequest) closeRef.current?.();
+  }, [closeRequest]);
 
   /* ---------- Archiving ---------- */
 
@@ -626,6 +634,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose }: AgentPagePro
                 {tab === "instructions" && <InstructionsTab />}
                 {tab === "access" && <AccessTab />}
                 {tab === "memory" && <MemoryTab />}
+                {tab === "files" && <FilesTab />}
                 {tab === "activity" && <ActivityTab />}
                 {tab === "settings" && (
                   <SettingsTab

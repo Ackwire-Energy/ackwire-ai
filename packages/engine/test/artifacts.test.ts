@@ -237,6 +237,32 @@ describe("visibility and editing", () => {
     await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, table.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  test("an author's files: made by them, or made or changed by them (an agent's page)", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const mine = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, {
+      title: "Meu",
+      content: { kind: "document", markdown: "a" },
+    });
+    const hers = await createArtifact(f.artifactDeps, person(bia.id), f.org.id, {
+      title: "Dela",
+      content: { kind: "document", markdown: "b" },
+    });
+    await updateArtifact(f.artifactDeps, person(f.owner.id), f.org.id, hers.id, {
+      content: { kind: "document", markdown: "b2" },
+      baseVersion: 1,
+    });
+    await createArtifact(f.artifactDeps, person(bia.id), f.org.id, {
+      title: "Só dela",
+      content: { kind: "document", markdown: "c" },
+    });
+    const owner = { type: "person" as const, id: f.owner.id };
+    const ids = async (filters: Parameters<typeof listArtifacts>[3]) =>
+      (await listArtifacts(f.db, person(bia.id), f.org.id, filters)).map((a) => a.id).sort();
+    expect(await ids({ author: owner })).toEqual([mine.id]);
+    expect(await ids({ changedBy: owner })).toEqual([mine.id, hers.id].sort());
+  });
+
   test("kinds and sizes are validated", () => {
     expect(() => validateContent({ kind: "pdf" })).toThrow(ValidationError);
     expect(() => validateContent({ kind: "document" })).toThrow("markdown");
