@@ -363,6 +363,17 @@ function osLang(): string | null {
   }
 }
 
+/**
+ * Where Chrome keeps the key to its cookies and saved logins: never the
+ * person's keychain (macOS asks for the login password the first time),
+ * a key of its own in the agent's profile instead.
+ */
+function secretStoreArgs(platform: string): string[] {
+  if (platform === "darwin") return ["--use-mock-keychain"];
+  if (platform === "linux") return ["--password-store=basic"];
+  return [];
+}
+
 /** The whole command line for the agent's Chrome: our flags, its own port (0: Chrome picks), its profile. */
 export function chromeLaunchArgs(
   exe: string,
@@ -373,6 +384,7 @@ export function chromeLaunchArgs(
   const ua = chromeUserAgent(exe, platform);
   return [
     ...CHROME_ARGS,
+    ...secretStoreArgs(platform),
     "--remote-debugging-port=0",
     `--user-data-dir=${profile}`,
     ...(ua ? [`--user-agent=${ua}`] : []),

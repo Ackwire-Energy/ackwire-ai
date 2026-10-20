@@ -355,6 +355,9 @@ test("a normal Chrome user agent for the platform, and the whole launch line", (
   const args = chromeLaunchArgs(exe, "/p", "darwin", "pt-BR");
   expect(args).toContain("--lang=pt-BR");
   expect(args).toContain("--user-data-dir=/p");
+  // Never the person's keychain (macOS would ask for their password).
+  expect(args).toContain("--use-mock-keychain");
+  expect(chromeLaunchArgs(exe, "/p", "linux", null)).toContain("--password-store=basic");
   expect(args.at(-1)).toBe("about:blank");
   expect(chromeLaunchArgs("/usr/bin/chrome", "/p", "linux", null).some((a) => a.startsWith("--user-agent"))).toBe(
     false,
