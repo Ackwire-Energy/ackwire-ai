@@ -10759,10 +10759,13 @@ a.machine-row__name:hover {
   width: 28px;
   height: 28px;
 }
+/* Room around the agent: it never touches the tile's top, the name sits clear of it. */
 .newag__car .newag__opt {
-  width: 64px;
-  height: 70px;
-  font-size: 11px;
+  width: 80px;
+  height: 92px;
+  padding: 12px 6px 9px;
+  gap: 8px;
+  font-size: 11.5px;
 }
 @media (max-width: 640px) {
   .agp-id {
