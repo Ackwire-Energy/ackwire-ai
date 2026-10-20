@@ -178,6 +178,15 @@ describe("live agent runs (streaming)", () => {
     expect(runsInChannel(s, "c1")[0]).toMatchObject({ status: "failed", error: "budget_exceeded" });
     expect(runningAgents(s).size).toBe(0);
   });
+
+  test("a new run of the same agent in the channel clears its failed row", () => {
+    let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "failed", error: "budget_exceeded" });
+    // Another agent's run leaves it.
+    s = applyChannelEvent(s, { type: "agent.run", ...base, runId: "r2", agentId: "iris", status: "running" });
+    expect(runsInChannel(s, "c1").map((r) => r.runId)).toEqual([base.runId, "r2"]);
+    s = applyChannelEvent(s, { type: "agent.run", ...base, runId: "r3", status: "running" });
+    expect(runsInChannel(s, "c1").map((r) => r.runId)).toEqual(["r2", "r3"]);
+  });
 });
 
 describe("the guessed 'pensando…' when the server is faster than the send", () => {

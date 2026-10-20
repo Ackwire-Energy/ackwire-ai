@@ -1987,6 +1987,14 @@ const Timeline = memo(function Timeline({
     for (const i of items) if (i.kind === "message" && i.message.agentRunId) out.set(i.message.agentRunId, i.key);
     return out;
   }, [items]);
+  // The block that opens is the first one at work: a failed or stopped block draws anyway and never hides it.
+  const opener = useStreams(
+    (s) =>
+      slots.find((x) => {
+        const r = s.runs[x.runId];
+        return !r || !drawsBehind(r);
+      })?.runId,
+  );
   // A take over whose run has no live block and no message here: its card at the end (`HeldBrowserRow`).
   const heldPlaces = useHeldPlaces();
   const held = useMemo(
@@ -2065,7 +2073,7 @@ const Timeline = memo(function Timeline({
         key={slot.key}
         runId={slot.runId}
         after={i === 0 ? after : null}
-        opens={i === 0}
+        opens={slot.runId === (opener ?? slots[0]?.runId)}
         grouped={false}
         entering={blockEnters.current.get(slot.key) ?? false}
         modelLabels={modelLabels}

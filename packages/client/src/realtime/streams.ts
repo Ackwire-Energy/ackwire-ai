@@ -313,7 +313,15 @@ function upsert(
   patch: Partial<LiveRun>,
 ) {
   const provisional = state.runs[provisionalId(event.agentId, event.threadId)];
-  const base = settleProvisional(state, event.agentId, event.threadId);
+  let base = settleProvisional(state, event.agentId, event.threadId);
+  // A new run of the same agent in the channel: its earlier failure is old news, not the latest word.
+  if (!base.runs[event.runId] && patch.status !== "failed") {
+    for (const r of Object.values(base.runs)) {
+      if (r.status === "failed" && r.agentId === event.agentId && r.channelId === event.channelId) {
+        base = finish(base, r.runId);
+      }
+    }
+  }
   // Partial: under some tsconfigs the index type isn't `| undefined`, and the spread below must stay optional.
   const current: Partial<LiveRun> | undefined = base.runs[event.runId];
   const next: LiveRun = {
