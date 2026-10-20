@@ -1,18 +1,17 @@
 import type { Actor, Agent } from "@agenteschat/client";
-import { useAgentDetail, useAgentScopes, useModels, usePeople, useSettings } from "@agenteschat/client";
+import { useAgentDetail, useModels, usePeople, useSettings } from "@agenteschat/client";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
 import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { scopeSummary } from "@agenteschat/client/lib/scopes";
 import { Avatar, BrainIcon, Button, Meter, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { agentBrainLine } from "@/components/AgentBrain";
+import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { useScopeGroups } from "@/hooks/useScopeGroups";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
@@ -92,7 +91,12 @@ export function ProfileTrigger({
         </button>
       }
     >
-      {open && (actor.type === "agent" ? <AgentCard agentId={actor.id} /> : <PersonCard userId={actor.id} />)}
+      {open &&
+        (actor.type === "agent" ? (
+          <AgentCard agentId={actor.id} onDone={() => setOpen(false)} />
+        ) : (
+          <PersonCard userId={actor.id} />
+        ))}
     </Popover>
   );
 }
@@ -169,28 +173,25 @@ function PersonCard({ userId }: { userId: string }) {
   );
 }
 
-function AgentCard({ agentId }: { agentId: string }) {
+function AgentCard({ agentId, onDone }: { agentId: string; onDone: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const agent = dir.agentById.get(agentId);
   if (!agent) return <p className="small muted">{t("channel.unknownAgent")}</p>;
-  return <AgentCardBody agent={agent} />;
+  return <AgentCardBody agent={agent} onDone={onDone} />;
 }
 
-function AgentCardBody({ agent }: { agent: Agent }) {
+function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const models = useModels();
-  const grants = useAgentScopes(org.id, agent.id);
-  const groups = useScopeGroups(org.id);
+  const openPanel = useOpenAgentPanel();
   const seesSpend = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
   const model = models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model;
   const thinks = agent.brain && agent.brain.kind !== "model" ? agentBrainLine(t, agent, model) : null;
-  const summary = groups && grants.data ? scopeSummary(groups, grants.data, t("agent.noPermission")) : null;
-  const allowed = summary?.rows.filter((r) => r.granted !== t("agent.noPermission")).slice(0, 3) ?? [];
   return (
     <div className="profile-card__body">
       <div className="profile-card__head">
@@ -222,14 +223,6 @@ function AgentCardBody({ agent }: { agent: Agent }) {
             shortModel(model)
           )}
         </dd>
-        <dt>{t("profile.can")}</dt>
-        <dd>
-          {summary === null
-            ? "…"
-            : allowed.length === 0
-              ? t("agent.noPermission")
-              : allowed.map((r) => `${r.name}: ${r.granted}`).join("; ")}
-        </dd>
       </dl>
       {seesSpend && <Spend agent={agent} locale={i18n.language} />}
       {!canTalk(agent) && (
@@ -241,11 +234,25 @@ function AgentCardBody({ agent }: { agent: Agent }) {
             {t("profile.dm")}
           </Link>
         </Button>
-        <Button asChild size="sm" variant="ghost">
-          <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+        {/* In a conversation, its page opens in the panel beside it; elsewhere, the page. */}
+        {openPanel ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              onDone();
+              openPanel(agent.id);
+            }}
+          >
             {t("profile.viewProfile")}
-          </Link>
-        </Button>
+          </Button>
+        ) : (
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+              {t("profile.viewProfile")}
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   );

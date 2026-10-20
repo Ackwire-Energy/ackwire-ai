@@ -1,22 +1,20 @@
 import type { DmTarget } from "@agenteschat/client";
 import { keys, useModels } from "@agenteschat/client";
-import type { AgentSection, AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Avatar, BrainIcon, Button } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { agentBrainLine } from "@/components/AgentBrain";
+import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { AgentPage } from "./AgentPage";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
@@ -40,9 +38,6 @@ export function DmPage({ target }: { target: DmTarget }) {
   });
 
   const agent = "agentId" in target ? dir.agentById.get(target.agentId) : undefined;
-  // "Ver perfil": the agent's page in the panel beside the conversation, like a thread's.
-  const [profile, setProfile] = useState<{ tab: AgentTab; section?: AgentSection } | null>(null);
-  const [closeRequest, setCloseRequest] = useState(0);
   const person = "userId" in target ? dir.memberById.get(target.userId) : undefined;
   const name = agent?.name ?? person?.name ?? "";
 
@@ -87,63 +82,41 @@ export function DmPage({ target }: { target: DmTarget }) {
         )}
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
-      {agent && (
-        <Button size="sm" aria-pressed={profile !== null} onClick={() => setProfile((p) => p ?? { tab: "overview" })}>
-          {t("dm.profile")}
-        </Button>
-      )}
+      {agent && <ProfileButton agentId={agent.id} />}
     </header>
   );
   return (
-    <>
-      <ChannelPage
-        channelId={dm.data.channelId}
-        fallback={{
-          id: dm.data.channelId,
-          name,
-          topic: "",
-          visibility: "private",
-          isMember: true,
-          createdAt: "",
-        }}
-        chrome={{
-          header,
-          composerTarget: name,
-          dmAgentId: agent?.id,
-          dmPersonId: person?.userId,
-          locked:
-            agent && !canTalk(agent) ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name) : undefined,
-          emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
-          emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),
-          suggestions: agent ? greetingSuggestions(t, agent.role) : [],
-        }}
-      />
-      {agent && profile && (
-        <button
-          type="button"
-          className="thread-panel__scrim"
-          tabIndex={-1}
-          aria-label={t("common.close")}
-          onClick={() => setCloseRequest((n) => n + 1)}
-        />
-      )}
-      {agent && profile && (
-        <aside
-          className="thread-panel thread-panel--wide"
-          aria-label={t("agentPage.panel.label", agentGrammar(t, agent.name))}
-        >
-          <div className="thread-panel__page">
-            <AgentPage
-              agentId={agent.id}
-              tab={profile.tab}
-              section={profile.section}
-              onNavigate={(tab, section) => setProfile({ tab, section })}
-              onClose={() => setProfile(null)}
-              closeRequest={closeRequest}
-            />
-          </div>
-        </aside>
-      )}
-    </>
+    <ChannelPage
+      channelId={dm.data.channelId}
+      fallback={{
+        id: dm.data.channelId,
+        name,
+        topic: "",
+        visibility: "private",
+        isMember: true,
+        createdAt: "",
+      }}
+      chrome={{
+        header,
+        composerTarget: name,
+        dmAgentId: agent?.id,
+        dmPersonId: person?.userId,
+        locked: agent && !canTalk(agent) ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name) : undefined,
+        emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
+        emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),
+        suggestions: agent ? greetingSuggestions(t, agent.role) : [],
+      }}
+    />
+  );
+}
+
+/** "Ver perfil": the agent's page in the panel beside the conversation (the conversation's own panel). */
+function ProfileButton({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
+  const openPanel = useOpenAgentPanel();
+  return (
+    <Button size="sm" onClick={() => openPanel?.(agentId)}>
+      {t("dm.profile")}
+    </Button>
   );
 }

@@ -118,7 +118,7 @@ describe("profile card", () => {
     );
   });
 
-  test("agent: role, owner, model, what it can do, budget used (%), DM and profile", async () => {
+  test("agent: role, owner, model, budget used (%), DM, and its page in the panel beside the channel", async () => {
     await go(`c/${ENG_ID}`);
     await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
     await settle(6);
@@ -127,16 +127,16 @@ describe("profile card", () => {
     expect(c.textContent).toContain("Responsável");
     expect(c.textContent).toContain("João");
     expect(c.textContent).toContain("sonnet 5.5");
-    expect(c.textContent).toContain("Pode");
+    expect(c.textContent).not.toContain("Pode");
     expect(c.textContent).toContain("31% do orçamento usado este mês");
     expect(c.textContent).not.toContain("US$");
     expect(within(c).getByRole("meter", { name: "Orçamento usado no mês" })).toBeTruthy();
     expect(within(c).getByRole("link", { name: "Mensagem direta" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
     );
-    expect(within(c).getByRole("link", { name: "Ver perfil" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/agents/${ADA_ID}`,
-    );
+    await click(within(c).getByRole("button", { name: "Ver perfil" }));
+    await settle(4);
+    expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
 
   test("agent thinking with Claude Code: the card says so instead of the API model", async () => {

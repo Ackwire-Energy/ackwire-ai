@@ -2830,16 +2830,21 @@ button.drive-where:focus-visible {
   font-size: 16px;
   font-weight: 650;
 }
+/* Each fact: its name above it, all lined up on the card's left edge. */
 .profile-card__facts {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   font-size: 13px;
   line-height: 18px;
 }
 .profile-card__facts dt {
   color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.profile-card__facts dd + dt {
+  margin-top: 8px;
 }
 .profile-card__facts dd {
   margin: 0;
