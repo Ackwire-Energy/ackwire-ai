@@ -7,6 +7,8 @@ describe("a computer brain's answer with a squashed echo", () => {
     const real = "Esse pedido é pro Theo, que é quem tem o navegador aberto no app, então não vou navegar por ele.";
     const echo = "EssepedidoéproTheo,queéquemtemonavegadorabertonoapp,entãonãovounavegar";
     expect(dropSquashedEcho(`${echo}${real}`)).toBe(real);
+    const short = "Nada novo. Desde 19/10 não chegou nada na INBOX.";
+    expect(dropSquashedEcho(`Nadanovo.Desde19/10${short}`)).toBe(short);
   });
 
   test("a normal answer, a long first word or a link stays as it is", () => {
