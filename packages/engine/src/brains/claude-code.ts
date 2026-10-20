@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  ACCOUNTS_PROTOCOL,
   type AgentScope,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
@@ -13,7 +14,7 @@ import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
-import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
+import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn } from "./types";
 
 /**
  * The Claude Code brain (ADR 0032): an agent thinks with Claude Code on its
@@ -30,7 +31,8 @@ import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
  * - Usage: `usage{source:"plan"}` (no cost; `recordPlanUsage` writes it).
  *   A plan limit: `limit{resetsAt}` and then `error{code:"plan_limit"}`.
  * - Before sending anything the machine is checked: offline, commands off,
- *   an older runner, no Claude Code, or not logged in end the turn at once
+ *   an older runner, no Claude Code, or not logged in (the agent's account,
+ *   ADR 0041, when it has one) end the turn at once
  *   with an `error` whose `retryable: true` tells the engine it may fall back
  *   to the model brain (ADR 0032 §5).
  *
@@ -96,8 +98,48 @@ const err = (code: string, message: string, retryable: boolean): BrainEvent => (
   retryable,
 });
 
-/** Why the turn can't go to this machine now (null: it can). */
-export function claudeCodeAvailability(status: MachineStatus | null): BrainEvent | null {
+/**
+ * Why the agent's account can't take the turn (ADR 0041; null: it can): a
+ * runner older than accounts, or an account its CLI signed out. It never
+ * falls back to another account (the model fallback still may answer).
+ */
+export function accountUnavailable(
+  status: { name?: string; protocol?: number } | null,
+  account: BrainAccount | undefined,
+  kind: "claude_code" | "codex",
+): { code: string; message: string } | null {
+  if (!account) return null;
+  const name = kind === "codex" ? "Codex" : "Claude";
+  const where = status?.name ? ` on ${status.name}` : "";
+  if (status?.protocol !== undefined && status.protocol < ACCOUNTS_PROTOCOL) {
+    return {
+      code: "runner_outdated",
+      message: `The runner${where} is too old for agents with their own ${name} account; update it (agentes-runner update).`,
+    };
+  }
+  if (account.status === "signed_out") {
+    return {
+      code: "not_logged_in",
+      message: `The ${name} account "${account.label}"${where} is signed out; the computer's owner can sign in again in the agent's settings.`,
+    };
+  }
+  return null;
+}
+
+/** Sent only to a runner that knows accounts (protocol 13): older ones never see these fields. */
+export function accountFields(
+  protocol: number | undefined,
+  turn: Pick<BrainTurn, "account" | "effort">,
+): Pick<BrainTurnRequest, "account" | "effort"> {
+  if (protocol !== undefined && protocol < ACCOUNTS_PROTOCOL) return {};
+  return {
+    ...(turn.account ? { account: turn.account.id } : {}),
+    ...(turn.effort ? { effort: turn.effort } : {}),
+  };
+}
+
+/** Why the turn can't go to this machine now (null: it can). With an account, the account decides the sign-in. */
+export function claudeCodeAvailability(status: MachineStatus | null, account?: BrainAccount): BrainEvent | null {
   if (!status) return err("machine_offline", "The agent's computer is not connected to the organization.", true);
   if (!status.online) return err("machine_offline", `Claude Code on ${status.name} is offline.`, true);
   if (status.paused) {
@@ -116,6 +158,10 @@ export function claudeCodeAvailability(status: MachineStatus | null): BrainEvent
   }
   const ex = status.executors ?? {};
   if (ex.detectedAt && !ex.claude) return err("cli_missing", `Claude Code is not installed on ${status.name}.`, true);
+  if (account) {
+    const e = accountUnavailable(status, account, "claude_code");
+    return e ? err(e.code, e.message, true) : null;
+  }
   if (ex.claude?.loggedIn === false) {
     return err("not_logged_in", `Claude Code on ${status.name} is not logged in (run claude auth login there).`, true);
   }
@@ -217,7 +263,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
         return;
       }
       const status = await deps.hub.status(session.machineId).catch(() => null);
-      const unavailable = claudeCodeAvailability(status);
+      const unavailable = claudeCodeAvailability(status, turn.account);
       if (unavailable) {
         yield unavailable;
         return;
@@ -250,6 +296,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           keepAlive: deps.keepAlive !== false,
           personalMcp,
           ...(permissions ? { permissions } : {}),
+          ...accountFields(status?.protocol, turn),
         };
         deps.hub
           .call<"brain.turn">(

@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_PROTOCOL,
   BROWSER_PROTOCOL,
   type BrowserHandoffInfo,
   brainTopic,
@@ -25,6 +26,7 @@ import {
 import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { applyAccessDecided, storeMachineAccess } from "./machine-access";
+import { syncMachineAccounts } from "./machine-accounts";
 import {
   applyTaskDone,
   applyTaskEvent,
@@ -223,6 +225,8 @@ export function isNewWork(request: MachineRequest) {
     case "task.cancel":
     case "task.output":
     case "access.reduce":
+    // The owner managing the brains' accounts (ADR 0041) isn't agent work.
+    case "account":
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove";
@@ -441,6 +445,12 @@ export function createMachineHub(deps: MachineHubDeps) {
     await publishMachineStatus(pubsub, machine.orgId, machine.id, true);
     if (frame.protocol >= PAUSE_PROTOCOL) {
       await publishMachineUpdated(pubsub, machine.orgId, machine.id, { paused: conn.pause, access: true });
+    }
+    // Protocol 13 (ADR 0041): the accounts of the computer brains on it (an older runner says nothing: kept).
+    if (frame.protocol >= ACCOUNTS_PROTOCOL && frame.accounts) {
+      await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch((error) =>
+        deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) }),
+      );
     }
     if (frame.protocol >= TASKS_PROTOCOL) {
       await reconcileMachineTasks({ db, pubsub, start: localStarter(conn) }, machine.id, frame.tasks ?? []).catch(
@@ -893,6 +903,14 @@ export function createMachineHub(deps: MachineHubDeps) {
         await runnerState(conn, frame).catch((error) =>
           deps.log?.warn("runner.state failed", { machineId: conn.machineId, error: String(error) }),
         );
+      } else if (frame.type === "accounts.changed") {
+        if (conn.machineId && conn.orgId) {
+          const machineId = conn.machineId;
+          const orgId = conn.orgId;
+          await syncMachineAccounts({ db, pubsub }, orgId, machineId, frame.accounts).catch((error) =>
+            deps.log?.warn("account sync failed", { machineId, error: String(error) }),
+          );
+        }
       } else if (frame.type === "access.changed") {
         const machineId = conn.machineId;
         await storeMachineAccess({ db, pubsub }, machineId, frame.access).catch((error) =>

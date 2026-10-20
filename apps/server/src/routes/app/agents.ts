@@ -40,7 +40,17 @@ import {
   requireSession,
   security,
 } from "./context";
-import { Agent, AgentAppearance, AgentAudience, AgentBrain, BrainKind, Credential, Model, Usage } from "./schemas";
+import {
+  Agent,
+  AgentAppearance,
+  AgentAudience,
+  AgentBrain,
+  BrainEffort,
+  BrainKind,
+  Credential,
+  Model,
+  Usage,
+} from "./schemas";
 
 const tags = ["Agents"];
 
@@ -436,6 +446,11 @@ export function agentRoutes(deps: AppDeps) {
             }),
             fallback: z.boolean().optional(),
             acceptPlanTerms: z.boolean().optional(),
+            account: z.uuid().nullable().optional().openapi({
+              description:
+                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the person who connected the computer may change it (`account.not_owner`).",
+            }),
+            effort: BrainEffort.nullable().optional().openapi({ description: "Null = the CLI's default; omitted = keep." }),
           }),
         ),
       },

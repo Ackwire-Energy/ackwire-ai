@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 12;
+export const MACHINE_PROTOCOL_VERSION = 13;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -95,6 +95,66 @@ export const GIT_PROTOCOL = 11;
  * a person's input back. The server never sends `browser.*` to an older runner.
  */
 export const BROWSER_PROTOCOL = 12;
+
+/**
+ * From this protocol on (ADR 0041): accounts and effort for the computer
+ * brains. An account is a folder in `<runner home>/accounts/<kind>/<id>`,
+ * used as `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex); the CLI
+ * keeps its own sign-in there and the runner never reads it. `op: "account"`
+ * starts a sign-in (`begin`), takes the Claude code sealed to the machine
+ * (`code`), reports it (`status`), cancels it, lists and removes accounts.
+ * `hello.accounts` lists them; `brain.turn` carries `account` and `effort`.
+ * The server never sends these to an older runner.
+ */
+export const ACCOUNTS_PROTOCOL = 13;
+
+/** Which CLI an account signs in. */
+export type AccountKind = "claude_code" | "codex";
+export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
+export const isAccountKind = (v: unknown): v is AccountKind => v === "claude_code" || v === "codex";
+/** Account and sign-in ids: UUIDs (the server makes them; the desktop app's runner too). */
+export const isAccountId = (v: unknown): v is string =>
+  typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
+
+/** How hard a computer brain thinks (Claude Code `--effort`; Codex maps `xhigh`/`max` to `high`). */
+export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
+export const BRAIN_EFFORTS: readonly BrainEffort[] = ["low", "medium", "high", "xhigh", "max"];
+export const isBrainEffort = (v: unknown): v is BrainEffort =>
+  typeof v === "string" && (BRAIN_EFFORTS as readonly string[]).includes(v);
+
+/** An account on the machine, as the runner sees it (`hello.accounts`, `account` replies). No secrets. */
+export interface RunnerAccountInfo {
+  id: string;
+  kind: AccountKind;
+  /** The CLI's status command says it is signed in. */
+  loggedIn: boolean;
+  email?: string;
+  /** `pro`, `max`, `team`, `plus`… as the CLI says. */
+  plan?: string;
+}
+
+/** Where a sign-in is: waiting for the person, done (signed in), failed or expired (folder removed). */
+export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
+
+/**
+ * `op: "account"` (protocol 13, ADR 0041 §2). `begin` starts the CLI's sign-in
+ * in a new folder named `loginId` (it becomes the account id). Claude Code
+ * answers the URL it printed and an ephemeral public key; the browser seals the
+ * code the person pastes with it (AAD `accountCodeAad`), and `code` hands it to
+ * the waiting CLI. Codex answers its device URL and one-time code. A sign-in
+ * expires after `ACCOUNT_LOGIN_TTL_MS`.
+ */
+export type AccountRequest =
+  | { action: "begin"; kind: AccountKind; loginId: string }
+  | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
+  | { action: "status"; loginId: string }
+  | { action: "cancel"; loginId: string }
+  | { action: "list" }
+  | { action: "remove"; kind: AccountKind; accountId: string };
+
+export const ACCOUNT_LOGIN_TTL_MS = 15 * 60_000;
+/** The AAD that binds a sealed Claude sign-in code to its sign-in and organization. */
+export const accountCodeAad = (loginId: string, orgId: string) => `${loginId}|${orgId}|account`;
 
 /** The `agent-browser` release the runner and the desktop app ship (ADR 0040 §2). */
 export const AGENT_BROWSER_VERSION = "0.39.1";
@@ -409,6 +469,10 @@ export interface BrainTurnRequest {
   personalMcp?: boolean;
   /** Command policy (as missions): `work` (default) edits and asks a person for the rest; `plan` reads only. */
   permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
+  /** Protocol 13: the account folder to run in (`accounts/<kind>/<id>`); absent: the machine's own sign-in. */
+  account?: string;
+  /** Protocol 13: how hard it thinks; absent: the CLI's default. */
+  effort?: BrainEffort;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
@@ -556,6 +620,8 @@ export interface RunnerInfo {
   access?: RunnerAccess;
   /** Protocol 12: whether the agent browser can run here. */
   browser?: RunnerBrowserInfo;
+  /** Protocol 13: the accounts on the machine (ADR 0041). */
+  accounts?: RunnerAccountInfo[];
 }
 
 export interface FileEntry {
@@ -592,6 +658,8 @@ export type MachineRequest = (
   | { op: "write"; path: string; base64: string }
   | { op: "list"; path: string; depth: number }
   | ({ op: "secret" } & SecretRequest)
+  /** Protocol 13: sign-ins and accounts of the computer brains (ADR 0041). Not per agent. */
+  | ({ op: "account" } & AccountRequest)
   | ({ op: "task.start" } & TaskStart)
   /** One task, or all of this agent's when `taskId` is omitted. */
   | { op: "task.status"; taskId?: string }
@@ -656,6 +724,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "list",
   "push",
   "secret",
+  "account",
   "task.start",
   "task.status",
   "task.cancel",
@@ -682,6 +751,20 @@ export interface MachineReplies {
   push: { name: string; size: number; sha256: string; contentType: string };
   /** `keypair`: the public key (raw P-256, base64); `deliver`: the value's size in bytes. */
   secret: { publicKey?: string; size?: number };
+  /**
+   * `begin`: what the person needs (`url`; Claude Code: `publicKey`; Codex: `userCode`);
+   * `status`: `state` and, when done, `account`; `list`: `accounts`; `code`, `cancel`, `remove`: `{}`.
+   */
+  account: {
+    url?: string;
+    userCode?: string;
+    publicKey?: string;
+    state?: AccountLoginState;
+    account?: RunnerAccountInfo;
+    accounts?: RunnerAccountInfo[];
+    /** `failed`: why, for people. */
+    error?: string;
+  };
   /** `cwd`: where it runs, relative to the agent's folder (`.worktrees/<taskId>` with a branch). */
   "task.start": { taskId: string; pid: number; startedAt: string; cwd: string; branch?: string; command: string };
   "task.status": { tasks: RunnerTask[] };
@@ -796,6 +879,8 @@ export type RunnerFrame =
   | { type: "runner.state"; paused: RunnerPause }
   /** Protocol 10: what the machine allows changed (the person granted, removed, or turned a tool on or off). */
   | { type: "access.changed"; access: RunnerAccess }
+  /** Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in done, a status changed). */
+  | { type: "accounts.changed"; accounts: RunnerAccountInfo[] }
   /**
    * Protocol 10: the person answered an `access.request` on the machine (or it
    * expired). `granted` also comes with an `access.changed`.
@@ -866,6 +951,18 @@ export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerIn
       ...(authMethod ? { authMethod } : {}),
       ...(plan ? { plan } : {}),
     };
+  }
+  return out;
+}
+
+/** `hello.accounts` (protocol 13): at most 50, ids and kinds checked, short words only. */
+export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
+  const out: RunnerAccountInfo[] = [];
+  for (const a of v.slice(0, 50)) {
+    if (!isObject(a) || !isAccountId(a.id) || !isAccountKind(a.kind)) continue;
+    const email = isString(a.email) && a.email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(a.email) ? a.email : undefined;
+    const plan = isString(a.plan) && /^[\w.-]{1,40}$/.test(a.plan) ? a.plan : undefined;
+    out.push({ id: a.id, kind: a.kind, loggedIn: a.loggedIn === true, ...(email ? { email } : {}), ...(plan ? { plan } : {}) });
   }
   return out;
 }
@@ -992,6 +1089,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(paused ? { paused } : {}),
         ...(access ? { access } : {}),
         ...(isObject(f.browser) ? { browser: parseBrowserInfo(f.browser) } : {}),
+        ...(Array.isArray(f.accounts) ? { accounts: parseAccounts(f.accounts) } : {}),
       };
     }
     case "browser.frame": {
@@ -1036,6 +1134,8 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const access = parseAccess(f.access);
       return access ? { type: "access.changed", access } : null;
     }
+    case "accounts.changed":
+      return Array.isArray(f.accounts) ? { type: "accounts.changed", accounts: parseAccounts(f.accounts) } : null;
     case "access.decided": {
       if (!isString(f.requestId)) return null;
       const decision = (["granted", "denied", "expired"] as const).find((d) => d === f.decision);

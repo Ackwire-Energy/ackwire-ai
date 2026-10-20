@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { ACCOUNTS_PROTOCOL, channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -7,6 +7,7 @@ import {
   type Brain,
   type BrainEvent,
   type BrainTurn,
+  brainEffortFor,
   brainFor,
   brainModelFor,
   brainSessionId,
@@ -408,6 +409,83 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
     .where(eq(schema.usageRecords.runId, run?.id ?? ""));
   expect(usage.some((u) => u.provider === "anthropic")).toBe(true);
   expect(computerBrainUnavailable("claude_code", machineId, statusOf(machineId))?.code).toBe("plan_limit");
+});
+
+test("the agent's account and effort reach its turn; a refused sign-in marks the account signed out and falls back", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
+  const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";
+  const machineId = await computerAgent(f, { brainEffort: "high" });
+  await f.db.insert(schema.machineAccounts).values({
+    id: ACCOUNT,
+    orgId: f.org.id,
+    machineId,
+    kind: "claude_code",
+    label: "Trabalho",
+    status: "active",
+  });
+  await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
+  const { brain, seen } = scriptedComputerBrain(() => [
+    { type: "error", code: "not_logged_in", message: "Not logged in · Please run /login" },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { protocol: ACCOUNTS_PROTOCOL }) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+
+  expect(seen[0]).toMatchObject({ account: { id: ACCOUNT, label: "Trabalho", status: "active" }, effort: "high" });
+  const [account] = await f.db.select().from(schema.machineAccounts);
+  expect(account?.status).toBe("signed_out");
+  const runs = await f.db.select().from(schema.agentRuns);
+  expect(runs.map((r) => r.status)).toEqual(["done"]);
+
+  // The next turn knows before asking the computer: the API answers again, the brain isn't called.
+  await post(f, "@dev de novo");
+  await drainOutbox(f.db, handlers);
+  expect(seen.length).toBe(1);
+  const after = await f.db.select().from(schema.agentRuns);
+  expect(after.map((r) => r.status)).toEqual(["done", "done"]);
+});
+
+test("the agent's account and effort apply to its own brain; signed out or an older runner: unavailable", async () => {
+  f = await setup();
+  const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";
+  const machineId = await computerAgent(f, { brainEffort: "low" });
+  await f.db.insert(schema.machineAccounts).values({
+    id: ACCOUNT,
+    orgId: f.org.id,
+    machineId,
+    kind: "claude_code",
+    label: "Trabalho",
+    status: "active",
+  });
+  await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
+  const question = await post(f, "@dev oi");
+  const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!agent || !run) throw new Error("missing rows");
+  const plan = await resolveBrain({ db: f.db }, agent, run, question.id);
+  expect(plan).toMatchObject({ kind: "claude_code", account: { id: ACCOUNT, status: "active" }, effort: "low" });
+  // Another brain (a mission's choice): neither applies; an account of another kind is no account.
+  expect(brainEffortFor(agent, "codex")).toBeUndefined();
+  expect(brainEffortFor(agent, "claude_code")).toBe("low");
+  const codex = await resolveBrain({ db: f.db }, { ...agent, brain: "codex" }, run, question.id);
+  expect(codex.account).toBeUndefined();
+  // Signed out: the plan says so before the computer is asked.
+  await f.db.update(schema.machineAccounts).set({ status: "signed_out" });
+  const out = await resolveBrain(
+    { db: f.db, machines: { status: async (id) => statusOf(id, { protocol: ACCOUNTS_PROTOCOL }) } },
+    agent,
+    run,
+    question.id,
+  );
+  expect(out.unavailable).toMatchObject({ code: "not_logged_in" });
+  // A runner older than accounts can't run it.
+  await f.db.update(schema.machineAccounts).set({ status: "active" });
+  const old = await resolveBrain({ db: f.db, machines: { status: async (id) => statusOf(id) } }, agent, run, question.id);
+  expect(old.unavailable).toMatchObject({ code: "runner_outdated" });
 });
 
 test("with no model credential, an offline computer: the agent says so once and the run waits until it is back", async () => {

@@ -335,7 +335,8 @@ export async function deleteMachine(
   const freed = await deps.db.transaction(async (tx) => {
     const rows = await tx
       .update(agents)
-      .set({ machineId: null, updatedAt: now })
+      // Its accounts (ADR 0041) stay with it: the agents leave them.
+      .set({ machineId: null, brainAccountId: null, updatedAt: now })
       .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machine.id)))
       .returning({ id: agents.id });
     const ids = rows.map((r) => r.id);
@@ -418,9 +419,15 @@ export async function setAgentComputerTarget(
       );
     }
   }
+  const moved = (machine?.id ?? null) !== agent.machineId;
   await deps.db
     .update(agents)
-    .set({ machineId: machine?.id ?? null, updatedAt: new Date() })
+    .set({
+      machineId: machine?.id ?? null,
+      // An account is a folder on one computer (ADR 0041): another computer starts on its own sign-in.
+      ...(moved ? { brainAccountId: null } : {}),
+      updatedAt: new Date(),
+    })
     .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
   caches.agents.delete(`${orgId}:${agentId}`);
   await recordAudit(deps.db, {

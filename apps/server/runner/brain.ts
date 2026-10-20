@@ -5,14 +5,19 @@ import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import {
+  type AccountKind,
   type AgentScope,
   BRAIN_LIMITS,
+  type BrainEffort,
   type BrainTurnRequest,
+  isAccountId,
+  isBrainEffort,
   isRunToolToken,
   PERMISSION_PROMPT_TOOL,
   PERMISSION_WAIT_MS,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
+import { ACCOUNT_MISSING_MESSAGE } from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
@@ -43,6 +48,10 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   idle is started again (resumed) on the next turn; one that dies mid-turn
  *   is replaced by a one-shot resume of the same turn. Turns of one session
  *   run one at a time (queued).
+ * - ADR 0041: a turn with an `account` runs with `CLAUDE_CONFIG_DIR` set to
+ *   that account's folder (its sessions live there too; a missing folder is
+ *   `account_missing`, never another account), and `effort` is `--effort`.
+ *   A change of either starts the process again.
  */
 
 export const BRAIN_IDLE_MS = 10 * 60_000;
@@ -305,6 +314,8 @@ export interface ClaudeLaunch {
   permissionMode: "acceptEdits" | "dontAsk";
   /** Protocol 10: folders allowed for the agent besides its own (`--add-dir` each). */
   addDirs?: string[];
+  /** Protocol 13: `--effort` (anything else is left out). */
+  effort?: BrainEffort;
 }
 
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
@@ -326,6 +337,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     l.permissionMode,
     ...(model ? ["--model", model] : []),
     ...(fallback ? ["--fallback-model", fallback] : []),
+    ...(isBrainEffort(l.effort) ? ["--effort", l.effort] : []),
     ...(l.systemFile ? ["--append-system-prompt-file", l.systemFile] : []),
     ...(l.mcpConfigFile ? ["--mcp-config", l.mcpConfigFile] : []),
     ...(l.strictMcp ? ["--strict-mcp-config"] : []),
@@ -538,6 +550,8 @@ export interface BrainManagerOptions {
   claudeCommand?: string[];
   /** Where Claude Code keeps sessions (default `$CLAUDE_CONFIG_DIR` or `~/.claude`). */
   claudeHome?: string;
+  /** Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`. */
+  accounts?: { accountDir(kind: AccountKind, id: string): string | null };
   /** The local MCP bridge (where the daemon listens and how to start `agentes-runner mcp`). */
   mcp?: { socketPath: string; command: string[] };
   idleMs?: number;
@@ -552,6 +566,8 @@ interface Live {
   proc: ClaudeProcess;
   /** Launch settings: a turn asking for others restarts the process (resumed). */
   sig: string;
+  /** What `ran` remembers for it: the session, in its account. */
+  ranKey: string;
   busy: boolean;
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
@@ -577,7 +593,13 @@ export interface BrainTurnContext {
   signal?: AbortSignal;
   /** Protocol 10: folders allowed for the agent besides its own (real paths): `cwd` may be inside one, `--add-dir` each. */
   grants?: string[];
+  /** Set by the manager (ADR 0041): the turn's account folder, its Claude Code home. */
+  accountHome?: string;
 }
+
+/** A session is remembered per account: the same id in another account's folder is another session. */
+const ranKeyOf = (req: BrainTurnRequest, session: string) =>
+  typeof req.account === "string" && req.account ? `${req.account}:${session}` : session;
 
 /**
  * A conversation that moves to another folder (the agent's folder, then its
@@ -618,7 +640,7 @@ export class BrainManager {
   private readonly live = new Map<string, Live>();
   private readonly chains = new Map<string, Promise<unknown>>();
   private readonly bridge = new Map<string, BridgeEntry>();
-  /** Sessions that answered here: resumed next time even where Claude Code's folder can't be looked at. */
+  /** Sessions that answered here (`ranKeyOf`): resumed next time even where Claude Code's folder can't be looked at. */
   private readonly ran = new Set<string>();
   private closed = false;
   private readonly log: (line: string) => void;
@@ -693,6 +715,14 @@ export class BrainManager {
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
       cwd = resolved.abs;
     }
+    // ADR 0041: the account's folder or nothing (never the machine's own sign-in instead).
+    const account: unknown = req.account;
+    if (account !== undefined && account !== null && account !== "") {
+      if (!isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
+      const home = this.opts.accounts?.accountDir("claude_code", account);
+      if (!home) return errorEvent("account_missing", ACCOUNT_MISSING_MESSAGE.claude_code, false);
+      ctx = { ...ctx, accountHome: home };
+    }
     const key = `${ctx.agent.id}:${session}`;
     const prev = this.chains.get(key) ?? Promise.resolve();
     const run = prev.catch(() => undefined).then(() => this.runTurn(key, session, cwd, req, ctx));
@@ -712,6 +742,9 @@ export class BrainManager {
       perm: req.permissions ?? null,
       // Folders allowed or removed on the machine: the process restarts (resumed) with the new `--add-dir`s.
       dirs: ctx.grants ?? [],
+      // Another account or effort: a new process (in the other account, a new session).
+      account: ctx.accountHome ? (req.account ?? null) : null,
+      effort: isBrainEffort(req.effort) ? req.effort : null,
     });
   }
 
@@ -733,7 +766,7 @@ export class BrainManager {
     if (!live && keepAlive) {
       if (this.size >= (this.opts.maxProcesses ?? BRAIN_MAX_PROCESSES)) this.evictIdle();
       if (this.size < (this.opts.maxProcesses ?? BRAIN_MAX_PROCESSES)) {
-        live = this.spawn(key, session, cwd, req, ctx, sig, true, this.resumeFor(cwd, session, req));
+        live = this.spawn(key, session, cwd, req, ctx, sig, true, this.resumeFor(cwd, session, req, ctx));
       }
     }
     if (live) {
@@ -742,17 +775,20 @@ export class BrainManager {
       // Died mid-turn: the same turn again, one-shot, resuming the session.
       this.log(`[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} died mid-turn; resuming one-shot`);
       if (live.proc.stderr.startsWith("ENOENT")) return this.cliMissing();
-      return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, true), true);
+      return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx, true), true);
     }
-    return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req), true);
+    return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx), true);
   }
 
-  private resumeFor(cwd: string, session: string, req: BrainTurnRequest, ranBefore = false) {
-    const home = this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
+  private resumeFor(cwd: string, session: string, req: BrainTurnRequest, ctx: BrainTurnContext, ranBefore = false) {
+    const home =
+      ctx.accountHome ?? this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
     carryClaudeSession(home, cwd, session);
     const found = claudeSessionExists(home, cwd, session);
     if (found !== null) return found;
-    return ranBefore || this.ran.has(session) || req.session?.resume === true;
+    const ran = ranBefore || this.ran.has(ranKeyOf(req, session));
+    // An account folder with no sessions yet: the conversation's earlier ones live in another home.
+    return ctx.accountHome ? ran : ran || req.session?.resume === true;
   }
 
   private cliMissing() {
@@ -776,7 +812,7 @@ export class BrainManager {
         redact: ctx.secrets?.redact,
         endInput: !live.persistent,
       });
-      if (out.final?.type === "done") this.ran.add(live.key.slice(live.key.indexOf(":") + 1));
+      if (out.final?.type === "done") this.ran.add(live.ranKey);
       if (out.died || (out.final?.type === "error" && out.final.code === "canceled")) this.drop(live);
       return out;
     } finally {
@@ -837,7 +873,12 @@ export class BrainManager {
     writeFileSync(systemFile, typeof req.system === "string" ? req.system : "", { mode: 0o600 });
     const mode = req.permissions?.mode === "plan" ? "plan" : "work";
     let mcpConfigFile: string | undefined;
-    const env: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(ctx.secrets?.env ?? {}),
+      // ADR 0041: the account's folder is this process's Claude Code home.
+      ...(ctx.accountHome ? { CLAUDE_CONFIG_DIR: ctx.accountHome } : {}),
+    };
     if (this.opts.mcp) {
       const token = newMcpToken();
       mcpConfigFile = path.join(dir, "mcp.json");
@@ -893,9 +934,20 @@ export class BrainManager {
       promptTool: mode === "work",
       permissionMode: mode === "plan" ? "dontAsk" : "acceptEdits",
       ...(addDirs.length ? { addDirs } : {}),
+      ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
     });
     const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
-    const live: Live = { key, id, proc, sig, busy: false, lastUsed: Date.now(), idleTimer: null, persistent };
+    const live: Live = {
+      key,
+      id,
+      proc,
+      sig,
+      ranKey: ranKeyOf(req, session),
+      busy: false,
+      lastUsed: Date.now(),
+      idleTimer: null,
+      persistent,
+    };
     if (persistent) this.live.set(key, live);
     // Crashed while idle: forgotten; the next turn starts it again (resumed).
     proc.onExit(() => {

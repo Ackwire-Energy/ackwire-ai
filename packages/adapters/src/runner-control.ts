@@ -9,7 +9,15 @@
  * Shared by the runner and the desktop app, so this file imports nothing but
  * types from the machine protocol.
  */
-import type { RunnerAccess, RunnerExecutorInfo, RunnerPause, RunnerTools } from "./machine-protocol";
+import type {
+  AccountKind,
+  AccountLoginState,
+  RunnerAccess,
+  RunnerAccountInfo,
+  RunnerExecutorInfo,
+  RunnerPause,
+  RunnerTools,
+} from "./machine-protocol";
 
 /** Bumped on breaking changes; the app refuses a runner whose `hello.control` it doesn't know. */
 export const CONTROL_PROTOCOL_VERSION = 1;
@@ -200,6 +208,17 @@ export type ControlRequest =
   | { type: "reconnect" }
   /** Closes an agent's browser on this computer (the tray's "Parar"); its profile stays. */
   | { type: "browser.stop"; agentId: string }
+  /**
+   * ADR 0041: the computer brains' accounts on this computer. `accounts.list`
+   * asks each CLI (cached). `account.begin` starts the CLI's sign-in here: it
+   * opens this computer's browser and finishes by itself; poll `account.status`.
+   * The server learns about the new account from the next `hello`/status.
+   */
+  | { type: "accounts.list" }
+  | { type: "account.begin"; kind: AccountKind }
+  | { type: "account.status"; loginId: string }
+  | { type: "account.cancel"; loginId: string }
+  | { type: "account.remove"; kind: AccountKind; accountId: string }
   /** Finish what's running briefly, then exit 0 (the app quits). */
   | { type: "shutdown" };
 
@@ -230,6 +249,12 @@ export interface ControlReplies {
   "access.answer": { access: RunnerAccess };
   reconnect: { reconnecting: boolean };
   "browser.stop": { stopped: boolean };
+  "accounts.list": { accounts: RunnerAccountInfo[] };
+  /** The URL the CLI opened (shown in case the browser didn't open) and, for Codex, the code to type there. */
+  "account.begin": { loginId: string; url: string; userCode?: string };
+  "account.status": { state: AccountLoginState; account?: RunnerAccountInfo; error?: string };
+  "account.cancel": { canceled: boolean };
+  "account.remove": { removed: boolean };
   shutdown: { stopping: true };
 }
 

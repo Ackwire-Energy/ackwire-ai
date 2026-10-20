@@ -24,6 +24,7 @@ import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
 import { knowledgeRoutes } from "./routes/app/knowledge";
+import { machineAccountRoutes } from "./routes/app/machine-accounts";
 import { mailRoutes } from "./routes/app/mail";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
@@ -134,6 +135,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", agentImportRoutes(deps));
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", machineAppRoutes(deps));
+    api.route("/app", machineAccountRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);

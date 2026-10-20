@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { bigint, boolean, foreignKey, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
-import { machines } from "./machines";
+import { machineAccounts, machines } from "./machines";
 import { organizations } from "./tenancy";
 
 /**
@@ -98,6 +98,14 @@ export const agents = pgTable(
     brainModel: text(),
     /** When the computer brain can't answer, answer through the API (counts against the budget). */
     brainFallback: boolean().notNull().default(true),
+    /**
+     * The account its computer brain runs with (ADR 0041), on its machine and
+     * of its brain's kind (checked in code); null = the computer's own sign-in.
+     * Cleared when the agent changes computer or brain kind, or the account goes.
+     */
+    brainAccountId: uuid(),
+    /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
+    brainEffort: text(),
     /** Sites its browser may open (ADR 0040, `*.example.com` matches the domain too); null = any site. */
     browserAllowedDomains: text().array(),
     /**
@@ -114,6 +122,11 @@ export const agents = pgTable(
     unique().on(t.orgId, t.id),
     // Machines are only soft-deleted (and `deleteMachine` clears this column first).
     foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }),
+    // No action (a composite SET NULL would null `org_id` too): code clears it before an account row goes.
+    foreignKey({
+      columns: [t.orgId, t.brainAccountId],
+      foreignColumns: [machineAccounts.orgId, machineAccounts.id],
+    }),
   ],
 );
 

@@ -30,6 +30,8 @@ export const keys = {
   run: (orgId: string, runId: string) => ["org", orgId, "run", runId] as const,
   agentDetail: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "detail"] as const,
   agentBrain: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "brain"] as const,
+  accountLogin: (orgId: string, machineId: string, loginId: string) =>
+    ["org", orgId, "machine", machineId, "account-login", loginId] as const,
   agentChannels: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "channels"] as const,
   settings: (orgId: string) => ["org", orgId, "settings"] as const,
   overview: (orgId: string) => ["org", orgId, "overview"] as const,

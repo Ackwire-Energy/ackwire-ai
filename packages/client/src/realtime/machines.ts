@@ -84,7 +84,9 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   }
   // Whether agents can use their browser (ADR 0040) and what can think for them follow the computer: its
   // switches (the app's Ferramentas: `machine.updated` with `access`), a reconnect, a move. No reload needed.
-  if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined) {
+  // ADR 0041: an account added, removed or signed out on the computer (`machine.updated` with `accounts`).
+  const accounts = e.type === "machine.updated" && e.accounts !== undefined;
+  if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined || accounts) {
     void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
     void qc.invalidateQueries({ predicate: (q) => isAgentBrainKey(q.queryKey, orgId) });
   }

@@ -5824,6 +5824,21 @@ a.ac-list__row:focus-visible {
   margin-top: auto;
   max-width: 100%;
 }
+/* Rows: where the choice runs, quiet, at the row's end (telas/ContaClaude.html "Quem pensa"). */
+.ac-optrow__side {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .ac-optrow__side {
+    display: none;
+  }
+}
 .ac-optrow__more--cards {
   padding: 6px 0 0;
 }

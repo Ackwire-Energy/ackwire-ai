@@ -34,7 +34,8 @@ export function PrefRow({
   under,
 }: {
   lead?: ReactNode;
-  title: ReactNode;
+  /** Omitted: a row of one small line (a hint next to a button). */
+  title?: ReactNode;
   desc?: ReactNode;
   end?: ReactNode;
   /** The control's id: the title becomes its label. */
@@ -47,7 +48,7 @@ export function PrefRow({
     <div className="dk-crow" data-top={top || undefined}>
       {lead}
       <span className="dk-crow__text">
-        {htmlFor ? (
+        {title == null ? null : htmlFor ? (
           <label htmlFor={htmlFor} className="dk-crow__title">
             {title}
           </label>

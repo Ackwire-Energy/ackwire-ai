@@ -25,6 +25,13 @@ export function secretAad(input: { requestId: string; orgId: string; name: strin
   return `agentes-secret|v1|${input.requestId}|${input.orgId}|${input.name}|${target}`;
 }
 
+/**
+ * ADR 0041 §2: the code Claude shows when adding an account, bound to that
+ * sign-in. Same string as `accountCodeAad` in
+ * `packages/adapters/src/machine-protocol.ts` (the client doesn't depend on adapters).
+ */
+export const accountCodeAad = (loginId: string, orgId: string) => `${loginId}|${orgId}|account`;
+
 export async function sealSecret(recipientPublicKey: string, plaintext: string, aad: string): Promise<SecretBox> {
   const subtle = globalThis.crypto.subtle;
   const data = new TextEncoder().encode(plaintext);

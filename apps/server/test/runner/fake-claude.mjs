@@ -1,6 +1,6 @@
 // A fake `claude` for brain tests: speaks stream-json in and out like
 // `claude -p --input-format stream-json --output-format stream-json`.
-// Each start appends its argv to $FAKE_CLAUDE_LOG (one JSON line).
+// Each start appends its argv and $CLAUDE_CONFIG_DIR to $FAKE_CLAUDE_LOG (one JSON line).
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
 // of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate.
@@ -10,7 +10,10 @@ import { createInterface } from "node:readline";
 
 const args = process.argv.slice(2);
 const log = process.env.FAKE_CLAUDE_LOG;
-if (log) appendFileSync(log, `${JSON.stringify({ pid: process.pid, args })}\n`);
+if (log) {
+  const configDir = process.env.CLAUDE_CONFIG_DIR ?? null;
+  appendFileSync(log, `${JSON.stringify({ pid: process.pid, args, configDir })}\n`);
+}
 const flag = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;

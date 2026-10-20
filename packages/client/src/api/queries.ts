@@ -1631,6 +1631,20 @@ export const useAgentBrain = (orgId: string, agentId: string, enabled = true) =>
   });
 };
 
+/** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
+export const useAccountLogin = (orgId: string, machineId: string, loginId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.accountLogin(orgId, machineId, loginId ?? ""),
+    queryFn: () => api.machines.accountLogin(orgId, machineId, loginId ?? ""),
+    enabled: loginId !== null,
+    retry: false,
+    refetchInterval: (q) => (q.state.data && q.state.data.state !== "waiting" ? false : 2000),
+    // The person is on Claude's page in another tab meanwhile.
+    refetchIntervalInBackground: true,
+  });
+};
+
 export const useComputer = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
   return useQuery({

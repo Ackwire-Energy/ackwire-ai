@@ -30,6 +30,7 @@ function link(opts: {
   online?: boolean;
   events?: BrainEvent[];
   fail?: Error;
+  protocol?: number;
 }): ComputerBrainLink & { sent: BrainTurnRequest[] } {
   const sent: BrainTurnRequest[] = [];
   return {
@@ -38,6 +39,7 @@ function link(opts: {
       return {
         online: opts.online ?? true,
         execAllowed: true,
+        ...(opts.protocol !== undefined ? { protocol: opts.protocol } : {}),
         executors: opts.version === null ? {} : { codex: { version: opts.version ?? "codex-cli 0.163.0" } },
       };
     },
@@ -153,4 +155,28 @@ test("the turn always ends once: a runner failure is an error, a silent end is d
     ).run(turn(), io()),
   );
   expect(errored.map((e) => e.type)).toEqual(["limit", "error"]);
+});
+
+test("accounts (ADR 0041): account and effort go to a runner that knows them; a signed-out account is refused", async () => {
+  const ACCOUNT = "0193dddd-0000-4000-8000-000000000002";
+  const account = { id: ACCOUNT, label: "Pessoal", status: "active" as const };
+  const run = async (l: ComputerBrainLink, t: BrainTurn) =>
+    collect(new CodexBrain({ link: l, mcp: async () => ({ token: "t" }) }).run(t, io()));
+
+  const current = link({ protocol: 13, events: [{ type: "done", text: "ok" }] });
+  await run(current, turn({ account, effort: "max" }));
+  expect(current.sent[0]).toMatchObject({ kind: "codex", account: ACCOUNT, effort: "max" });
+
+  // An older runner: the effort is dropped, an account can't run there.
+  const old = link({ protocol: 12, events: [{ type: "done", text: "ok" }] });
+  await run(old, turn({ effort: "max" }));
+  expect("effort" in (old.sent[0] ?? {})).toBe(false);
+  expect(await run(old, turn({ account }))).toMatchObject([{ type: "error", code: "runner_outdated" }]);
+  expect(old.sent).toHaveLength(1);
+
+  const out = link({ protocol: 13 });
+  const refused = await run(out, turn({ account: { ...account, status: "signed_out" } }));
+  expect(refused).toMatchObject([{ type: "error", code: "not_logged_in", retryable: true }]);
+  expect((refused[0] as { message: string }).message).toContain('"Pessoal"');
+  expect(out.sent).toHaveLength(0);
 });

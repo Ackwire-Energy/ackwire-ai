@@ -48,6 +48,7 @@ import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { mirrorReplyToIssue } from "./issues";
+import { markAccountSignedOut, touchMachineAccount } from "./machine-accounts";
 import type { MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
@@ -1213,7 +1214,9 @@ async function executeRunInner(
               ),
             onLimit: (resetsAt) => {
               const machineId = turnPlan.session?.machineId;
-              if (machineId && turnPlan.kind !== "model") notePlanLimit(machineId, turnPlan.kind, resetsAt);
+              if (machineId && turnPlan.kind !== "model") {
+                notePlanLimit(machineId, turnPlan.kind, resetsAt, Date.now(), turnPlan.account?.id);
+              }
             },
             onExecuted: (call) => executedNow.push(call),
           },
@@ -1221,6 +1224,9 @@ async function executeRunInner(
         if (turnPlan.kind !== "model") {
           computerTurns++;
           nextPrompt = null;
+          // The account it ran with (ADR 0041): when it was last used, after the turn.
+          const account = turnPlan.account;
+          if (account && computerTurns === 1) later(() => touchMachineAccount(db, run.orgId, account.id));
           // A turn cut off by its computer is finished now.
           delete transcript.interruptedTurn;
           // Later turns of this run continue the same session.
@@ -1246,6 +1252,16 @@ async function executeRunInner(
           if (row?.status === "waiting_approval" || row?.status === "waiting_input") {
             return suspendedByBridge(row.status, deltas.text().trim(), deltas.text() ? deltas.textBefore : undefined);
           }
+        }
+        // The agent's account was refused by its CLI (ADR 0041): it shows as signed out until its owner signs in.
+        const refused = turnPlan.account;
+        if (
+          refused &&
+          error instanceof BrainFailure &&
+          (error.code === "not_logged_in" || error.code === "account_missing") &&
+          refused.status !== "signed_out"
+        ) {
+          await markAccountSignedOut({ db, pubsub: deps.pubsub }, run.orgId, refused.id).catch(() => {});
         }
         // Only while the run is running: never over the pending calls of a bridged pause.
         await db
@@ -1709,6 +1725,8 @@ function brainTurnOf(
     tools: tools.map(brainToolOf),
     ...(model ? { model } : {}),
     ...(plan.session ? { session: plan.session } : {}),
+    ...(plan.account ? { account: plan.account } : {}),
+    ...(plan.effort ? { effort: plan.effort } : {}),
     trigger,
   };
 }

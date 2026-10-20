@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useSnapshot, useStore } from "../../app";
 import { pairedHomes } from "../../control/store";
 import { useToast } from "../../ui/Toast";
+import { ToolAccounts } from "./Accounts";
 import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
 
 /** Tools are for the whole computer: every organization gets the same switch. */
@@ -137,6 +138,8 @@ export function Tools() {
           }
         />
       </PrefCard>
+
+      <ToolAccounts homes={homes} executors={executors} />
 
       <CardTitle>{t("desktop.prefs.tools.protection")}</CardTitle>
       <PrefCard>

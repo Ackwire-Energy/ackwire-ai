@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters/machine-protocol";
@@ -715,3 +715,54 @@ test("the org logo cached by an earlier run is offered at once, and unpair remov
   expect(existsSync(orgLogoPath(home))).toBe(false);
   expect(await c.data({ type: "org.logo" })).toEqual({ logo: null });
 });
+
+test.if(process.platform !== "win32")(
+  "accounts (ADR 0041): hello lists them; the app lists, signs in here (a fresh id) and removes",
+  async () => {
+    const { home } = pairedHome();
+    const fakeCli = [process.execPath, path.join(import.meta.dir, "fake-account-cli.mjs")];
+    // An account signed in earlier.
+    const existing = "0193ffff-0000-7000-8000-000000000003";
+    const dir = path.join(home, "accounts", "codex", existing);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "signed-in"), "");
+    const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
+    const s = await c.connect();
+    expect(s.of("hello")[0]).toMatchObject({ accounts: [{ id: existing, kind: "codex", loggedIn: true }] });
+    expect(await c.data({ type: "accounts.list" })).toEqual({
+      accounts: [{ id: existing, kind: "codex", loggedIn: true }],
+    });
+
+    const begun = await c.data<{ loginId: string; url: string; userCode?: string }>({
+      type: "account.begin",
+      kind: "codex",
+    });
+    expect(begun.loginId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(begun).toMatchObject({ url: "https://auth.openai.com/codex/device", userCode: "7HYC-J6JGM" });
+    let state = "waiting";
+    for (let i = 0; i < 100 && state === "waiting"; i++) {
+      const st = await c.data<{ state: string }>({ type: "account.status", loginId: begun.loginId });
+      state = st.state;
+      if (state === "waiting") await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(state).toBe("done");
+    const listed = await c.data<{ accounts: { id: string }[] }>({ type: "accounts.list" });
+    expect(listed.accounts.map((a) => a.id).sort()).toEqual([existing, begun.loginId].sort());
+
+    expect(await c.data({ type: "account.remove", kind: "codex", accountId: existing })).toEqual({ removed: true });
+    expect(existsSync(dir)).toBe(false);
+    expect(await c.request({ type: "account.begin", kind: "vim" })).toMatchObject({
+      ok: false,
+      error: { code: "bad_request" },
+    });
+    expect(await c.request({ type: "account.status", loginId: "../x" })).toMatchObject({
+      ok: false,
+      error: { code: "bad_request" },
+    });
+    expect(await c.request({ type: "account.remove", kind: "codex", accountId: "../x" })).toMatchObject({
+      ok: false,
+      error: { code: "bad_request" },
+    });
+  },
+  20_000,
+);
