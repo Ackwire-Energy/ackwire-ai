@@ -823,41 +823,6 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
                 title: t("agentPage.work.browserDialog.only"),
                 description: t("agentPage.work.browserDialog.onlyText"),
                 disabled: !admin && !work.granted,
-                children: (
-                  <div className="brw-sites">
-                    {sites.map((d) => (
-                      <span key={d} className="brw-site">
-                        <Icon name="globe" size={14} />
-                        {d}
-                        <button
-                          type="button"
-                          aria-label={t("browser.agent.removeSite", { site: d })}
-                          onClick={() => setSites(sites.filter((x) => x !== d))}
-                        >
-                          <Icon name="close" size={14} />
-                        </button>
-                      </span>
-                    ))}
-                    <Input
-                      className="brw-sites__add"
-                      value={typed}
-                      placeholder={t("browser.agent.addSite")}
-                      aria-label={t("browser.agent.addSite")}
-                      title={t("browser.agent.addSiteHint")}
-                      onChange={(e) => {
-                        setTyped(e.target.value);
-                        setBad(false);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          add();
-                        }
-                      }}
-                      onBlur={add}
-                    />
-                  </div>
-                ),
               },
               {
                 value: "off",
@@ -868,6 +833,40 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
               },
             ]}
           />
+          {mode === "only" && (
+            <div className="brw-sites">
+              {sites.map((d) => (
+                <span key={d} className="brw-site">
+                  <Icon name="globe" size={14} />
+                  {d}
+                  <button
+                    type="button"
+                    aria-label={t("browser.agent.removeSite", { site: d })}
+                    onClick={() => setSites(sites.filter((x) => x !== d))}
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </span>
+              ))}
+              <Input
+                className="brw-sites__add"
+                value={typed}
+                placeholder={`${t("browser.agent.addSite")} · ${t("browser.agent.addSiteHint")}`}
+                aria-label={t("browser.agent.addSite")}
+                onChange={(e) => {
+                  setTyped(e.target.value);
+                  setBad(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    add();
+                  }
+                }}
+                onBlur={add}
+              />
+            </div>
+          )}
           {bad && <SettingNote icon="alert">{t("browser.agent.badSite")}</SettingNote>}
           {!admin && <SettingNote icon="lock">{t("agentPage.work.browserDialog.admins")}</SettingNote>}
           {moveTo && (
