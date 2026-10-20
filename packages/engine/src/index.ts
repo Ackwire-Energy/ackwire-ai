@@ -150,6 +150,7 @@ export * from "./storage";
 export * from "./team";
 export * from "./thread-assess";
 export * from "./threads";
+export * from "./tool-loading";
 export * from "./tools/directory";
 export * from "./tools/gateway";
 export * from "./tools/json-schema";

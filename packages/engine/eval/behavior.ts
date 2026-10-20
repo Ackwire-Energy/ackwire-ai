@@ -9,7 +9,7 @@
  * Manual, never in CI (it calls the real model and costs a little):
  *
  *   bun run eval:behavior [--only id,id] [--model claude-sonnet-5-5] [--judge jev|llm] [--judge-model claude-haiku-5-5]
- *                         [--no-judge] [--max-turns 12] [--concurrency 5]
+ *                         [--no-judge] [--max-turns 12] [--concurrency 5] [--tools-on-demand]
  *
  * Needs `ANTHROPIC_API_KEY` (in `.env`). `EVAL_AGENT_MODEL` / `EVAL_JUDGE_MODEL`
  * override the models. Cases: `behavior-cases.json`, plus
@@ -36,6 +36,8 @@ const only = arg("only")?.split(",");
 const agentModel = arg("model") ?? process.env.EVAL_AGENT_MODEL;
 const judgeModel = arg("judge-model") ?? process.env.EVAL_JUDGE_MODEL ?? "claude-haiku-5-5";
 const useJudge = !process.argv.includes("--no-judge");
+/** Tools on demand (D65) as in production: run it with and without to compare tokens and behavior. */
+const toolsOnDemand = process.argv.includes("--tools-on-demand");
 const jevKey = process.env.TYPESAFE_API_KEY || undefined;
 const judgeKind = arg("judge") ?? "jev";
 if (judgeKind !== "jev" && judgeKind !== "llm" && judgeKind !== "both") {
@@ -116,7 +118,7 @@ async function evalCase(c: BehaviorCase): Promise<CaseReport> {
   let checks: CheckResult[] = [];
   let nano = 0;
   try {
-    run = await runCase(c, { apiKey: apiKey as string, provider, maxToolTurns, agentModel, jevKey });
+    run = await runCase(c, { apiKey: apiKey as string, provider, maxToolTurns, agentModel, jevKey, toolsOnDemand });
     nano += run.costNanoUsd;
     checks = deterministicChecks(c.expect, run);
     if (useJudge) {
@@ -204,6 +206,14 @@ if (compareLlm)
   );
 for (const [id, m] of [...byCriterion].sort((x, y) => x[0].localeCompare(y[0])))
   console.log(`  ${id.padEnd(30)} ${m.pass}/${m.total}`);
+// What the agent's calls carried: the prompt (uncached + cache read + cache write) and the output.
+const tokens = { calls: 0, input: 0, cacheRead: 0, cacheWrite: 0, output: 0 };
+for (const r of reports)
+  for (const k of Object.keys(tokens) as (keyof typeof tokens)[]) tokens[k] += r.run?.tokens?.[k] ?? 0;
+const prompt = tokens.input + tokens.cacheRead + tokens.cacheWrite;
+console.log(
+  `  tools on demand ${toolsOnDemand ? "on" : "off"} · ${tokens.calls} model calls · prompt ${prompt} tokens (${Math.round(prompt / Math.max(tokens.calls, 1))} per call; cache read ${tokens.cacheRead}, write ${tokens.cacheWrite}) · output ${tokens.output}`,
+);
 
 const outDir = join(here, "out");
 mkdirSync(outDir, { recursive: true });
@@ -220,6 +230,8 @@ writeFileSync(
       ...(compareLlm ? { llmJudgeCostUsd: llmNano / 1e9, judgesAgree: agreement } : {}),
       maxToolTurns,
       concurrency,
+      toolsOnDemand,
+      tokens,
       wallMs,
       passed,
       total: reports.length,

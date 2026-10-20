@@ -92,6 +92,8 @@ export interface EngineOptions {
   github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
   /** Tests: this process's replica id for the machine hub (default: random). */
   replicaId?: string;
+  /** Tools on demand (D65; default on). Tests turn it off: every granted tool is listed. */
+  toolsOnDemand?: boolean;
 }
 
 /**
@@ -322,6 +324,8 @@ export function buildEngine(o: EngineOptions) {
     artifacts,
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
+    // Tools on demand (D65): each run lists what the judge expects it to need; the rest behind `find_tools`.
+    toolsOnDemand: o.toolsOnDemand ?? true,
     brains,
     machines: machineHub,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,

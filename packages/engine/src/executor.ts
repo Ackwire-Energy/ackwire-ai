@@ -85,7 +85,9 @@ import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, 
 import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
 import { enabledSkills } from "./skills";
 import { FIND_AGENT_TOOL } from "./team";
-import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
+import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
+import { presentTools } from "./tools/directory";
+import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
@@ -130,6 +132,12 @@ export interface EngineDeps {
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
+  /**
+   * Tools on demand (D65): each run lists the core tools and the groups the
+   * judge (`context.judge`) expects it to need; the rest go behind
+   * `find_tools` / `use_tool`. Off: every granted tool is listed (tests).
+   */
+  toolsOnDemand?: boolean;
 }
 
 /**
@@ -151,6 +159,8 @@ export type RunExecutorDeps = EngineDeps;
 export interface Transcript {
   system: SystemBlock[];
   messages: ModelMessage[];
+  /** Tools on demand (D65): the tool groups this run listed up front; absent = every tool. */
+  toolGroups?: string[];
   /** Assistant text before this index was already posted to the chat (or was history). */
   postedUpTo: number;
   /** Chat messages this run posted so far. */
@@ -516,10 +526,12 @@ async function executeRunInner(
     threadRootId: run.threadRootId,
     triggerMessageId: run.triggerMessageId,
     signal,
+    // A resumed run keeps the tools it started with (the list, and the prompt cache, stay the same).
+    loadedGroups: (run.transcript as unknown as Transcript | null)?.toolGroups ?? null,
   };
   const needsContext = !run.transcript;
   // Independent reads together: the agent (cached), the trigger, and the tools it may use.
-  const [agent, triggerRows, tools] = await Promise.all([
+  const [agent, triggerRows, granted] = await Promise.all([
     getAgentCached(db, run.orgId, run.agentId),
     !needsContext
       ? Promise.resolve([])
@@ -529,13 +541,33 @@ async function executeRunInner(
             .select()
             .from(schema.messages)
             .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId))),
-    deps.tools ? deps.tools.list(ctx) : Promise.resolve([]),
+    deps.tools ? deps.tools.granted(ctx) : Promise.resolve([]),
   ]);
+  let tools = presentTools(granted, isSensitive, ctx.loadedGroups);
   const trigger = triggerRows[0];
   if (fresh && trigger)
     deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
   if (!agent || agent.archivedAt) return fail("agent_archived");
   await publishChannelEvent(deps.pubsub, event("running"));
+  // Tools on demand (D65): a new run lists the core tools and the groups the judge expects it to need.
+  let toolChoice: ToolGroupChoice | null = null;
+  const judge = deps.context?.judge;
+  if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
+    const [recent, keep] = await Promise.all([
+      recentForJudge(db, run).catch(() => [] as string[]),
+      keptToolGroups(db, run, granted).catch(() => [] as string[]),
+    ]);
+    toolChoice = await chooseToolGroups(judge, {
+      orgId: run.orgId,
+      agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+      message: trigger?.body ?? "",
+      recent,
+      tools: granted,
+      keep,
+    });
+    ctx.loadedGroups = toolChoice.groups;
+    tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+  }
 
   // Started by a routine: its answer carries the routine (the app shows a small tag on the
   // agent's message, since the routine's own call isn't shown), and it may end in silence.
@@ -584,13 +616,13 @@ async function executeRunInner(
   if (!transcript) {
     const contextDeps = deps.context;
     const pending: { label: string; reason: string }[] = deps.tools
-      ? await pendingConnectors(db, run.orgId, new Set(tools.map((t) => t.name))).catch(() => [])
+      ? await pendingConnectors(db, run.orgId, new Set(granted.map((t) => t.name))).catch(() => [])
       : [];
     // Skills: only names and descriptions here; the body loads with `load_skill` (progressive disclosure).
     const skillList = tools.some((t) => t.name === "load_skill") ? await enabledSkills(db, run.orgId, agent.id) : [];
     const readsWiki = tools.some((t) => t.name === "read_wiki_page");
     // Limited to some GitHub repositories: which ones, and where to start.
-    const repositories = tools.some((t) => t.scope.startsWith("github:"))
+    const repositories = granted.some((t) => t.scope.startsWith("github:"))
       ? repositoriesPrompt(await agentRepositoryList(db, run.orgId, agent.id).catch(() => []))
       : "";
     const [context, memory, wikiPages] = await Promise.all([
@@ -653,7 +685,7 @@ async function executeRunInner(
         text: `# Organization wiki (trusted source)\nPages written and reviewed by the team: they are the organization's official knowledge and outweigh memory. Cite the page with [[Title]] when you use what it says.\n${wikiPages.text}`,
       });
     }
-    if (tools.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
+    if (granted.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
       system.push({
         text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X"). Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
       });
@@ -662,6 +694,7 @@ async function executeRunInner(
       ...context.stats,
       model: agent.model,
       tools: tools.map((t) => t.name),
+      ...(toolChoice ? { toolGroups: toolChoice } : {}),
       memoryItems: memory.itemIds,
       wikiPages: wikiPages.pageIds,
     };
@@ -669,6 +702,7 @@ async function executeRunInner(
     transcript = {
       system,
       messages: context.messages,
+      ...(toolChoice ? { toolGroups: toolChoice.groups } : {}),
       postedUpTo: context.messages.length,
       postedCount: 0,
       deltaSeq: 0,

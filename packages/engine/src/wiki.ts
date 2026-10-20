@@ -1763,18 +1763,29 @@ export async function retrieveWikiForRun(
   const lines: string[] = [];
   const ids: string[] = [];
   let used = 0;
+  // Context on demand (D65): pages the message names and the best match go in (cut at `WIKI_PAGE_CHARS`);
+  // the other matches only as an index line, read with read_wiki_page when the run needs them.
+  const full = new Set([...namedRows.map((p) => p.id), ...found.slice(0, 1).map((p) => p.id)]);
   for (const p of [...namedRows, ...found]) {
     if (ids.includes(p.id)) continue;
-    const room = Math.min(2500, budget - used);
-    if (room < 300) break;
+    const room = Math.min(full.has(p.id) ? WIKI_PAGE_CHARS : WIKI_INDEX_CHARS, budget - used);
+    if (room < 120) break;
     const body = p.body.trim();
-    const text = `## [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version})\n${body.length > room ? `${body.slice(0, room)}\n[… continues: read it with read_wiki_page]` : body}`;
+    const where = `${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}`;
+    const text = full.has(p.id)
+      ? `## [[${p.title}]] (${where})\n${body.length > room ? `${body.slice(0, room)}\n[… continues: read it with read_wiki_page]` : body}`
+      : `- [[${p.title}]] (${where}): ${body.replace(/\s+/g, " ").slice(0, room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
     lines.push(text);
     ids.push(p.id);
     used += text.length;
   }
   return { text: lines.join("\n\n"), pageIds: ids };
 }
+
+/** A page the run's message names, or its best match, goes in up to this much (D65). */
+const WIKI_PAGE_CHARS = 1500;
+/** Any other match goes in as one index line this long. */
+const WIKI_INDEX_CHARS = 200;
 
 // ── Search index ─────────────────────────────────────────────────────────────
 

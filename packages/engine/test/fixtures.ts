@@ -153,6 +153,8 @@ export async function setup(
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
     schedules?: FakeScheduleAnswers;
+    /** Tools on demand (D65): the judge picks the tool groups each run lists. */
+    toolsOnDemand?: boolean;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -292,6 +294,7 @@ export async function setup(
     storage,
     artifacts: artifactDeps,
     sandbox: sandboxDeps,
+    toolsOnDemand: options.toolsOnDemand ?? false,
   };
   const handlers = createJobHandlers(jobDeps);
 

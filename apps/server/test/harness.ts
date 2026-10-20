@@ -122,6 +122,7 @@ export async function createTestServer(
     github: options.github,
     judge: createFakeJudge(options.judge),
     schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
+    toolsOnDemand: false,
   });
   const { handlers } = engine;
   const auth = createAuth({ db, config, log, emailDelivers: true });

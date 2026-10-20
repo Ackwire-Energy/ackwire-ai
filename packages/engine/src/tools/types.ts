@@ -22,6 +22,11 @@ export interface ToolContext {
    * only for computer brains (`permission_prompt`) look at this.
    */
   bridge?: { machineId: string; taskId?: string };
+  /**
+   * Tools on demand (D65): the tool groups this run loaded (`Transcript.toolGroups`); the others sit
+   * behind `find_tools` / `use_tool`. Undefined or null: every tool is listed as is.
+   */
+  loadedGroups?: readonly string[] | null;
 }
 
 export interface ToolOutput {

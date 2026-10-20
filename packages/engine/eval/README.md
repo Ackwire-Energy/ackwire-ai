@@ -16,7 +16,10 @@ bun run eval:behavior --judge-model claude-sonnet-5-5  # default claude-haiku-5-
 bun run eval:behavior --no-judge --max-turns 8         # deterministic checks only; tool-loop cap (default 12)
 bun run eval:behavior --judge llm                      # grade with the LLM judge instead of Jev (default jev; `both` compares)
 bun run eval:behavior --concurrency 3                  # cases at a time (default 5, or EVAL_CONCURRENCY)
+bun run eval:behavior --tools-on-demand                # tools on demand as in production (D65; Jev picks the groups)
 ```
+
+The totals line also says what the agent's calls carried (model calls, prompt tokens per call, cache read and write, output), so two runs (with and without `--tools-on-demand`, or before and after a prompt change) compare in tokens as well as in behavior.
 
 Judges: with `TYPESAFE_API_KEY` the addressee classification uses Jev like production, and the grading too (a probability per criterion, pass at 0.5, no written reason; `--judge both` also asks the LLM and prints where they differ). Without the key both use the LLM (the output says so). Each case has its own in-memory database and fakes, so cases run in parallel; model calls refused for load (429, overloaded) are retried with backoff.
 

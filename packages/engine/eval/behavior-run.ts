@@ -44,6 +44,7 @@ import {
   insertContextItem,
   insertMessage,
   isNoReply,
+  type Judge,
   openDm,
   postPersonMessage,
   type ToolSource,
@@ -160,6 +161,10 @@ export interface CaseRun {
   cards?: string;
   /** The tools the agent had (names). */
   tools?: string[];
+  /** The agent's model calls and their tokens (`input`: uncached; the prompt is input + cacheRead + cacheWrite). */
+  tokens?: { calls: number; input: number; cacheRead: number; cacheWrite: number; output: number };
+  /** Tools on demand: the run's choice (`context` step). */
+  toolGroups?: unknown;
   /** The cheap model's structured answers during the run (addressees), for the report. */
   classifier?: string[];
   error?: string;
@@ -209,6 +214,11 @@ export interface RunOptions {
   agentModel?: string;
   /** TypeSafe key: the addressee classification uses Jev like production (the cheap model only without it). */
   jevKey?: string;
+  /**
+   * Tools on demand (D65) as in production: the run lists the core tools and the groups Jev expects
+   * (only that judgment is Jev's; the others stay fake). Without `jevKey` the run gets the core tools.
+   */
+  toolsOnDemand?: boolean;
 }
 
 /** Runs one case through the engine on a fresh in-memory database. */
@@ -294,6 +304,11 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ...fakes.map((f) => f.source),
     ];
     const tools = createToolGateway({ sources });
+    if (options.toolsOnDemand && options.jevKey) {
+      const jev = createJevJudge({ apiKey: options.jevKey, gateway, timeoutMs: 5000 });
+      const fake = context.judge as Judge;
+      context.judge = { name: "eval", ask: (r) => (r.kind === "tool_groups" ? jev : fake).ask(r) };
+    }
     const handlers = createJobHandlers({
       db,
       gateway,
@@ -306,6 +321,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       tools,
       context,
       search,
+      toolsOnDemand: options.toolsOnDemand ?? false,
     });
 
     // The conversation.
@@ -510,10 +526,23 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           .where(and(eq(schema.messages.orgId, org.id), inArray(schema.messages.agentRunId, runIds)))
           .orderBy(asc(schema.messages.createdAt))
       : [];
+    const u = schema.usageRecords;
     const [usage] = await db
-      .select({ cost: sql<number>`coalesce(sum(${schema.usageRecords.costNanoUsd}), 0)::bigint` })
-      .from(schema.usageRecords)
-      .where(eq(schema.usageRecords.orgId, org.id));
+      .select({ cost: sql<number>`coalesce(sum(${u.costNanoUsd}), 0)::bigint` })
+      .from(u)
+      .where(eq(u.orgId, org.id));
+    // The agent's own model calls (tools on demand: what each call carries).
+    const [tokens] = await db
+      .select({
+        calls: sql<number>`count(*)::int`,
+        input: sql<number>`coalesce(sum(${u.inputTokens}), 0)::int`,
+        cacheRead: sql<number>`coalesce(sum(${u.cacheReadTokens}), 0)::int`,
+        cacheWrite: sql<number>`coalesce(sum(${u.cacheWriteTokens}), 0)::int`,
+        output: sql<number>`coalesce(sum(${u.outputTokens}), 0)::int`,
+      })
+      .from(u)
+      .where(and(eq(u.orgId, org.id), eq(u.kind, "agent")));
+    const contextStep = steps.find((s) => s.kind === "context");
     // Act with undo: the receipts the run's messages carry.
     const receipts = runIds.length
       ? (
@@ -542,6 +571,14 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       receipts,
       ...(cards ? { cards } : {}),
       tools: (recorder.turns[0]?.request.tools ?? []).map((t) => t.name),
+      tokens: {
+        calls: Number(tokens?.calls ?? 0),
+        input: Number(tokens?.input ?? 0),
+        cacheRead: Number(tokens?.cacheRead ?? 0),
+        cacheWrite: Number(tokens?.cacheWrite ?? 0),
+        output: Number(tokens?.output ?? 0),
+      },
+      ...(contextStep?.data.toolGroups ? { toolGroups: contextStep.data.toolGroups } : {}),
       ...(recorder.structured.length ? { classifier: [...recorder.structured] } : {}),
     };
   } finally {

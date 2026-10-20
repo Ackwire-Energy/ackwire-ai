@@ -4,7 +4,7 @@ import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
 import { checkToolCall } from "./checks";
-import { compactSchema, directoryRole, presentTools, resolveDirectoryTool } from "./directory";
+import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
@@ -64,19 +64,22 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     return byName;
   }
 
+  /** Every tool this agent may call now, as is: every source, filtered by granted scopes, by name. */
+  async function granted(ctx: ToolContext): Promise<ToolDefinition[]> {
+    const keys = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+    return [...(await allTools(ctx)).values()]
+      .filter((t) => isAllowed(toolAccess(keys, t)))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   /**
-   * Tools this agent may call now: every source, filtered by granted scopes,
-   * with each big connector listed as its directory (`find_tools` /
-   * `use_tool`, tools/directory.ts).
+   * Tools this agent may call now, as the model sees them: each big
+   * connector listed as its directory, and with tools on demand
+   * (`ctx.loadedGroups`, D65) the groups not loaded behind `find_tools` /
+   * `use_tool` (tools/directory.ts).
    */
   async function list(ctx: ToolContext): Promise<ToolDefinition[]> {
-    const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-    return presentTools(
-      [...(await allTools(ctx)).values()]
-        .filter((t) => isAllowed(toolAccess(granted, t)))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-      isSensitive,
-    );
+    return presentTools(await granted(ctx), isSensitive, ctx.loadedGroups);
   }
 
   async function run(tool: ToolDefinition, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
@@ -103,6 +106,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
 
   return {
     list,
+    granted,
 
     async invoke(ctx: ToolContext, requested: ToolCall): Promise<InvokeResult> {
       const all = await allTools(ctx);
@@ -126,7 +130,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
               input: args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {},
             };
           } else {
-            unknownInDirectory = `No ${role.label} tool named "${name}". Find the exact name with ${role.prefix}_find_tools.`;
+            const find = role.prefix ? `${role.prefix}_find_tools` : ON_DEMAND_FIND;
+            unknownInDirectory = `No ${role.label} tool named "${name}". Find the exact name with ${find}.`;
           }
         }
       }

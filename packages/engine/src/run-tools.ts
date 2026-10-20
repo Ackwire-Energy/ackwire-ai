@@ -19,7 +19,7 @@ import type { BridgeIdentity } from "./run-tool-tokens";
 import type { AgentRun } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
-import { directoryRole, resolveDirectoryTool } from "./tools/directory";
+import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
@@ -334,7 +334,10 @@ export async function invokeWithChip(
   // The bridge has no turn list (`turnTools: null`): the name the model gave is the best label there.
   const givenTool = (use.input as { tool?: unknown } | undefined)?.tool;
   const shownName =
-    target?.name ?? (!listed && use.name.endsWith("_use_tool") && typeof givenTool === "string" ? givenTool : use.name);
+    target?.name ??
+    (!listed && (use.name === ON_DEMAND_USE || use.name.endsWith("_use_tool")) && typeof givenTool === "string"
+      ? givenTool
+      : use.name);
   const connector = def?.connectorLabel;
   // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
   const input = use.input as Record<string, unknown> | undefined;
@@ -408,9 +411,17 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
       threadRootId: run.threadRootId,
       triggerMessageId: run.triggerMessageId,
       ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
+      // Tools on demand (D65): the same list the run's turns see.
+      loadedGroups: loadedGroupsOf(run.transcript),
     },
   };
 }
+
+/** The tool groups a run listed up front (`Transcript.toolGroups`, D65); null = every tool. */
+const loadedGroupsOf = (transcript: unknown): string[] | null => {
+  const groups = (transcript as { toolGroups?: unknown } | null)?.toolGroups;
+  return Array.isArray(groups) ? groups.filter((g): g is string => typeof g === "string") : null;
+};
 
 /**
  * The tools of a bridge identity, as `BrainTool[]`: a run's (the Tool Gateway

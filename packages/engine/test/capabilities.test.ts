@@ -30,7 +30,9 @@ test("capabilities come from the granted tools, grouped, with what needs approva
     { name: "ask_user", description: "Ask the person.", scope: "" },
   ]);
   expect(text).toContain("You can:");
-  expect(text).toContain("- Files (Drive): `create_artifact` (Save a file people can open.); `read_artifact`");
+  // Names only: each tool's description is already in its schema (D65).
+  expect(text).toContain("- Files (Drive): `create_artifact`, `read_artifact`");
+  expect(text).not.toContain("Save a file people can open");
   expect(text).toContain("- GitHub: `github_merge_pr`");
   expect(text).toContain("Download PDF");
   expect(text).toContain("Need a person's approval (you ask, someone approves in the chat): `github_merge_pr`.");

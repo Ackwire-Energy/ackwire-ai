@@ -1,0 +1,262 @@
+import { afterEach, expect, test } from "bun:test";
+import { asc, eq, schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
+import {
+  chooseToolGroups,
+  createFakeJudge,
+  createToolGateway,
+  describeCapabilities,
+  drainOutbox,
+  grantScopes,
+  type Judge,
+  postPersonMessage,
+  presentTools,
+  type ToolContext,
+  type ToolDefinition,
+} from "../src";
+import { type Fixture, setup } from "./fixtures";
+
+let f: Fixture;
+afterEach(async () => {
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
+
+const tool = (name: string, scope: string, extra: Partial<ToolDefinition> = {}): ToolDefinition => ({
+  name,
+  description: `${name.replace(/_/g, " ")}.`,
+  inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  scope,
+  execute: async () => ({ content: `${name} ok` }),
+  ...extra,
+});
+
+const SENTRY = "1f0e2d3c-4b5a-4968-8776-a5b4c3d2e1f0";
+const tools = (): ToolDefinition[] => [
+  tool("ask_user", ""),
+  tool("remember", "memory:write"),
+  tool("search_context", "context:read"),
+  tool("read_wiki_page", "wiki:read"),
+  tool("create_wiki_page", "wiki:write"),
+  tool("create_issue", "issues:write"),
+  tool("list_issues", "issues:read"),
+  tool("browser_read", "browser:use"),
+  tool("sentry_search_issues", "sentry:read", { connectionId: SENTRY, connectorLabel: "Sentry" }),
+];
+
+test("tools on demand: core and loaded groups as they are, the rest behind find_tools / use_tool", () => {
+  expect(presentTools(tools()).map((t) => t.name)).toHaveLength(9);
+  const shown = presentTools(tools(), undefined, ["issues"]);
+  expect(shown.map((t) => t.name)).toEqual([
+    "ask_user",
+    "remember",
+    "search_context",
+    "read_wiki_page",
+    "create_issue",
+    "list_issues",
+    "find_tools",
+    "use_tool",
+  ]);
+  const find = shown.find((t) => t.name === "find_tools");
+  expect(find?.description).toContain("Organization wiki (writing) (1), Browser (1), Sentry (1)");
+  // Everything loaded: no directory.
+  expect(
+    presentTools(tools(), undefined, ["issues", "wiki", "browser", "sentry"]).some((t) => t.name === "find_tools"),
+  ).toBe(false);
+});
+
+test("the prompt names the loaded tools only by name and the on-demand groups in one line", () => {
+  const text = describeCapabilities(presentTools(tools(), undefined, []));
+  expect(text).toContain("- On demand: Organization wiki (writing) (1), Issues (2), Browser (1), Sentry (1).");
+  expect(text).toContain("Find the one you need with `find_tools` and run it with `use_tool`");
+  expect(text).not.toContain("`create_issue`");
+  expect(text).not.toContain("`find_tools` (");
+  // The browser's guidance is there: the run can reach it on demand.
+  expect(text).toContain("Your browser (`browser_*`)");
+});
+
+async function ctxOf(fx: Fixture, loadedGroups: string[]): Promise<ToolContext> {
+  const msg = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+    body: "hi",
+  });
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId: msg.id,
+      triggerMessageId: msg.id,
+      trigger: "mention",
+      hop: 1,
+    })
+    .returning();
+  return {
+    db: fx.db,
+    orgId: fx.org.id,
+    agentId: fx.agent.id,
+    runId: run?.id ?? "",
+    channelId: fx.general.id,
+    threadRootId: msg.id,
+    triggerMessageId: msg.id,
+    loadedGroups,
+  };
+}
+
+test("find_tools finds a tool not loaded; use_tool and its real name run it, as itself", async () => {
+  f = await setup();
+  const ran: string[] = [];
+  const gateway = createToolGateway({
+    sources: [
+      {
+        name: "fake",
+        tools: async () =>
+          tools().map((t) => ({
+            ...t,
+            execute: async () => {
+              ran.push(t.name);
+              return { content: `${t.name} ok` };
+            },
+          })),
+      },
+    ],
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [
+    { connectionId: null, scope: "issues:read" },
+    { connectionId: null, scope: "issues:write" },
+  ]);
+  const ctx = await ctxOf(f, []);
+  expect((await gateway.list(ctx)).map((t) => t.name)).toContain("find_tools");
+  const call = (name: string, input: Record<string, unknown>) =>
+    gateway.invoke(ctx, { toolUseId: `tu_${Math.random()}`, name, input });
+
+  const found = await call("find_tools", { query: "create an issue" });
+  const text = found.type === "result" ? found.output.content : "";
+  expect(text).toContain("- create_issue");
+  expect(text).toContain("call one with use_tool");
+  expect(await call("use_tool", { tool: "create_issue", arguments: {} })).toMatchObject({
+    output: { content: "create_issue ok" },
+  });
+  // A tool on demand called by its own name still runs (the gateway knows every granted tool).
+  expect(await call("list_issues", {})).toMatchObject({ output: { content: "list_issues ok" } });
+  expect(await call("use_tool", { tool: "nope", arguments: {} })).toMatchObject({
+    output: { isError: true, content: expect.stringContaining('No other tool named "nope"') },
+  });
+  expect(ran).toEqual(["create_issue", "list_issues"]);
+  const steps = await f.db.select().from(schema.agentRunSteps).orderBy(asc(schema.agentRunSteps.seq));
+  expect(steps.filter((s) => s.kind === "tool_call").map((s) => s.data.name)).toEqual([
+    "find_tools",
+    "create_issue",
+    "list_issues",
+    "use_tool",
+  ]);
+});
+
+test("chooseToolGroups: one calibrated question per group, the threshold, and the core tools when the judge fails", async () => {
+  const judge = createFakeJudge((kind, _id, _state, q) =>
+    kind === "tool_groups" && JSON.stringify(q.instructions).includes("Sentry") ? 0.8 : 0.1,
+  );
+  const input = {
+    orgId: "o",
+    agent: { name: "Ada", role: "Dev", instructions: "" },
+    message: "olha os erros do sentry",
+    recent: [],
+    tools: tools(),
+  };
+  const chosen = await chooseToolGroups(judge, input);
+  expect(chosen).toMatchObject({ groups: ["sentry"], source: "judge" });
+  expect(Object.keys(chosen.scores).sort()).toEqual(["browser", "issues", "sentry", "wiki"]);
+  expect(judge.calls[0]).toMatchObject({ kind: "tool_groups", calibrated: true });
+
+  const slow: Judge = { name: "slow", ask: () => new Promise(() => {}) };
+  expect(await chooseToolGroups(slow, { ...input, timeoutMs: 5 })).toEqual({
+    groups: [],
+    scores: {},
+    source: "timeout",
+    kept: [],
+  });
+  // In a thread the list only grows: the previous run's groups stay without asking, even when the judge fails.
+  expect(await chooseToolGroups(slow, { ...input, keep: ["browser", "gone"], timeoutMs: 5 })).toMatchObject({
+    groups: ["browser"],
+    kept: ["browser"],
+  });
+  const kept = await chooseToolGroups(judge, { ...input, keep: ["browser"] });
+  expect(kept.groups).toEqual(["browser", "sentry"]);
+  expect(Object.keys(kept.scores)).not.toContain("browser");
+  const broken: Judge = {
+    name: "broken",
+    ask: async () => {
+      throw new Error("down");
+    },
+  };
+  expect(await chooseToolGroups(broken, input)).toEqual({ groups: [], scores: {}, source: "error", kept: [] });
+});
+
+test("a run lists what the judge expects it to need, keeps it for the whole run, and reaches the rest on demand", async () => {
+  let step = 0;
+  f = await setup({
+    toolsOnDemand: true,
+    issueTools: true,
+    contextTools: true,
+    reply: () => {
+      step++;
+      if (step === 1)
+        return { chunks: [], toolUses: [{ name: "use_tool", input: { tool: "list_issues", arguments: {} } }] };
+      return { chunks: ["Nenhuma issue aberta."] };
+    },
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "issues:read" }]);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev quais issues estão abertas?",
+  });
+  await drainOutbox(f.db, f.handlers);
+
+  const [first, second] = f.provider.calls.map((c) => c.request);
+  const names = (first?.tools ?? []).map((t) => t.name);
+  expect(names).toContain("search_context");
+  expect(names).toContain("find_tools");
+  expect(names).not.toContain("list_issues");
+  expect(systemText(first?.system ?? "")).toContain("- On demand: Issues");
+  // The same list on every turn of the run (the prompt cache stays valid).
+  expect((second?.tools ?? []).map((t) => t.name)).toEqual(names);
+  expect(JSON.stringify(second?.messages.at(-1)?.content)).not.toContain("Unknown tool");
+
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
+  expect((run?.transcript as { toolGroups?: string[] } | null)?.toolGroups).toEqual([]);
+  const [context] = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "context"));
+  expect(context?.data.toolGroups).toMatchObject({ groups: [], source: "judge", scores: { issues: 0 } });
+
+  // Used in this channel in the last 6 hours: the next run lists it as it is, without asking.
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev e as fechadas?",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const next = (f.provider.calls.at(-1)?.request.tools ?? []).map((t) => t.name);
+  expect(next).toContain("list_issues");
+  const contexts = await f.db
+    .select()
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.kind, "context"))
+    .orderBy(asc(schema.agentRunSteps.createdAt));
+  expect(contexts.at(-1)?.data.toolGroups).toMatchObject({ groups: ["issues"], kept: ["issues"], source: "none" });
+});
+
+test("a group the judge expects goes in as it is, with no directory when nothing is left", async () => {
+  f = await setup({
+    toolsOnDemand: true,
+    issueTools: true,
+    contextTools: true,
+    judge: (kind, _id, _state, q) =>
+      kind === "tool_groups" && JSON.stringify(q.instructions).includes("Issues") ? 0.9 : 0,
+    reply: () => ({ chunks: ["ok"] }),
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "issues:read" }]);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev quais issues estão abertas?",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const names = (f.provider.calls[0]?.request.tools ?? []).map((t) => t.name);
+  expect(names).toContain("list_issues");
+  expect(names).not.toContain("find_tools");
+});

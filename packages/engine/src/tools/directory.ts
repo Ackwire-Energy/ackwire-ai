@@ -55,7 +55,10 @@ function prefixOf(tools: ToolDefinition[], label: string) {
 /** The real tool's name as the model may write it: full, or without the connector's prefix. */
 export function resolveDirectoryTool(role: DirectoryRole, name: string) {
   const n = name.trim();
-  return role.tools.find((t) => t.name === n) ?? role.tools.find((t) => t.name === `${role.prefix}_${n}`);
+  return (
+    role.tools.find((t) => t.name === n) ??
+    (role.prefix ? role.tools.find((t) => t.name === `${role.prefix}_${n}`) : undefined)
+  );
 }
 
 /** The most common topics in the connector's tool names (`ad`, `campaign`, `report`…), for the search's description. */
@@ -134,11 +137,27 @@ function directoryTools(
  * as is, each big connector (`DIRECTORY_MAX_TOOLS` / `DIRECTORY_MAX_CHARS`)
  * as its two directory tools. Order is kept (a big connector's pair sits where
  * its first tool was).
+ *
+ * Tools on demand (`loaded`, a run's tool groups, D65): only the core groups
+ * and the loaded ones go as they are; the rest sit behind one directory of
+ * their own, `find_tools` / `use_tool`, at the end of the list. Without
+ * `loaded` every tool goes.
  */
 export function presentTools(
   tools: ToolDefinition[],
   sensitive: IsSensitive = (t) => t.sensitive === true,
+  loaded?: readonly string[] | null,
 ): ToolDefinition[] {
+  if (loaded) {
+    const keep = new Set(loaded);
+    const now = new Set(tools.filter((t) => isCore(t) || keep.has(toolGroupKey(t))));
+    const later = tools.filter((t) => !now.has(t));
+    const shown = presentTools([...now], sensitive);
+    if (later.length === 0) return shown;
+    const taken = new Set(shown.map((t) => t.name));
+    if (taken.has(ON_DEMAND_FIND) || taken.has(ON_DEMAND_USE)) return [...shown, ...later];
+    return [...shown, ...onDemandTools(later, sensitive)];
+  }
   const byConnection = new Map<string, ToolDefinition[]>();
   for (const t of tools) {
     if (!t.connectionId) continue;
@@ -169,6 +188,131 @@ export function presentTools(
     }
   }
   return out;
+}
+
+// ── Tools on demand (D65) ────────────────────────────────────────────────────
+
+/** A tool's group: its scope's prefix (`drive:write` → `drive`), each custom connector on its own; "" = conversation. */
+export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId">) {
+  const prefix = tool.scope.split(":")[0] ?? "";
+  return prefix.startsWith("custom") ? `custom:${tool.connectionId ?? prefix}` : prefix;
+}
+
+/**
+ * Groups every run gets as they are: the conversation, memory and skills
+ * (the prompt points at them), and reading the wiki (its index is in the
+ * prompt). Everything else is loaded when the run needs it.
+ */
+export const CORE_GROUPS: ReadonlySet<string> = new Set(["", "context", "memory", "skills"]);
+const CORE_TOOLS: ReadonlySet<string> = new Set(["read_wiki_page", "search_wiki"]);
+
+export const isCore = (tool: Pick<ToolDefinition, "name" | "scope" | "connectionId">) =>
+  CORE_GROUPS.has(toolGroupKey(tool)) || CORE_TOOLS.has(tool.name);
+
+/** How a group is named for the model and the judge ("Browser", "GitHub", a connector's label). */
+const GROUP_LABELS: Record<string, string> = {
+  drive: "Files (Drive)",
+  issues: "Issues",
+  calendar: "Calendar",
+  schedule: "Schedule, reminders and routines",
+  forum: "Forum",
+  wiki: "Organization wiki (writing)",
+  sandbox: "Computer and code",
+  browser: "Browser",
+  github: "GitHub",
+  sentry: "Sentry",
+  linear: "Linear",
+  gdrive: "Google Drive",
+};
+
+export interface ToolGroup {
+  key: string;
+  label: string;
+  tools: ToolDefinition[];
+}
+
+/** The groups a run could load (core groups left out), in the order of their first tool. */
+export function deferrableGroups(tools: ToolDefinition[]): ToolGroup[] {
+  const groups = new Map<string, ToolGroup>();
+  for (const t of tools) {
+    if (isCore(t)) continue;
+    const key = toolGroupKey(t);
+    const group = groups.get(key) ?? {
+      key,
+      label: GROUP_LABELS[key] ?? t.connectorLabel ?? key.charAt(0).toUpperCase() + key.slice(1),
+      tools: [],
+    };
+    group.tools.push(t);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+export const ON_DEMAND_FIND = "find_tools";
+export const ON_DEMAND_USE = "use_tool";
+
+/**
+ * The directory of a run's tools not loaded yet: `find_tools` searches them
+ * (BM25, no model call) and `use_tool` runs one by its name, through the
+ * gateway like any direct call. Its description names every group, so the
+ * model knows what it can reach.
+ */
+function onDemandTools(tools: ToolDefinition[], sensitive: IsSensitive): ToolDefinition[] {
+  const groups = deferrableGroups(tools);
+  const areas = groups.map((g) => `${g.label} (${g.tools.length})`);
+  const label = "other";
+  const find: ToolDefinition = {
+    name: ON_DEMAND_FIND,
+    description: `More tools you have, loaded when you need them: ${areas.join(", ")}. Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`${ON_DEMAND_USE}\`. Search before saying you can't do something.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "What you need, in a few words (e.g. 'open a web page', 'create an issue', 'sentry errors').",
+        },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: FIND_MAX,
+          description: `How many matches (default ${FIND_DEFAULT}).`,
+        },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    scope: "",
+    execute: async (input) => ({
+      content: findTools(
+        tools,
+        "",
+        label,
+        input,
+        sensitive,
+        groups.map((g) => g.label),
+        ON_DEMAND_USE,
+      ),
+    }),
+  };
+  const use: ToolDefinition = {
+    name: ON_DEMAND_USE,
+    description: `Run one of your tools by the exact name \`${ON_DEMAND_FIND}\` gave you, with its input in \`arguments\`. Approvals and permissions are the tool's own.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        tool: { type: "string", description: "The tool's exact name." },
+        arguments: { type: "object", description: "The tool's input, as its schema says." },
+      },
+      required: ["tool", "arguments"],
+      additionalProperties: false,
+    },
+    scope: "",
+    // Never runs itself: the gateway runs the real tool (`directoryRole`).
+    execute: async () => ({ content: "Unknown tool", isError: true }),
+  };
+  roles.set(find, { kind: "find", tools, prefix: "", label });
+  roles.set(use, { kind: "use", tools, prefix: "", label });
+  return [find, use];
 }
 
 const words = (s: string) =>
@@ -231,16 +375,18 @@ function findTools(
   label: string,
   input: Record<string, unknown>,
   sensitive: IsSensitive,
+  areas: string[] = areasOf(tools, prefix),
+  useName = `${prefix}_use_tool`,
 ) {
   const query = typeof input.query === "string" ? input.query : "";
   const limit = Math.min(Math.max(Number(input.limit) || FIND_DEFAULT, 1), FIND_MAX);
   const matches = rankTools(tools, prefix, query).slice(0, limit);
   if (matches.length === 0) {
-    return `No ${label} tool matches "${query}". Try other words (${areasOf(tools, prefix).slice(0, 12).join(", ")}).`;
+    return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).`;
   }
   const lines = matches.map(
     (t) =>
       `- ${t.name}${sensitive(t) ? " (asks a person's approval)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
   );
-  return `${label} tools for "${query}" (call one with ${prefix}_use_tool):\n${lines.join("\n")}`;
+  return `${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`;
 }

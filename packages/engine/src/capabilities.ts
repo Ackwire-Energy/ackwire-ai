@@ -1,5 +1,5 @@
 import { UNDOABLE_TOOLS } from "./agent-actions";
-import { type DirectoryRole, directoryRole } from "./tools/directory";
+import { type DirectoryRole, deferrableGroups, directoryRole, ON_DEMAND_FIND, ON_DEMAND_USE } from "./tools/directory";
 import { isSensitive } from "./tools/gateway";
 import type { ToolDefinition } from "./tools/types";
 
@@ -28,11 +28,6 @@ const groupOf = (tool: Pick<ToolDefinition, "scope">) => {
   if (prefix in GROUPS) return GROUPS[prefix] as string;
   if (prefix.startsWith("custom")) return "Organization tools";
   return prefix.charAt(0).toUpperCase() + prefix.slice(1);
-};
-
-const firstSentence = (s: string) => {
-  const one = s.split(/(?<=\.)\s/)[0] ?? s;
-  return one.length > 140 ? `${one.slice(0, 137)}…` : one;
 };
 
 /** A scope's group as a stable key (`drive:write` → `drive`, any custom connector → `custom`); "" = conversation. */
@@ -79,8 +74,9 @@ export function summarizeGrants(rows: { scope: string; connectionLabel: string |
 /**
  * The "what you can do" section of an agent's system prompt, built from the
  * tools it was actually granted for this run (so it can't drift from its
- * permissions): tools grouped by purpose, what needs a person's approval,
- * and how to behave about anything else.
+ * permissions): tool names grouped by purpose (each tool's description is
+ * already in its schema), the groups loaded on demand (D65), what needs a
+ * person's approval, and how to behave about anything else.
  */
 export function describeCapabilities(
   tools: Pick<ToolDefinition, "name" | "description" | "scope" | "sensitive" | "connectionId" | "connectorLabel">[],
@@ -93,6 +89,9 @@ export function describeCapabilities(
     );
   } else {
     lines.push("You can:");
+    // Tools on demand (D65): the run's other tools, behind `find_tools` / `use_tool`.
+    const findTool = tools.find((t) => t.name === ON_DEMAND_FIND);
+    const onDemand = findTool ? directoryRole(findTool as ToolDefinition) : undefined;
     const groups = new Map<string, string[]>();
     // A connector's tools carry their own descriptions: here one line per connector, by name only,
     // and a big one (a directory, tools/directory.ts) says how to find its tools instead of listing them.
@@ -110,12 +109,14 @@ export function describeCapabilities(
         connectors.set(t.connectionId, entry);
         continue;
       }
+      // Tools on demand (D65): their directory gets a line of its own below.
+      if (onDemand && (t.name === ON_DEMAND_FIND || t.name === ON_DEMAND_USE)) continue;
       const group = groupOf(t);
       const items = groups.get(group) ?? [];
-      items.push(`\`${t.name}\` (${firstSentence(t.description)})`);
+      items.push(`\`${t.name}\``);
       groups.set(group, items);
     }
-    for (const [group, items] of groups) lines.push(`- ${group}: ${items.join("; ")}`);
+    for (const [group, items] of groups) lines.push(`- ${group}: ${items.join(", ")}`);
     for (const c of connectors.values()) {
       const d = c.directory;
       lines.push(
@@ -124,7 +125,14 @@ export function describeCapabilities(
           : `- ${c.label}: ${c.names.join(", ")}`,
       );
     }
-    const names = new Set(tools.map((t) => t.name));
+    if (onDemand) {
+      const more = deferrableGroups(onDemand.tools).map((g) => `${g.label} (${g.tools.length})`);
+      lines.push(
+        `- On demand: ${more.join(", ")}. Find the one you need with \`${ON_DEMAND_FIND}\` and run it with \`${ON_DEMAND_USE}\` (also any tool named here that isn't in your tool list). Search before saying you can't do something.`,
+      );
+    }
+    // What the guidance below is about: every tool the run can reach, loaded or on demand.
+    const names = new Set([...tools, ...(onDemand?.tools ?? [])].map((t) => t.name));
     if (names.has("create_artifact")) {
       lines.push(
         '- Requests for a PDF (or Word file): create a document with `create_artifact` (kind `document`); the file\'s card offers "Download PDF".',

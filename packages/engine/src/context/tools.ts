@@ -564,13 +564,16 @@ export async function retrieveForRun(
       .sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99) - (b.relevance - a.relevance));
     searched = await withLinked(db, base, searched);
   }
-  const budget = input.budgetChars ?? 6000;
+  const budget = input.budgetChars ?? MEMORY_BUDGET_CHARS;
   const picked = pickDistinct([...pinned, ...own, ...shared, ...searched], input.known ?? "");
   const seen = new Set<string>();
   const lines: string[] = [];
   let used = 0;
   for (const item of picked) {
-    const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${item.content.replace(/\s+/g, " ").slice(0, 600)} (id ${item.id})`;
+    // Context on demand (D65): a long item goes in cut short; `expand` opens it in full by its id.
+    const room = item.pinned ? 600 : MEMORY_ITEM_CHARS;
+    const content = item.content.replace(/\s+/g, " ");
+    const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${content.length > room ? `${content.slice(0, room)}… [more with expand]` : content} (id ${item.id})`;
     if (used + line.length > budget && !item.pinned) continue;
     seen.add(item.id);
     lines.push(line);
@@ -578,6 +581,11 @@ export async function retrieveForRun(
   }
   return { text: lines.join("\n"), itemIds: [...seen] };
 }
+
+/** Memory in a run's prompt, at most (characters), pinned items aside. */
+export const MEMORY_BUDGET_CHARS = 3500;
+/** One item's content in the prompt, at most (pinned ones: 600). */
+const MEMORY_ITEM_CHARS = 240;
 
 /** Two items of the same family that share this much (`overlap`) say the same thing: only the newest goes in. */
 const SAME_ITEM = 0.7;
