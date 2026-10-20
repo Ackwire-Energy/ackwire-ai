@@ -3490,19 +3490,9 @@ button.drive-where:focus-visible {
 .catalog__search {
   max-width: 360px;
 }
-/* One line of filters that scrolls sideways (never wraps). */
-.catalog__filters .ac-toolbar__filters {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  margin: -2px;
-  padding: 2px;
-}
-.catalog__filters .ac-toolbar__filters::-webkit-scrollbar {
-  display: none;
-}
-.catalog__filters .ac-filtertoggle {
-  flex: none;
+/* The categories: one line that scrolls sideways (never wraps). */
+.catalog__filters {
+  align-self: flex-start;
 }
 .catalog__body {
   position: relative;

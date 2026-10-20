@@ -86,12 +86,16 @@ describe("Issues (board and list)", () => {
 
   test("filters, search and the list view", async () => {
     await go("issues");
-    await click(screen().getByRole("button", { name: "Com agentes" }));
-    expect(screen().getByRole("button", { name: "Com agentes" }).getAttribute("aria-pressed")).toBe("true");
+    await click(screen().getByRole("radio", { name: /^Com agentes/ }));
+    expect(
+      screen()
+        .getByRole("radio", { name: /^Com agentes/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     expect(cardTitles(column("Em andamento"))).toEqual(["Timeout no agendamento em horários de pico"]);
-    await click(screen().getByRole("button", { name: "Minhas" }));
+    await click(screen().getByRole("radio", { name: /^Minhas/ }));
     expect(screen().getByText("Nenhuma tarefa com esses filtros.")).toBeTruthy();
-    await click(screen().getByRole("button", { name: "Todas" }));
+    await click(screen().getByRole("radio", { name: /^Todas/ }));
     await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "#128");
     await settle(4);
     expect(screen().getAllByRole("link", { name: /^#\d+/ })).toHaveLength(1);

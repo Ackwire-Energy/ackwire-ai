@@ -19,13 +19,14 @@ const type = (el: Element, value: string) => act(async () => fireEvent.change(el
 
 describe("Aprovações", () => {
   const pills = () =>
-    within(screen().getByRole("group", { name: "Filtro" }))
-      .getAllByRole("button")
+    within(screen().getByRole("radiogroup", { name: "Filtro" }))
+      .getAllByRole("radio")
       .map((b) => b.textContent);
 
   test("waiting cards with the exact action; refusing sends the reason and moves it to the history", async () => {
     const { state } = await go("approvals");
-    expect(pills()).toEqual(["Esperando você2", "Aprovados1", "Recusados0", "Expirados0", "Todos3"]);
+    // A zero count isn't shown.
+    expect(pills()).toEqual(["Esperando você2", "Aprovados1", "Recusados", "Expirados", "Todos3"]);
     const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
     expect(merge.textContent).toContain("Ada");
     expect(merge.textContent).toContain("#eng");
@@ -41,7 +42,7 @@ describe("Aprovações", () => {
     await click(within(merge).getByRole("button", { name: /Recusar e avisar/ }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
-    expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados0", "Todos3"]);
+    expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados", "Todos3"]);
     expect(screen().queryByRole("article", { name: "Merge PR #42 into main" })).toBeNull();
     expect(screen().getByText("Decididos há pouco")).toBeTruthy();
   });

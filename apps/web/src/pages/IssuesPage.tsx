@@ -14,7 +14,6 @@ import {
   Field,
   FilterBar,
   FilterChip,
-  FilterToggle,
   Icon,
   Input,
   Menu,
@@ -210,19 +209,16 @@ export function IssuesPage() {
             </span>
           }
         >
-          {/* biome-ignore lint/a11y/useSemanticElements: filter pills */}
-          <span className="ac-filterbar" role="group" aria-label={t("issues.filters")}>
-            {FILTERS.map((f) => (
-              <FilterToggle
-                key={f}
-                pressed={filter === f}
-                onPressedChange={() => setFilter(f)}
-                count={all.filter((i) => isOpen(i) && pass(i, f)).length}
-              >
-                {t(`issues.filter.${f}`)}
-              </FilterToggle>
-            ))}
-          </span>
+          <Segmented
+            label={t("issues.filters")}
+            value={filter}
+            onValueChange={setFilter}
+            options={FILTERS.map((f) => ({
+              value: f,
+              label: t(`issues.filter.${f}`),
+              count: all.filter((i) => isOpen(i) && pass(i, f)).length,
+            }))}
+          />
           <FilterBar
             label={t("issues.moreFilters")}
             clearText={copy.clearAll}

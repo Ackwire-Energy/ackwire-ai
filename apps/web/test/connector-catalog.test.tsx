@@ -22,10 +22,11 @@ const open = async (state = seedState({ connections: [] })) => {
 };
 /** The names of the tiles in the grid (the suggestions on top aren't tiles). */
 const names = (dialog: HTMLElement) => [...dialog.querySelectorAll(".catalog-tile__name")].map((el) => el.textContent);
+/** The category choices' words (without their counts). */
 const filterNames = (cats: HTMLElement) =>
   within(cats)
-    .getAllByRole("button")
-    .map((b) => b.querySelector(".ac-filtertoggle__text")?.textContent);
+    .getAllByRole("radio")
+    .map((b) => b.firstChild?.textContent);
 /** The detail pane of the service picked. */
 const pane = (dialog: HTMLElement, name: string) =>
   within(dialog).getByRole("complementary", { name: `Sobre ${name}` });
@@ -65,7 +66,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(within(pane(dialog, "Slack")).getByRole("button", { name: "Em breve" }).hasAttribute("disabled")).toBe(true);
     expect(dialog.textContent).not.toMatch(/MCP/);
 
-    const cats = within(dialog).getByRole("group", { name: "Categorias" });
+    const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
     expect(filterNames(cats)).toEqual([
       "Todos",
       "Conectados",
@@ -77,7 +78,7 @@ describe("Adicionar conector: one catalog", () => {
       "Marketing",
       "Automação",
     ]);
-    await click(within(cats).getByRole("button", { name: "Docs" }));
+    await click(within(cats).getByRole("radio", { name: /^Docs/ }));
     expect(names(dialog)).toEqual(["Google Drive", "Notion", "Não achou?"]);
     await type(within(dialog).getByRole("searchbox", { name: "Buscar conector" }), "notion");
     expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
@@ -140,7 +141,7 @@ describe("Adicionar conector: one catalog", () => {
       "Conectar outra conta",
     );
     await click(
-      within(dialog).getByRole("group", { name: "Categorias" }).querySelector("button:nth-child(2)") as Element,
+      within(dialog).getByRole("radiogroup", { name: "Categorias" }).querySelectorAll("[role=radio]")[1] as Element,
     );
     expect(names(dialog)).toEqual(["GitHub", "Zapier", "Não achou?"]);
   });

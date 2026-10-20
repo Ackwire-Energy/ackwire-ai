@@ -1,6 +1,6 @@
 import type { WikiGraph } from "@agenteschat/client";
 import { useWikiGraph } from "@agenteschat/client";
-import { appearanceStyle, FilterToggle } from "@agenteschat/ui";
+import { appearanceStyle, Segmented } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -242,14 +242,14 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
         </div>
       </header>
       <div className="wiki-graph__box">
-        <fieldset className="wiki-graph__filter">
-          <legend className="ac-visually-hidden">{t("wiki.graphFilter")}</legend>
-          {chips.map(([value, label]) => (
-            <FilterToggle key={value} pressed={filter === value} onPressedChange={() => setFilter(value)}>
-              {label}
-            </FilterToggle>
-          ))}
-        </fieldset>
+        <Segmented
+          size="sm"
+          className="wiki-graph__filter"
+          label={t("wiki.graphFilter")}
+          value={filter}
+          onValueChange={setFilter}
+          options={chips.map(([value, label]) => ({ value, label }))}
+        />
         {svg}
         <p className="wiki-graph__legend" aria-hidden="true">
           <span data-kind="person">{t("wiki.legend.people")}</span>

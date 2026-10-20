@@ -173,9 +173,7 @@ export function ThreadHeader({ thread, onClose }: { thread: ThreadInfo; onClose?
           <ThreadTitle thread={thread} />
         </h1>
         <span className="channel__topic thread-head__meta">
-          <span className="thread-head__where">
-            {who && thread.channelKind !== "dm" ? `${where} · ${who}` : where}
-          </span>
+          <span className="thread-head__where">{who && thread.channelKind !== "dm" ? `${where} · ${who}` : where}</span>
           {thread.replyCount > 0 && (
             <>
               <span aria-hidden="true">·</span>

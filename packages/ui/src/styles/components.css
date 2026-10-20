@@ -3175,6 +3175,13 @@ a.ac-list__row:focus-visible {
   box-shadow:
     inset 0 0 0 1px var(--line),
     inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  /* Never wider than its place: a long choice list scrolls sideways (the pill scrolls with it). */
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ac-seg::-webkit-scrollbar {
+  display: none;
 }
 .ac-seg__item {
   position: relative;

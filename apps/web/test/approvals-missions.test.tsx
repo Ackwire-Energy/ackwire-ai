@@ -78,8 +78,8 @@ describe("Aprovações: missions", () => {
     expect(within(section).getByRole("link", { name: "App mobile" })).toBeTruthy();
     expect(within(section).getByRole("button", { name: "Recusar" })).toBeTruthy();
     expect(within(section).getByRole("button", { name: /Aprovar sempre/ })).toBeTruthy();
-    const pill = within(screen().getByRole("group", { name: "Filtro" })).getByRole("button", {
-      name: "Esperando você",
+    const pill = within(screen().getByRole("radiogroup", { name: "Filtro" })).getByRole("radio", {
+      name: /^Esperando você/,
     });
     expect(pill.textContent).toBe(`Esperando você${approvals + 1}`);
     await act(async () => fireEvent.click(within(section).getByRole("button", { name: "Aprovar" })));

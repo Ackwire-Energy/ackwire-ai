@@ -20,11 +20,11 @@ import {
   DetailsSection,
   EmptyState,
   ExpiryFuse,
-  FilterToggle,
   Icon,
   type IconName,
   Kbd,
   SearchInput,
+  Segmented,
   Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
@@ -230,20 +230,10 @@ export function ApprovalsPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [all, openId, refusing, order, setOpenId]);
 
-  const pill = (f: Filter) => (
-    <FilterToggle
-      key={f}
-      pressed={filter === f}
-      onPressedChange={() => setFilter(f)}
-      count={
-        f === "all"
-          ? all.length
-          : all.filter((a) => bucketOf(approvalPhase(a)) === f).length + (f === "pending" ? commands : 0)
-      }
-    >
-      {t(`approvals.filter.${f}`)}
-    </FilterToggle>
-  );
+  const countOf = (f: Filter) =>
+    f === "all"
+      ? all.length
+      : all.filter((a) => bucketOf(approvalPhase(a)) === f).length + (f === "pending" ? commands : 0);
   const waiters = [...new Set(mine.map((a) => a.agentId))];
 
   return (
@@ -284,7 +274,12 @@ export function ApprovalsPage() {
             />
           }
         >
-          {FILTERS.map(pill)}
+          <Segmented
+            label={t("approvals.filters")}
+            value={filter}
+            onValueChange={setFilter}
+            options={FILTERS.map((f) => ({ value: f, label: t(`approvals.filter.${f}`), count: countOf(f) }))}
+          />
         </Toolbar>
 
         {filter === "pending" && waiters.length > 1 && (

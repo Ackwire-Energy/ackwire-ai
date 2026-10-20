@@ -1094,15 +1094,10 @@ a.wiki-embed:hover {
 }
 .wiki-graph__filter {
   position: absolute;
+  z-index: 1;
   top: 12px;
   left: 12px;
-  right: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  border: 0;
+  max-width: calc(100% - 24px);
 }
 .wiki-graph__svg {
   display: block;

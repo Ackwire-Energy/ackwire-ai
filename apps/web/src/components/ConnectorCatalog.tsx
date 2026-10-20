@@ -1,7 +1,7 @@
 import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
 import type { MailChoice } from "@agenteschat/client/lib/mail";
 import { connectorDescription, connectorName, scopeText } from "@agenteschat/client/lib/scopes";
-import { Button, Dialog, FilterToggle, Icon, type IconName, initialsOf, SearchField, Toolbar } from "@agenteschat/ui";
+import { Button, Dialog, Icon, type IconName, initialsOf, SearchField, Segmented } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -275,13 +275,18 @@ export function ConnectorCatalogDialog({
           onClear={() => setQ("")}
           clearLabel={t("filters.clearSearch")}
         />
-        <Toolbar size="sm" label={t("connectors.categories")} className="catalog__filters">
-          {(["all", "connected", ...present] as const).map((c) => (
-            <FilterToggle key={c} pressed={category === c} count={countOf(c)} onPressedChange={() => setCategory(c)}>
-              {c === "connected" ? t("connectors.connectedFilter") : t(`connectors.category.${c}`)}
-            </FilterToggle>
-          ))}
-        </Toolbar>
+        <Segmented
+          size="sm"
+          className="catalog__filters"
+          label={t("connectors.categories")}
+          value={category}
+          onValueChange={setCategory}
+          options={(["all", "connected", ...present] as const).map((c) => ({
+            value: c,
+            label: c === "connected" ? t("connectors.connectedFilter") : t(`connectors.category.${c}`),
+            count: countOf(c),
+          }))}
+        />
       </div>
       <div className="catalog__body" data-pane={paneOpen || undefined}>
         {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
