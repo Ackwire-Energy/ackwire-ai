@@ -348,15 +348,17 @@ const browserRows = (kind: BrowserPixelKind, rows: number) =>
 export function BrowserStrip({
   kinds,
   color = "sky",
+  rows: ROWS = 10,
   className,
 }: {
   kinds: BrowserPixelKind[];
   color?: AgentColor;
+  /** Its height in pixels: 7 sits on one line of text. */
+  rows?: number;
   className?: string;
 }) {
   const W = 3;
   const GAP = 1;
-  const ROWS = 10;
   const width = Math.max(1, kinds.length * (W + GAP) - GAP);
   const ref = useCanvas((ctx, canvas) => {
     const pal = browserPalette(canvas, color);

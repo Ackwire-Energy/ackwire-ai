@@ -7496,7 +7496,7 @@ export const en: Translations = {
       stoppedAt: "Stopped at {{time}}",
       summary: "{{steps}} on {{sites}} · {{duration}}",
       summaryNoSite: "{{steps}} · {{duration}}",
-      title: "Browsed {{sites}}",
+      titleMore: "{{site}} and {{count}} more",
       titleNoSite: "Used the browser",
       pair: "{{a}} and {{b}}",
       failed: "{{step}} · didn't work",

@@ -7514,7 +7514,7 @@ export const ptBR = {
       stoppedAt: "Parado às {{time}}",
       summary: "{{steps}} em {{sites}} · {{duration}}",
       summaryNoSite: "{{steps}} · {{duration}}",
-      title: "Navegou em {{sites}}",
+      titleMore: "{{site}} e mais {{count}}",
       titleNoSite: "Usou o navegador",
       pair: "{{a}} e {{b}}",
       failed: "{{step}} · não funcionou",

@@ -7,7 +7,7 @@ import {
   browserTrailPages,
   browserTrailSpanMs,
 } from "@agenteschat/client";
-import { formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { BrowserMark, BrowserStrip, Button, Icon, PageSilhouette, SkyStrip } from "@agenteschat/ui";
@@ -71,9 +71,13 @@ export function BrowserTrailCard({
         ? t("browser.after.stoppedBy", { person: dir.memberById.get(by)?.name, time })
         : t("browser.after.stoppedAt", { time });
   const hosts = browserTrailHosts(steps);
-  const title = hosts.length
-    ? t("browser.after.title", { sites: joinNames(hosts, t("newAgent.and")) })
-    : t("browser.after.titleNoSite");
+  // The site alone, short ("web.whatsapp.com" → "whatsapp.com"): the drawn page already says it browsed.
+  const site = hosts[0]?.replace(/^(www|web|m)\./, "");
+  const title = !site
+    ? t("browser.after.titleNoSite")
+    : hosts.length > 1
+      ? t("browser.after.titleMore", { site, count: hosts.length - 1 })
+      : site;
   const count = t("chat.work.steps", { count: steps.length });
   const duration = formatDuration(t, browserTrailSpanMs(steps));
   const summary = t("browser.after.summaryNoSite", { steps: count, duration });
@@ -104,7 +108,7 @@ export function BrowserTrailCard({
           <span className="brw-ac__tx">
             <b>{title}</b>
             <small className="brw-trail__sum">
-              <BrowserStrip kinds={steps.map(browserTrailKind)} color={color} />
+              <BrowserStrip kinds={steps.map(browserTrailKind)} color={color} rows={7} />
               <span>{summary}</span>
             </small>
             {ended && (
