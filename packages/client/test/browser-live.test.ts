@@ -201,6 +201,32 @@ describe("agent browser live connection (ADR 0040)", () => {
     live.close();
   });
 
+  test("a Parar says who pressed it and when", () => {
+    const ended: unknown[] = [];
+    const live = createBrowserLiveConnection({
+      send: () => {},
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      onEnded: (...args) => ended.push(args),
+      timers: fakeTimers().timers,
+    });
+    live.start();
+    live.handleMessage({
+      type: "browser.ended",
+      agentId: AGENT,
+      reason: "stopped",
+      byUserId: "u-joao",
+      at: "2026-10-20T12:00:00.000Z",
+    });
+    live.handleMessage({ type: "browser.ended", agentId: AGENT, reason: "closed" });
+    expect(ended).toEqual([
+      ["stopped", undefined, { userId: "u-joao", at: "2026-10-20T12:00:00.000Z" }],
+      ["closed", undefined, undefined],
+    ]);
+    live.close();
+  });
+
   test("input goes in batches the server accepts", () => {
     const sent: { events?: unknown[] }[] = [];
     const live = createBrowserLiveConnection({

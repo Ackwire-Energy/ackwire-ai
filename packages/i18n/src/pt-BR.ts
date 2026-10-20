@@ -5966,6 +5966,11 @@ export const ptBR = {
       notUndoable: "Só uma thread criada a partir de um trecho pode ser desfeita.",
       forum: "Tópicos do fórum não têm threads.",
     },
+    run: {
+      notContinuable: "Esta resposta não pode mais ser continuada.",
+      agentBusy: "O agente já está trabalhando nesta conversa. Espere ele terminar para continuar.",
+      continueForbidden: "Só quem pediu, o dono do agente ou um admin pode continuar.",
+    },
     artifact: {
       fileTooLarge: "O arquivo passa de {{max}} MB, o limite por arquivo.",
       fileRequired: "Escolha um arquivo para enviar.",
@@ -7382,6 +7387,8 @@ export const ptBR = {
       no: "Não",
       stopped: "Navegador parado",
       stoppedBy: "por você · {{time}}",
+      stoppedByOther: "por {{person}} · {{time}}",
+      stoppedAt: "às {{time}}",
       open: "Ver ao vivo",
       step: {
         browser_open: "Abriu {{detail}}",

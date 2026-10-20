@@ -158,12 +158,15 @@ export function browserRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Take over an agent's browser while watching; it waits until handed back",
-      request: { params: AgentParams },
+      description:
+        "`runId`: the agent's run whose card it was taken from; the take over is bound to it (its card stays in that conversation).",
+      request: { params: AgentParams, body: body(z.object({ runId: z.uuid().optional() })) },
       responses: { 200: json(BrowserHandoff), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      return c.json(await startTakeover(handoffDeps, c.get("user").id, orgId, agentId), 200);
+      const { runId } = c.req.valid("json");
+      return c.json(await startTakeover(handoffDeps, c.get("user").id, orgId, agentId, runId ?? null), 200);
     },
   );
 
@@ -179,7 +182,14 @@ export function browserRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      await stopAgentBrowser(db, deps.extras?.sandbox?.machines?.hub, c.get("user").id, orgId, agentId);
+      await stopAgentBrowser(
+        db,
+        deps.extras?.sandbox?.machines?.hub,
+        c.get("user").id,
+        orgId,
+        agentId,
+        adapters.pubsub,
+      );
       return c.body(null, 204);
     },
   );

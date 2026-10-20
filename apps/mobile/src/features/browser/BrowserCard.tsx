@@ -6,6 +6,7 @@ import {
   handoffMinutesLeft,
   isOpenHandoff,
   type LiveRun,
+  rememberHeldPlace,
   useAgentBrowserHandoff,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
@@ -90,7 +91,9 @@ export function BrowserCard({
   const ofAgent = useAgentBrowserHandoff(orgId, agentId, open && !given);
   const handoff = given ?? (ofAgent.data && isOpenHandoff(ofAgent.data) ? ofAgent.data : null);
   // Open, or closed while the agent works in it (its small live picture); a finished one keeps the last frame.
-  const live = useLiveConnection(agentId, open || Boolean(run));
+  // The person in control keeps watching even closed: their watching is what keeps their control.
+  const holding = Boolean(meId) && handoff?.status === "active" && handoff.controllerUserId === meId;
+  const live = useLiveConnection(agentId, open || Boolean(run) || holding);
   const controller = live.handoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
   const mine = Boolean(meId) && controller === meId;
   const waiting = handoff?.status === "pending";
@@ -124,9 +127,14 @@ export function BrowserCard({
     tapHaptic();
     setOpen(true);
     try {
-      await actions.takeover(agentId);
-    } catch {
-      failedToast();
+      // From a run's card: bound to that run, so the card stays in this conversation while the run waits.
+      const h = await actions.takeover(agentId, run?.runId);
+      if (h.kind === "takeover" && h.runId && run) {
+        rememberHeldPlace({ runId: h.runId, agentId, channelId: run.channelId, threadId: run.threadId });
+      }
+    } catch (err) {
+      if ((err as { status?: number }).status === 409) toast({ title: t("browser.card.busy"), icon: "x" });
+      else failedToast();
     }
   };
   const finish = async (ok: boolean, note?: string) => {
@@ -183,7 +191,9 @@ export function BrowserCard({
   };
 
   // ── The header: what the card says it is ──
-  const title = mine || waiting ? (handoff?.instructions ?? "") : host || t("browser.watch.title");
+  // A take over asks nothing: its title is the site, as while watching.
+  const asked = (mine || waiting) && handoff?.instructions ? handoff.instructions : "";
+  const title = asked || host || t("browser.watch.title");
   const minutes = waiting ? handoffMinutesLeft(handoff, now) : null;
   const subtitle = mine
     ? host
@@ -226,7 +236,7 @@ export function BrowserCard({
           </View>
         ) : null}
         <View style={styles.grow}>
-          <Text variant="footnote" tone="ink" numberOfLines={mine || waiting ? 2 : 1} style={styles.semibold}>
+          <Text variant="footnote" tone="ink" numberOfLines={asked ? 2 : 1} style={styles.semibold}>
             {title}
           </Text>
           <View style={styles.subRow}>

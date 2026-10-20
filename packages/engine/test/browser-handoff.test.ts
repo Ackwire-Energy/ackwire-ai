@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { BrowserInputEvent, MachineRequest } from "@agenteschat/adapters";
+import { type BrowserInputEvent, channelTopic, type MachineRequest, type RealtimeEvent } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
@@ -20,6 +20,8 @@ import {
   ForbiddenError,
   finishHandoff,
   grantScopes,
+  handoffInfo,
+  handoffResultText,
   listMessages,
   type MachineCaller,
   type MachineStatus,
@@ -29,8 +31,10 @@ import {
   requireBrowserAccess,
   requirePageRead,
   startTakeover,
+  stopAgentBrowser,
   type ToolSource,
   touchControl,
+  ValidationError,
   waitIfPersonInControl,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -65,7 +69,7 @@ const probe: ToolSource = {
       scope: "",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute(_input, ctx) {
-        return (await waitIfPersonInControl(ctx.db, ctx)) ?? { content: "acted" };
+        return (await waitIfPersonInControl(ctx.db, ctx, f.pubsub)) ?? { content: "acted" };
       },
     },
   ],
@@ -405,6 +409,117 @@ describe("take over", () => {
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("handed it back");
   });
 
+  test("Assumir from a run's card binds the take over to that run: its conversation hears it, the tray links there", async () => {
+    await start();
+    const heard: RealtimeEvent[] = [];
+    f.pubsub.subscribe(channelTopic(f.general.id), (e) => heard.push(e));
+    await post("@dev probe the page");
+    const [run] = await runs();
+    if (!run) throw new Error("no run");
+    const t = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, run.id);
+    expect(t).toMatchObject({ kind: "takeover", status: "active", runId: run.id });
+    await Bun.sleep(5);
+    const updates = heard.filter((e) => e.type === "browser.handoff.updated") as unknown as {
+      threadId: string | null;
+      handoff: { id: string; runId: string; kind: string };
+    }[];
+    expect(updates.some((e) => e.handoff.id === t.id && e.handoff.runId === run.id)).toBe(true);
+    expect(updates[0]?.threadId).toBe(run.threadRootId);
+    const [row] = await handoffs();
+    if (!row) throw new Error("no handoff");
+    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/threads/${run.threadRootId}`);
+
+    // The run reaches its browser call and waits; handing back wakes it.
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("waiting_input");
+    await finishHandoff(deps(), f.owner.id, f.org.id, t.id, { result: "done" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    // Over: it no longer shows on the run's conversation.
+    expect(updates.at(-1)?.handoff).toMatchObject({ id: t.id });
+    expect(
+      (heard.filter((e) => e.type === "browser.handoff.updated").at(-1) as unknown as { handoff: { status: string } })
+        .handoff.status,
+    ).toBe("done");
+  });
+
+  test("a take over from the agent's or computer's page has no run: the tray opens the computer's page", async () => {
+    const machine = await start();
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    const [row] = await handoffs();
+    if (!row) throw new Error("no handoff");
+    expect(row.runId).toBeNull();
+    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/settings/computers/${machine.machineId}`);
+  });
+
+  test("a run that isn't the agent's can't carry a take over; one that already ended binds nothing", async () => {
+    await start();
+    await expect(
+      startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, "00000000-0000-4000-8000-000000000000"),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await post("@dev hello");
+    await drainOutbox(f.db, f.handlers);
+    const [done] = await runs();
+    expect(done?.status).toBe("done");
+    const t = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, done?.id);
+    expect(t.runId).toBeNull();
+  });
+
+  test("leaving without handing back is told as such, not as handed back", async () => {
+    expect(handoffResultText({ result: "expired" }, "takeover")).toContain("left without handing it back");
+    expect(handoffResultText({ result: "expired" }, "takeover")).not.toContain("handed it back.");
+    expect(handoffResultText({ result: "done" }, "takeover")).toContain("handed it back");
+
+    await start();
+    await post("@dev probe the page");
+    const [run] = await runs();
+    const t = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, run?.id);
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("waiting_input");
+    await expireControl(deps(), t.id, f.owner.id, new Date(Date.now() + CONTROL_GRACE_MS + 1000));
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("left without handing it back");
+  });
+
+  test("the run under a take over is canceled: the person keeps the browser, and the next run waits on it", async () => {
+    await start();
+    await post("@dev probe the page");
+    const [first] = await runs();
+    if (!first) throw new Error("no run");
+    const t = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, first.id);
+    await f.db.update(schema.agentRuns).set({ status: "canceled" }).where(eq(schema.agentRuns.id, first.id));
+    const heard: RealtimeEvent[] = [];
+    f.pubsub.subscribe(channelTopic(f.general.id), (e) => heard.push(e));
+
+    await post("@dev probe it again");
+    await drainOutbox(f.db, f.handlers);
+    const second = (await runs()).find((r) => r.id !== first.id);
+    // Not refused as busy forever: the take over moved to the run that needs the browser now.
+    expect(second?.status).toBe("waiting_input");
+    const [row] = await handoffs();
+    expect(row).toMatchObject({ id: t.id, status: "active", runId: second?.id ?? "", controllerUserId: f.owner.id });
+    await Bun.sleep(5);
+    expect(
+      heard.some((e) => e.type === "browser.handoff.updated" && (e.handoff as { runId: string }).runId === second?.id),
+    ).toBe(true);
+
+    await finishHandoff(deps(), f.owner.id, f.org.id, t.id, { result: "done" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs()).find((r) => r.id === second?.id)?.status).toBe("done");
+  });
+
+  test("while the run under a take over still goes on, another run of the agent is refused", async () => {
+    await start();
+    await post("@dev probe the page");
+    const [first] = await runs();
+    if (!first) throw new Error("no run");
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, first.id);
+    const other = { orgId: f.org.id, agentId: f.agent.id, runId: "00000000-0000-4000-8000-000000000001" };
+    expect(await waitIfPersonInControl(f.db, other)).toMatchObject({ isError: true });
+    expect((await handoffs())[0]?.runId).toBe(first.id);
+  });
+
   test("taking over while the agent asked claims that request instead of starting another", async () => {
     await start();
     await post("@dev sign in please");
@@ -486,6 +601,25 @@ describe("live view", () => {
     await Bun.sleep(5);
     expect(calls.at(-1)).toMatchObject({ op: "browser.stream.stop" });
     expect(live.watching(f.agent.id)).toBe(false);
+  });
+
+  test("Parar is heard by everyone watching: who stopped it, and when", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    const a = viewer(f.owner.id);
+    const b = viewer("someone-else");
+    await live.watch(a.viewer, f.org.id, f.agent.id);
+    await live.watch(b.viewer, f.org.id, f.agent.id);
+    await stopAgentBrowser(f.db, hub as unknown as MachineCaller, f.owner.id, f.org.id, f.agent.id, f.pubsub);
+    await Bun.sleep(5);
+    expect(calls.some((c) => c.op === "browser.stop")).toBe(true);
+    for (const v of [a, b]) {
+      const ended = v.got.find((m) => m.type === "browser.ended");
+      expect(ended).toMatchObject({ type: "browser.ended", reason: "stopped", byUserId: f.owner.id });
+      expect(typeof (ended as { at?: string }).at).toBe("string");
+    }
+    live.close();
   });
 
   test("the stream outlives its last viewer for a moment: a quick re-watch doesn't stop and start it", async () => {

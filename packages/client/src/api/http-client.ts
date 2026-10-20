@@ -260,8 +260,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       cancel: (orgId, handoffId) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/cancel`, { json: {} }),
-      takeover: (orgId, agentId) =>
-        request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/browser/takeover`, { json: {} }),
+      takeover: (orgId, agentId, runId) =>
+        request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/browser/takeover`, {
+          json: runId ? { runId } : {},
+        }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
     },
     reminders: {

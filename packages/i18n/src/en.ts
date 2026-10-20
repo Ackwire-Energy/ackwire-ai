@@ -5949,6 +5949,11 @@ export const en: Translations = {
       notUndoable: "Only a thread made from a range can be undone.",
       forum: "Forum topics have no threads.",
     },
+    run: {
+      notContinuable: "This answer can't be continued anymore.",
+      agentBusy: "The agent is already working in this conversation. Wait for it to finish to continue.",
+      continueForbidden: "Only who asked, the agent's owner or an admin can continue it.",
+    },
     artifact: {
       fileTooLarge: "The file is over {{max}} MB, the limit per file.",
       fileRequired: "Choose a file to upload.",
@@ -7361,6 +7366,8 @@ export const en: Translations = {
       no: "No",
       stopped: "Browser stopped",
       stoppedBy: "by you · {{time}}",
+      stoppedByOther: "by {{person}} · {{time}}",
+      stoppedAt: "at {{time}}",
       open: "View live",
       step: {
         browser_open: "Opened {{detail}}",

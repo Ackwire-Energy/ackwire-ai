@@ -928,8 +928,11 @@ export interface ApiClient {
     /** "Não consegui", with an optional reason the agent reads. */
     failed(orgId: string, handoffId: string, note?: string): Promise<BrowserHandoff>;
     cancel(orgId: string, handoffId: string): Promise<BrowserHandoff>;
-    /** Take over while watching; the agent waits until handed back. */
-    takeover(orgId: string, agentId: string): Promise<BrowserHandoff>;
+    /**
+     * Take over while watching; the agent waits until handed back. `runId`: the run whose card it
+     * was taken from (the take over is bound to it, so its card stays in that conversation).
+     */
+    takeover(orgId: string, agentId: string, runId?: string): Promise<BrowserHandoff>;
     /** "Parar": closes the agent's browser now (its logins stay). */
     stop(orgId: string, agentId: string): Promise<void>;
   };

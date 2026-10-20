@@ -4,6 +4,7 @@ import type {
   Approval,
   ArtifactRef,
   Channel,
+  HeldPlace,
   Member,
   MemoryUpdate,
   Message as MessageType,
@@ -16,6 +17,7 @@ import {
   browserHandoffOf,
   type ConnectionStatus,
   consultsIn,
+  heldRowsIn,
   isQuiet,
   keys,
   type LiveRun,
@@ -33,6 +35,7 @@ import {
   useChannels,
   useChannelThreads,
   useCreateMission,
+  useHeldPlaces,
   useJoinChannel,
   useMessages,
   useMissionControl,
@@ -124,14 +127,22 @@ import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
 import { browserOffline, failedOffline, outbox, useQueued } from "@/chat/outbox";
 import { readingLanding } from "@/chat/reading";
-import { elapsedParts, nextSlots, type RunSlot, runPhase, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
+import {
+  blockRowByRun,
+  elapsedParts,
+  nextSlots,
+  type RunSlot,
+  runPhase,
+  SLOT_HOLD_MS,
+  sameSlots,
+} from "@/chat/run-slots";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
-import { RunBrowserCard } from "@/components/browser/BrowserCard";
+import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/browser/BrowserCard";
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
@@ -451,6 +462,12 @@ function ChannelView({
       .map((r) => r.runId)
       .join(" "),
   );
+  /** The most recent run at work here (anyone writing chooses "Juntar" or "Parar e mandar" for it). */
+  const busyTarget = stoppableKey
+    ? scopedRuns(live.get().streams)
+        .filter((r) => isStoppable(r) && !r.stopping)
+        .at(-1)
+    : undefined;
   /** The most recent run here that I may stop. */
   const stopTarget = stoppableKey
     ? scopedRuns(live.get().streams)
@@ -1288,10 +1305,15 @@ function ChannelView({
         onStop: () => stopRun(stopTarget),
       }
     : null;
-  const choice = stopTarget
+  // The choice is for anyone who writes while an agent works (the stop button only for who may stop it).
+  const busyGrammar = agentGrammar(
+    t,
+    busyTarget ? (dir.agentById.get(busyTarget.agentId)?.name ?? t("channel.unknownAgent")) : "",
+  );
+  const choice = busyTarget
     ? {
-        label: t("run.choice.label", stopGrammar),
-        joinLabel: t("run.choice.join", stopGrammar),
+        label: t("run.choice.label", busyGrammar),
+        joinLabel: t("run.choice.join", busyGrammar),
         interruptLabel: t("run.choice.interrupt"),
         hint: (c: "join" | "interrupt", mod: string) => (
           <>
@@ -1587,6 +1609,8 @@ function ChannelView({
                       slots={slots}
                       runKeys={runKeys.current}
                       divider={divider}
+                      channelId={channel.id}
+                      runVisible={runVisible}
                     />
                     {!thread && (
                       <ArchivedThreadsNote channelId={channel.id} count={archivedThreads.data?.threads.length ?? 0} />
@@ -1799,6 +1823,8 @@ const Timeline = memo(function Timeline({
   slots,
   runKeys,
   divider,
+  channelId,
+  runVisible,
 }: {
   items: ReturnType<typeof buildTimeline>;
   /** The first page loaded: rows from then on slide in. */
@@ -1809,6 +1835,9 @@ const Timeline = memo(function Timeline({
   runKeys: Map<string, string>;
   /** "Novas": before this row, fading once the person got there. */
   divider: { key: string; fading: boolean } | null;
+  /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
+  channelId: string;
+  runVisible: { current: (r: { threadId: string }) => boolean };
 }) {
   const { t, i18n } = useTranslation();
   const models = useModels();
@@ -1865,6 +1894,27 @@ const Timeline = memo(function Timeline({
     }
     return start ? <ThreadStartLine key={key} message={m} start={start} thread={info} /> : null;
   };
+  // A run can post more than one message (text before a card, the card, the final reply): only its
+  // last one is drawn under the block's key, the others under their own (keys stay unique).
+  const blockRows = useMemo(() => blockRowByRun(items, new Set(slots.map((s) => s.runId))), [items, slots]);
+  // Each run's last message here carries its browser card while a take over holds it (`HeldBrowserCard`).
+  const lastByRun = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const i of items) if (i.kind === "message" && i.message.agentRunId) out.set(i.message.agentRunId, i.key);
+    return out;
+  }, [items]);
+  // A take over whose run has no live block and no message here: its card at the end (`HeldBrowserRow`).
+  const heldPlaces = useHeldPlaces();
+  const held = useMemo(
+    () =>
+      heldRowsIn(heldPlaces, {
+        channelId,
+        visible: (threadId) => runVisible.current({ threadId: threadId ?? "" }),
+        live: new Set(slots.map((x) => x.runId)),
+        landed: new Set(lastByRun.keys()),
+      }),
+    [heldPlaces, channelId, runVisible, slots, lastByRun],
+  );
   const rows: ReactNode[] = [];
   for (const item of items) {
     if (divider?.key === item.key) {
@@ -1886,7 +1936,7 @@ const Timeline = memo(function Timeline({
       continue;
     }
     const entering = initial !== null && entersWithMotion(item.key, m.createdAt, initial, mountedAt);
-    const blockKey = m.agentRunId ? runKeys.get(m.agentRunId) : undefined;
+    const blockKey = m.agentRunId && blockRows.get(m.agentRunId) === item.key ? runKeys.get(m.agentRunId) : undefined;
     rows.push(
       blockKey && m.agentRunId ? (
         // Seen live: the same block, with its own header (it had one while it worked).
@@ -1899,6 +1949,7 @@ const Timeline = memo(function Timeline({
           modelLabels={modelLabels}
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
+          lastOfRun={lastByRun.get(m.agentRunId) === item.key}
         />
       ) : (
         <TimelineMessage
@@ -1909,6 +1960,7 @@ const Timeline = memo(function Timeline({
           modelLabels={modelLabels}
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
+          lastOfRun={Boolean(m.agentRunId && lastByRun.get(m.agentRunId) === item.key)}
         />
       ),
     );
@@ -1925,8 +1977,37 @@ const Timeline = memo(function Timeline({
       />,
     );
   }
+  for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
   return <>{rows}</>;
 });
+
+/**
+ * A person holds the agent's browser (Assumir) for a run that has no live block and posted nothing
+ * here (it paused without a word, or ended): the card stays at the end of its conversation, as the
+ * agent's row, until the browser is handed back.
+ */
+function HeldBrowserRow({ place }: { place: HeldPlace }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const held = useHeldTakeover(place.agentId, place.runId);
+  if (!held) return null;
+  const name = dir.agentById.get(place.agentId)?.name ?? t("channel.unknownAgent");
+  return (
+    <Message
+      agent
+      stacked
+      avatar={<AgentAvatar agentId={place.agentId} name={name} state="idle" />}
+      author={name}
+      time={t("common.now")}
+    >
+      <HeldBrowserCard agentId={place.agentId} runId={place.runId} name={name} />
+    </Message>
+  );
+}
+
+/** A run's last message asks whether a take over still holds its browser only this recently (older: events only). */
+const HELD_RECENT_MS = 12 * 60 * 60_000;
 
 /** Model names for the rows of "Ajustar trecho" (no usage line is shown there). */
 const NO_LABELS = new Map<string, string>();
@@ -1964,6 +2045,7 @@ function RunBlock({
   modelLabels: Map<string, string>;
   contextMark?: boolean;
   replyContext?: ReplyRef;
+  lastOfRun?: boolean;
 }) {
   const run = useStreams((s) => (message ? undefined : s.runs[runId]));
   const last = useRef<LiveRun | undefined>(undefined);
@@ -2489,6 +2571,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   replyContext,
   live = null,
   seenLive,
+  lastOfRun = false,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -2502,6 +2585,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   live?: LiveRun | null;
   /** This answer was watched live here: its last live state (the steps fold into "3 passos"). */
   seenLive?: LiveRun;
+  /** The last message of its run here: it carries the run's browser card while a take over holds it. */
+  lastOfRun?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -2771,7 +2856,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </p>
           )}
-          {!liveFailed && !liveStopped && <RunBrowserCard run={live} name={name} />}
+          {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
+          <RunBrowserCard run={live} name={name} />
           {!liveFailed && revealed && (
             <MessageText>
               <MessageBody body={revealed} resolveMention={dir.mentionName} live={!liveStopped} />
@@ -2870,6 +2956,14 @@ export const TimelineMessage = memo(function TimelineMessage({
           {question && <QuestionCard question={question} />}
           {secretRequest && <SecretCard request={secretRequest} />}
           {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+          {lastOfRun && m.author.type === "agent" && m.author.id && m.agentRunId && !m.local && (
+            <HeldBrowserCard
+              agentId={m.author.id}
+              runId={m.agentRunId}
+              name={name}
+              enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
+            />
+          )}
           {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptWork && (
             <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
           )}

@@ -104,6 +104,10 @@ Modeled on Cloudflare's handoff:
 
 A person watching can also **take over** on their own: the same screen; the agent pauses and, when handed back, is told "a person changed the page" and reads again before acting.
 
+- Taken from a run's card, the take over is bound to that run (`runId`): its card stays in that run's conversation (on the run's last message, else at the end) while the person holds control, even after the run's live block goes, and `browser.handoff.updated` goes to that conversation. Taken from the agent's or the computer's page it has no run until a run's browser call waits on it; the tray links to the run's conversation, else to the computer's page.
+- If the run under a take over ends (done, failed, canceled) while the person keeps control, the person keeps the browser and the card stays; the agent's next run that needs the browser takes the take over over (it waits on it, and the card moves to it), so it is never "busy" forever. A run still going keeps it (other runs are refused).
+- Leaving without handing back (expired) is told to the agent as such, not as handed back. "Parar" is heard by everyone watching (`browser.stopped` → `browser.ended` with who and when).
+
 - One person in control per agent browser; others watch ("Ana is in control").
 - Timing, as in OpenBot and OpenMausBot: a request waits 10 minutes for someone to open it (the agent may ask for up to 30), then expires; once a person is in control there is no deadline; if their view drops, control is kept for 2 minutes (presence renewed every 30 s and stored in the database, so it holds across replicas and restarts), then it ends as `expired`.
 - While a request is open (waiting or in control) the agent's browser tools wait or refuse; after a person had control, only `browser_read` works until the agent reads the page again (`page_read_at`, migration 0080), as OpenBot requires a fresh snapshot after hand back.

@@ -3,7 +3,9 @@ import { useApi } from "../api/context";
 import { keys } from "../api/keys";
 import type { AgentBrowserSettings, BrowserHandoff } from "../api/types";
 import type { LiveWork } from "../realtime/streams";
+import { noteHandoffPlace } from "./held";
 
+export * from "./held";
 export * from "./input";
 export * from "./live";
 export * from "./watches";
@@ -113,8 +115,17 @@ export function browserSiteUrl(frameUrl: string | null | undefined, steps: Brows
   return null;
 }
 
-/** A request changed (an action's answer, `browser.handoff.updated`): every cached view of it follows. */
-export function applyBrowserHandoff(qc: QueryClient, orgId: string, handoff: BrowserHandoff) {
+/**
+ * A request changed (an action's answer, `browser.handoff.updated`): every cached view of it follows.
+ * `place`: the conversation the event came in (a take over's run lives there: its held card).
+ */
+export function applyBrowserHandoff(
+  qc: QueryClient,
+  orgId: string,
+  handoff: BrowserHandoff,
+  place?: { channelId: string; threadId: string | null },
+) {
+  if (place) noteHandoffPlace(handoff, place.channelId, place.threadId);
   qc.setQueryData(keys.browserHandoff(orgId, handoff.id), handoff);
   qc.setQueryData<BrowserHandoff | null>(keys.agentBrowserHandoff(orgId, handoff.agentId), (old) =>
     isOpenHandoff(handoff) ? handoff : old?.id === handoff.id || old === undefined ? null : old,
@@ -142,14 +153,18 @@ export function useUpdateAgentBrowserSettings(orgId: string, agentId: string) {
   });
 }
 
-/** The agent's open request or take over (who is in control), if any. */
-export const useAgentBrowserHandoff = (orgId: string, agentId: string, enabled = true) => {
+/**
+ * The agent's open request or take over (who is in control), if any. `staleTime`: how long a
+ * fetched answer is trusted (the realtime event keeps it current meanwhile).
+ */
+export const useAgentBrowserHandoff = (orgId: string, agentId: string, enabled = true, staleTime = 0) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.agentBrowserHandoff(orgId, agentId),
     queryFn: () => api.browser.agentHandoff(orgId, agentId),
     enabled,
     retry: false,
+    staleTime,
   });
 };
 
@@ -162,6 +177,12 @@ export const useBrowserHandoff = (orgId: string, handoffId: string | null | unde
     retry: false,
   });
 };
+
+/** "Assumir" from a run's card: the run it is bound to (its card stays in that conversation). */
+export interface TakeoverInput {
+  agentId: string;
+  runId?: string;
+}
 
 /**
  * "Abrir" (take control), "Pronto", "Não consegui", cancel, "Assumir" while watching,
@@ -195,7 +216,8 @@ export function useBrowserHandoffMutations(orgId: string) {
       onSuccess: apply,
     }),
     takeover: useMutation({
-      mutationFn: (agentId: string) => api.browser.takeover(orgId, agentId),
+      mutationFn: (v: string | TakeoverInput) =>
+        typeof v === "string" ? api.browser.takeover(orgId, v) : api.browser.takeover(orgId, v.agentId, v.runId),
       meta: { silent: true },
       onSuccess: apply,
     }),
@@ -218,7 +240,7 @@ export function useBrowserHandoffActions(orgId: string) {
     done: (handoffId: string) => m.done.mutateAsync(handoffId),
     failed: (handoffId: string, note?: string) => m.failed.mutateAsync({ handoffId, ...(note ? { note } : {}) }),
     cancel: (handoffId: string) => m.cancel.mutateAsync(handoffId),
-    takeover: (agentId: string) => m.takeover.mutateAsync(agentId),
+    takeover: (agentId: string, runId?: string) => m.takeover.mutateAsync(runId ? { agentId, runId } : agentId),
     stop: (agentId: string) => m.stop.mutateAsync(agentId),
     pending:
       m.takeControl.isPending ||

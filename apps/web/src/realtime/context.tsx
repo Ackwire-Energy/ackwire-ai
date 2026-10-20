@@ -652,7 +652,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
       if (event.type === "thread.updated") applyThreadEvent(qc, orgId, event);
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
-      if (event.type === "browser.handoff.updated") applyBrowserHandoff(qc, orgId, event.handoff);
+      if (event.type === "browser.handoff.updated")
+        applyBrowserHandoff(qc, orgId, event.handoff, { channelId: event.channelId, threadId: event.threadId });
       // Missions (ADR 0029): the pinned card, the cards in the thread, the lists; a task's row.
       if (event.type === "mission.updated") applyMissionEvent(qc, orgId, event);
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
@@ -749,11 +750,20 @@ export interface BrowserLiveState {
   /** Why nothing is shown now (cleared by the next frame or status). */
   unavailable: { reason: BrowserLiveUnavailable; message?: string } | null;
   ended: boolean;
+  /** How it ended (cleared with `ended`): Parar says who and when. */
+  endedBy: { reason: "stopped" | "closed" | "error"; userId?: string; at?: string } | null;
   /** The last refusal (`not_in_control`, `forbidden`, …). */
   error: string | null;
 }
 
-const EMPTY_LIVE: BrowserLiveState = { frame: null, status: null, unavailable: null, ended: false, error: null };
+const EMPTY_LIVE: BrowserLiveState = {
+  frame: null,
+  status: null,
+  unavailable: null,
+  ended: false,
+  endedBy: null,
+  error: null,
+};
 
 /**
  * Watches an agent's browser on the org's socket while mounted (`enabled`):
@@ -772,11 +782,17 @@ export function useBrowserLive(agentId: string, enabled = true) {
       // Shared per socket: the card, the bar and the full view of one agent are one watch.
       watcher: connection.browserWatcher,
       agentId,
-      onFrame: (frame) => setState((s) => ({ ...s, frame, unavailable: null, ended: false })),
-      onStatus: (status) => setState((s) => ({ ...s, status, unavailable: null, ended: false })),
+      onFrame: (frame) => setState((s) => ({ ...s, frame, unavailable: null, ended: false, endedBy: null })),
+      onStatus: (status) => setState((s) => ({ ...s, status, unavailable: null, ended: false, endedBy: null })),
       onUnavailable: (reason, message) =>
         setState((s) => ({ ...s, unavailable: { reason, ...(message ? { message } : {}) } })),
-      onEnded: () => setState((s) => ({ ...s, ended: true })),
+      onEnded: (reason, _message, by) =>
+        setState((s) => ({
+          ...s,
+          ended: true,
+          // A stop says who; a later "closed" from the same stop keeps it.
+          endedBy: reason === "stopped" || s.endedBy?.reason !== "stopped" ? { reason, ...by } : s.endedBy,
+        })),
       onError: (code) => setState((s) => ({ ...s, error: code })),
     });
     liveRef.current = live;

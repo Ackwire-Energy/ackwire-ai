@@ -1,4 +1,4 @@
-import type { AgentScope, MachineReplies } from "@agenteschat/adapters";
+import type { AgentScope, MachineReplies, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
@@ -63,6 +63,8 @@ async function browserSecret(ctx: ToolContext, name: string, machineId: string) 
 export interface BrowserToolDeps {
   /** Connected machines (ADR 0025); without them the source offers nothing. */
   machines?: { hub: MachineCaller };
+  /** A take over moving to the run that waits on it is told to its conversation (the card follows). */
+  pubsub?: PubSub;
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -268,7 +270,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     // A person in control of this browser, or asked to take it, makes the agent wait; after
     // they had it, only browser_read works until the agent has seen the page again.
     execute: async (input, ctx) => {
-      const waiting = await waitIfPersonInControl(ctx.db, ctx);
+      const waiting = await waitIfPersonInControl(ctx.db, ctx, deps.pubsub);
       if (waiting) return waiting;
       // Only tools that act on what the agent last read are held back: reading, opening a page,
       // tabs or closing always work (so a browser closed meanwhile can always be opened again).

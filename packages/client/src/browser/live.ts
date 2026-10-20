@@ -77,7 +77,15 @@ export type BrowserLiveMessage =
   | ({ type: "browser.frame" } & BrowserFrame)
   | ({ type: "browser.status" } & BrowserLiveStatus)
   | { type: "browser.unavailable"; agentId: string; reason: BrowserLiveUnavailable; message?: string }
-  | { type: "browser.ended"; agentId: string; reason: "stopped" | "closed" | "error"; message?: string }
+  | {
+      type: "browser.ended";
+      agentId: string;
+      reason: "stopped" | "closed" | "error";
+      message?: string;
+      /** Parar: who pressed it, and when. */
+      byUserId?: string;
+      at?: string;
+    }
   | { type: "error"; agentId: string; code: string };
 
 /** Most events in one `browser.input` frame (the server's limit). */
@@ -136,6 +144,8 @@ export function parseBrowserLiveMessage(v: unknown): BrowserLiveMessage | null {
         agentId: v.agentId,
         reason: v.reason === "stopped" || v.reason === "closed" ? v.reason : "error",
         ...(typeof v.message === "string" ? { message: v.message } : {}),
+        ...(typeof v.byUserId === "string" ? { byUserId: v.byUserId } : {}),
+        ...(typeof v.at === "string" ? { at: v.at } : {}),
       };
     case "error":
       return typeof v.code === "string" ? { type: "error", agentId: v.agentId, code: v.code } : null;
@@ -156,7 +166,8 @@ export interface BrowserLiveOptions {
   onFrame(frame: BrowserFrame): void;
   onStatus(status: BrowserLiveStatus): void;
   onUnavailable?(reason: BrowserLiveUnavailable, message?: string): void;
-  onEnded?(reason: "stopped" | "closed" | "error", message?: string): void;
+  /** The stream ended: the browser closed, an error, or someone pressed Parar (`by`: who and when). */
+  onEnded?(reason: "stopped" | "closed" | "error", message?: string, by?: { userId?: string; at?: string }): void;
   /** `forbidden`, `not_found`, `not_in_control`, `too_many_browsers`, `rate_limited`. */
   onError?(code: string): void;
   timers?: Pick<Timers, "setTimeout" | "clearTimeout">;
@@ -291,7 +302,13 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
           if (m.reason === "reconnecting" || m.reason === "unavailable" || m.reason === "offline") retryLater();
           return;
         case "browser.ended":
-          options.onEnded?.(m.reason, m.message);
+          options.onEnded?.(
+            m.reason,
+            m.message,
+            m.byUserId || m.at
+              ? { ...(m.byUserId ? { userId: m.byUserId } : {}), ...(m.at ? { at: m.at } : {}) }
+              : undefined,
+          );
           // The browser closed or failed on the computer: watching again picks it up when it is back.
           if (m.reason !== "stopped") retryLater();
           return;

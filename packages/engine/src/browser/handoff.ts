@@ -60,6 +60,13 @@ export const ASK_PERSON_TOOL = "browser_ask_person";
 export const BROWSER_HANDOFF_TOPIC = "browser-handoffs";
 
 const OPEN: BrowserHandoffStatus[] = ["pending", "active"];
+/** Runs that can still wait on a handoff (a take over bound to any other run is free to take). */
+const LIVE_RUN: (typeof agentRuns.$inferSelect)["status"][] = [
+  "queued",
+  "running",
+  "waiting_input",
+  "waiting_approval",
+];
 
 /**
  * A person's turn in an agent's browser (ADR 0040 §6), as the app shows it:
@@ -119,6 +126,12 @@ export interface HandoffDeps {
 /** What the agent reads when its run resumes. */
 export function handoffResultText(result: BrowserHandoffResult, kind: "ask" | "takeover" = "ask"): string {
   if (kind === "takeover") {
+    if (result.result === "expired") {
+      return "A person took control of your browser and left without handing it back. The page may be anywhere now: read it again (browser_read) and check where things are before assuming anything.";
+    }
+    if (result.result === "failed") {
+      return "A person had control of your browser and ended it without handing it back as done. Read the page again (browser_read) and check where things are before assuming anything.";
+    }
     return "A person used your browser and handed it back. The page may have changed: read it again (browser_read) before acting.";
   }
   if (result.result === "done") {
@@ -229,7 +242,7 @@ export async function getHandoff(db: Database, userId: string, orgId: string, ha
 
 // ── Card, events, notifications ───────────────────────────────────────────────
 
-/** Writes the handoff's state into its chat card (`meta.browserHandoff`); takeovers have no card. */
+/** Writes the handoff's state into its chat card (`meta.browserHandoff`); takeovers have no card of their own. */
 async function syncCard(db: Executor, row: BrowserHandoffRow) {
   if (row.kind !== "ask") return;
   await db
@@ -238,6 +251,7 @@ async function syncCard(db: Executor, row: BrowserHandoffRow) {
     .where(and(eq(messages.id, row.id), eq(messages.orgId, row.orgId)));
 }
 
+/** Where a handoff lives in the conversation: an ask's card message. */
 async function cardWhere(db: Executor, row: BrowserHandoffRow) {
   if (row.kind !== "ask") return null;
   const [m] = await db
@@ -245,6 +259,27 @@ async function cardWhere(db: Executor, row: BrowserHandoffRow) {
     .from(messages)
     .where(and(eq(messages.id, row.id), eq(messages.orgId, row.orgId)));
   return m ?? null;
+}
+
+/** Where a run's replies go (its card in the conversation follows it), when the run exists. */
+async function runPlace(db: Executor, orgId: string, runId: string | null) {
+  if (!runId) return null;
+  const [run] = await db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
+  if (!run) return null;
+  const where = await runWhere(db as Database, run);
+  return { channelId: where.channelId, threadId: where.threadId };
+}
+
+/**
+ * Where a handoff shows in the conversation: an ask's card, a take over's run (its browser card
+ * stays on that run's live block or reply while the person holds control). Null: nowhere (a take
+ * over started from the agent's or the computer's page, before any run waits on it).
+ */
+export async function handoffPlace(db: Executor, row: BrowserHandoffRow) {
+  return row.kind === "ask" ? cardWhere(db, row) : runPlace(db, row.orgId, row.runId);
 }
 
 /** The open handoffs on a computer (sent to it again when it reconnects). */
@@ -264,12 +299,15 @@ export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise
   const [person] = row.controllerUserId
     ? await db.select({ name: users.name }).from(users).where(eq(users.id, row.controllerUserId))
     : [];
-  const where = await cardWhere(db, row);
+  const where = await handoffPlace(db, row);
+  // The conversation holding its card (an ask's message, a take over's run), else the computer's page.
   const link = where
     ? where.threadId
       ? `/org/${row.orgId}/threads/${where.threadId}`
-      : `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
-    : `/org/${row.orgId}/agents/${row.agentId}`;
+      : row.kind === "ask"
+        ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
+        : `/org/${row.orgId}/c/${where.channelId}`
+    : `/org/${row.orgId}/settings/computers/${row.machineId}`;
   return {
     status: row.status === "active" && row.controllerUserId ? "active" : "pending",
     ...(person?.name ? { controller: person.name } : {}),
@@ -278,8 +316,12 @@ export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise
   };
 }
 
-/** Tells the conversation (card state) and the live view (who is in control) after a change committed. */
-async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow) {
+/**
+ * Tells the conversation (card state) and the live view (who is in control) after a change
+ * committed. `movedFrom`: the run the take over was bound to before (its conversation hears too,
+ * so the card there goes).
+ */
+async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow, movedFrom?: string | null) {
   deps.live?.changed(row);
   // The replica holding the computer's socket may be another one: it hears it here.
   await deps.pubsub
@@ -291,8 +333,14 @@ async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow) {
       machineId: row.machineId,
     })
     .catch(() => {});
-  const where = await cardWhere(deps.db, row);
-  if (where) {
+  const places = [await handoffPlace(deps.db, row)];
+  if (movedFrom && movedFrom !== row.runId) places.push(await runPlace(deps.db, row.orgId, movedFrom));
+  const seen = new Set<string>();
+  for (const where of places) {
+    if (!where) continue;
+    const key = `${where.channelId}:${where.threadId ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     await publishChannelEvent(deps.pubsub, {
       type: "browser.handoff.updated",
       channelId: where.channelId,
@@ -582,10 +630,28 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
  * A person watching takes over the agent's browser. An open handoff of that
  * agent is claimed instead (one person in control at a time); otherwise a
  * `takeover` starts, and the agent's browser tools wait until it is handed
- * back (`waitIfPersonInControl`).
+ * back (`waitIfPersonInControl`). `runId`: the run whose card it was taken
+ * from (the agent's, still going): the take over is bound to it at once, so
+ * its card keeps a place in that conversation. A run that already ended
+ * binds nothing (the next run that needs the browser waits on it).
  */
-export async function startTakeover(deps: HandoffDeps, actorId: string, orgId: string, agentId: string) {
+export async function startTakeover(
+  deps: HandoffDeps,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  runId?: string | null,
+) {
   await requireBrowserAccess(deps.db, actorId, orgId, agentId);
+  let boundRun: string | null = null;
+  if (runId) {
+    const [run] = await deps.db
+      .select({ agentId: agentRuns.agentId, status: agentRuns.status })
+      .from(agentRuns)
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
+    if (!run || run.agentId !== agentId) throw new ValidationError("That run isn't this agent's");
+    if (LIVE_RUN.includes(run.status)) boundRun = runId;
+  }
   const open = await openHandoffOf(deps.db, orgId, agentId);
   if (open) return claimHandoff(deps, actorId, orgId, open.id);
   const machineId = await browserMachineOf(deps.db, orgId, agentId);
@@ -598,6 +664,7 @@ export async function startTakeover(deps: HandoffDeps, actorId: string, orgId: s
       .values({
         orgId,
         agentId,
+        runId: boundRun,
         machineId,
         kind: "takeover",
         status: "active",
@@ -620,31 +687,52 @@ export async function startTakeover(deps: HandoffDeps, actorId: string, orgId: s
 /**
  * Before an agent acts in its browser: a person in control, or asked to take
  * it, makes the call wait (the run pauses on that handoff and resumes when
- * it ends); another run of the agent is refused. Null: go on. For the
- * browser tools (`tools.ts`).
+ * it ends); another run of the agent is refused while the run the handoff
+ * belongs to still goes on. A take over whose run ended (done, failed,
+ * canceled) while the person kept control is this run's to wait on: it
+ * moves here, and its card with it. Null: go on. For the browser tools
+ * (`tools.ts`).
  */
 export async function waitIfPersonInControl(
   db: Database,
   ctx: { orgId: string; agentId: string; runId: string },
+  pubsub?: PubSub,
 ): Promise<ToolOutput | null> {
   const open = await openHandoffOf(db, ctx.orgId, ctx.agentId);
   if (!open) return null;
   const busy = "A person has control of your browser, or has been asked to take it.";
-  if (open.runId && open.runId !== ctx.runId) {
-    return { content: `${busy} Try again later, or say so in your reply.`, isError: true };
-  }
-  if (!open.runId) {
+  if (open.runId !== ctx.runId) {
+    const from = open.runId;
+    if (from && (open.kind !== "takeover" || (await runIsLive(db, ctx.orgId, from)))) {
+      return { content: `${busy} Try again later, or say so in your reply.`, isError: true };
+    }
     const [bound] = await db
       .update(browserHandoffs)
       .set({ runId: ctx.runId })
-      .where(and(eq(browserHandoffs.id, open.id), isNull(browserHandoffs.runId)))
-      .returning({ id: browserHandoffs.id });
+      .where(
+        and(
+          eq(browserHandoffs.id, open.id),
+          inArray(browserHandoffs.status, OPEN),
+          from ? eq(browserHandoffs.runId, from) : isNull(browserHandoffs.runId),
+        ),
+      )
+      .returning();
     if (!bound) return { content: `${busy} Try again later.`, isError: true };
+    // The card follows the run that waits now (and leaves the one it was on).
+    await afterChange({ db, pubsub }, bound, from).catch(() => {});
   }
   return {
     content: `${busy} End your turn; you'll be woken when it's over.`,
     data: { pause: { kind: "input", id: open.id }, handoffId: open.id },
   };
+}
+
+async function runIsLive(db: Executor, orgId: string, runId: string) {
+  const [run] = await db
+    .select({ status: agentRuns.status })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
+  return Boolean(run && LIVE_RUN.includes(run.status));
 }
 
 /**
@@ -795,7 +883,8 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
 /**
  * "Parar" on the live view or the computer page: closes the agent's browser
  * now (its logins stay in its profile). Whoever may watch it may stop it; the
- * agent's next browser call opens a fresh one.
+ * agent's next browser call opens a fresh one. Everyone watching hears it
+ * (`browser.stopped` on every replica: their card says it was stopped, by whom).
  */
 export async function stopAgentBrowser(
   db: Database,
@@ -803,6 +892,7 @@ export async function stopAgentBrowser(
   actorId: string,
   orgId: string,
   agentId: string,
+  pubsub?: PubSub,
 ) {
   await requireBrowserAccess(db, actorId, orgId, agentId);
   if (!hub) throw new ValidationError("Connected computers are not available on this server");
@@ -815,4 +905,13 @@ export async function stopAgentBrowser(
     { op: "browser.stop", agent: { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) } },
     { timeoutMs: 30_000 },
   );
+  await pubsub
+    ?.publish(BROWSER_HANDOFF_TOPIC, {
+      type: "browser.stopped",
+      orgId,
+      agentId,
+      byUserId: actorId,
+      at: new Date().toISOString(),
+    })
+    .catch(() => {});
 }

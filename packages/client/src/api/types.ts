@@ -3465,7 +3465,8 @@ export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "e
 /**
  * A person's turn in an agent's browser: the agent asked (`ask`, with a chat
  * card `meta.browserHandoff` whose message id is this id) or someone watching
- * took over (`takeover`, no card).
+ * took over (`takeover`: no card of its own; its browser card stays with the
+ * run it is bound to, `runId`).
  */
 export interface BrowserHandoff {
   id: string;

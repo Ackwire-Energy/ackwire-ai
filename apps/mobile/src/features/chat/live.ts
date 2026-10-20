@@ -195,7 +195,7 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "browser.handoff.updated":
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
-      applyBrowserHandoff(qc, orgId, event.handoff);
+      applyBrowserHandoff(qc, orgId, event.handoff, { channelId: event.channelId, threadId: event.threadId });
       break;
     case "machine.task":
       if (event.task.threadId) void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, event.task.threadId) });

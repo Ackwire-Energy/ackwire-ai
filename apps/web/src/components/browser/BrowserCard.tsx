@@ -3,12 +3,16 @@ import {
   browserSiteUrl,
   browserSteps,
   clickEvents,
+  controlledBy,
   frameMetadata,
+  HELD_STALE_MS,
+  isHeldTakeover,
   isOpenHandoff,
   keyboardEvents,
   keyEvents,
   modifiersOf,
   pagePoint,
+  rememberHeldPlace,
   textEvent,
   useAgentBrowserHandoff,
   useBrowserHandoffMutations,
@@ -23,10 +27,10 @@ import { type KeyboardEvent, type MouseEvent, useEffect, useLayoutEffect, useRef
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
-import { useBrowserLive } from "@/realtime/context";
+import { useBrowserLive, useStreams } from "@/realtime/context";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
-import { useBrowserCardRequest } from "./open";
+import { requestBrowserCard, useBrowserCardRequest } from "./open";
 import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
@@ -113,11 +117,70 @@ export function titleKind(v: {
   return v.opening ? "opening" : "agent";
 }
 
-/** The browser card on an agent's live row, while (and after) it used its browser in this run. */
+/**
+ * The browser card on an agent's live row, while (and after) it used its browser in this run. A
+ * take over bound to this run keeps it even without steps (a reload); a run that failed or was
+ * stopped keeps it only for the person still in control (they hand back from it).
+ */
 export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
+  const { org, me } = useOrg();
   const steps = browserSteps(run.work);
-  if (steps.length === 0) return null;
-  return <BrowserCard agentId={run.agentId} name={name} steps={steps} />;
+  const ended = run.status === "failed" || run.status === "canceled";
+  const ask = !run.provisional && (ended || steps.length === 0);
+  const open = useAgentBrowserHandoff(org.id, run.agentId, ask, HELD_STALE_MS);
+  const held = isHeldTakeover(open.data, run.runId);
+  if (ended ? !(held && controlledBy(open.data, me.user.id)) : steps.length === 0 && !held) return null;
+  return (
+    <BrowserCard
+      agentId={run.agentId}
+      name={name}
+      steps={steps}
+      runId={run.runId}
+      place={{ channelId: run.channelId, threadId: run.threadId }}
+      handoff={held ? (open.data ?? null) : null}
+      defaultOpen={held && controlledBy(open.data, me.user.id)}
+    />
+  );
+}
+
+/**
+ * A take over held after its run's live block went (the run paused for the person, or ended): the
+ * same card, on the run's last saved message or at the end of its conversation, until the browser
+ * is handed back (telas/NavegadorNoChat.html: "Assumir pausa o agente e abre a tela ao vivo").
+ * Nothing while the run's live block is there (it draws the card) or when no take over holds it.
+ */
+export function HeldBrowserCard({
+  agentId,
+  runId,
+  name,
+  enabled = true,
+}: {
+  agentId: string;
+  runId: string;
+  name: string;
+  /** Ask the server (a recent message); otherwise only what the realtime events said. */
+  enabled?: boolean;
+}) {
+  const { me } = useOrg();
+  const held = useHeldTakeover(agentId, runId, enabled);
+  if (!held) return null;
+  return (
+    <BrowserCard
+      agentId={agentId}
+      name={name}
+      runId={runId}
+      handoff={held}
+      defaultOpen={controlledBy(held, me.user.id)}
+    />
+  );
+}
+
+/** The agent's open take over bound to this run, while the run has no live block here (`HeldBrowserCard`). */
+export function useHeldTakeover(agentId: string, runId: string, enabled = true): BrowserHandoff | null {
+  const { org } = useOrg();
+  const open = useAgentBrowserHandoff(org.id, agentId, enabled, HELD_STALE_MS);
+  const liveHere = useStreams((s) => Boolean(s.runs[runId]));
+  return !liveHere && open.data && isHeldTakeover(open.data, runId) ? open.data : null;
 }
 
 const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
@@ -136,11 +199,17 @@ export function BrowserCard({
   handoff: given = null,
   defaultOpen = false,
   onSettled,
+  runId,
+  place,
 }: {
   agentId: string;
   name: string;
   /** What the agent did in its browser in this run (the log); none outside a run. */
   steps?: BrowserStep[];
+  /** The run whose card this is: Assumir binds the take over to it (the card stays in its conversation). */
+  runId?: string;
+  /** Where that run answers (the held card's place once its live block goes). */
+  place?: { channelId: string; threadId: string | null };
   /** The help request this card answers (opened from it). */
   handoff?: BrowserHandoff | null;
   defaultOpen?: boolean;
@@ -171,7 +240,9 @@ export function BrowserCard({
     if (scroller) scroller.scrollTop += root.current.getBoundingClientRect().top - before;
   }, [open]);
   // The small live picture streams only while the card is on screen; off screen it keeps the last frame.
+  // Except for the person in control: their watching is what keeps their control (2 min without it ends it).
   const [visible, setVisible] = useState(false);
+  const [holding, setHolding] = useState(() => controlledBy(given, me.user.id));
   useEffect(() => {
     const el = root.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
@@ -179,7 +250,7 @@ export function BrowserCard({
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const live = useBrowserLive(agentId, open || visible);
+  const live = useBrowserLive(agentId, open || visible || holding);
   const [still, setStill] = useState<typeof live.frame>(null);
   useEffect(() => {
     if (live.frame) setStill(live.frame);
@@ -196,6 +267,7 @@ export function BrowserCard({
   const controller = handoff?.status === "active" ? handoff.controllerUserId : null;
   const inControl = controller === me.user.id;
   const otherInControl = Boolean(controller) && !inControl;
+  useEffect(() => setHolding(inControl), [inControl]);
   const controllerName = controller ? (dir.memberById.get(controller)?.name ?? t("channel.unknownPerson")) : "";
   // The computer the browser runs on: the request's, else the one this agent works on.
   const machine = (machines.data ?? []).find((m) =>
@@ -324,10 +396,15 @@ export function BrowserCard({
 
   const takeover = () => {
     setOpen(true);
-    actions.takeover.mutate(agentId, {
+    actions.takeover.mutate(runId ? { agentId, runId } : agentId, {
+      onSuccess: (h) => {
+        // It claimed the agent's own request: that request's card is the control (one card, not two).
+        if (h.kind === "ask") requestBrowserCard({ agentId, handoffId: h.id });
+        else if (h.runId && place) rememberHeldPlace({ runId: h.runId, agentId, ...place });
+      },
       onError: (err) =>
         toast.show(
-          (err as { status?: number }).status === 409 ? t("browser.live.notInControl") : t("browser.live.actionFailed"),
+          (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.live.actionFailed"),
           "error",
         ),
     });
@@ -343,7 +420,18 @@ export function BrowserCard({
       onError: failedToast,
     });
 
-  if (stoppedAt) {
+  // The agent's own request is open and mine: its card (under the request) is the control, not this one.
+  if (!given && handoff?.kind === "ask" && inControl) return null;
+
+  // Parar (here, or by someone else: everyone watching hears it), or the browser closed on its own.
+  const stopped = stoppedAt
+    ? { at: stoppedAt, by: me.user.id }
+    : live.endedBy?.reason === "stopped"
+      ? { at: live.endedBy.at ?? null, by: live.endedBy.userId ?? null }
+      : null;
+  if (stopped || live.ended) {
+    const byName = stopped?.by && stopped.by !== me.user.id ? dir.memberById.get(stopped.by)?.name : undefined;
+    const time = stopped?.at ? formatTime(i18n.language, stopped.at) : "";
     return (
       <div className="brw-ac" ref={root}>
         <div className="brw-ac__head">
@@ -351,11 +439,26 @@ export function BrowserCard({
             <Icon name="stop" size={14} />
           </span>
           <span className="brw-ac__tx">
-            <b>{t("browser.watch.stopped")}</b>
-            <small>
-              <span>{t("browser.watch.stoppedBy", { time: formatTime(i18n.language, stoppedAt) })}</span>
-            </small>
+            <b>{stopped ? t("browser.watch.stopped") : t("browser.live.ended", g)}</b>
+            {stopped && (stopped.by === me.user.id || byName || time) && (
+              <small>
+                <span>
+                  {stopped.by === me.user.id
+                    ? t("browser.watch.stoppedBy", { time })
+                    : byName
+                      ? t("browser.watch.stoppedByOther", { person: byName, time })
+                      : t("browser.watch.stoppedAt", { time })}
+                </span>
+              </small>
+            )}
           </span>
+          {inControl && handoff && (
+            <span className="brw-ac__acts">
+              <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
+                {t("browser.inCard.done")}
+              </Button>
+            </span>
+          )}
         </div>
       </div>
     );
@@ -453,7 +556,7 @@ export function BrowserCard({
         </Button>
       )}
       <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
-        {ask ? t("browser.inCard.done") : t("browser.inCard.handBack")}
+        {t("browser.inCard.done")}
       </Button>
     </>
   );

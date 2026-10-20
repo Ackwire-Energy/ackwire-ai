@@ -1,19 +1,23 @@
 import {
   ApiError,
   type ArtifactDetail,
+  type BrowserHandoff,
   type ConnectionStatus,
   type DirectMessage,
+  heldTakeoversHere,
   keys,
   type LiveRun,
   MESSAGES_PAGE,
   type Message,
   type MessagePin,
   sendHelpers,
+  useAgentsBrowserHandoffs,
   useApi,
   useChannels,
   useChannelThreads,
   useCreateMission,
   useDms,
+  useHeldPlaces,
   useJoinChannel,
   useMarkChannelRead,
   useMessages,
@@ -48,7 +52,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { setOpenConversation } from "@/lib/push";
+import { holdOpenConversation } from "@/lib/push";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
 import {
@@ -64,7 +68,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
-import { BrowserRunCard } from "../browser/BrowserCard";
+import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
 import { isListedThread, threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
@@ -105,6 +109,7 @@ import {
   STICK_TO_END_THRESHOLD,
   type TurnKey,
   turnKeys,
+  turnRowByRun,
   type Unseen,
   unseenBelow,
 } from "./scroll";
@@ -119,11 +124,16 @@ import {
 } from "./sheets";
 import { turnRuns, withOpacity } from "./turn";
 
+/** A run's messages this recent are asked whether a take over still holds the agent's browser. */
+const HELD_RECENT_MS = 12 * 60 * 60_000;
+
 type Row =
   | ChatRow
   | { kind: "marker"; key: string; text: string }
   | { kind: "run"; key: string; run: LiveRun }
-  | { kind: "browser"; key: string; run: LiveRun }
+  /** An agent's browser card: its live run in the browser, or (no run row) a take over held here. */
+  | { kind: "browser"; key: string; run: LiveRun; handoff?: undefined }
+  | { kind: "browser"; key: string; run: null; handoff: BrowserHandoff }
   | { kind: "unseen"; key: string; fading: boolean };
 
 const rowKey = (r: Row) => r.key;
@@ -262,22 +272,56 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     },
     [meId, stop],
   );
-  // The composer's "Parar" (the empty field's button): every agent at work here I may stop, writing too.
-  const stoppable = useMemo(() => stoppableInLine(runs).filter((r) => !r.stopping && canStop(r)), [runs, canStop]);
+  // While an agent works here, anyone who writes chooses "Juntar" or "Parar e mandar" (the server takes a
+  // steer from them); the composer's "Parar" (the empty field's button) stops every agent at work here I
+  // may stop, writing too, and only shows if there is one.
+  const busyRuns = useMemo(() => stoppableInLine(runs).filter((r) => !r.stopping), [runs]);
+  const stoppable = useMemo(() => busyRuns.filter((r) => canStop(r)), [busyRuns, canStop]);
   const working = useMemo<ComposerWorking | null>(() => {
+    if (busyRuns.length === 0) return null;
     const first = stoppable[0];
-    if (!first) return null;
+    if (!first) return {};
     return {
-      stopLabel: t("mobile.chat.stopAgent", { name: dir.agentById.get(first.agentId)?.name ?? "" }),
-      onStop: () => {
-        for (const r of stoppable) stopRun(r);
+      stop: {
+        label: t("mobile.chat.stopAgent", { name: dir.agentById.get(first.agentId)?.name ?? "" }),
+        onStop: () => {
+          for (const r of stoppable) stopRun(r);
+        },
       },
     };
-  }, [stoppable, stopRun, dir.agentById, t]);
+  }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
 
   // ── Agents' blocks ──
   // An agent at work in its browser: its card in the conversation (NavegadorNoChat A), open on demand.
   const browsing = useMemo(() => browsingRuns(runs), [runs]);
+  // A take over held here after its run's live row went (the run paused for the person, or ended): the
+  // same card stays, at the end, until the browser is handed back. Its runs: recent ones of this
+  // conversation, the ones taken over here (or heard of in its events), and the live ones.
+  const heldPlaces = useHeldPlaces();
+  const heldAsk = useMemo(() => {
+    const since = Date.now() - HELD_RECENT_MS;
+    const runIds = new Set<string>(runs.map((r) => r.runId));
+    const agentIds = new Set<string>();
+    for (const m of list) {
+      if (m.author.type !== "agent" || !m.author.id || !m.agentRunId || Date.parse(m.createdAt) < since) continue;
+      runIds.add(m.agentRunId);
+      agentIds.add(m.author.id);
+    }
+    for (const p of heldPlaces) {
+      if (p.channelId !== channelId || (isThread && p.threadId !== threadId)) continue;
+      runIds.add(p.runId);
+      agentIds.add(p.agentId);
+    }
+    return { runIds, agentIds: [...agentIds].sort() };
+  }, [runs, list, heldPlaces, channelId, threadId, isThread]);
+  const agentHandoffs = useAgentsBrowserHandoffs(orgId, heldAsk.agentIds);
+  const heldNow = heldTakeoversHere(agentHandoffs, {
+    runIds: heldAsk.runIds,
+    drawnAgents: new Set(browsing.map((r) => r.agentId)),
+  });
+  const heldKey = heldNow.map((h) => `${h.id}:${h.runId}:${h.controllerUserId ?? ""}`).join(" ");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the rows change only when what is held changes
+  const held = useMemo(() => heldNow, [heldKey]);
   // Every agent at work is one block, the last thing in the conversation (Mensagens.html): "pensando",
   // its steps, its words. A finished one keeps its block (last words) until its saved message is listed: no
   // empty frame between them.
@@ -333,12 +377,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // One waiting card per agent and computer: an older "my computer is away" gives way to the newer one.
   const superseded = useMemo(() => supersededBrainNotices(list), [list]);
   const rows = useMemo<Row[]>(() => {
-    // A saved reply that was live here keeps its block's key.
-    const asTurns = (chatRows: ChatRow[]): Row[] =>
-      chatRows.map((r) => {
-        const key = r.kind === "message" && r.message.agentRunId ? turnKeyOf(r.message.agentRunId) : undefined;
+    // A saved reply that was live here keeps its block's key (only the run's last message: keys stay unique).
+    const drawn = new Set(shownRuns.map((r) => r.runId));
+    const asTurns = (chatRows: ChatRow[]): Row[] => {
+      const last = turnRowByRun(chatRows, drawn);
+      return chatRows.map((r) => {
+        const runId = r.kind === "message" ? r.message.agentRunId : null;
+        const key = runId && last.get(runId) === r.key ? turnKeyOf(runId) : undefined;
         return key ? { ...r, key } : r;
       });
+    };
     const runRowsOf = (live: LiveRun[]): Row[] =>
       live.map((run) => ({ kind: "run" as const, key: turnKeyOf(run.runId) ?? `turn-${run.runId}`, run }));
     if (isThread && threadId) {
@@ -370,6 +418,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         ...head,
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
+        ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
         ...runRowsOf(shownRuns),
       ];
     }
@@ -378,6 +427,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     return [
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
+      ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
       ...runRowsOf(shownRuns),
     ];
   }, [
@@ -389,6 +439,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     shownRuns,
     turnKeyOf,
     browsing,
+    held,
     linkThreads,
     collapsed,
     superseded,
@@ -530,18 +581,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     onSent: (message) => {
       if (dmAgentId) live.expect(message.threadId ?? message.id, [dmAgentId]);
     },
-    onFailed: (error) => {
+    onFailed: (error, { clientId }) => {
       if (error instanceof ApiError) {
         toast({ title: t("mobile.chat.notSent"), icon: "x" });
         return;
       }
-      // No answer at all (no internet): the message just turned "failed" in the cache; it waits instead.
-      setTimeout(() => {
-        const failed = (qc.getQueryData<Message[]>(keys.messages(orgId, channelId)) ?? []).flatMap((m) =>
-          m.local === "failed" && m.clientId ? [m.clientId] : [],
-        );
-        if (failed.length > 0) setWaiting((prev) => new Set([...prev, ...failed]));
-      }, 0);
+      // No answer at all (no internet): this message (only this one; others the server refused stay
+      // "failed") waits instead.
+      setWaiting((prev) => (prev.has(clientId) ? prev : new Set([...prev, clientId])));
     },
   });
   const { send, retry } = sendHelpers(post);
@@ -872,16 +919,27 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           );
         case "unseen":
           return <UnseenLine fading={item.fading} />;
-        case "browser":
+        case "browser": {
+          const agentId = item.run ? item.run.agentId : item.handoff.agentId;
           return (
             <Animated.View entering={isFresh(item.key) ? ENTER : undefined} style={styles.browserRow}>
-              <BrowserRunCard
-                run={item.run}
-                open={openBrowsers.has(item.run.agentId)}
-                onToggle={(open) => toggleBrowser(item.run.agentId, open)}
-              />
+              {item.run ? (
+                <BrowserRunCard
+                  run={item.run}
+                  open={openBrowsers.has(agentId)}
+                  onToggle={(open) => toggleBrowser(agentId, open)}
+                />
+              ) : (
+                <BrowserCard
+                  agentId={agentId}
+                  handoff={item.handoff}
+                  open={openBrowsers.has(agentId)}
+                  onToggle={(open) => toggleBrowser(agentId, open)}
+                />
+              )}
             </Animated.View>
           );
+        }
         case "message":
           // An agent took an issue made from this conversation: one quiet line, not a voice.
           if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
@@ -917,8 +975,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const focused = useIsFocused();
   useEffect(() => {
     if (!focused) return;
-    setOpenConversation({ orgId, channelId });
-    return () => setOpenConversation(null);
+    // The release clears it only if it still holds this screen's conversation (the next screen may have
+    // taken over before this one's blur).
+    return holdOpenConversation({ orgId, channelId });
   }, [focused, orgId, channelId]);
 
   // ── Composer and keyboard ──

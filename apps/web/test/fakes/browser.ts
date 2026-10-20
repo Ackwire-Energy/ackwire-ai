@@ -80,12 +80,12 @@ export function createFakeBrowser(
       log("browser.cancel", orgId, handoffId);
       return end(handoffId, "cancelled");
     },
-    takeover: async (orgId, agentId) => {
-      log("browser.takeover", orgId, agentId);
+    takeover: async (orgId, agentId, runId) => {
+      log("browser.takeover", orgId, agentId, ...(runId ? [runId] : []));
       const h: BrowserHandoff = {
         id: `takeover-${handoffs.size + 1}`,
         agentId,
-        runId: null,
+        runId: runId ?? null,
         machineId: "machine-1",
         kind: "takeover",
         instructions: "",

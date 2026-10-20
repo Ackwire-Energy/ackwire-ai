@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { browserHandoffOf } from "@agenteschat/client";
+import { type BrowserHandoff, browserHandoffOf, controlledBy, heldTakeoversHere } from "@agenteschat/client";
 import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
 import { cardStateOf, hostOf, siteLetter, siteOf } from "../../src/features/browser/logic";
 import { handoffHref, hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
@@ -104,5 +104,44 @@ describe("where a browser request opens", () => {
     });
     const q = notification({ id: "n2", kind: "agent_question", waiting: true });
     expect(sortWaiting([q, n]).map((x) => x.id)).toEqual(["n1", "n2"]);
+  });
+});
+
+describe("a take over held in the conversation (the card outlives the run's live row)", () => {
+  const takeover: BrowserHandoff = {
+    id: "t1",
+    agentId: "a1",
+    runId: "r1",
+    machineId: "m1",
+    kind: "takeover",
+    instructions: "",
+    status: "active",
+    requestedForUserId: null,
+    controllerUserId: "u1",
+    note: null,
+    expiresAt: null,
+    createdAt: "2026-10-19T12:00:00.000Z",
+    resolvedAt: null,
+  };
+  const here = { runIds: new Set(["r1"]), drawnAgents: new Set<string>() };
+
+  test("an open take over of a run of this conversation gets its row; others don't", () => {
+    expect(heldTakeoversHere([takeover, null, undefined], here)).toEqual([takeover]);
+    // Another conversation's run, an ended one, or the agent's own request (its message is its card).
+    expect(heldTakeoversHere([{ ...takeover, runId: "r9" }], here)).toEqual([]);
+    expect(heldTakeoversHere([{ ...takeover, status: "done" }], here)).toEqual([]);
+    expect(heldTakeoversHere([{ ...takeover, kind: "ask" }], here)).toEqual([]);
+    expect(heldTakeoversHere([{ ...takeover, runId: null }], here)).toEqual([]);
+  });
+
+  test("not while the run's live browser row still draws it, and one per agent", () => {
+    expect(heldTakeoversHere([takeover], { ...here, drawnAgents: new Set(["a1"]) })).toEqual([]);
+    expect(heldTakeoversHere([takeover, { ...takeover, id: "t2" }], here)).toHaveLength(1);
+  });
+
+  test("in control: only the person holding it", () => {
+    expect(controlledBy(takeover, "u1")).toBe(true);
+    expect(controlledBy(takeover, "u2")).toBe(false);
+    expect(controlledBy({ ...takeover, status: "pending" }, "u1")).toBe(false);
   });
 });

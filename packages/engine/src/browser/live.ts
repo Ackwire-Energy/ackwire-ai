@@ -120,8 +120,18 @@ export type BrowserLiveMessage =
       reason: "reconnecting" | "offline" | "no_computer" | "unavailable" | "forbidden";
       message?: string;
     }
-  /** The runner stopped the stream (the browser closed, an error). */
-  | { type: "browser.ended"; agentId: string; reason: "stopped" | "closed" | "error"; message?: string };
+  /**
+   * The runner stopped the stream (the browser closed, an error), or a person pressed Parar
+   * (`stopped`, with who and when: every viewer's card says so).
+   */
+  | {
+      type: "browser.ended";
+      agentId: string;
+      reason: "stopped" | "closed" | "error";
+      message?: string;
+      byUserId?: string;
+      at?: string;
+    };
 
 export interface LiveViewer {
   userId: string;
@@ -289,6 +299,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
 
   // The computer's desktop app hears every change, from whichever replica made it.
   const unsubscribeComputers = deps.pubsub?.subscribe(BROWSER_HANDOFF_TOPIC, (event) => {
+    if (event.type === "browser.stopped") return;
     const { machineId, orgId, agentId } = event;
     if (typeof machineId !== "string" || typeof orgId !== "string" || typeof agentId !== "string") return;
     void tellComputer(machineId, orgId, agentId).catch((error) =>
@@ -302,6 +313,17 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     const agentId = typeof event.agentId === "string" ? event.agentId : null;
     const state = agentId ? live.get(agentId) : undefined;
     if (!agentId || !state || event.orgId !== state.orgId) return;
+    // Someone pressed Parar (here or on another replica): everyone watching here hears who and when.
+    if (event.type === "browser.stopped") {
+      broadcast(state, {
+        type: "browser.ended",
+        agentId,
+        reason: "stopped",
+        ...(typeof event.byUserId === "string" ? { byUserId: event.byUserId } : {}),
+        ...(typeof event.at === "string" ? { at: event.at } : {}),
+      });
+      return;
+    }
     void openHandoffOf(deps.db, state.orgId, agentId)
       .then((row) => {
         if (live.get(agentId) !== state) return;
