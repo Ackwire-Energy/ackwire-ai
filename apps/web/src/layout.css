@@ -6299,7 +6299,6 @@ button.live-call__head:hover {
   flex-direction: column;
   padding: 0;
 }
-.sidebar[data-rail="true"] .sidebar__org > a,
 .sidebar[data-rail="true"] .sidebar__org-text,
 .sidebar[data-rail="true"] .sidebar__org-button > .ac-icon,
 .sidebar[data-rail="true"] .sidebar__jump .ac-kbd,
@@ -6746,7 +6745,8 @@ button.live-call__head:hover {
   position: relative;
   overflow: hidden;
   min-height: 56px;
-  padding: 8px 6px;
+  /* The whole card is the menu button: no inset, so every pixel of it opens the menu. */
+  padding: 0;
   border-radius: 14px;
   /* The sky is light tones faded from this surface, so the text keeps the theme's own ink. */
   border: 1px solid var(--line);
@@ -6760,6 +6760,11 @@ button.live-call__head:hover {
 .sidebar__org .sidebar__org-button > .ac-icon,
 .sidebar__org .ac-btn {
   color: var(--ink);
+}
+.sidebar__org .sidebar__org-button {
+  align-self: stretch;
+  padding: 8px 12px 8px 10px;
+  border-radius: inherit;
 }
 .sidebar__org .sidebar__org-meta {
   color: var(--ink-muted);
@@ -6821,6 +6826,9 @@ button.live-call__head:hover {
 }
 .sidebar[data-rail="true"] .sidebar__org {
   min-height: 0;
+}
+.sidebar[data-rail="true"] .sidebar__org .sidebar__org-button {
+  justify-content: center;
   padding: 6px;
 }
 .sidebar[data-rail="true"] .sidebar__trail {

@@ -228,11 +228,6 @@ export function Sidebar() {
                 : null
             }
           />
-          <Button asChild variant="ghost" size="sm" iconOnly>
-            <Link to="/org/$orgId/search" params={{ orgId }} aria-label={t("shell.searchWorkspace")}>
-              <Icon name="search" />
-            </Link>
-          </Button>
         </div>
 
         <div className="sidebar__jump-row">

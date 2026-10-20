@@ -3182,8 +3182,11 @@ a.ac-list__row:focus-visible {
   height: var(--seg-h);
   padding: var(--seg-in);
   border-radius: var(--seg-r);
-  background: var(--sunken);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  /* Stands off any surface (the page's own tone included): a darker track with a hairline. */
+  background: color-mix(in srgb, var(--ink) 6%, var(--bg));
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 .ac-seg__item {
   position: relative;
@@ -3201,11 +3204,14 @@ a.ac-list__row:focus-visible {
   border: 0;
   border-radius: calc(var(--seg-r) - var(--seg-in));
   background: transparent;
-  color: var(--muted);
+  color: var(--ink2);
   cursor: pointer;
   transition: color 0.2s;
   flex: none;
   white-space: nowrap;
+}
+.ac-seg__item:hover {
+  color: var(--ink);
 }
 /*
  * Counts: the text face (Onest) with tabular figures, so a number that
@@ -3253,7 +3259,13 @@ a.ac-list__row:focus-visible {
   background: var(--ink);
   color: var(--bg);
 }
+/* On the track the chip needs its own tone; on the raised pill the usual sunken one. */
+.ac-seg__item .ac-countchip {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink2);
+}
 .ac-seg__item[data-on] .ac-countchip {
+  background: var(--sunken);
   color: var(--ink2);
 }
 .ac-seg--sm {
