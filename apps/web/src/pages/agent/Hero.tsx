@@ -155,7 +155,16 @@ function Stats() {
  * the actions in its corner; then its name, @ and role, and what it works with
  * as one sentence (telas/PerfilAgente.html).
  */
-export function AgentHero({ onArchive }: { onArchive: () => void }) {
+/** `onClose` / `onExpand`: in the panel beside its DM, where "Conversar" is the conversation next to it. */
+export function AgentHero({
+  onArchive,
+  onClose,
+  onExpand,
+}: {
+  onArchive: () => void;
+  onClose?: () => void;
+  onExpand?: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const navigate = useNavigate();
@@ -163,7 +172,8 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
   const { agent, draft, viewer, goTo, saved, openWork } = useAgentEdit();
   const detail = useAgentDetail(org.id, agent.id);
   const status = useStatus();
-  const narrow = useMediaQuery("(max-width: 900px)");
+  const narrowScreen = useMediaQuery("(max-width: 900px)");
+  const narrow = narrowScreen || Boolean(onClose);
   const busy = status.kind === "working";
   const name = draft.name.trim() || agent.name;
   const channelNames = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
@@ -191,12 +201,14 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
         <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} className="agp-cover__agent" />
         {!narrow && <Stats />}
         <div className="agp-cover__acts">
-          <Button asChild variant="primary" size="sm" className="agp-chat">
-            <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-              <Icon name="message" size={14} />
-              {t("agent.chat")}
-            </Link>
-          </Button>
+          {!onClose && (
+            <Button asChild variant="primary" size="sm" className="agp-chat">
+              <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+                <Icon name="message" size={14} />
+                {t("agent.chat")}
+              </Link>
+            </Button>
+          )}
           <Menu
             align="end"
             label={t("agent.moreActions")}
@@ -248,6 +260,28 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
               </MenuItem>
             )}
           </Menu>
+          {onExpand && (
+            <Button
+              size="sm"
+              iconOnly
+              icon="external"
+              className="agp-glass"
+              aria-label={t("agentPage.panel.expand")}
+              title={t("agentPage.panel.expand")}
+              onClick={onExpand}
+            />
+          )}
+          {onClose && (
+            <Button
+              size="sm"
+              iconOnly
+              icon="close"
+              className="agp-glass"
+              aria-label={t("common.close")}
+              title={t("common.close")}
+              onClick={onClose}
+            />
+          )}
         </div>
       </div>
       <div className="agp-ident">

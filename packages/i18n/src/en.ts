@@ -1594,6 +1594,10 @@ export const en: Translations = {
       text_other: "{{name}} has {{count}} unsaved changes. If you leave now, they're lost.",
       discard: "Discard and leave",
     },
+    panel: {
+      label: "{{name}}'s profile",
+      expand: "Open full page",
+    },
     saveBar: {
       see: "See",
       title: "What changed",

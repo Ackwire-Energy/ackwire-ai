@@ -388,9 +388,12 @@ describe("direct messages with an agent", () => {
     expect(state.calls.find((c) => c.method === "dms.open")?.args).toEqual([ORG_ID, { agentId: ADA_ID }]);
     expect(screen().getByRole("heading", { level: 1, name: "Ada" })).toBeTruthy();
     expect(document.body.textContent).toContain("Dev · responde a João · Claude Sonnet 5.5");
-    expect(screen().getByRole("link", { name: "Ver perfil" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/agents/${ADA_ID}`,
-    );
+    // "Ver perfil": the agent's page in the panel beside the conversation (like a thread's), closed by its ×.
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver perfil" })));
+    await settle(4);
+    const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
+    await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Fechar" })));
+    expect(screen().queryByRole("complementary", { name: "Perfil da Ada" })).toBeNull();
     expect(document.body.textContent).toContain(
       "Converse direto com a Ada. Peça para lembrar ou esquecer algo, ou para mudar como ela trabalha.",
     );

@@ -420,6 +420,153 @@
   }
 }
 
+/* The agent page in the panel beside its DM (never wider than 640 px): every narrow rule of the page (above and in layout.css), always. */
+.agp--panel {
+  padding: 20px 16px 24px;
+}
+.agp--panel .agp-cols {
+  grid-template-columns: minmax(0, 1fr);
+}
+.agp--panel .agp-cfg {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.agp--panel .agp-subnav {
+  position: static;
+  flex-direction: row;
+  margin: 0 -16px;
+  padding: 2px 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.agp--panel .agp-subnav::-webkit-scrollbar {
+  display: none;
+}
+.agp--panel .agp-subnav__item {
+  flex: none;
+  white-space: nowrap;
+}
+.agp--panel .agp-tag--dot {
+  margin-left: 4px;
+}
+.agp--panel .agp-tabs .ac-tabs {
+  margin: 12px -16px 0;
+}
+.agp--panel .agp-cover {
+  height: 150px;
+  border-radius: 20px;
+}
+.agp--panel .agp-cover .agp-cover__agent {
+  left: 20px;
+  width: 80px;
+  height: 80px;
+}
+.agp--panel .agp-state {
+  top: 10px;
+  left: 10px;
+  font-size: 12px;
+}
+.agp--panel .agp-state__sub {
+  display: none;
+}
+.agp--panel .agp-stat b {
+  font-size: 20px;
+}
+.agp--panel .agp-stat em {
+  display: block;
+  margin: 0;
+  font-size: 11.5px;
+}
+.agp--panel .agp-stat small {
+  font-size: 11px;
+}
+.agp--panel .agp-ident {
+  gap: 12px;
+  padding-top: 12px;
+}
+.agp--panel .agp-name {
+  font-size: 34px;
+}
+.agp--panel .agp-tabs .ac-tab {
+  height: 44px;
+  padding: 0 10px;
+  font-size: 13.5px;
+}
+.agp--panel .agp-tiles,
+.agp--panel .agp-tiles--four {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.agp--panel .agp-tile {
+  padding: 10px 12px;
+}
+.agp--panel .agp-tile b {
+  font-size: 24px;
+}
+.agp--panel .agp-tile span {
+  display: none;
+}
+.agp--panel .agp-quick {
+  margin-left: 0;
+}
+/* The track keeps the ruler's height: it scrolls sideways instead of wrapping. */
+.agp--panel .agp-toolbar .ac-seg {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.agp--panel .agp-run {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+}
+.agp--panel .agp-run time {
+  grid-column: 1 / -1;
+  padding: 0;
+}
+.agp--panel .agp-card.ac-card {
+  --card-pad: 16px;
+}
+.agp--panel .agp-savebar {
+  bottom: 10px;
+  width: 100%;
+  padding: 8px 8px 8px 12px;
+}
+.agp--panel .agp-savebar__where {
+  display: none;
+}
+.agp--panel .agp-savebar__save {
+  flex: 1;
+}
+.agp--panel .agp-work__sentence {
+  font-size: 20px;
+}
+.agp--panel .agp-word {
+  white-space: normal;
+  text-align: left;
+}
+.agp--panel .agp-brainrows > .ac-setrow {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.agp--panel .agp-brainrows .ac-setrow__end,
+.agp--panel .agp-brainrows__sel {
+  width: 100%;
+}
+.agp--panel .agp-addacct__step {
+  flex-wrap: wrap;
+}
+.agp--panel .level-row__below {
+  padding-left: 0;
+}
+.agp--panel .agp-id {
+  flex-direction: column;
+}
+.agp--panel .agp-look__row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
 /* ── Offline computer notice on phones: the words, then the buttons sharing the width ── */
 @media (max-width: 640px) {
   .outage {

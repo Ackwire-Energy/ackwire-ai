@@ -21,6 +21,7 @@ import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agentesch
 import {
   type AgentAppearance,
   Button,
+  cx,
   Dialog,
   DialogFooter,
   EmptyState,
@@ -88,6 +89,8 @@ export interface AgentPageProps {
   section?: AgentSection;
   /** Changes the tab (and section) in the URL. */
   onNavigate: (tab: AgentTab, section?: AgentSection) => void;
+  /** Shown in the panel beside its DM (like a thread's), not as a page: closes the panel. */
+  onClose?: () => void;
 }
 
 /** docs/design/telas/AgentePerfil.html — the agent on its sky, tabs, inline editing with one save bar. */
@@ -113,7 +116,7 @@ export function AgentPage(props: AgentPageProps) {
   return <AgentProfile key={agent.id} agent={agent} {...props} />;
 }
 
-function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { agent: Agent }) {
+function AgentProfile({ agent, tab, section, onNavigate, onClose }: AgentPageProps & { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
@@ -511,6 +514,10 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
     withResolver: true,
   });
 
+  // Closing the panel with unsaved changes asks first, like leaving the page.
+  const [closing, setClosing] = useState(false);
+  const close = onClose && (() => (dirtyRef.current ? setClosing(true) : onClose()));
+
   /* ---------- Archiving ---------- */
 
   const archive = useMutation({
@@ -592,8 +599,20 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
 
   return (
     <AgentEditProvider value={value}>
-      <div className="page page--xwide agp" data-dirty={dirty || undefined}>
-        <AgentHero onArchive={() => setArchiving(true)} />
+      <div className={cx("page page--xwide agp", onClose && "agp--panel")} data-dirty={dirty || undefined}>
+        <AgentHero
+          onArchive={() => setArchiving(true)}
+          onClose={close}
+          onExpand={
+            onClose &&
+            (() =>
+              void navigate({
+                to: "/org/$orgId/agents/$agentId",
+                params: { orgId: org.id, agentId: agent.id },
+                search: { tab: tab === "overview" ? undefined : tab, sec: section },
+              }))
+          }
+        />
         <div className="agp-tabs" ref={top}>
           <Tabs
             label={t("agentPage.tabsLabel", g)}
@@ -635,9 +654,11 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
       <WorkDialogs open={work} onClose={() => setWork(null)} />
 
       <Dialog
-        open={blocker.status === "blocked"}
+        open={blocker.status === "blocked" || closing}
         onOpenChange={(o) => {
-          if (!o) blocker.reset?.();
+          if (o) return;
+          setClosing(false);
+          blocker.reset?.();
         }}
         title={t("agentPage.leave.title")}
         description={t("agentPage.leave.text", { count: changes.length, ...g })}
@@ -645,8 +666,23 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         width={440}
       >
         <DialogFooter>
-          <Button onClick={() => blocker.reset?.()}>{t("edit.keepEditing")}</Button>
-          <Button variant="danger" onClick={() => blocker.proceed?.()}>
+          <Button
+            onClick={() => {
+              setClosing(false);
+              blocker.reset?.();
+            }}
+          >
+            {t("edit.keepEditing")}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (!closing) return blocker.proceed?.();
+              setClosing(false);
+              setEdits({});
+              onClose?.();
+            }}
+          >
             {t("agentPage.leave.discard")}
           </Button>
         </DialogFooter>

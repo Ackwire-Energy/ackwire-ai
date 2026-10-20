@@ -1599,6 +1599,10 @@ export const ptBR = {
       text_other: "Há {{count}} alterações não salvas {{of}} {{name}}. Se sair agora, elas se perdem.",
       discard: "Descartar e sair",
     },
+    panel: {
+      label: "Perfil {{of}} {{name}}",
+      expand: "Abrir em tela cheia",
+    },
     saveBar: {
       see: "Ver",
       title: "O que mudou",

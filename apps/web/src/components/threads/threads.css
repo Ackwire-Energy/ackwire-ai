@@ -900,3 +900,10 @@
   margin-left: 0;
   line-height: 16px;
 }
+/* The agent's page in the same panel ("Ver perfil" in its DM): it scrolls inside, so its tabs and
+   save bar stick to the panel. */
+.thread-panel__page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
