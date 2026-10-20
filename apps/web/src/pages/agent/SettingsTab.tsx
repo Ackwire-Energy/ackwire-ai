@@ -165,7 +165,7 @@ export function SettingsTab({
                 className="agp-id__look"
                 style={{ "--a": agentGradient(look.color)[0], "--b": agentGradient(look.color)[1] } as CSSProperties}
               >
-                <AgentAvatar size="lg" name={draft.name || agent.name} appearance={look} />
+                <AgentAvatar size="lg" framed={false} name={draft.name || agent.name} appearance={look} />
               </span>
               <div className="agp-id__fields">
                 {can("name") ? (

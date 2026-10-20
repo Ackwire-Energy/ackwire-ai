@@ -170,7 +170,11 @@ function EyesChoices({ look, onPick, carousel }: LookPickProps & { carousel?: bo
           onClick={() => onPick({ eyes: e })}
         >
           <span className="newag__stage">
-            <AgentAvatar name={t(`look.eyesNames.${e}`)} appearance={{ ...look, eyes: e, accessory: "none" }} />
+            <AgentAvatar
+              framed={false}
+              name={t(`look.eyesNames.${e}`)}
+              appearance={{ ...look, eyes: e, accessory: "none" }}
+            />
           </span>
           {t(`look.eyesNames.${e}`)}
         </button>
@@ -195,7 +199,12 @@ function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel
             {a === "none" ? (
               <Icon name="block" />
             ) : (
-              <AgentAvatar size="sm" name={t(`look.accessories.${a}`)} appearance={{ ...look, accessory: a }} />
+              <AgentAvatar
+                size="sm"
+                framed={false}
+                name={t(`look.accessories.${a}`)}
+                appearance={{ ...look, accessory: a }}
+              />
             )}
           </span>
           {t(`look.accessories.${a}`)}
