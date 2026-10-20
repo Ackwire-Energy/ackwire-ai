@@ -1,6 +1,6 @@
 [package]
 name = "agentes-desktop"
-version = "0.3.4"
+version = "0.3.5"
 description = "agentes: the menu bar app that lets agents use this computer (ADR 0036)"
 edition = "2021"
 rust-version = "1.77.2"
