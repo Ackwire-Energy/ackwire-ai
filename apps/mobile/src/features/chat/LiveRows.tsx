@@ -2,7 +2,7 @@ import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agen
 import { activitySentence, activityVerb, barPhrase, isWriting, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
 import { formatDuration, toolLabel } from "@agenteschat/client/lib/work";
-import { memo, type ReactNode, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, type LayoutChangeEvent, Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, {
@@ -11,7 +11,6 @@ import Animated, {
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withTiming,
   ZoomIn,
@@ -44,6 +43,7 @@ import {
   rememberTurn,
   type TurnItem,
   turnItems,
+  turnOpener,
   turnPhase,
   WORD_FADE_MS,
   withOpacity,
@@ -72,6 +72,8 @@ export const TurnRow = memo(function TurnRow({
   const phase = turnPhase(run);
   const live = phase !== "stopped";
   const items = turnItems(run);
+  // It opens as if it had answered: a generic phrase until the first thing it says takes its place.
+  const { said, opener, lines } = turnOpener(run, items);
   const now = useNow(1000);
   const since = run.startedAt ?? run.since ?? null;
   const secs = since ? Math.max(0, now - since) : 0;
@@ -98,17 +100,24 @@ export const TurnRow = memo(function TurnRow({
           <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
             {agent?.name ?? ""}
           </Text>
+          {/* While it works, the line above the box says so; the block only says "parado". */}
           <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
-            {live ? <PixelOrbit color={color} size={12} /> : null}
-            <Breathing active={live}>
+            {live ? (
+              <PixelOrbit color={color} size={12} />
+            ) : (
               <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                 {word}
                 {took}
               </Text>
-            </Breathing>
+            )}
           </View>
         </View>
-        <TurnLines items={items} quoteOf={bodyOf} color={color} />
+        {said || opener !== null ? (
+          <View style={styles.say}>
+            <MessageText body={said ?? t(`mobile.chat.turn.opener${opener}`)} selectable={false} />
+          </View>
+        ) : null}
+        <TurnLines items={lines} quoteOf={bodyOf} color={color} />
         {run.text ? <RevealText text={run.text} live={phase === "writing"} /> : null}
       </View>
     </View>
@@ -238,17 +247,6 @@ function ReadWell({ now, quote, settled }: { now: boolean; quote: string; settle
       ) : null}
     </Animated.View>
   );
-}
-
-/** The header's word breathes while the agent works (a soft shimmer); still with reduced motion. */
-function Breathing({ active, children }: { active: boolean; children: ReactNode }) {
-  const reduced = useReducedMotion();
-  const k = useSharedValue(1);
-  useEffect(() => {
-    k.value = active && !reduced ? withRepeat(withTiming(0.45, { duration: 900 }), -1, true) : withTiming(1);
-  }, [active, reduced, k]);
-  const style = useAnimatedStyle(() => ({ opacity: k.value }));
-  return <Animated.View style={style}>{children}</Animated.View>;
 }
 
 /**

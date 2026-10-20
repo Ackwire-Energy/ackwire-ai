@@ -225,6 +225,9 @@ export const featureKeysPtBR = {
       working: "trabalhando",
       writing: "escrevendo",
       stopped: "parado",
+      opener0: "Deixa eu ver…",
+      opener1: "Já vejo isso…",
+      opener2: "Um instante…",
     },
     steer: {
       waiting: "{{name}} lê na próxima pausa",

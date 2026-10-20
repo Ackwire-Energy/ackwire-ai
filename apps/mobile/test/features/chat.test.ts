@@ -35,7 +35,9 @@ import {
   recentTurn,
   rememberTurn,
   stoppedOf,
+  OPENERS,
   turnItems,
+  turnOpener,
   turnPhase,
   turnRuns,
   turnSteps,
@@ -457,6 +459,26 @@ describe("an agent's turn as one block", () => {
     expect(items[2]).toMatchObject({ kind: "read", messageId: "m2", now: true });
     expect(items[3]).toMatchObject({ kind: "step", running: true });
     expect(turnSteps(items)).toBe(2);
+  });
+
+  test("it opens as if it had answered: a generic phrase, then the first thing it said", () => {
+    const quiet = run({ runId: "r" });
+    const generic = turnOpener(quiet, turnItems(quiet));
+    expect(generic.said).toBeNull();
+    expect(generic.opener).toBeGreaterThanOrEqual(0);
+    expect(generic.opener).toBeLessThan(OPENERS);
+    expect(turnOpener(quiet, []).opener).toBe(generic.opener);
+
+    const said = run({
+      runId: "r",
+      work: [call("1", "sentry_list_issues", false), { kind: "say", text: "Vou pedir pro Josh", turn: 1 }],
+    });
+    const opened = turnOpener(said, turnItems(said));
+    expect(opened).toMatchObject({ said: "Vou pedir pro Josh", opener: null });
+    expect(opened.lines.map((x) => x.kind)).toEqual(["step"]);
+
+    expect(turnOpener(run({ runId: "w", status: "running", text: "Ontem" }), []).opener).toBeNull();
+    expect(turnOpener(run({ runId: "s", status: "canceled" }), []).opener).toBeNull();
   });
 
   test("a stopped run's steps are not running any more", () => {

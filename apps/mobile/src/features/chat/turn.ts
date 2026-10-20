@@ -41,6 +41,26 @@ export function turnItems(r: Pick<LiveRun, "work" | "status">): TurnItem[] {
   });
 }
 
+/** How many generic openers there are (`mobile.chat.turn.opener0`…): one per run, always the same. */
+export const OPENERS = 3;
+
+/**
+ * What the block opens with, as if it had answered at once: the first thing it said (out of the lines
+ * below), or a generic phrase with an ellipsis until then (`opener`, which of `OPENERS`). Nothing when
+ * its words already arrive or it was stopped before saying anything.
+ */
+export function turnOpener(
+  run: Pick<LiveRun, "runId" | "status" | "text">,
+  items: readonly TurnItem[],
+): { said: string | null; opener: number | null; lines: TurnItem[] } {
+  const first = items.find((x) => x.kind === "say");
+  if (first) return { said: first.text, opener: null, lines: items.filter((x) => x !== first) };
+  const generic = run.text.length === 0 && run.status !== "canceled";
+  let h = 0;
+  for (const ch of run.runId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return { said: null, opener: generic ? h % OPENERS : null, lines: [...items] };
+}
+
 /** How many steps the block folds into when it is done ("3 passos"). */
 export const turnSteps = (items: readonly TurnItem[]) => items.filter((x) => x.kind === "step").length;
 
