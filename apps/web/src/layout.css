@@ -3861,13 +3861,28 @@ button.drive-where:focus-visible {
 }
 
 /* Settings → Conectores: one row per connected service. */
+/*
+ * One grid for every connected row (service, email box, database): icon | name and details | who uses
+ * it | actions, so the columns line up row after row. The details stay on one line ("…"). Narrow: the
+ * agents and the actions go under the text, the same way on every row.
+ */
+.connected-list {
+  container-type: inline-size;
+}
 .connected-row {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 10.5rem auto;
   align-items: center;
-  gap: 14px;
+  column-gap: 16px;
+  row-gap: 10px;
 }
 .connected-row__text {
-  flex: 1 1 220px;
+  min-width: 0;
+}
+.connected-row__text > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .connected-row__name {
   display: flex;
@@ -3880,11 +3895,26 @@ button.drive-where:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
 }
 .connected-row__actions {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+}
+@container (max-width: 720px) {
+  .connected-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .connected-row__who {
+    grid-column: 2;
+  }
+  .connected-row__actions {
+    grid-column: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 /* The connect flow: one dialog, three steps (conectar → o que faz → quem usa). */

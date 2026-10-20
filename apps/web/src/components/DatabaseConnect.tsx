@@ -629,7 +629,9 @@ export function DatabaseRow({
           )}
           <Chip icon="eyeOff">{t("database.readOnlyChip")}</Chip>
         </span>
-        <span className="small muted">{meta.join(" · ")}</span>
+        <span className="small muted" title={meta.join(" · ")}>
+          {meta.join(" · ")}
+        </span>
       </span>
       <span className="connected-row__who small muted">
         {using.length > 0 && (

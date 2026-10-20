@@ -157,7 +157,7 @@ export function ConnectorsSection({
         accounts.length === 0 &&
         dbList.length === 0 && <p className="small muted">{t("connectors.none")}</p>}
       {items.length + accounts.length + dbList.length > 0 && (
-        <List aria-label={t("connectors.connectedList")}>
+        <List className="connected-list" aria-label={t("connectors.connectedList")}>
           {accounts.map((account) => (
             <MailRow
               key={`mail-${account.id}`}
@@ -288,7 +288,9 @@ function ConnectedRow({
             </Chip>
           )}
         </span>
-        <span className="small muted">{meta.join(" · ")}</span>
+        <span className="small muted" title={meta.join(" · ")}>
+          {meta.join(" · ")}
+        </span>
       </span>
       <span className="connected-row__who small muted">
         {using.length > 0 && (
