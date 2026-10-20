@@ -8658,10 +8658,11 @@ a.machine-row__name:hover {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
-/* "Outro valor" is one more amount button you can type in: same pill, height and type as the others. */
+/* "Outro valor" is one more amount button you can type in: same shape, height and type as the others. */
 .newag__money-field .ac-input-affix {
+  height: var(--control-h-md);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--control-r-md);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   font-size: 13px;
