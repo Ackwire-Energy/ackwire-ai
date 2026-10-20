@@ -9,6 +9,7 @@ import {
   grantScopes,
   postPersonMessage,
   setAgentScopes,
+  summarizeGrants,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
@@ -80,4 +81,14 @@ test("the run's prompt lists exactly what the agent was granted", async () => {
   prompt = promptOf(f.provider.calls.at(-1)?.request);
   expect(prompt).toContain("You only write messages in this chat");
   expect(prompt).not.toContain("`create_artifact`");
+});
+
+test("summarizeGrants: built-ins by group, connections by name, '*' with every connection, denials name nothing", () => {
+  const row = (scope: string, connectionLabel: string | null = null) => ({ scope, connectionLabel });
+  expect(summarizeGrants([row("issues:write"), row("connector:*", "Sentry"), row("tool:x", "Linear")], [])).toBe(
+    "Issues, Sentry, Linear",
+  );
+  expect(summarizeGrants([row("*")], ["Sentry", "GitHub"])).toBe("every tool of the organization (Sentry, GitHub)");
+  expect(summarizeGrants([row("deny:sentry_list_issues", "Sentry")], ["Sentry"])).toBe("conversation only");
+  expect(summarizeGrants([], [])).toBe("conversation only");
 });

@@ -84,7 +84,7 @@ export function createJevRouterStrategy(options: {
               can: c.can ?? null,
             },
             question:
-              'Should `agent` reply to `latest_message`? Yes when the message addresses this agent, fits its role and what it `can` do, or follows up on a conversation this agent was just part of (see `agent_just_talking`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer (its name, its computer, its status): then every agent should reply. No when it can\'t actually help with this.',
+              'Should `agent` reply to `latest_message`? Yes when the message addresses this agent, fits its role and what it `can` do, or follows up on a conversation this agent was just part of (see `agent_just_talking`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer (its name, its computer, its status): then every agent should reply. No when it can\'t actually help with this, and no when the message is about an app or tool (Sentry, GitHub, the Drive…) that is not in its `can`: it has no access to it.',
           },
           criteria: {
             true: "This agent should answer (alone, or along with the others when the message is for all of them).",
@@ -106,7 +106,8 @@ export function createJevRouterStrategy(options: {
       if (input.candidates.length >= 2) {
         const criteria: Record<string, string> = {};
         for (const c of input.candidates)
-          criteria[c.handle] = `${c.name}${c.role ? `, ${c.role}` : ""}${c.about ? `: ${c.about.slice(0, 200)}` : ""}`;
+          criteria[c.handle] =
+            `${c.name}${c.role ? `, ${c.role}` : ""}${c.about ? `: ${c.about.slice(0, 200)}` : ""}${c.can ? ` (can use: ${c.can})` : ""}`;
         criteria[NONE] = "No agent should reply.";
         questions.best_agent = {
           type: "choice",

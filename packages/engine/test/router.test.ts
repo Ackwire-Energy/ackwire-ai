@@ -103,6 +103,36 @@ function fixedStrategy(scores: Record<string, number>) {
 }
 
 describe("routeMessage", () => {
+  test("each candidate's `can` names the connections it may use (a question about Sentry goes to who has it)", async () => {
+    f = await setup();
+    const make = (handle: string) =>
+      createAgent(f.db, f.owner.id, f.org.id, { name: handle, handle }, { model: "claude-sonnet-5-5" });
+    const atlas = await make("atlas");
+    const ada = await make("ada");
+    for (const a of [atlas, ada])
+      await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: a.id });
+    const [sentry] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "sentry",
+        label: "Sentry",
+        serverUrl: "https://mcp.sentry.dev",
+        authType: "none",
+      })
+      .returning();
+    await f.db.insert(schema.agentScopes).values([
+      { orgId: f.org.id, agentId: atlas.id, connectionId: sentry?.id, scope: "connector:*" },
+      { orgId: f.org.id, agentId: ada.id, connectionId: sentry?.id, scope: "deny:sentry_list_issues" },
+    ]);
+    const { strategy, seen } = fixedStrategy({});
+    const message = await post("nenhum erro novo no sentry gente?");
+    await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: message.id });
+    const can = Object.fromEntries((seen[0] ?? []).map((c) => [c.handle, c.can]));
+    expect(can.atlas).toContain("Sentry");
+    expect(can.ada).not.toContain("Sentry");
+  });
+
   test("candidates are filtered by code: channel members, active, auto-reply on", async () => {
     f = await setup();
     const make = (handle: string) =>

@@ -53,6 +53,30 @@ export function summarizeScopes(scopes: string[]) {
 }
 
 /**
+ * What an agent's grant rows allow, by name, for the router ("Sentry, Files (Drive)"): built-in scopes by
+ * group, each connection it may use by its label (a grant on a connection is `connector:*` or `tool:…`,
+ * never named by its scope), and "*" as every tool of the organization with the connections it reaches.
+ * Denials name nothing.
+ */
+export function summarizeGrants(rows: { scope: string; connectionLabel: string | null }[], orgConnections: string[]) {
+  const named = new Set<string>();
+  const builtin: string[] = [];
+  let everything = false;
+  for (const r of rows) {
+    if (r.scope.startsWith("deny:")) continue;
+    if (r.connectionLabel) named.add(r.connectionLabel);
+    else if (r.scope === "*") everything = true;
+    else if (!r.scope.startsWith("tool:") && !r.scope.startsWith("connector:")) builtin.push(r.scope);
+  }
+  const parts = capabilityKeys(builtin).map((key) => groupOf({ scope: key }));
+  if (everything) {
+    const apps = [...new Set([...orgConnections, ...named])];
+    parts.unshift(`every tool of the organization${apps.length > 0 ? ` (${apps.join(", ")})` : ""}`);
+  } else parts.push(...named);
+  return parts.length > 0 ? [...new Set(parts)].join(", ") : "conversation only";
+}
+
+/**
  * The "what you can do" section of an agent's system prompt, built from the
  * tools it was actually granted for this run (so it can't drift from its
  * permissions): tools grouped by purpose, what needs a person's approval,
