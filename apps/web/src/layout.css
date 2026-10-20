@@ -10428,8 +10428,20 @@ a.machine-row__name:hover {
   cursor: default;
   opacity: 0.55;
 }
-.agp-repodialog__note {
-  margin: 0 0 4px;
+/* "Todos os repositórios" on top of the list (telas/RepositoriosDialogo.html, B). */
+.agp-repodialog__all {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  cursor: pointer;
+}
+.agp-repodialog__first {
+  flex: none;
 }
 .agp-repodialog__empty {
   display: flex;

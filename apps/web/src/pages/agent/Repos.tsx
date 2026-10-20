@@ -22,7 +22,6 @@ import {
   type IconName,
   Menu,
   MenuItem,
-  Segmented,
 } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -153,21 +152,33 @@ export function ReposBlock() {
   );
 }
 
-/** The rows of the picker for one account: "Toda a conta X" (no search), then its repositories. */
+/**
+ * The rows of the picker for one account: "Toda a conta X" (no search), then its repositories.
+ * With "Todos os repositórios" on (`all`) every row shows checked and dimmed: what "todos" covers.
+ */
 function AccountRows({
   account,
   query,
   list,
+  all,
   onToggle,
 }: {
   account: GitHubRepositories["accounts"][number];
   query: string;
   list: string[];
+  all: boolean;
   onToggle: (entry: string, on: boolean) => void;
 }) {
   const { t } = useTranslation();
   const whole = `${account.login}/*`;
-  const wholeOn = list.some((e) => e.toLowerCase() === whole.toLowerCase());
+  const same = (a: string | undefined, b: string) => a?.toLowerCase() === b.toLowerCase();
+  const wholeOn = list.some((e) => same(e, whole));
+  const startsHere = (entry: string) =>
+    !all && same(list[0], entry) ? (
+      <Chip icon="pin" className="agp-repodialog__first">
+        {t("repos.startsHere")}
+      </Chip>
+    ) : null;
   const repos = account.repositories.filter((r) => !query || r.fullName.toLowerCase().includes(query));
   if (repos.length === 0 && query) return null;
   const id = (s: string) => `repo-${s.replace(/[^a-zA-Z0-9]/g, "-")}`;
@@ -175,21 +186,32 @@ function AccountRows({
     <section className="agp-repogroup" aria-label={account.login}>
       <p className="ac-eyebrow">{account.login}</p>
       {!query && (
-        <label htmlFor={id(whole)} className="scope-row">
-          <Checkbox id={id(whole)} checked={wholeOn} onCheckedChange={(on) => onToggle(whole, on)} />
+        <label htmlFor={id(whole)} className="scope-row" data-off={all || undefined}>
+          <Checkbox
+            id={id(whole)}
+            checked={all || wholeOn}
+            disabled={all}
+            onCheckedChange={(on) => onToggle(whole, on)}
+          />
           <Icon name="members" size={16} />
           <span className="scope-row__text">
             <b>{t("repos.wholeAccount", { owner: account.login })}</b>
             <span className="small muted">{t("repos.wholeAccountHelp", { count: account.repositories.length })}</span>
           </span>
+          {startsHere(whole)}
         </label>
       )}
       {repos.map((r) => (
-        <label key={r.fullName} htmlFor={id(r.fullName)} className="scope-row" data-off={wholeOn || undefined}>
+        <label
+          key={r.fullName}
+          htmlFor={id(r.fullName)}
+          className="scope-row"
+          data-off={all || wholeOn || undefined}
+        >
           <Checkbox
             id={id(r.fullName)}
-            checked={covers(list, r.fullName)}
-            disabled={wholeOn}
+            checked={all || covers(list, r.fullName)}
+            disabled={all || wholeOn}
             onCheckedChange={(on) => onToggle(r.fullName, on)}
           />
           <Icon name={r.private ? "lock" : "globe"} size={16} />
@@ -197,6 +219,7 @@ function AccountRows({
             <b>{r.fullName}</b>
             <span className="small muted">{r.private ? t("repos.private") : t("repos.public")}</span>
           </span>
+          {startsHere(r.fullName)}
         </label>
       ))}
     </section>
@@ -204,9 +227,10 @@ function AccountRows({
 }
 
 /**
- * "Repositórios da Ada": Todos / Só alguns, search, the organization's
- * repositories by account. "Usar estes" puts the choice in the draft.
- * `add` ("Liberar") starts with that repository checked.
+ * "Repositórios da Ada" (telas/RepositoriosDialogo.html, B): "Todos os repositórios" on top of
+ * the list, which is always there (with Todos on, all of it checked and dimmed); search; the
+ * organization's repositories by account. The button says what it will do ("Usar 2
+ * repositórios") and puts the choice in the draft. `add` ("Liberar") starts with it checked.
  */
 export function RepoDialog({
   add,
@@ -233,32 +257,40 @@ export function RepoDialog({
   const matches = accounts.some((a) => a.repositories.some((r) => !query || r.fullName.toLowerCase().includes(query)));
   const canInstall = orgCan(org.role, "configure") && app.data?.installable === true;
   const exists = (e: string) => repoExists(listing.data, e);
+  const all = pick.mode === "all";
+  const total = accounts.reduce((n, a) => n + a.repositories.length, 0);
+  const chosen = pick.list.filter(exists);
+  const first = chosen[0];
+  const note = all
+    ? listing.data && total > 0
+      ? t("repos.allFoot", { count: total })
+      : undefined
+    : first
+      ? t("repos.startsAt", { repo: repoName(t, first) })
+      : undefined;
   return (
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
       title={t("repos.dialogTitle", g)}
+      description={t("repos.dialogDesc", g)}
       closeLabel={t("common.close")}
       className="agp-repodialog"
     >
       <div className="ac-dialog__tools">
-        <Segmented
-          size="sm"
-          label={t("repos.label")}
-          value={pick.mode}
-          onValueChange={(mode) => setPick((p) => ({ ...p, mode }))}
-          options={[
-            { value: "all" as const, label: t("repos.allShort") },
-            { value: "some" as const, label: t("repos.some") },
-          ]}
-        />
+        <label htmlFor="repos-all" className="agp-repodialog__all">
+          <Checkbox
+            id="repos-all"
+            checked={all}
+            onCheckedChange={(on) => setPick((p) => ({ ...p, mode: on ? "all" : "some" }))}
+          />
+          <span className="scope-row__text">
+            <b>{t("repos.all")}</b>
+            <span className="small muted">{t("repos.allRowHelp", { org: org.name })}</span>
+          </span>
+        </label>
       </div>
-      {pick.mode === "all" ? (
-        <p className="newag__note agp-repodialog__note">
-          <Icon name="globe" size={16} />
-          <span>{t("repos.allNote", { ...g, org: org.name })}</span>
-        </p>
-      ) : listing.isLoading ? (
+      {listing.isLoading ? (
         <div className="ac-dialog__body">
           <LoadingLine width={220} />
         </div>
@@ -299,16 +331,27 @@ export function RepoDialog({
               account={a}
               query={query}
               list={pick.list}
+              all={all}
               onToggle={(entry, on) => setPick((p) => ({ mode: "some", list: toggleRepo(p.list, entry, on) }))}
             />
           ))}
           {listing.data?.truncated && <p className="small muted">{t("repos.truncated")}</p>}
         </DialogSearchList>
       )}
-      <DialogFooter bar>
-        <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button variant="primary" onClick={() => onUse(applyPick(current.list, pick, exists))}>
-          {t("repos.use")}
+      <DialogFooter bar note={note}>
+        <Button variant="ghost" onClick={onClose}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          variant="primary"
+          disabled={!all && chosen.length === 0}
+          onClick={() => onUse(applyPick(current.list, pick, exists))}
+        >
+          {all
+            ? t("repos.useAll")
+            : chosen.length === 0
+              ? t("repos.pickOne")
+              : t("repos.useCount", { count: chosen.length })}
         </Button>
       </DialogFooter>
     </Dialog>
