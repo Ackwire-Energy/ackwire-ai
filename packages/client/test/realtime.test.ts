@@ -211,6 +211,22 @@ describe("the guessed 'pensando…' when the server is faster than the send", ()
     s = retargetProvisional(s, "local-1", "m1");
     expect(runsInChannel(s, "dm").map((r) => r.runId)).toEqual(["pending:theo:m1"]);
   });
+
+  test("the send answers first, then a flat DM run starts: the run takes the guess's place", () => {
+    let s = expectReply(emptyStreams, { channelId: "dm", threadId: "local-1", agentId: "theo" }, 1000);
+    s = retargetProvisional(s, "local-1", "m1");
+    s = applyChannelEvent(s, {
+      type: "agent.run",
+      channelId: "dm",
+      threadId: null,
+      runId: "r1",
+      agentId: "theo",
+      status: "running",
+    } as unknown as ChannelEvent);
+    const runs = runsInChannel(s, "dm");
+    expect(runs.map((r) => r.runId)).toEqual(["r1"]);
+    expect(runs[0]?.triggerMessageId).toBe("m1");
+  });
 });
 
 describe("a run parked waiting for its computer (never 'working' forever)", () => {

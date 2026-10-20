@@ -312,8 +312,14 @@ function upsert(
   event: { runId: string; agentId: string; channelId: string; threadId: string },
   patch: Partial<LiveRun>,
 ) {
-  const provisional = state.runs[provisionalId(event.agentId, event.threadId)];
-  let base = settleProvisional(state, event.agentId, event.threadId);
+  // A flat run (DMs: thread null) answers whatever message we guessed: any "pensando…" of the agent
+  // there is its own. Kept, it held the first block and hid this run's (its browser card) all run long.
+  const provisional = event.threadId
+    ? state.runs[provisionalId(event.agentId, event.threadId)]
+    : Object.values(state.runs).find(
+        (r) => r.provisional && r.agentId === event.agentId && r.channelId === event.channelId,
+      );
+  let base = settleAfterRun(state, event);
   // A new run of the same agent in the channel: its earlier failure is old news, not the latest word.
   if (!base.runs[event.runId] && patch.status !== "failed") {
     for (const r of Object.values(base.runs)) {
