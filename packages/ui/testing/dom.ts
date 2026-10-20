@@ -141,6 +141,10 @@ export function detachDom() {
 export function setupDom() {
   beforeAll(attachDom);
   afterAll(async () => {
+    // Unmount what the file rendered first: a mounted component's timer (a highlight, a poll) would
+    // fire after the DOM is gone and set state with no `window` ("Unhandled error between tests").
+    const { cleanup } = await import("@testing-library/react");
+    cleanup();
     s().window.document.body.innerHTML = "";
     // Let React's scheduler finish work queued by the file's last test (it runs on a MessageChannel
     // task and reads `window.event`); detaching first made it throw "window is not defined" between
