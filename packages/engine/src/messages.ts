@@ -676,7 +676,15 @@ export async function postPersonMessage(
       threadId: input.threadId,
       author: { type: "person", userId },
       body: input.body,
-      meta: clientId || meta ? { ...(meta ?? {}), ...(clientId ? { clientId } : {}) } : undefined,
+      meta:
+        clientId || meta || input.steer === "now"
+          ? {
+              ...(meta ?? {}),
+              ...(clientId ? { clientId } : {}),
+              // A computer brain can't drop a turn halfway: its task stops and starts again from this message.
+              ...(input.steer === "now" ? { steerNow: true } : {}),
+            }
+          : undefined,
     },
     { startRuns: true },
   );
@@ -743,7 +751,14 @@ export async function postPersonMessage(
         ...(now ? { now: true as const } : {}),
       });
       // Its model call stops and the loop reads the message at once (a running tool finishes first).
-      if (now && active?.status === "running") await interruptRun(deps.pubsub, s.id, message.id);
+      // A computer brain (Claude Code, Codex) can't drop its turn halfway: the task stops for real, and
+      // stopping it starts it again from this message (`restartAfterStopAndSend`). Who may not stop it
+      // just leaves the message for its next step.
+      if (now && active?.status === "running") {
+        const agent = await getAgentCached(deps.db, orgId, s.agentId);
+        if (agent && agent.brain !== "model") await cancelRun(deps, userId, orgId, s.id).catch(() => undefined);
+        else await interruptRun(deps.pubsub, s.id, message.id);
+      }
       // Parked waiting for its computer: look again now. Back (or never really away): the run resumes
       // and reads this message with the rest; still away: it parks again quietly (one answer later).
       else if (active?.status === "waiting_input" && active.waitingMachineId) {

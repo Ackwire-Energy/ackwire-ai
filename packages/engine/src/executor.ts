@@ -792,6 +792,11 @@ async function executeRunInner(
     if (view) await publishMessageCreated(deps.pubsub, view);
     await publishChannelEvent(deps.pubsub, event("canceled"));
     await finished("canceled");
+    // Stopped by a "Parar e mandar" (a computer brain): it starts again from that message.
+    if (by) {
+      const { restartAfterStopAndSend } = await import("./continue-run");
+      await restartAfterStopAndSend(deps, run.id, { id: message.id, threadId: message.threadId }, t);
+    }
   };
 
   /** Messages this run already read (a "stop and send" for one of them has nothing to interrupt). */

@@ -140,3 +140,94 @@ export async function continueRun(
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, runId: newRunId });
   return { runId: newRunId };
 }
+
+/**
+ * "Parar e mandar" to a computer brain (Claude Code, Codex): its turn can't be cut halfway, so the
+ * task was stopped (`postPersonMessage`). Once its stop is posted (`stopped`, the reply), a new run
+ * of the same agent starts from that message: same conversation, the stopped run's context and its
+ * computer session, plus "[Ana stopped you to say this:] …". Only for a message of the person who
+ * stopped it, still unread (`meta.steerNow`). The stopped reply is marked continued (no "Continuar"),
+ * and the app hears it read the message. Returns the new run's id, or null when there is nothing to do.
+ */
+export async function restartAfterStopAndSend(
+  deps: { db: Database; pubsub?: PubSub },
+  stoppedRunId: string,
+  reply: { id: string; threadId: string | null },
+  transcript: Transcript,
+): Promise<string | null> {
+  const { db } = deps;
+  const [stopped] = await db.select().from(agentRuns).where(eq(agentRuns.id, stoppedRunId));
+  const by = canceledBy(stopped?.error);
+  if (!stopped || !by || stopped.pendingMessageIds.length === 0) return null;
+  // A model brain reads a "Parar e mandar" mid-task (its call is cut); only a computer brain is restarted.
+  const [agent] = await db.select({ brain: agents.brain }).from(agents).where(eq(agents.id, stopped.agentId));
+  if (!agent || agent.brain === "model") return null;
+  const [said] = await db
+    .select()
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, stopped.orgId),
+        inArray(messages.id, stopped.pendingMessageIds),
+        eq(messages.authorUserId, by),
+        sql`${messages.meta}->>'steerNow' = 'true'`,
+      ),
+    )
+    .orderBy(sql`${messages.createdAt} desc`)
+    .limit(1);
+  if (!said) return null;
+  const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, by));
+  const line = `[${person?.name ?? "A person"} stopped you to say this:]\n\n${said.body}`;
+  const newRunId = Bun.randomUUIDv7();
+  const created = await db.transaction(async (tx) => {
+    // The message is its trigger (it started no run of this agent: it went into the stopped one).
+    const [inserted] = await tx
+      .insert(agentRuns)
+      .values({
+        id: newRunId,
+        orgId: stopped.orgId,
+        agentId: stopped.agentId,
+        channelId: stopped.channelId,
+        threadRootId: said.threadId ?? said.id,
+        triggerMessageId: said.id,
+        trigger: stopped.trigger === "router" ? "mention" : stopped.trigger,
+        hop: stopped.hop,
+        transcript: continuedTranscript(transcript, line) as unknown as Record<string, unknown>,
+        issueId: stopped.issueId,
+        brainSessionId: stopped.brainSessionId,
+      })
+      .onConflictDoNothing()
+      .returning({ id: agentRuns.id });
+    if (!inserted) return false;
+    const mark = JSON.stringify({ continuedRunId: newRunId, continuedByUserId: by });
+    await tx
+      .update(messages)
+      .set({ meta: sql`jsonb_set(${messages.meta}, '{canceled}', (${messages.meta}->'canceled') || ${mark}::jsonb)` })
+      .where(and(eq(messages.orgId, stopped.orgId), eq(messages.id, reply.id)));
+    await enqueue(tx, {
+      orgId: stopped.orgId,
+      kind: "agent_run.execute",
+      payload: { runId: newRunId },
+      dedupeKey: `agent_run.execute:${newRunId}`,
+      maxAttempts: 4,
+    });
+    return true;
+  });
+  if (!created) return null;
+  const where = { channelId: stopped.channelId, threadId: reply.threadId, agentId: stopped.agentId };
+  await publishChannelEvent(deps.pubsub, {
+    type: "run.continued",
+    ...where,
+    runId: stopped.id,
+    newRunId,
+    messageId: reply.id,
+  });
+  await publishChannelEvent(deps.pubsub, {
+    type: "agent.run.read",
+    ...where,
+    runId: stopped.id,
+    messageIds: [said.id],
+  });
+  await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, runId: newRunId });
+  return newRunId;
+}

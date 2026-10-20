@@ -14,9 +14,11 @@ import {
   type JudgeAnswer,
   listMessages,
   postPersonMessage,
+  restartAfterStopAndSend,
   stopChecksSettled,
   type ToolSource,
 } from "../src";
+import type { Transcript } from "../src/executor";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -290,6 +292,41 @@ describe('"Continuar" after a stop', () => {
     expect(textOf(sent.at(-1)?.content ?? "")).toContain("[ana asked you to continue from where you stopped.]");
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
     expect(thread.at(-1)?.body).toBe("Terminei a análise.");
+  });
+
+  test("'Parar e mandar' to a computer brain: stopping it starts it again from that message", async () => {
+    const { question, stopped } = await stoppedRun();
+    // Ana's message went into the task and is still unread when the stop lands.
+    const said = await ask("na verdade só os 3 primeiros", { threadId: question.id, steer: "now" });
+    expect(said.meta.steerNow).toBe(true);
+    await f.db
+      .update(schema.agentRuns)
+      .set({ pendingMessageIds: [said.id] })
+      .where(eq(schema.agentRuns.id, stopped.id));
+    const reply = { id: stopped.replyMessageId as string, threadId: question.id };
+    const transcript = stopped.transcript as unknown as Transcript;
+
+    // A model brain read it mid-task already: nothing to restart.
+    expect(await restartAfterStopAndSend(deps(), stopped.id, reply, transcript)).toBeNull();
+
+    await f.db.update(schema.agents).set({ brain: "claude_code" }).where(eq(schema.agents.id, f.agent.id));
+    const events = f.listen(f.general.id);
+    const runId = await restartAfterStopAndSend(deps(), stopped.id, reply, transcript);
+    expect(runId).toBeString();
+    const next = await runById(runId as string);
+    expect(next).toMatchObject({ agentId: f.agent.id, triggerMessageId: said.id, threadRootId: question.id });
+    const t = next?.transcript as unknown as Transcript;
+    expect(t.continued?.prompt).toBe("[ana stopped you to say this:]\n\nna verdade só os 3 primeiros");
+    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+    expect(thread.find((m) => m.id === reply.id)?.meta.canceled).toMatchObject({ continuedRunId: runId });
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "run.continued", runId: stopped.id, newRunId: runId }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "agent.run.read", runId: stopped.id, messageIds: [said.id] }),
+    );
+    // Once: the message is now a run's trigger.
+    expect(await restartAfterStopAndSend(deps(), stopped.id, reply, transcript)).toBeNull();
   });
 
   test("permissions and 409s: same people as stopping it; busy agent; never a run nobody stopped", async () => {
