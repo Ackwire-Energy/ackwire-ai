@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { LiveConsult, LiveConsultStatus } from "../realtime/consults";
-import type { LiveRun } from "../realtime/streams";
+import { type LiveRun, narrationOf } from "../realtime/streams";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 
@@ -12,6 +12,7 @@ import { agentGrammar } from "./grammar";
 export type ActivityKind =
   | "thinking"
   | "typing"
+  | "writing"
   | "consulting"
   | "creatingIssue"
   | "updatingIssue"
@@ -263,6 +264,8 @@ export function barEntries(
   agentName: (id: string) => string,
   personName: (id: string) => string | undefined,
   consults: LiveConsult[] = [],
+  /** Agents already writing stay in ("Theo está escrevendo…"): the card above the box is always on. */
+  withWriting = false,
 ): ActivityEntry[] {
   const out: ActivityEntry[] = [];
   const seen = new Set<string>();
@@ -281,13 +284,15 @@ export function barEntries(
   }
   for (const r of runs) {
     // Only work in progress: a run waiting (an approval, an answer, its computer) or ended isn't "working".
-    if (isWriting(r) || !BAR_STATUSES.has(r.status) || seen.has(r.agentId)) continue;
+    if (!BAR_STATUSES.has(r.status) || seen.has(r.agentId)) continue;
+    const writing = isWriting(r);
+    if (writing && !withWriting) continue;
     seen.add(r.agentId);
     out.push({
       id: r.agentId,
       type: "agent",
       name: agentName(r.agentId),
-      activity: toolActivity(r.tool, r.connector, r.toolDetail),
+      activity: writing ? { kind: "writing" } : toolActivity(r.tool, r.connector, r.toolDetail),
     });
   }
   for (const id of typingUserIds) {
@@ -366,3 +371,56 @@ export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: M
 
 /** The bar's sentence as plain text (see `activitySentence`). */
 export const activityText = (t: TFunction, entries: ActivityEntry[]) => activitySentence(t, entries);
+
+/** How often the card's phrase turns (telas/CardTrabalhando.html, A). */
+export const PHRASE_TURN_MS = 2600;
+/** A step running this long gets an aside in turn ("Isso leva um minutinho…"). */
+export const LONG_STEP_MS = 4000;
+const THINKING_LINES = [
+  "chat.phrase.thinking.l0",
+  "chat.phrase.thinking.l1",
+  "chat.phrase.thinking.l2",
+  "chat.phrase.thinking.l3",
+  "chat.phrase.thinking.l4",
+] as const;
+const LONG_LINES = [
+  "chat.phrase.long.l0",
+  "chat.phrase.long.l1",
+  "chat.phrase.long.l2",
+  "chat.phrase.long.l3",
+] as const;
+
+/**
+ * The card's phrase at turn `tick`. One agent on its own: nothing done yet → who it is, then light lines
+ * ("Juntando as peças…"); at work → what it does, an aside when the step is long, and what it
+ * said last ("Theo: Achei a área de viagens…"), in turn. Anyone else (several, a question out, people
+ * typing, writing): the plain sentence.
+ */
+export function barPhrase(
+  t: TFunction,
+  entries: ActivityEntry[],
+  runs: LiveRun[],
+  tick: number,
+  now: number,
+  mark: MarkName = plain,
+): string {
+  const sentence = activitySentence(t, entries, mark);
+  const only = entries.length === 1 ? entries[0] : undefined;
+  if (only?.type !== "agent" || only.consult || only.activity.kind === "writing") return sentence;
+  const run = runs.find((r) => r.agentId === only.id);
+  if (!run) return sentence;
+  const calls = (run.work ?? []).filter((w) => w.kind === "call");
+  if (only.activity.kind === "thinking" && calls.length === 0) {
+    // Who it is first, then two light lines, and again (the lines move on each round).
+    const k = Math.floor(tick / 3) * 2;
+    const line = (i: number) => `${t(THINKING_LINES[i % THINKING_LINES.length] ?? THINKING_LINES[0])}…`;
+    return [sentence, line(k), line(k + 1)][tick % 3] ?? sentence;
+  }
+  const pool = [sentence];
+  const step = calls.at(-1);
+  if (step?.kind === "call" && step.running && step.since !== undefined && now - step.since >= LONG_STEP_MS)
+    pool.push(`${t(LONG_LINES[Math.floor(tick / 2) % LONG_LINES.length] ?? LONG_LINES[0])}…`);
+  const said = narrationOf(run).at(-1);
+  if (said) pool.push(t("chat.phrase.said", { name: mark(only.name), text: said }));
+  return pool[tick % pool.length] ?? sentence;
+}

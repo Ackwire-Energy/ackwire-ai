@@ -6356,6 +6356,18 @@ export const en: Translations = {
     doing_other: "{{names}} are {{doing}}",
     /** "Theo, Iris and 2 more" (3 or more names in the working line). */
     namesMore: "{{first}}, {{second}} and {{count}} more",
+    /** The card above the box turns its phrase (telas/CardTrabalhando.html, A). */
+    phrase: {
+      thinking: {
+        l0: "Thinking about your request",
+        l1: "Putting the pieces together",
+        l2: "Reading carefully",
+        l3: "Sorting out the ideas",
+        l4: "Finding the best way",
+      },
+      long: { l0: "This takes a minute", l1: "Going carefully", l2: "Checking the details", l3: "Almost there" },
+      said: "{{name}}: {{text}}",
+    },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} is asking {{to}}",
@@ -6444,6 +6456,7 @@ export const en: Translations = {
         usingTool: "Used the {{tool}} tool",
         thinking: "Thought",
         typing: "Wrote",
+        writing: "Wrote",
       },
     },
     activity: {
@@ -6454,6 +6467,7 @@ export const en: Translations = {
       updatingRoutine: "changing a routine",
       thinking: "working",
       typing: "typing",
+      writing: "writing",
       consulting: "checking {{app}}",
       creatingIssue: "creating a task",
       updatingIssue: "updating a task",

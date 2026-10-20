@@ -1,7 +1,13 @@
-import { elapsedClock } from "@agenteschat/client";
-import { type ActivityEntry, activitySentence, type MarkName } from "@agenteschat/client/lib/activity";
+import { elapsedClock, type LiveRun } from "@agenteschat/client";
+import {
+  type ActivityEntry,
+  activitySentence,
+  barPhrase,
+  type MarkName,
+  PHRASE_TURN_MS,
+} from "@agenteschat/client/lib/activity";
 import { Avatar, Icon } from "@agenteschat/ui";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -41,6 +47,47 @@ export function boldNames(text: string): ReactNode[] {
 export function WorkingWords({ entries }: { entries: ActivityEntry[] }) {
   const { t } = useTranslation();
   return <>{boldNames(activitySentence(t, entries, mark))}</>;
+}
+
+/**
+ * The card's phrase, turning (telas/CardTrabalhando.html, A): one agent on its own gets a light line
+ * while it only thinks, then what it does, an aside on a long step and what it said last, in turn.
+ */
+export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: LiveRun[] }) {
+  const { t } = useTranslation();
+  const [tick, setTick] = useState(0);
+  const turning = entries.length === 1 && entries[0]?.type === "agent";
+  useEffect(() => {
+    if (!turning) return;
+    const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
+    return () => clearInterval(timer);
+  }, [turning]);
+  return <TurnText text={barPhrase(t, entries, runs, tick, Date.now(), mark)} />;
+}
+
+/**
+ * A new phrase comes up from below while the old one leaves upward (just a swap with reduced motion).
+ * The one leaving is drawn from an attribute, so the text on the page is only the phrase now.
+ */
+function TurnText({ text }: { text: string }) {
+  const [shown, setShown] = useState({ now: text, was: null as string | null, n: 0 });
+  if (shown.now !== text) setShown({ now: text, was: shown.now, n: shown.n + 1 });
+  return (
+    <span className="ac-turn">
+      {shown.was !== null && (
+        <span
+          key={`was-${shown.n}`}
+          className="ac-turn__out"
+          aria-hidden="true"
+          data-text={shown.was.split(OPEN).join("").split(CLOSE).join("")}
+          onAnimationEnd={() => setShown((s) => (s.n === shown.n ? { ...s, was: null } : s))}
+        />
+      )}
+      <span key={`now-${shown.n}`} className="ac-turn__in" data-first={shown.n === 0 || undefined}>
+        {boldNames(shown.now)}
+      </span>
+    </span>
+  );
 }
 
 /**

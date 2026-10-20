@@ -223,7 +223,8 @@ export function workingEntries(
   consults: LiveConsult[],
   agentName: (id: string) => string,
 ): ActivityEntry[] {
-  return barEntries(runs, [], agentName, () => undefined, consults);
+  // Writing agents stay in: the line above the box is on while they work (CardTrabalhando.html, A).
+  return barEntries(runs, [], agentName, () => undefined, consults, true);
 }
 
 /**

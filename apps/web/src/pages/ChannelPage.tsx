@@ -51,7 +51,7 @@ import {
   useUpdateChannel,
   useWikiTree,
 } from "@agenteschat/client";
-import { activityText, activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import { activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import {
@@ -184,7 +184,7 @@ import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
-import { isStoppable, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
+import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -197,7 +197,7 @@ import {
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { ConsultClock, WorkingStack, WorkingWords } from "@/components/WorkingLine";
+import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
@@ -2408,9 +2408,9 @@ function useBlocksInView(scroller: { current: HTMLElement | null }, key: string)
 }
 
 /**
- * The thin line right above the composer (telas/Mensagens.html): what an agent is doing while its
- * block is out of view ("Theo está consultando o GitHub · 12 s · Ver · Esc para parar"), and who is
- * typing. Agents in plain sight leave it: their block says it.
+ * The card right above the composer (telas/CardTrabalhando.html, A): while an agent works, the glass
+ * pill in its color with a turning phrase (a light line while it thinks, what it does, what it said
+ * last), the time, "Ver" when its block is out of view and the stop; and who is typing.
  */
 function ActivityBar({
   channelId,
@@ -2422,11 +2422,11 @@ function ActivityBar({
   channelId: string;
   /** Which runs belong here (a thread view shows only its own). */
   visible?: { current: (r: { threadId: string }) => boolean };
-  /** The run's block is not on screen. */
+  /** The run's block is not on screen ("Ver" brings it back). */
   outOfView: (runId: string) => boolean;
   /** "Ver": back to that block. */
   onSee: (runId: string) => void;
-  /** The run Esc stops (so the line says so). */
+  /** The run Esc stops (the pill shows its stop). */
   stoppable?: string;
 }) {
   const { t } = useTranslation();
@@ -2434,11 +2434,7 @@ function ActivityBar({
   const dir = useDirectory(org.id);
   const [now, setNow] = useState(() => Date.now());
   const all = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
-  const runs = all.filter((r) => r.status !== "failed" && r.status !== "canceled" && outOfView(r.runId));
-  // Out of view, an agent already writing still counts as at work.
-  const atWork = runs.map((r) =>
-    isWriting(r) ? { ...r, text: "", work: (r.work ?? []).filter((w) => w.kind !== "steer") } : r,
-  );
+  const runs = all.filter((r) => r.status !== "failed" && r.status !== "canceled");
   // An agent asking another one: "Dev está perguntando ao Infra… 0:12" (its run pauses meanwhile).
   const consults = useLive(
     (s) => consultsIn(s.consults, channelId, now).filter((c) => visible?.current(c) ?? true),
@@ -2454,20 +2450,23 @@ function ActivityBar({
     return () => clearInterval(timer);
   }, [ticking]);
   const entries = barEntries(
-    atWork,
+    runs,
     ids,
     (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
     (id) => dir.memberById.get(id)?.name,
     consults,
+    true,
   );
-  const text = activityText(t, entries);
+  const { stop } = useStopRun();
   const active = entries.length > 0;
   // The strip behind the bar (and the orbit) take the color of the first agent at work.
   const firstAgent = entries.find((e) => e.type === "agent");
   const firstRun = firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
   const took = firstRun ? elapsedParts(now - (firstRun.startedAt ?? now)) : null;
   // Agents running code: "Ver código" with the live code and output.
-  const coding = runs.filter((r) => r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running));
+  const coding = runs.filter(
+    (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
+  );
   // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
   const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
   const openBrowser = browsing ? () => requestBrowserCard({ agentId: browsing.agentId }) : undefined;
@@ -2506,9 +2505,9 @@ function ActivityBar({
             {/* Agents at work: the pixel orbit in the first one's color (people only typing: the dots). */}
             {firstAgent && <AgentSpinner agentId={firstAgent.id} size={14} />}
             <WorkingStack entries={entries} />
-            {/* Keyed by the words: a new activity fades in. Names in ink. */}
-            <span key={text} className="ac-typing__text">
-              <WorkingWords entries={entries} />
+            {/* The phrase turns: the old one leaves upward, the new one comes from below. Names in ink. */}
+            <span className="ac-typing__text">
+              <BarPhrase entries={entries} runs={runs} />
             </span>
             <ConsultClock entries={entries} now={now} />
             {took && !entries.some((e) => e.consult?.status === "asking") && (
@@ -2537,7 +2536,7 @@ function ActivityBar({
                 <span />
               </span>
             )}
-            {firstRun && (
+            {firstRun && outOfView(firstRun.runId) && (
               <>
                 <span className="ac-typing__sep" aria-hidden="true" />
                 <button type="button" className="ac-typing__see" onClick={() => onSee(firstRun.runId)}>
@@ -2545,11 +2544,7 @@ function ActivityBar({
                 </button>
               </>
             )}
-            {firstRun && stoppable === firstRun.runId && (
-              <span className="ac-typing__hint">
-                <Kbd>{"Esc"}</Kbd> {t("run.strip.toStop")}
-              </span>
-            )}
+            {firstRun && stoppable === firstRun.runId && <StopButton run={firstRun} onStop={stop} place="bar" />}
           </>
         )}
       </div>

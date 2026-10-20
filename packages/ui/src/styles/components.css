@@ -2237,10 +2237,50 @@ a.ac-list__row:focus-visible {
     animation-delay: 0.3s;
   }
 }
-/* The bar's words fade in when someone starts (or changes what they're doing) */
+/* The bar's phrase turns (telas/CardTrabalhando.html, A): the old one leaves upward, the new one comes
+   from below, in the same cell. Reduced motion: a plain swap. */
+.ac-turn {
+  display: inline-grid;
+  max-width: 100%;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.ac-turn__in,
+.ac-turn__out {
+  grid-area: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-turn__out {
+  display: none;
+}
+.ac-turn__out::before {
+  content: attr(data-text);
+}
 @media (prefers-reduced-motion: no-preference) {
-  .ac-typing__text {
+  .ac-turn__out {
+    display: block;
+    animation: ac-turn-out 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .ac-turn__in {
+    animation: ac-turn-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .ac-turn__in[data-first] {
     animation: ac-fade-in 160ms ease-out both;
+  }
+}
+@keyframes ac-turn-out {
+  to {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+@keyframes ac-turn-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
   }
 }
 @keyframes ac-fade-in {

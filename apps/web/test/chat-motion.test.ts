@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "@agenteschat/client";
 import { applyChannelEvent, emptyStreams, runsInChannel } from "@agenteschat/client";
-import { type ActivityEntry, activityText, barEntries, toolActivity } from "@agenteschat/client/lib/activity";
+import {
+  type ActivityEntry,
+  activityText,
+  barEntries,
+  barPhrase,
+  toolActivity,
+} from "@agenteschat/client/lib/activity";
 import {
   entersWithMotion,
   greetingSuggestions,
@@ -67,6 +73,60 @@ describe("smooth reveal of streamed text", () => {
     expect(rebaseReveal(5, "Hello world", "Hello world again")).toBe(5);
     expect(rebaseReveal(5, "Hello world", "Outra coisa")).toBe(0);
     expect(rebaseReveal(20, "Hi", "Hi there")).toBe(2);
+  });
+});
+
+describe("the card's turning phrase (CardTrabalhando.html, A)", () => {
+  const name = () => "Theo";
+  const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "theo", lastSeq: 0 } as const;
+  const call = (since: number, running = true) =>
+    ({
+      kind: "call",
+      id: "k1",
+      tool: "browser_read",
+      connector: null,
+      detail: null,
+      code: null,
+      output: [],
+      running,
+      since,
+    }) as const;
+
+  test("nothing done yet: who it is, then light lines that move on each round", () => {
+    const runs = [{ ...base, status: "running" as const, text: "" }];
+    const entries = barEntries(runs, [], name, () => undefined, [], true);
+    const turns = [0, 1, 2, 3, 4].map((tick) => barPhrase(t, entries, runs, tick, 0));
+    expect(turns).toEqual([
+      "Theo está trabalhando…",
+      "Pensando no seu pedido…",
+      "Juntando as peças…",
+      "Theo está trabalhando…",
+      "Lendo com calma…",
+    ]);
+  });
+
+  test("at work: what it does, an aside on a long step and what it said last, in turn", () => {
+    const runs = [
+      {
+        ...base,
+        status: "running" as const,
+        text: "",
+        tool: "browser_read",
+        work: [{ kind: "say" as const, text: "Achei a área de viagens." }, call(1000)],
+      },
+    ];
+    const entries = barEntries(runs, [], name, () => undefined, [], true);
+    const turns = [0, 1, 2].map((tick) => barPhrase(t, entries, runs, tick, 1000 + 5000));
+    expect(turns[0]).toBe(activityText(t, entries));
+    expect(turns[1]).toBe("Isso leva um minutinho…");
+    expect(turns[2]).toBe("Theo: Achei a área de viagens.");
+  });
+
+  test("writing stays in the card and does not turn", () => {
+    const runs = [{ ...base, status: "running" as const, text: "Pronto: criei" }];
+    expect(barEntries(runs, [], name, () => undefined)).toEqual([]);
+    const entries = barEntries(runs, [], name, () => undefined, [], true);
+    expect(barPhrase(t, entries, runs, 3, 0)).toBe("Theo está escrevendo…");
   });
 });
 

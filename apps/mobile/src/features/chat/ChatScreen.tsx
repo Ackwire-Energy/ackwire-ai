@@ -962,15 +962,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     [when, meId, isThread, linkThreads, onLongPress, onRetry, isFresh, openBrowsers, toggleBrowser, bodyOf, waiting],
   );
 
-  // ── Out of view ──
-  // The working line above the composer stands in for the agents' blocks only while they are out of view.
-  const [inView, setInView] = useState<ReadonlySet<string>>(() => new Set());
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: { item: Row }[] }) => {
-    const ids = new Set(viewableItems.flatMap((v) => (v.item.kind === "run" ? [v.item.run.runId] : [])));
-    setInView((prev) => (prev.size === ids.size && [...ids].every((id) => prev.has(id)) ? prev : ids));
-  }, []);
-  const lineRuns = useMemo(() => runs.filter((r) => !inView.has(r.runId)), [runs, inView]);
-
   // Pushes about this conversation stay quiet while it is on screen (no banner, no buzz).
   const focused = useIsFocused();
   useEffect(() => {
@@ -1059,7 +1050,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             keyboardOffset={lift}
             contentInsetEndAdjustment={contentInsetEndAdjustment}
             contentContainerStyle={styles.listPad}
-            onViewableItemsChanged={onViewableItemsChanged}
           />
         )}
         <KeyboardStickyView
@@ -1082,10 +1072,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             style={[styles.composer, { paddingBottom: bottomPad, backgroundColor: c.bg }]}
           >
             <Connection status={realtime} />
-            {/* Who is working, right above the composer (as on the web), while their blocks are out of view. */}
+            {/* Who is working, right above the composer (as on the web), while they work. */}
             {member ? (
               <WorkingLine
-                runs={lineRuns}
+                runs={runs}
                 consults={consults}
                 canStop={canStop}
                 onStop={stopRun}

@@ -31,8 +31,8 @@ const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) 
 const esc = () => act(async () => fireEvent.keyDown(window, { key: "Escape" }));
 
 describe("Parar is immediate (telas/Mensagens.html)", () => {
-  test("the bar out of view: living avatar with its look, the words, 'Ver' and 'Esc para parar'", async () => {
-    const { ev } = await open((s) => {
+  test("the card above the box: living avatar with its look, the words, 'Ver' out of view and its stop", async () => {
+    const { state, ev } = await open((s) => {
       const ada = s.agents.find((a) => a.id === ADA_ID);
       if (ada) (ada as { appearance?: unknown }).appearance = { color: "amber", accessory: "hat" };
     });
@@ -43,9 +43,11 @@ describe("Parar is immediate (telas/Mensagens.html)", () => {
     const avatar = bar.querySelector(".ac-avatar--agent") as HTMLElement;
     expect(avatar.getAttribute("data-accessory")).toBe("hat");
     expect(within(bar).getByRole("button", { name: "Ver" })).toBeTruthy();
-    expect(bar.textContent).toContain("para parar");
-    // No confirmation anywhere.
-    expect(within(bar).queryByRole("button", { name: "Parar" })).toBeNull();
+    // Its stop, one click, nothing asked.
+    await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Parar" })));
+    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(cancels(state)).toHaveLength(1);
   });
 
   test("the send button turns into stop with an empty box; one click stops, nothing asked", async () => {

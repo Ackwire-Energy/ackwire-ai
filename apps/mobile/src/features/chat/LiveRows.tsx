@@ -1,5 +1,5 @@
-import { elapsedClock, type LiveConsult, type LiveRun, narrationOf, usesBrowser } from "@agenteschat/client";
-import { activitySentence, activityVerb, isWriting } from "@agenteschat/client/lib/activity";
+import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agenteschat/client";
+import { activitySentence, activityVerb, barPhrase, isWriting, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
 import { formatDuration, toolLabel } from "@agenteschat/client/lib/work";
 import { memo, type ReactNode, useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { ActivityIndicator, type LayoutChangeEvent, Pressable, Text as RNText, S
 import Animated, {
   Easing,
   FadeIn,
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -326,10 +327,10 @@ const STACK_MAX = 4;
  * pixel orbit; the stacked live mini bodies, each on a plate and popping in (an agent asking
  * another shows both, with an arrow); the sentence with names in ink, fading in whenever what they
  * do changes ("Atlas está consultando o Sentry…"); the clock of a question that is out; and, after
- * a thin rule, "Parar" for the runs not writing yet that I may stop (one tap, no question: what it
- * did stays and can continue). Above it, what each one said last between tool calls. The screen
- * shows it only while those agents' blocks are out of view. Nothing moves with Reduce Motion or off
- * screen.
+ * a thin rule, "Parar" for the runs I may stop (one tap, no question: what it did stays and can
+ * continue). On while they work (CardTrabalhando.html, A): one agent on its own gets a turning phrase
+ * (a light line while it thinks, what it does, an aside on a long step, what it said last). Nothing
+ * moves with Reduce Motion or off screen.
  */
 export function WorkingLine({
   runs,
@@ -353,13 +354,20 @@ export function WorkingLine({
   const entries = workingEntries(runs, consults, agentName);
   const asking = entries.find((e) => e.consult?.status === "asking")?.consult;
   const now = useNow(asking ? 1000 : 60_000);
+  const turning = entries.length === 1 && entries[0]?.type === "agent";
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!turning) return;
+    const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
+    return () => clearInterval(timer);
+  }, [turning]);
   const first = entries[0];
   if (!first) return null;
   const color = agentLook(dir.agentById.get(first.id)).color;
-  // Its words aren't on screen yet (a writing agent is stopped from the composer).
-  const stoppable = stoppableInLine(runs).filter((r) => !isWriting(r) && canStop(r));
+  const stoppable = stoppableInLine(runs).filter(canStop);
   const sentence = activitySentence(t, entries, markName);
-  const words = markedParts(sentence).map((p, i) =>
+  const phrase = barPhrase(t, entries, runs, tick, Date.now(), markName);
+  const words = markedParts(phrase).map((p, i) =>
     p.bold ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
       <RNText key={i} style={[styles.ink, { color: c.ink }]}>
@@ -369,12 +377,6 @@ export function WorkingLine({
       p.text
     ),
   );
-  const said = runs
-    .filter((r) => !isWriting(r))
-    .flatMap((r) => {
-      const last = narrationOf(r).at(-1);
-      return last ? [{ id: r.runId, name: agentName(r.agentId), text: last }] : [];
-    });
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
   // Right away, nothing asked: what it did stays and "Continuar" picks it up again.
@@ -388,11 +390,6 @@ export function WorkingLine({
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
   return (
     <View style={styles.dock}>
-      {said.map((n) => (
-        <Text key={n.id} variant="small" tone="muted" numberOfLines={1} style={styles.said}>
-          <RNText style={[styles.saidName, { color: c.ink2 }]}>{n.name}:</RNText> {n.text}
-        </Text>
-      ))}
       <Animated.View
         entering={reduced ? undefined : FadeIn.duration(160)}
         style={[styles.pill, { backgroundColor: c.glassSolid, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
@@ -426,7 +423,7 @@ export function WorkingLine({
             );
           })}
         </View>
-        {/* Keyed by the words: a new activity fades in. An agent in its browser: tapping opens it live. */}
+        {/* An agent in its browser: tapping opens it live. */}
         <Pressable
           disabled={!browsing}
           onPress={openBrowser}
@@ -434,7 +431,8 @@ export function WorkingLine({
           accessibilityLabel={browsing ? t("browser.watch.open") : undefined}
           style={styles.wordsTap}
         >
-          <Animated.View key={sentence} entering={reduced ? undefined : FadeIn.duration(160)} style={styles.words}>
+          {/* The phrase turns: the new one comes up from below. */}
+          <Animated.View key={phrase} entering={reduced ? undefined : FadeInDown.duration(380)} style={styles.words}>
             <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
               {words}
             </Text>
@@ -517,8 +515,6 @@ const styles = StyleSheet.create({
   wellTitle: { fontWeight: "600", flexShrink: 0 },
   fold: { overflow: "hidden" },
   dock: { paddingHorizontal: 4, paddingBottom: 6, alignItems: "flex-start" },
-  said: { marginBottom: 4, alignSelf: "stretch" },
-  saidName: { fontWeight: "600" },
   pill: {
     flexDirection: "row",
     alignItems: "center",

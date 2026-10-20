@@ -113,11 +113,10 @@ describe("typing bar above the composer", () => {
     await settle();
     const streaming = document.querySelector(".ac-msg--streaming") as HTMLElement;
     expect(streaming.textContent).toContain("Deploy ok");
-    // It's the last row of the timeline. With no layout here the block counts as out of view, so the
-    // line above the composer still says it (in a browser it leaves while the block is on screen).
+    // It's the last row of the timeline; the card above the box stays on while it works.
     const rows = screen().getAllByRole("article");
     expect(rows[rows.length - 1]).toBe(streaming);
-    expect(bar().textContent).toBe("Atlas está trabalhando…");
+    expect(bar().textContent).toBe("Atlas está escrevendo…");
     await push(socket, { type: "agent.idle", ...run });
     await settle();
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
@@ -139,8 +138,8 @@ describe("typing bar above the composer", () => {
       text: "Sim",
     });
     await settle();
-    // Atlas writes now; its block is out of view (no layout here), so it stays on the line.
-    expect(bar().textContent).toBe("Atlas está trabalhando · João está digitando…");
+    // Atlas writes now; it stays on the card while it works.
+    expect(bar().textContent).toBe("Atlas está escrevendo · João está digitando…");
     for (const v of ["o", "oi", "oi ", "oi j"])
       await act(async () => fireEvent.change(composer(), { target: { value: v } }));
     expect(socket.sent.filter((f) => (f as { type: string }).type === "typing")).toEqual([

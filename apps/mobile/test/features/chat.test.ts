@@ -167,7 +167,7 @@ describe("working line", () => {
     expect(entries[0]?.consult).toMatchObject({ to: "infra", toName: "Infra", status: "asking" });
   });
 
-  test("writing, failed and waiting runs leave the line (their rows say it)", () => {
+  test("a writing agent stays on the line ('escrevendo'); failed and waiting runs leave it", () => {
     const entries = workingEntries(
       [
         run({ runId: "w", agentId: "atlas", status: "running", text: "Oi" }),
@@ -177,7 +177,7 @@ describe("working line", () => {
       [],
       name,
     );
-    expect(entries).toEqual([]);
+    expect(entries.map((e) => [e.id, e.activity.kind])).toEqual([["atlas", "writing"]]);
   });
 
   test("the tool step comes through (what it is doing, as on the web)", () => {

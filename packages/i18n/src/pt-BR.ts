@@ -6377,6 +6377,18 @@ export const ptBR = {
     doing_other: "{{names}} estão {{doing}}",
     /** "Theo, Iris e mais 2" (3 or more names in the working line). */
     namesMore: "{{first}}, {{second}} e mais {{count}}",
+    /** The card above the box turns its phrase (telas/CardTrabalhando.html, A). */
+    phrase: {
+      thinking: {
+        l0: "Pensando no seu pedido",
+        l1: "Juntando as peças",
+        l2: "Lendo com calma",
+        l3: "Organizando as ideias",
+        l4: "Vendo o melhor caminho",
+      },
+      long: { l0: "Isso leva um minutinho", l1: "Indo com cuidado", l2: "Conferindo os detalhes", l3: "Quase lá" },
+      said: "{{name}}: {{text}}",
+    },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} está perguntando {{prep}} {{to}}",
@@ -6465,6 +6477,7 @@ export const ptBR = {
         usingTool: "Usou a ferramenta {{tool}}",
         thinking: "Pensou",
         typing: "Escreveu",
+        writing: "Escreveu",
       },
     },
     activity: {
@@ -6475,6 +6488,7 @@ export const ptBR = {
       updatingRoutine: "alterando uma rotina",
       thinking: "trabalhando",
       typing: "digitando",
+      writing: "escrevendo",
       consulting: "consultando o {{app}}",
       creatingIssue: "criando uma tarefa",
       updatingIssue: "atualizando uma tarefa",
