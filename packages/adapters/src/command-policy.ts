@@ -796,3 +796,18 @@ export function forbiddenReason(
   }
   return null;
 }
+
+/**
+ * What to do instead of a refused call, by `forbiddenReason`: the agent hears
+ * why it was refused, so it changes the call instead of resending the same
+ * one with another path (a heredoc refused three times in one run).
+ */
+const FORBIDDEN_HINTS: Record<string, string> = {
+  "it can't be read plainly":
+    "Commands are checked word by word, so heredocs (<<), $(…), backticks, variables, `FOO=1 cmd` and & jobs are never run here. Write or change files with the Edit and Write tools, then run plain commands one at a time.",
+  "it writes outside the mission folder": "Write only inside your folder or /tmp.",
+  "it changes files outside the mission folder": "Change files only inside your folder or /tmp.",
+  "it runs other commands": "Run the commands themselves, one at a time, not through a shell, eval or xargs.",
+};
+
+export const forbiddenHint = (reason: string) => FORBIDDEN_HINTS[reason] ?? null;

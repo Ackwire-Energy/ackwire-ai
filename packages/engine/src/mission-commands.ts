@@ -3,6 +3,7 @@ import {
   type CommandScope,
   commandOf,
   deniedInMissions,
+  forbiddenHint,
   forbiddenReason,
   PERMISSION_TIMEOUT_MESSAGE,
   PERMISSION_WAIT_MS,
@@ -530,10 +531,15 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
   }
   const scope = scopeOf(args.scope);
   if (scope && readOnlyCall(tool, input, scope)) return allow();
-  if (opts.canRun && forbiddenReason(tool, input, scope ?? NO_SCOPE) === null) return allow();
+  if (!opts.canRun) {
+    return deny(
+      "Running commands on this computer is turned off for you. If the request needs it, ask for it with request_permission (sandbox:run). Never give the person a terminal command to run.",
+    );
+  }
+  const reason = forbiddenReason(tool, input, scope ?? NO_SCOPE);
+  if (reason === null) return allow();
+  const hint = forbiddenHint(reason);
   return deny(
-    opts.canRun
-      ? "This command is outside what agents may run on this computer (no sudo, deletes or writes outside your folder, uploads, remote shells or global installs). Do it another way; if there is none, tell the person in plain words what you couldn't do. Never give them a terminal command to run."
-      : "Running commands on this computer is turned off for you. If the request needs it, ask for it with request_permission (sandbox:run). Never give the person a terminal command to run.",
+    `This command was refused because ${reason}.${hint ? ` ${hint}` : ""} Agents may not use sudo, delete or write outside their folder, upload, open remote shells or install globally. Do it another way; if there is none, tell the person in plain words what you couldn't do. Never give them a terminal command to run.`,
   );
 }

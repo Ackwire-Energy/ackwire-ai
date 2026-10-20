@@ -380,4 +380,19 @@ describe("prompt text and permissions", () => {
     expect(ask("git push origin main").behavior).toBe("deny");
     expect(ask("git clone https://github.com/acme/web /tmp/web").behavior).toBe("deny");
   });
+
+  test("a refused command says why and what to do instead, so the agent doesn't resend it", () => {
+    const scope = { cwd: `${FOLDER}/repos/acme/app`, folders: [`${FOLDER}/repos/acme/app`, FOLDER] };
+    const ask = (command: string) =>
+      JSON.parse(runPermissionPrompt({ tool_name: "Bash", input: { command }, scope }, { canRun: true })) as {
+        behavior: string;
+        message?: string;
+      };
+    const heredoc = ask("git checkout -b fix && cat > src/a.test.ts <<'EOF'\ntest()\nEOF");
+    expect(heredoc.behavior).toBe("deny");
+    expect(heredoc.message).toContain("because it can't be read plainly");
+    expect(heredoc.message).toContain("Edit and Write tools");
+    expect(ask("echo hi > /etc/hosts").message).toContain("because it writes outside the mission folder");
+    expect(ask("git checkout -b fix").behavior).toBe("allow");
+  });
 });
