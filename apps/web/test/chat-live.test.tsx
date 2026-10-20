@@ -94,7 +94,7 @@ const bar = () => ({ textContent: typingBar().querySelector(".ac-typing__text")?
 const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state.messages.length - 1];
 
 describe("typing bar above the composer", () => {
-  test("mention → 'Atlas está trabalhando…' in the bar (not a message row); first words → message at the end; bar clears", async () => {
+  test("mention → 'Atlas está trabalhando…'; its block from the start, last in the timeline", async () => {
     const { socket, state } = await open();
     await sendText("@atlas olha o deploy");
     expect(bar().textContent).toBe("Atlas está trabalhando…");
@@ -102,7 +102,7 @@ describe("typing bar above the composer", () => {
     expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
     expect(typingBar().querySelector(".ac-typing__dots")).toBeNull();
     expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
-    // Not a row in the timeline.
+    // The words are the bar's; the block in the timeline says "pensando".
     expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
     const run = { threadId: lastPerson(state)?.id, runId: "r-live", agentId: ATLAS_ID };
@@ -113,10 +113,11 @@ describe("typing bar above the composer", () => {
     await settle();
     const streaming = document.querySelector(".ac-msg--streaming") as HTMLElement;
     expect(streaming.textContent).toContain("Deploy ok");
-    // It's the last row of the timeline, and the bar is empty again.
+    // It's the last row of the timeline. With no layout here the block counts as out of view, so the
+    // line above the composer still says it (in a browser it leaves while the block is on screen).
     const rows = screen().getAllByRole("article");
     expect(rows[rows.length - 1]).toBe(streaming);
-    expect(bar().textContent).toBe("");
+    expect(bar().textContent).toBe("Atlas está trabalhando…");
     await push(socket, { type: "agent.idle", ...run });
     await settle();
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
@@ -138,7 +139,8 @@ describe("typing bar above the composer", () => {
       text: "Sim",
     });
     await settle();
-    expect(bar().textContent).toBe("João está digitando…");
+    // Atlas writes now; its block is out of view (no layout here), so it stays on the line.
+    expect(bar().textContent).toBe("Atlas está trabalhando · João está digitando…");
     for (const v of ["o", "oi", "oi ", "oi j"])
       await act(async () => fireEvent.change(composer(), { target: { value: v } }));
     expect(socket.sent.filter((f) => (f as { type: string }).type === "typing")).toEqual([

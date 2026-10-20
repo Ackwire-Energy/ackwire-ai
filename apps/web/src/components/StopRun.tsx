@@ -1,25 +1,29 @@
 import type { LiveRun, Message } from "@agenteschat/client";
-import { ApiError, keys } from "@agenteschat/client";
+import { ApiError, continuedRunIdOf, keys, useContinuedRun } from "@agenteschat/client";
 import { activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Spinner } from "@agenteschat/ui";
+import { PixelStop, Spinner } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { useLiveStore } from "@/realtime/context";
+import { useToast } from "@/lib/toast";
+import { useLive, useLiveStore } from "@/realtime/context";
 
 /** Still working (thinking, writing or running a tool), not stopped yet. */
 export const isStoppable = (r: LiveRun) =>
   !r.provisional && (r.status === "thinking" || r.status === "queued" || r.status === "running");
 
+/** What decides who may stop (or continue) a run: its agent and the message that started it. */
+type RunOwner = Pick<LiveRun, "agentId" | "channelId" | "threadId"> & { triggerMessageId?: string | null };
+
 /**
  * "Parar" for a run: who may press it (the person whose message started it,
- * the agent's owner, admins) and the optimistic stop.
+ * the agent's owner, admins) and the stop itself. Stopping is immediate (no
+ * confirmation): what the agent did stays, and "Continuar" picks it up again.
  */
 export function useStopRun() {
   const { org, me } = useOrg();
@@ -41,54 +45,43 @@ export function useStopRun() {
       live.unstopping(runId);
     },
   });
-  const startedByMe = (r: LiveRun) => {
+  const startedByMe = (r: RunOwner) => {
     const list = qc.getQueryData<Message[]>(keys.messages(org.id, r.channelId)) ?? [];
     const root = list.find((m) => m.id === (r.triggerMessageId ?? r.threadId));
     return root?.author.type === "person" && root.author.id === me.user.id;
   };
-  const canStop = (r: LiveRun) =>
+  const canStop = (r: RunOwner) =>
     can(org.role, "manage_agents") || dir.agentById.get(r.agentId)?.ownerUserId === me.user.id || startedByMe(r);
   return { canStop, stop: (r: LiveRun) => stop.mutate(r.runId) };
 }
 
-const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
-
-// ── The confirmation ("Parar a tarefa do Rick?"), shared by the bar, the row and Esc ──
-
-interface Confirming {
-  runId: string;
-  /** Which button it hangs from ("row", "bar", "forum"). */
-  place: string;
-  /** Opened with Esc at this time: a second Esc within 1.5 s stops directly. */
-  viaEscAt: number | null;
-}
-let confirming: Confirming | null = null;
-const confirmListeners = new Set<() => void>();
-const setConfirming = (next: Confirming | null) => {
-  confirming = next;
-  for (const l of confirmListeners) l();
-};
-export const DOUBLE_ESC_MS = 1500;
-
-/** Opens the confirmation for a run (Esc: anchored to its row or the bar). */
-export function askToStop(runId: string, place: string, viaEsc = false) {
-  setConfirming({ runId, place, viaEscAt: viaEsc ? Date.now() : null });
-}
-export const closeStopConfirm = () => setConfirming(null);
-/** The confirmation open right now, if any (the page's Esc handler checks it). */
-export const stopConfirmOpen = () => confirming;
-
-function useConfirming() {
-  return useSyncExternalStore(
-    (l) => {
-      confirmListeners.add(l);
-      return () => {
-        confirmListeners.delete(l);
-      };
+/**
+ * "Continuar" under a stopped answer: a new run of the same agent picks up
+ * from where it stopped. The button goes away for everyone once it is
+ * continued (`run.continued`, or `meta.canceled.continuedRunId` on reload).
+ */
+export function useContinueRun() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const live = useLiveStore();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (runId: string) => api.agents.continueRun(org.id, runId),
+    onSuccess: (out, runId) => live.continued(runId, out.runId),
+    onError: (err, runId) => {
+      // 409: already continued (by someone else) or the agent is busy here: the button has no job left.
+      if (err instanceof ApiError && err.status === 409) live.continued(runId, null);
+      toast.show(errorText(t, err), "error");
     },
-    () => confirming,
-    () => null,
-  );
+  });
+}
+
+/** This stopped run was already continued (here, by someone else, or before a reload). */
+export function useWasContinued(runId: string | null | undefined, message?: Pick<Message, "id" | "meta">) {
+  const here = useLive((s) => (runId ? s.continued[runId] : undefined));
+  const heard = useContinuedRun(message?.id ?? "");
+  return here !== undefined || Boolean(heard) || Boolean(message && continuedRunIdOf(message));
 }
 
 /** "rodando código há 2 min", "escrevendo a resposta", "pensando há 1 min". */
@@ -109,22 +102,13 @@ export function runContext(t: TFunction, run: LiveRun, now = Date.now()) {
 }
 
 /**
- * The small round "Parar" (stop square in a circle, 28px; a danger tint only
- * on hover; "Parar tarefa · Esc"). A click opens the glass confirmation next
- * to it; after "Parar" it spins with "Parando…".
+ * The small "Parar" (a pixel stop square; a danger tint only on hover). A
+ * click stops right away; it spins with "Parando…" until the server says so.
+ * The chat stops from its composer instead; this one is for other live views
+ * (the forum's turn).
  */
-export function StopButton({
-  run,
-  onStop,
-  place = "row",
-}: {
-  run: LiveRun;
-  onStop: (r: LiveRun) => void;
-  place?: string;
-}) {
+export function StopButton({ run, onStop }: { run: LiveRun; onStop: (r: LiveRun) => void; place?: string }) {
   const { t } = useTranslation();
-  const open = useConfirming();
-  const isOpen = open?.runId === run.runId && open.place === place;
   return (
     <span className="stop-run-wrap">
       <button
@@ -132,105 +116,17 @@ export function StopButton({
         className="stop-run"
         title={t("run.stopHint")}
         aria-label={run.stopping ? t("run.stopping") : t("run.stop")}
-        aria-haspopup="dialog"
-        aria-expanded={isOpen}
         disabled={run.stopping}
         data-stopping={run.stopping || undefined}
-        onClick={() => (isOpen ? closeStopConfirm() : askToStop(run.runId, place))}
+        onClick={() => onStop(run)}
       >
-        {run.stopping ? <Spinner size={14} /> : <StopGlyph />}
+        {run.stopping ? <Spinner size={14} /> : <PixelStop size={12} />}
       </button>
       {run.stopping && (
         <span className="stop-run__label small muted" aria-hidden="true">
           {t("run.stopping")}
         </span>
       )}
-      {isOpen && open && (
-        <StopConfirm
-          run={run}
-          viaEscAt={open.viaEscAt}
-          onCancel={closeStopConfirm}
-          onConfirm={() => {
-            closeStopConfirm();
-            onStop(run);
-          }}
-        />
-      )}
     </span>
-  );
-}
-
-/** A circle with a rounded square: "stop". */
-function StopGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="7.25" y="7.25" width="5.5" height="5.5" rx="1.2" fill="currentColor" />
-    </svg>
-  );
-}
-
-function StopConfirm({
-  run,
-  viaEscAt,
-  onCancel,
-  onConfirm,
-}: {
-  run: LiveRun;
-  viaEscAt: number | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const name = dir.agentById.get(run.agentId)?.name ?? t("channel.unknownAgent");
-  const panel = useRef<HTMLDivElement>(null);
-  const stopRef = useRef<HTMLButtonElement>(null);
-  const [now] = useState(() => Date.now());
-  // "Parar" has the focus: Enter confirms.
-  useEffect(() => {
-    stopRef.current?.focus();
-  }, []);
-  // Esc closes; a second Esc right after the one that opened it stops directly. A click outside closes.
-  const latest = useRef({ onCancel, onConfirm, viaEscAt });
-  latest.current = { onCancel, onConfirm, viaEscAt };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      const { viaEscAt: at, onConfirm: yes, onCancel: no } = latest.current;
-      if (at !== null && Date.now() - at <= DOUBLE_ESC_MS) yes();
-      else no();
-    };
-    const onDown = (e: PointerEvent) => {
-      const el = panel.current;
-      if (el && !el.parentElement?.contains(e.target as Node)) latest.current.onCancel();
-    };
-    window.addEventListener("keydown", onKey, true);
-    window.addEventListener("pointerdown", onDown, true);
-    return () => {
-      window.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("pointerdown", onDown, true);
-    };
-  }, []);
-  const title = t("run.confirmTitle", agentGrammar(t, name));
-  return (
-    <div ref={panel} className="stop-confirm" role="dialog" aria-label={title}>
-      <p className="stop-confirm__title">{title}</p>
-      <p className="stop-confirm__context small muted">
-        {capitalize(runContext(t, run, now))}. {t("run.kept")}
-      </p>
-      <div className="stop-confirm__actions">
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          {t("run.continue")}
-        </Button>
-        <Button ref={stopRef} size="sm" variant="danger" onClick={onConfirm}>
-          {t("run.stop")}
-        </Button>
-      </div>
-      <p className="stop-confirm__hint small muted">{t("run.confirmHint")}</p>
-    </div>
   );
 }

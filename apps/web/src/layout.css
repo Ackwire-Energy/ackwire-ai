@@ -5312,60 +5312,46 @@ button.live-call__head:hover {
 .stop-run:disabled {
   cursor: default;
 }
-/* The confirmation: a small glass card above the button. */
-.stop-confirm {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: -6px;
-  z-index: var(--z-popover, 50);
-  width: min(300px, 80vw);
-  padding: 12px 14px;
-  border-radius: var(--radius-lg);
-  background: var(--glass-solid);
-  box-shadow: var(--e3, var(--e2)), var(--top);
-  text-align: left;
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .stop-confirm {
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(18px) saturate(1.6);
-    backdrop-filter: blur(18px) saturate(1.6);
-  }
-}
-.stop-confirm__title {
-  margin: 0 0 4px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.stop-confirm__context {
-  margin: 0 0 10px;
-}
-.stop-confirm__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.stop-confirm__hint {
-  margin: 8px 0 0;
-  font-size: 11.5px;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .stop-confirm {
-    animation: ac-rise 0.18s var(--out) both;
-  }
-}
 .ac-typing__sep {
   width: 1px;
   height: 16px;
   margin: 0 2px 0 4px;
   background: var(--line);
 }
+/* "Parado por você · Continuar" under a stopped answer. */
 .run-canceled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--faint);
-  font-style: italic;
+  color: var(--muted);
+}
+.run-continue {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 9px 9px 9px 3px;
+  background: var(--raised);
+  box-shadow: var(--card-shadow);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.18s var(--spring);
+}
+.run-continue:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.run-continue:focus-visible {
+  outline: none;
+  box-shadow: var(--card-shadow), var(--focus-ring);
+}
+.run-continue:disabled {
+  cursor: progress;
+  opacity: 0.6;
 }
 .ac-typing__said {
   margin: 0 0 4px;
@@ -5379,41 +5365,36 @@ button.live-call__head:hover {
   color: var(--ink2);
   font-weight: 600;
 }
-/* "Theo ainda trabalhando" (a live row above newer messages) and the composer hint while it works. */
-.still-working {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
-  padding: 3px 10px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--sunken);
-  color: var(--ink2);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.still-working:hover {
-  background: var(--plate);
-}
-.still-working:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.msg-steered {
-  margin: 4px 0 0;
-  font-style: italic;
-}
+/* "Leu seu recado · …" inside the work: a well, like the prototype's mark. */
 .live-work__steer {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 13px;
+  gap: 7px;
+  width: max-content;
+  max-width: 100%;
+  margin: 2px 0;
+  padding: 6px 10px 6px 8px;
+  border-radius: 11px 11px 11px 3px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.live-work__steer b {
   color: var(--ink2);
   font-weight: 600;
+  white-space: nowrap;
+}
+.live-work__steer q {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink2);
+}
+.live-work__steer q::before,
+.live-work__steer q::after {
+  content: "";
 }
 /* Editing a routine still read in UTC: a quiet hint under the zone. */
 .routine-utc-hint {
@@ -11005,4 +10986,286 @@ html[data-menu-overlay] .shell {
 }
 .sidebar[data-rail="true"] .sidebar__section[data-open="false"] .sidebar__section-body > * {
   display: flex;
+}
+
+/* A streaming answer: each word fades in as it is revealed (Mensagens.html, the `.w` words); still with reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .ac-word {
+    animation: ac-word-in 280ms ease-out both;
+  }
+}
+@keyframes ac-word-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── Messages fluidity (telas/Mensagens.html, option C) ── */
+
+/* The block's header while it works: the orbit, "pensando" with a light sweep, how long. */
+.run-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.run-clock__word {
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .run-clock__word {
+    background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      var(--muted) 40%,
+      var(--ink) 50%,
+      var(--muted) 60%,
+      var(--muted) 100%
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: run-shim 1.8s linear infinite;
+  }
+}
+@keyframes run-shim {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+/* Steps: the pixel mark in a fixed 16px box; a stopped step is struck through. */
+.live-call__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.live-call[data-s="stop"] .live-call__head {
+  color: var(--faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--line2);
+}
+/* When the answer is done the steps fold into "3 passos" (same element: it closes smoothly). */
+.live-work-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.live-work-fold > .live-work {
+  min-height: 0;
+  overflow: hidden;
+}
+.live-work-fold[data-folded] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.live-work-fold[data-folded] > .live-work {
+  margin: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .live-work-fold {
+    transition:
+      grid-template-rows 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 0.3s;
+  }
+}
+.live-work__sum {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: max-content;
+  height: 24px;
+  margin: 2px 0 4px -6px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.live-work__sum:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.live-work__sum:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.live-work__chev {
+  transition: transform 0.2s;
+}
+.live-work__sum[aria-expanded="true"] .live-work__chev {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .live-work__sum {
+    animation: ac-fade-in 0.4s ease-out both;
+  }
+}
+
+/* Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler". */
+.msg-steer {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.msg-steer__swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .msg-steer__swap {
+    animation: ac-msg-enter 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+/* "Novas": where the unseen messages start; it fades a few seconds after the person got there. */
+.channel__unread {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 16px;
+  color: var(--agent);
+  font-size: 12px;
+  font-weight: 650;
+  transition: opacity 0.6s;
+}
+.channel__unread::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--agent) 45%, transparent);
+}
+.channel__unread[data-fade] {
+  opacity: 0;
+}
+
+/* "↓ 2 novas · Marina e Ada · Theo escrevendo": who spoke, with their faces; it lands on "Novas". */
+.channel__newpill {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  height: 36px;
+  padding: 0 12px 0 8px;
+  border: 0;
+  border-radius: 13px 13px 13px 4px;
+  background: var(--raised);
+  box-shadow: var(--card-shadow);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translate(-50%, 16px) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+}
+.channel__newpill[data-on] {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.channel__newpill:focus-visible {
+  outline: none;
+  box-shadow: var(--card-shadow), var(--focus-ring);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .channel__newpill {
+    transition:
+      transform 0.32s cubic-bezier(0.34, 1.5, 0.5, 1),
+      opacity 0.2s;
+  }
+}
+.channel__newpill-stack {
+  display: inline-flex;
+  align-items: center;
+}
+.channel__newpill-stack > * + * {
+  margin-left: -4px;
+}
+.channel__newpill-stack > * {
+  box-shadow: 0 0 0 2px var(--raised);
+}
+.channel__newpill-more {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-weight: 550;
+}
+
+/* Above the box when the connection drops, then "Conectado de novo". */
+.channel__conn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  margin: 0 4px 6px;
+  padding: 4px 10px;
+  border-radius: 10px 10px 10px 3px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.channel__conn[data-back] {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .channel__conn {
+    animation: ac-msg-enter 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+/* The line above the composer for a block out of view: "· 12 s · Ver · Esc para parar". */
+.ac-typing__elapsed {
+  flex: none;
+  color: var(--faint);
+}
+.ac-typing__see {
+  flex: none;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 650;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--line2);
+  cursor: pointer;
+}
+.ac-typing__see:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 4px;
+}
+.ac-typing__hint {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--faint);
+}
+@media (hover: none) {
+  .ac-typing__hint {
+    display: none;
+  }
 }

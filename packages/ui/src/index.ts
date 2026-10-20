@@ -89,6 +89,7 @@ export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge, CountCh
 export { CommandPalette, filterPalette, type PaletteItem } from "./components/CommandPalette";
 export {
   Composer,
+  type ComposerChoice,
   type ComposerCommand,
   type ComposerCommands,
   ComposerFile,
@@ -96,8 +97,11 @@ export {
   type ComposerMentions,
   type ComposerProps,
   type ComposerSuggestion,
+  type ComposerWorking,
   linkQuery,
   mentionQuery,
+  type SendChoice,
+  sendChoice,
 } from "./components/Composer";
 export {
   ComputerIcon,
@@ -167,6 +171,13 @@ export {
 } from "./components/MenuOverlay";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
 export { OptionList, type OptionListItem, type OptionListProps } from "./components/OptionList";
+export {
+  PixelDone,
+  type PixelDoneProps,
+  PixelStop,
+  type PixelStopProps,
+  pixelCell,
+} from "./components/PixelMarks";
 export { glowOptions, PixelSky, SkyGlow } from "./components/PixelSky";
 export {
   ORBIT_RING,

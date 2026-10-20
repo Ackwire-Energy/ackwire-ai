@@ -1,0 +1,67 @@
+import type { CSSProperties } from "react";
+import { cx } from "../cx";
+
+/**
+ * Pixel marks that sit next to the PixelSpinner (docs/design/telas/Mensagens.html):
+ * `PixelDone`, one green pixel (the spinner grid's center cell) that pops in
+ * when a step is done, and `PixelStop`, a 2×2 square that reads as "stop"
+ * (one cell dims in turn while an agent works). Pure CSS; still under
+ * prefers-reduced-motion. Decorative unless `label` is given.
+ */
+
+/** A cell of an n×n pixel grid `size` px wide: its pitch, the gap and the drawn side (PixelSpinner's rule). */
+export function pixelCell(size: number, n: 3 | 2) {
+  const cell = size / n;
+  const gap = Math.max(1, Math.round(cell * 0.14));
+  return { cell, gap, inner: Math.max(1, Math.round(cell - gap)) };
+}
+
+const a11y = (label: string | undefined) =>
+  label ? { role: "img" as const, "aria-label": label } : { "aria-hidden": true as const };
+
+export interface PixelDoneProps {
+  size?: number;
+  label?: string;
+  className?: string;
+}
+
+/** Done: one pixel in the ok color, the size of the spinner's center cell, popping in over ~160 ms. */
+export function PixelDone({ size = 14, label, className }: PixelDoneProps) {
+  const { inner } = pixelCell(size, 3);
+  return (
+    <span
+      className={cx("ac-pixdone", className)}
+      style={{ width: size, height: size, "--px": `${inner}px` } as CSSProperties}
+      {...a11y(label)}
+    />
+  );
+}
+
+export interface PixelStopProps {
+  size?: number;
+  /** An agent is working: one cell dims in turn (220 ms each, clockwise from the top-left). */
+  animated?: boolean;
+  /** Stopped (a halted step): every cell dimmed. */
+  dim?: boolean;
+  label?: string;
+  className?: string;
+}
+
+/** Stop: a 2×2 pixel square in the text color. */
+export function PixelStop({ size = 13, animated = false, dim = false, label, className }: PixelStopProps) {
+  const { gap } = pixelCell(size, 2);
+  return (
+    <span
+      className={cx("ac-pixstop", className)}
+      data-animated={animated || undefined}
+      data-dim={(!animated && dim) || undefined}
+      style={{ width: size, height: size, "--px-gap": `${gap}px` } as CSSProperties}
+      {...a11y(label)}
+    >
+      <span />
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}

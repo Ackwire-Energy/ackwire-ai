@@ -18,8 +18,8 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
    * or keyboard focus): "entrou na conversa" on a reply nobody asked for.
    */
   note?: { label: ReactNode; tip: ReactNode };
-  /** A person-facing state on the header line, with an icon: "enviando…". */
-  status?: { icon: IconName; label: ReactNode };
+  /** A person-facing state on the header line, with an icon (or a `mark`, e.g. a PixelSpinner): "enviando…". */
+  status?: { icon?: IconName; mark?: ReactNode; label: ReactNode };
   /** A new row: slides in (opacity/transform only; none with reduced motion). */
   entering?: boolean;
   /** Same author as the previous message: hide avatar and header (text keeps its column). */
@@ -130,7 +130,7 @@ export function Message({
           )}
           {status && (
             <span className="ac-msg__status">
-              <Icon name={status.icon} size={14} />
+              {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
               {status.label}
             </span>
           )}

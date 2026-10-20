@@ -168,7 +168,10 @@ describe("the working line while an agent asks another", () => {
     expect(typingBar().querySelector(".ac-typing__clock")).toBeNull();
     await push(socket, { type: "agent.delta", ...run, seq: 0, text: "O Atlas me passou" });
     await settle();
-    expect(bar()).toBe("");
+    // Writing now: the question is over. With no layout here its block counts as out of view, so the
+    // line still says Ada is at work (in a browser it leaves while the block is on screen).
+    expect(bar()).toBe("Ada está trabalhando…");
+    expect(typingBar().querySelector(".ac-typing__to")).toBeNull();
   });
 
   test("several agents: one line, stacked, 'Ada e Atlas estão trabalhando…'; it shrinks as each one finishes", async () => {

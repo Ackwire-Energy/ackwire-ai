@@ -90,7 +90,7 @@ describe("live row and Parar", () => {
   };
   const ids = { threadId: "m-1", runId: "r-live", agentId: ADA_ID };
 
-  test("tool calls stack in the row: open while running, folded into a summary when done; narration in the bar", async () => {
+  test("tool calls stack in the block: open while running, folded into a summary when done", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "Vou checar o ambiente." });
@@ -102,7 +102,7 @@ describe("live row and Parar", () => {
       code: { language: "python", source: "print(1)" },
     });
     await settle(2);
-    expect(document.querySelector(".ac-typing__said")?.textContent).toBe("Ada: Vou checar o ambiente.");
+    expect(document.querySelector(".live-work__say")?.textContent).toBe("Vou checar o ambiente.");
     await ev({ type: "agent.delta", ...ids, seq: 1, text: "Rodando o teste." });
     await ev({
       type: "agent.tool",
@@ -127,40 +127,33 @@ describe("live row and Parar", () => {
     expect(done.at(-1)?.getAttribute("aria-expanded")).toBe("false");
   });
 
-  test("Parar: optimistic 'Parando…', then 'Interrompido por Walter' and an idle avatar; text kept", async () => {
+  test("Parar: one click on the composer's stop, then 'Parado por você · Continuar'; text kept", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "Começando a análise" });
     await settle(2);
-    const row = document.querySelector(".ac-msg--streaming") as HTMLElement;
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Parar" })));
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Parar a Ada" })));
     await settle(2);
-    // Nothing stops before the confirmation.
-    expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(false);
-    const confirm = screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" });
-    await act(async () => fireEvent.click(within(confirm).getByRole("button", { name: "Parar" })));
-    await settle(2);
+    // Nothing asked: it stops at once.
+    expect(screen().queryByRole("dialog")).toBeNull();
     expect(state.calls.find((c) => c.method === "agents.cancelRun")?.args).toEqual([ORG_ID, "r-live"]);
-    expect(within(row).getByRole("button", { name: "Parando…" }).hasAttribute("disabled")).toBe(true);
     await ev({ type: "run.canceled", ...ids, byUserId: "u-walter" });
     await settle(2);
     const stopped = screen()
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Começando a análise")) as HTMLElement;
-    expect(stopped.textContent).toContain("Interrompido por Walter");
+    expect(stopped.textContent).toContain("Parado por você");
+    expect(within(stopped).getByRole("button", { name: "Continuar" })).toBeTruthy();
     expect(stopped.querySelector('.ac-avatar[data-state="idle"]')).not.toBeNull();
   });
 
-  test("Esc with an empty composer asks to stop the latest run I may stop; Esc again right away stops it", async () => {
+  test("Esc with an empty composer stops the latest run I may stop, right away", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
     await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
     await settle(2);
-    expect(screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" })).toBeTruthy();
-    expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(false);
-    await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
-    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
     expect(state.calls.find((c) => c.method === "agents.cancelRun")?.args).toEqual([ORG_ID, "r-live"]);
   });
 });

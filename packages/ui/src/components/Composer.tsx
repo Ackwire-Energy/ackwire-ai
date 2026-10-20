@@ -23,6 +23,7 @@ import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
 import { type EmojiPickerLabels, EmojiPickerPopover } from "./EmojiPicker";
 import { modKey } from "./Kbd";
+import { PixelStop } from "./PixelMarks";
 import { Spinner } from "./Skeleton";
 
 /** Names of the formatting buttons (also their tooltips, with the shortcut). */
@@ -90,11 +91,40 @@ export interface ComposerCommands {
   listLabel: string;
 }
 
+/** An agent is working here: with an empty box, send turns into stop (click or Esc stops right away). */
+export interface ComposerWorking {
+  /** "Parar o Theo". */
+  stopLabel: string;
+  /** The stop button's tooltip ("Parar o Theo · Esc"). */
+  stopText?: ReactNode;
+  onStop: () => void;
+}
+
+/** What a message sent while an agent works does: joins what it is doing, or stops it to be read now. */
+export type SendChoice = "join" | "interrupt";
+
+/** Enter sends with the current choice; ⌘/Ctrl+Enter (`alt`) with the other one. */
+export const sendChoice = (current: SendChoice, alt: boolean): SendChoice =>
+  alt ? (current === "join" ? "interrupt" : "join") : current;
+
+/** The row above the box while an agent works and there is text: "Juntar ao que ele faz" / "Parar e mandar". */
+export interface ComposerChoice {
+  joinLabel: string;
+  interruptLabel: string;
+  /** Accessible name of the choice ("Ao mandar"). */
+  label: string;
+  /** Desktop hint next to it ("↵ junta · ⌘↵ para e manda"); `mod` is "⌘" or "Ctrl". */
+  hint?: (choice: SendChoice, mod: string) => ReactNode;
+}
+
 export interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
-  /** Called with the trimmed text on Enter (Shift+Enter adds a line) or the send button. */
-  onSend: (text: string) => void;
+  /**
+   * Called with the trimmed text on Enter (Shift+Enter adds a line) or the send button. While `working`,
+   * `opts.interrupt` says whether the person chose "Parar e mandar".
+   */
+  onSend: (text: string, opts?: { interrupt?: boolean }) => void;
   /** Accessible name of the text box, e.g. "Mensagem para #eng". */
   label: string;
   placeholder?: string;
@@ -135,6 +165,10 @@ export interface ComposerProps {
   canSendEmpty?: boolean;
   /** Not yet (e.g. uploads still running): Enter and the send button wait. */
   sendBlocked?: boolean;
+  /** An agent is working in this conversation (send ↔ stop). */
+  working?: ComposerWorking | null;
+  /** With `working` and text: the choice row above the box. */
+  choice?: ComposerChoice;
 }
 
 /**
@@ -315,6 +349,8 @@ export function Composer({
   attachments,
   canSendEmpty,
   sendBlocked,
+  working,
+  choice,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -459,9 +495,25 @@ export function Composer({
   };
 
   const ready = Boolean(value.trim() || canSendEmpty) && !disabled && !sendBlocked;
-  const send = () => {
+  // An agent at work and nothing to send: the send button is the stop button.
+  const stopMode = Boolean(working) && !disabled && !value.trim() && !canSendEmpty;
+  const showChoice = Boolean(working && choice) && Boolean(value.trim()) && !disabled;
+  const [chosen, setChosen] = useState<SendChoice>("join");
+  const [pressed, setPressed] = useState(false);
+  const press = () => {
+    setPressed(true);
+    setTimeout(() => setPressed(false), 160);
+  };
+  const stop = () => {
+    if (!working) return;
+    press();
+    working.onStop();
+  };
+  const send = (alt = false) => {
     if (!ready) return;
-    onSend(value.trim());
+    if (working) onSend(value.trim(), { interrupt: showChoice && sendChoice(chosen, alt) === "interrupt" });
+    else onSend(value.trim());
+    setChosen("join");
     // Keep typing: focus stays in the box (also after clicking the send button).
     ref.current?.focus();
   };
@@ -497,10 +549,17 @@ export function Composer({
         return;
       }
     }
+    // Esc in an empty box while an agent works: stop it right away.
+    if (e.key === "Escape" && stopMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      stop();
+      return;
+    }
     // On-screen keyboards: Enter is a new line; the send button sends.
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !onScreenKeyboard()) {
       e.preventDefault();
-      send();
+      send(e.metaKey || e.ctrlKey);
     }
   };
 
@@ -539,168 +598,245 @@ export function Composer({
     />
   );
 
-  return (
-    <RPopover.Root
-      open={open}
-      onOpenChange={(o) => {
-        if (!o && open) setDismissed(isSlash ? -1 : (token?.start ?? null));
-      }}
-    >
-      <RPopover.Anchor asChild>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: files dropped anywhere on the card (the attach button is the accessible way) */}
-        <div
-          ref={box}
-          className={cx("ac-composer", inlinePills && "ac-composer--inline-pills", className)}
-          data-disabled={disabled || undefined}
-          data-dragging={dragging || undefined}
-          onDragOver={
-            onFiles
-              ? (e) => {
-                  if (!hasFiles(e) || disabled) return;
-                  e.preventDefault();
-                  setDragging(true);
-                }
-              : undefined
-          }
-          onDragLeave={
-            onFiles
-              ? (e) => {
-                  if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)))
-                    setDragging(false);
-                }
-              : undefined
-          }
-          onDrop={
-            onFiles
-              ? (e) => {
-                  setDragging(false);
-                  const dropped = files(e.dataTransfer?.files);
-                  if (dropped.length === 0 || disabled) return;
-                  e.preventDefault();
-                  onFiles(dropped);
-                }
-              : undefined
-          }
-        >
-          {header && <div className="ac-composer__header">{header}</div>}
-          {textarea}
-          {attachments && <div className="ac-composer__attachments">{attachments}</div>}
-          <div className={cx("ac-composer__tools", format && "ac-composer__tools--format")}>
-            {pills && <div className="ac-composer__pills">{pills}</div>}
-            {format && !disabled && <FormatBar labels={format} onFormat={applyKind} />}
-            {emoji && !disabled && (
-              <EmojiPickerPopover
-                labels={emoji}
-                onPick={insertEmoji}
-                align="start"
-                // Back to the text box (the caret after the emoji), not to the button.
-                onCloseAutoFocus={(e) => {
-                  e.preventDefault();
-                  ref.current?.focus();
-                }}
-                trigger={<Button variant="ghost" iconOnly size="sm" icon="smile" aria-label={emoji.button} />}
-              />
-            )}
-            {attachLabel && (
-              <Button
-                variant="ghost"
-                iconOnly
-                size="sm"
-                icon="attach"
-                aria-label={attachLabel}
-                onClick={onAttach ?? (onFiles ? () => fileInput.current?.click() : undefined)}
-                disabled={(!onAttach && !onFiles) || disabled}
-              />
-            )}
-            {onFiles && !onAttach && (
-              <input
-                ref={fileInput}
-                type="file"
-                multiple
-                hidden
-                tabIndex={-1}
-                aria-label={attachLabel}
-                onChange={(e) => {
-                  const picked = files(e.target.files);
-                  e.target.value = "";
-                  if (picked.length > 0) onFiles(picked);
-                }}
-              />
-            )}
-            {/* The compact primary square (32px): dim until there is something to send. */}
-            <Button
-              variant="primary"
-              size="sm"
-              iconOnly
-              icon="send"
-              className="ac-composer__send"
-              data-ready={ready ? "" : undefined}
-              aria-label={sendLabel}
-              title={sendText ? `${sendText} ↵` : undefined}
-              onClick={send}
-              disabled={!ready}
-            />
-          </div>
-        </div>
-      </RPopover.Anchor>
-      {(mentions || commands || links) && (
-        <RPopover.Portal>
-          <RPopover.Content
-            className={cx("ac-menu ac-suggest", isSlash && "ac-suggest--commands")}
-            side="top"
-            align="start"
-            sideOffset={6}
-            // Focus stays in the text box (combobox).
-            onOpenAutoFocus={(e) => e.preventDefault()}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-            onInteractOutside={(e) => {
-              if (e.target instanceof Node && box.current?.contains(e.target)) e.preventDefault();
-            }}
-          >
-            <div
-              role="listbox"
-              id={listId}
-              aria-label={
-                isSlash ? (commands?.listLabel ?? "") : isLink ? (links?.listLabel ?? "") : (mentions?.listLabel ?? "")
-              }
+  const choiceRow =
+    showChoice && choice ? (
+      <div className="ac-composer-choice">
+        <div className="ac-seg ac-seg--sm" role="radiogroup" aria-label={choice.label}>
+          {(["join", "interrupt"] as const).map((c) => (
+            // biome-ignore lint/a11y/useSemanticElements: a two-way segmented choice, styled like the app's other segments
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={chosen === c}
+              data-on={chosen === c || undefined}
+              className="ac-seg__item"
+              // Keep the text box's focus and selection.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setChosen(c);
+                ref.current?.focus();
+              }}
             >
-              {items.map((item, i) => {
-                const heading = item.group && item.group !== items[i - 1]?.group;
-                return (
-                  <div key={item.key} role="presentation">
-                    {heading && (
-                      <div className="ac-menu__heading" role="presentation">
-                        {item.group}
-                      </div>
-                    )}
-                    <div
-                      id={optionId(i)}
-                      role="option"
-                      tabIndex={-1}
-                      aria-selected={i === current}
-                      data-active={i === current || undefined}
-                      className="ac-menu__item ac-suggest__item"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        pick(item);
-                      }}
-                      onClick={() => pick(item)}
-                      onKeyDown={() => {}}
-                    >
-                      {item.leading}
-                      <span className="ac-menu__label">
-                        <span>{item.label}</span>
-                        {item.description && <span className="ac-menu__desc">{item.description}</span>}
-                      </span>
-                      {item.note && <span className="ac-suggest__note">{item.note}</span>}
-                    </div>
-                  </div>
-                );
-              })}
+              {c === "join" ? <Icon name="arrowRight" size={14} /> : <Icon name="bolt" size={14} />}
+              {c === "join" ? choice.joinLabel : choice.interruptLabel}
+            </button>
+          ))}
+        </div>
+        {choice.hint && (
+          <span className="ac-composer-choice__hint" aria-hidden="true">
+            {choice.hint(chosen, modKey())}
+          </span>
+        )}
+      </div>
+    ) : null;
+
+  const sendTitle = stopMode
+    ? typeof working?.stopText === "string"
+      ? working.stopText
+      : working?.stopLabel
+    : sendText
+      ? `${sendText} ↵`
+      : undefined;
+
+  return (
+    <>
+      {choiceRow}
+      <RPopover.Root
+        open={open}
+        onOpenChange={(o) => {
+          if (!o && open) setDismissed(isSlash ? -1 : (token?.start ?? null));
+        }}
+      >
+        <RPopover.Anchor asChild>
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: files dropped anywhere on the card (the attach button is the accessible way) */}
+          <div
+            ref={box}
+            className={cx("ac-composer", inlinePills && "ac-composer--inline-pills", className)}
+            data-disabled={disabled || undefined}
+            data-dragging={dragging || undefined}
+            onDragOver={
+              onFiles
+                ? (e) => {
+                    if (!hasFiles(e) || disabled) return;
+                    e.preventDefault();
+                    setDragging(true);
+                  }
+                : undefined
+            }
+            onDragLeave={
+              onFiles
+                ? (e) => {
+                    if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)))
+                      setDragging(false);
+                  }
+                : undefined
+            }
+            onDrop={
+              onFiles
+                ? (e) => {
+                    setDragging(false);
+                    const dropped = files(e.dataTransfer?.files);
+                    if (dropped.length === 0 || disabled) return;
+                    e.preventDefault();
+                    onFiles(dropped);
+                  }
+                : undefined
+            }
+          >
+            {header && <div className="ac-composer__header">{header}</div>}
+            {textarea}
+            {attachments && <div className="ac-composer__attachments">{attachments}</div>}
+            <div className={cx("ac-composer__tools", format && "ac-composer__tools--format")}>
+              {pills && <div className="ac-composer__pills">{pills}</div>}
+              {format && !disabled && <FormatBar labels={format} onFormat={applyKind} />}
+              {emoji && !disabled && (
+                <EmojiPickerPopover
+                  labels={emoji}
+                  onPick={insertEmoji}
+                  align="start"
+                  // Back to the text box (the caret after the emoji), not to the button.
+                  onCloseAutoFocus={(e) => {
+                    e.preventDefault();
+                    ref.current?.focus();
+                  }}
+                  trigger={<Button variant="ghost" iconOnly size="sm" icon="smile" aria-label={emoji.button} />}
+                />
+              )}
+              {attachLabel && (
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  size="sm"
+                  icon="attach"
+                  aria-label={attachLabel}
+                  onClick={onAttach ?? (onFiles ? () => fileInput.current?.click() : undefined)}
+                  disabled={(!onAttach && !onFiles) || disabled}
+                />
+              )}
+              {onFiles && !onAttach && (
+                <input
+                  ref={fileInput}
+                  type="file"
+                  multiple
+                  hidden
+                  tabIndex={-1}
+                  aria-label={attachLabel}
+                  onChange={(e) => {
+                    const picked = files(e.target.files);
+                    e.target.value = "";
+                    if (picked.length > 0) onFiles(picked);
+                  }}
+                />
+              )}
+              {/* The compact primary square (32px): dim until there is something to send. */}
+              {working !== undefined ? (
+                // An agent may work here: one button whose glyph morphs between send and stop.
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="ac-composer__send ac-btn--icon"
+                  data-ready={ready || stopMode ? "" : undefined}
+                  data-mode={stopMode ? "stop" : "send"}
+                  data-press={pressed || undefined}
+                  aria-label={stopMode ? working?.stopLabel : sendLabel}
+                  title={sendTitle}
+                  onClick={() => {
+                    if (stopMode) stop();
+                    else {
+                      press();
+                      send();
+                    }
+                  }}
+                  disabled={!ready && !stopMode}
+                >
+                  <span className="ac-composer__glyph ac-composer__glyph--send" aria-hidden="true">
+                    <Icon name="send" />
+                  </span>
+                  <span className="ac-composer__glyph ac-composer__glyph--stop" aria-hidden="true">
+                    <PixelStop size={13} animated={stopMode} />
+                  </span>
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  iconOnly
+                  icon="send"
+                  className="ac-composer__send"
+                  data-ready={ready ? "" : undefined}
+                  aria-label={sendLabel}
+                  title={sendTitle}
+                  onClick={() => send()}
+                  disabled={!ready}
+                />
+              )}
             </div>
-          </RPopover.Content>
-        </RPopover.Portal>
-      )}
-    </RPopover.Root>
+          </div>
+        </RPopover.Anchor>
+        {(mentions || commands || links) && (
+          <RPopover.Portal>
+            <RPopover.Content
+              className={cx("ac-menu ac-suggest", isSlash && "ac-suggest--commands")}
+              side="top"
+              align="start"
+              sideOffset={6}
+              // Focus stays in the text box (combobox).
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              onCloseAutoFocus={(e) => e.preventDefault()}
+              onInteractOutside={(e) => {
+                if (e.target instanceof Node && box.current?.contains(e.target)) e.preventDefault();
+              }}
+            >
+              <div
+                role="listbox"
+                id={listId}
+                aria-label={
+                  isSlash
+                    ? (commands?.listLabel ?? "")
+                    : isLink
+                      ? (links?.listLabel ?? "")
+                      : (mentions?.listLabel ?? "")
+                }
+              >
+                {items.map((item, i) => {
+                  const heading = item.group && item.group !== items[i - 1]?.group;
+                  return (
+                    <div key={item.key} role="presentation">
+                      {heading && (
+                        <div className="ac-menu__heading" role="presentation">
+                          {item.group}
+                        </div>
+                      )}
+                      <div
+                        id={optionId(i)}
+                        role="option"
+                        tabIndex={-1}
+                        aria-selected={i === current}
+                        data-active={i === current || undefined}
+                        className="ac-menu__item ac-suggest__item"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          pick(item);
+                        }}
+                        onClick={() => pick(item)}
+                        onKeyDown={() => {}}
+                      >
+                        {item.leading}
+                        <span className="ac-menu__label">
+                          <span>{item.label}</span>
+                          {item.description && <span className="ac-menu__desc">{item.description}</span>}
+                        </span>
+                        {item.note && <span className="ac-suggest__note">{item.note}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </RPopover.Content>
+          </RPopover.Portal>
+        )}
+      </RPopover.Root>
+    </>
   );
 }

@@ -14,14 +14,15 @@ import type {
 import {
   agentStateOfRun,
   browserHandoffOf,
+  type ConnectionStatus,
   consultsIn,
   isQuiet,
   keys,
   type LiveRun,
   MESSAGES_PAGE,
-  narrationOf,
   OPEN_THREAD,
   runsInChannel,
+  type SteerState,
   type StreamsState,
   sendHelpers,
   typingIn,
@@ -38,6 +39,7 @@ import {
   useModels,
   usePostMessage,
   useRoster,
+  useSteerState,
   usesBrowser,
   useThreadInfo,
   useThreadMessages,
@@ -101,9 +103,12 @@ import {
   Icon,
   type IconName,
   Input,
+  Kbd,
   Mention,
   Message,
   MessageText,
+  PixelSpinner,
+  PixelStop,
   Skeleton,
   SkeletonGroup,
   SkeletonMessage,
@@ -117,7 +122,10 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
+import { browserOffline, failedOffline, outbox, useQueued } from "@/chat/outbox";
 import { readingLanding } from "@/chat/reading";
+import { elapsedParts, nextSlots, type RunSlot, runPhase, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
+import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
@@ -133,7 +141,7 @@ import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
-import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
+import { LiveCodeToggle, LiveWorkList, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { WaitingCard } from "@/components/MachineOutages";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
@@ -165,7 +173,7 @@ import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
-import { askToStop, isStoppable, StopButton, useStopRun } from "@/components/StopRun";
+import { isStoppable, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -429,26 +437,34 @@ function ChannelView({
   runVisible.current = thread ? (r) => r.threadId === thread.id : (r) => !hiddenRunThreads.has(r.threadId);
   const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
-  const status = useConnectionStatus();
   const join = useJoinChannel(org.id, channel.id);
   const sendTyping = useTypingSender(channel.id);
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
   const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
-  // Esc (composer empty, nothing open): asks to stop the most recent run here that I may stop
-  // (the confirmation; Esc twice within 1.5 s stops directly).
-  const { canStop: mayStop } = useStopRun();
+  // Stopping is immediate, nothing asked (what it did stays, "Continuar" picks it up): the composer's
+  // button when the box is empty, or Esc anywhere on the page (composer empty, nothing open).
+  const { canStop: mayStop, stop: stopRun } = useStopRun();
+  const stoppableKey = useStreams((s) =>
+    scopedRuns(s)
+      .filter((r) => isStoppable(r) && !r.stopping)
+      .map((r) => r.runId)
+      .join(" "),
+  );
+  /** The most recent run here that I may stop. */
+  const stopTarget = stoppableKey
+    ? scopedRuns(live.get().streams)
+        .filter((r) => isStoppable(r) && !r.stopping && mayStop(r))
+        .at(-1)
+    : undefined;
   const draftRef = useRef("");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
-      const target = scopedRuns(live.get().streams)
-        .filter((r) => isStoppable(r) && !r.stopping && mayStop(r))
-        .at(-1);
-      if (!target) return;
+      if (!stopTarget) return;
       e.preventDefault();
-      askToStop(target.runId, isWriting(target) ? "row" : "bar", true);
+      stopRun(stopTarget);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -507,6 +523,9 @@ function ChannelView({
       .map((a) => a.id);
 
   const toast = useToast();
+  const qc = useQueryClient();
+  // Failed copies already looked at (so a server refusal is never queued later as "offline").
+  const seenFailed = useRef(new Set<string>());
   const post = usePostMessage(org.id, channel.id, {
     me: { id: me.user.id },
     mentioned,
@@ -520,13 +539,48 @@ function ChannelView({
           : [];
       if (agents.length > 0) live.expect(channel.id, local.id, agents);
     },
-    onSent: (message, local) => live.retarget(local.id, message.id),
+    onSent: (message, local) => {
+      if (local.clientId) outbox.remove(local.clientId);
+      live.retarget(local.id, message.id);
+    },
     // A thread archived meanwhile (`thread.archived`): say so in the person's language.
     onFailed: (error) => {
       if (errorCode(error)?.startsWith("thread.")) toast.show(errorText(t, error), "error");
+      // No connection: the message waits ("sai quando a internet voltar") and goes out when it is back.
+      // The copy turns "failed" right after this callback; pick it up then.
+      const offline = failedOffline(error);
+      queueMicrotask(() => {
+        for (const m of qc.getQueryData<MessageType[]>(keys.messages(org.id, channel.id)) ?? []) {
+          if (m.local !== "failed" || !m.clientId || seenFailed.current.has(m.clientId)) continue;
+          seenFailed.current.add(m.clientId);
+          if (offline) outbox.add(m.clientId);
+        }
+      });
     },
   });
   const { send, retry } = sendHelpers(post);
+  // Back online (the socket reopened, or the browser says so): what waited goes out, in order.
+  const status = useConnectionStatus();
+  const flushOutbox = useRef(() => {});
+  flushOutbox.current = () => {
+    if (browserOffline()) return;
+    for (const m of qc.getQueryData<MessageType[]>(keys.messages(org.id, channel.id)) ?? []) {
+      if (m.local !== "failed" || !outbox.has(m.clientId ?? undefined)) continue;
+      if (m.clientId) {
+        outbox.remove(m.clientId);
+        seenFailed.current.delete(m.clientId);
+      }
+      retry(m);
+    }
+  };
+  useEffect(() => {
+    if (status === "open") flushOutbox.current();
+  }, [status]);
+  useEffect(() => {
+    const online = () => flushOutbox.current();
+    window.addEventListener("online", online);
+    return () => window.removeEventListener("online", online);
+  }, []);
 
   // Reading the channel marks it read (unread counts in the DM list).
   const api = useApi();
@@ -653,6 +707,54 @@ function ChannelView({
     return ungroupAfter(items, special);
   }, [thread, channelList, channelMessages.data, threadMessages.data, threadsView]);
 
+  // The agents' blocks at the end of the conversation (one per run, from "pensando" to its final
+  // message: `chat/run-slots.ts`). They change when runs start or end, never on a streaming delta.
+  const liveRunsKey = useStreams((s) =>
+    scopedRuns(s)
+      .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))
+      .map((r) => `${r.runId}\t${r.agentId}\t${r.provisional ? 1 : 0}`)
+      .join("\n"),
+  );
+  const landedRuns = useMemo(
+    () =>
+      new Set(timeline.flatMap((i) => (i.kind === "message" && i.message.agentRunId ? [i.message.agentRunId] : []))),
+    [timeline],
+  );
+  const slotsRef = useRef<RunSlot[]>([]);
+  // Every block's key by run (the final message is drawn under it), kept for this view.
+  const runKeys = useRef(new Map<string, string>());
+  const [holdTick, setHoldTick] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `holdTick` re-checks blocks waiting for their message
+  const slots = useMemo(() => {
+    const live = liveRunsKey
+      ? liveRunsKey.split("\n").map((line) => {
+          const [runId = "", agentId = "", provisional] = line.split("\t");
+          return { runId, agentId, provisional: provisional === "1" };
+        })
+      : [];
+    // Its message is in a cache already (it lands in the timeline on the next render): hold the block.
+    const expected = (runId: string) =>
+      qc
+        .getQueriesData<MessageType[]>({ queryKey: ["org", org.id, "channel", channel.id] })
+        .some(([, list]) => Array.isArray(list) && list.some((m) => m?.agentRunId === runId));
+    const next = nextSlots(slotsRef.current, live, {
+      landed: (runId) => landedRuns.has(runId),
+      expected,
+      now: Date.now(),
+    });
+    for (const slot of next) runKeys.current.set(slot.runId, slot.key);
+    const kept = sameSlots(slotsRef.current, next) ? slotsRef.current : next;
+    slotsRef.current = kept;
+    return kept;
+  }, [liveRunsKey, landedRuns, holdTick, qc, org.id, channel.id]);
+  // A block waiting for its message: look again once the wait is over (it goes if nothing came).
+  useEffect(() => {
+    if (!slots.some((x) => x.goneAt !== null)) return;
+    const timer = setTimeout(() => setHoldTick((n) => n + 1), SLOT_HOLD_MS + 50);
+    return () => clearTimeout(timer);
+  }, [slots]);
+  const slotsKey = slots.map((x) => x.key).join(" ");
+
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
   const scroller = useRef<HTMLElement>(null);
@@ -688,11 +790,11 @@ function ChannelView({
     holdingRef.current = on;
     setHolding(on);
   };
-  /** The newest row, when it is an agent's answer. */
+  /** The newest row, when it is an agent's answer (walked from the end: no query over every row). */
   const newestAnswer = () => {
-    const rows = scroller.current?.querySelectorAll<HTMLElement>(".ac-msg");
-    const last = rows?.[rows.length - 1];
-    return last?.dataset.readId ? last : null;
+    let el = scroller.current?.lastElementChild ?? null;
+    while (el && !el.classList.contains("ac-msg")) el = el.previousElementSibling;
+    return el instanceof HTMLElement && el.dataset.readId ? el : null;
   };
   /** The person saw the end of the conversation: its newest answer never jumps back to its start. */
   const markRead = () => {
@@ -702,7 +804,50 @@ function ChannelView({
   const reducedMotion = usePrefersReducedMotion();
   const reducedMotionRef = useRef(reducedMotion);
   reducedMotionRef.current = reducedMotion;
-  const [unseen, setUnseen] = useState(false);
+  // Scrolled up while things arrive: the first unseen row ("Novas" goes before it), an agent that
+  // started meanwhile, and the divider (it fades ~3.5 s after the person gets there).
+  const [unseenFrom, setUnseenFrom] = useState<string | null>(null);
+  const [unseenRun, setUnseenRun] = useState(false);
+  const [divider, setDivider] = useState<{ key: string; fading: boolean } | null>(null);
+  const dividerTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const dropDividerTimers = () => {
+    for (const timer of dividerTimers.current) clearTimeout(timer);
+    dividerTimers.current = [];
+  };
+  useEffect(
+    () => () => {
+      for (const timer of dividerTimers.current) clearTimeout(timer);
+    },
+    [],
+  );
+  const unseenFromRef = useRef<string | null>(null);
+  const dividerOn = useRef(false);
+  /** Something arrived out of view: the divider before `key` (the first one since the person left). */
+  const markUnseen = (key: string) => {
+    if (unseenFromRef.current !== null) return;
+    unseenFromRef.current = key;
+    dropDividerTimers();
+    dividerOn.current = true;
+    setUnseenFrom(key);
+    setDivider({ key, fading: false });
+  };
+  /** The person reached what was new: the pill goes, the divider fades a little later. */
+  const clearUnseen = () => {
+    if (unseenFromRef.current !== null) {
+      unseenFromRef.current = null;
+      setUnseenFrom(null);
+    }
+    setUnseenRun(false);
+    if (!dividerOn.current || dividerTimers.current.length > 0) return;
+    dividerTimers.current = [
+      setTimeout(() => setDivider((d) => (d ? { ...d, fading: true } : d)), 3500),
+      setTimeout(() => {
+        dividerTimers.current = [];
+        dividerOn.current = false;
+        setDivider(null);
+      }, 4100),
+    ];
+  };
   const openedAt = useRef(Date.now());
   /**
    * At the bottom: follow it, unless the newest row is an agent's answer taller than the list. That
@@ -730,7 +875,7 @@ function ChannelView({
         landed.current.add(id);
         stick.current = false;
         setHold(true);
-        setUnseen(false);
+        clearUnseen();
         if (smooth && !reducedMotionRef.current && typeof el.scrollTo === "function") {
           autoScrollUntil.current = Date.now() + 600;
           el.scrollTo({ top: land.top, behavior: "smooth" });
@@ -746,12 +891,13 @@ function ChannelView({
       autoScrollUntil.current = Date.now() + 600;
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     } else el.scrollTop = el.scrollHeight;
-    setUnseen(false);
+    clearUnseen();
   };
   const followRef = useRef(follow);
   followRef.current = follow;
-  // Pinned to the bottom: anything that grows later (images, cards, the skeleton turning into
-  // messages, fonts) keeps the latest message in view until the person scrolls.
+  // Pinned to the bottom: anything that grows (an agent's words, images, cards, the skeleton turning
+  // into messages, fonts) keeps the latest message in view until the person scrolls. A ResizeObserver
+  // on the rows does it (at most once a frame, after layout), not a loop per streaming delta.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the list only exists for members; re-attach when it appears
   useEffect(() => {
     const el = scroller.current;
@@ -760,20 +906,21 @@ function ChannelView({
       if (stick.current && Date.now() >= autoScrollUntil.current) followRef.current();
     };
     const ro = new ResizeObserver(pin);
-    const watch = () => {
-      for (const child of Array.from(el.children)) ro.observe(child);
-    };
-    watch();
+    for (const child of Array.from(el.children)) ro.observe(child);
     ro.observe(el);
-    const mo = typeof MutationObserver === "undefined" ? null : new MutationObserver(watch);
+    // Only rows that came in are watched (observing every row again on each change cost a pass per delta).
+    const mo =
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver((records) => {
+            for (const r of records) for (const n of Array.from(r.addedNodes)) if (n instanceof Element) ro.observe(n);
+          });
     mo?.observe(el, { childList: true });
     return () => {
       ro.disconnect();
       mo?.disconnect();
     };
   }, [isMember]);
-  const runCount = useStreams((s) => scopedRuns(s).length);
-  const streamSize = useStreams((s) => scopedRuns(s).reduce((n, r) => n + r.text.length, 0));
   const lastKey = timeline.at(-1)?.key;
   const previousLastKey = useRef(lastKey);
   /** The person asked for the end ("Novas mensagens", "Fim da resposta", a correction sent). */
@@ -788,19 +935,39 @@ function ChannelView({
     }
     stick.current = true;
     setHold(false);
-    setUnseen(false);
+    clearUnseen();
   };
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever rows or streaming text grow
+  const previousSlots = useRef(slotsKey);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever rows or agents' blocks come
   useLayoutEffect(() => {
-    // A new row glides down; streaming text follows instantly (no fighting smooth scrolls each frame).
+    // A new row glides down (streaming text is followed by the ResizeObserver above).
     // Not while the channel is still loading (first page, thread replies): that lands at once.
-    const newRow = previousLastKey.current !== lastKey;
-    const settled = previousLastKey.current !== undefined && Date.now() - openedAt.current > 1500;
+    const before = previousLastKey.current;
+    const newRow = before !== lastKey;
+    const settled = before !== undefined && Date.now() - openedAt.current > 1500;
     previousLastKey.current = lastKey;
-    if (stick.current) follow(newRow && settled);
+    const blocks = previousSlots.current.split(" ");
+    const newBlock = slotsKey.split(" ").some((k) => k && !blocks.includes(k));
+    previousSlots.current = slotsKey;
+    if (stick.current) follow((newRow || newBlock) && settled);
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
-    else if ((newRow || runCount > 0) && !holdingRef.current) setUnseen(true);
-  }, [lastKey, runCount, streamSize]);
+    else if (!holdingRef.current) {
+      const first = newRow ? firstNewKey(timeline, before) : null;
+      if (first) markUnseen(first);
+      if (newBlock) setUnseenRun(true);
+    }
+  }, [lastKey, slotsKey]);
+
+  // Which agents' blocks are on screen: the line above the composer speaks only for those out of view.
+  const inView = useBlocksInView(scroller, slotsKey);
+  const outOfView = useMemo(() => (runId: string) => !inView.has(runId), [inView]);
+  /** "Ver" on that line: back to the agent's block. */
+  const seeRun = (runId: string) => {
+    const row = Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-run-id]") ?? []).find(
+      (el) => el.dataset.runId === runId,
+    );
+    row?.scrollIntoView?.({ block: "end", behavior: reducedMotion ? "auto" : "smooth" });
+  };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the rows are there
   useLayoutEffect(() => {
@@ -1082,7 +1249,7 @@ function ChannelView({
   const attached = files.flatMap((f) => (f.status === "done" && f.ref ? [f.ref] : []));
   const uploading = files.some((f) => f.status === "uploading");
 
-  const onSend = (text: string) => {
+  const onSend = (text: string, opts?: { interrupt?: boolean }) => {
     if (uploading || (!text && attached.length === 0)) return;
     if (attached.length === 0 && parseMissionCommand(text)) {
       void runCommand(text);
@@ -1106,18 +1273,69 @@ function ChannelView({
     const meta = localMeta(null, "", attached);
     // From the thread panel or page: the reply makes it a "Responder" thread (out of the channel's timeline).
     if (thread && chrome?.openThread) meta[OPEN_THREAD] = true;
-    send(text, thread ? thread.id : null, meta);
+    // "Parar e mandar" (⌘↵): the agent drops the step it is on and reads this now.
+    send(text, thread ? thread.id : null, meta, opts?.interrupt ? { steer: "now" } : undefined);
     dropFiles(() => false);
   };
-  // Live rows sit by time: right after the message that started them (never at the bottom glued
-  // to a later reply). `liveKey` only changes when runs start or end.
-  const liveKey = useStreams((s) =>
+  // While an agent works here: the send button turns into stop (box empty), and typing offers
+  // "Juntar ao que ele faz" (↵) or "Parar e mandar" (⌘↵).
+  const stopName = stopTarget ? (dir.agentById.get(stopTarget.agentId)?.name ?? t("channel.unknownAgent")) : "";
+  const stopGrammar = agentGrammar(t, stopName);
+  const working = stopTarget
+    ? {
+        stopLabel: t("run.stopAgent", stopGrammar),
+        stopText: `${t("run.stopAgent", stopGrammar)} · Esc`,
+        onStop: () => stopRun(stopTarget),
+      }
+    : null;
+  const choice = stopTarget
+    ? {
+        label: t("run.choice.label", stopGrammar),
+        joinLabel: t("run.choice.join", stopGrammar),
+        interruptLabel: t("run.choice.interrupt"),
+        hint: (c: "join" | "interrupt", mod: string) => (
+          <>
+            <Kbd>↵</Kbd> {c === "join" ? t("run.choice.joins") : t("run.choice.interrupts")} · <Kbd>{mod}↵</Kbd>{" "}
+            {c === "join" ? t("run.choice.interrupts") : t("run.choice.joins")}
+          </>
+        ),
+      }
+    : undefined;
+  // The "↓ novas" pill: how many, who spoke, and who is writing now.
+  const unseenSummary = useMemo(() => unseenOf(timeline, unseenFrom, me.user.id), [timeline, unseenFrom, me.user.id]);
+  const writingAgents = useStreams((s) =>
     scopedRuns(s)
-      .filter(hasRow)
-      .map((r) => JSON.stringify([r.runId, r.startedAt ?? 0, r.threadId, r.triggerMessageId ?? null]))
-      .join("\n"),
+      .filter((r) => r.status === "running" && r.text.length > 0)
+      .map((r) => r.agentId)
+      .filter((id, i, all) => all.indexOf(id) === i)
+      .join(" "),
   );
-  const { anchors, unanchored } = useMemo(() => liveAnchors(liveKey, timeline), [liveKey, timeline]);
+  const pillOn = unseenFrom !== null || unseenRun;
+  const pillWriting = pillOn && writingAgents ? writingAgents.split(" ") : [];
+  const pillAuthors = unseenSummary.authors.filter((a) => !(a.type === "agent" && pillWriting.includes(a.id ?? "")));
+  const pillText = pillParts(
+    t,
+    unseenSummary.count,
+    pillAuthors.map((a) => dir.authorName(a)),
+    pillWriting.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),
+  );
+  /** The pill: to the "Novas" divider when it is far up, else to the end. */
+  const openUnseen = () => {
+    const el = scroller.current;
+    const line = el?.querySelector<HTMLElement>(".channel__unread");
+    // Without layout (no size) there is nothing to measure: the end.
+    if (el && line && line.offsetHeight > 0) {
+      const top = line.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+      if (dividerIsFar(top, el.scrollHeight, el.clientHeight)) {
+        autoScrollUntil.current = Date.now() + 600;
+        if (!reducedMotion && typeof el.scrollTo === "function") el.scrollTo({ top: top - 12, behavior: "smooth" });
+        else el.scrollTop = top - 12;
+        clearUnseen();
+        return;
+      }
+    }
+    toBottom(true);
+  };
   const emptySuggestions = useMemo(() => {
     if (chrome?.suggestions) return chrome.suggestions;
     const first = channelAgents[0];
@@ -1307,7 +1525,7 @@ function ChannelView({
                   const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
                   if (near && !stick.current && !(byPerson && movedDown)) return;
                   stick.current = near;
-                  if (near) setUnseen(false);
+                  if (near) clearUnseen();
                   // The person reached the end by themselves: the answer was read, the hold is over.
                   if (near && byPerson) {
                     markRead();
@@ -1322,7 +1540,7 @@ function ChannelView({
                 {messages.isError && !messages.data && (
                   <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
                 )}
-                {messages.isSuccess && timeline.length === 0 && streamSize === 0 && !thread && !adjusting && (
+                {messages.isSuccess && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
                   <div className="channel__empty">
                     <EmptyState
                       icon="message"
@@ -1363,7 +1581,13 @@ function ChannelView({
                   />
                 ) : (
                   <>
-                    <Timeline items={timeline} ready={messages.isSuccess} anchors={anchors} />
+                    <Timeline
+                      items={timeline}
+                      ready={messages.isSuccess}
+                      slots={slots}
+                      runKeys={runKeys.current}
+                      divider={divider}
+                    />
                     {!thread && (
                       <ArchivedThreadsNote channelId={channel.id} count={archivedThreads.data?.threads.length ?? 0} />
                     )}
@@ -1378,9 +1602,6 @@ function ChannelView({
                 )}
                 <LiveMemoryCards channelId={channel.id} />
                 <LiveNotices channelId={channel.id} />
-                {unanchored.map((runId) => (
-                  <LiveRunSlot key={runId} runId={runId} />
-                ))}
               </section>
               {holding && (
                 <div className="channel__pill">
@@ -1390,21 +1611,48 @@ function ChannelView({
                   </Button>
                 </div>
               )}
-              {unseen && !holding && (
-                <div className="channel__pill">
-                  <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
-                    {t("channel.newMessages")}
-                    <Icon name="chevronDown" size={16} />
-                  </Button>
-                </div>
-              )}
-              {status === "reconnecting" && (
-                <p className="channel__status" role="status">
-                  {t("channel.reconnecting")}
-                </p>
-              )}
+              <div className="channel__pill">
+                <button
+                  type="button"
+                  className="channel__newpill"
+                  data-on={(pillOn && !holding) || undefined}
+                  aria-hidden={!pillOn || holding || undefined}
+                  tabIndex={pillOn && !holding ? 0 : -1}
+                  aria-label={t("channel.newPill.label", { text: pillText.join(" · ") || t("channel.newMessages") })}
+                  onClick={openUnseen}
+                >
+                  <Icon name="chevronDown" size={16} />
+                  <span className="channel__newpill-stack" aria-hidden="true">
+                    {[
+                      ...pillWriting.map((id) => ({ type: "agent" as const, id })),
+                      ...pillAuthors.flatMap((a) => (a.id ? [{ type: a.type, id: a.id }] : [])),
+                    ]
+                      .filter((a, i, all) => all.findIndex((x) => x.type === a.type && x.id === a.id) === i)
+                      .slice(0, 3)
+                      .map((a) => (
+                        <ActorAvatar key={`${a.type}:${a.id}`} actor={a} size="xs" name={dir.authorName(a)} />
+                      ))}
+                  </span>
+                  <span>{pillText[0] ?? t("channel.newMessages")}</span>
+                  {pillText.length > 1 && (
+                    <span className="channel__newpill-more">
+                      {pillText
+                        .slice(1)
+                        .map((x) => `· ${x}`)
+                        .join(" ")}
+                    </span>
+                  )}
+                </button>
+              </div>
               <div className="channel__composer">
-                <ActivityBar channelId={channel.id} visible={runVisible} />
+                <ConnectionBanner status={status} />
+                <ActivityBar
+                  channelId={channel.id}
+                  visible={runVisible}
+                  outOfView={outOfView}
+                  onSee={seeRun}
+                  stoppable={stopTarget?.runId}
+                />
                 {adjustThreadId ? (
                   <RangeBar adjust={adjust} />
                 ) : chrome?.composerReplacement ? (
@@ -1448,6 +1696,8 @@ function ChannelView({
                         if (v.trim()) sendTyping();
                       }}
                       onSend={onSend}
+                      working={chrome?.locked ? null : working}
+                      choice={choice}
                       disabled={Boolean(chrome?.locked)}
                       label={
                         chrome?.composerLabel ??
@@ -1538,17 +1788,27 @@ function ungroupAfter(items: TimelineItem[], special: (m: MessageType) => boolea
   });
 }
 
-/** Persisted rows. Memoized: streaming deltas don't re-render it. */
+/**
+ * Persisted rows, then the agents' live blocks (always last while they work: new messages go above
+ * them). One flat keyed list: an answer seen live is drawn under its block's key, so the final message
+ * takes the block's place without a remount. Memoized: streaming deltas don't re-render it.
+ */
 const Timeline = memo(function Timeline({
   items,
   ready,
-  anchors,
+  slots,
+  runKeys,
+  divider,
 }: {
   items: ReturnType<typeof buildTimeline>;
   /** The first page loaded: rows from then on slide in. */
   ready: boolean;
-  /** Live runs to show right after a row (by item key). */
-  anchors: Map<string, string[]>;
+  /** The agents' blocks at work (`chat/run-slots.ts`). */
+  slots: RunSlot[];
+  /** Each block's key by run id: its final message is drawn under it. */
+  runKeys: Map<string, string>;
+  /** "Novas": before this row, fading once the person got there. */
+  divider: { key: string; fading: boolean } | null;
 }) {
   const { t, i18n } = useTranslation();
   const models = useModels();
@@ -1561,6 +1821,8 @@ const Timeline = memo(function Timeline({
   const initialKeys = useRef<Set<string> | null>(null);
   if (ready && initialKeys.current === null) initialKeys.current = new Set(items.map((i) => i.key));
   const initial = initialKeys.current;
+  // A block slides in once, when it first shows (not the ones already working when the page opened).
+  const blockEnters = useRef(new Map<string, boolean>());
   const threadsView = useChannelThreadsView();
   // Threads a mission link card already points to (the agent's reply): their start marker stays out.
   const linked = useMemo(
@@ -1578,7 +1840,6 @@ const Timeline = memo(function Timeline({
     () => groupAutoApproved(items.flatMap((i) => (i.kind === "message" ? [i.message] : []))),
     [items],
   );
-  let afterLive = false;
   /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
   const threadRow = (key: string, m: MessageType) => {
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
@@ -1604,90 +1865,125 @@ const Timeline = memo(function Timeline({
     }
     return start ? <ThreadStartLine key={key} message={m} start={start} thread={info} /> : null;
   };
-  return (
-    <>
-      {items.map((item) => {
-        const live = anchors.get(item.key);
-        const row =
-          item.kind === "day" ? (
-            <DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>
-          ) : item.kind === "message" ? (
-            (threadRow(item.key, item.message) ?? (
-              <TimelineMessage
-                key={item.key}
-                message={item.message}
-                // Right after a live row, always a full header (never "grouped" under it).
-                grouped={item.grouped && !afterLive}
-                entering={initial !== null && entersWithMotion(item.key, item.message.createdAt, initial, mountedAt)}
-                modelLabels={modelLabels}
-                contextMark={threadsView?.marks.has(item.message.id)}
-                replyContext={item.context}
-              />
-            ))
-          ) : null;
-        afterLive = Boolean(live?.length);
-        return live?.length ? (
-          <Fragment key={item.key}>
-            {row}
-            {live.map((runId) => (
-              <LiveRunSlot key={runId} runId={runId} />
-            ))}
-          </Fragment>
-        ) : (
-          row
-        );
-      })}
-    </>
-  );
+  const rows: ReactNode[] = [];
+  for (const item of items) {
+    if (divider?.key === item.key) {
+      rows.push(
+        <div key="unread-divider" className="channel__unread" data-fade={divider.fading || undefined}>
+          {t("channel.unreadDivider")}
+        </div>,
+      );
+    }
+    if (item.kind === "day") {
+      rows.push(<DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>);
+      continue;
+    }
+    if (item.kind !== "message") continue;
+    const m = item.message;
+    const special = threadRow(item.key, m);
+    if (special) {
+      rows.push(special);
+      continue;
+    }
+    const entering = initial !== null && entersWithMotion(item.key, m.createdAt, initial, mountedAt);
+    const blockKey = m.agentRunId ? runKeys.get(m.agentRunId) : undefined;
+    rows.push(
+      blockKey && m.agentRunId ? (
+        // Seen live: the same block, with its own header (it had one while it worked).
+        <RunBlock
+          key={blockKey}
+          runId={m.agentRunId}
+          message={m}
+          grouped={false}
+          entering={false}
+          modelLabels={modelLabels}
+          contextMark={threadsView?.marks.has(m.id)}
+          replyContext={item.context}
+        />
+      ) : (
+        <TimelineMessage
+          key={item.key}
+          message={m}
+          grouped={item.grouped}
+          entering={entering}
+          modelLabels={modelLabels}
+          contextMark={threadsView?.marks.has(m.id)}
+          replyContext={item.context}
+        />
+      ),
+    );
+  }
+  for (const slot of slots) {
+    if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
+    rows.push(
+      <RunBlock
+        key={slot.key}
+        runId={slot.runId}
+        grouped={false}
+        entering={blockEnters.current.get(slot.key) ?? false}
+        modelLabels={modelLabels}
+      />,
+    );
+  }
+  return <>{rows}</>;
 });
 
-const CLOCK_SLACK_MS = 3000;
 /** Model names for the rows of "Ajustar trecho" (no usage line is shown there). */
 const NO_LABELS = new Map<string, string>();
 
-/**
- * Where each live run goes: after the message that started it (`triggerMessageId`;
- * without it, the last message of its conversation sent before it started), else at the end.
- */
-
-export function liveAnchors(liveKey: string, items: ReturnType<typeof buildTimeline>) {
-  const anchors = new Map<string, string[]>();
-  const unanchored: string[] = [];
-  if (!liveKey) return { anchors, unanchored };
-  for (const line of liveKey.split("\n")) {
-    const [runId, started, threadId, trigger] = JSON.parse(line) as [string, number, string, string | null];
-    // The server says which message started it: right after that one.
-    const exact = trigger ? items.find((i) => i.kind === "message" && i.message.id === trigger) : undefined;
-    if (exact) {
-      anchors.set(exact.key, [...(anchors.get(exact.key) ?? []), runId]);
-      continue;
-    }
-    // Anchor: the last message of its conversation sent before the run started (a little slack
-    // for clock skew); messages that came later stay below the row.
-    const startedAt = Number(started) || Number.POSITIVE_INFINITY;
-    let key: string | null = null;
-    let fallback: string | null = null;
-    for (const item of items) {
-      if (item.kind !== "message") continue;
-      if (item.message.id !== threadId && item.message.threadId !== threadId) continue;
-      fallback = item.key;
-      if (Date.parse(item.message.createdAt) <= startedAt + CLOCK_SLACK_MS) key = item.key;
-    }
-    key ??= fallback;
-    if (key) anchors.set(key, [...(anchors.get(key) ?? []), runId]);
-    else unanchored.push(runId);
-  }
-  return { anchors, unanchored };
+/** The live run as a message, while it has none (the block's text and header come from the run). */
+function liveMessageOf(r: LiveRun): MessageType {
+  return {
+    id: `live:${r.runId}`,
+    channelId: r.channelId,
+    threadId: r.threadId,
+    author: { type: "agent", id: r.agentId },
+    body: "",
+    mentionedAgentIds: [],
+    agentRunId: r.runId,
+    meta: {},
+    createdAt: new Date(r.startedAt ?? Date.now()).toISOString(),
+  } as MessageType;
 }
 
-/** A live run gets its row once it writes, or (with its browser card) as soon as it uses its browser. */
-const hasRow = (r: LiveRun) => isWriting(r) || usesBrowser(r);
-
-/** One live run, subscribed by id (deltas re-render only this row). Never grouped. */
-function LiveRunSlot({ runId }: { runId: string }) {
-  const run = useStreams((s) => s.runs[runId]);
-  if (!run || !hasRow(run)) return null;
-  return <LiveRunRow run={run} grouped={false} />;
+/**
+ * One agent's answer, from "pensando" to its final message (telas/Mensagens.html, "Um bloco só"): the
+ * live run while it works, then the message, in the same component (same element: nothing remounts or
+ * flashes). Until the message lands, the last live state stays on screen. Subscribed by run id, so a
+ * streaming delta re-renders only this block.
+ */
+function RunBlock({
+  runId,
+  message,
+  ...rest
+}: {
+  runId: string;
+  message?: MessageType;
+  grouped: boolean;
+  entering: boolean;
+  modelLabels: Map<string, string>;
+  contextMark?: boolean;
+  replyContext?: ReplyRef;
+}) {
+  const run = useStreams((s) => (message ? undefined : s.runs[runId]));
+  const last = useRef<LiveRun | undefined>(undefined);
+  if (run) last.current = run;
+  const live = message ? undefined : (run ?? last.current);
+  const liveId = live?.runId;
+  const liveAgent = live?.agentId;
+  const liveChannel = live?.channelId;
+  const liveThread = live?.threadId;
+  const liveStart = live?.startedAt;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the placeholder only depends on who and when
+  const placeholder = useMemo(
+    () => (live ? liveMessageOf(live) : null),
+    [liveId, liveAgent, liveChannel, liveThread, liveStart],
+  );
+  const shown = message ?? placeholder;
+  if (!shown) return null;
+  return (
+    <TimelineMessage message={shown} live={live ?? null} seenLive={message ? last.current : undefined} {...rest} />
+  );
 }
 
 /**
@@ -1745,28 +2041,47 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
 
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
-const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; grouped: boolean }) {
+/**
+ * The block's header while it works: the agent's pixel orbit, "pensando" / "trabalhando" /
+ * "escrevendo" with the light sweep, and how long it has been at it (from 2 s on).
+ */
+function RunClock({ run }: { run: LiveRun }) {
   const { t, i18n } = useTranslation();
+  const working = run.status === "thinking" || run.status === "queued" || run.status === "running";
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!working) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [working]);
+  const started = run.startedAt ?? now;
+  if (!working) {
+    const at = new Date(started).toISOString();
+    return <time dateTime={at}>{formatTime(i18n.language, at)}</time>;
+  }
+  const took = elapsedParts(now - started);
+  return (
+    <span className="run-clock">
+      <AgentSpinner agentId={run.agentId} size={14} />
+      <span className="run-clock__word">{t(`run.state.${runPhase(run)}`)}</span>
+      {took && (
+        <span className="run-clock__time ac-num">
+          {" · "}
+          {took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s })}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Under a live block: "sem notícias há 4 min · Atualizar", or what it is doing between its steps. */
+function LiveRunStatus({ run }: { run: LiveRun }) {
+  const { t } = useTranslation();
   const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const dismissRun = useDismissRun();
-  const actions = useChannelActions();
-  const agent = dir.agentById.get(run.agentId);
-  const name = agent?.name ?? t("channel.unknownAgent");
-  const failed = run.status === "failed";
-  const waiting = run.status === "waiting_approval";
-  const canceled = run.status === "canceled";
-  const { canStop, stop } = useStopRun();
-  const qc = useQueryClient();
-  const messageAuthor = (messageId: string) => {
-    const m = qc.getQueryData<MessageType[]>(keys.messages(org.id, run.channelId))?.find((x) => x.id === messageId);
-    return m ? dir.authorName(m.author) : undefined;
-  };
-  // Same clock face as the final message ("21:10"), from when the run started.
-  const [startedAt] = useState(() => new Date(run.startedAt ?? Date.now()).toISOString());
-  // A run with no news for minutes (orphaned by a restart?): say so and offer to check.
   const api = useApi();
+  const qc = useQueryClient();
   const liveStore = useLiveStore();
+  // A run with no news for minutes (orphaned by a restart?): say so and offer to check.
   const [, tick] = useState(0);
   useEffect(() => {
     const again = () => tick((n) => n + 1);
@@ -1778,7 +2093,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       window.removeEventListener("focus", again);
     };
   }, []);
-  const quiet = !failed && !canceled && isQuiet(run);
+  const quiet = isQuiet(run);
   const [checking, setChecking] = useState(false);
   const recheck = () => {
     setChecking(true);
@@ -1788,168 +2103,260 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       })
       .finally(() => setChecking(false));
   };
-  const text = useRevealedText(run.text);
-  const followBottom = actions?.followBottom;
-  useLayoutEffect(() => {
-    if (text) followBottom?.();
-  }, [text, followBottom]);
   const doing = run.tool ? toolActivity(run.tool, run.connector) : null;
+  const showDoing =
+    !quiet && doing && doing.kind !== "thinking" && !(run.work ?? []).some((w) => w.kind === "call" && w.running);
+  if (!quiet && !showDoing) return null;
   return (
-    <Message
-      agent
-      grouped={grouped}
-      streaming={!failed && !waiting && !canceled}
-      avatar={<AgentAvatar agentId={run.agentId} name={name} state={agentStateOfRun(run)} />}
-      author={
-        failed || canceled ? (
-          name
-        ) : (
-          <span>
-            {name} <span className="small muted">· {t("run.inProgress")}</span>
-          </span>
-        )
-      }
-      time={<time dateTime={startedAt}>{formatTime(i18n.language, startedAt)}</time>}
-      status={waiting ? { icon: "waiting", label: t("channel.waitingApproval") } : undefined}
-      data-live={run.status}
-      data-run-id={run.runId}
-      data-read-id={run.runId}
-    >
-      {!failed && !waiting && !canceled && <span className="ac-visually-hidden">{t("channel.writing")}</span>}
-      {failed ? (
-        <p className="ac-msg__error" role="alert">
-          <Icon name="alert" size={18} />
-          <span style={{ flex: 1 }}>
-            {run.error
-              ? t("channel.runFailed", { agent: name, reason: run.error })
-              : t("channel.runFailedNoReason", { agent: name })}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="close"
-            aria-label={t("common.close")}
-            onClick={() => dismissRun(run.runId)}
-          />
+    <div className="run-status">
+      {quiet ? (
+        <p className="ac-msg__activity run-quiet">
+          {t("run.quiet", {
+            minutes: Math.max(3, Math.floor((Date.now() - (run.lastEventAt ?? run.startedAt ?? 0)) / 60_000)),
+          })}
+          {" · "}
+          <Button variant="ghost" size="sm" loading={checking} onClick={recheck}>
+            {t("run.refresh")}
+          </Button>
         </p>
       ) : (
-        <>
-          {/* What it said and did before this answer: narration and each tool call (code + output). */}
-          <LiveWorkList work={run.work ?? []} messageAuthor={messageAuthor} />
-          {!canceled && <RunBrowserCard run={run} name={name} />}
-          {text && (
-            <MessageText>
-              <MessageBody body={text} resolveMention={dir.mentionName} />
-            </MessageText>
-          )}
-          {canceled ? (
-            <p className="ac-msg__activity run-canceled">
-              {run.canceledBy && dir.memberById.get(run.canceledBy)
-                ? t("run.canceledBy", { name: dir.memberById.get(run.canceledBy)?.name })
-                : t("run.canceled")}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                icon="close"
-                aria-label={t("common.close")}
-                onClick={() => dismissRun(run.runId)}
-              />
-            </p>
-          ) : (
-            <div className="run-status">
-              {quiet && (
-                <p className="ac-msg__activity run-quiet">
-                  {t("run.quiet", {
-                    minutes: Math.max(3, Math.floor((Date.now() - (run.lastEventAt ?? run.startedAt ?? 0)) / 60_000)),
-                  })}
-                  {" · "}
-                  <Button variant="ghost" size="sm" loading={checking} onClick={recheck}>
-                    {t("run.refresh")}
-                  </Button>
-                </p>
-              )}
-              {!quiet &&
-                doing &&
-                doing.kind !== "thinking" &&
-                !(run.work ?? []).some((w) => w.kind === "call" && w.running) && (
-                  <p className="ac-msg__activity" aria-live="polite">
-                    {capitalize(activityVerb(t, doing))}…
-                  </p>
-                )}
-              {isStoppable(run) && canStop(run) && <StopButton run={run} onStop={stop} place="row" />}
-            </div>
-          )}
-        </>
+        doing && (
+          <p className="ac-msg__activity" aria-live="polite">
+            {capitalize(activityVerb(t, doing))}…
+          </p>
+        )
       )}
-    </Message>
+    </div>
   );
-});
-
-/** A live row with a message after it in the timeline (checked as the DOM changes). */
-function hasNewerMessage(runId: string) {
-  let el = document.querySelector(`[data-run-id="${runId}"]`)?.nextElementSibling;
-  while (el) {
-    if (el.matches(".ac-msg") || el.querySelector(".ac-msg")) return true;
-    el = el.nextElementSibling;
-  }
-  return false;
-}
-
-/** Ids of the writing runs whose live row has newer messages below it. */
-function useRowsBehind(runs: LiveRun[]) {
-  const ids = runs
-    .filter((r) => isWriting(r) && r.status !== "failed" && r.status !== "canceled")
-    .map((r) => r.runId)
-    .join(" ");
-  const [behind, setBehind] = useState<string[]>([]);
-  useEffect(() => {
-    if (!ids) {
-      setBehind([]);
-      return;
-    }
-    const check = () => {
-      const next = ids.split(" ").filter(hasNewerMessage);
-      setBehind((prev) => (prev.join(" ") === next.join(" ") ? prev : next));
-    };
-    check();
-    let frame = 0;
-    const observer = new MutationObserver(() => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        check();
-      });
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => {
-      observer.disconnect();
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [ids]);
-  return behind;
 }
 
 /**
- * The typing bar right above the composer: small avatars + what each one is
- * doing ("Theo está consultando o GitHub · Marina está digitando…") + three
- * dots (still with reduced motion). Agents leave it when their first words
- * arrive in the timeline.
+ * Under a stopped answer (telas/Mensagens.html): "Parado por você · Continuar". Continuar starts a new
+ * run of the same agent from where it stopped; it goes away for everyone once someone pressed it.
+ */
+function StoppedLine({
+  runId,
+  byUserId,
+  note,
+  owner,
+  message,
+}: {
+  runId: string | null | undefined;
+  byUserId: string | null | undefined;
+  /** The server's line, for older messages without a person in the meta. */
+  note?: string | null;
+  /** Who may continue: the same people who may stop it. */
+  owner: { agentId: string; channelId: string; threadId: string; triggerMessageId?: string | null } | null;
+  /** The stopped reply, once it is saved (its meta says when it was continued). */
+  message?: MessageType;
+}) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const { canStop } = useStopRun();
+  const cont = useContinueRun();
+  const continued = useWasContinued(runId, message);
+  const stopper = byUserId ? dir.memberById.get(byUserId)?.name : undefined;
+  const who =
+    byUserId && byUserId === me.user.id
+      ? t("run.stoppedByYou")
+      : stopper
+        ? t("run.stoppedBy", { name: stopper })
+        : byUserId || !note
+          ? t("run.stopped")
+          : note;
+  // Only a run a person stopped picks up again.
+  const can = Boolean(runId && byUserId && owner && !continued && canStop(owner));
+  return (
+    <p className="ac-msg__activity run-canceled">
+      <PixelStop size={12} dim />
+      <span>{who}</span>
+      {can && runId && (
+        <>
+          <span aria-hidden="true">·</span>
+          <button type="button" className="run-continue" disabled={cont.isPending} onClick={() => cont.mutate(runId)}>
+            <Icon name="play" size={14} />
+            {t("run.continueRun")}
+          </button>
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
+ * Under a message sent while an agent worked: "Theo lê na próxima pausa" → "Theo leu" (its face);
+ * "Theo parou para ler" when the person asked it to stop and read now.
+ */
+function SteerLine({ steer }: { steer: SteerState }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const name = dir.agentById.get(steer.agentId)?.name;
+  if (!name) return null;
+  return (
+    <p className="msg-steer" data-state={steer.state} aria-live="polite">
+      {/* Keyed by the state: each new word swaps in. */}
+      <span key={steer.state} className="msg-steer__swap">
+        {steer.state === "waiting" ? (
+          <>
+            <PixelSpinner size={14} />
+            {t("run.steer.waiting", { name })}
+          </>
+        ) : steer.state === "now" ? (
+          <>
+            <Icon name="bolt" size={14} />
+            {t("run.steer.now", { name })}
+          </>
+        ) : (
+          <>
+            <AgentAvatar agentId={steer.agentId} name={name} size="xs" state="idle" />
+            {t("run.steer.read", { name })}
+          </>
+        )}
+      </span>
+    </p>
+  );
+}
+
+/** Shows only after `ms` while `on` ("enviando" waits half a second: most sends never show it). */
+function useAfter(ms: number, on: boolean) {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (!on) {
+      setLate(false);
+      return;
+    }
+    const timer = setTimeout(() => setLate(true), ms);
+    return () => clearTimeout(timer);
+  }, [ms, on]);
+  return on && late;
+}
+
+/**
+ * Above the composer when the connection drops: "Sem internet. O que você mandar sai sozinho quando
+ * voltar." (what is sent meanwhile waits and goes out on its own), then "Conectado de novo" for 1.6 s.
+ * A socket that only reconnects for a moment says nothing.
+ */
+function ConnectionBanner({ status }: { status: ConnectionStatus }) {
+  const { t } = useTranslation();
+  const [offline, setOffline] = useState(browserOffline);
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+  const reconnecting = status === "reconnecting";
+  const [longReconnect, setLongReconnect] = useState(false);
+  useEffect(() => {
+    if (!reconnecting) {
+      setLongReconnect(false);
+      return;
+    }
+    const timer = setTimeout(() => setLongReconnect(true), 1500);
+    return () => clearTimeout(timer);
+  }, [reconnecting]);
+  const down = offline || (reconnecting && longReconnect);
+  const [back, setBack] = useState(false);
+  const wasDown = useRef(false);
+  useEffect(() => {
+    if (down) {
+      wasDown.current = true;
+      setBack(false);
+      return;
+    }
+    if (!wasDown.current) return;
+    wasDown.current = false;
+    setBack(true);
+    const timer = setTimeout(() => setBack(false), 1600);
+    return () => clearTimeout(timer);
+  }, [down]);
+  if (!down && !back) return null;
+  return (
+    <p className="channel__conn" data-back={!down || undefined} role="status">
+      <Icon name={down ? "cloud" : "check"} size={16} />
+      {down ? t("channel.offline") : t("channel.backOnline")}
+    </p>
+  );
+}
+
+const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+
+/**
+ * The live blocks (`data-run-id`) at least partly inside the scroller: measured once when they come
+ * (no frame of the line above the composer for a block in plain sight), then by an IntersectionObserver.
+ */
+function useBlocksInView(scroller: { current: HTMLElement | null }, key: string) {
+  const [inView, setInView] = useState<Set<string>>(() => new Set());
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` changes when blocks come or go
+  useLayoutEffect(() => {
+    const root = scroller.current;
+    if (!root) return;
+    const rows = Array.from(root.querySelectorAll<HTMLElement>("[data-run-id]"));
+    const box = root.getBoundingClientRect();
+    const now = new Set<string>();
+    for (const row of rows) {
+      const r = row.getBoundingClientRect();
+      if (r.height > 0 && r.bottom > box.top && r.top < box.bottom) now.add(row.dataset.runId ?? "");
+    }
+    setInView((prev) => (sameSet(prev, now) ? prev : now));
+    if (typeof IntersectionObserver === "undefined" || rows.length === 0) return;
+    const io = new IntersectionObserver(
+      (entries) =>
+        setInView((prev) => {
+          const next = new Set(prev);
+          for (const e of entries) {
+            const id = (e.target as HTMLElement).dataset.runId ?? "";
+            if (e.isIntersecting) next.add(id);
+            else next.delete(id);
+          }
+          return sameSet(prev, next) ? prev : next;
+        }),
+      { root, threshold: 0 },
+    );
+    for (const row of rows) io.observe(row);
+    return () => io.disconnect();
+  }, [key]);
+  return inView;
+}
+
+/**
+ * The thin line right above the composer (telas/Mensagens.html): what an agent is doing while its
+ * block is out of view ("Theo está consultando o GitHub · 12 s · Ver · Esc para parar"), and who is
+ * typing. Agents in plain sight leave it: their block says it.
  */
 function ActivityBar({
   channelId,
   visible,
+  outOfView,
+  onSee,
+  stoppable,
 }: {
   channelId: string;
   /** Which runs belong here (a thread view shows only its own). */
   visible?: { current: (r: { threadId: string }) => boolean };
+  /** The run's block is not on screen. */
+  outOfView: (runId: string) => boolean;
+  /** "Ver": back to that block. */
+  onSee: (runId: string) => void;
+  /** The run Esc stops (so the line says so). */
+  stoppable?: string;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const [now, setNow] = useState(() => Date.now());
-  const runs = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
+  const all = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
+  const runs = all.filter((r) => r.status !== "failed" && r.status !== "canceled" && outOfView(r.runId));
+  // Out of view, an agent already writing still counts as at work.
+  const atWork = runs.map((r) =>
+    isWriting(r) ? { ...r, text: "", work: (r.work ?? []).filter((w) => w.kind !== "steer") } : r,
+  );
   // An agent asking another one: "Dev está perguntando ao Infra… 0:12" (its run pauses meanwhile).
   const consults = useLive(
     (s) => consultsIn(s.consults, channelId, now).filter((c) => visible?.current(c) ?? true),
@@ -1957,7 +2364,7 @@ function ActivityBar({
   );
   const typing = useLive((s) => s.typing[channelId]);
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id);
-  const ticking = Boolean(typing) || consults.length > 0;
+  const ticking = Boolean(typing) || consults.length > 0 || runs.length > 0;
   useEffect(() => {
     if (!ticking) return;
     setNow(Date.now());
@@ -1965,7 +2372,7 @@ function ActivityBar({
     return () => clearInterval(timer);
   }, [ticking]);
   const entries = barEntries(
-    runs,
+    atWork,
     ids,
     (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
     (id) => dir.memberById.get(id)?.name,
@@ -1975,27 +2382,13 @@ function ActivityBar({
   const active = entries.length > 0;
   // The strip behind the bar (and the orbit) take the color of the first agent at work.
   const firstAgent = entries.find((e) => e.type === "agent");
-  const skyAgent = firstAgent;
-  const { canStop, stop } = useStopRun();
-  // "Parar" in the bar for the runs not writing yet that I may stop.
-  const barStoppable = runs.filter((r) => !isWriting(r) && isStoppable(r) && canStop(r));
-  // A live row with newer messages below it: "Theo ainda trabalhando" jumps back to it.
-  const behindIds = useRowsBehind(runs);
-  const behind = runs.filter((r) => behindIds.includes(r.runId));
-  // Agents running code (not writing yet): "Ver código" with the live code and output.
-  const coding = runs.filter((r) => !isWriting(r) && r.code);
+  const firstRun = firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
+  const took = firstRun ? elapsedParts(now - (firstRun.startedAt ?? now)) : null;
+  // Agents running code: "Ver código" with the live code and output.
+  const coding = runs.filter((r) => r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running));
   // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
   const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
   const openBrowser = browsing ? () => requestBrowserCard({ agentId: browsing.agentId }) : undefined;
-  // What they said last between tool calls ("Theo: Go não está instalado; vou tentar…").
-  const said = runs
-    .filter((r) => !isWriting(r))
-    .flatMap((r) => {
-      const last = narrationOf(r).at(-1);
-      return last
-        ? [{ id: r.runId, name: dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent"), text: last }]
-        : [];
-    });
   return (
     <>
       {coding.map((r) =>
@@ -2008,26 +2401,6 @@ function ActivityBar({
           />
         ) : null,
       )}
-      {behind.map((r) => (
-        <button
-          key={`behind-${r.runId}`}
-          type="button"
-          className="still-working"
-          onClick={() =>
-            document
-              .querySelector(`[data-run-id="${r.runId}"]`)
-              ?.scrollIntoView?.({ block: "center", behavior: "smooth" })
-          }
-        >
-          <Icon name="waiting" size={14} />
-          {t("run.stillWorking", { name: dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent") })}
-        </button>
-      ))}
-      {said.map((n) => (
-        <p key={n.id} className="ac-typing__said">
-          <strong>{n.name}:</strong> {n.text}
-        </p>
-      ))}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the "No navegador" button inside is the keyboard way; the pill is a bigger target */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: same */}
       <div
@@ -2038,7 +2411,7 @@ function ActivityBar({
         onClick={
           openBrowser
             ? (e) => {
-                // Its own buttons (Parar) keep their job.
+                // Its own buttons (Ver) keep their job.
                 if ((e.target as HTMLElement).closest("button, [role=dialog]")) return;
                 openBrowser();
               }
@@ -2047,7 +2420,7 @@ function ActivityBar({
       >
         {active && (
           <>
-            {skyAgent && <ActivitySky color={colorOf(dir.agentById.get(skyAgent.id))} />}
+            {firstAgent && <ActivitySky color={colorOf(dir.agentById.get(firstAgent.id))} />}
             {/* Agents at work: the pixel orbit in the first one's color (people only typing: the dots). */}
             {firstAgent && <AgentSpinner agentId={firstAgent.id} size={14} />}
             <WorkingStack entries={entries} />
@@ -2056,6 +2429,13 @@ function ActivityBar({
               <WorkingWords entries={entries} />
             </span>
             <ConsultClock entries={entries} now={now} />
+            {took && !entries.some((e) => e.consult?.status === "asking") && (
+              <span className="ac-typing__elapsed ac-num">
+                {took.m > 0
+                  ? t("run.elapsedMinutes", { m: took.m, s: took.s })
+                  : t("run.elapsedSeconds", { n: took.s })}
+              </span>
+            )}
             {openBrowser && (
               <Button
                 size="sm"
@@ -2075,10 +2455,19 @@ function ActivityBar({
                 <span />
               </span>
             )}
-            {barStoppable.length > 0 && <span className="ac-typing__sep" aria-hidden="true" />}
-            {barStoppable.map((r) => (
-              <StopButton key={r.runId} run={r} onStop={stop} place="bar" />
-            ))}
+            {firstRun && (
+              <>
+                <span className="ac-typing__sep" aria-hidden="true" />
+                <button type="button" className="ac-typing__see" onClick={() => onSee(firstRun.runId)}>
+                  {t("run.strip.see")}
+                </button>
+              </>
+            )}
+            {firstRun && stoppable === firstRun.runId && (
+              <span className="ac-typing__hint">
+                <Kbd>{"Esc"}</Kbd> {t("run.strip.toStop")}
+              </span>
+            )}
           </>
         )}
       </div>
@@ -2086,7 +2475,11 @@ function ActivityBar({
   );
 }
 
-/** One persisted row; agent replies get feedback actions, people's messages get receipts. */
+/**
+ * One row; agent replies get feedback actions, people's messages get receipts. With `live`, the agent's
+ * answer while it works (its steps, its words arriving, how to stop it): the same component, so the
+ * final message takes over in place (`RunBlock`).
+ */
 export const TimelineMessage = memo(function TimelineMessage({
   message: m,
   grouped,
@@ -2094,6 +2487,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   modelLabels,
   contextMark,
   replyContext,
+  live = null,
+  seenLive,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -2103,9 +2498,24 @@ export const TimelineMessage = memo(function TimelineMessage({
   contextMark?: boolean;
   /** Shown away from the message it answers: that message, quoted above (`buildTimeline`). */
   replyContext?: ReplyRef;
+  /** The run still at work (the row is its live block; `message` is a placeholder). */
+  live?: LiveRun | null;
+  /** This answer was watched live here: its last live state (the steps fold into "3 passos"). */
+  seenLive?: LiveRun;
 }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
+  const qc = useQueryClient();
+  const dismissRun = useDismissRun();
+  // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
+  const revealed = useRevealedText(live?.text ?? "");
+  const liveFailed = live?.status === "failed";
+  const liveWaiting = live?.status === "waiting_approval";
+  const liveStopped = live?.status === "canceled";
+  // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
+  const queued = useQueued(m.local === "failed" ? (m.clientId ?? undefined) : undefined);
+  const local = m.local === "failed" && queued ? "pending" : m.local;
+  const slowSend = useAfter(500, local === "pending");
   // The streamed row it replaces was already on screen: take its place without sliding in again.
   const replacesLive = useStreams((s) => Boolean(m.agentRunId && s.finished[m.agentRunId]));
   const dir = useDirectory(org.id);
@@ -2130,21 +2540,27 @@ export const TimelineMessage = memo(function TimelineMessage({
     });
   }, [routine, m.body, dir.agentByHandle]);
   const wikiLink = useWikiLinkRenderer();
-  // `agent.run.steered`: this message went into a running task.
-  const steeredAgent = useLive((s) => s.steered[m.id]);
+  // It went into a running task: "Theo lê na próxima pausa" → "Theo leu" / "Theo parou para ler".
+  const steer = useSteerState(org.id, m.channelId, m.author.type === "person" && !m.local ? m.id : "");
+  /** A message that went into this run's work, as the well inside it shows it. */
+  const steerNote = (messageId: string): SteerNote | undefined => {
+    const lists = [
+      qc.getQueryData<MessageType[]>(keys.messages(org.id, m.channelId)),
+      m.threadId ? qc.getQueryData<MessageType[]>(keys.thread(org.id, m.channelId, m.threadId)) : undefined,
+    ];
+    const found = lists.flatMap((l) => l ?? []).find((x) => x.id === messageId);
+    if (!found) return undefined;
+    return {
+      author: dir.authorName(found.author),
+      mine: found.author.type === "person" && found.author.id === me.user.id,
+      text: found.body,
+    };
+  };
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
   const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
   const body = reminderBody(stopped.body, m.meta);
-  const stopper = stopped.byUserId ? dir.memberById.get(stopped.byUserId)?.name : undefined;
-  const canceledNote = !stopped.canceled
-    ? null
-    : stopper
-      ? t("run.canceledBy", { name: stopper })
-      : stopped.byUserId || !stopped.note
-        ? t("run.canceled")
-        : // Older messages without a person in the meta: the server's line.
-          stopped.note;
+
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
   const reminder = isReminderMessage(m.meta);
@@ -2223,7 +2639,9 @@ export const TimelineMessage = memo(function TimelineMessage({
     missionCard ||
     forumSuggestion ||
     issueWork;
-  const feedback = m.author.type === "agent" && !card && !m.local;
+  const feedback = m.author.type === "agent" && !card && !m.local && !live;
+  // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
+  const keptWork = seenLive?.work?.length ? seenLive.work : null;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
   const details = [
@@ -2235,12 +2653,15 @@ export const TimelineMessage = memo(function TimelineMessage({
   return (
     <Message
       agent={m.author.type === "agent"}
-      data-message-id={m.id}
-      // An agent's answer: lands at its start when long (same id as its live row, so only once).
+      data-message-id={live ? undefined : m.id}
+      data-run-id={live?.runId}
+      data-live={live?.status}
+      // An agent's answer: lands at its start when long (same id as its live block, so only once).
       data-read-id={m.author.type === "agent" && !m.local ? (m.agentRunId ?? m.id) : undefined}
-      grouped={grouped}
+      grouped={grouped && !live}
       entering={entering && !replacesLive}
-      className={cx(m.local && `ac-msg--local ac-msg--${m.local}`, contextMark && "msg--context")}
+      streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
+      className={cx(local && `ac-msg--local ac-msg--${local}`, contextMark && "msg--context")}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
       avatar={
@@ -2255,9 +2676,14 @@ export const TimelineMessage = memo(function TimelineMessage({
         ) : m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
             {agent ? (
-              // A saved message: the agent at rest (its live state shows on the live row).
+              // At work: thinking, then writing; a saved message: the agent at rest.
               // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
-              <AgentAvatar agentId={agent.id} name={name} state="idle" reactionKey={m.id} />
+              <AgentAvatar
+                agentId={agent.id}
+                name={name}
+                state={live ? agentStateOfRun(live) : "idle"}
+                reactionKey={live ? undefined : m.id}
+              />
             ) : (
               <Avatar kind="person" name={name} imageUrl={person?.image} />
             )}
@@ -2300,123 +2726,201 @@ export const TimelineMessage = memo(function TimelineMessage({
           name
         )
       }
-      time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
-      meta={m.local ? undefined : details}
+      time={
+        live ? <RunClock run={live} /> : <time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>
+      }
+      meta={m.local || live ? undefined : details}
       note={joinedTip ? { label: t("chat.joined.label"), tip: joinedTip } : undefined}
-      status={m.local === "pending" ? { icon: "waiting", label: t("channel.sending") } : undefined}
+      status={
+        liveWaiting
+          ? { icon: "waiting", label: t("channel.waitingApproval") }
+          : local === "pending"
+            ? {
+                // "enviando" only past half a second (most sends never show it); offline it says when it goes.
+                mark: slowSend ? <PixelSpinner size={14} /> : undefined,
+                label: (
+                  <span className={slowSend ? undefined : "ac-visually-hidden"}>
+                    {queued ? t("channel.sendingOffline") : t("channel.sending")}
+                  </span>
+                ),
+              }
+            : undefined
+      }
       aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
       stacked={Boolean(card)}
     >
-      {routine && (
-        <p className="msg-routine small">
-          <span className="muted">
-            {routineAgents.length
-              ? t("channel.routineCalled", { names: routineAgents.map((a) => `@${a.name}`).join(", ") })
-              : t("channel.routineRan")}
-          </span>
-          <button
-            type="button"
-            className="ac-link"
-            aria-expanded={routineOpen}
-            onClick={() => setRoutineOpen((o) => !o)}
-            style={inlineButton}
-          >
-            {routineOpen ? t("channel.routineHide") : t("channel.routineShow")}
-          </button>
-        </p>
-      )}
-      {quoted && <QuotedMessage reply={quoted} />}
-      {m.author.id &&
-        consulted.map((c) => <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />)}
-      {(!routine || routineOpen) &&
-        !missionCard &&
-        !forumSuggestion &&
-        !issueWork &&
-        !waitNotice &&
-        // A question's card already says it: its own text isn't repeated above.
-        !(question && body.trim() === question.text.trim()) &&
-        (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
-          <MessageText>
-            <MessageBody
-              body={body}
-              resolveMention={dir.mentionName}
-              renderMention={renderMention}
-              wikiLink={wikiLink}
+      {live ? (
+        <>
+          {/* Steps, the messages it read, and each tool call (the same list folds when it is done). */}
+          <LiveWorkList work={live.work ?? []} steerNote={steerNote} agentId={live.agentId} stopped={liveStopped} />
+          {liveFailed && (
+            <p className="ac-msg__error" role="alert">
+              <Icon name="alert" size={18} />
+              <span style={{ flex: 1 }}>
+                {live.error
+                  ? t("channel.runFailed", { agent: name, reason: live.error })
+                  : t("channel.runFailedNoReason", { agent: name })}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="close"
+                aria-label={t("common.close")}
+                onClick={() => dismissRun(live.runId)}
+              />
+            </p>
+          )}
+          {!liveFailed && !liveStopped && <RunBrowserCard run={live} name={name} />}
+          {!liveFailed && revealed && (
+            <MessageText>
+              <MessageBody body={revealed} resolveMention={dir.mentionName} live={!liveStopped} />
+            </MessageText>
+          )}
+          {liveStopped ? (
+            <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
+          ) : (
+            !liveFailed && <LiveRunStatus run={live} />
+          )}
+          {!liveFailed && !liveWaiting && !liveStopped && (
+            <span className="ac-visually-hidden">{t("channel.writing")}</span>
+          )}
+        </>
+      ) : (
+        <>
+          {keptWork && seenLive ? (
+            <LiveWorkList
+              work={keptWork}
+              steerNote={steerNote}
+              agentId={seenLive.agentId}
+              done
+              stopped={stopped.canceled}
             />
-          </MessageText>
-        )}
-      {canceledNote && <p className="ac-msg__activity run-canceled">{canceledNote}</p>}
-      {m.local === "failed" && (
-        <p className="ac-msg__error" role="alert">
-          <Icon name="alert" size={18} />
-          <span>{t("channel.notSent")} ·</span>
-          <button type="button" className="ac-link" onClick={() => actions?.retry(m)} style={inlineButton}>
-            {t("channel.retrySend")}
-          </button>
-        </p>
-      )}
-      {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
-      {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
-      {proposalId && <InlineProposal proposalId={proposalId} />}
-      {agent &&
-        memoryUpdates.map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
-      {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
-      {question && <QuestionCard question={question} />}
-      {secretRequest && <SecretCard request={secretRequest} />}
-      {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
-      {m.author.type === "agent" && m.agentRunId && !card && !m.local && (
-        <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
-      )}
-      {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
-      {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
-      {missionPlan && <MissionPlanCard plan={missionPlan} />}
-      {missionDecision && <MissionDecisionCard message={missionDecision} />}
-      {missionReview && <MissionReviewCard message={missionReview} />}
-      {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
-      {missionCommand && <MissionCommandCard command={missionCommand} />}
-      {missionReport && <MissionReportExtras report={missionReport} message={m} />}
-      {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
-      {missionStart && <MissionStartLink message={m} />}
-      {missionLink && <MissionLinkCard link={missionLink} />}
-      {issueWork && (
-        <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
-      )}
-      {artifacts.length > 0 && (
-        <div className="artifact-cards">
-          {artifacts.map((r) => (
-            <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
-          ))}
-        </div>
-      )}
-      {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
-      {!m.local && (
-        <MessageReactions
-          messageId={m.id}
-          initial={m.reactions}
-          feedback={feedback}
-          extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
-        />
-      )}
-      {/* A "Responder" thread went on from here: its line (opens the panel). */}
-      {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
-      {feedback && (
-        <MessageFeedback
-          messageId={m.id}
-          agentName={agent?.name ?? t("channel.unknownAgent")}
-          active={active}
-          initial={m.reactions}
-          quick={<ReplyButton message={m} />}
-          more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
-        />
-      )}
-      {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
-      {steeredAgent && (
-        <p className="msg-steered small muted">
-          {t("run.steered", { name: dir.agentById.get(steeredAgent)?.name ?? t("channel.unknownAgent") })}
-        </p>
-      )}
-      {m.author.type === "person" && !m.local && (
-        <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
+          ) : null}
+          {routine && (
+            <p className="msg-routine small">
+              <span className="muted">
+                {routineAgents.length
+                  ? t("channel.routineCalled", { names: routineAgents.map((a) => `@${a.name}`).join(", ") })
+                  : t("channel.routineRan")}
+              </span>
+              <button
+                type="button"
+                className="ac-link"
+                aria-expanded={routineOpen}
+                onClick={() => setRoutineOpen((o) => !o)}
+                style={inlineButton}
+              >
+                {routineOpen ? t("channel.routineHide") : t("channel.routineShow")}
+              </button>
+            </p>
+          )}
+          {quoted && <QuotedMessage reply={quoted} />}
+          {m.author.id &&
+            consulted.map((c) => (
+              <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />
+            ))}
+          {(!routine || routineOpen) &&
+            !missionCard &&
+            !forumSuggestion &&
+            !issueWork &&
+            !waitNotice &&
+            // A question's card already says it: its own text isn't repeated above.
+            !(question && body.trim() === question.text.trim()) &&
+            (body.trim() || (!card && !stopped.canceled && artifacts.length === 0)) && (
+              <MessageText>
+                <MessageBody
+                  body={body}
+                  resolveMention={dir.mentionName}
+                  renderMention={renderMention}
+                  wikiLink={wikiLink}
+                />
+              </MessageText>
+            )}
+          {stopped.canceled && (
+            <StoppedLine
+              runId={m.agentRunId}
+              byUserId={stopped.byUserId}
+              note={stopped.note}
+              owner={
+                m.author.type === "agent" && m.author.id
+                  ? { agentId: m.author.id, channelId: m.channelId, threadId: m.threadId ?? m.id }
+                  : null
+              }
+              message={m}
+            />
+          )}
+          {local === "failed" && (
+            <p className="ac-msg__error" role="alert">
+              <Icon name="alert" size={18} />
+              <span>{t("channel.notSent")} ·</span>
+              <button type="button" className="ac-link" onClick={() => actions?.retry(m)} style={inlineButton}>
+                {t("channel.retrySend")}
+              </button>
+            </p>
+          )}
+          {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
+          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
+          {proposalId && <InlineProposal proposalId={proposalId} />}
+          {agent &&
+            memoryUpdates.map((u) => (
+              <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />
+            ))}
+          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+          {question && <QuestionCard question={question} />}
+          {secretRequest && <SecretCard request={secretRequest} />}
+          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptWork && (
+            <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
+          )}
+          {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
+          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
+          {missionPlan && <MissionPlanCard plan={missionPlan} />}
+          {missionDecision && <MissionDecisionCard message={missionDecision} />}
+          {missionReview && <MissionReviewCard message={missionReview} />}
+          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
+          {missionCommand && <MissionCommandCard command={missionCommand} />}
+          {missionReport && <MissionReportExtras report={missionReport} message={m} />}
+          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
+          {missionStart && <MissionStartLink message={m} />}
+          {missionLink && <MissionLinkCard link={missionLink} />}
+          {issueWork && (
+            <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
+          )}
+          {artifacts.length > 0 && (
+            <div className="artifact-cards">
+              {artifacts.map((r) => (
+                <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
+              ))}
+            </div>
+          )}
+          {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
+          {!m.local && (
+            <MessageReactions
+              messageId={m.id}
+              initial={m.reactions}
+              feedback={feedback}
+              extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
+            />
+          )}
+          {/* A "Responder" thread went on from here: its line (opens the panel). */}
+          {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
+          {feedback && (
+            <MessageFeedback
+              messageId={m.id}
+              agentName={agent?.name ?? t("channel.unknownAgent")}
+              active={active}
+              initial={m.reactions}
+              quick={<ReplyButton message={m} />}
+              more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
+            />
+          )}
+          {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
+          {steer && <SteerLine steer={steer} />}
+          {m.author.type === "person" && !m.local && (
+            <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
+          )}
+        </>
       )}
     </Message>
   );

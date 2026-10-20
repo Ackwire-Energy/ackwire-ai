@@ -44,12 +44,13 @@ describe("narration keyed by turn", () => {
     expect(s.runs.r?.text).toBe("Achei.");
   });
 
-  test("steered with stop: the row shows it's stopping", () => {
-    const s = run([
+  test("steered with stop: the row shows it's stopping; the message joins the work once read", () => {
+    let s = run([
       delta(0, 0, "Trabalhando"),
       { type: "agent.run.steered", channelId: "c", runId: "r", messageId: "m9", stop: true } as Ev,
     ]);
     expect(s.runs.r?.stopping).toBe(true);
+    s = run([{ type: "agent.run.read", channelId: "c", runId: "r", agentId: "ada", messageIds: ["m9"] } as Ev], s);
     // The text so far became narration, but the row keeps its place in the timeline.
     expect(s.runs.r?.text).toBe("");
     expect(isWriting(s.runs.r as NonNullable<typeof s.runs.r>)).toBe(true);
@@ -118,7 +119,7 @@ describe("work summary and stopped messages", () => {
 });
 
 describe("in the channel", () => {
-  test("a stopped message shows its text and 'Interrompido por Walter' as a note", async () => {
+  test("a stopped message shows its text, 'Parado por você' and Continuar", async () => {
     const state = seedState();
     state.messages.push({
       id: "m-stopped",
@@ -134,8 +135,14 @@ describe("in the channel", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(5);
     const msg = screen().getByText("Comecei a revisar o PR.").closest(".ac-msg") as HTMLElement;
-    expect(msg.querySelector(".run-canceled")?.textContent).toBe("Interrompido por Walter");
+    const line = msg.querySelector(".run-canceled") as HTMLElement;
+    expect(line.textContent).toContain("Parado por você");
     expect(msg.querySelector(".ac-msg__text")?.textContent).not.toContain("Interrompido");
+    // Continuar picks it up from where it stopped; the button goes away.
+    await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Continuar" })));
+    await settle(3);
+    expect(state.calls.find((c) => c.method === "agents.continueRun")?.args).toEqual([ORG_ID, "r-stopped"]);
+    expect(within(msg).queryByRole("button", { name: "Continuar" })).toBeNull();
   });
 
   test("Parar on a run that already finished (409 run_finished): the row just goes away", async () => {
@@ -154,11 +161,8 @@ describe("in the channel", () => {
       socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.delta", ...ids, seq: 0, text: "Quase" } }),
     );
     await settle(2);
-    const row = document.querySelector('[data-run-id="run-1"]') as HTMLElement;
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Parar" })));
-    await settle(2);
-    const confirm = screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" });
-    await act(async () => fireEvent.click(within(confirm).getByRole("button", { name: "Parar" })));
+    // The composer's send button is the stop while the box is empty: one click, nothing asked.
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Parar a Ada" })));
     await settle(4);
     expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(true);
     expect(document.querySelector('[data-run-id="run-1"]')).toBeNull();

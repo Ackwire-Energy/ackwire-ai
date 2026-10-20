@@ -3,58 +3,83 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { ActiveRun, ApiClient, Message } from "@agenteschat/client";
-import { ApiError, applyChannelEvent, emptyStreams, isQuiet, QUIET_AFTER_MS, reconcileRuns } from "@agenteschat/client";
-import type { TimelineItem } from "@agenteschat/client/lib/timeline";
+import type { ActiveRun, ApiClient } from "@agenteschat/client";
+import {
+  ApiError,
+  applyChannelEvent,
+  emptyStreams,
+  isQuiet,
+  QUIET_AFTER_MS,
+  reconcileRuns,
+  steerStore,
+} from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { liveAnchors } from "@/pages/ChannelPage";
+import { elapsedParts, nextSlots, runPhase, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
   setSystemTime();
+  steerStore.reset();
   cleanup();
 });
 
-const msg = (id: string, threadId: string | null, at: number): TimelineItem => ({
-  kind: "message",
-  key: id,
-  grouped: false,
-  message: {
-    id,
-    channelId: "c",
-    threadId,
-    author: { type: "person", id: "u" },
-    body: "",
-    mentionedAgentIds: [],
-    agentRunId: null,
-    createdAt: new Date(at).toISOString(),
-  } as Message,
+const opts = (over: Partial<{ landed: string[]; expected: string[]; now: number }> = {}) => ({
+  landed: (id: string) => (over.landed ?? []).includes(id),
+  expected: (id: string) => (over.expected ?? []).includes(id),
+  now: over.now ?? 1_000,
 });
-const key = (runId: string, startedAt: number, threadId: string, trigger: string | null = null) =>
-  JSON.stringify([runId, startedAt, threadId, trigger]);
 
-describe("where a live run goes", () => {
-  const items = [msg("a", null, 1_000), msg("b", "a", 60_000), msg("other", null, 120_000), msg("c", "a", 180_000)];
-
-  test("right after the last message of its conversation sent before it started; later ones stay below", () => {
-    const { anchors, unanchored } = liveAnchors(key("r1", 100_000, "a"), items);
-    expect([...anchors.entries()]).toEqual([["b", ["r1"]]]);
-    expect(unanchored).toEqual([]);
+describe("one block per answer (run-slots)", () => {
+  test("a 'pensando…' hands its block to the real run, then to its final message (same key)", () => {
+    let slots = nextSlots([], [{ runId: "pending:ada:m1", agentId: "ada", provisional: true }], opts());
+    expect(slots.map((s) => s.key)).toEqual(["run:pending:ada:m1"]);
+    // The server's run replaces the guess: same block.
+    slots = nextSlots(slots, [{ runId: "r1", agentId: "ada" }], opts());
+    expect(slots).toEqual([
+      { key: "run:pending:ada:m1", runId: "r1", agentId: "ada", provisional: false, goneAt: null },
+    ]);
+    // The run ended and its message is on its way: the block holds…
+    slots = nextSlots(slots, [], opts({ expected: ["r1"], now: 2_000 }));
+    expect(slots[0]?.goneAt).toBe(2_000);
+    // …until the message is in the timeline, which takes its place.
+    expect(nextSlots(slots, [], opts({ landed: ["r1"], now: 2_100 }))).toEqual([]);
   });
 
-  test("the server's triggerMessageId wins over the time guess", () => {
-    const { anchors } = liveAnchors(key("r1", 500_000, "a", "b"), items);
-    expect([...anchors.entries()]).toEqual([["b", ["r1"]]]);
+  test("new blocks go last, in order; one that ends with nothing to show goes at once; the hold has a limit", () => {
+    let slots = nextSlots([], [{ runId: "a", agentId: "ada" }], opts());
+    slots = nextSlots(
+      slots,
+      [
+        { runId: "a", agentId: "ada" },
+        { runId: "b", agentId: "theo" },
+      ],
+      opts(),
+    );
+    expect(slots.map((s) => s.runId)).toEqual(["a", "b"]);
+    expect(nextSlots(slots, [{ runId: "b", agentId: "theo" }], opts()).map((s) => s.runId)).toEqual(["b"]);
+    const held = nextSlots(slots, [], opts({ expected: ["a", "b"], now: 1_000 }));
+    expect(nextSlots(held, [], opts({ expected: ["a", "b"], now: 1_000 + SLOT_HOLD_MS }))).toEqual([]);
+    const again = nextSlots(
+      slots,
+      [
+        { runId: "a", agentId: "ada" },
+        { runId: "b", agentId: "theo" },
+      ],
+      opts(),
+    );
+    expect(sameSlots(slots, again)).toBe(true);
   });
 
-  test("ids with colons, several runs, unknown conversation at the end", () => {
-    const k = [key("pending:x:a", 10_000, "a"), key("r2", 500_000, "a"), key("r3", 1, "zzz")].join("\n");
-    const { anchors, unanchored } = liveAnchors(k, items);
-    expect(anchors.get("a")).toEqual(["pending:x:a"]);
-    expect(anchors.get("c")).toEqual(["r2"]);
-    expect(unanchored).toEqual(["r3"]);
+  test("the header word and the elapsed time", () => {
+    const base = { text: "", status: "running" as const, work: [], tool: null };
+    expect(runPhase(base)).toBe("thinking");
+    expect(runPhase({ ...base, tool: "github_list_prs" })).toBe("working");
+    expect(runPhase({ ...base, text: "Olá" })).toBe("writing");
+    expect(elapsedParts(1_500)).toBeNull();
+    expect(elapsedParts(4_200)).toEqual({ m: 0, s: 4 });
+    expect(elapsedParts(75_000)).toEqual({ m: 1, s: 15 });
   });
 });
 
@@ -141,22 +166,24 @@ describe("live row in the timeline", () => {
       },
     });
 
-  test("own header (never grouped), placed by time; a later message stays below with a full header", async () => {
+  test("one block from the start: it stays last while it works; a later message goes above it", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
+    await settle(2);
+    // Before any word: the block is there, "pensando".
+    expect(row().textContent).toContain("pensando");
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
     await settle(2);
     expect(row().classList.contains("ac-msg--grouped")).toBe(false);
     expect(row().textContent).toContain("Ada");
-    expect(row().textContent).toContain("em andamento");
+    expect(row().textContent).toContain("escrevendo");
     await post(ev, "m-later", "Também confere o refresh");
     await settle(3);
     const later = screen().getByText("Também confere o refresh").closest(".ac-msg") as HTMLElement;
-    expect(row().compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(later.classList.contains("ac-msg--grouped")).toBe(false);
+    expect(later.compareDocumentPosition(row()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  test("'ainda trabalhando' jumps back to the row; steering shows on my message and in the row; no composer hint", async () => {
+  test("steering: 'lê na próxima pausa' → 'leu', 'Leu seu recado' in the block; 'Ver' leads back", async () => {
     const proto = HTMLElement.prototype as unknown as { scrollIntoView?: () => void };
     const before = proto.scrollIntoView;
     const scrolled: string[] = [];
@@ -168,21 +195,19 @@ describe("live row in the timeline", () => {
       await ev({ type: "agent.run", ...ids, status: "running" });
       await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
       await settle(2);
-      // No "is working" line under the composer: stopping stays on the run itself (and Esc, /stop).
-      expect(document.body.textContent).not.toContain("Sua mensagem entra na tarefa atual");
-      expect(document.body.textContent).not.toContain("Ada está trabalhando");
-      expect(within(row()).getByRole("button", { name: "Parar" })).toBeTruthy();
-
       await post(ev, "m-steer", "Olha também o refresh");
       await ev({ type: "agent.run.steered", ...ids, messageId: "m-steer" });
       await settle(4);
-      const mine = screen().getByText("Olha também o refresh").closest(".ac-msg") as HTMLElement;
-      expect(mine.textContent).toContain("Ada recebeu durante a tarefa");
-      expect(row().textContent).toContain("Nova mensagem de Walter");
-
-      // The chip follows the DOM (a MutationObserver, batched per frame).
-      await act(() => new Promise((r) => setTimeout(r, 60)));
-      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ada ainda trabalhando" })));
+      // By id: once read, the text is also quoted in the agent's block.
+      const mine = () => document.querySelector('[data-message-id="m-steer"]') as HTMLElement;
+      expect(mine().textContent).toContain("Ada lê na próxima pausa");
+      await ev({ type: "agent.run.read", ...ids, messageIds: ["m-steer"] });
+      await settle(4);
+      expect(mine().textContent).toContain("Ada leu");
+      expect(row().querySelector(".live-work__steer")?.textContent).toContain("Leu seu recado");
+      expect(row().querySelector(".live-work__steer")?.textContent).toContain("Olha também o refresh");
+      // Out of view (no layout here), the line above the composer leads back to the block.
+      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver" })));
       expect(scrolled).toContain("r-live");
     } finally {
       proto.scrollIntoView = before;

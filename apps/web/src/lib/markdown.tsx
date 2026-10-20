@@ -1,5 +1,5 @@
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 
 /**
  * A small, safe Markdown renderer for chat messages and artifact documents
@@ -16,18 +16,40 @@ export type WikiLinkRenderer = (title: string, label: string, key: string) => Re
 /** `![[foto.png]]`: how an embed shows (`block` alone on its line, else inside a sentence). */
 export type EmbedRenderer = (target: string, key: string, block: boolean) => ReactNode;
 
-function withMentions(text: string, key: string, mention?: MentionRenderer): ReactNode[] {
-  if (!mention) return [text];
+/**
+ * A streaming answer's words, each in its own span (keyed by position, so a
+ * word already on screen keeps its node and only new ones fade in); spaces
+ * stay plain text.
+ */
+function wordSpans(text: string, key: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let i = 0;
+  for (const part of text.split(/(\s+)/)) {
+    if (!part) continue;
+    if (/^\s+$/.test(part)) out.push(part);
+    else
+      out.push(
+        <span key={`${key}-w${i++}`} className="ac-word">
+          {part}
+        </span>,
+      );
+  }
+  return out;
+}
+
+function withMentions(text: string, key: string, mention?: MentionRenderer, words?: boolean): ReactNode[] {
+  const plain = (t: string, k: string) => (words ? wordSpans(t, k) : [t]);
+  if (!mention) return plain(text, key);
   const out: ReactNode[] = [];
   let last = 0;
   let n = 0;
   for (const m of text.matchAll(MENTION)) {
     const start = (m.index ?? 0) + (m[1]?.length ?? 0);
-    if (start > last) out.push(text.slice(last, start));
+    if (start > last) out.push(...plain(text.slice(last, start), `${key}-p${n}`));
     out.push(mention(m[2] ?? "", `${key}-m${n++}`));
     last = start + 1 + (m[2]?.length ?? 0);
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < text.length) out.push(...plain(text.slice(last), `${key}-p${n}`));
   return out;
 }
 
@@ -43,14 +65,17 @@ export function renderInline(
   mention?: MentionRenderer,
   wiki?: WikiLinkRenderer,
   embed?: EmbedRenderer,
+  /** Each plain word in its own `.ac-word` span (a streaming answer's words fade in). */
+  words?: boolean,
 ): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
+  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words);
   while (rest) {
     const m = rest.match(INLINE);
     if (!m || m.index === undefined) {
-      out.push(...withMentions(rest, `${key}-t${n}`, mention));
+      out.push(...withMentions(rest, `${key}-t${n}`, mention, words));
       break;
     }
     const tok = m[0];
@@ -58,16 +83,16 @@ export function renderInline(
     // `![[…]]` inside a sentence: the "!" belongs to the embed.
     const isEmbed = Boolean(m[6] && embed && m.index > 0 && rest[m.index - 1] === "!");
     const before = rest.slice(0, isEmbed ? m.index - 1 : m.index);
-    if (before) out.push(...withMentions(before, `${key}-t${n}`, mention));
+    if (before) out.push(...withMentions(before, `${key}-t${n}`, mention, words));
     if (isEmbed && embed) {
       out.push(embed(parseWikiToken(tok).title, k, false));
       rest = rest.slice(m.index + tok.length);
       continue;
     }
     if (m[1]) out.push(<code key={k}>{tok.slice(1, -1)}</code>);
-    else if (m[2]) out.push(<strong key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki, embed)}</strong>);
-    else if (m[3]) out.push(<em key={k}>{renderInline(tok.slice(1, -1), k, mention, wiki, embed)}</em>);
-    else if (m[7]) out.push(<del key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki, embed)}</del>);
+    else if (m[2]) out.push(<strong key={k}>{inner(tok.slice(2, -2), k)}</strong>);
+    else if (m[3]) out.push(<em key={k}>{inner(tok.slice(1, -1), k)}</em>);
+    else if (m[7]) out.push(<del key={k}>{inner(tok.slice(2, -2), k)}</del>);
     else if (m[4]) {
       const parts = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       const href = parts?.[2] ?? "";
@@ -102,6 +127,10 @@ export interface MarkdownProps {
   embed?: EmbedRenderer;
   /** Skip a leading `# Title` equal to this (the page shows the title itself). */
   title?: string;
+  /** Plain words in `.ac-word` spans: a streaming answer's newest block, whose words fade in. */
+  words?: boolean;
+  /** Added to the wrapper (`md--tail` on a streaming answer's last block). */
+  className?: string;
 }
 
 const TASK = /^\[( |x|X)\]\s+(.*)$/;
@@ -114,12 +143,23 @@ const calloutKind = (kind: string) =>
       ? "tip"
       : "note";
 
-export function Markdown({ source, variant = "document", mention, wikiLink, embed, title }: MarkdownProps) {
+export function Markdown({
+  source,
+  variant = "document",
+  mention,
+  wikiLink,
+  embed,
+  title,
+  words,
+  className,
+}: MarkdownProps) {
   const message = variant === "message";
-  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed);
-  const parsed = parseMarkdown(source, { breaks: message });
-  const [first] = parsed;
-  if (title && first?.type === "heading" && first.level === 1 && first.text.trim() === title.trim()) parsed.shift();
+  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed, words);
+  // Parsed once per source (a streaming row re-renders every reveal frame); never mutated.
+  const all = useMemo(() => parseMarkdown(source, { breaks: message }), [source, message]);
+  const [first] = all;
+  const parsed =
+    title && first?.type === "heading" && first.level === 1 && first.text.trim() === title.trim() ? all.slice(1) : all;
   const blocks = parsed.map((b, i) => {
     const k = `b${i}`;
     switch (b.type) {
@@ -218,5 +258,10 @@ export function Markdown({ source, variant = "document", mention, wikiLink, embe
     }
     return null;
   });
-  return message ? <div className="md md--message">{blocks}</div> : <div className="md">{blocks}</div>;
+  const extra = className ? ` ${className}` : "";
+  return message ? (
+    <div className={`md md--message${extra}`}>{blocks}</div>
+  ) : (
+    <div className={`md${extra}`}>{blocks}</div>
+  );
 }

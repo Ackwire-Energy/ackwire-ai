@@ -86,10 +86,20 @@ export interface LiveState {
   memory: Record<string, LiveMemoryCard[]>;
   /** "O Theo só responde a Walter." per channel: only for me, never stored. */
   notices: Record<string, LiveNotice[]>;
-  /** Messages that went into a running task (`agent.run.steered`): message id → agent id. */
-  steered: Record<string, string>;
+  /** Stopped runs someone continued (`run.continued`, or our own "Continuar"): run id → the new run's id. */
+  continued: Record<string, string | null>;
   /** Agents asking other agents right now (`agent.consulting` / `agent.consulted`), by the asking run. */
   consults: ConsultsState;
+}
+
+/** `run.continued`: someone pressed "Continuar" on a stopped answer. */
+interface RunContinuedEvent {
+  type: "run.continued";
+  channelId: string;
+  threadId: string | null;
+  runId: string;
+  newRunId: string;
+  messageId: string;
 }
 
 export interface LiveNotice {
@@ -145,11 +155,22 @@ export function createStreamsStore(
     questions: {},
     secrets: {},
     notices: {},
-    steered: {},
+    continued: {},
     consults: {},
   };
   const listeners = new Set<() => void>();
-  const set = (next: LiveState) => {
+  const notify = () => {
+    for (const l of listeners) l();
+  };
+  // Streaming deltas arrive many times a frame: their notifications wait for the next frame (one render
+  // per frame, `get()` is always current). Anything else notifies at once, with whatever was waiting.
+  let frame: number | null = null;
+  const flush = () => {
+    if (frame !== null && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
+    frame = null;
+    notify();
+  };
+  const set = (next: LiveState, batched = false) => {
     if (
       next.streams === state.streams &&
       next.receipts === state.receipts &&
@@ -158,12 +179,19 @@ export function createStreamsStore(
       next.questions === state.questions &&
       next.secrets === state.secrets &&
       next.notices === state.notices &&
-      next.steered === state.steered &&
+      next.continued === state.continued &&
       next.consults === state.consults
     )
       return;
     state = next;
-    for (const l of listeners) l();
+    if (batched && batchFrames()) {
+      frame ??= requestAnimationFrame(() => {
+        frame = null;
+        notify();
+      });
+      return;
+    }
+    flush();
   };
   return {
     get: () => state,
@@ -202,29 +230,33 @@ export function createStreamsStore(
         event.type === "secret.requested" || event.type === "secret.updated"
           ? { ...state.secrets, [event.secretRequest.id]: event.secretRequest }
           : state.secrets;
-      const steeredRun =
-        event.type === ("agent.run.steered" as string)
-          ? state.streams.runs[(event as unknown as { runId: string }).runId]
-          : undefined;
-      const steered = steeredRun
-        ? { ...state.steered, [(event as unknown as { messageId: string }).messageId]: steeredRun.agentId }
-        : state.steered;
-      set({
-        ...state,
-        steered,
-        questions,
-        secrets,
-        memory,
-        streams: applyChannelEvent(state.streams, event, now()),
-        consults: applyConsultEvent(state.consults, event, now()),
-        receipts: applyReceiptEvent(
-          event.type === "message.created" && event.message
-            ? seedReceipt(state.receipts, event.message)
-            : state.receipts,
-          event,
-        ),
-        typing,
-      });
+      const continued =
+        event.type === ("run.continued" as string)
+          ? {
+              ...state.continued,
+              [(event as unknown as RunContinuedEvent).runId]: (event as unknown as RunContinuedEvent).newRunId,
+            }
+          : state.continued;
+      const streaming = event.type === "agent.delta" || event.type === ("agent.tool.output" as string);
+      set(
+        {
+          ...state,
+          continued,
+          questions,
+          secrets,
+          memory,
+          streams: applyChannelEvent(state.streams, event, now()),
+          consults: applyConsultEvent(state.consults, event, now()),
+          receipts: applyReceiptEvent(
+            event.type === "message.created" && event.message
+              ? seedReceipt(state.receipts, event.message)
+              : state.receipts,
+            event,
+          ),
+          typing,
+        },
+        streaming,
+      );
     },
     /** Person messages loaded over HTTP: start their receipts. */
     seed: (messages: Message[]) => {
@@ -296,6 +328,9 @@ export function createStreamsStore(
     /** The server's active runs for a channel (load, reconnect): stale rows go away. */
     reconcile: (channelId: string, active: ActiveRun[], askedAt = now()) =>
       set({ ...state, streams: reconcileRuns(state.streams, channelId, active, now(), askedAt) }),
+    /** "Continuar" went through (or there is nothing left to continue: `newRunId` null). */
+    continued: (runId: string, newRunId: string | null) =>
+      set({ ...state, continued: { ...state.continued, [runId]: newRunId } }),
     /** "Atualizar" found the run still active. */
     touch: (runId: string) => set({ ...state, streams: touchRun(state.streams, runId, now()) }),
     subscribe: (listener: () => void) => {
@@ -307,6 +342,11 @@ export function createStreamsStore(
   };
 }
 export type StreamsStore = ReturnType<typeof createStreamsStore>;
+
+/** Frames to batch on (a browser); React's act() environment (tests) and SSR notify at once. */
+const batchFrames = () =>
+  typeof requestAnimationFrame === "function" &&
+  !(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
 
 interface RealtimeValue {
   connection: RealtimeConnection | null;

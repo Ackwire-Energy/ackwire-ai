@@ -13,7 +13,7 @@ const files = (dir: string): string[] =>
 const SKIP_FILES = ["GalleryPage.tsx"];
 /** Brand names, keys, symbols and code that stay as they are. */
 const ALLOWED = [
-  /^(agentes|chat|agentes\.chat|GitHub|MCP|Drive|Sentry|Linear|Slack|US\$|UTC)$/,
+  /^(agentes|chat|agentes\.chat|GitHub|MCP|Drive|Sentry|Linear|Slack|Claude Code|Codex|US\$|UTC)$/,
   /^[A-Z]$/,
   /^@\w+$/,
   /^https?:/,

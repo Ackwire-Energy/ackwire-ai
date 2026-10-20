@@ -30,80 +30,68 @@ const open = async (configure?: (s: ReturnType<typeof seedState>) => void) => {
 const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) => c.method === "agents.cancelRun");
 const esc = () => act(async () => fireEvent.keyDown(window, { key: "Escape" }));
 
-describe("Parar with a confirmation", () => {
-  test("the bar is a pill: living avatar with its look, the words, then a small round Parar", async () => {
+describe("Parar is immediate (telas/Mensagens.html)", () => {
+  test("the bar out of view: living avatar with its look, the words, 'Ver' and 'Esc para parar'", async () => {
     const { ev } = await open((s) => {
       const ada = s.agents.find((a) => a.id === ADA_ID);
       if (ada) (ada as { appearance?: unknown }).appearance = { color: "amber", accessory: "hat" };
     });
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(3);
+    // happy-dom has no layout: the block counts as out of view, so the line above the composer speaks.
     const bar = document.querySelector('.ac-typing[data-active="true"]') as HTMLElement;
     const avatar = bar.querySelector(".ac-avatar--agent") as HTMLElement;
     expect(avatar.getAttribute("data-accessory")).toBe("hat");
-    expect(bar.querySelector(".ac-typing__sep")).not.toBeNull();
-    const stop = within(bar).getByRole("button", { name: "Parar" });
-    expect(stop.className).toBe("stop-run");
-    expect(stop.getAttribute("title")).toBe("Parar tarefa · Esc");
+    expect(within(bar).getByRole("button", { name: "Ver" })).toBeTruthy();
+    expect(bar.textContent).toContain("para parar");
+    // No confirmation anywhere.
+    expect(within(bar).queryByRole("button", { name: "Parar" })).toBeNull();
   });
 
-  test("click: the confirmation says what it's doing, focuses Parar; Continuar keeps it running", async () => {
+  test("the send button turns into stop with an empty box; one click stops, nothing asked", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await ev({ type: "agent.delta", ...ids, seq: 0, text: "Escrevendo" });
     await settle(2);
-    const row = document.querySelector('[data-run-id="r-live"]') as HTMLElement;
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Parar" })));
+    const stop = screen().getByRole("button", { name: "Parar a Ada" });
+    expect(stop.getAttribute("data-mode")).toBe("stop");
+    await act(async () => fireEvent.click(stop));
     await settle(2);
-    const confirm = screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" });
-    expect(confirm.textContent).toContain("Escrevendo a resposta. O que já foi feito fica salvo.");
-    expect(confirm.textContent).toContain("Esc duas vezes para parar direto");
-    expect(document.activeElement).toBe(within(confirm).getByRole("button", { name: "Parar" }));
-    await act(async () => fireEvent.click(within(confirm).getByRole("button", { name: "Continuar" })));
-    await settle(2);
-    expect(screen().queryByRole("dialog", { name: "Parar a tarefa da Ada?" })).toBeNull();
-    expect(cancels(state)).toHaveLength(0);
-  });
-
-  test("opened by a click, Esc only closes it", async () => {
-    const { state, ev } = await open();
-    await ev({ type: "agent.run", ...ids, status: "running" });
-    await settle(2);
-    const bar = document.querySelector(".ac-typing") as HTMLElement;
-    await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Parar" })));
-    await settle(2);
-    expect(screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" })).toBeTruthy();
-    await esc();
-    await settle(2);
-    expect(screen().queryByRole("dialog", { name: "Parar a tarefa da Ada?" })).toBeNull();
-    expect(cancels(state)).toHaveLength(0);
-  });
-
-  test("Esc opens it; after 1.5 s a second Esc just closes it; confirming shows Parando…", async () => {
-    const { state, ev } = await open();
-    await ev({ type: "agent.run", ...ids, status: "running" });
-    await settle(2);
-    const realNow = Date.now;
-    try {
-      await esc();
-      await settle(2);
-      expect(screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" })).toBeTruthy();
-      Date.now = () => realNow() + 2000;
-      await esc();
-      await settle(2);
-      expect(screen().queryByRole("dialog", { name: "Parar a tarefa da Ada?" })).toBeNull();
-      expect(cancels(state)).toHaveLength(0);
-    } finally {
-      Date.now = realNow;
-    }
-    await esc();
-    await settle(2);
-    const confirm = screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" });
-    await act(async () => fireEvent.click(within(confirm).getByRole("button", { name: "Parar" })));
-    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
     expect(cancels(state)).toHaveLength(1);
-    const bar = document.querySelector(".ac-typing") as HTMLElement;
-    expect(within(bar).getByRole("button", { name: "Parando…" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  test("Esc with an empty composer stops right away", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await settle(2);
+    await esc();
+    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(cancels(state)).toHaveLength(1);
+  });
+
+  test("typing while it works: 'Juntar' (↵) joins; ⌘↵ / Ctrl↵ sends with 'Parar e mandar'", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await settle(2);
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    await act(async () => fireEvent.change(box, { target: { value: "olha o refresh" } }));
+    const group = screen().getByRole("radiogroup", { name: "Como mandar enquanto a Ada trabalha" });
+    expect(
+      within(group)
+        .getByRole("radio", { name: /Juntar ao que ela faz/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    await act(async () => fireEvent.keyDown(box, { key: "Enter", ctrlKey: true }));
+    await settle(3);
+    const posts = state.calls.filter((c) => c.method === "chat.post").map((c) => c.args[2] as { steer?: string });
+    expect(posts.at(-1)?.steer).toBe("now");
+    await act(async () => fireEvent.change(box, { target: { value: "e o login" } }));
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    await settle(3);
+    const again = state.calls.filter((c) => c.method === "chat.post").map((c) => c.args[2] as { steer?: string });
+    expect(again.at(-1)?.steer).toBeUndefined();
   });
 
   test("the context line: code for N min, a tool, writing, thinking", () => {

@@ -5,7 +5,7 @@ setupDom();
 
 import { cleanup, render } from "@testing-library/react";
 import { MessageBody } from "@/chat/MessageBody";
-import { renderInline } from "@/lib/markdown";
+import { Markdown, renderInline } from "@/lib/markdown";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -132,5 +132,45 @@ describe("in the channel", () => {
     const person = rows.find((r) => r.textContent?.includes("Combinado")) as HTMLElement;
     expect(person.querySelector("em")?.textContent).toBe("amanhã");
     expect(person.querySelector(".ac-mention")?.textContent).toBe("@Ada");
+  });
+});
+
+describe("streaming words", () => {
+  test("Markdown with `words`: each plain word in an .ac-word span; mentions and code stay whole", () => {
+    const el = render(
+      <Markdown
+        source={"Oi **time**, olha `bun test` com @ada agora"}
+        variant="message"
+        words
+        mention={(h, k) => (
+          <span key={k} className="ac-mention">
+            @{h}
+          </span>
+        )}
+      />,
+    ).container;
+    const words = [...el.querySelectorAll(".ac-word")].map((w) => w.textContent);
+    expect(words).toEqual(["Oi", "time", ",", "olha", "com", "agora"]);
+    expect(el.querySelector("code")?.textContent).toBe("bun test");
+    expect(el.querySelector("code .ac-word")).toBeNull();
+    expect(el.querySelector(".ac-mention")?.textContent).toBe("@ada");
+    expect(el.textContent).toBe("Oi time, olha bun test com @ada agora");
+  });
+
+  test("without `words` nothing is wrapped (the final message)", () => {
+    expect(body("Uma frase só.").querySelector(".ac-word")).toBeNull();
+  });
+
+  test("MessageBody live: settled blocks plain, the tail last with fading words", () => {
+    const el = render(<MessageBody body={"Primeiro bloco.\n\nAgora escrevendo"} live />).container;
+    const blocks = el.querySelectorAll(".md");
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.querySelector(".ac-word")).toBeNull();
+    expect(blocks[1]?.classList.contains("md--tail")).toBe(true);
+    expect(el.lastElementChild).toBe(blocks[1] ?? null);
+    expect([...(blocks[1]?.querySelectorAll(".ac-word") ?? [])].map((w) => w.textContent)).toEqual([
+      "Agora",
+      "escrevendo",
+    ]);
   });
 });
