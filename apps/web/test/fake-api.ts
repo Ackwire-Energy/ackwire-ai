@@ -17,6 +17,8 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
+  ImportItemKind,
+  ImportItemResult,
   InvitationWithStatus,
   Me,
   Member,
@@ -1066,6 +1068,49 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
                 costUsd: 3.1,
               },
             ],
+    },
+    // Like the backend on an empty workspace: every picked item is new; a taken handle gets the next free one.
+    imports: {
+      apply: async (orgId, input) => {
+        log("imports.apply", orgId, input);
+        if (state.me?.organizations[0]?.role === "member") {
+          throw new ApiError(403, "forbidden", "You don't have permission to do this");
+        }
+        const { bundle } = input;
+        const items: ImportItemResult[] = [];
+        const add = (kind: ImportItemKind, key: string, label: string, extra: Partial<ImportItemResult> = {}) => {
+          if (input.pick && !input.pick.includes(`${kind}:${key}`)) return;
+          items.push({ kind, key, label, action: "create", ...extra, ...(input.dryRun ? {} : { targetId: id(kind) }) });
+        };
+        for (const s of bundle.skills) add("skill", s.key, /^name:\s*(.+)$/m.exec(s.markdown)?.[1]?.trim() ?? s.key);
+        const taken = new Set(state.agents.map((a) => a.handle));
+        for (const a of bundle.agents) {
+          let handle = a.handle;
+          for (let i = 2; taken.has(handle); i++) handle = `${a.handle}${i}`;
+          taken.add(handle);
+          add("agent", a.key, a.name, handle === a.handle ? {} : { renamedTo: handle });
+          const created = items.at(-1);
+          if (input.dryRun || created?.kind !== "agent" || created.key !== a.key) continue;
+          state.agents.push({
+            id: created.targetId ?? id("agent"),
+            name: a.name,
+            handle,
+            role: a.role,
+            instructions: a.instructions,
+            model: a.model ?? "claude-sonnet-5-5",
+            ownerUserId: state.me?.user.id ?? null,
+            hasCredential: false,
+            monthlyBudgetUsd: null,
+            createdAt: NOW.toISOString(),
+            audience: { mode: "everyone", userIds: [] },
+          });
+        }
+        for (const c of bundle.channels) add("channel", c.key, c.name);
+        for (const r of bundle.routines) add("routine", r.key, r.name);
+        for (const n of bundle.notes) add("note", n.key, n.title || n.content.split("\n")[0]?.slice(0, 80) || n.key);
+        return { items };
+      },
+      exportUrl: (orgId) => `/api/app/organizations/${orgId}/export`,
     },
     chat: {
       channels: async () => state.channels,

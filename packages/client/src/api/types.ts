@@ -2392,6 +2392,141 @@ export interface WikiImportResult {
   failed: { title: string; reason: "title" | "too_long" }[];
 }
 
+/**
+ * Everything an import can create, in one shape for every source (ADR 0053).
+ * The app parses another product's files into it where the person is (their
+ * browser); `POST …/imports` plans it (`dryRun`) and applies the picked items;
+ * `GET …/export` returns this workspace as one. Keys are the source's own ids:
+ * they only link items to each other and tell a re-import what it created.
+ * Never carries keys, tokens or passwords.
+ */
+export interface MigrationBundle {
+  format: "agenteschat.bundle";
+  version: 1;
+  source: {
+    /** The app it came from: an import source id ("openmausbot", "openclaw"…) or "agenteschat". */
+    app: string;
+    /** Stable id of the package or workspace in that app; with `app`, which earlier import an item belongs to. */
+    ref: string;
+    /** For the header ("Equipe de vendas", "~/.openclaw"). */
+    name: string;
+    files: string[];
+  };
+  agents: BundleAgent[];
+  skills: BundleSkill[];
+  channels: BundleChannel[];
+  routines: BundleRoutine[];
+  notes: BundleNote[];
+  /** What the person does afterwards: connect an app, add a key, sign in. */
+  todo: BundleTodo[];
+  /** What doesn't come along, as labels only. */
+  leftOut: { kind: string; label: string }[];
+}
+
+export interface BundleAgent {
+  key: string;
+  name: string;
+  handle: string;
+  role: string;
+  instructions: string;
+  /** A model id of our catalog, else null (the workspace's suggestion). */
+  model: string | null;
+  appearance: { color?: string; eyes?: string; accessory?: string };
+  /** Keys in `skills` this agent had on. */
+  skills: string[];
+}
+
+export interface BundleSkill {
+  key: string;
+  /** The whole SKILL.md: frontmatter with `name` and `description`, then the body. */
+  markdown: string;
+}
+
+export interface BundleChannel {
+  key: string;
+  name: string;
+  topic: string;
+  agents: { key: string; autoReply: boolean }[];
+}
+
+export interface BundleRoutine {
+  key: string;
+  name: string;
+  /** Key of the agent that runs it. */
+  agent: string;
+  prompt: string;
+  /** Key of a channel in the bundle; null posts in the importer's DM with the agent. */
+  channel: string | null;
+  trigger: { cron: string; timezone: string | null } | { rule: ApiRule } | { at: string };
+}
+
+export interface BundleNote {
+  key: string;
+  /** Key of the agent it belongs to; null for the whole workspace. */
+  agent: string | null;
+  kind: "fact" | "preference" | "decision" | "note" | "lesson";
+  title?: string;
+  content: string;
+}
+
+export interface BundleTodo {
+  kind: "connection" | "app" | "secret" | "model" | "file";
+  label: string;
+  url?: string;
+  /** Keys of the agents it matters to. */
+  agents: string[];
+}
+
+export type ImportItemKind = "agent" | "skill" | "channel" | "routine" | "note";
+
+export type ImportSkipReason =
+  | "exists"
+  | "model_not_in_catalog"
+  | "invalid_skill"
+  | "schedule_unsupported"
+  | "schedule_in_past"
+  | "secret_like"
+  | "agent_not_picked"
+  /** A routine whose channel isn't coming (unpicked, or a private channel with that name exists). */
+  | "channel_not_picked"
+  | "invalid"
+  | "failed";
+
+export interface ImportItemResult {
+  kind: ImportItemKind;
+  key: string;
+  label: string;
+  action: "create" | "update" | "unchanged" | "skip";
+  /**
+   * Why it is skipped. On a create or update, a note: `model_not_in_catalog` (the workspace's
+   * default model instead), `exists` (a public channel with that name: the agents join it).
+   */
+  reason?: ImportSkipReason;
+  /** Fields cut to fit our limits. */
+  trimmed?: string[];
+  /** An agent whose handle was taken gets the next free one. */
+  renamedTo?: string;
+  /** The row created or updated (after an apply). */
+  targetId?: string;
+}
+
+export interface ImportInput {
+  bundle: MigrationBundle;
+  dryRun: boolean;
+  /**
+   * `kind:key` of the items to apply; default every item (items left out aren't in the plan). One
+   * apply creates or updates at most 200 (`import.too_many_items`): apply a big import in chunks,
+   * in the plan's order (each call is safe to repeat).
+   */
+  pick?: string[];
+  /** `skill:key` of the skills to turn on for their agents; imported skills land off otherwise. */
+  enableSkills?: string[];
+}
+
+export interface ImportPlan {
+  items: ImportItemResult[];
+}
+
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
 export type WikiBacklink =
   | { kind: "page"; slug: string; title: string; excerpt?: string }

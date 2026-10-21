@@ -5,7 +5,7 @@ setupDom();
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { SignInOptions } from "@agenteschat/client";
+import type { ImportInput, SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
@@ -490,7 +490,7 @@ describe("Onboarding", () => {
     await settle(4);
   };
 
-  test("import: an OpenMausBot team file → what was found → the agents step prefilled → created with their instructions", async () => {
+  test("import: an OpenMausBot team file → the server's plan to pick from → the agents step prefilled → one apply with the key's model", async () => {
     const { state } = await start();
     await throughContext(state);
     await click(button(/OpenMausBot/), 1);
@@ -502,13 +502,18 @@ describe("Onboarding", () => {
     const bring = (name: string) => screen().getByRole("checkbox", { name: `Trazer ${name}` });
     for (const name of ["Morgan", "Scout", "Quill"]) expect(bring(name).getAttribute("aria-checked")).toBe("true");
     const text = document.body.textContent ?? "";
+    // Skills, the room and the routines come along; connections are to-dos after importing.
+    for (const name of ["pricing-policy", "research-brief", "objection-handling", "#deal-desk", "Daily digest"]) {
+      expect(text).toContain(name);
+    }
+    expect(text).toContain("Conectar CRM (mcp.example.com)");
     expect(text).toContain("O que não vem junto");
-    expect(text).toContain("pricing-policy, research-brief, objection-handling");
-    expect(text).toContain("Daily digest (Scout), Weekly pipeline review (Morgan)");
-    expect(text).toContain("CRM (mcp.example.com)");
     expect(text).toContain("Chaves, senhas e histórico de conversa nunca vêm.");
-    // Nothing is saved while reading.
+    expect(text).toContain("Os agentes usam o modelo e a chave do workspace.");
+    expect(text).toContain("Isso chega junto com o time, quando você criar os agentes.");
+    // Nothing is saved while reading: the server only planned it.
     expect(calls(state, "agents.create")).toHaveLength(0);
+    expect(calls(state, "imports.apply").map((c) => (c.args[1] as ImportInput).dryRun)).toEqual([true]);
 
     await click(bring("Quill"), 1);
     expect(bring("Quill").getAttribute("aria-checked")).toBe("false");
@@ -519,29 +524,46 @@ describe("Onboarding", () => {
     expect(button(/Morgan · Sales lead/).getAttribute("aria-pressed")).toBe("true");
     expect(button(/Scout · Prospect researcher/).getAttribute("aria-pressed")).toBe("true");
     expect(button(/Quill · Outreach writer/).getAttribute("aria-pressed")).toBe("false");
+    // Only Ada (always on the team) joins them.
     await keepOnly();
     await keyAndCreate(/Salvar e criar 2 agentes/);
 
-    const created = calls(state, "agents.create").map((c) => c.args[1] as Record<string, unknown>);
-    expect(created.map((a) => a.name)).toEqual(["Ada", "Morgan", "Scout"]);
-    expect(created[1]).toMatchObject({
+    expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual(["Ada"]);
+    const applied = calls(state, "imports.apply")
+      .map((c) => c.args[1] as ImportInput)
+      .filter((i) => !i.dryRun);
+    expect(applied).toHaveLength(1);
+    expect(applied[0]?.pick).toEqual([
+      "skill:pricing-policy",
+      "skill:research-brief",
+      "skill:objection-handling",
+      "agent:lead",
+      "agent:scout",
+      "channel:desk",
+      "routine:daily-digest",
+      "routine:weekly-review",
+      "note:lead/MEMORY.md",
+      "note:lead/memory/pricing.md",
+    ]);
+    const [morgan, scout] = applied[0]?.bundle.agents ?? [];
+    expect(morgan).toMatchObject({
       name: "Morgan",
       handle: "lead",
       role: "Sales lead",
       model: "claude-sonnet-5-5",
-      credentialId: null,
       appearance: { color: "violet" },
     });
-    expect(String(created[1]?.instructions)).toStartWith(
+    expect(String(morgan?.instructions)).toStartWith(
       "You coordinate the desk. Keep answers short and cite the price list.\n\n## Qualify a lead",
     );
-    expect(created[2]).toMatchObject({ handle: "scout", role: "Prospect researcher", appearance: { color: "sky" } });
+    expect(scout).toMatchObject({ handle: "scout", role: "Prospect researcher", appearance: { color: "sky" } });
     expect(calls(state, "chat.addMember")).toHaveLength(3);
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
 
-    // They're in the crew at the end.
+    // They're in the crew at the end, with what the import brought.
     await next();
     expect(document.body.textContent).toContain("Ada, Morgan e Scout já estão no #general.");
+    expect(screen().getByRole("heading", { name: "Chegou tudo" })).toBeTruthy();
   });
 
   test("import: an OpenBot GitHub link is read by the backend; a bad link says so; skipping the step drops it", async () => {
@@ -554,40 +576,47 @@ describe("Onboarding", () => {
       ],
     };
     await throughContext(state);
-    await click(button(/OpenBot/), 1);
+    await click(button(/^OpenBot O pacote/), 1);
 
-    await type("Ou um link público do GitHub", "https://github.com/acme/nada/blob/main/agents.yaml");
-    await click(button("Ler link"), 8);
+    const field = "Ou cole um link do GitHub ou a resposta do outro app";
+    await type(field, "https://github.com/acme/nada/blob/main/agents.yaml");
+    await click(button("Ler"), 8);
     expect(screen().getByRole("alert").textContent).toContain("Não deu para ler esse link");
 
-    await type("Ou um link público do GitHub", url);
-    await click(button("Ler link"), 8);
+    await type(field, url);
+    await click(button("Ler"), 8);
     expect(calls(state, "agents.importFromGithub").at(-1)?.args[1]).toBe(url);
-    expect(screen().getByRole("heading", { name: "agents.yaml, model.yaml" })).toBeTruthy();
+    // Named after the linked folder; recognized by its files.
+    expect(screen().getByRole("heading", { name: "tenant" })).toBeTruthy();
+    expect(document.body.textContent).toContain("Veio do OpenBot");
     expect(screen().getByRole("checkbox", { name: "Trazer General Assistant" })).toBeTruthy();
     expect(screen().getByRole("checkbox", { name: "Trazer Knowledge" })).toBeTruthy();
     const text = document.body.textContent ?? "";
     expect(text).toContain("Risk Analyst (remote-ag-ui), Your Bot (remote-ag-ui)");
-    expect(text).toContain("openai · gpt-5.6-terra");
+    expect(text).toContain("openai/gpt-5.6-terra");
     expect(text).toContain("openai-api-key");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
 
-    // Skipping the step: nothing imported reaches the agents step.
+    // Skipped: nothing imported reaches the agents step, which offers the whole team.
     await skip();
     await skip();
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: /Knowledge · Company Knowledge/ })).toBeNull();
-    await keepOnly();
-    await keyAndCreate(/^Continuar(?! com)/);
-    expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual(["Ada"]);
+    await keyAndCreate(/Salvar e criar 3 agentes/);
+    expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual([
+      "Theo",
+      "Ada",
+      "Lia",
+      "Atlas",
+    ]);
+    expect(calls(state, "imports.apply").filter((c) => !(c.args[1] as ImportInput).dryRun)).toHaveLength(0);
   });
 
-  test("import: a file that isn't a team file is refused; skipping the step clears the source", async () => {
+  test("import: files no app wrote are refused with what to do; skipping the step clears them", async () => {
     const { state } = await start();
     await throughContext(state);
-    await click(button(/OpenMausBot/), 1);
-    await pickFiles([new File([fixture("agents.yaml")], "agents.yaml")]);
-    expect(screen().getByRole("alert").textContent).toContain("Isso não parece um arquivo de time do OpenMausBot");
+    await pickFiles([new File(["Lista de compras: café, pão."], "notas.txt")]);
+    expect(screen().getByRole("alert").textContent).toContain("Não reconhecemos esses arquivos");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await skip();
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();

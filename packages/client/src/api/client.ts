@@ -68,6 +68,8 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
+  ImportInput,
+  ImportPlan,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -264,7 +266,14 @@ export interface ApiClient {
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
-    importFromGithub(orgId: string, url: string): Promise<{ files: { path: string; text: string }[] }>;
+    importFromGithub(
+      orgId: string,
+      url: string,
+    ): Promise<{
+      files: { path: string; text: string }[];
+      /** Files the link has that fit the import but not the limits (200 files, 8 MB): not read. */
+      skipped?: string[];
+    }>;
     detail(orgId: string, agentId: string): Promise<AgentDetail>;
     channels(orgId: string, agentId: string): Promise<AgentChannel[]>;
     setChannels(
@@ -292,6 +301,13 @@ export interface ApiClient {
     activeRuns(orgId: string, channelId: string): Promise<ActiveRun[] | null>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
+  };
+  /** Bringing agents and what's around them from another app or another agentes.chat (ADR 0053); admins. */
+  imports: {
+    /** The plan of a bundle (`dryRun`), or the picked items applied: either way every item with its action. */
+    apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
+    /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
+    exportUrl(orgId: string): string;
   };
   chat: {
     channels(orgId: string): Promise<Channel[]>;

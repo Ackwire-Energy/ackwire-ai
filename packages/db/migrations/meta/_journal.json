@@ -617,6 +617,13 @@
       "when": 1792606644477,
       "tag": "0087_blobs_person_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1792607760778,
+      "tag": "0088_import_items",
+      "breakpoints": true
     }
   ]
 }

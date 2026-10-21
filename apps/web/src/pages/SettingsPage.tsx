@@ -50,6 +50,7 @@ import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
+import { ImportExportSection } from "@/components/ImportFlow";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -69,7 +70,8 @@ export type SettingsSection =
   | "keys"
   | "storage"
   | "computers"
-  | "usage";
+  | "usage"
+  | "import";
 
 type SettingsGroup = "org" | "agents" | "costs";
 
@@ -90,6 +92,7 @@ export const SETTINGS_SECTIONS: {
   { id: "usage", icon: "wallet", group: "costs", allowed: (r) => can(r, "view_usage") },
   { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "manage_credentials") },
   { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
+  { id: "import", icon: "archiveBox", group: "costs", allowed: (r) => can(r, "manage_agents") },
 ];
 
 const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
@@ -193,6 +196,7 @@ export function SettingsPage({
         {current === "storage" && <StorageSection />}
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
+        {current === "import" && <ImportExportSection />}
       </div>
     </div>
   );
