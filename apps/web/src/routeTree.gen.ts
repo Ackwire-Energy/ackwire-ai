@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConectarRouteImport } from './routes/conectar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as DevGalleryRouteImport } from './routes/dev.gallery'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
@@ -63,6 +64,11 @@ const LoginRoute = LoginRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/dev/gallery': typeof DevGalleryRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -266,6 +273,7 @@ export interface FileRoutesByTo {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/dev/gallery': typeof DevGalleryRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/dev/gallery': typeof DevGalleryRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -342,6 +351,7 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
+    | '/reset-password'
     | '/signup'
     | '/dev/gallery'
     | '/invite/$token'
@@ -379,6 +389,7 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
+    | '/reset-password'
     | '/signup'
     | '/dev/gallery'
     | '/invite/$token'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
+    | '/reset-password'
     | '/signup'
     | '/dev/gallery'
     | '/invite/$token'
@@ -453,6 +465,7 @@ export interface RootRouteChildren {
   ConectarRoute: typeof ConectarRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   DevGalleryRoute: typeof DevGalleryRoute
   InviteTokenRoute: typeof InviteTokenRoute
@@ -487,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -779,6 +799,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConectarRoute: ConectarRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   DevGalleryRoute: DevGalleryRoute,
   InviteTokenRoute: InviteTokenRoute,

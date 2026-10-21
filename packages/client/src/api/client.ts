@@ -146,6 +146,7 @@ import type {
   SecretBox,
   SecretRequest,
   SeriesScope,
+  SignInOptions,
   Skill,
   SkillDetail,
   SkillInput,
@@ -187,8 +188,12 @@ export interface ApiClient {
   system: { health(): Promise<Health> };
   account: {
     authConfig(): Promise<AuthConfig>;
+    /** Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). */
+    signInOptions(input: { email: string; inviteToken?: string }): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
+    /** My app language (emails and pushes are written in it). */
+    updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
   };
   orgs: {
     create(input: {

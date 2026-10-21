@@ -13,6 +13,7 @@ const {
   channels,
   channelMembers,
   users,
+  accounts,
 } = schema;
 
 export type MemberRole = "owner" | "admin" | "member";
@@ -170,6 +171,38 @@ export async function isSignupAllowed(
   return invite !== undefined;
 }
 
+export type SignInProvider = "google" | "github" | "apple";
+const SIGN_IN_PROVIDERS = new Set<string>(["google", "github", "apple"]);
+
+/**
+ * The sign-in screen asks for the e-mail first, then shows the one next step:
+ * the password, the provider the account signs in with, or the sign-up (when
+ * allowed for that e-mail). This tells whether the e-mail has an account, so
+ * the route that serves it is rate limited.
+ */
+export async function signInOptions(db: Database, email: string, allowSignup: boolean, inviteToken?: string | null) {
+  const rows = await db
+    .select({ providerId: accounts.providerId })
+    .from(users)
+    .leftJoin(accounts, eq(accounts.userId, users.id))
+    .where(eq(users.email, email.trim().toLowerCase()));
+  if (rows.length === 0) {
+    return {
+      account: false,
+      password: false,
+      providers: [] as SignInProvider[],
+      canSignUp: await isSignupAllowed(db, email, allowSignup, new Date(), inviteToken),
+    };
+  }
+  const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);
+  return {
+    account: true,
+    password: ids.includes("credential"),
+    providers: [...new Set(ids.filter((id) => SIGN_IN_PROVIDERS.has(id)))] as SignInProvider[],
+    canSignUp: false,
+  };
+}
+
 /**
  * Runs after a user is created. The very first account of an installation
  * becomes owner of every organization that already exists, so a self-hoster
@@ -312,6 +345,16 @@ export async function updateMyProfile(
   const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
   if (!me) throw new ForbiddenError("You are not a member of this organization");
   return me;
+}
+
+/** The languages of the app (`users.locale`): emails and pushes are written in it. */
+export const USER_LOCALES = ["pt-BR", "en"] as const;
+export type UserLocale = (typeof USER_LOCALES)[number];
+
+/** Saves the person's app language (picked up from the onboarding). */
+export async function setMyLocale(db: Database, userId: string, locale: UserLocale) {
+  if (!USER_LOCALES.includes(locale)) throw new ValidationError("locale must be pt-BR or en");
+  await db.update(users).set({ locale }).where(eq(users.id, userId));
 }
 
 async function ownerCount(db: Pick<Database, "select">, orgId: string) {

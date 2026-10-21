@@ -477,6 +477,11 @@ export const extraIcons = {
     ["path", { d: "m5 4 10 4.17-4.17 1.66L9.17 14 5 4Z" }],
     ["path", { d: "m11 11 3.5 3.5" }],
   ],
+  /** Entrar: show the password. */
+  eye: [
+    ["path", { d: "M2.5 10c.42-2.08 3.33-5.83 7.5-5.83s7.08 3.75 7.5 5.83c-.42 2.08-3.33 5.83-7.5 5.83S2.92 12.08 2.5 10Z" }],
+    ["circle", { cx: "10", cy: "10", r: "2.4" }],
+  ],
   /** ConversaAgentes.html: a talk only between two agents (the consultation card's footer). */
   eyeOff: [
     ["path", { d: "M3.3 3.3 16.7 16.7" }],

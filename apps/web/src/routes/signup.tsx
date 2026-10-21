@@ -1,8 +1,9 @@
 import { meQuery } from "@agenteschat/client";
 import { safeRedirect } from "@agenteschat/client/lib/guards";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { SignupPage } from "@/pages/SignupPage";
+import { AuthPage } from "@/pages/AuthPage";
 
+/** The same flow as /login (the e-mail decides), worded for someone new. */
 export const Route = createFileRoute("/signup")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
     redirect: safeRedirect(search.redirect),
@@ -12,6 +13,6 @@ export const Route = createFileRoute("/signup")({
     if (me) throw redirect({ to: search.redirect ?? "/" });
   },
   component: function Signup() {
-    return <SignupPage redirect={Route.useSearch().redirect} />;
+    return <AuthPage start="up" redirect={Route.useSearch().redirect} />;
   },
 });

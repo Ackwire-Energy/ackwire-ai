@@ -222,31 +222,8 @@
   }
 }
 
-/* Sign in / sign up: on a phone the sky is a band with the logo; the form comes right after. */
+/* Centered card pages on a phone (invite, onboarding) */
 @media (max-width: 640px) {
-  .auth {
-    align-content: flex-start;
-  }
-  .auth__aside {
-    flex-basis: 100%;
-    min-height: 0;
-    gap: 12px;
-    padding: calc(env(safe-area-inset-top, 0px) + 20px) 16px 24px;
-  }
-  .auth__aside .auth__demo .ac-msg,
-  .auth__aside .auth__steps {
-    display: none;
-  }
-  .auth__giant {
-    right: -12px;
-    bottom: -24px;
-    width: 88px;
-    height: 88px;
-  }
-  .auth__main {
-    align-items: flex-start;
-    padding: 28px 16px calc(env(safe-area-inset-bottom, 0px) + 32px);
-  }
   .center {
     padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 32px);
   }

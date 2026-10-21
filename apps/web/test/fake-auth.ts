@@ -1,6 +1,8 @@
 import type { AuthClient, AuthResult } from "@/auth/client";
 
-export function createFakeAuth(options: { signIn?: AuthResult; signUp?: AuthResult; onSignIn?: () => void } = {}) {
+export function createFakeAuth(
+  options: { signIn?: AuthResult; signUp?: AuthResult; reset?: AuthResult; onSignIn?: () => void } = {},
+) {
   const calls: { method: string; args: unknown[] }[] = [];
   const auth: AuthClient = {
     signIn: async (input) => {
@@ -16,6 +18,14 @@ export function createFakeAuth(options: { signIn?: AuthResult; signUp?: AuthResu
     signInSocial: async (provider, callbackURL) => {
       calls.push({ method: "signInSocial", args: [provider, callbackURL] });
       return { ok: true };
+    },
+    requestPasswordReset: async (input) => {
+      calls.push({ method: "requestPasswordReset", args: [input] });
+      return { ok: true };
+    },
+    resetPassword: async (input) => {
+      calls.push({ method: "resetPassword", args: [input] });
+      return options.reset ?? { ok: true };
     },
     signOut: async () => {
       calls.push({ method: "signOut", args: [] });

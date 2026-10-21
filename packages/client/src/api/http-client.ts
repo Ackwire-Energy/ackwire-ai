@@ -107,6 +107,7 @@ import type {
   ScopeGrant,
   SearchHit,
   SecretRequest,
+  SignInOptions,
   Skill,
   SkillDetail,
   StorageConfig,
@@ -296,7 +297,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),
+      signInOptions: (input) => request<SignInOptions>("/api/app/sign-in-options", { json: input }),
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
+      updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
     },
     orgs: {
       create: (input) =>

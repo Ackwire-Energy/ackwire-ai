@@ -173,7 +173,7 @@ describe("i18n", () => {
   });
   test("pt-BR is the default; copy follows the screens", () => {
     expect(i18n.language).toBe("pt-BR");
-    expect(t("auth.signInSubtitle")).toBe("Bom te ver de novo.");
+    expect(t("auth.flow.password")).toBe("Bom te ver de novo.");
     expect(t("approval.approve.merge")).toBe("Aprovar merge");
     expect(t("auth.passwordMissing", { count: 3 })).toBe("Faltam 3 caracteres (mínimo de 8).");
   });

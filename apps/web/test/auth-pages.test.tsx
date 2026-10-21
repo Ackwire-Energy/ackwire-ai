@@ -5,6 +5,7 @@ setupDom();
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
@@ -15,56 +16,161 @@ afterEach(() => cleanup());
 const type = (label: string, value: string) =>
   act(async () => fireEvent.change(screen().getByLabelText(label), { target: { value } }));
 
-describe("Entrar", () => {
-  test("wrong password shows the prototype's error and marks the field", async () => {
-    const { auth, calls } = createFakeAuth({ signIn: { ok: false, status: 401, message: "Invalid" } });
-    await renderApp("/login", { api: createFakeApi(seedState({ me: null })), auth });
-    await type("E-mail", "walter@acme.com.br");
-    await type("Senha", "senha-errada");
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Entrar" })));
-    await settle();
-    expect(calls[0]).toEqual({ method: "signIn", args: [{ email: "walter@acme.com.br", password: "senha-errada" }] });
-    expect(screen().getByRole("alert").textContent).toBe(
-      "E-mail ou senha incorretos. Confira e tente de novo, ou redefina a senha.",
-    );
-    expect(screen().getByLabelText("Senha").getAttribute("aria-invalid")).toBe("true");
-  });
+/** A fake API whose sign-in screen answers `options` for any e-mail (and "forgot password" when `reset`). */
+const authApi = (options: SignInOptions, { reset = false, state = seedState({ me: null }) } = {}) => {
+  const api = createFakeApi(state);
+  api.account.signInOptions = async (input) => {
+    state.calls.push({ method: "account.signInOptions", args: [input] });
+    return options;
+  };
+  const config = api.account.authConfig;
+  api.account.authConfig = async () => ({ ...(await config()), passwordReset: reset });
+  return { api, state };
+};
+const press = async (name: string | RegExp, rounds = 6) => {
+  await act(async () => fireEvent.click(screen().getByRole("button", { name })));
+  await settle(rounds);
+};
+const heading = () => screen().getByRole("heading").textContent;
+const ACCOUNT: SignInOptions = { account: true, password: true, providers: [], canSignUp: false };
+const NEW: SignInOptions = { account: false, password: false, providers: [], canSignUp: true };
 
-  test("signing in goes to the redirect target; social and sign-up links follow the server config", async () => {
+describe("Entrar (e-mail primeiro)", () => {
+  test("the e-mail has a password: a wrong one frowns and offers a link; the right one enters", async () => {
     const state = seedState({ me: null });
     const signedIn = seedState().me;
-    const { auth } = createFakeAuth({ onSignIn: () => (state.me = signedIn) });
-    const { router } = await renderApp(`/login?redirect=/org/${ORG_ID}/drive`, { api: createFakeApi(state), auth });
-    // auth-config of the fake: GitHub only, sign-up open.
-    expect(screen().queryByRole("button", { name: "Continuar com Google" })).toBeNull();
-    expect(screen().getByRole("button", { name: "Continuar com GitHub" })).toBeTruthy();
-    expect(screen().getByRole("link", { name: "Criar conta" })).toBeTruthy();
-    await type("E-mail", "walter@acme.com.br");
+    let tries = 0;
+    const { auth, calls } = createFakeAuth({ onSignIn: () => (state.me = signedIn) });
+    const signIn = auth.signIn;
+    auth.signIn = async (input) => {
+      if (++tries > 1) return signIn(input);
+      calls.push({ method: "signIn", args: [input] });
+      return { ok: false, status: 401, message: "Invalid" };
+    };
+    const { api } = authApi(ACCOUNT, { reset: true, state });
+    const { router } = await renderApp(`/login?redirect=/org/${ORG_ID}/drive`, { api, auth });
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+    // auth-config of the fake: GitHub only.
+    expect(screen().queryByRole("button", { name: /Continuar com Google/ })).toBeNull();
+    expect(screen().getByRole("button", { name: /Continuar com GitHub/ })).toBeTruthy();
+    expect(screen().getByRole("button", { name: /^Continuar(?! com)/ }).hasAttribute("disabled")).toBe(true);
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(state.calls.find((c) => c.method === "account.signInOptions")?.args).toEqual([{ email: "marina@acme.com.br" }]);
+    expect(heading()).toBe("Bom te ver de novo.");
+    expect(screen().getByText("marina@acme.com.br")).toBeTruthy();
+
+    await type("Senha", "senha-errada");
+    await press(/^Entrar/);
+    expect(heading()).toBe("Hmm, essa senha não bateu.");
+    expect(screen().getByLabelText("Senha").getAttribute("aria-invalid")).toBe("true");
+    expect(screen().getByRole("button", { name: "Esqueci a senha" })).toBeTruthy();
+
     await type("Senha", "correct horse");
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Entrar" })));
-    await settle(6);
+    await press(/^Entrar/);
+    expect(calls.filter((c) => c.method === "signIn").map((c) => c.args[0])).toEqual([
+      { email: "marina@acme.com.br", password: "senha-errada" },
+      { email: "marina@acme.com.br", password: "correct horse" },
+    ]);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
+  });
+
+  test("an account without a password: only the provider it signs in with", async () => {
+    const { api } = authApi({ account: true, password: false, providers: ["github"], canSignUp: false });
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/login", { api, auth });
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(heading()).toBe("Você entra com GitHub.");
+    expect(screen().queryByLabelText("Senha")).toBeNull();
+    await press(/Continuar com GitHub/);
+    expect(calls[0]).toEqual({ method: "signInSocial", args: ["github", "/"] });
+  });
+
+  test("a misspelled webmail domain gets a one-click fix", async () => {
+    const { api } = authApi(ACCOUNT);
+    await renderApp("/login", { api, auth: createFakeAuth().auth });
+    await type("E-mail", "marina@gmial.com");
+    await press("Você quis dizer marina@gmail.com?", 1);
+    expect((screen().getByLabelText("E-mail") as HTMLInputElement).value).toBe("marina@gmail.com");
+  });
+
+  test("forgot password: sends the link in place and opens the webmail", async () => {
+    const { api } = authApi(ACCOUNT, { reset: true });
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/login", { api, auth });
+    await type("E-mail", "marina@gmail.com");
+    await press(/^Continuar(?! com)/);
+    await press("Esqueci a senha", 2);
+    expect(heading()).toBe("Te mando um link para criar outra senha.");
+    await press(/^Enviar link/);
+    expect(calls[0]?.method).toBe("requestPasswordReset");
+    expect((calls[0]?.args[0] as { email: string }).email).toBe("marina@gmail.com");
+    expect(heading()).toBe("Pronto. Mandei o link para marina@gmail.com.");
+    expect(screen().getByRole("link", { name: "Abrir o Gmail" }).getAttribute("href")).toBe("https://mail.google.com");
+  });
+
+  test("without e-mail on the server, no 'forgot password'", async () => {
+    const { api } = authApi(ACCOUNT, { reset: false });
+    await renderApp("/login", { api, auth: createFakeAuth().auth });
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
   });
 });
 
-describe("Criar conta", () => {
-  test("live password help and the button enables only when everything is valid", async () => {
+describe("Criar conta (e-mail novo)", () => {
+  test("name, then a password with live help; creating the account goes to onboarding", async () => {
+    const { api } = authApi(NEW);
     const { auth, calls } = createFakeAuth();
-    const { router } = await renderApp("/signup", { api: createFakeApi(seedState({ me: null })), auth });
-    const submit = screen().getByRole("button", { name: "Criar conta" });
-    expect(screen().getByText("Pelo menos 8 caracteres.")).toBeTruthy();
-    await type("Seu nome", "Walter");
-    await type("E-mail de trabalho", "walter@acme.com.br");
-    await type("Senha", "curta");
-    expect(screen().getByText("Faltam 3 caracteres (mínimo de 8).").className).toBe("ac-field__error");
-    expect(submit.hasAttribute("disabled")).toBe(true);
-    await type("Senha", "senha-longa");
+    const { router } = await renderApp("/signup", { api, auth });
+    expect(heading()).toBe("Vamos criar sua conta. Qual é o seu e-mail de trabalho?");
+    await type("E-mail", "walter@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(heading()).toBe("Prazer. Esse e-mail é novo por aqui.");
+    await type("Seu nome", "Walter Souza");
+    await press(/^Continuar(?! com)/, 2);
+    expect(heading()).toBe("Boa, Walter. Agora uma senha.");
+    await type("Crie uma senha", "curta");
+    expect(screen().getByText("Faltam 3 caracteres (mínimo de 8).")).toBeTruthy();
+    expect(screen().getByRole("button", { name: /Criar conta/ }).hasAttribute("disabled")).toBe(true);
+    await type("Crie uma senha", "senha-longa");
     expect(screen().getByText("Senha ok.")).toBeTruthy();
-    expect(submit.hasAttribute("disabled")).toBe(false);
-    await act(async () => fireEvent.click(submit));
-    await settle(6);
-    expect(calls[0]?.args[0]).toEqual({ name: "Walter", email: "walter@acme.com.br", password: "senha-longa" });
+    await press(/Criar conta/);
+    expect(calls[0]?.args[0]).toEqual({ name: "Walter Souza", email: "walter@acme.com.br", password: "senha-longa" });
+    // Signed out in the fake, so onboarding sends back to sign-in.
     expect(router.state.location.pathname).toBe("/login");
+  });
+
+  test("sign-up closed for that e-mail: says so and offers another e-mail", async () => {
+    const { api } = authApi({ ...NEW, canSignUp: false });
+    await renderApp("/login", { api, auth: createFakeAuth().auth });
+    await type("E-mail", "stranger@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(heading()).toBe("Esse e-mail ainda não tem conta.");
+    await press("Usar outro e-mail", 2);
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+  });
+});
+
+describe("Senha nova (link do e-mail)", () => {
+  test("saves the new password with the link's token", async () => {
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/reset-password?token=tok-1", { api: createFakeApi(seedState({ me: null })), auth });
+    expect(heading()).toBe("Crie uma senha nova.");
+    await type("Crie uma senha nova.", "senha-nova-1");
+    await press(/Salvar senha/);
+    expect(calls[0]).toEqual({ method: "resetPassword", args: [{ token: "tok-1", newPassword: "senha-nova-1" }] });
+    expect(heading()).toBe("Senha nova salva.");
+  });
+
+  test("an expired link (no token) asks for another", async () => {
+    await renderApp("/reset-password?error=INVALID_TOKEN", {
+      api: createFakeApi(seedState({ me: null })),
+      auth: createFakeAuth().auth,
+    });
+    expect(heading()).toBe("Esse link expirou.");
+    expect(screen().getByRole("link", { name: "Pedir outro link" }).getAttribute("href")).toBe("/login");
   });
 });
 
@@ -449,7 +555,7 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: /Knowledge · Company Knowledge/ })).toBeNull();
     await keepOnly();
-    await keyAndCreate(/^Continuar/);
+    await keyAndCreate(/^Continuar(?! com)/);
     expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual(["Ada"]);
   });
 

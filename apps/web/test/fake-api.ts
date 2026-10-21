@@ -654,7 +654,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     },
     account: {
       authConfig: async () => ({ socialProviders: { google: false, github: true }, signupOpen: true, firstRun: false }),
+      signInOptions: async () => ({ account: false, password: false, providers: [], canSignUp: true }),
       me: async () => state.me,
+      updateMe: async (input) => {
+        log("account.updateMe", input);
+      },
     },
     orgs: {
       create: async (input) => {

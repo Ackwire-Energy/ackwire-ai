@@ -13,6 +13,21 @@ export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
   firstRun: boolean;
+  /** "Esqueci a senha" can send its e-mail. */
+  passwordReset?: boolean;
+}
+
+export type SignInProvider = "google" | "github" | "apple";
+
+/** How an e-mail signs in: the sign-in screen asks for the e-mail first (`account.signInOptions`). */
+export interface SignInOptions {
+  account: boolean;
+  /** The account has a password. */
+  password: boolean;
+  /** Social sign-ins linked to the account. */
+  providers: SignInProvider[];
+  /** No account, and this e-mail may create one. */
+  canSignUp: boolean;
 }
 
 export interface User {

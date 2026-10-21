@@ -26,6 +26,8 @@ export const storage = {
 export const STORAGE_KEYS = {
   theme: "agentes.theme",
   lastOrg: "agentes.lastOrg",
+  /** How this browser signed in last ("google", "github", "apple" or "email"): marked on the sign-in screen. */
+  lastSignIn: "agentes.lastSignIn",
   /** The email the visitor put on the landing page's waiting list. */
   waitlist: "agentes.waitlist",
   /** Set once the visitor opened the link in the confirmation email. */

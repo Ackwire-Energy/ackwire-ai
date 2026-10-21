@@ -49,3 +49,46 @@ export function parseAmount(value: string) {
   if (!/^\d+(\.\d+)?$/.test(normalized)) return Number.NaN;
   return Number(normalized);
 }
+
+/** Common misspellings of webmail domains (the sign-in screen offers the fix). */
+const DOMAIN_TYPOS: Record<string, string> = {
+  "gmial.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "gamil.com": "gmail.com",
+  "gnail.com": "gmail.com",
+  "gmail.con": "gmail.com",
+  "gmail.co": "gmail.com",
+  "gmail.com.br": "gmail.com",
+  "hotmial.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
+  "hotmail.con": "hotmail.com",
+  "outlok.com": "outlook.com",
+  "outllok.com": "outlook.com",
+  "outlook.con": "outlook.com",
+  "yaho.com": "yahoo.com",
+  "yahoo.con": "yahoo.com",
+  "icloud.con": "icloud.com",
+  "icoud.com": "icloud.com",
+  "uol.com": "uol.com.br",
+  "bol.com": "bol.com.br",
+};
+
+/** `ana@gmial.com` → `ana@gmail.com`; null when the domain looks right. */
+export function emailTypoFix(email: string): string | null {
+  const [user, domain, ...rest] = email.trim().toLowerCase().split("@");
+  if (!user || !domain || rest.length) return null;
+  const fixed = DOMAIN_TYPOS[domain];
+  return fixed ? `${user}@${fixed}` : null;
+}
+
+/** Where to read the e-mail we just sent: the webmail of known domains ("Abrir o Gmail"). */
+export function webmailOf(email: string): { name: "Gmail" | "Outlook" | "iCloud Mail" | "Yahoo Mail"; url: string } | null {
+  const domain = email.trim().toLowerCase().split("@")[1] ?? "";
+  if (domain === "gmail.com" || domain === "googlemail.com") return { name: "Gmail", url: "https://mail.google.com" };
+  if (["outlook.com", "hotmail.com", "live.com", "msn.com"].includes(domain))
+    return { name: "Outlook", url: "https://outlook.live.com/mail" };
+  if (["icloud.com", "me.com", "mac.com"].includes(domain)) return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };
+  if (domain.startsWith("yahoo.")) return { name: "Yahoo Mail", url: "https://mail.yahoo.com" };
+  return null;
+}

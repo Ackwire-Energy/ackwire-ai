@@ -167,26 +167,36 @@ export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy:
   );
 }
 
-/* ---------- Sign in and sign up: the landing's sky ---------- */
+/* ---------- Sign in and sign up ---------- */
 
-/** The auth aside's sky, calm behind the given elements (text and messages). */
-export function AuthSky({ calm }: { calm: () => (Element | null)[] }) {
+/**
+ * The sign-in screen's horizon (telas/EntrarCadastro.html, C): soft tones rising from the page
+ * at the bottom, a few agents passing. Calm, so the one question above stays the subject.
+ */
+export function AuthHorizon() {
+  const opts: SkyOptions = {
+    pixel: 4,
+    surface: "--bg",
+    palette: (bg) => softTones("sky", bg),
+    body: spriteTone("sky"),
+    near: 0,
+    ceil: 0.3,
+    light: 0.06,
+    sprites: 6,
+    base: (u, v, tt) => {
+      const s = Math.max(0, (v - 0.2) / 0.8);
+      const e = s * s * (3 - 2 * s);
+      return 0.78 * e + 0.05 * S(u * 4 + tt * 0.4) * e;
+    },
+    blobs: (tt) => [
+      [0.2 + 0.1 * C(tt * 0.17), 0.95, 0.06, 0.08],
+      [0.8 + 0.1 * S(tt * 0.13), 0.92, 0.06, 0.08],
+    ],
+  };
   return (
-    <PixelSky
-      options={{
-        pixel: 4,
-        palette: SKY_TONES,
-        sprites: { area: 1500, max: 34 },
-        calm,
-        base: (u, v) => 0.86 - 0.42 * u - 0.48 * v,
-        blobs: (tt) => [
-          [0.18 + 0.06 * S(tt * 0.21), 0.2 + 0.05 * C(tt * 0.17), 0.12, 0.16],
-          [0.62 + 0.08 * S(tt * 0.13), 0.35 + 0.08 * C(tt * 0.19), 0.08, 0.14],
-          [0.86 + 0.05 * C(tt * 0.15), 0.92 + 0.04 * S(tt * 0.23), 0.16, -0.3],
-          [0.42 + 0.1 * C(tt * 0.11), 0.95, 0.1, -0.16],
-        ],
-      }}
-    />
+    <span className="auth__horizon" aria-hidden="true">
+      <PixelSky options={opts} />
+    </span>
   );
 }
 

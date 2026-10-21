@@ -21,12 +21,16 @@ import {
   requirePermission,
   revokeInvitation,
   setAvatar,
+  setMyLocale,
   setOrgLogo,
+  signInOptions,
   updateOrganization,
   updateOrgSettings,
+  USER_LOCALES,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { authUiConfig } from "../../auth";
+import { clientIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
@@ -43,6 +47,8 @@ import {
 import { Invitation, Member, Organization, Role } from "./schemas";
 
 const tags = ["Account"];
+/** E-mail lookups on the sign-in screen: enough for typos and a few accounts, not for listing who has one. */
+const SIGN_IN_OPTIONS_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
 const Name = z.string().trim().min(1).max(100);
 const Context = z.string().max(20_000).openapi({ description: "Shared with every agent of the organization." });
 
@@ -77,6 +83,7 @@ export function accountRoutes(deps: AppDeps) {
               .boolean()
               .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
             firstRun: z.boolean().openapi({ description: "No account exists yet: show first-run setup." }),
+            passwordReset: z.boolean().openapi({ description: "Offer \"forgot password\" (e-mail is configured)." }),
           }),
         ),
       },
@@ -84,9 +91,51 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       const users = await countUsers(db);
       return c.json(
-        { ...authUiConfig(config), signupOpen: config.ALLOW_SIGNUP || users === 0, firstRun: users === 0 },
+        {
+          ...authUiConfig(config),
+          signupOpen: config.ALLOW_SIGNUP || users === 0,
+          firstRun: users === 0,
+          passwordReset: deps.adapters.email.delivers === true,
+        },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/sign-in-options",
+      tags,
+      summary: "How an e-mail signs in (the login screen asks for the e-mail first)",
+      description: "Tells whether the e-mail has an account, so it is rate limited per IP.",
+      request: {
+        body: body(
+          z.object({
+            email: z.email().max(254),
+            inviteToken: z.string().min(1).max(200).optional().openapi({ description: "From an org invite link." }),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z.object({
+            account: z.boolean(),
+            password: z.boolean().openapi({ description: "The account has a password." }),
+            providers: z.array(z.enum(["google", "github", "apple"])).openapi({ description: "Social sign-ins linked." }),
+            canSignUp: z.boolean().openapi({ description: "No account, and this e-mail may create one." }),
+          }),
+        ),
+        429: errorResponse("Too many attempts (`rate_limited`)"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const ip = clientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip"));
+      const limit = await deps.adapters.rateLimiter.consume(`sign-in-options:${ip}`, SIGN_IN_OPTIONS_PER_IP);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
+      const { email, inviteToken } = c.req.valid("json");
+      return c.json(await signInOptions(db, email, config.ALLOW_SIGNUP, inviteToken), 200);
     },
   );
 
@@ -148,6 +197,23 @@ export function accountRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/me",
+      tags,
+      security,
+      summary: "Change your app language",
+      description: "The language of the emails and pushes sent to you. The onboarding saves the one in use.",
+      request: { body: body(z.object({ locale: z.enum(USER_LOCALES) })) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      await setMyLocale(db, c.get("user").id, c.req.valid("json").locale);
+      return c.body(null, 204);
     },
   );
 
