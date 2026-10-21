@@ -100,7 +100,10 @@ export function EffortPixels<V extends string>({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const n = steps.length;
-  const index = Math.max(0, steps.findIndex((s) => s.value === value));
+  const index = Math.max(
+    0,
+    steps.findIndex((s) => s.value === value),
+  );
   // While dragging: how far the fill reaches, in steps.
   const [drag, setDrag] = useState<number | null>(null);
   const shown = drag === null ? index : Math.min(n - 1, Math.max(0, Math.ceil(drag) - 1));
@@ -124,7 +127,14 @@ export function EffortPixels<V extends string>({
       if (frame++ % 30 === 0) colors = { ink: token(c, "--ink", "#151514"), off: token(c, "--faint", "#6f6f6a") };
       const m = motion.current;
       m.pos = still ? m.target : m.pos + (m.target - m.pos) * 0.16;
-      drawEffort(ctx, c, { pos: m.pos, steps: n, t: still ? 0 : now, fill: tones[1], tip: tones[3], ...colors });
+      drawEffort(ctx, c, {
+        pos: m.pos,
+        steps: n,
+        t: still ? 0 : now,
+        fill: tones[1] ?? "#5b8def",
+        tip: tones[3] ?? "#9cc0ff",
+        ...colors,
+      });
       if (!still) raf = requestAnimationFrame(paint);
     };
     raf = requestAnimationFrame(paint);
@@ -166,7 +176,6 @@ export function EffortPixels<V extends string>({
       <canvas
         ref={canvas}
         className="ac-effort__ramp"
-        aria-hidden="true"
         onPointerDown={(e) => {
           if (disabled) return;
           e.currentTarget.setPointerCapture?.(e.pointerId);
