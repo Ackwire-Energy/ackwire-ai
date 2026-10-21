@@ -43,6 +43,7 @@ import { createDesktopReleases, registerDesktopRoutes } from "./routes/desktop";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
+import { registerInstance } from "./routes/instance";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
@@ -68,6 +69,7 @@ export interface AppOptions {
  *
  * Layout:
  * - `/api/health`         health probe
+ * - `/api/instance`       public: what this server is, for the phone and desktop apps choosing a server
  * - `/api/auth/*`         Better Auth (sign-up, sign-in, sessions, OAuth callbacks)
  * - `/api/app/*`          private API of the web and phone apps (cookie session + CSRF, ADR 0035)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
@@ -101,6 +103,7 @@ export function createApp(options: AppOptions) {
     const { auth } = options.services;
     api.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
     const deps = options.services;
+    registerInstance(api, deps, options.version);
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));

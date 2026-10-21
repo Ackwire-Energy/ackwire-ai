@@ -94,6 +94,7 @@ import type {
   OrgOverview,
   OrgSettings,
   Person,
+  PhoneSignIn,
   Proposal,
   ReactionCount,
   Reminder,
@@ -305,6 +306,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       signInOptions: (input) => request<SignInOptions>("/api/app/sign-in-options", { json: input }),
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
+      phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
     },
     orgs: {
       create: (input) =>

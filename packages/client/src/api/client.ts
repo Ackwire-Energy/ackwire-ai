@@ -125,6 +125,7 @@ import type {
   OrgOverview,
   OrgSettings,
   Person,
+  PhoneSignIn,
   Proposal,
   ReactionCount,
   Reminder,
@@ -196,6 +197,8 @@ export interface ApiClient {
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
     updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
+    /** A one-time sign-in for the phone app, shown as a QR code. */
+    phoneSignIn(): Promise<PhoneSignIn>;
   };
   orgs: {
     create(input: {

@@ -35,6 +35,28 @@ export interface SignInOptions {
   canSignUp: boolean;
 }
 
+/** `GET /api/instance`: what the phone and desktop apps check before using a server. Public, nothing secret. */
+export interface Instance {
+  /** Always "agentes.chat". */
+  name: string;
+  version: string;
+  /** The app API contract the server speaks, and the oldest one it still serves. */
+  api: number;
+  minApi: number;
+  /** The server's own address (`PUBLIC_URL`), the only one its realtime accepts. */
+  url: string;
+  signIn: { email: boolean; google: boolean; github: boolean; apple: boolean };
+  signup: "open" | "invite";
+}
+
+/** "Abrir no celular": a sign-in for the phone, single use, a few minutes long. */
+export interface PhoneSignIn {
+  token: string;
+  /** The server's own address (`PUBLIC_URL`). */
+  server: string;
+  expiresAt: string;
+}
+
 export interface User {
   id: string;
   name: string;

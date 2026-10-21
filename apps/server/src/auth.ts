@@ -1,11 +1,13 @@
-import { sign as signWithKey } from "node:crypto";
+import { randomBytes, sign as signWithKey } from "node:crypto";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
 import { deriveSecret, emailLocale, isSignupAllowed, onUserCreated, queueEmail, sha256 } from "@agenteschat/engine";
 import { expo } from "@better-auth/expo";
-import { betterAuth } from "better-auth";
+import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware } from "better-auth/api";
+import { setSessionCookie } from "better-auth/cookies";
+import { z } from "zod";
 import type { Logger } from "./logger";
 
 /**
@@ -54,7 +56,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
     trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
-    plugins: [expo()],
+    plugins: [expo(), phoneSignIn],
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: {
@@ -207,6 +209,48 @@ export function authUiConfig(config: Config) {
     privacyUrl: config.PRIVACY_URL ?? null,
   };
 }
+
+/** How long the sign-in in "Abrir no celular" (the web app's QR code) lasts. */
+const PHONE_SIGN_IN_TTL_MS = 3 * 60_000;
+const phoneSignInKey = (token: string) => `phone-sign-in:${sha256(token)}`;
+
+/**
+ * A one-time sign-in for the phone, minted from a signed-in session: single use, a few minutes long, stored
+ * as a hash, and void once that session ends (signing out on the web voids a QR code still on screen).
+ */
+export async function mintPhoneSignIn(auth: Auth, sessionToken: string) {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + PHONE_SIGN_IN_TTL_MS);
+  const { internalAdapter } = await auth.$context;
+  await internalAdapter.createVerificationValue({ identifier: phoneSignInKey(token), value: sessionToken, expiresAt });
+  return { token, expiresAt };
+}
+
+/**
+ * `POST /api/auth/sign-in/one-time-token { token }`: the phone trades the token for a session of its own.
+ * Better Auth's `oneTimeToken` plugin would hand it the browser's session instead, so signing out on one
+ * device would sign out the other.
+ */
+const phoneSignIn = {
+  id: "phone-sign-in",
+  endpoints: {
+    signInOneTimeToken: createAuthEndpoint(
+      "/sign-in/one-time-token",
+      { method: "POST", body: z.object({ token: z.string().min(1).max(200) }), use: [formCsrfMiddleware] },
+      async (ctx) => {
+        const { internalAdapter } = ctx.context;
+        const minted = await internalAdapter.consumeVerificationValue(phoneSignInKey(ctx.body.token));
+        const from = minted ? await internalAdapter.findSession(minted.value) : null;
+        if (!from || from.session.expiresAt < new Date()) {
+          throw new APIError("UNAUTHORIZED", { message: "This code expired or was already used" });
+        }
+        const session = await internalAdapter.createSession(from.user.id);
+        await setSessionCookie(ctx, { session, user: from.user });
+        return ctx.json({ user: { id: from.user.id, name: from.user.name, email: from.user.email } });
+      },
+    ),
+  },
+} satisfies BetterAuthPlugin;
 
 /** The phone app's URL scheme (deep links back from social sign-in). */
 export const APP_SCHEME = "agenteschat://";

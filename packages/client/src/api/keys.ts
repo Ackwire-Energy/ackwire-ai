@@ -3,6 +3,7 @@ export const keys = {
   health: ["health"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
+  phoneSignIn: ["phone-sign-in"] as const,
   models: ["models"] as const,
   invitation: (token: string) => ["invitation", token] as const,
   org: (orgId: string) => ["org", orgId] as const,
