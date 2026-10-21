@@ -104,105 +104,108 @@ export function AgentHero({
   const g = agentGrammar(t, agent.name);
   return (
     <header className="agp-hero">
-      <div className="agp-cover" data-busy={busy || undefined}>
-        <AgentCover color={draft.look.color as AgentColor} busy={busy} />
-        <div className="agp-cover__acts">
-          {!onClose && (
-            <Button asChild variant="primary" size="sm" className="agp-chat">
-              <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-                <Icon name="message" size={14} />
-                {t("agent.chat")}
-              </Link>
-            </Button>
-          )}
-          <Menu
-            align="end"
-            label={t("agent.moreActions")}
-            trigger={
-              <Button size="sm" iconOnly icon="more" className="agp-glass" aria-label={t("agent.moreActions")} />
-            }
-          >
-            {home && (
-              <MenuItem
-                icon="channel"
-                onSelect={() =>
-                  void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: home.id } })
-                }
-              >
-                {t("agent.openIn", { channel: home.name })}
-              </MenuItem>
+      {/* One card holds who the agent is: cover, face, name and how it works (telas/AgenteFundo.html, B). */}
+      <section className="agp-idcard" aria-label={name}>
+        <div className="agp-cover" data-busy={busy || undefined}>
+          <AgentCover color={draft.look.color as AgentColor} busy={busy} />
+          <div className="agp-cover__acts">
+            {!onClose && (
+              <Button asChild variant="primary" size="sm" className="agp-chat">
+                <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+                  <Icon name="message" size={14} />
+                  {t("agent.chat")}
+                </Link>
+              </Button>
             )}
-            {viewer === "admin" && (
+            <Menu
+              align="end"
+              label={t("agent.moreActions")}
+              trigger={
+                <Button size="sm" iconOnly icon="more" className="agp-glass" aria-label={t("agent.moreActions")} />
+              }
+            >
+              {home && (
+                <MenuItem
+                  icon="channel"
+                  onSelect={() =>
+                    void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: home.id } })
+                  }
+                >
+                  {t("agent.openIn", { channel: home.name })}
+                </MenuItem>
+              )}
+              {viewer === "admin" && (
+                <MenuItem
+                  icon="edit"
+                  onSelect={() => {
+                    goTo("settings", "identity");
+                    setTimeout(() => document.getElementById("agp-name")?.focus());
+                  }}
+                >
+                  {t("agent.editIdentity")}
+                </MenuItem>
+              )}
+              <MenuItem icon="book" onSelect={() => goTo("memory")}>
+                {t("agent.viewMemory")}
+              </MenuItem>
+              {viewer !== "member" && (
+                <MenuItem icon="routines" onSelect={() => goTo("activity")}>
+                  {t("agent.viewRuns")}
+                </MenuItem>
+              )}
               <MenuItem
-                icon="edit"
+                icon="copy"
                 onSelect={() => {
-                  goTo("settings", "identity");
-                  setTimeout(() => document.getElementById("agp-name")?.focus());
+                  void navigator.clipboard?.writeText(`@${agent.handle}`).catch(() => {});
+                  toast.show(t("agentPage.copied", { handle: agent.handle }));
                 }}
               >
-                {t("agent.editIdentity")}
+                {t("agentPage.copyHandle", { handle: agent.handle })}
               </MenuItem>
+              {viewer === "admin" && (
+                <MenuItem icon="archive" danger onSelect={onArchive}>
+                  {t("agentPage.archive.action", g)}
+                </MenuItem>
+              )}
+            </Menu>
+            {onExpand && (
+              <Button
+                size="sm"
+                iconOnly
+                icon="external"
+                className="agp-glass"
+                aria-label={t("agentPage.panel.expand")}
+                title={t("agentPage.panel.expand")}
+                onClick={onExpand}
+              />
             )}
-            <MenuItem icon="book" onSelect={() => goTo("memory")}>
-              {t("agent.viewMemory")}
-            </MenuItem>
-            {viewer !== "member" && (
-              <MenuItem icon="routines" onSelect={() => goTo("activity")}>
-                {t("agent.viewRuns")}
-              </MenuItem>
+            {onClose && (
+              <Button
+                size="sm"
+                iconOnly
+                icon="close"
+                className="agp-glass"
+                aria-label={t("common.close")}
+                title={t("common.close")}
+                onClick={onClose}
+              />
             )}
-            <MenuItem
-              icon="copy"
-              onSelect={() => {
-                void navigator.clipboard?.writeText(`@${agent.handle}`).catch(() => {});
-                toast.show(t("agentPage.copied", { handle: agent.handle }));
-              }}
-            >
-              {t("agentPage.copyHandle", { handle: agent.handle })}
-            </MenuItem>
-            {viewer === "admin" && (
-              <MenuItem icon="archive" danger onSelect={onArchive}>
-                {t("agentPage.archive.action", g)}
-              </MenuItem>
-            )}
-          </Menu>
-          {onExpand && (
-            <Button
-              size="sm"
-              iconOnly
-              icon="external"
-              className="agp-glass"
-              aria-label={t("agentPage.panel.expand")}
-              title={t("agentPage.panel.expand")}
-              onClick={onExpand}
-            />
-          )}
-          {onClose && (
-            <Button
-              size="sm"
-              iconOnly
-              icon="close"
-              className="agp-glass"
-              aria-label={t("common.close")}
-              title={t("common.close")}
-              onClick={onClose}
-            />
-          )}
+          </div>
         </div>
-      </div>
-      {/* In the middle, over the cover's edge, cut out by a ring of the page (telas/AgenteTopo.html, D). */}
-      <span className="agp-face">
-        <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} />
-      </span>
-      <div className="agp-ident">
-        <h1 className="agp-name">{name}</h1>
-        <span className="agp-handle">
-          @{agent.handle}
-          {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
+        {/* In the middle, over the cover's edge, cut out by a ring of the card (telas/AgenteTopo.html, D). */}
+        <span className="agp-face">
+          <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} />
         </span>
-      </div>
-      {/* In the panel the numbers stay on the full page. */}
-      <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+        <div className="agp-ident">
+          <h1 className="agp-name">{name}</h1>
+          <span className="agp-handle">
+            @{agent.handle}
+            {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
+          </span>
+        </div>
+        {/* In the panel the numbers stay on the full page. */}
+        <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+      </section>
     </header>
   );
 }

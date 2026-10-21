@@ -624,6 +624,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         <div className="agp-tabs" ref={top}>
           <Tabs
             label={t("agentPage.tabsLabel", g)}
+            variant="segmented"
             value={tab}
             onValueChange={(next) => goTo(next)}
             items={AGENT_TABS.map((id) => ({ value: id, label: tabLabel(id) }))}

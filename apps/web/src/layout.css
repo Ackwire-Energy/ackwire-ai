@@ -9921,6 +9921,66 @@ textarea.onb__big.ac-input {
   width: 100%;
   height: 100%;
 }
+/*
+ * telas/AgenteFundo.html, B: the agent's page sits on a grayer desk (full page and the panel beside its DM),
+ * and who the agent is (cover, face, name, how it works) lives in one white card, so it never blends
+ * with the cards of the tabs.
+ */
+:root,
+[data-theme="light"] {
+  --agp-desk: #efefec;
+}
+[data-theme="dark"] {
+  --agp-desk: #080807;
+}
+.shell__main:not(.shell__main--chat):has(> .agp),
+.thread-panel--wide {
+  --pane: var(--agp-desk);
+  --bg: var(--agp-desk);
+  --surface: var(--agp-desk);
+}
+.agp-idcard {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
+  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
+  box-shadow: var(--card-shadow);
+}
+/* Concentric with the card. */
+.agp-idcard .agp-cover {
+  border-radius: calc(var(--radius-section) - 8px);
+  box-shadow: none;
+}
+.agp-idcard .agp-face {
+  box-shadow:
+    0 0 0 5px var(--surface-raised),
+    var(--e1);
+}
+.agp-idcard .agp-work {
+  padding-top: 14px;
+}
+/* The three cells are part of the card: a hairline above them, no card of their own. */
+.agp-idcard .agp-workcard {
+  padding: 6px 0 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+/* The tabs as a segmented control under the card, centered; it sticks to the top while the page scrolls. */
+.agp-tabs .ac-tabs--seg {
+  position: sticky;
+  top: 8px;
+  z-index: var(--z-sticky);
+  display: flex;
+  width: max-content;
+  margin: 16px auto 0;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 2px rgba(0, 0, 0, 0.06),
+    0 6px 16px -10px rgba(0, 0, 0, 0.25);
+}
 .agp-ident {
   display: flex;
   flex-direction: column;
