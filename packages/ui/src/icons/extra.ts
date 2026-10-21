@@ -262,6 +262,11 @@ export const extraIcons = {
   ],
   /** The cloud computer. */
   cloud: [["path", { d: "M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z" }]],
+  /** "Abrir no celular". */
+  phone: [
+    ["rect", { x: "5.5", y: "2.5", width: "9", height: "15", rx: "2" }],
+    ["path", { d: "M9 14.5h2" }],
+  ],
   /**
    * Computers: each computer's line icon (the small form of its
    * portrait, `ComputerIcon`), redrawn from the 24px grid. A laptop with the notch.

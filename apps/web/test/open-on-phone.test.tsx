@@ -1,0 +1,66 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import { connectLink } from "@agenteschat/client/lib/server";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { encode } from "uqr";
+import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { renderApp, screen, settle } from "./render";
+
+afterEach(() => cleanup());
+
+const click = (el: Element) => act(async () => fireEvent.click(el));
+
+/** Account menu → Abrir no celular. */
+async function openPhoneDialog(state: ReturnType<typeof seedState>) {
+  await renderApp(`/org/${ORG_ID}/issues`, { api: createFakeApi(state) });
+  await settle(6);
+  await click(screen().getByRole("button", { name: /^Conta: / }));
+  await act(() => new Promise((r) => setTimeout(r, 0)));
+  const menu = screen().getAllByRole("menu")[0] as HTMLElement;
+  await click(within(menu).getByRole("menuitem", { name: /^Abrir no celular/ }));
+  await settle(4);
+  return screen().getByRole("dialog", { name: "Abrir no celular" });
+}
+
+describe("Abrir no celular", () => {
+  test("a QR code of the connect link with a fresh sign-in, how long it lasts and what to do", async () => {
+    const state = seedState();
+    const dialog = await openPhoneDialog(state);
+    expect(state.calls.filter((c) => c.method === "account.phoneSignIn")).toHaveLength(1);
+
+    const qr = within(dialog).getByRole("img", { name: "QR code para entrar no app agentes" });
+    const expected = encode(connectLink("https://agentes.chat", "tok-1"), { ecc: "M", border: 2 });
+    expect(qr.getAttribute("viewBox")).toBe(`0 0 ${expected.size} ${expected.size}`);
+    const modules = qr.querySelector("path")?.getAttribute("d")?.match(/M/g)?.length;
+    expect(modules).toBe(expected.data.flat().filter(Boolean).length);
+
+    expect(dialog.textContent).toMatch(/Vale por [23]:\d\d/);
+    expect(
+      within(dialog)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual([
+      "Instale o app agentes no celular (App Store ou Google Play).",
+      "Aponte a câmera do celular para o código.",
+    ]);
+    expect(dialog.textContent).toContain("Quem escanear este código entra na sua conta.");
+  });
+
+  test("on a tailnet, installing Tailscale comes before scanning", async () => {
+    const state = seedState();
+    state.phoneServer = "https://box.tail1234.ts.net";
+    const dialog = await openPhoneDialog(state);
+    expect(
+      within(dialog)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual([
+      "Instale o app agentes no celular (App Store ou Google Play).",
+      "Instale o Tailscale no celular e entre na mesma rede (tailnet) deste servidor.",
+      "Aponte a câmera do celular para o código.",
+    ]);
+  });
+});

@@ -7677,6 +7677,30 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
+/* Abrir no celular: the QR code stays dark on white in both themes (cameras read that best), then the steps. */
+.phone-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.phone-code__qr {
+  width: 216px;
+  height: 216px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.phone-code__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.phone-code .machine-pair__steps {
+  align-self: stretch;
+}
+
 /* Configurações → Computadores: the two kinds, the cloud card, your computers, each agent's. */
 .computers-kinds {
   display: grid;
