@@ -91,8 +91,10 @@ reads the address from Tailscale and writes `PUBLIC_URL`.
 page, **Share**). Then invite them in the app, from **Settings → Members and invitations**.
 
 **Running the setup again** is safe: it keeps `.env` and fills in only what's missing, asking with
-your current answers as defaults. `--dry-run` prints the plan and changes nothing, and `--help`
-lists every option.
+your current answers as defaults. A `PUBLIC_URL` of your own (nginx, a tunnel) stays as it is.
+Choosing another way in removes the old one's container (Caddy or Tailscale), which
+`docker compose up` alone would leave running. `--dry-run` prints the plan and changes nothing, and
+`--help` lists every option.
 
 `docker compose ps` shows the app as `healthy` once it answers `/api/health`, and
 `docker compose logs -f agentes` shows what it is doing.
@@ -107,14 +109,15 @@ lists every option.
    **Connected**.
 2. Install the agentes.chat app.
 3. Point the phone's camera at a QR code for your instance. The setup prints one at the end; in the
-   web app, **Abrir no celular** in the account menu shows one that also signs you in. Or, on the
-   app's sign-in screen, tap the server line (**Servidor: agentes.chat · Trocar**), then
-   **Escanear QR code**, or type the address and tap **Usar este servidor**.
+   web app, **Open on your phone** (**Abrir no celular** in Portuguese) in the account menu shows
+   one that also signs you in. Or, on the app's sign-in screen, tap the server line
+   (**Server: agentes.chat · Change**, or **Servidor: agentes.chat · Trocar**), then
+   **Scan QR code**, or type the address and tap **Use this server**.
 4. The app shows your server's address. Confirm, then sign in (the web app's code signs you in by
    itself).
 
 If the app can't reach the server, open the Tailscale app, check that it's connected, and try again.
-**Voltar para agentes.chat**, on the screen **Trocar** opens, goes back to agentes.chat Cloud.
+**Back to agentes.chat**, on the screen **Change** opens, goes back to agentes.chat Cloud.
 
 The QR code is a link, `agenteschat://connect?server=<the address, URL-encoded>`. The web app's adds
 `&token=<a one-time sign-in>`, which works once, within 3 minutes, for whoever scans it: show it to
@@ -129,9 +132,10 @@ Agents run commands and code, drive a browser, and can think with Claude Code or
 you connect (Agent computers, below). A computer must reach the instance, so on Tailscale, install
 Tailscale on it and sign in to the same tailnet first.
 
-- **A Mac:** the agentes.chat desktop app. On its first screen, tap the server line
-  (**Servidor: agentes.chat · Trocar**), paste your address (`https://agentes.<your-tailnet>.ts.net`)
-  and sign in when the browser opens. **Adicionar organização** has the same line.
+- **A Mac:** the agentes.chat desktop app. On its first screen, click the server line
+  (**Server: agentes.chat · Change**), paste your address (`https://agentes.<your-tailnet>.ts.net`),
+  click **Use this server**, and sign in when the browser opens. **Add organization** has the same
+  line.
 - **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
   Agent computers below explains it.
 
@@ -368,7 +372,8 @@ account must exist first.
    **Add Funnel to policy**. It covers your members' devices. A server added with an OAuth client
    secret is tagged: add its tag to the rule's `"target"`, as in
    `{ "target": ["autogroup:member", "tag:agentes"], "attr": ["funnel"] }`.
-2. Set `TAILSCALE_FUNNEL=true` in `.env` and run `docker compose up -d`.
+2. Set `TAILSCALE_FUNNEL=true` in `.env` (exactly `true` or `false`: Compose refuses any other
+   value) and run `docker compose up -d`.
 
 Check it from outside the tailnet, a phone on mobile data with Tailscale off for example:
 `https://agentes.<your-tailnet>.ts.net/api/health` answers `{"status":"ok",…}`. Public DNS for the
@@ -398,7 +403,7 @@ ones a self-hosted instance usually touches:
 | `TS_AUTHKEY` | | The auth key or OAuth client secret the server joins your tailnet with, read only until it has joined. The setup empties it then. |
 | `TS_HOSTNAME` | `agentes` | The server's name in your tailnet: `https://<TS_HOSTNAME>.<tailnet>.ts.net`. After changing it, run the setup again to update `PUBLIC_URL`. |
 | `TS_EXTRA_ARGS` | | More `tailscale up` flags. The setup puts `--advertise-tags` here for an OAuth client secret. |
-| `TAILSCALE_FUNNEL` | `false` | `true` opens the instance to the internet at the same address (What needs a public URL). |
+| `TAILSCALE_FUNNEL` | `false` | `true` opens the instance to the internet at the same address (What needs a public URL). Only `true` or `false`. |
 | `ALLOW_SIGNUP` | `false` | `true` lets anyone create an account. |
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
@@ -604,6 +609,12 @@ docker compose start agentes
 On a new server: the compose file and the old `.env`, `docker compose up -d --wait postgres`, the
 restore commands above, then `docker compose up -d`. Restore into the version that took the dump or
 a newer one.
+
+On Tailscale, the new server needs a key of its own: its login stays in the old server's
+`tailscale-state` volume. On https://console.tailscale.com/admin/machines, remove the old server
+(its **⋯** menu, **Remove**) so the new one gets the same name, then run the setup in the restored
+directory instead of the last `docker compose up -d`. It asks for an auth key (or takes
+`--tailscale-key`) and writes `PUBLIC_URL` again if the name changed.
 
 </details>
 
