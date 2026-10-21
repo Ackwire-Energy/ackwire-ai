@@ -297,6 +297,45 @@ describe("custom MCP servers", () => {
     expect(accepted.server.tools.find((t) => t.name === "reopen_ticket")?.access).not.toBeNull();
   });
 
+  test("connecting the same address again updates the credentials in place: grants and classification stay", async () => {
+    f = await setup();
+    const mcp = ticketsMcp();
+    const deps = depsOf(f, { connect: mcp.connect });
+    const first = await connectCustomServer(deps, f.owner.id, f.org.id, {
+      serverUrl: SERVER,
+      apiKey: "tk_old_12345",
+      label: "Tickets",
+    });
+    if (first.status !== "connected") throw new Error(`expected connected, got ${first.status}`);
+    const id = first.server.id;
+    await saveCustomTools(deps, f.owner.id, f.org.id, id, {
+      label: "Suporte",
+      tools: [{ name: "list_tickets", access: "read", label: "Listar chamados" }],
+    });
+    await setAgentScopes(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      f.agent.id,
+      [{ connectionId: id, scope: `custom:${id}:read` }],
+      connectorGrantValidator,
+    );
+
+    const again = await connectCustomServer(deps, f.owner.id, f.org.id, {
+      serverUrl: SERVER,
+      apiKey: "tk_new_12345",
+      label: "Tickets",
+    });
+    if (again.status !== "connected") throw new Error(`expected connected, got ${again.status}`);
+    expect(again.server.id).toBe(id);
+    expect(again.server.label).toBe("Suporte");
+    expect(again.server.tools.find((t) => t.name === "list_tickets")?.access).toBe("read");
+    expect(await f.db.select().from(schema.connectorConnections)).toHaveLength(1);
+    const grants = await f.db.select().from(schema.agentScopes);
+    expect(grants.filter((g) => g.connectionId === id).map((g) => g.scope)).toEqual([`custom:${id}:read`]);
+    expect(mcp.state.headers.at(-1)).toEqual({ authorization: "Bearer tk_new_12345" });
+  });
+
   test("MCP-native OAuth: discovery, dynamic registration, PKCE S256 + resource, token refresh", async () => {
     f = await setup();
     const mcp = ticketsMcp();
