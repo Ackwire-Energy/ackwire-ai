@@ -34,6 +34,11 @@ const dialog = async (word: string, title: string) => {
 const brainDialog = () => dialog("Mudar quem pensa", "Quem pensa");
 const card = (d: HTMLElement, name: RegExp) =>
   within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name });
+/** The opened brain's model, one click away (a segmented control). */
+const model = (d: HTMLElement, name: RegExp) => click(within(d).getByRole("radio", { name }));
+/** The switch at the opened brain's foot: answer through the API while the computer is off. */
+const offSwitch = (d: HTMLElement) =>
+  within(d).getByRole("switch", { name: /^Se o MacBook desligar, responder pela API/ });
 /** Opens one of the opened brain's dropdowns and picks an option. */
 const pick = async (d: HTMLElement, select: string, option: RegExp) => {
   const trigger = within(d).getByRole("combobox", { name: select });
@@ -90,7 +95,7 @@ describe("Como trabalha under the name", () => {
 });
 
 describe("Quem pensa (its dialog)", () => {
-  test("three brains in a list with their portraits and where each runs; the organization's model and key under it", async () => {
+  test("three brains in a list with their portraits and where each runs; the organization's model and key in its card", async () => {
     await open();
     const d = await brainDialog();
     const rows = within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getAllByRole("radio");
@@ -106,13 +111,15 @@ describe("Quem pensa (its dialog)", () => {
     expect(rows[2]?.querySelector(".ac-brand--openai")).not.toBeNull();
     // The agent is on the cloud: a plan brain says where it will go, before it is chosen.
     expect(rows.map((r) => r.querySelector(".ac-optrow__side")?.textContent)).toEqual([
-      "Pago pela organização",
+      undefined,
       "Vai para o MacBook",
       "Vai para o MacBook",
     ]);
-    const more = d.querySelector(".ac-optrow__more") as HTMLElement;
+    // The chosen brain and its settings are one card.
+    const more = d.querySelector(".ac-optcard .ac-optrow__more") as HTMLElement;
+    expect(rows[0]?.textContent).toContain("Pela API. O uso conta no orçamento da Ada.");
     expect(within(more).getByRole("combobox", { name: "Modelo" })).toBeTruthy();
-    expect(within(more).getByRole("combobox", { name: "Chave" })).toBeTruthy();
+    expect(within(more).getByRole("combobox", { name: "Chave da API" })).toBeTruthy();
     expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -123,8 +130,10 @@ describe("Quem pensa (its dialog)", () => {
     expect(d.textContent).toContain("O plano do Claude é seu, pessoal.");
     // The agent moves to the MacBook: its accounts there aren't offered yet.
     expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
-    await pick(d, "Modelo", /^Opus/);
-    await pick(d, "Se o MacBook desligar", /^Espera o MacBook ligar/);
+    await model(d, /^Opus$/);
+    expect(offSwitch(d).getAttribute("aria-checked")).toBe("true");
+    await click(offSwitch(d));
+    expect(d.textContent).toContain("A Ada avisa quem chamou e espera ele voltar.");
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
     expect(callOrder(state)).toEqual(["sandbox.setTarget", "agents.setBrain"]);
@@ -144,7 +153,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(sentence().textContent).toContain("Codex · GPT-6 Sol · esforço médio");
     const d = await brainDialog();
     expect(card(d, /^Codex/).getAttribute("aria-checked")).toBe("true");
-    await pick(d, "Modelo", /Luna/);
+    await model(d, /Luna/);
     expect(d.textContent).not.toContain("é seu, pessoal");
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
@@ -201,7 +210,6 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
     expect(account.textContent).toContain("Conta deste MacBook");
-    expect(d.textContent).toContain("Quem paga o uso");
     account.focus();
     await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
     const options = screen().getAllByRole("option");
@@ -211,7 +219,12 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       "Adicionar conta",
     ]);
     await click(screen().getByRole("option", { name: /^Trabalho · Team/ }));
-    await pick(d, "Esforço", /^Alto/);
+    // Effort: the pixel ramp, a slider (Médio → Alto with the arrow key).
+    const effort = within(d).getByRole("slider", { name: "Esforço" });
+    expect(effort.getAttribute("aria-valuetext")).toBe("Médio");
+    await act(async () => fireEvent.keyDown(effort, { key: "ArrowRight" }));
+    expect(effort.getAttribute("aria-valuetext")).toBe("Alto");
+    expect(d.textContent).toContain("Pensa mais em tarefas difíceis.");
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({
@@ -233,7 +246,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(sentence().textContent).not.toContain("Conta deste MacBook");
     d = await brainDialog();
     expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
-    expect(within(d).getByRole("combobox", { name: "Esforço" })).toBeTruthy();
+    expect(within(d).getByRole("slider", { name: "Esforço" })).toBeTruthy();
   });
 
   test("a signed-out account says so and offers to sign in again", async () => {

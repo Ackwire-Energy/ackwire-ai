@@ -39,22 +39,24 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EffortPixels,
   Icon,
   type IconName,
   Input,
   LogoMark,
   OptionList,
+  Segmented,
   Select,
   type SelectOption,
   SettingNote,
-  SettingRow,
+  Switch,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { CLOUD } from "@/components/AgentComputer";
-import { DEFAULT_KEY, keyOptions, modelDescription } from "@/components/AgentFields";
+import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { cleanSite, SITE } from "@/components/browser/sites";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
@@ -365,10 +367,11 @@ function Footer({
 // ── Quem pensa ──────────────────────────────────────────────────────────────
 
 /*
- * telas/ContaClaude.html ("Nova"): the brains as a list; the chosen one opens
- * with one row per choice (name and one plain line on the left, a dropdown of
- * the same width on the right). A computer brain also picks the account on
- * that computer (ADR 0041, only its owner) and how much it thinks.
+ * telas/QuemPensa.html ("C"): the brains as a list; the chosen one opens into
+ * one card with its settings full width under a hairline, each with a small
+ * label above it: the model one click away, the effort as a pixel ramp, the
+ * account on that computer (ADR 0041, only its owner), and at the card's foot
+ * a switch for answering through the API while the computer is off.
  */
 
 /** Select values that aren't an account id: the computer's own sign-in, and "Adicionar conta". */
@@ -388,14 +391,27 @@ function BrainDialog({ onClose }: { onClose: () => void }) {
   return <BrainForm view={work.brain.data} onClose={onClose} />;
 }
 
-/** A row of the opened brain: what it is and one plain line on the left, its dropdown on the right. */
-function BrainRow({ title, help, children }: { title: string; help: ReactNode; children: ReactNode }) {
+/** A setting of the opened brain: a small label above its control (the label is the control's name too). */
+function BrainField({ label, children }: { label?: string; children: ReactNode }) {
   return (
-    <SettingRow title={title} description={help}>
+    <div className="agp-brainfield">
+      {label && (
+        <span className="agp-brainfield__label" aria-hidden="true">
+          {label}
+        </span>
+      )}
       {children}
-    </SettingRow>
+    </div>
   );
 }
+
+/** A model's maker as its mark (the API models): Claude's for Anthropic, OpenAI's for OpenAI. */
+const providerMark = (provider: string) =>
+  provider === "anthropic" ? (
+    <BrainLogo kind="claude_code" size="sm" />
+  ) : provider === "openai" ? (
+    <BrainLogo kind="codex" size="sm" />
+  ) : undefined;
 
 function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -423,6 +439,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
+  const offId = useId();
   const machines = view.machines;
   const homeOf = (k: BrainKind) => (k === "model" ? null : homeFor(k, work.machineId, machines));
   const home = homeOf(kind);
@@ -515,13 +532,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     }
   };
   const side = (k: BrainKind) => {
-    if (k === "model")
-      return (
-        <>
-          <Icon name="wallet" size={14} />
-          {t("agentPage.work.brain.paid")}
-        </>
-      );
+    if (k === "model") return null;
     const where = homeOf(k);
     if (!where)
       return (
@@ -587,19 +598,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     },
   ];
   const owner = view.accountsOwner?.name.split(" ")[0] ?? "";
-  const accountRow = accountsOn && accountKind && (
-    <BrainRow
-      title={t(`agentPage.work.brain.account.${accountKind}`)}
-      help={
-        signedOut
-          ? t("agentPage.work.brain.accountSignedOut")
-          : view.canManageAccounts || !owner
-            ? t("agentPage.work.brain.accountHelp")
-            : t("agentPage.work.brain.accountLocked", { name: owner })
-      }
-    >
+  // The account says why only when it must: signed out, or only the computer's owner changes it.
+  const accountNote = signedOut
+    ? t("agentPage.work.brain.accountSignedOut")
+    : !view.canManageAccounts && owner
+      ? t("agentPage.work.brain.accountLocked", { name: owner })
+      : null;
+  const accountField = accountsOn && accountKind && (
+    <BrainField>
       <Select
-        className="agp-brainrows__sel"
+        className="agp-brainsel"
         aria-label={t(`agentPage.work.brain.account.${accountKind}`)}
         value={account ?? HERE}
         disabled={!view.canManageAccounts}
@@ -609,95 +617,89 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           setAccount(v === HERE ? null : v);
         }}
         options={view.canManageAccounts ? accountOptions : accountOptions.filter((o) => o.value !== ADD)}
+        renderValue={pickerValue}
       />
-    </BrainRow>
+      {accountNote && <SettingNote icon={signedOut ? "alert" : "lock"}>{accountNote}</SettingNote>}
+      {arrived && (
+        <SettingNote icon="check" live>
+          {t("agentPage.work.brain.add.done", { account: arrived.label, computer: computerName })}
+        </SettingNote>
+      )}
+    </BrainField>
   );
   const planRows = (
-    <div className="agp-brainrows">
-      {accountRow}
-      <BrainRow title={t("agentPage.work.brain.planModel")} help={t("agentPage.work.brain.modelHelp")}>
-        <Select
-          className="agp-brainrows__sel"
-          aria-label={t("agentPage.work.brain.planModel")}
-          value={planModel ?? option?.defaultModel ?? undefined}
+    <>
+      <BrainField label={t("agentPage.work.brain.planModel")}>
+        <Segmented
+          className="agp-brainseg"
+          label={t("agentPage.work.brain.planModel")}
+          value={planModel ?? option?.defaultModel ?? ""}
           onValueChange={setPlanModel}
-          options={(option?.models ?? []).map((m) => ({
-            value: m.value,
-            label: m.label,
-            description: m.recommended ? t("brain.recommended") : undefined,
-          }))}
+          options={(option?.models ?? []).map((m) => ({ value: m.value, label: m.label }))}
         />
-      </BrainRow>
-      <BrainRow title={t("agentPage.work.brain.effort")} help={t("agentPage.work.brain.effortHelp")}>
-        <Select
-          className="agp-brainrows__sel"
-          aria-label={t("agentPage.work.brain.effort")}
-          value={effort}
-          onValueChange={setEffort}
-          options={EFFORTS.map((e) => ({
-            value: e,
-            label: t(`agentPage.work.brain.efforts.${e}`),
-            description: t(`agentPage.work.brain.effortText.${e}`),
-          }))}
-        />
-      </BrainRow>
-      <BrainRow
-        title={t("agentPage.work.brain.whenOffRow", { computer: whereName })}
-        help={t("agentPage.work.brain.whenOffHelp")}
-      >
-        <Select
-          className="agp-brainrows__sel"
-          aria-label={t("agentPage.work.brain.whenOffRow", { computer: whereName })}
-          value={fallback ? "on" : "off"}
-          onValueChange={(v) => setFallback(v === "on")}
-          options={[
-            {
-              value: "on",
-              label: t("agentPage.work.brain.fallbackOn"),
-              description: t("agentPage.work.brain.fallbackOnText"),
-            },
-            {
-              value: "off",
-              label: t("agentPage.work.brain.fallbackOff", { computer: whereName }),
-              description: t("agentPage.work.brain.fallbackOffText"),
-            },
-          ]}
-        />
-      </BrainRow>
-    </div>
+      </BrainField>
+      <EffortPixels
+        label={t("agentPage.work.brain.effort")}
+        value={effort}
+        onValueChange={setEffort}
+        color={draft.look.color}
+        steps={EFFORTS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
+        hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
+      />
+      {accountField}
+      <div className="ac-optcard__foot">
+        <label className="agp-brainoff" htmlFor={offId}>
+          <b>{t("agentPage.work.brain.fallbackTitle", { computer: whereName })}</b>
+          <span>
+            {fallback ? t("agentPage.work.brain.fallbackOnNow", g) : t("agentPage.work.brain.fallbackOffNow", g)}
+          </span>
+        </label>
+        <Switch id={offId} checked={fallback} onCheckedChange={setFallback} />
+      </div>
+    </>
   );
   const orgRows = can("model") ? (
-    <div className="agp-brainrows">
-      <BrainRow title={t("agentPage.work.brain.planModel")} help={t("agentPage.work.brain.modelHelpOrg")}>
+    <>
+      <BrainField label={t("agentPage.work.brain.planModel")}>
         <Select
-          className="agp-brainrows__sel"
+          className="agp-brainsel"
           aria-label={t("agentPage.work.brain.planModel")}
           value={model}
           onValueChange={setModel}
+          renderValue={pickerValue}
           options={choices.flatMap(([provider, list]) =>
             list.map(({ model: m, available }) => ({
               value: m.id,
               label: m.label,
               group: providerLabel(provider),
               disabled: !available,
+              leading: providerMark(provider),
               description: available
                 ? modelDescription(t, i18n.language, m)
                 : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
             })),
           )}
         />
-      </BrainRow>
-      <BrainRow title={t("newAgent.key")} help={t("agentPage.work.brain.keyHelp")}>
+      </BrainField>
+      <BrainField label={t("agentPage.work.brain.keyLabel")}>
         <Select
-          className="agp-brainrows__sel"
-          aria-label={t("newAgent.key")}
+          className="agp-brainsel"
+          aria-label={t("agentPage.work.brain.keyLabel")}
           value={key}
           onValueChange={setKey}
           placeholder={t("newAgent.noKeys")}
-          options={keyChoices}
+          renderValue={pickerValue}
+          options={keyChoices.map((k) => ({
+            ...k,
+            leading: (
+              <span className="newag__ib">
+                <Icon name="key" size={16} />
+              </span>
+            ),
+          }))}
         />
-      </BrainRow>
-    </div>
+      </BrainField>
+    </>
   ) : (
     <SettingNote icon="lock">{t("agentPage.lock.admins")}</SettingNote>
   );
@@ -708,11 +710,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       title={t("brain.title")}
       description={t("agentPage.work.brain.sub")}
       closeLabel={t("common.close")}
-      width={760}
+      width={560}
       className="agp-wdlg"
     >
       <DialogBody>
         <OptionList
+          attached
           aria-label={t("brain.title")}
           value={kind}
           onValueChange={choose}
@@ -731,7 +734,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ),
               title: k === "model" ? t("agentPage.work.brain.model") : t(`brain.card.${k}`),
               tag: k === "codex" ? t("brain.testing") : undefined,
-              description: k !== "model" && !where ? reason(k) : t(`agentPage.work.brain.${k}Text`),
+              description: k !== "model" && !where ? reason(k) : t(`agentPage.work.brain.${k}Text`, g),
               side: side(k),
               disabled: k !== "model" && !where,
               children:
@@ -752,14 +755,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     }}
                   />
                 ) : (
-                  <>
-                    {planRows}
-                    {arrived && (
-                      <SettingNote icon="check" live>
-                        {t("agentPage.work.brain.add.done", { account: arrived.label, computer: computerName })}
-                      </SettingNote>
-                    )}
-                  </>
+                  planRows
                 ),
             };
           })}

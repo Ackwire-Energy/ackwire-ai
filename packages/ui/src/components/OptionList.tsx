@@ -36,6 +36,11 @@ export interface OptionListProps<V extends string> {
    * per row, the leading icon on the title's line (telas/Tarefas.html: the stage).
    */
   layout?: "rows" | "cards" | "tiles";
+  /**
+   * Rows only: the chosen row and its settings are one card (telas/QuemPensa.html "C"), the
+   * settings full width under a hairline; rows with a leading keep their radio dot too.
+   */
+  attached?: boolean;
   className?: string;
 }
 
@@ -52,11 +57,13 @@ export function OptionList<V extends string>({
   options,
   disabled,
   layout = "rows",
+  attached,
   className,
   ...rest
 }: OptionListProps<V>) {
   const cards = layout === "cards";
   const tiles = layout === "tiles";
+  const card = attached && !cards && !tiles;
   const item = (o: OptionListItem<V>) => (
     <RRadioGroup.Item
       key={o.value}
@@ -64,11 +71,8 @@ export function OptionList<V extends string>({
       disabled={o.disabled}
       className={cx("ac-optrow", o.leading ? "ac-optrow--lead" : undefined)}
     >
-      {o.leading ? (
-        <span className="ac-optrow__lead">{o.leading}</span>
-      ) : (
-        <span className="ac-optrow__dot" aria-hidden="true" />
-      )}
+      {(!o.leading || card) && <span className="ac-optrow__dot" aria-hidden="true" />}
+      {o.leading && <span className="ac-optrow__lead">{o.leading}</span>}
       {cards && o.leading && <span className="ac-optrow__dot ac-optrow__dot--corner" aria-hidden="true" />}
       <span className="ac-optrow__text">
         <span className="ac-optrow__title">
@@ -89,6 +93,7 @@ export function OptionList<V extends string>({
         cards && "ac-optlist--cards",
         tiles && "ac-optlist--tiles",
         disabled && "ac-optlist--locked",
+        card && "ac-optlist--attached",
         className,
       )}
       value={value}
@@ -104,14 +109,23 @@ export function OptionList<V extends string>({
           {chosen?.children && <div className="ac-optrow__more ac-optrow__more--cards">{chosen.children}</div>}
         </>
       ) : (
-        options.map((o) => (
-          <Fragment key={o.value}>
-            {item(o)}
-            {o.value === value && o.children && (
-              <div className={cx("ac-optrow__more", o.leading ? "ac-optrow__more--lead" : undefined)}>{o.children}</div>
-            )}
-          </Fragment>
-        ))
+        options.map((o) =>
+          card && o.value === value && o.children ? (
+            <div key={o.value} className="ac-optcard">
+              {item(o)}
+              <div className="ac-optrow__more ac-optrow__more--card">{o.children}</div>
+            </div>
+          ) : (
+            <Fragment key={o.value}>
+              {item(o)}
+              {o.value === value && o.children && (
+                <div className={cx("ac-optrow__more", o.leading ? "ac-optrow__more--lead" : undefined)}>
+                  {o.children}
+                </div>
+              )}
+            </Fragment>
+          ),
+        )
       )}
     </RRadioGroup.Root>
   );

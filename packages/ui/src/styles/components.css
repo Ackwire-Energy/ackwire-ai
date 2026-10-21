@@ -5810,6 +5810,109 @@ a.ac-list__row:focus-visible {
 .ac-optlist--locked .ac-optrow[data-state="checked"]:hover {
   box-shadow: var(--chosen-shadow);
 }
+/*
+ * Attached (telas/QuemPensa.html "C"): the chosen row and its settings are one card. The row on top, a
+ * hairline, then the settings full width from the card's edge; the dot stays next to the leading.
+ */
+.ac-optcard {
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line2),
+    var(--e1);
+}
+.ac-optcard > .ac-optrow,
+.ac-optcard > .ac-optrow[data-state="checked"] {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.ac-optcard > .ac-optrow:focus-visible {
+  box-shadow: var(--field-ring);
+}
+.ac-optlist--attached .ac-optrow--lead {
+  padding-left: 16px;
+}
+.ac-optrow__more--card {
+  gap: 22px;
+  padding: 18px 16px 16px;
+  border-top: 1px solid var(--line);
+}
+/* The card's last band (a switch with what it does): full width under a hairline. */
+.ac-optcard__foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 -16px -16px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* Effort (EffortPixels.tsx; telas/QuemPensa.html): label and meaning on one line, the pixel ramp, the names. */
+.ac-effort {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  outline: none;
+}
+.ac-effort__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.ac-effort__hint {
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
+}
+.ac-effort__ramp {
+  display: block;
+  width: 100%;
+  height: 30px;
+  cursor: grab;
+  touch-action: none;
+}
+.ac-effort__ramp:active {
+  cursor: grabbing;
+}
+.ac-effort:focus-visible .ac-effort__ramp {
+  border-radius: 4px;
+  box-shadow: var(--field-ring);
+}
+.ac-effort__names {
+  display: grid;
+  margin-top: -4px;
+}
+.ac-effort__names button {
+  padding: 2px 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.ac-effort__names button:hover {
+  color: var(--ink2);
+}
+.ac-effort__names button[data-on] {
+  color: var(--ink);
+}
+.ac-effort--off {
+  opacity: 0.5;
+}
+.ac-effort--off .ac-effort__ramp,
+.ac-effort--off .ac-effort__names button {
+  cursor: default;
+}
 /* Tiles (layout="tiles"; telas/Tarefas.html "Em que etapa?"): two per row, the icon on the title's line. */
 .ac-optlist--tiles {
   display: grid;

@@ -246,7 +246,7 @@ export function LookRows({
 }
 
 /** A picker shaped like the cards around it: the option's leading, name and description. */
-const pickerValue = (o: SelectOption) => (
+export const pickerValue = (o: SelectOption) => (
   <span className="newag__sel-value">
     {o.leading}
     <span className="newag__sel-text">

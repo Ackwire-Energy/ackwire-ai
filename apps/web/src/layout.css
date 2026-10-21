@@ -10147,35 +10147,48 @@ textarea.onb__big.ac-input {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa" (telas/ContaClaude.html "Nova"): the opened brain's rows, each with a dropdown of one width. */
-.agp-brainrows {
+/* "Quem pensa" (telas/QuemPensa.html "C"): the opened brain's settings full width, a small label above each. */
+.agp-brainfield {
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
-.agp-brainrows > .ac-setrow {
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
+.agp-brainfield__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
 }
-.agp-brainrows > .ac-setrow:first-child {
-  border-top: 0;
-  padding-top: 4px;
+.agp-brainseg {
+  display: flex;
+  width: 100%;
 }
-.agp-brainrows > .ac-setrow:last-child {
-  padding-bottom: 0;
+.agp-brainseg .ac-seg__item {
+  flex: 1;
 }
-.agp-brainrows__sel {
-  width: 260px;
+.agp-brainsel .ac-select__trigger {
+  min-height: 52px;
+  height: auto;
+  padding: 8px 14px 8px 10px;
 }
-@media (max-width: 640px) {
-  .agp-brainrows > .ac-setrow {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .agp-brainrows .ac-setrow__end,
-  .agp-brainrows__sel {
-    width: 100%;
-  }
+.agp-brainsel .newag__sel-value {
+  gap: 10px;
+}
+/* The card's foot: "Se o … desligar, responder pela API" and what it does now, the switch at the end. */
+.agp-brainoff {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.agp-brainoff b {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.agp-brainoff span {
+  color: var(--muted);
+  font-size: 12.5px;
 }
 /* "Adicionar conta": the provider's own sign-in, in numbered steps. */
 .agp-addacct {
