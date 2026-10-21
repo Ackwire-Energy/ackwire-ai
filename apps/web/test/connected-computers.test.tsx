@@ -449,9 +449,9 @@ describe("Configurações → Computadores", () => {
 describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
   // The server sends `path` and `computer`; the agent is the note's author.
   const params = {
-    path: "/Users/walter/Projects/loja-v5",
+    path: "/Users/you/Projects/loja-v5",
     computer: "MacBook do Walter",
-    command: "agentes-runner folders allow /Users/walter/Projects/loja-v5 --agent ada",
+    command: "agentes-runner folders allow /Users/you/Projects/loja-v5 --agent ada",
   };
   const post = (state: ReturnType<typeof seedState>, id: string, bodyCode: string, bodyParams: object) => {
     const base = state.messages[0] as (typeof state.messages)[number];
@@ -497,8 +497,8 @@ describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
 });
 
 describe("the computer page: pause, folders and tools (ADR 0036)", () => {
-  const LOJA = "/Users/walter/Projects/loja-v5";
-  const DOCS = "/Users/walter/Documents";
+  const LOJA = "/Users/you/Projects/loja-v5";
+  const DOCS = "/Users/you/Documents";
   const mac = (over: Partial<Machine> = {}): Partial<Machine> & { name: string } => ({
     name: "MacBook do Walter",
     os: "darwin",

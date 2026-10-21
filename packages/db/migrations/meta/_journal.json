@@ -610,6 +610,13 @@
       "when": 1792583051860,
       "tag": "0086_mission_worktree",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1792606644477,
+      "tag": "0087_blobs_person_photos",
+      "breakpoints": true
     }
   ]
 }

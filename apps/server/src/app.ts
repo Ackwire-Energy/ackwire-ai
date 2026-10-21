@@ -75,7 +75,7 @@ export interface AppOptions {
  * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
- * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page)
+ * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page, only with LANDING_PAGE)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - everything else       web app (single-page app), when built
@@ -151,7 +151,7 @@ export function createApp(options: AppOptions) {
         fetch: deps.extras?.desktopFetch,
       }),
     );
-    registerWaitlist(api, deps);
+    if (deps.config.LANDING_PAGE) registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
 

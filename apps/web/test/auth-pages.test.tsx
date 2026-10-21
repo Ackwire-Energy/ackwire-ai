@@ -161,6 +161,19 @@ describe("Criar conta (e-mail novo)", () => {
     await press("Usar outro e-mail", 2);
     expect(heading()).toBe("Oi. Qual é o seu e-mail?");
   });
+
+  test("the terms line shows only when the server has both links, and links to them", async () => {
+    const terms = "https://example.com/terms";
+    await renderApp("/signup", { api: createFakeApi(seedState({ me: null, authConfig: { termsUrl: terms } })) });
+    expect(screen().queryByText(/Ao continuar/)).toBeNull();
+    cleanup();
+    const both = { termsUrl: terms, privacyUrl: "https://example.com/privacy" };
+    await renderApp("/signup", { api: createFakeApi(seedState({ me: null, authConfig: both })) });
+    expect(screen().getByRole("link", { name: "Termos" }).getAttribute("href")).toBe(terms);
+    expect(screen().getByRole("link", { name: "Política de privacidade" }).getAttribute("href")).toBe(
+      "https://example.com/privacy",
+    );
+  });
 });
 
 describe("Senha nova (link do e-mail)", () => {

@@ -145,7 +145,7 @@ A mission's main session is simply the agent's run in the mission thread with th
 ### Codex (block 6)
 
 - Same `brain.turn` op: the runner's dispatch sends `kind: "codex"` to `handleCodexBrainTurn` (`apps/server/runner/brain-codex.ts`): `codex exec --json` per turn (`resume <thread_id>` next turns; our session → Codex thread in `<runner home>/brain/codex-threads.json`), JSONL → `BrainEvent`, our MCP bridge as `mcp_servers.agenteschat_agentes` (`agentes-runner mcp --run <runId>`, token in the env), relayed for the run while the turn lasts. Not on Windows yet. `CODEX_MIN_VERSION` (0.163.0) is kept in the runner and the engine.
-- Engine side: `CodexBrain` over `hubBrainLink` (`brain.turn` through the hub, events from `brainTopic`); availability errors are retryable (fallback). Default model: the catalog's recommended OpenAI model (`gpt-6-sol`).
+- Engine side: `CodexBrain` over `hubBrainLink` (`brain.turn` through the hub, events from `brainTopic`); availability errors are retryable (fallback). Default model: the catalog's recommended OpenAI model (`gpt-6.1-sol`).
 
 ### Missions on the engine (block 4; the only path)
 

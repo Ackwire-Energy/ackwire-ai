@@ -40,7 +40,7 @@ export const installCommand = (origin: string) =>
 export const allowFolderCommand = (path: string, handle?: string) =>
   `agentes-runner folders allow ${shellQuote(path)}${handle ? ` --agent ${handle}` : ""}`;
 
-/** The last part of a path: "/Users/walter/Projects/loja-v5" → "loja-v5". */
+/** The last part of a path: "/Users/you/Projects/loja-v5" → "loja-v5". */
 export function folderName(path: string): string {
   const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || path;

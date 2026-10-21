@@ -4,6 +4,7 @@ import { deflateSync } from "node:zlib";
 import { createFakeSandboxProvider } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  agentCommitEmail,
   type ConnectorDeps,
   connectorGrantValidator,
   createApiKeyConnection,
@@ -414,7 +415,7 @@ describe("the computer", () => {
     expect(script).toContain(`url.${PUBLIC_URL}/api/git/${f.org.id}/${connection.id}/.insteadOf`);
     expect(script).toContain("https://github.com/");
     expect(script).toContain("Dev (agentes)");
-    expect(script).toContain("dev@agents.agentes.chat");
+    expect(script).toContain("dev@agents.agentes.test");
     const token = /printf %s '([^']+)' > "\$HOME\/\.config\/agentes\/git-token"/.exec(script)?.[1] ?? "";
     expect(verifyGitToken(SECRET, token)).toMatchObject({ orgId: f.org.id, agentId: f.agent.id });
     // The GitHub token is nowhere in the computer: not in commands, files or the spec.
@@ -441,6 +442,12 @@ describe("the computer", () => {
     expect(script).not.toMatch(/\bexport\b|\benv\b/);
     expect(script).toContain('chmod 600 "$HOME/.config/agentes/git-token"');
     expect(script).toContain("credential.https://agentes.test.helper");
+  });
+
+  test("agents commit as handle@agents.<our host>: theo@agents.agentes.chat on agentes.chat", () => {
+    expect(agentCommitEmail("https://agentes.chat", "theo")).toBe("theo@agents.agentes.chat");
+    expect(agentCommitEmail("https://agentes.chat/api/git/o/c/", "theo")).toBe("theo@agents.agentes.chat");
+    expect(agentCommitEmail("http://localhost:3000", "theo")).toBe("theo@agents.localhost");
   });
 
   test("git_clone runs real git in the computer; open_pull_request goes through the org's GitHub", async () => {

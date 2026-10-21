@@ -19,3 +19,7 @@ A person's message without mentions enqueues `message.posted`; the handler calls
 **Failures**: transient errors rethrow (outbox retry); permanent ones (no credential, rejected request) or the final attempt store a decision with `error` and pick nobody.
 
 **Other strategies** plug in through `JobDeps.router.strategy`. Planned: an optional external classifier (TypeSafe Jev, `POST https://api.typesafe.ai/v1/systemone`, one question per candidate plus "does this need any agent?"), enabled by env only, never required, and recording its usage like every other model call.
+
+## Addendum (2026-10-20): up to four agents
+
+Since ADR 0034 (2026-10-17) policy picks at most `DEFAULT_ROUTER_POLICY.maxAgents` (4, `packages/engine/src/router.ts`) instead of 2, so a message to the room can wake several agents; an agent's own message still brings in at most one.

@@ -79,7 +79,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       minPasswordLength: 8,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      // Only when a real email sender is configured (MILLIONSEND_API_KEY); sent through the outbox.
+      // Only when a real email sender is configured (MillionSend or SMTP); sent through the outbox.
       ...(emailEnabled
         ? {
             sendResetPassword: async ({
@@ -194,7 +194,7 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
   return session ? (session.user as SessionUser) : null;
 }
 
-/** Sign-in options the login page needs to render. */
+/** Sign-in options the login and sign-up pages need to render. */
 export function authUiConfig(config: Config) {
   return {
     socialProviders: {
@@ -202,6 +202,9 @@ export function authUiConfig(config: Config) {
       github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET),
       apple: appleConfigured(config),
     },
+    landing: config.LANDING_PAGE,
+    termsUrl: config.TERMS_URL ?? null,
+    privacyUrl: config.PRIVACY_URL ?? null,
   };
 }
 

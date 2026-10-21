@@ -1,7 +1,11 @@
+import nodemailer from "nodemailer";
+import type Mail from "nodemailer/lib/mailer";
+
 /**
  * Transactional email. Core sends only through an outbox job (`email.send`),
  * never inline in a request. Cloud: MillionSend (Resend-compatible API).
- * Without a key: a dev sender that logs instead of sending.
+ * Self-hosted: that API, or any SMTP server. Without either: a dev sender
+ * that logs instead of sending.
  */
 export interface EmailMessage {
   to: string[];
@@ -87,13 +91,67 @@ export function createMillionSendSender(options: {
   };
 }
 
-/** Dev fallback: no key configured, so the email is logged (subject, recipients, text) and not sent. */
+/**
+ * Any SMTP server, from an `smtp://` (STARTTLS) or `smtps://` (implicit TLS)
+ * URL with the credentials. A 5xx answer (recipient refused, bad login) won't
+ * change on retry; anything else (4xx, connection, timeout) retries.
+ */
+export function createSmtpEmailSender(options: {
+  url: string;
+  from: string;
+  replyTo?: string;
+  /** Tests: replaces the SMTP connection (nodemailer's `jsonTransport`, or a stub). */
+  transport?: Pick<Mail, "sendMail">;
+}): EmailSender {
+  const transport: Pick<Mail, "sendMail"> =
+    options.transport ??
+    // Timeouts well under the outbox lease (10 min): a hung server must not get the job claimed and sent twice.
+    nodemailer.createTransport({
+      url: options.url,
+      // Without it, smtp:// goes on in plaintext when the server doesn't offer STARTTLS, an offer an
+      // on-path attacker can strip. A `?requireTLS=false` in the URL overrides it (nodemailer's precedence).
+      requireTLS: true,
+      connectionTimeout: 30_000,
+      greetingTimeout: 30_000,
+      socketTimeout: 60_000,
+    });
+  return {
+    id: "smtp",
+    delivers: true,
+    async send(message) {
+      try {
+        const info = await transport.sendMail({
+          from: options.from,
+          to: message.to,
+          subject: message.subject,
+          html: message.html,
+          text: message.text,
+          replyTo: message.replyTo ?? options.replyTo,
+        });
+        return { id: String(info.messageId) };
+      } catch (error) {
+        const e = error as { responseCode?: number; message?: string };
+        throw new EmailError(
+          `SMTP send failed: ${e.message ?? String(error)}`,
+          (e.responseCode ?? 0) < 500,
+          e.responseCode,
+        );
+      }
+    },
+  };
+}
+
+/** Dev fallback: no email configured, so the email is logged (subject, recipients, text) and not sent. */
 export function createLogEmailSender(log: (line: string, data: Record<string, unknown>) => void): EmailSender {
   return {
     id: "log",
     delivers: false,
     async send(message) {
-      log("email (not sent: no MILLIONSEND_API_KEY)", { to: message.to, subject: message.subject, text: message.text });
+      log("email (not sent: neither MILLIONSEND_API_KEY nor SMTP_URL is set)", {
+        to: message.to,
+        subject: message.subject,
+        text: message.text,
+      });
       return { id: `logged:${message.idempotencyKey}` };
     },
   };

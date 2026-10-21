@@ -78,6 +78,8 @@ export function AuthPage({
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
+  const termsUrl = config.data?.termsUrl;
+  const privacyUrl = config.data?.privacyUrl;
 
   const go = (next: Step) => {
     setError(null);
@@ -406,12 +408,12 @@ export function AuthPage({
             </>
           )}
 
-          {(step === "email" || step === "newPassword") && (
+          {(step === "email" || step === "newPassword") && termsUrl && privacyUrl && (
             <p className="auth__fine">
               {t("auth.termsBefore")}
-              <a href="https://agentes.chat/termos">{t("auth.terms")}</a>
+              <a href={termsUrl}>{t("auth.terms")}</a>
               {t("auth.termsMiddle")}
-              <a href="https://agentes.chat/privacidade">{t("auth.privacy")}</a>
+              <a href={privacyUrl}>{t("auth.privacy")}</a>
               {t("auth.termsAfter")}
             </p>
           )}

@@ -12,7 +12,7 @@ import type { MachineCaller, MachineCallOptions, MachineStatus } from "../machin
 import { MachineOfflineError, MachinePausedError } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { grantedScopeKeys } from "../tools/scopes";
-import { GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
+import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
 import { gitAccess } from "./proxy";
 import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "./repos";
 
@@ -85,7 +85,7 @@ export async function machineGitSetup(
   });
   return {
     proxy: { base: gitProxyBase(deps.git.publicUrl, orgId, connection.id), token },
-    author: { name: `${agent.name} (agentes)`, email: `${agent.handle}@agents.agentes.chat` },
+    author: { name: `${agent.name} (agentes)`, email: agentCommitEmail(deps.git.publicUrl, agent.handle) },
     agent: { id: agent.id, handle: agent.handle, name: agent.name },
   };
 }

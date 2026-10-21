@@ -1,0 +1,19 @@
+[extend]
+useDefault = true
+
+# Tests never read .env and never touch the network: every key, token and password in them is made
+# up, most on purpose to check redaction, encryption at rest and masking. Only the generic rule is
+# off there: a real key in a provider's format (Anthropic, OpenAI, AWS, GitHub, a private key...)
+# pasted into a test still fails the scan.
+[[allowlists]]
+description = "Made-up keys and tokens in tests"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)test/''',
+  '''\.test\.tsx?$''',
+]
+
+# A Himetrica site key only names the site to the analytics tracker, which sends it from every page.
+[[allowlists]]
+description = "Himetrica site keys (public by design)"
+regexes = ['''^hm_[0-9a-f]{48}$''']

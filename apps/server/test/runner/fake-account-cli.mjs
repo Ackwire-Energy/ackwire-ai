@@ -10,7 +10,9 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 
 const args = process.argv.slice(2).join(" ");
-const home = process.env.CLAUDE_CONFIG_DIR ?? process.env.CODEX_HOME ?? "";
+// Each reads only its own variable, as the real CLIs do (`auth …` is Claude Code, the rest Codex): a
+// CLAUDE_CONFIG_DIR inherited from the shell (set when tests run inside Claude Code) must not move Codex's folder.
+const home = (args.startsWith("auth ") ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME) ?? "";
 const marker = path.join(home, "signed-in");
 const mode = process.env.FAKE_ACCOUNT_MODE ?? "";
 const log = process.env.FAKE_ACCOUNT_LOG;

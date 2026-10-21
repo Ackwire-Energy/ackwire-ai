@@ -66,13 +66,13 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
 
   fake.tester.state.result = { ok: false, error: "auth" };
   const failed = await api("/mail/accounts/imap", {
-    json: { preset: "icloud", address: "support@icloud.com", password: "wrong" },
+    json: { preset: "icloud", address: "support@example.com", password: "wrong" },
   });
   expect(failed.status).toBe(422);
   expect(await failed.json()).toEqual({ error: "auth" });
   fake.tester.state.result = { ok: true, sentFolder: "Sent" };
   const created = await api("/mail/accounts/imap", {
-    json: { preset: "icloud", address: "support@icloud.com", password: "abcd-efgh-ijkl", label: "Suporte" },
+    json: { preset: "icloud", address: "support@example.com", password: "abcd-efgh-ijkl", label: "Suporte" },
   });
   expect(created.status).toBe(201);
   const { account } = (await created.json()) as { account: { id: string; status: string } };
@@ -84,7 +84,7 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
     redirectUrl: string;
   };
   expect(started.redirectUrl).toBe("https://composio.example/connect/ca_1");
-  fake.composio.activate("ca_1", "walt@gmail.com");
+  fake.composio.activate("ca_1", "team@example.com");
   const back = await owner(`/api/app/mail/composio/callback?account=${started.accountId}`);
   expect(back.status).toBe(302);
   expect(back.headers.get("location")).toBe(
@@ -95,8 +95,8 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   expect(listed).not.toContain("abcd-efgh");
   const accounts = (JSON.parse(listed) as { accounts: { id: string; address: string; status: string }[] }).accounts;
   expect(accounts.map((a) => [a.address, a.status])).toEqual([
-    ["support@icloud.com", "active"],
-    ["walt@gmail.com", "active"],
+    ["support@example.com", "active"],
+    ["team@example.com", "active"],
   ]);
 
   // Agent access: sending without asking needs allowed recipients.
@@ -155,7 +155,7 @@ test("email routines through the routines API, woken by a signed Composio webhoo
   const { accountId } = (await (await api("/mail/accounts/composio", { json: { provider: "gmail" } })).json()) as {
     accountId: string;
   };
-  fake.composio.activate("ca_1", "walt@gmail.com");
+  fake.composio.activate("ca_1", "team@example.com");
   await owner(`/api/app/mail/composio/callback?account=${accountId}`);
   await api(`/agents/${agentId}/mail/${accountId}`, {
     method: "PUT",

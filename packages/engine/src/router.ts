@@ -61,7 +61,7 @@ export interface RoutingResult {
 /**
  * Ranks the candidates for one message (docs/adr/0013-router.md). A strategy
  * only scores agents code already allowed; it never adds candidates, never
- * grants permissions, and policy (threshold, at most 2, hop limit) is applied
+ * grants permissions, and policy (threshold, `maxAgents`, hop limit) is applied
  * by `routeMessage`, not by the strategy.
  *
  * Core ships `createLlmRouterStrategy`. Other implementations (e.g. an

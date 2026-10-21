@@ -84,6 +84,17 @@ export function accountRoutes(deps: AppDeps) {
               .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
             firstRun: z.boolean().openapi({ description: "No account exists yet: show first-run setup." }),
             passwordReset: z.boolean().openapi({ description: 'Offer "forgot password" (e-mail is configured).' }),
+            landing: z
+              .boolean()
+              .openapi({ description: "Signed out, `/` shows the marketing page (LANDING_PAGE); else sign-in." }),
+            termsUrl: z
+              .string()
+              .nullable()
+              .openapi({ description: "Terms of service linked on the sign-in screen (TERMS_URL)." }),
+            privacyUrl: z
+              .string()
+              .nullable()
+              .openapi({ description: "Privacy policy linked on the sign-in screen (PRIVACY_URL)." }),
           }),
         ),
       },

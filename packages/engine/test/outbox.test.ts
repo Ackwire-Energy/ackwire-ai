@@ -9,6 +9,7 @@ import {
   drainOutbox,
   enqueue,
   failJob,
+  MissingCredentialError,
   PermanentJobError,
   processOutbox,
   renewLease,
@@ -150,6 +151,23 @@ test("processOutbox runs handlers and records outcomes", async () => {
   expect(errors.sort()).toEqual(["flaky:retry", "permanent:failed", "unknown.kind:failed"]);
   const byKind = Object.fromEntries((await rows()).map((r) => [r.kind, r.status]));
   expect(byKind).toEqual({ ok: "done", permanent: "failed", flaky: "pending", "unknown.kind": "failed" });
+});
+
+test("a job that hits a missing provider key fails at once instead of retrying 8 times", async () => {
+  await enqueue(db, job("reflect"));
+  const outcomes: string[] = [];
+  await processOutbox(
+    db,
+    {
+      reflect: async () => {
+        throw new MissingCredentialError("Add an API key for Anthropic in the workspace settings");
+      },
+    },
+    { workerId: "w", onError: (_j, _e, outcome) => outcomes.push(outcome) },
+  );
+  expect(outcomes).toEqual(["failed"]);
+  const [row] = await rows();
+  expect([row?.status, row?.attempts, row?.maxAttempts]).toEqual(["failed", 1, 8]);
 });
 
 test("createOutboxPump: a slow job doesn't hold back jobs claimed after it, and slots stay capped", async () => {

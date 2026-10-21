@@ -64,6 +64,9 @@ export class BudgetExceededError extends Error {
 
 /** No usable provider credential (none configured, revoked, or no platform key in this edition). */
 export class MissingCredentialError extends Error {
+  /** A job that hits it fails at once: retrying can't add a key (the outbox reads this flag). */
+  readonly retryable = false;
+
   constructor(message = "This agent has no usable provider credential") {
     super(message);
     this.name = "MissingCredentialError";

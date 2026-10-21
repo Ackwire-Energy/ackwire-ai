@@ -132,7 +132,7 @@ test("ingestMail filters, deduplicates and merges a burst into one routine run",
   const event = runs[0]?.event as { type: string; summary: string; messages: { id: string }[] };
   expect(event.type).toBe("email.received");
   expect(event.messages.map((x) => x.id)).toEqual(["a1", "a2", "a3"]);
-  expect(event.summary).toContain("3 new emails in support@icloud.com (INBOX). Read one with mail_support_read");
+  expect(event.summary).toContain("3 new emails in support@example.com (INBOX). Read one with mail_support_read");
   expect(event.summary).toContain('ana@acme.com · "Help [marker removed] now" · id a1');
   expect(event.summary).not.toContain("</email_content>");
 

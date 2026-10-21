@@ -11,6 +11,7 @@ import type { SandboxProvider } from "./sandbox";
 import type { SearchIndexResolver } from "./search";
 
 export * from "./blob";
+export * from "./blob-disk";
 export * from "./blob-postgres";
 export * from "./command-policy";
 export * from "./composio";
@@ -49,7 +50,7 @@ export interface Adapters {
   /** Transactional email (sent from the `email.send` outbox job). */
   email: EmailSender;
   /**
-   * Platform file storage (our bucket, or Postgres without one). Orgs with
+   * Platform file storage (our bucket, a folder on disk, or Postgres). Orgs with
    * their own bucket are resolved on top of it by the engine.
    */
   platformBlobs: BlobStore;
