@@ -9,7 +9,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { Logger } from "./logger";
 
 /**
- * Sign-in for people, built on Better Auth (same split as Tierbird):
+ * Sign-in for people, built on Better Auth (ADR 0006):
  * Better Auth owns users, sessions, passwords and social sign-in; agentes.chat
  * owns organizations, memberships, roles and invitations
  * (`@agenteschat/engine` organizations). Agents are not users.

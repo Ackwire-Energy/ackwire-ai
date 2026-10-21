@@ -36,7 +36,7 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   /** Agents only: plays the face started by `playAgentReaction(reactionKey, …)` (a message id). */
   reactionKey?: string;
   /**
-   * The tile (telas/RefinoUI.html): a rounded square with a hairline, the
+   * The tile: a rounded square with a hairline, the
    * agent standing in its own pixel sky. On by default; off for the 18px
    * receipts (`xs`) and the 112px hero (`xl`), where the agent stands on the
    * page's own sky.

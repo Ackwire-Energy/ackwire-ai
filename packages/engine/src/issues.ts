@@ -39,7 +39,7 @@ export interface IssueView {
   title: string;
   description: string;
   status: IssueStatus;
-  /** Its board column (D55): always one of its stage. */
+  /** Its board column: always one of its stage. */
   columnId: string | null;
   /** Order inside the column, lowest first. */
   boardRank: number;
@@ -52,7 +52,7 @@ export interface IssueView {
   createdBy: WorkActor;
   source: IssueSource;
   channelId: string | null;
-  /** The issue this one is a sub-issue of (e.g. a plan step from the forum, D45). */
+  /** The issue this one is a sub-issue of (e.g. a plan step from the forum). */
   parentIssueId: string | null;
   pullRequests: { number: number; url: string; openedBy: WorkActor | null }[];
   artifacts: { id: string; title: string; createdBy: WorkActor }[];
@@ -116,7 +116,7 @@ export type IssuePatch = Partial<{
   title: string;
   description: string;
   status: IssueStatus;
-  /** A board column (D55): the issue takes that column's stage. */
+  /** A board column: the issue takes that column's stage. */
   columnId: string;
   boardRank: number;
   priority: IssuePriority;
@@ -572,7 +572,7 @@ export async function getIssueDetail(
 }
 
 /**
- * The forum's mark on an issue's activity (D45): `forum_opened` ("in
+ * The forum's mark on an issue's activity: `forum_opened` ("in
  * evaluation in the forum") when a topic opens from it, `forum_evaluated`
  * when its synthesis is written (with `comment`: the summary and the link,
  * and the synthesis file linked to the issue). No visibility check: the
@@ -758,7 +758,7 @@ export async function updateIssue(
   await linkRun(deps, actor, row);
   const view = await one(db, (await reload(db, row)) ?? row);
   await announce(deps.pubsub, orgId, view, "issue.updated");
-  // The inbox (D46): a new assignee, a status change for whoever follows it.
+  // The inbox: a new assignee, a status change for whoever follows it.
   if (patch.assignee !== undefined || row.status !== current.status) {
     await notifyIssueChanged(deps, author, current, row).catch(() => {});
   }
@@ -957,7 +957,7 @@ export async function askAgentToImplement(
   const issue = await findVisible(db, actor, orgId, { id: issueId });
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  // The person must be able to talk to the agent (D31); the DM needs nothing else.
+  // The person must be able to talk to the agent; the DM needs nothing else.
   if (!canTalkTo(agent, userId)) throw await audienceError(db, agent);
   const dm = await openDm(db, userId, orgId, { agentId });
   const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });

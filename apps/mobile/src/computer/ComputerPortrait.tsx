@@ -10,7 +10,7 @@ import { Icon } from "@/ui/Icon";
 import { useTheme } from "@/ui/theme";
 import { type CellRun, type ComputerKind, type ComputerState, cellsToSvg, portraitFrame } from "./cells";
 
-/** The prototype's pace (~11 frames a second): screens shimmer, agents bob, drive lights blink. */
+/** The design's pace (~11 frames a second): screens shimmer, agents bob, drive lights blink. */
 const FPS = 11;
 /** The still frame (reduced motion, off screen): eyes open, nothing mid-blink. */
 const STILL_T = 2;
@@ -86,7 +86,7 @@ function ComputerPortraitView({ kind, state, size = 48, live = true, label }: Co
 }
 
 /**
- * A computer's portrait (telas/IconesComputador.html), drawn by the shared engine
+ * A computer's portrait, drawn by the shared engine
  * (`@agenteschat/ui/computer/portrait`) on a Skia canvas, the way agents are: a Mac laptop, a Windows
  * monitor, a Linux tower or the cloud computer, its screen lit, dimmed (paused) or dark (offline). It
  * sits directly on the surface, no tile. Living portraits share the app's clock; with reduced motion,

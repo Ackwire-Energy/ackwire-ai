@@ -64,8 +64,8 @@ export interface StartOptions {
 /**
  * Boots an agentes.chat server: config → database → migrations → adapters
  * (core defaults, then module overrides) → HTTP + WebSocket → workers.
- * Shared by the self-hosted entrypoint (`src/main.ts`) and the Cloud
- * entrypoint in the private `agentes-chat-cloud` repo; only `modules` differ.
+ * Shared by the self-hosted entrypoint (`src/main.ts`) and any entrypoint
+ * that adds public modules (ADR 0002); only `modules` differ.
  */
 export async function startServer({ edition, modules = [] }: StartOptions) {
   let config: ReturnType<typeof loadConfig>;

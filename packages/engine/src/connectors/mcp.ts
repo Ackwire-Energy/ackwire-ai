@@ -81,7 +81,7 @@ export const exposedToolName = (connector: string, tool: string) =>
 const LIST_TTL_MS = 60_000;
 
 /**
- * Tools of the organization's connected MCP servers (layer 2 of D7). Lists
+ * Tools of the organization's connected MCP servers (layer 2 of ADR 0016). Lists
  * each server's tools, keeps only those in our catalog (with our scope and
  * sensitivity), and calls them over MCP. The Tool Gateway filters them by the
  * agent's scopes and gates sensitive ones; this source never decides access.

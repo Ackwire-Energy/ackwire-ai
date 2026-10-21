@@ -5,7 +5,7 @@ import { readZip } from "@agenteschat/client/lib/zip";
  * An Obsidian vault in the browser: a .zip, a folder (picked or dropped) or
  * loose .md files. Reading says what would become of it in the wiki (the
  * review); importing sends the embedded attachments to the Drive and the
- * notes to `POST …/wiki/import` in batches. Prototype: docs/design/telas/Wiki.html.
+ * notes to `POST …/wiki/import` in batches.
  */
 
 export interface VaultFile {

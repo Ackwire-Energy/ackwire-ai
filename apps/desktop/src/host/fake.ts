@@ -4,7 +4,7 @@
  * a time; `showWindow` switches it (the dev bar does too) and keeps the fake state.
  */
 import type { TrayState } from "../control/tray";
-import { acmeSeed, FakeRunner, himetricaSeed } from "../dev/fake-runner";
+import { acmeSeed, FakeRunner, horizonteSeed } from "../dev/fake-runner";
 import type { AppInfo, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
 
 export interface FakeHost extends Host {
@@ -50,7 +50,7 @@ export function createFakeHost(initial: WindowName, scenario: "first" | "default
 
   if (scenario === "default") {
     spawn("a1b2c3d4", acmeSeed());
-    spawn("e5f6a7b8", himetricaSeed());
+    spawn("e5f6a7b8", horizonteSeed());
     signIns = 2;
   }
 
@@ -108,11 +108,7 @@ export function createFakeHost(initial: WindowName, scenario: "first" | "default
       console.info("[fake] show in Finder:", path);
     },
     pickFolder: async () => {
-      const picks = [
-        "/Users/voce/Documents/Notas",
-        "/Users/voce/Projects/Personal/colmeia",
-        "/Users/voce/Desktop/Fotos",
-      ];
+      const picks = ["/Users/voce/Documents/Notas", "/Users/voce/Projects/Personal/site", "/Users/voce/Desktop/Fotos"];
       return picks[Math.floor(Math.random() * picks.length)] ?? null;
     },
     setTrayState: async (state) => {

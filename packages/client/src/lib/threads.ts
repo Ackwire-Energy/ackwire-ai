@@ -1,8 +1,7 @@
 import type { Message, ThreadInfo, ThreadStartMeta } from "../api/types";
 
 /**
- * Threads in the web (ADR 0029; docs/design/telas/ThreadContexto.html and
- * Threads.html): the range suggested by "Criar thread a partir daqui", the
+ * Threads in the web (ADR 0029): the range suggested by "Criar thread a partir daqui", the
  * selection model of "Ajustar trecho", and what the channel shows for each
  * thread (context marks, closed lines). Pure functions; the components are in
  * components/threads.
@@ -140,7 +139,7 @@ function clampExcluded(list: Message[], a: string, b: string, excluded: Readonly
 
 /**
  * A tap on a row: before the range moves the start there, after it moves the
- * end, inside it toggles the row in or out (the prototype's `pickRow`).
+ * end, inside it toggles the row in or out.
  */
 export function pickRow(list: Message[], sel: RangeSelection, id: string): RangeSelection {
   const j = indexOf(list, id);

@@ -196,7 +196,7 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
             label={t("missions.menu.label")}
             trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("missions.pinned.more")} />}
           >
-            {/* Actions only, each saying what it does; the settings are in their own dialog (telas/MissaoConfig.html). */}
+            {/* Actions only, each saying what it does; the settings are in their own dialog. */}
             {menu && m.canAct && (m.status === "active" || m.status === "awaiting_close") && (
               <MenuItem icon="pause" description={t("missions.menu.pauseHint")} onSelect={() => act("pause")}>
                 {t("missions.menu.pause")}

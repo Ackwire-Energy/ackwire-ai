@@ -17,7 +17,7 @@ export interface ComputerPortraitProps {
 }
 
 /**
- * A computer's portrait (telas/IconesComputador.html), from the one portrait
+ * A computer's portrait, from the one portrait
  * engine (computer/portrait.js): a Mac laptop, a Windows monitor, a Linux
  * tower or the cloud computer, its screen lit, dimmed (paused) or dark
  * (offline). Pixels on a 48×48 grid scaled by whole numbers; it sits directly

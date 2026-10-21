@@ -25,7 +25,7 @@ async function open(state = seedState(), api = createFakeApi(state)) {
   await settle(8);
   return { state, api };
 }
-/** "Como trabalha" under the name: where, who thinks, the browser (telas/AgenteTopo.html, D). */
+/** "Como trabalha" under the name: where, who thinks, the browser. */
 const sentence = () => screen().getByRole("region", { name: "Como trabalha" });
 const dialog = async (word: string, title: string) => {
   await click(screen().getByRole("button", { name: word }));

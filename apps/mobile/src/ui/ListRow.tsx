@@ -14,7 +14,7 @@ export const LIST_INSET = 14 + LIST_AVATAR + GAP;
 const IOS = Platform.OS === "ios";
 
 /**
- * A row's second line, readable (MobileIntencional.html `.cr .l2 p`): 15.5/21 on iOS (Android keeps its
+ * A row's second line, readable: 15.5/21 on iOS (Android keeps its
  * 14/20 body medium). For any text that sits in that line (a preview, what an agent is doing).
  */
 export const LIST_PREVIEW: TextStyle = IOS ? { fontSize: 15.5, lineHeight: 21 } : { lineHeight: 20 };
@@ -47,7 +47,7 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
 }
 
 /**
- * One full-width row of a list (MobileConversas.html, readable per MobileIntencional.html): no card, the
+ * One full-width row of a list: no card, the
  * 52pt avatar, the semibold 17 name and the time on line 1, the preview (15.5/21, two lines) with a badge or
  * state on line 2, hairlines inset to the text, about 82pt tall. Unread: bold name, darker time and preview.
  * Conversas, Atividade and Agentes use it.

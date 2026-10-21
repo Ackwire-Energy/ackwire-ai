@@ -2,7 +2,6 @@
 
 - Status: Accepted (to build)
 - Date: 2026-10-16
-- Planning: D41
 - Extends: ADR 0017 (search, context items and the memory loop), ADR 0013 (Jev already scores the router and agent mentions)
 
 ## Context
@@ -119,5 +118,5 @@ On every write through `consolidateItem` (people, agents, reflection) and in the
 
 - Better than today on duplicates, contradictions and prompt noise, at a cost that is a rounding error next to the agent's own model call (a consolidation judgment is ~1–3k input tokens, about US$0.0001).
 - A second external dependency on the memory path. It's mitigated by the fallbacks, but Jev quality and latency are now product quality, so the live eval runs again whenever `jev-latest` moves (`jev-preview` is tried there first).
-- More memory content goes to TypeSafe, on top of the router messages already sent. Before turning this on for customer workspaces, check their retention policy and DPA, as noted in D41 in planning.
-- Self-host keeps working without Jev (D25: Cloud first, interfaces kept). Each point runs on its fallback, which is today's behavior.
+- More memory content goes to TypeSafe, on top of the router messages already sent (`SELF_HOSTING.md` lists what it receives).
+- Self-host keeps working without Jev. Each point runs on its fallback, which is today's behavior.

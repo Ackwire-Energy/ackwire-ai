@@ -297,7 +297,7 @@ export interface ChannelChrome {
   composerReplacement?: ReactNode;
   /** Under the composer (a mission someone only reads: "para pedir algo, peça para participar"). */
   composerNote?: ReactNode;
-  /** A thread in the panel beside its channel (telas/ThreadPainel.html): a section, not the page's main. */
+  /** A thread in the panel beside its channel: a section, not the page's main. */
   panel?: boolean;
   /** A thread view where a person's reply makes it a "Responder" thread (`openThread` on the post). */
   openThread?: boolean;
@@ -372,7 +372,7 @@ function QuotedMessage({ reply }: { reply: ReplyRef }) {
   );
 }
 
-/** telas/Main.dc.html — a channel with real-time messages, streaming agent replies and inline approvals. */
+/** A channel with real-time messages, streaming agent replies and inline approvals. */
 export function ChannelPage({
   channelId,
   chrome,
@@ -498,7 +498,7 @@ function ChannelView({
     [openThreads.data, archivedThreads.data],
   );
   // Live runs shown here: a thread view shows its own; the channel, those answering in the channel
-  // (asked there, D67). A thread's runs are in its panel; the channel shows its line. A "pensando…"
+  // (asked there). A thread's runs are in its panel; the channel shows its line. A "pensando…"
   // the app guessed hangs off the message sent: shown here when that message is in the channel.
   const topLevelIds = useMemo(
     () => new Set((channelMessages.data ?? []).flatMap((m) => (m.threadId ? [] : [m.id]))),
@@ -743,7 +743,7 @@ function ChannelView({
     el.scrollTop = el.scrollHeight - a.height + a.top;
   }, [older]);
 
-  // The channel's messages: only what was said in the channel (agents asked there answer there, D67).
+  // The channel's messages: only what was said in the channel (agents asked there answer there).
   // Every thread with replies is one line under its root; its replies live in the panel.
   const channelList = useMemo(() => {
     if (thread) return null;
@@ -1538,7 +1538,7 @@ function ChannelView({
       <ChannelActionsContext.Provider value={actions}>
         <ChannelThreadsContext.Provider value={threadsView}>
           {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
-            are a left-aligned team chat (telas/RefinoUI.html, "Conversa: Nova leitura"). */}
+            are a left-aligned team chat. */}
           <Tag className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}>
             {chrome?.header ?? (
               <header className="channel__header">
@@ -2139,7 +2139,7 @@ function liveMessageOf(r: LiveRun): MessageType {
 }
 
 /**
- * One agent's answer, from "pensando" to its final message (telas/Mensagens.html, "Um bloco só"): the
+ * One agent's answer, from "pensando" to its final message: the
  * live run while it works, then the message, in the same component (same element: nothing remounts or
  * flashes). Until the message lands, the last live state stays on screen. Subscribed by run id, so a
  * streaming delta re-renders only this block.
@@ -2324,7 +2324,7 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
 }
 
 /**
- * Under a stopped answer (telas/Mensagens.html): "Parado por você · Continuar". Continuar starts a new
+ * Under a stopped answer: "Parado por você · Continuar". Continuar starts a new
  * run of the same agent from where it stopped; it goes away for everyone once someone pressed it.
  */
 function StoppedLine({
@@ -2533,7 +2533,7 @@ function useBlocksInView(scroller: { current: HTMLElement | null }, key: string)
 }
 
 /**
- * The card right above the composer (telas/CardTrabalhando.html, A): while an agent works, the glass
+ * The card right above the composer: while an agent works, the glass
  * pill in its color with a turning phrase (a light line while it thinks, what it does, what it said
  * last), the time, "Ver" when its block is out of view and the stop; and who is typing.
  */
@@ -3223,7 +3223,7 @@ function MessageApproval({
 const DETAILS_SEARCH_FROM = 8;
 
 /**
- * "Detalhes do canal" (telas/CanalDetalhes.html B): the description edited in place under the name
+ * "Detalhes do canal": the description edited in place under the name
  * (saves on blur, Enter or close), members grouped as agents and people, one "⋯" per row with how an
  * agent replies and "Tirar do canal".
  */

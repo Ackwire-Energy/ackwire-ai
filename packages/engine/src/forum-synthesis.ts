@@ -1,5 +1,5 @@
 /**
- * The forum's text formats (D45): the stance line an agent starts its post
+ * The forum's text formats: the stance line an agent starts its post
  * with, and the synthesis in two formats ("decision" or "plan"). The model
  * writes markdown with fixed English headings; these parsers turn it into
  * the structured cards the app shows. They are lenient: a missing section is

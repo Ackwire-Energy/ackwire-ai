@@ -323,7 +323,7 @@ export interface RouteResult {
 /** A follow-up goes to another agent than the one just spoken to only when the router is this much surer of it. */
 export const NAMED_OVER_CONTINUITY = 0.3;
 
-/** An agent's message may bring in one more agent, only when it clearly should (D5, revised 2026-10-17). */
+/** An agent's message may bring in one more agent, only when it clearly should (ADR 0034). */
 export const AGENT_CHIME_IN_SCORE = 0.75;
 // An agent's message at this hop (an answer to an answer) brings in nobody; defined next to the outbox insert.
 export { AGENT_CHIME_IN_MAX_HOP };
@@ -332,8 +332,8 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * Router for a message without mentions (job `message.posted`). Code picks
  * the candidates: active agents that are members of the channel with
  * auto-reply on. The strategy only scores them; policy picks at most
- * `maxAgents` above `minScore`. An agent's message goes through it too (D5,
- * revised): the author is never a candidate, at most one agent is picked,
+ * `maxAgents` above `minScore`. An agent's message goes through it too
+ * (ADR 0034): the author is never a candidate, at most one agent is picked,
  * only a clear pick (`AGENT_CHIME_IN_SCORE`), and never from an answer to an
  * answer (`AGENT_CHIME_IN_MAX_HOP`). One decision per message (unique),
  * stored with every score.
@@ -393,7 +393,7 @@ export async function routeMessage(
         eq(channelMembers.autoReply, true),
         // Never the agent that wrote it.
         byAgent && message.authorAgentId ? ne(agents.id, message.authorAgentId) : undefined,
-        // Never an agent this person can't talk to (D31): not as a pick, not as "the last agent" of a follow-up.
+        // Never an agent this person can't talk to: not as a pick, not as "the last agent" of a follow-up.
         audienceSql("agents", sql`${personId}::text`),
       ),
     );
@@ -501,7 +501,7 @@ export async function routeMessage(
     const addressed = previous.mentionedAgentIds.filter((id) => candidateIds.has(id));
     if (addressed.length === 1) continuityAgentId = addressed[0] ?? null;
     else {
-      // Its answers come after it, where it was asked (D67).
+      // Its answers come after it, where it was asked.
       const answers = recent.filter((m) => m.createdAt > previous.createdAt && m.authorAgentId);
       const first = answers
         .filter((m) => m.authorAgentId && candidateIds.has(m.authorAgentId))

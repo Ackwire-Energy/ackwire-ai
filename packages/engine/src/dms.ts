@@ -52,7 +52,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
     return found;
   }
-  // A new DM with an agent this person can't talk to (D31) isn't started; an old one stays readable.
+  // A new DM with an agent this person can't talk to isn't started; an old one stays readable.
   if (blockedAgent) throw await audienceError(db, blockedAgent);
   const created = await db.transaction(async (tx) => {
     const [channel] = await tx
@@ -86,7 +86,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
 
 /**
  * The DM between a person and an agent, opened by the agent (`send_dm`): created the first time with
- * both as members, the same conversation the person opens with `openDm`. Who may talk to the agent (D31)
+ * both as members, the same conversation the person opens with `openDm`. Who may talk to the agent
  * isn't checked: the agent may write to anyone in the organization; the person's replies only get an
  * answer when they may talk to it.
  */

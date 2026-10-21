@@ -41,7 +41,7 @@ const person = (userId: string) => ({ type: "person" as const, userId });
 
 /**
  * A run's tool context whose trigger is a real message by the owner (tools act for them): in the
- * channel (the run answers there, D67), or `inThread` (a reply under another message).
+ * channel (the run answers there), or `inThread` (a reply under another message).
  */
 async function runContext(fx: Fixture, body = "please organize this", inThread = false): Promise<ToolContext> {
   const root = inThread

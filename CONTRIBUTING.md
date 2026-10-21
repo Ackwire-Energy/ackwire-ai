@@ -37,7 +37,7 @@ CI runs on every pull request. These must pass:
 | Check | Command |
 | --- | --- |
 | Lint and format (Biome) | `bun run lint` (`bun run format` fixes what it can) |
-| `apps/` and `packages/` never import Cloud or `ee` code | `bun run check:boundaries` |
+| `apps/` and `packages/` never import Cloud or `ee` code; comments and docs cite ADRs, not the maintainers' private notes | `bun run check:boundaries` |
 | No npm dependency under GPL, AGPL, a source-available or proprietary license, or none | `bun run check:licenses` |
 | Typecheck | `bun run typecheck` |
 | Build | `bun run build` |

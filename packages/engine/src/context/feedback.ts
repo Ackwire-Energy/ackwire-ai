@@ -154,7 +154,7 @@ export async function addReaction(
   });
   const reactions = await listReactions(db, orgId, messageId);
   await publishChannelEvent(pubsub, { type: "message.reactions", channelId: message.channelId, messageId, reactions });
-  // The author of a person's message hears it (D46); never of their own reaction.
+  // The author of a person's message hears it; never of their own reaction.
   if (added && message.authorType === "person" && message.authorUserId !== userId) {
     await notifyReaction({ db, pubsub }, { orgId, messageId, userId }).catch(() => {});
   }
@@ -220,7 +220,7 @@ export async function addAgentReaction(
     messageId: input.messageId,
     reactions,
   });
-  // A person's message: its author hears the agent reacted (D46).
+  // A person's message: its author hears the agent reacted.
   if (inserted.length > 0 && message.authorType === "person") {
     await notifyReaction(
       { db, pubsub },

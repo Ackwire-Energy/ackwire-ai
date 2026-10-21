@@ -574,7 +574,7 @@ export function routineRoutes(deps: AppDeps) {
       security,
       summary: '"Remind me": a one-off reminder about a message or a conversation',
       description:
-        "Like an agent's reminder (D32): at `at` an agent of the conversation posts \"@you Reminder: …\" where the message is (its thread; in a DM, the DM), which notifies you. The agent: `agentId`, else the message's author when it is an agent, else the first agent there you can talk to (`reminder.no_agent` when none). Text: `text`, else the message's first line. Refused: `when.past`, `when.too_far` (over a year).",
+        "Like an agent's reminder: at `at` an agent of the conversation posts \"@you Reminder: …\" where the message is (its thread; in a DM, the DM), which notifies you. The agent: `agentId`, else the message's author when it is an agent, else the first agent there you can talk to (`reminder.no_agent` when none). Text: `text`, else the message's first line. Refused: `when.past`, `when.too_far` (over a year).",
       request: {
         params: OrgParams,
         body: body(

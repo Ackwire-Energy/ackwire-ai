@@ -90,7 +90,7 @@ export interface EngineOptions {
   github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
   /** Tests: this process's replica id for the machine hub (default: random). */
   replicaId?: string;
-  /** Tools on demand (D65; default on). Tests turn it off: every granted tool is listed. */
+  /** Tools on demand (ADR 0043; default on). Tests turn it off: every granted tool is listed. */
   toolsOnDemand?: boolean;
 }
 
@@ -165,7 +165,7 @@ export function buildEngine(o: EngineOptions) {
     resolveHost: o.resolveHost,
   };
   const artifacts: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub: adapters.pubsub };
-  // Code sandbox (D30): cloud computers only when a provider is configured (Daytona in the Cloud);
+  // Code sandbox (ADR 0021): cloud computers only when a provider is configured (Daytona in the Cloud);
   // connected machines (ADR 0025) always, through the hub that holds their sockets.
   const sandboxProvider = o.sandbox !== undefined ? o.sandbox : (adapters.sandbox ?? null);
   const machineHub = createMachineHub({ db, pubsub: adapters.pubsub, replicaId: o.replicaId });
@@ -180,7 +180,7 @@ export function buildEngine(o: EngineOptions) {
     },
     autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
     archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
-    // Git through our proxy (D35): the computer never gets a GitHub token.
+    // Git through our proxy (ADR 0024): the computer never gets a GitHub token.
     git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
     publicUrl: config.PUBLIC_URL,
   };
@@ -314,7 +314,7 @@ export function buildEngine(o: EngineOptions) {
     artifacts,
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
-    // Tools on demand (D65): each run lists what the judge expects it to need; the rest behind `find_tools`.
+    // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
     brains,
     machines: machineHub,

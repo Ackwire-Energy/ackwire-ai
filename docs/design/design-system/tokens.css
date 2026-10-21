@@ -1,10 +1,10 @@
-/* agentes — design system 2026-10 (docs/design/telas/Componentes.dc.html; spec: docs/design/refresh-2026-10.md) */
+/* agentes — design system 2026-10 (spec: docs/design/refresh-2026-10.md) */
 :root, [data-theme="light"] {
-  /* Light is near white (telas/RefinoUI.html): white work area, paper sidebar; gray only in fields' tracks and chosen states. */
+  /* Light is near white: white work area, paper sidebar; gray only in fields' tracks and chosen states. */
   --bg: #fbfbfa; --raised: #ffffff; --raised-2: #ffffff; --sunken: #f3f3f0;
   /* The app shell: the sidebar's paper and the work area beside it. */
   --side: #f8f8f6; --pane: #ffffff;
-  /* The open book of the memory mark (telas/ReacoesAgente.html). */
+  /* The open book of the memory mark. */
   --book-page: #fffdf6; --book-line: #cfc8b6;
   --glass: rgba(255, 255, 255, 0.88); --glass-solid: #fbfbf9;
   --line: rgba(23, 23, 22, 0.07); --line2: rgba(23, 23, 22, 0.12); --line-strong: #82827d;
@@ -17,7 +17,7 @@
   --e3: 0 2px 4px rgba(23, 23, 22, 0.04), 0 24px 56px -16px rgba(23, 23, 22, 0.3), 0 0 0 1px var(--line2);
   --top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --scrim: rgba(10, 10, 10, 0.32);
-  /* Chosen (telas/Selecao.html "H"), never a thick ring. Light: it sinks into the page in place, like a key
+  /* Chosen, never a thick ring. Light: it sinks into the page in place, like a key
      held down. Dark: it rises (brighter face, deeper shadow) and, in a single-choice group, the others step
      back to a flat hairline (components.css). */
   --chosen-bg: var(--sunken);
@@ -61,7 +61,7 @@
   --radius-sm: 6px; --radius-item: 10px; --radius-md: 10px; --radius-btn: 12px; --radius-lg: 14px;
   --radius-xl: 18px; --radius-section: 20px; --radius-cut: 2px; --radius-full: 999px;
   --radius-agent: 30% 30% 30% 9%;
-  /* The control ruler (telas/RefinoUI.html): everything you click or type in is one of three heights, radius
+  /* The control ruler: everything you click or type in is one of three heights, radius
      30% of the height. sm 32 = toolbars, list filters, in-row actions, composer; md 40 = forms, page and dialog
      buttons, search, selects, sidebar items; lg 48 = only the main action of a full screen. Pills (radius-full)
      are only for labels you don't press (status, counters, mentions). */

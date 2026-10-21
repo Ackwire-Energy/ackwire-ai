@@ -22,7 +22,7 @@ function fakeCtx() {
   return { ctx, cells };
 }
 
-describe("computer portraits (IconesComputador.html)", () => {
+describe("computer portraits", () => {
   test("every kind and state draws inside the 48×48 grid", () => {
     for (const kind of COMPUTER_KINDS)
       for (const state of COMPUTER_STATES) {

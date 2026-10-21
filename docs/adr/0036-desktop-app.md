@@ -2,15 +2,13 @@
 
 - Status: Accepted (not built yet)
 - Date: 2026-10-17
-- Planning: D51
 - Extends: ADR 0025 (connected computers), ADR 0029 (missions and background tasks), ADR 0030 (isolation), ADR 0035 (shared client packages)
-- Prototype: `docs/design/telas/AppBandeja.html` (awaiting approval)
 
 ## Context
 
 A computer joins an organization through `agentes-runner`, a JavaScript file run by Node 22+ or Bun. It is installed with a shell one-liner, paired with a code created on the site, and kept alive as an OS service (launchd, systemd user unit, Task Scheduler). Settings live in `~/.agentes-runner/config.json` and are edited by hand. `agentes-runner update` downloads the latest `.mjs` from our server.
 
-That works for developers and servers. It does not work for the people the product is for (teams in general, not only developers): they don't have Node, don't open a terminal, can't see what the agents are doing on their computer, can't pause them, and have no place to grant access. "Permissions only widen on the machine" (machine folder access, `PastasComputador.html`) currently means "copy this command into a terminal".
+That works for developers and servers. It does not work for the people the product is for (teams in general, not only developers): they don't have Node, don't open a terminal, can't see what the agents are doing on their computer, can't pause them, and have no place to grant access. "Permissions only widen on the machine" (machine folder access) currently means "copy this command into a terminal".
 
 ## Decision
 
@@ -49,7 +47,7 @@ That works for developers and servers. It does not work for the people the produ
 ### 4. Single instance; no migration
 
 - One runner per OS user and runner home: a lock file (`~/.agentes-runner/runner.lock` with PID, checked for liveness) taken by `start` and `app`. A second one exits with a clear message. Tauri's single-instance plugin keeps one app.
-- The app never adopts a terminal install. We are building the MVP with a single user, so there is no migration: to move a computer to the app, disconnect it and connect again from the app.
+- The app never adopts a terminal install, and there is no migration: to move a computer to the app, disconnect it and connect again from the app.
 - Homes the app creates carry `"managedBy": "desktop"`; there `agentes-runner update` and `service install` from a terminal refuse and point to the app, so the two modes can't fight over the same home.
 
 ### 4b. More than one organization on one computer
@@ -76,7 +74,7 @@ The code is now created by the computer, like OAuth's device flow, and the perso
 ### 6. Pause
 
 - `pause { until }` sets a runner state (`paused`, `until`), persisted so a restart keeps it, and the runner reports it to the server (protocol 9: a `runner.state` message and the field in `hello`).
-- The server treats a paused machine like an offline one for new work: new ops and new tasks are refused with `machine_paused` (with `until`), and the agent says in the chat that the owner paused the computer. Work already running finishes. Agents whose engine is this computer's Claude Code (D38) follow the choice already stored on the agent (`agents.brainFallback`): with fallback on they answer through the API model, with it off they say the computer is paused and wait. Nothing new to configure.
+- The server treats a paused machine like an offline one for new work: new ops and new tasks are refused with `machine_paused` (with `until`), and the agent says in the chat that the owner paused the computer. Work already running finishes. Agents whose engine is this computer's Claude Code (ADR 0032) follow the choice already stored on the agent (`agents.brainFallback`): with fallback on they answer through the API model, with it off they say the computer is paused and wait. Nothing new to configure.
 - The web shows "Pausado até 16:24" on the computer page.
 
 ### 7. Activity log
@@ -86,7 +84,7 @@ The code is now created by the computer, like OAuth's device flow, and the perso
 
 ### 8. Folders and tools on the machine (v0.2, protocol 10)
 
-The machine-side access model from `PastasComputador.html`, built in the runner and shown in the app and on the site.
+The machine-side access model, built in the runner and shown in the app and on the site.
 
 - **Config** (`config.json`, per organization home): `access: { folders: [{ path, agents: [agentId] }], tools: { claude, codex, commands } }`. Defaults for a new pairing from the app: no folders, `claude` on only if the person chose it at first run, `codex` likewise, `commands` off. A terminal pairing keeps today's behaviour (`--no-exec` → `commands` off, otherwise on).
 - **Enforcement in the runner:** a request's paths stay relative to the agent's folder, or may be absolute when inside a folder allowed for that agent (`not_allowed` otherwise; symlinks resolved before checking). `exec` and `shell` tasks need `commands`; `claude`/`codex` tasks and brain turns need their tool. Claude Code and Codex get each allowed folder of that agent (`--add-dir` / Codex's writable roots). System folders (`/`, the home itself, `/System`, `/Library`…) are refused when adding.
@@ -105,12 +103,12 @@ The machine-side access model from `PastasComputador.html`, built in the runner 
 
 ### 10. Signing and notarization (macOS)
 
-- Since 2026-10-19 macOS builds are signed with a Developer ID Application certificate, with the hardened runtime, and notarized by Apple (App Store Connect API key); the ticket is stapled to the app. The bundled runner (a compiled Bun binary) is signed with the same entitlements (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`); a signed and notarized Bun binary was checked to run and be accepted before switching.
+- Since 2026-10-19 macOS builds are signed with our Developer ID Application certificate, with the hardened runtime, and notarized by Apple (App Store Connect API key); the ticket is stapled to the app. The bundled runner (a compiled Bun binary) is signed with the same entitlements (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`); a signed and notarized Bun binary was checked to run and be accepted before switching.
 - CI secrets: `APPLE_CERTIFICATE` (.p12, base64), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_P8`, `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The build fails without them; it verifies the signature, the stapled ticket and Gatekeeper (`spctl`) before publishing.
-- The Developer ID certificate expires on 2027-02-01: renew it before then (apps already notarized keep opening; new builds need the new one).
+- Renew the Developer ID certificate before it expires (apps already notarized keep opening; new builds need the new one).
 - The identity is now the same on every build, so macOS stops asking again for Documents/Desktop/Downloads access after an update.
 - Windows (later): SmartScreen's "Mais informações → Executar assim mesmo" until we sign.
-- CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, publish a GitHub Release with the SHA-256. Pull requests run the build without publishing. Nothing runs on a developer's machine; testing means installing the CI build. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).
+- CI: `.github/workflows/desktop.yml`, manual or on a `desktop-v*` tag, on a macOS runner: compile the runner for both architectures, build a universal `.app` + `.dmg` with `tauri-action`, publish a GitHub Release with the SHA-256. Pull requests run the build without publishing. The UI can be iterated in a browser against a fake runner (`apps/desktop/src/dev/fake-runner.ts`).
 
 ### 11. Security
 
@@ -129,7 +127,7 @@ The machine-side access model from `PastasComputador.html`, built in the runner 
 
 ## Resolved in review (2026-10-17)
 
-- Updates: built and released by this repository's CI (macOS only for now); served through our server because the repo is private (section 9). Manual (delete the old app, install the new one) until notarization brings the automatic updater.
+- Updates: built and released by this repository's CI (macOS only for now); served through our server (section 9). Manual (delete the old app, install the new one) until notarization brings the automatic updater.
 - Connecting: one device-code flow for the app and the terminal; the old site-created code goes away (section 5).
 - Several organizations and several agents per computer: yes (section 4b).
 - Pause with brain-engine agents: the agent's existing fallback choice decides (section 6).

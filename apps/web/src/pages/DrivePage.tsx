@@ -58,7 +58,7 @@ const typing = (el: Element | null) =>
 const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="listbox"], [role="dialog"]'));
 
 /**
- * Drive (docs/design/telas/Drive.html): everything the viewer can see, as a
+ * Drive: everything the viewer can see, as a
  * grid of real previews (or a list), with quick filters, grouping, a details
  * panel, multi-select with a floating bar, drop to upload and the trash.
  */

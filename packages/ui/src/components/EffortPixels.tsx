@@ -72,7 +72,7 @@ export function drawEffort(
 }
 
 /**
- * How much an agent thinks, as a slider (telas/QuemPensa.html "C"): a ramp of
+ * How much an agent thinks, as a slider: a ramp of
  * pixel bars in the agent's color fills up to the chosen step, the step names
  * under it, the label and what the step means on the line above. Drag or click
  * the ramp, click a name, or the arrow keys (`role="slider"`, one tab stop).

@@ -169,7 +169,7 @@ describe("short follow-ups without a mention", () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy feito."] }) });
     const qa = await addQa();
     await post("@dev status do deploy?");
-    await drainOutbox(f.db, f.handlers); // Dev answers in the channel (D67)
+    await drainOutbox(f.db, f.handlers); // Dev answers in the channel
     const followUp = await post("e agora?");
     const one = await routeMessage(
       { db: f.db, strategy: scoreAll, policy },
@@ -190,7 +190,7 @@ describe("short follow-ups without a mention", () => {
   test("a short message the router hears as for a person wakes nobody, even right after an agent spoke", async () => {
     f = await setup({ reply: () => ({ chunks: ["Oi!"] }) });
     await post("@dev tá acordado?");
-    await drainOutbox(f.db, f.handlers); // Dev answers in the channel (D67)
+    await drainOutbox(f.db, f.handlers); // Dev answers in the channel
     const quiet: RouterStrategy = {
       name: "fixed",
       async decide(input) {
@@ -210,7 +210,7 @@ describe("short follow-ups without a mention", () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy feito."] }) });
     const qa = await addQa();
     await post("@dev status do deploy?");
-    await drainOutbox(f.db, f.handlers); // Dev answers in the channel (D67)
+    await drainOutbox(f.db, f.handlers); // Dev answers in the channel
     await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,

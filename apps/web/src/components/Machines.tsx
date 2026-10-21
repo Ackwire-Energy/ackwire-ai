@@ -446,7 +446,7 @@ function RemoveDialog({
 }
 
 /**
- * Configurações → Computadores, "Seus computadores" (telas/Computadores.html):
+ * Configurações → Computadores, "Seus computadores":
  * the connected computers (each opens its page) and how to connect one.
  */
 export function MachinesSection() {
@@ -748,8 +748,7 @@ function GrantCard({ machine: m }: { machine: Machine }) {
 }
 
 /**
- * One connected computer (docs/design/telas/PastasComputador.html, view
- * "computer"): its state (online, paused), the folders it allows and which
+ * One connected computer: its state (online, paused), the folders it allows and which
  * agents use each, its tools. The site only shows and reduces; the admins and
  * whoever connected it reduce, everyone else reads.
  */

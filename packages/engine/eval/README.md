@@ -3,7 +3,7 @@
 Manual, never in CI: they call real models and cost a little. Keys come from `.env`.
 
 - `bun run eval:memory`: memory judgments (ADR 0028).
-- `bun run eval:mentions`: an agent's @mention of another agent, hand-off (it gets a run) or only a reference (D49). `--judge llm` scores the fallback instead of Jev.
+- `bun run eval:mentions`: an agent's @mention of another agent, hand-off (it gets a run) or only a reference (ADR 0034). `--judge llm` scores the fallback instead of Jev.
 - `bun run eval:behavior`: agent behavior: investigate before answering, cite evidence, concrete next step, ask only the person's decisions, sensitive actions only with approval (ADR 0037). Needs `ANTHROPIC_API_KEY`.
 
 ## Behavior eval
@@ -16,7 +16,7 @@ bun run eval:behavior --judge-model claude-sonnet-5-5  # default claude-haiku-5-
 bun run eval:behavior --no-judge --max-turns 8         # deterministic checks only; tool-loop cap (default 12)
 bun run eval:behavior --judge llm                      # grade with the LLM judge instead of Jev (default jev; `both` compares)
 bun run eval:behavior --concurrency 3                  # cases at a time (default 5, or EVAL_CONCURRENCY)
-bun run eval:behavior --tools-on-demand                # tools on demand as in production (D65; Jev picks the groups)
+bun run eval:behavior --tools-on-demand                # tools on demand as in production (ADR 0043; Jev picks the groups)
 ```
 
 The totals line also says what the agent's calls carried (model calls, prompt tokens per call, cache read and write, output), so two runs (with and without `--tools-on-demand`, or before and after a prompt change) compare in tokens as well as in behavior.

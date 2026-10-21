@@ -139,7 +139,7 @@ describe("Issues (board and list)", () => {
   });
 });
 
-describe("Tarefas: custom board columns (D55)", () => {
+describe("Tarefas: custom board columns", () => {
   const openMenu = async (name: string) => {
     const trigger = screen().getByRole("button", { name });
     trigger.focus();

@@ -17,7 +17,7 @@ import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
 
 /**
- * Sign in and sign up in one flow (telas/EntrarCadastro.html, C, like the web's `AuthPage`): the e-mail
+ * Sign in and sign up in one flow (like the web's `AuthPage`): the e-mail
  * first, then the one next step the server says it needs (the password, the provider the account signs
  * in with, or the name and a new password). "Esqueci a senha" happens in place. The agent reacts: eyes
  * shut while a hidden password is typed, a wink when it's shown, a frown when it's wrong. On success the

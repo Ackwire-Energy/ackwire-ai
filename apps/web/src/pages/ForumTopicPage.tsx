@@ -86,7 +86,7 @@ function go(id: string, flash = false) {
   }
 }
 
-/** A forum topic (telas/Forum.html): header, the table, the rounds, the live turn, the synthesis and the side panel. */
+/** A forum topic: header, the table, the rounds, the live turn, the synthesis and the side panel. */
 export function ForumTopicPage({ topicId }: { topicId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();

@@ -699,7 +699,7 @@ export function dismissRun(state: StreamsState, runId: string): StreamsState {
 
 /**
  * Shown in the channel itself, not in a thread: a run asked there (it answers
- * there, D67: its events carry no thread), or a "pensando…" the app guessed
+ * there: its events carry no thread), or a "pensando…" the app guessed
  * for a message sent there (`topLevelIds`: the channel's own messages).
  */
 export const inMainTimeline = (

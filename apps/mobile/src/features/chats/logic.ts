@@ -231,7 +231,7 @@ export function unreadConversationCount(input: {
   return channels + dms;
 }
 
-// ── The home by kind (MobileHomeAgentes.html, Recomendada) ─────────────────
+// ── The home by kind ───────────────────────────────────────────────────────
 
 /** The home's collapsible sections, in order. */
 export const HOME_SECTIONS = ["agents", "channels", "people"] as const;
@@ -300,7 +300,7 @@ export function toggleCollapsed<K extends string>(
   return keys.filter((k) => (k === key ? !on : list.includes(k)));
 }
 
-// ── The Threads tab (MobileRefinos.html, Threads C) ─────────────────────────
+// ── The Threads tab ─────────────────────────────────────────────────────────
 
 /** The Threads tab's collapsible sections, in order. */
 export const THREAD_SECTIONS = ["missions", "threads"] as const;

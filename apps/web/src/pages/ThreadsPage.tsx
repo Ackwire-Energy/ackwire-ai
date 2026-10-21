@@ -38,8 +38,7 @@ import { useOpenParam } from "@/lib/open-param";
 import "./threads.css";
 
 /**
- * Threads (docs/design/telas/Threads.html, rows from ThreadsRefino.html
- * "Por canal"): the subjects that left the channels and DMs. Tabs, search
+ * Threads: the subjects that left the channels and DMs. Tabs, search
  * and filters, rows grouped by channel (DMs together) with the tag, people
  * and time in fixed columns, hover actions, ⋯, multi-select with the
  * floating bar, and the details panel. No unread counts (reads are per

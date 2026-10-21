@@ -26,7 +26,7 @@ import { useDeferredValue, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 /**
- * The connector tool review (telas/ConectorFerramentas.html, approved): one
+ * The connector tool review: one
  * grouped list. "Precisam da sua decisão" first (only the tools whose names
  * don't say what they do), then every subject with its pixel strip and a
  * short summary; expanding shows the tools with one control each (Consulta ·

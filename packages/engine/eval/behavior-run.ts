@@ -215,7 +215,7 @@ export interface RunOptions {
   /** TypeSafe key: the addressee classification uses Jev like production (the cheap model only without it). */
   jevKey?: string;
   /**
-   * Tools on demand (D65) as in production: the run lists the core tools and the groups Jev expects
+   * Tools on demand (ADR 0043) as in production: the run lists the core tools and the groups Jev expects
    * (only that judgment is Jev's; the others stay fake). Without `jevKey` the run gets the core tools.
    */
   toolsOnDemand?: boolean;

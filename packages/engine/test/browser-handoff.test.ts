@@ -133,7 +133,7 @@ describe("browser_ask_person", () => {
     const [h] = await handoffs();
     expect(h).toMatchObject({ kind: "ask", status: "pending", instructions: "Sign in to Stripe" });
     expect(h?.requestedForUserId).toBe(f.owner.id);
-    // Asked in the channel: the card is in the channel itself (D67).
+    // Asked in the channel: the card is in the channel itself.
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     const card = timeline.find((m) => m.id === h?.id);
     expect(card?.meta.bodyCode).toBe("browser_handoff");
@@ -449,7 +449,7 @@ describe("take over", () => {
       handoff: { id: string; runId: string; kind: string };
     }[];
     expect(updates.some((e) => e.handoff.id === t.id && e.handoff.runId === run.id)).toBe(true);
-    // Asked in the channel: the run's conversation is the channel itself (D67).
+    // Asked in the channel: the run's conversation is the channel itself.
     expect(updates[0]?.threadId).toBeNull();
     const [row] = await handoffs();
     if (!row) throw new Error("no handoff");

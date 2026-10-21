@@ -4,7 +4,7 @@ import type { Widen } from "./widen";
 /**
  * Português do Brasil — the source locale. Every key exists here first;
  * other locales are typed against this object, so a missing translation is
- * a compile error. Copy follows docs/design/telas exactly.
+ * a compile error.
  * Rules (docs/design/design-system/README.md): short sentences, active voice,
  * no exclamation marks, buttons start with a verb, "agentes" in lower case.
  */
@@ -6776,7 +6776,7 @@ export const ptBR = {
     doing_other: "{{names}} estão {{doing}}",
     /** "Theo, Iris e mais 2" (3 or more names in the working line). */
     namesMore: "{{first}}, {{second}} e mais {{count}}",
-    /** The card above the box turns its phrase (telas/CardTrabalhando.html, A). */
+    /** The card above the box turns its phrase. */
     phrase: {
       thinking: {
         l0: "Pensando no seu pedido",

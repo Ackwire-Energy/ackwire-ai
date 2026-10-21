@@ -137,7 +137,7 @@ const PageParams = OrgParams.extend({ slug: z.string().min(1).max(200) });
 const conflict = errorResponse("`version_conflict`: someone saved first; `slug_taken`: the name is in use");
 
 /**
- * The org wiki (D34): pages every member reads and edits (admins can lock
+ * The org wiki (ADR 0023): pages every member reads and edits (admins can lock
  * one), linked with `[[Title]]`, with history, backlinks and a graph.
  * `{slug}` also accepts the page id.
  */

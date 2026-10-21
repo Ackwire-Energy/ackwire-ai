@@ -1,5 +1,5 @@
 /**
- * Preferences (AppBandeja.html, view "prefs"): Geral, Pastas, Ferramentas, Atualizações, Atividade,
+ * Preferences: Geral, Pastas, Ferramentas, Atualizações, Atividade,
  * Avançado. Everything here acts on this Mac through the runners; nothing is granted from the site.
  */
 import { CountChip, Icon, type IconName } from "@agenteschat/ui";

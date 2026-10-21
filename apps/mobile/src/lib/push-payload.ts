@@ -39,7 +39,7 @@ export function readPushData(data: unknown): PushData {
 
 /**
  * A push about the conversation open on screen stays quiet (no banner, no sound, no buzz): what it says
- * is already arriving in front of the person (Mensagens.html).
+ * is already arriving in front of the person.
  */
 export function quietWhileOpen(data: PushData, open: { orgId: string; channelId: string } | null): boolean {
   if (!open || !data.channelId) return false;

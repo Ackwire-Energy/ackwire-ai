@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { cx } from "../cx";
 
 /**
- * Pixel marks that sit next to the PixelSpinner (docs/design/telas/Mensagens.html):
+ * Pixel marks that sit next to the PixelSpinner:
  * `PixelDone`, one green pixel (the spinner grid's center cell) that pops in
  * when a step is done, and `PixelStop`, a solid rounded square that reads as
  * "stop" (it breathes while an agent works). Pure CSS; still under

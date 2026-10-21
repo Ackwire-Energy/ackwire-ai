@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D68
 - Revises: ADR 0029 §4 (background tasks: one worktree and branch per item) and "Missions as built" (item branches under `agentes/<id>/`, `work/<item>/` for folders without git)
 - Extends: ADR 0032 (missions on the engine), ADR 0030 (agent environment on the computer)
 

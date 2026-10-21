@@ -1,5 +1,5 @@
 /*
- * Page layout of the approved screens (docs/design/telas), as classes.
+ * Page layout of the app's screens, as classes.
  * Only structure and spacing: colors, shapes and type come from tokens and
  * the @agenteschat/ui components.
  */
@@ -17,7 +17,7 @@ p {
   overflow-wrap: anywhere;
 }
 
-/* Sign in / sign up (telas/EntrarCadastro.html, C): one calm question at a time, the sky's horizon below */
+/* Sign in / sign up: one calm question at a time, the sky's horizon below */
 .auth {
   position: relative;
   isolation: isolate;
@@ -321,7 +321,7 @@ p {
   }
 }
 
-/* Centered single card (telas/Convite, Onboarding) */
+/* Centered single card */
 .center {
   min-height: 100vh;
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
@@ -432,7 +432,7 @@ p {
   border-radius: var(--radius-sm);
 }
 
-/* Workspace shell (telas/Sidebar + main) */
+/* Workspace shell */
 .shell {
   position: relative;
   display: flex;
@@ -447,7 +447,7 @@ p {
 }
 /*
  * The work area is its own surface (`--pane`: white in light, the page in dark), beside the sidebar's paper
- * (`--side`). Pages inside paint `--bg`/`--surface`, so both point at the pane here (telas/RefinoUI.html: no
+ * (`--side`). Pages inside paint `--bg`/`--surface`, so both point at the pane here (no
  * gray panel around the work).
  */
 .shell__main {
@@ -465,7 +465,7 @@ p {
   overflow: hidden;
 }
 /*
- * Pages that aren't a conversation (telas/Cards.html "B · Mesa"): the work area is a paper a shade
+ * Pages that aren't a conversation: the work area is a paper a shade
  * darker, so the cards on it stand out. Conversations stay white. A page laid out like a chat but not
  * one (the calendar) says so with `--desk`.
  */
@@ -481,7 +481,7 @@ p {
   --pane: var(--desk);
 }
 /*
- * The work area beside the sidebar: an app-wide notice on top when there is one (telas/ComputadorOffline.html),
+ * The work area beside the sidebar: an app-wide notice on top when there is one,
  * then the page, laid out as before (a row: the page's main column and anything beside it).
  */
 .shell__work {
@@ -905,7 +905,7 @@ p {
   }
 }
 
-/* Page container (telas/Aprovacoes, Agente, Membros, NovoAgente) */
+/* Page container */
 .page {
   max-width: 920px;
   margin: 0 auto;
@@ -1035,7 +1035,7 @@ p {
   gap: var(--space-3);
 }
 
-/* Channel (telas/Main) */
+/* Channel */
 .channel__header {
   display: flex;
   flex-wrap: wrap;
@@ -1255,7 +1255,7 @@ p {
   flex-direction: column;
 }
 
-/* Memory (telas/Memoria) and proposals (telas/Propostas) */
+/* Memory and proposals */
 .tabs-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1781,7 +1781,7 @@ p {
   text-align: left;
 }
 
-/* ---------- Drive (docs/design/telas/Drive.html) ----------
+/* ---------- Drive ----------
  * A grid of real previews (or a list), quick filters, groups, a details panel
  * beside it (a sheet on phones), multi-select with a glass bar, drop to upload. */
 .drive {
@@ -2927,7 +2927,7 @@ button.drive-where:focus-visible {
   }
 }
 
-/* ── Issues, routines, calendar (telas/Issues, Issue, Rotinas, Calendario) ── */
+/* ── Issues, routines, calendar ── */
 .grid-fields--3 {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
 }
@@ -2964,7 +2964,7 @@ button.drive-where:focus-visible {
 }
 
 /*
- * Markdown inside chat messages, styled for reading (telas/RefinoUI.html, "Nova leitura"): line breaks
+ * Markdown inside chat messages, styled for reading: line breaks
  * kept (white-space from .ac-msg__text), 14px between paragraphs, 8px into a list and between its items,
  * a heading opens a section, bold marks without shouting, links in the text's own color.
  */
@@ -3422,7 +3422,7 @@ button.drive-where:focus-visible {
   border-radius: inherit;
 }
 
-/* Settings (telas/Configuracoes.html): a grouped left sub-nav + one section. */
+/* Settings: a grouped left sub-nav + one section. */
 .settings {
   display: flex;
   gap: 40px;
@@ -3723,7 +3723,7 @@ button.drive-where:focus-visible {
 }
 
 /*
- * "Adicionar conector" (telas/CatalogoConectores.html, B+C): a gallery with a big title, search and one
+ * "Adicionar conector": a gallery with a big title, search and one
  * line of filters; suggestions with the brand's pixel sky; even tiles with no tags (a check on the icon
  * when connected); a tile opens the detail pane beside the grid (a bottom sheet on phones).
  */
@@ -4507,7 +4507,7 @@ button.drive-where:focus-visible {
   box-shadow: none;
 }
 
-/* Connector tool review (telas/ConectorFerramentas.html): one grouped list, pending decisions first. */
+/* Connector tool review: one grouped list, pending decisions first. */
 .tr-body {
   gap: 24px;
 }
@@ -5840,7 +5840,7 @@ button.live-call__head:hover {
   color: var(--ink2);
   font-weight: 600;
 }
-/* "Leu seu recado · …" inside the work: a well, like the prototype's mark. */
+/* "Leu seu recado · …" inside the work: a well, like the design's mark. */
 .live-work__steer {
   display: flex;
   align-items: center;
@@ -6811,7 +6811,7 @@ button.live-call__head:hover {
   padding: 0;
   gap: 0;
 }
-/* The bell's badge bumps when a notification arrives (telas/Notificacoes.html). */
+/* The bell's badge bumps when a notification arrives. */
 .sidebar__bump {
   animation: sidebar-bump 0.5s var(--spring);
 }
@@ -7083,7 +7083,7 @@ button.live-call__head:hover {
   color: var(--muted);
 }
 
-/* ---------- The pixel sky in the app (docs/design/telas/CeuNoApp.html) ----------
+/* ---------- The pixel sky in the app ----------
  * The sky is the agents' world: the same blue in both themes, ink on it is
  * the deep sky ink. It shows only where the subject is the agents. */
 :root {
@@ -7548,7 +7548,7 @@ button.live-call__head:hover {
     display: none;
   }
 }
-/* The computer's portrait (IconesComputador.html) sits on the surface, no tile. */
+/* The computer's portrait sits on the surface, no tile. */
 .machine-row__icon {
   flex: none;
 }
@@ -7677,7 +7677,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores (Computadores.html): the two kinds, the cloud card, your computers, each agent's. */
+/* Configurações → Computadores: the two kinds, the cloud card, your computers, each agent's. */
 .computers-kinds {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7839,7 +7839,7 @@ a.machine-row__name:hover {
   font-size: 12.5px;
 }
 
-/* The computer page (PastasComputador.html, view "computer"). */
+/* The computer page. */
 .machine-page__back {
   align-self: flex-start;
 }
@@ -7983,7 +7983,7 @@ a.machine-row__name:hover {
   text-underline-offset: 2px;
 }
 
-/* ---------- Onboarding (docs/design/telas/OnboardingEtapas.html) ----------
+/* ---------- Onboarding ----------
  * A rail like the app's sidebar (its surface, the steps), a strip of pixel sky
  * on top for the progress and the sky as a horizon at its bottom; on the right,
  * one calm screen per step hosted by an agent of the team. */
@@ -8463,7 +8463,7 @@ textarea.onb__big.ac-input {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-/* The computer step's portraits (IconesComputador.html), on the card. */
+/* The computer step's portraits, on the card. */
 .onb__art {
   display: block;
   margin-bottom: 4px;
@@ -8639,7 +8639,7 @@ textarea.onb__big.ac-input {
   }
 }
 
-/* ---------- Criar agente (docs/design/telas/NovoAgente.html) ----------
+/* ---------- Criar agente ----------
  * The onboarding's shell (`.onb`: the rail on the sidebar surface, its steps
  * and horizon) with a live preview of the agent on the right. The page is the
  * scroll container: the rail, the preview and the bar at the bottom stick. */
@@ -9909,7 +9909,7 @@ textarea.onb__big.ac-input {
   min-width: 0;
 }
 
-/* ---------- The agent page (docs/design/telas/AgentePerfil.html) ----------
+/* ---------- The agent page ----------
  * The agent alive on its own-color sky, its numbers, sticky tabs, inline
  * editing and one save bar that sticks to the bottom while something is
  * unsaved. Cards stay neutral; only the cover and running states use color. */
@@ -9940,7 +9940,7 @@ textarea.onb__big.ac-input {
   width: 100%;
   height: 100%;
 }
-/* telas/AgenteTopo.html, D: the agent in the middle, over the cover's edge, cut out by a ring of the page. */
+/* The agent in the middle, over the cover's edge, cut out by a ring of the page. */
 .agp-face {
   position: relative;
   z-index: 1;
@@ -9959,7 +9959,7 @@ textarea.onb__big.ac-input {
   height: 100%;
 }
 /*
- * telas/AgenteFundo.html, B: the agent's page sits on a grayer desk (full page and the panel beside its DM),
+ * The agent's page sits on a grayer desk (full page and the panel beside its DM),
  * and who the agent is (cover, face, name, how it works) lives in one white card, so it never blends
  * with the cards of the tabs.
  */
@@ -10064,7 +10064,7 @@ textarea.onb__big.ac-input {
   color: var(--sky-ink);
 }
 
-/* Como trabalha (telas/AgenteTopo.html, D): three cells in one card, no shadow, a hairline; the numbers below. */
+/* Como trabalha: three cells in one card, no shadow, a hairline; the numbers below. */
 .agp-work {
   display: flex;
   flex-direction: column;
@@ -10249,7 +10249,7 @@ textarea.onb__big.ac-input {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa" (telas/QuemPensa.html "C"): the opened brain's settings full width, a small label above each. */
+/* "Quem pensa": the opened brain's settings full width, a small label above each. */
 .agp-brainfield {
   display: flex;
   flex-direction: column;
@@ -10768,7 +10768,7 @@ textarea.onb__big.ac-input {
   width: 12px;
   height: 12px;
 }
-/* RepositoriosAgente.html: which GitHub repositories, under the GitHub row; the chips that open a menu or a tab. */
+/* Which GitHub repositories, under the GitHub row; the chips that open a menu or a tab. */
 .level-row__below {
   flex-basis: 100%;
   min-width: 0;
@@ -10829,7 +10829,7 @@ textarea.onb__big.ac-input {
   cursor: default;
   opacity: 0.55;
 }
-/* "Todos os repositórios" on top of the list (telas/RepositoriosDialogo.html, B). */
+/* "Todos os repositórios" on top of the list. */
 .agp-repodialog__all {
   flex: 1;
   display: flex;
@@ -11153,7 +11153,7 @@ textarea.onb__big.ac-input {
   align-items: center;
   gap: 12px;
 }
-/* The computer's portrait (IconesComputador.html), on the surface. */
+/* The computer's portrait, on the surface. */
 .agp-pc__logo {
   flex: none;
 }
@@ -11349,7 +11349,7 @@ textarea.onb__big.ac-input {
   min-width: 0;
 }
 
-/* The memory mark (telas/ReacoesAgente.html): same height as a pill, another shape (not an emoji anyone can add) */
+/* The memory mark: same height as a pill, another shape (not an emoji anyone can add) */
 .msg-mem__sep {
   width: 1px;
   height: 16px;
@@ -11472,7 +11472,7 @@ textarea.onb__big.ac-input {
   }
 }
 
-/* ── The agent's identity, compact (telas/PerfilAgente.html): the agent on its color beside name and role;
+/* ── The agent's identity, compact: the agent on its color beside name and role;
    then the colors, and the eyes and what it wears as one sliding row each (Carousel). ── */
 .agp-id {
   display: flex;
@@ -11592,7 +11592,7 @@ html[data-menu-overlay] .shell {
   margin-left: var(--space-2);
 }
 
-/* ── Sidebar (telas/SidebarAPartirDaD.html, option 5) ─────────────
+/* ── Sidebar ──────────────────────────────────────────────────────
    The main tools are plain rows; the rest open beside the sidebar from More. Conversations sit in
    categories that open and close; closed, one shows only the open page's row and a count.
    The icon rail ignores the headers. */
@@ -11602,7 +11602,7 @@ html[data-menu-overlay] .shell {
 .sidebar__section {
   gap: 2px;
 }
-/* Rows (telas/SidebarLinhas.html, "B · Mais ar"): 36px, 14px text; 18px muted icons 9px in, the 24px
+/* Rows: 36px, 14px text; 18px muted icons 9px in, the 24px
    avatar (accessories need 24) 6px from the edge on three sides, centred on the icons, every name in
    one column. */
 .sidebar:not([data-rail="true"]) .sidebar__item {
@@ -11767,7 +11767,7 @@ html[data-menu-overlay] .shell {
   display: flex;
 }
 
-/* A streaming answer: each word fades in as it is revealed (Mensagens.html, the `.w` words); still with reduced motion. */
+/* A streaming answer: each word fades in as it is revealed; still with reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   .ac-word {
     animation: ac-word-in 280ms ease-out both;
@@ -11779,7 +11779,7 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* ── Messages fluidity (telas/Mensagens.html, option C) ── */
+/* ── Messages fluidity ── */
 
 /* Steps: the pixel mark in a fixed 16px box; a stopped step is struck through. */
 .live-call__mark {
@@ -12027,7 +12027,7 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* Arquivos on the agent's page (telas/AgenteArquivos.html, A): the Drive's preview, title, one line, Abrir. */
+/* Arquivos on the agent's page: the Drive's preview, title, one line, Abrir. */
 .agp-file {
   display: flex;
   align-items: center;

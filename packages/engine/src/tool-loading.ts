@@ -4,7 +4,7 @@ import { deferrableGroups, type ToolGroup, toolGroupKey } from "./tools/director
 import type { ToolDefinition } from "./tools/types";
 
 /**
- * Tools on demand (D65): a run starts with the core tools (conversation,
+ * Tools on demand (ADR 0043): a run starts with the core tools (conversation,
  * memory, skills, reading the wiki) and the groups the judge expects it to
  * need for this message; every other tool stays one `find_tools` away. The
  * judge only picks what is listed up front: permissions don't change, and a
@@ -12,7 +12,7 @@ import type { ToolDefinition } from "./tools/types";
  * run and kept on the transcript (`toolGroups`), so the tool list, and with
  * it the prompt cache, stays the same for the whole run. Some groups go
  * without asking (`keptToolGroups`): the thread's (its list only grows) and
- * those used in the channel lately. Completes D58's step 2, for every tool.
+ * those used in the channel lately.
  */
 
 /** A group is loaded up front at this probability or more (a miss costs a search; a load costs every call). */
@@ -160,11 +160,11 @@ export async function recentForJudge(
     .map((r) => `${r.authorType}: ${r.body.replace(/\s+/g, " ")}`);
 }
 
-/** Tools the agent used in the channel this recently are loaded again without asking (D58: 77/77 with the judge). */
+/** Tools the agent used in the channel this recently load again without asking (ADR 0043: 77/77 with the judge). */
 export const RECENT_USE_MS = 6 * 3600_000;
 
 /**
- * The groups a run keeps without asking the judge (D65): those the agent's
+ * The groups a run keeps without asking the judge (ADR 0043): those the agent's
  * previous run in this thread listed (the thread's tool list only grows, so a
  * computer brain's session and the cache aren't reset by every message), and
  * those of the tools it called in this channel in the last 6 hours.

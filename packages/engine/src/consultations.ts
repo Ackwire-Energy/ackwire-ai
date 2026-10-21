@@ -30,7 +30,7 @@ const refuse = (content: string): ToolOutput => ({ content, isError: true });
  * scopes: nothing is granted), and its reply resumes the asking run.
  *
  * Code decides who may be asked: an active agent of the org, not the asker,
- * one the person behind the run can talk to (D31), and not already in this
+ * one the person behind the run can talk to, and not already in this
  * chain (no cycles, at most `MAX_CONSULTATION_CHAIN` agents deep).
  */
 export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSource {
@@ -405,7 +405,7 @@ export async function consultationOrigin(
   return origin;
 }
 
-/** Where a consulted run's cards go: the thread of whoever asked, or null for its main timeline (D67). */
+/** Where a consulted run's cards go: the thread of whoever asked, or null for its main timeline. */
 export async function consultationCardThread(db: Executor, orgId: string, runId: string, fallback: string) {
   const origin = await consultationOrigin(db, orgId, runId);
   return origin ? origin.threadId : fallback;

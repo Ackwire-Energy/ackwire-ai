@@ -30,7 +30,7 @@ export interface ComposerMentionState {
 }
 
 /**
- * How a message goes while an agent works (Mensagens.html, C): "join" reaches it at its next pause, "now"
+ * How a message goes while an agent works: "join" reaches it at its next pause, "now"
  * makes it stop what it is doing and read the message at once. Without an agent at work it is "join".
  */
 export type SendHow = "join" | "now";
@@ -74,19 +74,19 @@ export interface ComposerProps {
   ) => { text: string; caret: number };
 }
 
-/** The pill's height, the "+" and the send button's (MobileRefinos.html, composer A). */
+/** The pill's height, the "+" and the send button's. */
 const FIELD = 48;
 const SEND = 36;
 /** Space around the send button inside the pill: it sits centered on the first line. */
 const INSET = (FIELD - SEND) / 2;
 
 /**
- * The center of the app (MobileRefinos.html, composer A): a round glass "+" for attachments and actions,
+ * The center of the app: a round glass "+" for attachments and actions,
  * then the field, a raised pill. Empty, it can show who you write to (a small face) before the
  * placeholder; with text, the round ink send button pops in. One line keeps "+", text and send on the
  * same center line; longer text grows the pill upward and everything stays at the bottom.
  *
- * While an agent works (Mensagens.html, C): the empty field's button is "Parar" (a rounded square), one
+ * While an agent works: the empty field's button is "Parar" (a rounded square), one
  * tap and it stops, no question asked (what it did stays and can continue); with text, two buttons above
  * the field choose "Juntar ao que está fazendo" (the default) or "Parar e mandar". A light tap on send, a
  * firm one on stop.

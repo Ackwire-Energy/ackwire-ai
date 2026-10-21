@@ -215,7 +215,7 @@ function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel
 }
 
 /**
- * The look right on the agent's settings (telas/PerfilAgente.html): the colors, then the eyes and what it
+ * The look right on the agent's settings: the colors, then the eyes and what it
  * wears as one sliding row each, so the section stays short. Each pick shows at once.
  */
 export function LookRows({

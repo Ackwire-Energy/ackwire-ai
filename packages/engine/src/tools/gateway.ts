@@ -53,7 +53,7 @@ export type InvokeResult =
   | { type: "secret"; requestId: string };
 
 /**
- * The only way an agent's tool call runs (D2, docs/adr/0015). For each call:
+ * The only way an agent's tool call runs (docs/adr/0015). For each call:
  * 1. the tool is looked up by name in the run's tool set (never trusting the
  *    model's claim of what it is);
  * 2. the agent's scope for it is read from `agent_scopes` (a prompt can't change it);
@@ -87,7 +87,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
   /**
    * Tools this agent may call now, as the model sees them: each big
    * connector listed as its directory, and with tools on demand
-   * (`ctx.loadedGroups`, D65) the groups not loaded behind `find_tools` /
+   * (`ctx.loadedGroups`, ADR 0043) the groups not loaded behind `find_tools` /
    * `use_tool` (tools/directory.ts).
    */
   async function list(ctx: ToolContext): Promise<ToolDefinition[]> {

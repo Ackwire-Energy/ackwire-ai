@@ -94,7 +94,7 @@ function inbox(): AppNotification[] {
 }
 
 const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
-  // The "Login 401" thread: Ada's reply there (the seed's channel messages are all top-level, D67).
+  // The "Login 401" thread: Ada's reply there (the seed's channel messages are all top-level).
   state.messages.push({
     id: "m-thread-ada",
     channelId: ENG_ID,

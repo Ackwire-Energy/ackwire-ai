@@ -68,7 +68,7 @@ export const downloadHref = (url: string, origin = "") => (/^https?:\/\//.test(u
 /** Where the browser runs: Apple Silicon or Intel is unknowable from the page, so Macs get the arm build. */
 export const DESKTOP_TARGET = { target: "darwin", arch: "aarch64" } as const;
 
-/** Which portrait a computer gets (telas/IconesComputador.html); same names as `ComputerKind` in @agenteschat/ui. */
+/** Which portrait a computer gets; same names as `ComputerKind` in @agenteschat/ui. */
 export type ComputerKind = "mac" | "windows" | "linux" | "cloud";
 export type ComputerState = "online" | "paused" | "offline";
 

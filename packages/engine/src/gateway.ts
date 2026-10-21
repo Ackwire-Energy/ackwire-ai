@@ -99,7 +99,7 @@ export const MIN_OUTPUT_TOKENS = 256;
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /**
- * The only way to call a model (docs/adr/0007, 0012, D2). For every call:
+ * The only way to call a model (docs/adr/0007, 0012). For every call:
  * 1. resolve the model from the catalog (agent's model, or the fixed org-call model);
  * 2. agent calls: atomically reserve the worst-case cost against the agent's
  *    monthly counter (row lock), shrinking `maxTokens` to fit the budget;

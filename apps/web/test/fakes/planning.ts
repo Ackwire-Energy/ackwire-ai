@@ -1,10 +1,10 @@
 /**
- * Test fake — issues, routines and calendar (D28; backend phase 6).
+ * Test fake — issues, routines and calendar.
  * Mirrors these endpoints (shapes in `api/types.ts`):
  * - Issues: `GET …/issues?q`, `GET …/issues/{number}`, `POST …/issues`, `PATCH …/issues/{id}`,
  *   `PUT …/issues/{id}/criteria/{criterionId} { done }`, `GET|POST …/issues/{id}/activity`,
  *   `POST …/issues/{id}/ask-agent { agentId }` (assigns, moves to "Em andamento", starts the run);
- *   board columns (D55): `GET|POST …/issue-columns`, `PATCH|DELETE …/issue-columns/{id}`.
+ *   board columns: `GET|POST …/issue-columns`, `PATCH|DELETE …/issue-columns/{id}`.
  * - Routines: `GET|POST …/routines`, `POST …/routines/parse-schedule|parse-rule { phrase }` → cron, rule and
  *   description in the workspace time zone (phrases looked up in a table, standing in for the model),
  *   `PATCH …/routines/{id} { active }`, `POST …/routines/{id}/run`, `GET …/routines/{id}/runs`.

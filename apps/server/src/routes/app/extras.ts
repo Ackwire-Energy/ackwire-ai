@@ -30,9 +30,9 @@ export interface AppExtras {
   /** Org storage settings and the blob resolver (Drive, artifacts). */
   storage?: StorageDeps;
   artifacts?: ArtifactDeps;
-  /** Code sandbox (D30); null/absent = off on this server. */
+  /** Code sandbox (ADR 0021); null/absent = off on this server. */
   sandbox?: SandboxDeps | null;
-  /** The git proxy for agents' computers (D35); absent = off. */
+  /** The git proxy for agents' computers (ADR 0024); absent = off. */
   gitProxy?: GitProxyDeps;
   /** Revokes Apple tokens when an account is deleted (ADR 0035); absent/null = Apple sign-in off. */
   appleRevoke?: AppleTokenRevoker | null;

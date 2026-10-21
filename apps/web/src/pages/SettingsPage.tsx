@@ -75,7 +75,7 @@ export type SettingsSection =
 
 type SettingsGroup = "org" | "agents" | "costs";
 
-/** The settings sub-nav (telas/Configuracoes.html), in order and in groups, with who can open each. */
+/** The settings sub-nav, in order and in groups, with who can open each. */
 export const SETTINGS_SECTIONS: {
   id: SettingsSection;
   icon: IconName;
@@ -203,7 +203,7 @@ export function SettingsPage({
 }
 
 /**
- * Geral (telas/Configuracoes.html, C with A's rows): the org's rows, the context every agent reads, then a
+ * Geral: the org's rows, the context every agent reads, then a
  * tile per area with how it is now. Every change saves by itself: name on blur, zone on pick, context
  * while typing.
  */

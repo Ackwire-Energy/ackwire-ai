@@ -30,8 +30,8 @@ import "./kit/kit.css";
 import "./DemoWorkspace.css";
 
 /**
- * "Agora é com você": the Pixelpress workspace running like the product
- * (docs/design/telas/LandingNova.html, #demo). Three scenarios, one per
+ * "Agora é com você" (#demo): the Pixelpress workspace running like the
+ * product. Three scenarios, one per
  * channel; the visitor can stop Dev, write while it works, decide Atlas's
  * approval and write in the composer.
  */

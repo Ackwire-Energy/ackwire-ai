@@ -1,9 +1,10 @@
 name: CI
 
-# All verification runs here, never on the developer's machine.
+# All verification runs here.
 # Every pull request and every push to main; a `v*` tag also publishes the image. Each job runs only
 # when something it covers changed (shared packages, the lockfile and this file run everything);
-# docs and READMEs alone run only the secret scan. A manual run or a release tag checks everything.
+# docs and READMEs alone run only the secret scan and the boundaries check. A manual run or a release tag
+# checks everything.
 on:
   push:
     branches: [main]
@@ -121,10 +122,11 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Lint and format
         run: bun run lint
-      - name: Boundaries (core must not import cloud/ or ee/)
+      # No test shard covers scripts/, so the checks' own tests run here. The boundaries check itself runs in
+      # the secrets job, which docs-only changes run too.
+      - name: Boundaries check's own test
         if: success() || failure()
-        run: bun run check:boundaries
-      # No test shard covers scripts/, so the check's own test runs here.
+        run: bun test scripts/check-boundaries.test.ts
       - name: Dependency licenses (no GPL, AGPL, source-available or unlicensed packages)
         if: success() || failure()
         run: |
@@ -255,9 +257,10 @@ jobs:
           retention-days: 7
 
   # Whole-history secret scan with the pinned gitleaks image (the GitHub action needs a license key
-  # for organization repos; the CLI does not).
+  # for organization repos; the CLI does not), and the boundaries check: no cloud/ or ee/ imports, no
+  # internal notes in public files. Every change runs this job, docs included; the check needs no install.
   secrets:
-    name: Secret scan
+    name: Secret scan and boundaries
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -265,6 +268,10 @@ jobs:
         with:
           fetch-depth: 0
       - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config /repo/.gitleaks.toml --no-banner --redact --exit-code 1 /repo
+      - *setup-bun
+      - name: Boundaries (no cloud/ or ee/ imports, no internal notes in public files)
+        if: success() || failure()
+        run: bun run check:boundaries
 
   # The image as self-hosters run it: the docker-compose.yml at the repository root with this
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health

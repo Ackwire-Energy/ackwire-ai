@@ -12,7 +12,7 @@ export interface IconProps {
   color?: string;
 }
 
-/** A line icon from the design system (Mobile.html's set). */
+/** A line icon from the design system. */
 export function Icon({ name, size = 20, color }: IconProps) {
   const { colors } = useTheme();
   const stroke = color ?? colors.ink2;

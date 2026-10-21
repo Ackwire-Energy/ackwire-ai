@@ -1,5 +1,6 @@
 /**
- * Claude Code's floor per step, before and after D60, on this computer: runs
+ * Claude Code's floor per step on this computer, without ("before") and with ("after") the runner's
+ * savings (`alwaysLoad`, project settings only, its own built-in tools): runs
  * `claude` headless with the runner's own arguments (`claudeBrainArgs`) and a
  * fake `agentes` MCP server serving a real tool list, and reports what each
  * turn carried (prompt tokens, cache, steps, time). Uses this computer's

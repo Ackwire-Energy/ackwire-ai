@@ -61,7 +61,7 @@ export const Credential = z
   })
   .openapi("Credential");
 
-/** Who can talk to an agent (D31). `userIds` only for `people`; the owner always can. */
+/** Who can talk to an agent. `userIds` only for `people`; the owner always can. */
 export const AgentAudience = z
   .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
   .openapi("AgentAudience");

@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { createApp } from "../src/app";
 
 /**
- * One process serves the API and the built web app (apps/web → WEB_DIR),
- * like Tierbird serves its dashboard. Client-side routes fall back to
+ * One process serves the API and the built web app (apps/web → WEB_DIR).
+ * Client-side routes fall back to
  * index.html; /api/* never does.
  */
 let dir: string;

@@ -354,7 +354,7 @@ describe("LLM strategy (end to end through the outbox)", () => {
     expect(JSON.stringify(routerCall?.outputSchema)).toContain('"enum":["dev"]');
     expect(textOf(routerCall?.messages[0]?.content ?? "")).toContain("<message>\n[ana]: why is the build failing?");
 
-    // Asked in the channel: the reply is in the main timeline (D67).
+    // Asked in the channel: the reply is in the main timeline.
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.map((m) => m.body)).toEqual(["why is the build failing?", "On it."]);
     const usage = await f.db.select().from(schema.usageRecords);

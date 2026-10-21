@@ -119,7 +119,7 @@ const TRAIT_ICON: Record<ReturnType<typeof approvalTraits>[number], IconName> = 
 };
 
 /**
- * Aprovações (telas/Aprovacoes.html): who waits on you, each request with its
+ * Aprovações: who waits on you, each request with its
  * exact action, then the history. Under the requests, the missions' command
  * cards and the decisions and reviews waiting on you in missions (ADR 0029).
  * A request's details open in the centered details dialog (`?open=<id>`).

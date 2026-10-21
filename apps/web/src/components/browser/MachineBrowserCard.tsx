@@ -28,8 +28,7 @@ function commandIn(reason: string | null | undefined): string | null {
 }
 
 /**
- * "Navegador" on a computer's page (ADR 0040, telas/NavegadorAgente.html
- * "Computador"): whether the browser is ready here, which agents are in it
+ * "Navegador" on a computer's page (ADR 0040): whether the browser is ready here, which agents are in it
  * now (Ver, Parar), and which agents may use it. Turning it on happens on
  * the computer; the owner can only turn it off here.
  */

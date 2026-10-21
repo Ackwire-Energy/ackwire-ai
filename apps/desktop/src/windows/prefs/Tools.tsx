@@ -45,7 +45,7 @@ export function Tools() {
       </Chip>
     );
 
-  /** Found and logged in: the engine at rest; not found or logged out: off (IconesMotor.html, Ferramentas). */
+  /** Found and logged in: the engine at rest; not found or logged out: off. */
   const engineState = (info: RunnerExecutorInfo | undefined): BrainPortraitState =>
     info && info.loggedIn !== false ? "idle" : "off";
 

@@ -14,7 +14,7 @@ import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "./p
 /**
  * A request, from anywhere (deep link `approval/<id>`): who asks, the exact
  * action, what it affects, the details table, what the agent said before and
- * the amber fuse (MobileIntencional.html). High risk takes a hold; refusing
+ * the amber fuse. High risk takes a hold; refusing
  * can say why ("ajuda o agente a aprender").
  */
 export function ApprovalSheet({

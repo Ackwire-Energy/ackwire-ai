@@ -2,7 +2,7 @@ import type { ArtifactDetail, ArtifactKind } from "@agenteschat/client";
 import { fileIcon, previewType } from "@agenteschat/client/lib/files";
 
 /**
- * Files on a message (MobileRefinos.html, "Arquivos"): which ones show as pictures, the card's tile and
+ * Files on a message: which ones show as pictures, the card's tile and
  * line ("MD", "Documento · 4 KB"), how a viewer shows each, and the name a shared copy gets.
  */
 

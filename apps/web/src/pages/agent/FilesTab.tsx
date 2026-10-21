@@ -15,7 +15,7 @@ import { CardHead, useAgentEdit } from "./context";
 const KINDS: ArtifactKind[] = ["document", "table", "file", "diagram", "html", "diff"];
 
 /**
- * Arquivos (telas/AgenteArquivos.html, A): the Drive files this agent made or changed, newest first,
+ * Arquivos: the Drive files this agent made or changed, newest first,
  * each with where it came from and how many versions; opening one opens it as the Drive does. Only
  * files of conversations the viewer sees (the Drive's own visibility).
  */

@@ -178,7 +178,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   const reply = events[10] as {
     message: { body: string; threadId: string | null; author: { type: string; id: string } };
   };
-  // Asked in the channel, answered in the channel (D67).
+  // Asked in the channel, answered in the channel.
   expect(reply.message).toMatchObject({
     body: "Hello there",
     threadId: null,

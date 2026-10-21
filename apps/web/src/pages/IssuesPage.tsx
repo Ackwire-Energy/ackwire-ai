@@ -69,7 +69,7 @@ export function StatusChip({ status }: { status: IssueStatus }) {
 }
 
 /**
- * Tarefas (telas/Tarefas.html; issues in the code): agents working now, the
+ * Tarefas (issues in the code): agents working now, the
  * org's board (custom columns in fixed stages, drag between and inside them)
  * or a list, a details panel.
  */

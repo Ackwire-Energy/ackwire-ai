@@ -70,7 +70,7 @@ export function waitingApprovals(list: Approval[], now = Date.now()): Approval[]
 }
 
 /**
- * The details table of a request (MobileIntencional.html, "Por onde / Muda / Testes"): where it goes
+ * The details table of a request: where it goes
  * (`via`: the connector and its account) first, then the exact values it runs with. Only what the
  * request carries; nothing is made up. `label: null` is the "Por onde" row (its label is translated).
  */

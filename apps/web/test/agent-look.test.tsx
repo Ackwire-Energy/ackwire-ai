@@ -58,13 +58,13 @@ describe("the agent's look", () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api: createFakeApi(state) });
     await settle(8);
-    // In place (telas/PerfilAgente.html): the colors, then the eyes and what it wears as one sliding row each.
+    // In place: the colors, then the eyes and what it wears as one sliding row each.
     const page = screen();
     await click(within(page.getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
     await click(within(page.getByRole("group", { name: "Olhos" })).getByRole("button", { name: /Felizes/ }));
     await click(within(page.getByRole("group", { name: "Acessório" })).getByRole("button", { name: /Coroa/ }));
     expect(document.querySelector(".ac-carousel")).not.toBeNull();
-    // The agent's face over the cover's edge (telas/AgenteTopo.html D) is the draft.
+    // The agent's face over the cover's edge is the draft.
     const cover = document.querySelector(".agp-face .ac-avatar") as HTMLElement;
     expect(cover.getAttribute("data-eyes")).toBe("happy");
     expect(cover.getAttribute("data-accessory")).toBe("crown");

@@ -1,8 +1,7 @@
 # 0002. One codebase, two editions, modules and adapters
 
 - Status: Accepted
-- Date: 2026-10-14. Revised 2026-10-21 (planejamento D80): no contributor license agreement, so nothing private runs in the server process (§5)
-- Implements: planejamento D16, D17, D18a, D18c. Same model as Tierbird ADR 0003.
+- Date: 2026-10-14. Revised 2026-10-21: no contributor license agreement, so nothing private runs in the server process (§5)
 
 ## Context
 

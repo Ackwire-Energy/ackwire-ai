@@ -18,7 +18,7 @@ test("claim → model request stays within 11 statements; a whole mention run wi
   let beforeModel = -1;
   f = await setup({
     reply: (req) => {
-      // The agent's call only: the router's (structured output) may run after an agent's answer (D49).
+      // The agent's call only: the router's (structured output) may run after an agent's answer (ADR 0034).
       if (!req.outputSchema) beforeModel = currentQueryCount();
       return { chunks: [req.outputSchema ? '{"needs_agent":0,"scores":[],"reason":"none"}' : "ok"] };
     },

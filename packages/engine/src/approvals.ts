@@ -28,7 +28,7 @@ export interface ApprovalView {
   missionId: string | null;
   agentId: string;
   channelId: string;
-  /** Where its card is: the thread, or null for the main timeline (asked there, D67). */
+  /** Where its card is: the thread, or null for the main timeline (asked there). */
   threadId: string | null;
   messageId: string | null;
   tool: string;
@@ -146,7 +146,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
 /**
  * Where each approval's card is: its message's thread (null: the main timeline).
  * `thread_root_id` is the run's conversation, which for a run asked in the main
- * timeline is its trigger, not a thread (D67). No card yet: that conversation.
+ * timeline is its trigger, not a thread. No card yet: that conversation.
  */
 export async function approvalCardThreads(db: Executor, rows: Pick<Approval, "id" | "messageId" | "threadRootId">[]) {
   const ids = [...new Set(rows.flatMap((r) => (r.messageId ? [r.messageId] : [])))];
@@ -252,7 +252,7 @@ export async function publishApproval(
   for (const userId of deciders) {
     await publishUserEvent(deps.pubsub, approval.orgId, userId, { type, approval: { ...view, canDecide: true } });
   }
-  // The inbox (D46): waiting for whoever may decide; out of it once decided or expired.
+  // The inbox: waiting for whoever may decide; out of it once decided or expired.
   if (type === "approval.created" && approval.status === "pending") {
     await notifyApproval(deps, approval, deciders).catch(() => {});
   } else if (type === "approval.decided") {

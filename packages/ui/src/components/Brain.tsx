@@ -20,7 +20,7 @@ export interface BrainPortraitProps {
 }
 
 /**
- * An engine's portrait (telas/IconesMotor.html, direction C), from the one
+ * An engine's portrait, from the one
  * portrait engine (brain/portrait.js): Claude Code's warm console or Codex's
  * cool terminal with the agent's small pixel self beside it, using it, or the
  * agent alone, thinking (through the API). Idle, working, or off (not
@@ -75,7 +75,7 @@ const BRAND_PATHS: Record<"claude_code" | "codex", string> = {
 };
 
 /**
- * A computer brain by its maker's official mark (telas/LogosCerebro.html, A):
+ * A computer brain by its maker's official mark:
  * Claude orange on cream, OpenAI ink on white. `tile`: 48 px for list rows,
  * like a portrait; `sm`: 30 px beside menu options. Off: gray and dim, like
  * the portrait.

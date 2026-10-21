@@ -50,7 +50,7 @@ export type RoutineTarget =
    * `forUserId` (no run); otherwise the agent is asked, as in any routine.
    */
   | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string }
-  /** Opens a forum topic each time (D33): the prompt is its goal, these agents discuss it. */
+  /** Opens a forum topic each time (ADR 0022): the prompt is its goal, these agents discuss it. */
   | { type: "forum"; agentIds: string[]; rounds?: number };
 export const ROUTINE_EVENTS = [
   "sentry.issue_created",
@@ -565,7 +565,7 @@ export async function createRoutine(
   await requireRoutineManager(db, actorId, orgId, input.agentId);
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  // A routine asks the agent on its creator's behalf: only people who can talk to it create one (D31).
+  // A routine asks the agent on its creator's behalf: only people who can talk to it create one.
   if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
@@ -661,7 +661,7 @@ export interface RoutinePatch {
 
 /**
  * Edits a routine (`PATCH …/routines/{id}`), validated like create: a new
- * agent must be one the person manages and can talk to (D31); the target is
+ * agent must be one the person manages and can talk to; the target is
  * checked against the agent; a new schedule is parsed again in its zone and
  * `nextRunAt` recomputed. Audited with the before/after of what changed.
  */
@@ -1016,7 +1016,7 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
     return;
   }
   if (!canTalkTo(agent, creator)) {
-    // Its creator can no longer talk to the agent (D31): the routine pauses, with the reason in its last run.
+    // Its creator can no longer talk to the agent: the routine pauses, with the reason in its last run.
     await db
       .update(routines)
       .set({ active: false, nextRunAt: null, updatedAt: new Date() })

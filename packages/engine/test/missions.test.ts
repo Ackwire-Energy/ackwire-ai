@@ -364,7 +364,7 @@ describe("missions (ADR 0029)", () => {
       title: "Mobile app",
       executor: "claude",
     });
-    // Asked in the channel: the mission's home is a thread of its own, like from a DM (D67).
+    // Asked in the channel: the mission's home is a thread of its own, like from a DM.
     expect(mission.threadRootId).not.toBe(ask.id);
     // No executor task: the main session is the agent's run in the thread, told to plan.
     expect(runner.started).toHaveLength(0);

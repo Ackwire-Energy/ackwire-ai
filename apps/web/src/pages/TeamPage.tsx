@@ -29,7 +29,7 @@ import { useTheme } from "@/lib/theme";
 import "./team.css";
 
 /*
- * Equipe (telas/Organograma.html, direction Céu): the agents as live sprites in
+ * Equipe: the agents as live sprites in
  * the pixel sky, in clusters around the person responsible for them. A pixel
  * line joins agents that consulted each other in the last day; a new
  * consultation lights its line for a moment. Tap an agent for its card.
@@ -143,7 +143,7 @@ function puck(f: SkyFrame, x0: number, y0: number, x1: number, y1: number, at: n
 }
 
 const WHITE = pixelOf("#ffffff");
-/** The night sky of the dark theme (telas/Organograma.html). */
+/** The night sky of the dark theme. */
 const NIGHT_TONES = ["#04112b", "#071c45", "#0a2b66", "#0e3d8c", "#1452b0", "#2b74e6", "#4b93ff", "#78b4ff"];
 const starAt = (x: number, y: number) => {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;

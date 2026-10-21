@@ -96,7 +96,7 @@ export interface AgentPageProps {
   closeRequest?: number;
 }
 
-/** docs/design/telas/AgentePerfil.html — the agent on its sky, tabs, inline editing with one save bar. */
+/** The agent page: the agent on its sky, tabs, inline editing with one save bar. */
 export function AgentPage(props: AgentPageProps) {
   const { t } = useTranslation();
   const { org } = useOrg();

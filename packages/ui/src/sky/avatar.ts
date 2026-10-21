@@ -1,5 +1,5 @@
 /**
- * The avatar tile's own pixel sky (telas/RefinoUI.html, "Molduras" → Céu): a
+ * The avatar tile's own pixel sky: a
  * 4×4 Bayer dither from a soft tone at the top to a slightly deeper one at the
  * bottom, both the agent's color mixed into the surface. Drawn once per color,
  * pixel size and theme and cached; the live loop (../agent/live.ts) stamps it

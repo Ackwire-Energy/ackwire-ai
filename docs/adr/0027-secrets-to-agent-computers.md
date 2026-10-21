@@ -2,7 +2,6 @@
 
 - Status: Accepted (built 2026-10-16)
 - Date: 2026-10-16
-- Planning: D40
 
 ## Context
 
@@ -50,7 +49,7 @@ The person's browser and the agent's computer. Our server, database, logs, outbo
 
 - **`env`**: one line in `~/.agentes/secrets/env` (mode 600). Commands the agent runs see it as an environment variable: on Daytona our exec wrapper sources that file; the runner adds it to the child's environment.
 - **`file`**: a path in the agent's workspace (e.g. `.npmrc`, `.env`), mode 600; paths outside it are refused.
-- **`stdin`** (later): the input of a process that is waiting (a CLI sign-in in a session kept by the computer). Until then, interactive sign-ins use the computer's terminal shown in the app, which talks to the computer directly (D38; Claude Code sign-in must complete through Anthropic's own flow).
+- **`stdin`** (later): the input of a process that is waiting (a CLI sign-in in a session kept by the computer). Until then, interactive sign-ins use the computer's terminal shown in the app, which talks to the computer directly (Claude Code sign-in must complete through Anthropic's own flow).
 
 ### 5. Keeping the value away from the model afterwards
 
@@ -69,7 +68,7 @@ The agent has a shell on its computer, so it can read a secret it was given. We 
 ## Consequences
 
 - Positive: one safe way to give a computer what only a person has, the same for cloud computers and connected machines. The chat, search and the model stay clean, and we never hold users' credentials, which some providers require.
-- Negative: we trust the code of our server, not just its storage. A compromised server could hand the browser its own public key instead of the computer's. Showing a fingerprint wouldn't help people in practice; the direct terminal (D38) remains the path where even that relay is gone.
+- Negative: we trust the code of our server, not just its storage. A compromised server could hand the browser its own public key instead of the computer's. Showing a fingerprint wouldn't help people in practice; the direct terminal remains the path where even that relay is gone.
 - Negative: redaction is best effort. A transformed value (base64, split strings) can still reach the model if the agent prints it.
 - Negative: new runner protocol 3 and a helper installed in cloud computers.
 

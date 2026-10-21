@@ -86,7 +86,7 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
 /** Tablet widths: the sidebar is always an icon rail (NavDrawer.tsx has the other breakpoints). */
 const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";
 
-/** The workspace sidebar (telas/Sidebar.dc.html). */
+/** The workspace sidebar. */
 export function Sidebar() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -268,8 +268,7 @@ export function Sidebar() {
           />
         )}
 
-        {/* The tools people use most stay in sight; the rest open beside the sidebar from More
-            (telas/SidebarAPartirDaD.html, option 5). */}
+        {/* The tools people use most stay in sight; the rest open beside the sidebar from More. */}
         <div className="sidebar__group sidebar__tools">
           <Link
             to="/org/$orgId/notifications"
@@ -656,9 +655,8 @@ function UnreadCount({ count }: { count: number }) {
 
 /**
  * The account button; under the name, the workspace's budget use this month
- * (a percentage, never money). It opens the account's full-screen menu
- * (telas/MenuOverlay.html): profile, time zone, theme, language, the budget
- * and signing out.
+ * (a percentage, never money). It opens the account's full-screen menu:
+ * profile, time zone, theme, language, the budget and signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
@@ -795,7 +793,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
 
 /**
  * The workspace header ("Acme · 2 membros · 3 agentes") opens the workspace's
- * full-screen menu (telas/MenuOverlay.html): invite, members, connectors,
+ * full-screen menu: invite, members, connectors,
  * agents' access, skills and settings as far as the role allows, then the
  * other workspaces to switch to.
  */

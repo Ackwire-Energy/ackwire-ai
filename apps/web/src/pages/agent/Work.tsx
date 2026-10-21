@@ -64,7 +64,7 @@ import { useAgentEdit } from "./context";
 import "@/components/browser/browser.css";
 
 /*
- * What the agent works with, under its name (telas/AgenteTopo.html, D): where
+ * What the agent works with, under its name: where
  * it works, who thinks and the browser, each opening its dialog. A choice brings what it depends on
  * along (Claude Code moves the agent to a computer that has it) and says so
  * before; "Usar" saves at once, in the right order (computer, then brain).
@@ -141,7 +141,7 @@ function Cell({
 }
 
 /**
- * Como trabalha (telas/AgenteTopo.html, D): where it works, who thinks (with the effort) and the browser
+ * Como trabalha: where it works, who thinks (with the effort) and the browser
  * side by side, each opening its dialog; the numbers in the footer. Where comes first: who thinks depends on it.
  */
 export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
@@ -156,7 +156,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
     ? (view.options.find((o) => o.kind === kind)?.models.find((m) => m.value === view.effectiveModel)?.label ??
       view.effectiveModel)
     : (agent.brain?.model ?? null);
-  // The account only when the computer has more than one of that kind (telas/ContaClaude.html).
+  // The account only when the computer has more than one of that kind.
   const kindAccounts = view?.accountsSupported ? view.accounts.filter((a) => a.kind === kind) : [];
   const accountWord =
     kind === "model" || kindAccounts.length === 0
@@ -367,11 +367,11 @@ function Footer({
 // ── Quem pensa ──────────────────────────────────────────────────────────────
 
 /*
- * telas/QuemPensa.html ("C"): the brains as a list; the chosen one opens into
- * one card with its settings full width under a hairline, each with a small
- * label above it: the model one click away, the effort as a pixel ramp, the
- * account on that computer (ADR 0041, only its owner), and at the card's foot
- * a switch for answering through the API while the computer is off.
+ * The brains as a list; the chosen one opens into one card with its settings
+ * full width under a hairline, each with a small label above it: the model one
+ * click away, the effort as a pixel ramp, the account on that computer
+ * (ADR 0041, only its owner), and at the card's foot a switch for answering
+ * through the API while the computer is off.
  */
 
 /** Select values that aren't an account id: the computer's own sign-in, and "Adicionar conta". */

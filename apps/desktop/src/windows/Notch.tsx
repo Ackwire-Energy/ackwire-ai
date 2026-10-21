@@ -1,5 +1,5 @@
 /**
- * The notch (telas/NotchAgente.html, "A · Asas"; off by default, Preferências → Geral): a black
+ * The notch (off by default, Preferências → Geral): a black
  * island over the MacBook's camera housing. Closed, it grows wings: who is working on the left, the
  * clock (or what needs you) on the right. When an agent needs a person, or the last work ends, it
  * drops for a few seconds with one line; a click opens the list. Nothing going on: hidden.

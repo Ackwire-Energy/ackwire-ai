@@ -11,7 +11,7 @@ import {
 } from "./notifications";
 
 /**
- * Where notifications come from (D46): each flow calls one of these after
+ * Where notifications come from: each flow calls one of these after
  * its change committed. They read what they need themselves (no imports of
  * the flows' modules, so no import cycles) and never throw into the flow:
  * callers add `.catch(() => {})`.
@@ -315,7 +315,7 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
       .where(eq(channels.id, approval.channelId)),
     approvalCardThreads(deps.db, [approval]),
   ]);
-  // Where its card is (the main timeline, D67, has no thread).
+  // Where its card is (the main timeline has no thread).
   const threadId = cardThreads.get(approval.id) ?? null;
   await notify(deps, {
     orgId: approval.orgId,

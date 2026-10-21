@@ -6755,7 +6755,7 @@ export const en: Translations = {
     doing_other: "{{names}} are {{doing}}",
     /** "Theo, Iris and 2 more" (3 or more names in the working line). */
     namesMore: "{{first}}, {{second}} and {{count}} more",
-    /** The card above the box turns its phrase (telas/CardTrabalhando.html, A). */
+    /** The card above the box turns its phrase. */
     phrase: {
       thinking: {
         l0: "Thinking about your request",

@@ -53,7 +53,7 @@ const wikiEdit = (p: { id: string; title: string; slug: string; version: number 
 const reader = (ctx: ToolContext): WikiActor => ({ type: "agent", agentId: ctx.agentId, requestedByUserId: null });
 
 /**
- * The org wiki for agents (D34): `search_wiki` and `read_wiki_page`
+ * The org wiki for agents (ADR 0023): `search_wiki` and `read_wiki_page`
  * (`wiki:read`), `create_wiki_page`, `update_wiki_page` and `link_to_wiki`
  * (`wiki:write`). Writes need a person's request in the trigger message, and
  * every version records "by {agent}, at {person}'s request".

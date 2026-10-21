@@ -133,7 +133,7 @@ export interface Agent {
   brain?: AgentBrainLine;
 }
 
-/** An agent on the team screen (D54): when to call it and what it can do. */
+/** An agent on the team screen: when to call it and what it can do. */
 export interface TeamAgent {
   id: string;
   name: string;
@@ -1326,7 +1326,7 @@ export type ArtifactEvent = {
   artifact: Artifact;
 };
 
-// ── Issues, routines and calendar (D28; expected with backend phase 6) ──────
+// ── Issues, routines and calendar ───────────────────────────────────────────
 
 /** A person or an agent (issues, routines, calendar). */
 export type Actor = ArtifactAuthor;
@@ -1363,7 +1363,7 @@ export interface Issue {
   title: string;
   description: string;
   status: IssueStatus;
-  /** Its board column (D55), always one of its stage. */
+  /** Its board column, always one of its stage. */
   columnId: string | null;
   /** Order inside the column, lowest first. */
   boardRank: number;
@@ -1386,7 +1386,7 @@ export interface Issue {
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
   artifacts: { id: string; title: string; createdBy: Actor }[];
   work?: IssueWork | null;
-  /** The issue this one is a sub-issue of (a plan step from the forum, D45). */
+  /** The issue this one is a sub-issue of (a plan step from the forum). */
   parentIssueId?: string | null;
   /** On the detail: its sub-issues. */
   subIssues?: { id: string; number: number; title: string; status: IssueStatus; assignee: Actor | null }[];
@@ -1431,7 +1431,7 @@ export type IssuePatch = Partial<
   columnId?: string;
 };
 
-/** A board column (D55): it sits in a fixed stage; `name` null shows the stage's own name. */
+/** A board column: it sits in a fixed stage; `name` null shows the stage's own name. */
 export interface IssueColumn {
   id: string;
   stage: IssueStatus;
@@ -2001,7 +2001,7 @@ export type MachineEvent =
   /** Waiting agents moved off an offline computer ("Trocar computador"). */
   | { type: "machine.agents_moved"; machineId: string };
 
-// ── Forum (apps/server/src/routes/app/forum.ts, D33 revised by D45) ─────────
+// ── Forum (apps/server/src/routes/app/forum.ts, ADR 0022) ───────────────────
 
 /** `stalled`: a person stopped the turn (or it failed) and nobody speaks until "Retomar". */
 export type ForumStatus = "open" | "stalled" | "done" | "canceled";

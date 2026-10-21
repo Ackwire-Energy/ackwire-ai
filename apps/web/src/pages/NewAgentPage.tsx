@@ -131,7 +131,7 @@ interface Created {
   ownerName: string | null;
 }
 
-/** docs/design/telas/NovoAgente.html — the steps on a rail, a live preview of the agent on the right. */
+/** "Criar agente": the steps on a rail, a live preview of the agent on the right. */
 export function NewAgentPage() {
   const { t } = useTranslation();
   const { org } = useOrg();

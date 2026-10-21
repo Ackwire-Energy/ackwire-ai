@@ -4,7 +4,7 @@ import { Button, Dialog, DialogFooter, type IconName } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
-/** Each brain's line icon (telas/IconesMotor.html): the agent itself for the API. */
+/** Each brain's line icon: the agent itself for the API. */
 const BRAIN_ICON: Record<BrainKind, IconName> = {
   model: "brainAgent",
   claude_code: "brainClaudeCode",

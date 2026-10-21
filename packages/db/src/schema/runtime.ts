@@ -311,7 +311,7 @@ export const approvalStatusEnum = pgEnum("approval_status", [
 ]);
 
 /**
- * A sensitive action an agent wants to take (D4, docs/adr/0015). Bound to the
+ * A sensitive action an agent wants to take (docs/adr/0015). Bound to the
  * exact action: `action_hash` = SHA-256 of the canonical JSON of (tool,
  * scope, connection, params); only that is ever executed. Who may decide:
  * the agent's owner (`owner_user_id`, snapshot at creation) and org admins.
@@ -413,7 +413,7 @@ export const agentActions = pgTable(
 );
 
 /**
- * What an agent may do: one row per granted scope (D7, docs/adr/0015).
+ * What an agent may do: one row per granted scope (docs/adr/0015, 0016).
  * `connection_id` null = a built-in tool scope (e.g. `context:read`);
  * otherwise a scope of one org connector connection (e.g. `github:pr.merge`).
  * The Tool Gateway checks this table on every call; prompts never matter.

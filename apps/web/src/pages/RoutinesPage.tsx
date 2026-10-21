@@ -99,7 +99,7 @@ const mailTrouble = (r: Routine) =>
 export const isDoneOnce = (r: Routine) => r.trigger.type === "once" && !r.active;
 const isPaused = (r: Routine) => !isDoneOnce(r) && !r.active;
 
-/** The horizon: the last 4 hours and the next 20 (telas/Rotinas.html). */
+/** The horizon: the last 4 hours and the next 20. */
 const HORIZON_BACK = 4 * 3_600_000;
 const HORIZON_AHEAD = 20 * 3_600_000;
 const RUN_SLOTS = 14;
@@ -182,7 +182,7 @@ function useWhen() {
   };
 }
 
-/** Rotinas (telas/Rotinas.html): scheduled and event-driven agent tasks. */
+/** Rotinas: scheduled and event-driven agent tasks. */
 export function RoutinesPage() {
   const { t } = useTranslation();
   const { org } = useOrg();

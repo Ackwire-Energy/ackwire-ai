@@ -10,8 +10,7 @@ export interface TabItem<V extends string> {
 
 /**
  * Tabs (Radix: arrow keys between tabs, `tablist`/`tab`/`tabpanel`). `segmented`: the tabs look like the
- * Segmented control (a track, the raised pill slides under the chosen tab), e.g. under the agent's card
- * (telas/AgenteFundo.html, B).
+ * Segmented control (a track, the raised pill slides under the chosen tab), e.g. under the agent's card.
  */
 export function Tabs<V extends string>({
   value,

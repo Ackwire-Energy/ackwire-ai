@@ -7,7 +7,7 @@ import { type HeaderAction, PersonAvatar } from "@/ui";
 import { usePersonPhoto } from "./photo";
 
 /**
- * The bar of the three tabs (MobileConversas.html): Você on the left, "+" on the right opens "Novo"
+ * The bar of the three tabs: Você on the left, "+" on the right opens "Novo"
  * (agent, channel, a conversation with someone), in the native bar.
  */
 export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {

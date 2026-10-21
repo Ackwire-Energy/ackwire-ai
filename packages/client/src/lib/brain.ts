@@ -2,7 +2,7 @@ import type { BrainKind, BrainOption } from "../api/types";
 
 /*
  * The engine an agent thinks and works with, as its icon draws it
- * (telas/IconesMotor.html; `BrainPortrait` / `BrainIcon` in packages/ui):
+ * (`BrainPortrait` / `BrainIcon` in packages/ui):
  * Claude Code or Codex on a computer, or the agent itself through the API.
  * Same names as the UI's `BrainPortraitKind` and `BrainPortraitState`.
  */

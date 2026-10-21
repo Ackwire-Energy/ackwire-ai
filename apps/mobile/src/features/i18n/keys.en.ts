@@ -1116,7 +1116,7 @@ export const featureKeysEn: FeatureTranslations = {
       movedBody: "What was waiting for {{computer}} goes on on the new computer.",
     },
   },
-  // The agent's browser (ADR 0040, NavegadorAgente.html).
+  // The agent's browser (ADR 0040).
   browser: {
     card: {
       needs: "{{name}} needs help",

@@ -64,7 +64,7 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
     const card = document.querySelector(".brw-ac") as HTMLElement;
     expect(card.classList.contains("is-open")).toBe(true);
     expect(card.classList.contains("is-control")).toBe(true);
-    // The request is the title; the line under it says who is in control (prototype A + Céu).
+    // The request is the title; the line under it says who is in control.
     expect(card.querySelector(".brw-ac__tx b")?.textContent).toBe("Entrar no painel com a conta de teste");
     expect(card.querySelector(".brw-ac__tx small")?.textContent).toContain("Você no controle ·");
     expect(card.querySelector(".brw-ac__tx small")?.textContent).not.toContain("Entrar no painel");

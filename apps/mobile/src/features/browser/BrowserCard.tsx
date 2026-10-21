@@ -34,7 +34,7 @@ import { useSheet } from "../shared/SheetHost";
 import { FAILED_REASONS, NOTE_MAX, pageNoteOf, siteOf } from "./logic";
 import { FrameView, TypeBar, useLiveConnection } from "./parts";
 
-/** The log's last lines under the page (the prototype shows three). */
+/** The log's last lines under the page (the design shows three). */
 const LOG_LINES = 3;
 
 /** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"), as on the web. */
@@ -50,9 +50,8 @@ export function stepText(t: TFunction, s: Pick<BrowserStep, "tool" | "detail">):
 }
 
 /**
- * The agent's browser as its card in the conversation (NavegadorNoChat.html, A "No card" with the
- * "Céu" header): a thin sky in the agent's color on top, the site's letter and host, and what the agent
- * does now. Open, the same card shows the page live with the last steps; Assumir (or Abrir on a request)
+ * The agent's browser as its card in the conversation, under a "Céu" header: a thin sky in the agent's
+ * color on top, the site's letter and host, and what the agent does now. Open, the same card shows the page live with the last steps; Assumir (or Abrir on a request)
  * turns it into control right there: the request as the title, Pronto in the header, the app's own
  * field ("Digite aqui", Senha for saved passwords) and Não consegui; a take over ends with Devolver.
  * Pronto and Devolver take an optional note. Nothing leaves the conversation. The page streams only
@@ -274,7 +273,7 @@ export function BrowserCard({
         style={styles.head}
       >
         {!open ? (
-          // Closed: the page's small live picture (NavegadorCardScroll.html, 4).
+          // Closed: the page's small live picture.
           <View style={[styles.thumb, { backgroundColor: c.sunken, borderColor: c.line }]}>
             {live.frame ? (
               <Image

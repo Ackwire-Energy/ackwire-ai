@@ -130,7 +130,7 @@ export function validateSkill(s: { name: string; description: string; body: stri
   if (s.body.length > SKILL_LIMITS.bodyChars) throw new ValidationError("The skill body is too long");
 }
 
-/** Scripts we keep (never shown to the model) so `run_skill_script` can run them in a sandbox (D30). */
+/** Scripts we keep (never shown to the model) so `run_skill_script` can run them in a sandbox (ADR 0021). */
 export const SKILL_SCRIPTS: Record<string, string> = {
   py: "text/x-python",
   sh: "text/x-shellscript",

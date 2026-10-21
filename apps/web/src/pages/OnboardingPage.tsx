@@ -130,7 +130,7 @@ function useGuideMood() {
 }
 
 /**
- * docs/design/telas/OnboardingEtapas.html — the steps on a rail (the pixel sky
+ * The onboarding: the steps on a rail (the pixel sky
  * on top fills as they get done); each step is one calm screen hosted by an
  * agent of the team, who asks in a speech bubble (introducing itself the first
  * time); one big action under the answer, "Pular esta etapa" on optional steps.

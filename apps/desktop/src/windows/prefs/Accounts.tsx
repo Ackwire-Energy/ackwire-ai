@@ -1,5 +1,5 @@
 /**
- * Preferências > Ferramentas, under the tools card (ContaClaudeBandeja.html, ADR 0041): one "Contas"
+ * Preferências > Ferramentas, under the tools card: one "Contas"
  * card per CLI found on this Mac. "Conta deste Mac" is the sign-in already in the CLI (not removable
  * here); each added account has its email, plan and "Remover"; "Adicionar conta" opens the CLI's own
  * sign-in in the browser and waits. Accounts belong to one organization's home, so with several

@@ -85,7 +85,7 @@ export function browserTrailHref(site: string | null): string | null {
 }
 
 /**
- * What a step was, for its pixel column (telas/NavegadorResumo.html, B): an open is the whole
+ * What a step was, for its pixel column: an open is the whole
  * column, reading most of it, an action a stub, a print two cells; a failure the whole column in red.
  */
 export type BrowserTrailKind = "open" | "read" | "act" | "shot" | "failed";

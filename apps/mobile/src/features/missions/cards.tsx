@@ -582,7 +582,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
 const FINDING_ICON = { read: "search", data: "chart", decision: "help" } as const;
 
 /**
- * What the agent found before proposing (FazerDesfazer.html, `.inv .fd`): what it read (search), numbers
+ * What the agent found before proposing: what it read (search), numbers
  * it saw (chart) and the one decision left for the person (help), highlighted. Refs are mono chips.
  */
 function Findings({ findings }: { findings: MissionFinding[] }) {

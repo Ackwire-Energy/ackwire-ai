@@ -9,7 +9,7 @@ import { can, requirePermission } from "./organizations";
 
 const { agents, users, organizationMembers } = schema;
 
-/** Who can talk to an agent (D31). */
+/** Who can talk to an agent. */
 export type AudienceMode = "everyone" | "people" | "owner";
 export const AUDIENCE_MODES: readonly AudienceMode[] = ["everyone", "people", "owner"];
 
@@ -67,7 +67,7 @@ export async function audienceDetail(db: Database, a: Agent) {
   return { code, params, english };
 }
 
-/** The ForbiddenError for someone the agent doesn't answer (D31), with code and params. */
+/** The ForbiddenError for someone the agent doesn't answer, with code and params. */
 export async function audienceError(db: Database, a: Agent) {
   const d = await audienceDetail(db, a);
   return new ForbiddenError(d.english, d.code, d.params);

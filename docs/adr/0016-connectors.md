@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D7 (our scopes for MCP tools) and the "Conectores em 2 camadas" concept.
 
 ## Decision
 

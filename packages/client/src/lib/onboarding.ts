@@ -2,7 +2,7 @@ import type { Role } from "../api/types";
 import { isEmail } from "./text";
 
 /**
- * The onboarding's steps, in order (docs/design/telas/OnboardingV2.html).
+ * The onboarding's steps, in order.
  * "import" reads another product's export (apps/web/src/lib/import); its
  * agents arrive chosen in "agents". "computer" comes before "agents": with a
  * computer connected, the model step can also pick its Claude Code.

@@ -51,7 +51,7 @@ import {
 } from "./turn";
 
 /**
- * An agent's turn, live (Mensagens.html, the base rules): one block from "pensando" to the last word, in
+ * An agent's turn, live: one block from "pensando" to the last word, in
  * the same place, the last thing in the conversation while it works. The header says what it is doing
  * (its pixel orbit and a breathing word, and for how long); above the words, its steps (the orbit while
  * one runs, one green pixel when done), what it said between them and the wells of the messages it read;
@@ -235,7 +235,7 @@ export function FoldingWork({ runId, agentId }: { runId: string; agentId: string
 const capitalize = (s: string) => (s ? s[0]?.toUpperCase() + s.slice(1) : s);
 
 /**
- * A message it read while working, inside its work (Mensagens.html, C): "Leu seu recado · …", or
+ * A message it read while working, inside its work: "Leu seu recado · …", or
  * "Parou para ler seu recado · …" when it was asked to stop and read (until then the message itself says
  * "lê na próxima pausa").
  */
@@ -332,13 +332,13 @@ const STACK_MAX = 4;
 
 /**
  * The working line, as the web's activity bar above the composer (ChannelPage `ActivityBar`,
- * WorkingLine.tsx, `.ac-typing[data-active]`; telas/ConversaAgentes.html): a compact glass pill
+ * WorkingLine.tsx, `.ac-typing[data-active]`): a compact glass pill
  * that fits its content, with a dithered band sweeping in the first agent's color behind it; the
  * pixel orbit; the stacked live mini bodies, each on a plate and popping in (an agent asking
  * another shows both, with an arrow); the sentence with names in ink, fading in whenever what they
  * do changes ("Atlas está consultando o Sentry…"); the clock of a question that is out; and, after
  * a thin rule, "Parar" for the runs I may stop (one tap, no question: what it did stays and can
- * continue). On while they work (CardTrabalhando.html, A): one agent on its own gets a turning phrase
+ * continue). On while they work: one agent on its own gets a turning phrase
  * (a light line while it thinks, what it does, an aside on a long step, what it said last). Nothing
  * moves with Reduce Motion or off screen.
  */
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   say: { marginVertical: 2 },
   step: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 26 },
   stepIcon: { width: 16, height: 16, alignItems: "center", justifyContent: "center" },
-  // "Leu seu recado": a sunken well with the "tato com canto" corner (Cards.html I).
+  // "Leu seu recado": a sunken well with the "tato com canto" corner.
   well: {
     flexDirection: "row",
     alignItems: "center",

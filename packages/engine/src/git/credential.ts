@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { deriveSecret } from "../crypto";
 
 /**
- * The credential a computer uses with our git proxy (D35). It is ours, not
+ * The credential a computer uses with our git proxy (ADR 0024). It is ours, not
  * GitHub's: an HMAC over org, agent, computer, a revocation generation and
  * an expiry. GitHub's token stays on the server and never enters a computer.
  */

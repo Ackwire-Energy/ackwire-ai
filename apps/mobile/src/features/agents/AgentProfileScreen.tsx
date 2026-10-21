@@ -72,7 +72,7 @@ const AREA_ICON: Record<string, IconName> = {
 };
 
 /**
- * An agent's profile as a teammate (MobileIntencional.html, "Perfil do agente"): its sky and living body, its
+ * An agent's profile as a teammate: its sky and living body, its
  * role in one plain sentence, who answers for it, what it is on now (or what waits on you), one button
  * (Conversar), then what it did for you, what it knows about you (tap to correct or forget, for its owner and
  * admins), what it can use in plain levels and the approval rule, and its month last.

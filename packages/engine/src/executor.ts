@@ -125,7 +125,7 @@ export interface EngineDeps {
   tools?: ToolGateway;
   /** Model calls one run may make (tool loops). */
   maxToolTurns?: number;
-  /** Memory and summaries (D9 layers 3–4). Without it the context is the recent conversation only. */
+  /** Memory and summaries (ADR 0017). Without it the context is the recent conversation only. */
   context?: ContextDeps;
   /** Latency measurements (`trigger_to_claim_ms`, `claim_to_first_delta_ms`, `run_ms`), for logs. */
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
@@ -143,7 +143,7 @@ export interface EngineDeps {
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
   /**
-   * Tools on demand (D65): each run lists the core tools and the groups the
+   * Tools on demand (ADR 0043): each run lists the core tools and the groups the
    * judge (`context.judge`) expects it to need; the rest go behind
    * `find_tools` / `use_tool`. Off: every granted tool is listed (tests).
    */
@@ -169,7 +169,7 @@ export type RunExecutorDeps = EngineDeps;
 export interface Transcript {
   system: SystemBlock[];
   messages: ModelMessage[];
-  /** Tools on demand (D65): the tool groups this run listed up front; absent = every tool. */
+  /** Tools on demand (ADR 0043): the tool groups this run listed up front; absent = every tool. */
   toolGroups?: string[];
   /** Assistant text before this index was already posted to the chat (or was history). */
   postedUpTo: number;
@@ -401,7 +401,7 @@ async function executeRunInner(
   // status is `running` here.
   prof.mark("claim");
   const claimedAt = Date.now();
-  // Asked in the main timeline, the run answers there; asked in a thread, in that thread (D67).
+  // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
   // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
   const [channelRow, topTrigger] = await Promise.all([
@@ -450,15 +450,15 @@ async function executeRunInner(
       status,
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
-    // A forum turn ended: announce the post and move the topic on (D33). A question to people
-    // (`waiting_input`) doesn't hold the discussion either (D45).
+    // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
+    // (`waiting_input`) doesn't hold the discussion either.
     if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
-    // A routine's run ended: its creator hears it (D46). A silent run (NO_REPLY) found nothing: no notification.
+    // A routine's run ended: its creator hears it. A silent run (NO_REPLY) found nothing: no notification.
     if (routineOfRun && (status === "done" || status === "failed")) {
       const routine = routineOfRun;
       const notifyDeps = { db, pubsub: deps.pubsub };
@@ -559,7 +559,7 @@ async function executeRunInner(
     deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
   if (!agent || agent.archivedAt) return fail("agent_archived");
   await publishChannelEvent(deps.pubsub, event("running"));
-  // Tools on demand (D65): a new run lists the core tools and the groups the judge expects it to need.
+  // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
   let toolChoice: ToolGroupChoice | null = null;
   const judge = deps.context?.judge;
   if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
@@ -585,7 +585,8 @@ async function executeRunInner(
   // agent's message, since the routine's own call isn't shown), and it may end in silence.
   const triggerMessage = trigger ?? topTrigger ?? (await getMessage(db, run.orgId, run.triggerMessageId));
   const routineCall = triggerMessage?.meta.routine as { id?: unknown; name?: unknown } | undefined;
-  // Brought in by the router after another agent spoke (D49): nobody called it, its replies say so (`meta.joined`).
+  // Brought in by the router after another agent spoke (ADR 0034): nobody called it, its replies say so
+  // (`meta.joined`).
   const joined = run.trigger === "router" && triggerMessage?.authorType === "agent";
   const viaRoutine =
     routineCall && typeof routineCall.id === "string" && typeof routineCall.name === "string"

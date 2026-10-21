@@ -2,7 +2,7 @@ import type { AgentAudience, BrainKind, Run } from "../api/types";
 import { readBudget } from "./new-agent";
 
 /*
- * The agent page (docs/design/telas/AgentePerfil.html): one draft over
+ * The agent page: one draft over
  * everything that can be edited, one save bar. These are the rules that
  * don't need the agent's look; the draft itself (`Saved`, `Edits`) lives with
  * each platform, which knows the look's types.

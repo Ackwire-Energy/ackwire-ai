@@ -13,7 +13,7 @@ import { prepareBurst } from "@/components/Sky";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/SocialButtons";
 
 /**
- * Sign in and sign up in one flow (telas/EntrarCadastro.html, C): the e-mail
+ * Sign in and sign up in one flow: the e-mail
  * first, then the one next step the server says it needs (the password, the
  * provider the account signs in with, or the name and a new password).
  * "Esqueci a senha" happens in place. The agent reacts to what you do.

@@ -7,7 +7,7 @@ import { useJoy, useVisible } from "./hooks";
 import { LpAvatar } from "./LpAvatar";
 import "./onboarding.css";
 
-/** How long each step stays before the next one (prototype: 3.4 s). */
+/** How long each step stays before the next one. */
 const STEP_MS = 3400;
 const ORG = ORGS.shop;
 const REPO = `${ORG.slug}/loja`;
@@ -42,7 +42,7 @@ interface Step {
   skip?: boolean;
 }
 
-/** The onboarding, step by step (LandingNova.html "08 · Começar"). */
+/** The onboarding, step by step ("08 · Começar"). */
 const STEPS: Step[] = [
   { id: "company", options: [{ id: "name" }] },
   {

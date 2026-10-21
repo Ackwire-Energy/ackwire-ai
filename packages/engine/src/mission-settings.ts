@@ -24,7 +24,7 @@ import {
 import { can, requirePermission } from "./organizations";
 
 /**
- * "Configurações da missão" (ADR 0029, telas/MissaoConfig.html): what the
+ * "Configurações da missão" (ADR 0029): what the
  * dialog reads in one call (the rules allowed for the whole mission, what
  * happened to its commands, the agent's default for new missions) and the
  * writes it makes besides the autonomy itself (`setCommandApproval`):

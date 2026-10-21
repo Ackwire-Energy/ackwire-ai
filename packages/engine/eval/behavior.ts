@@ -36,7 +36,7 @@ const only = arg("only")?.split(",");
 const agentModel = arg("model") ?? process.env.EVAL_AGENT_MODEL;
 const judgeModel = arg("judge-model") ?? process.env.EVAL_JUDGE_MODEL ?? "claude-haiku-5-5";
 const useJudge = !process.argv.includes("--no-judge");
-/** Tools on demand (D65) as in production: run it with and without to compare tokens and behavior. */
+/** Tools on demand (ADR 0043) as in production: run it with and without to compare tokens and behavior. */
 const toolsOnDemand = process.argv.includes("--tools-on-demand");
 const jevKey = process.env.TYPESAFE_API_KEY || undefined;
 const judgeKind = arg("judge") ?? "jev";

@@ -1,5 +1,5 @@
 /**
- * First run and "Adicionar organização" (AppBandeja.html, view "welcome"): sign in with a code the
+ * First run and "Adicionar organização": sign in with a code the
  * computer shows and the person confirms in the browser (ADR 0036 §5), then, the first time only,
  * folders, tools and "open when the Mac starts". One simple question per screen. Also "Reconectar
  * este Mac" from the popover: the same code screen on the refused organization's home, which comes

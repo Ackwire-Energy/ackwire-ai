@@ -22,7 +22,7 @@ const must = <T>(v: T | undefined): T => {
   return v;
 };
 
-describe("board columns (D55)", () => {
+describe("board columns", () => {
   test("one column per stage at first; custom columns sit in a stage; the status moves to the stage's first column", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };

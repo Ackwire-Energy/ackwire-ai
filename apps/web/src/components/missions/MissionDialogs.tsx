@@ -46,7 +46,7 @@ import { CommandApprovalSelect, executorOptions } from "./MissionBits";
 import "./missions.css";
 
 /**
- * The mission dialogs (Threads.html): "Nova missão" (objective, agent, where
+ * The mission dialogs: "Nova missão" (objective, agent, where
  * it lives, the computer it runs on), closing it (Concluída / Cancelada,
  * "Salvar decisões e lições na wiki"), and "Compartilhar" (who can decide or
  * comment, handing it over; the computer never moves by itself).

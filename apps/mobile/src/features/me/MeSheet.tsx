@@ -40,7 +40,7 @@ const closeThenPush = (onClose: () => void, href: string) => {
 };
 
 /**
- * Você (MobileRefinos.html, `voce`): a short settings list as on the iPhone. Your row opens Conta; the
+ * Você: a short settings list as on the iPhone. Your row opens Conta; the
  * workspace row opens Workspaces; "Do workspace" links Issues and Drive; Notificações, Aparência and
  * Idioma each open their own screen; then Sair and the app's version. A native form sheet over whatever
  * was on screen, with its own small stack.

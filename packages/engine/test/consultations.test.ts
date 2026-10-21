@@ -93,7 +93,7 @@ describe("ask_agent", () => {
     expect(members.every((m) => m.userId === null)).toBe(true);
     expect((await listDms(f.db, f.owner.id, f.org.id)).map((d) => d.channelId)).not.toContain(c?.channelId);
 
-    // The asking run heard the answer and replied where it was asked (D67), with the "message from @infra" card.
+    // The asking run heard the answer and replied where it was asked, with the "message from @infra" card.
     const all = await runs();
     expect(all.every((r) => r.status === "done")).toBe(true);
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
@@ -140,7 +140,7 @@ describe("ask_agent", () => {
       threadRootId: ask.id,
       status: "pending",
     });
-    // The card is in the channel's timeline, where the person asked (D67); the approval keeps the conversation.
+    // The card is in the channel's timeline, where the person asked; the approval keeps the conversation.
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     const card = timeline.find((m) => m.meta.approvalId === approval?.id);
     expect(card?.author).toMatchObject({ type: "agent", id: infra.id });

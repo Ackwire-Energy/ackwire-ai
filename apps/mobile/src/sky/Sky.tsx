@@ -11,7 +11,7 @@ export interface SkyProps {
   /** Fade to the bottom from this height share (default 0.55, as on the web). */
   fade?: number;
   /**
-   * The surface it blends into (prototype `data-surf`): the screen's background (default), a raised card,
+   * The surface it blends into: the screen's background (default), a raised card,
    * or the grouped gray.
    */
   surface?: "bg" | "raised" | "grouped";

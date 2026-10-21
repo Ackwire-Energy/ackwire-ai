@@ -28,7 +28,7 @@ type Open = "who" | "priority" | "due" | null;
 const close = () => (router.canGoBack() ? router.back() : router.replace("/issues"));
 
 /**
- * "Nova issue" (MobileDriveIssues.html), a native form sheet over Issues: the title, a description, who does
+ * "Nova issue", a native form sheet over Issues: the title, a description, who does
  * it (an agent picked here is asked right away, as on the web: it starts and the status moves on its own),
  * the priority and the due date. "Criar" in the header.
  */

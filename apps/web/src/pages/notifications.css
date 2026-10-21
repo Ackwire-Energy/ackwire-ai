@@ -1,5 +1,5 @@
 /*
- * Notificações (telas/Notificacoes.html): "Esperando você" on top (the
+ * Notificações: "Esperando você" on top (the
  * agents look up while they wait), then the rest by day, grouped by
  * conversation. Inline actions float on hover / focus (a row on phones),
  * the mini composer opens in place. Pixel pieces from @agenteschat/ui:
@@ -13,7 +13,7 @@
   flex: 1;
 }
 
-/* Avatars at the prototype's sizes (the engine draws to the box). */
+/* Avatars at the design's sizes (the engine draws to the box). */
 .nt-av40 {
   width: 40px;
   height: 40px;

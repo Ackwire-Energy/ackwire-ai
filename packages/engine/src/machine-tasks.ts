@@ -672,7 +672,7 @@ export const enqueueWake = (tx: Executor, row: Pick<MachineTaskRow, "id" | "orgI
  * A task the agent started itself with `start_task` (a shell command, or
  * Claude Code in the conversation's session), not one of a mission
  * executor's sessions (those have their own session id, in the mission's
- * thread). Started from the main timeline (D67), it reports to no thread.
+ * thread). Started from the main timeline, it reports to no thread.
  */
 export const isAgentTask = (row: Pick<MachineTaskRow, "sessionId" | "threadRootId">) =>
   !row.sessionId || row.threadRootId === null || row.sessionId === row.threadRootId;
@@ -982,7 +982,7 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
  * `machine.task_done`: wakes the conversation once per task. A notice in the
  * task's thread (as its agent) carries the result for the model
  * (`meta.machineTask`), and a run of that agent starts on it, unless the hop
- * limit or the agent's audience (D31) says no, or the agent left the
+ * limit or the agent's audience says no, or the agent left the
  * channel. A run of that agent already active in the thread gets it as a
  * new message instead (one run per agent and conversation).
  */

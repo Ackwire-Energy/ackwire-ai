@@ -4,7 +4,7 @@ import type { AuthClient, AuthResult } from "./client";
 const toResult = (error: { status?: number; message?: string } | null | undefined): AuthResult =>
   error ? { ok: false, status: error.status ?? 500, message: error.message ?? "" } : { ok: true };
 
-/** Better Auth client, the same setup as Tierbird's dashboard. */
+/** Better Auth client for the web app (same origin, `/api/auth`). */
 export function createBetterAuthClient(origin = window.location.origin): AuthClient {
   const client = createAuthClient({ baseURL: origin, basePath: "/api/auth" });
   return {

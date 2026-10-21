@@ -72,7 +72,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const settled = !waiting && !active;
   const status = current.status === "pending" ? "expired" : current.status;
   const minutes = handoffMinutesLeft(current);
-  // The agent's browser opens right here, under the request (telas/NavegadorNoChat.html, A).
+  // The agent's browser opens right here, under the request.
   const [here, setHere] = useState(false);
   const take = () =>
     actions.takeControl.mutate(current.id, {

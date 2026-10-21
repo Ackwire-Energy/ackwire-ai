@@ -299,11 +299,11 @@ describe("approval flow (end to end)", () => {
     expect(run?.status).toBe("waiting_approval");
     expect(gh.executed.map((e) => e.tool)).toEqual(["github_get_pr"]);
     const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
-    // Its card is where it was asked: the main timeline (D67).
+    // Its card is where it was asked: the main timeline.
     expect(approval).toMatchObject({ title: "Merge PR #42 in acme/app", canDecide: true, threadId: null });
 
     // The chat shows what the agent said before the approval and the card, in the main timeline where it
-    // was asked (D67); earlier narration is a step.
+    // was asked; earlier narration is a step.
     let main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.map((m) => m.body)).toEqual([
       "@dev merge PR 42 if the tests pass",

@@ -64,8 +64,8 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
 
 describe("Perfil: o papel numa frase", () => {
   test("skips the prompt's self-introduction and keeps what follows the comma", () => {
-    expect(plainRole("Você é o Theo, desenvolvedor do Time Himetrica. Cuida do repositório.")).toBe(
-      "Desenvolvedor do Time Himetrica",
+    expect(plainRole("Você é o Theo, desenvolvedor do Time Lumen. Cuida do repositório.")).toBe(
+      "Desenvolvedor do Time Lumen",
     );
     expect(plainRole("Você é a Nina.\nPesquisa mercado e concorrentes. Responda em português.")).toBe(
       "Pesquisa mercado e concorrentes",

@@ -33,7 +33,7 @@ export function GreetingSky() {
 }
 
 /**
- * The greeting under Conversas' large title (MobileHomeAgentes.html `.gmini`; MobileIntencional.html, A),
+ * The greeting under Conversas' large title,
  * scrolling away with the list: "Boa noite, Walter", then what changed: what an agent finished ("Theo
  * terminou “…”", opens where it happened) and how many work now (opens Agentes), with the faces of the
  * ones working (moving).
@@ -154,7 +154,7 @@ export function Greeting({
 }
 
 /**
- * Conversas with nothing in it yet (MobileIntencional.html, "Primeiro dia"): the sky with an agent about to
+ * Conversas with nothing in it yet: the sky with an agent about to
  * be born, one primary "Criar meu primeiro agente", and examples of what an agent can do (each opens "Novo
  * agente" with "o que faz" filled in).
  */

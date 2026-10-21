@@ -85,7 +85,7 @@ describe('"Leu": a message sent while it works', () => {
     const [run] = await runs();
     const types = events.map((e) => e.type);
     const read = events.find((e) => e.type === "agent.run.read");
-    // Asked in the channel: the run's events are in the main timeline (D67).
+    // Asked in the channel: the run's events are in the main timeline.
     expect(read).toMatchObject({ runId: run?.id, agentId: f.agent.id, threadId: null, messageIds: [steeredId] });
     expect(types.indexOf("agent.run.steered")).toBeLessThan(types.indexOf("agent.run.read"));
     expect(JSON.stringify(f.provider.calls[1]?.request.messages.at(-1))).toContain("usa a branch dev");
@@ -308,7 +308,7 @@ describe('"Continuar" after a stop', () => {
       .update(schema.agentRuns)
       .set({ pendingMessageIds: [said.id] })
       .where(eq(schema.agentRuns.id, stopped.id));
-    // The stopped reply is in the main timeline (asked there, D67).
+    // The stopped reply is in the main timeline (asked there).
     const reply = { id: stopped.replyMessageId as string, threadId: null };
     const transcript = stopped.transcript as unknown as Transcript;
 

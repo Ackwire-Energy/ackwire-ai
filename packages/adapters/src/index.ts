@@ -35,7 +35,7 @@ export * from "./secret-box";
 
 /**
  * Infrastructure the core talks to through interfaces, so each edition can
- * plug its own implementation (docs/planejamento.md D18a). The server builds
+ * plug its own implementation (ADR 0002). The server builds
  * core defaults, then applies each module's overrides in order.
  */
 export interface Adapters {
@@ -54,7 +54,7 @@ export interface Adapters {
    * their own bucket are resolved on top of it by the engine.
    */
   platformBlobs: BlobStore;
-  /** Where agents run code (D30): Daytona in the Cloud; null/absent = the sandbox tools are off. */
+  /** Where agents run code (ADR 0021): Daytona in the Cloud; null/absent = the sandbox tools are off. */
   sandbox?: SandboxProvider | null;
   /** Push to the phone app (`push.send` outbox job, ADR 0035); null/absent = no push. */
   push?: PushSender | null;

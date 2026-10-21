@@ -366,7 +366,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             (r) =>
               isRoutine(r) &&
               (!str(input.id) || r.id === str(input.id)) &&
-              // Another agent's routines only when the person behind this run may talk to it (D31).
+              // Another agent's routines only when the person behind this run may talk to it.
               (r.agentId === ctx.agentId ||
                 (byId.has(r.agentId) && (!person || canTalkTo(byId.get(r.agentId) as (typeof team)[number], person)))),
           );

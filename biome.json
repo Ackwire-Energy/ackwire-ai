@@ -9,7 +9,6 @@
       "!**/node_modules",
       "!**/dist",
       "!**/migrations/meta",
-      "!docs/prototipo",
       "!**/*.html",
       "!docs/design",
       "!**/routeTree.gen.ts",

@@ -288,7 +288,7 @@ describe("agent questions (ask_user)", () => {
       meta: { question },
       createdAt: new Date().toISOString(),
     });
-    // Asked in the channel (D67): the question has no thread, so the receipt follows the run that answers m-1.
+    // Asked in the channel: the question has no thread, so the receipt follows the run that answers m-1.
     const asked = state.messages.find((m) => m.id === "m-1");
     if (asked)
       asked.receipts = { seenBy: [], pickedBy: [], handled: [{ agentId: ADA_ID, runId: "r-q", status: "running" }] };

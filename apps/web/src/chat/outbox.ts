@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Messages that could not go out because the connection was down (telas/Mensagens.html, "Internet
- * caiu"): they stay "sai quando a internet voltar" instead of "Não enviada", and go out again on
- * their own when it is back. Keyed by the optimistic copy's `clientId`, for this tab.
+ * Messages that could not go out because the connection was down: they stay "sai quando a internet
+ * voltar" instead of "Não enviada", and go out again on their own when it is back. Keyed by the
+ * optimistic copy's `clientId`, for this tab.
  */
 const waiting = new Set<string>();
 const listeners = new Set<() => void>();

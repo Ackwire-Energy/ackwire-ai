@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D6, D18, D18a, D18b, D20.
 
 ## Decision
 
@@ -21,5 +20,5 @@
 
 ## Consequences
 
-- One process serves HTTP, WebSocket and the SPA: no separate real-time service (supersedes the "realtime" row of the planejamento Infra table).
+- One process serves HTTP, WebSocket and the SPA: no separate real-time service.
 - Follow-ups: revoke live subscriptions when someone leaves a channel or organization (today the check runs at subscribe time; a reconnect re-checks), presence events to clients, typing indicators for people, `NOTIFY` throughput limits at Cloud scale (Redis adapter).

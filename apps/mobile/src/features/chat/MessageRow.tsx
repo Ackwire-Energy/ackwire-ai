@@ -130,7 +130,7 @@ export const MessageRow = memo(function MessageRow({
   const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
   const issueWork = issueWorkOf(meta);
-  // My own message: a light bubble on the right, no face or name (MobileIntencional.html, `.me`).
+  // My own message: a light bubble on the right, no face or name.
   const mine = !routine && m.author.type === "person" && Boolean(meId) && m.author.id === meId;
 
   const cards = (
@@ -332,7 +332,7 @@ function Sending({ offline, end }: { offline: boolean; end: boolean }) {
 }
 
 /**
- * Under my message sent while an agent works (Mensagens.html, C): "{nome} lê na próxima pausa" (the ink
+ * Under my message sent while an agent works: "{nome} lê na próxima pausa" (the ink
  * orbit) until it reads it, "{nome} parou para ler" when I asked it to stop and read, then "{nome} leu"
  * with its small face.
  */
@@ -367,7 +367,7 @@ function SteerLine({ message: m }: { message: Message }) {
 }
 
 /**
- * A reply someone stopped (Mensagens.html): what it wrote stays, with "Parado por você · Continuar"; the
+ * A reply someone stopped: what it wrote stays, with "Parado por você · Continuar"; the
  * button picks up from where it stopped (a new run) and goes away once it did, for everyone.
  */
 function StoppedLine({
@@ -525,7 +525,7 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
 }
 
 const styles = StyleSheet.create({
-  // Readable turns (MobileIntencional.html): more room between turns, a quieter name and time.
+  // Readable turns: more room between turns, a quieter name and time.
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
   cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },

@@ -584,7 +584,7 @@ describe("from issues, the chat and routines", () => {
       origin: { kind: "agent", agentId: f.agent.id },
     });
     const back = (await f.db.select().from(schema.messages)).find((m) => m.meta.forumTopicId === topic?.id);
-    // Asked in the channel, with no thread under the message: back in the channel (D67).
+    // Asked in the channel, with no thread under the message: back in the channel.
     expect(back).toMatchObject({ channelId: f.general.id, threadId: null, authorAgentId: f.agent.id });
     expect(back?.meta.artifacts).toEqual([{ id: topic?.synthesis?.artifactId, version: 1 }]);
   });

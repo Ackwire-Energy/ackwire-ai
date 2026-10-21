@@ -380,7 +380,7 @@ function ComputerTargetSelect({
 }
 
 /**
- * The computer the agent uses, as its portrait (IconesComputador.html): the
+ * The computer the agent uses, as its portrait: the
  * cloud computer (lit while running or starting) or the connected machine,
  * its kind and pause from the computers list.
  */
@@ -483,7 +483,7 @@ export function AgentComputerPanel({
 }
 
 /**
- * "Pastas no computador" (PastasComputador.html, view "agent"): the folders of
+ * "Pastas no computador": the folders of
  * its computer this agent may use beyond its own, as the machine reported them.
  * Read-only here: granting happens on the computer.
  */
@@ -542,7 +542,7 @@ const draftOf = (s: SandboxSettings): Draft => ({
 });
 
 /**
- * Configurações → Computadores, "Computador na nuvem" (admins, telas/Computadores.html):
+ * Configurações → Computadores, "Computador na nuvem" (admins):
  * the card holds the on/off switch (saved at once) and a one-line summary;
  * internet, limits and approval are set in a dialog ("Ajustar"). They apply only
  * to the cloud computer; the person's own computers follow what is allowed on them.
@@ -827,7 +827,7 @@ function CloudComputerDialog({
 }
 
 /**
- * "Qual computador cada agente usa" (telas/Computadores.html): every agent and
+ * "Qual computador cada agente usa": every agent and
  * its computer, changed here at once. The current one comes from the computers
  * list (each says which agents use it); no computer there means the cloud.
  * Admins pick any computer; an agent's owner, the ones they connected (the

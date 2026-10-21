@@ -23,7 +23,7 @@ export interface ToolContext {
    */
   bridge?: { machineId: string; taskId?: string };
   /**
-   * Tools on demand (D65): the tool groups this run loaded (`Transcript.toolGroups`); the others sit
+   * Tools on demand (ADR 0043): the tool groups this run loaded (`Transcript.toolGroups`); the others sit
    * behind `find_tools` / `use_tool`. Undefined or null: every tool is listed as is.
    */
   loadedGroups?: readonly string[] | null;

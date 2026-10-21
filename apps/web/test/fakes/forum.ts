@@ -1,5 +1,5 @@
 /**
- * Test fake — the forum (apps/server/src/routes/app/forum.ts, D45): topics
+ * Test fake — the forum (apps/server/src/routes/app/forum.ts): topics
  * with seats, the round track, stances, syntheses (decision or plan) and the
  * actions (post, conclude, cancel, pass, resume, participants, issues,
  * suggestions). The track is rebuilt from the posts on every read.

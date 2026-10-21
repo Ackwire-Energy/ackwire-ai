@@ -1,9 +1,9 @@
 /**
  * The agent, defined once. Every place that draws an agent reads its shape,
  * eyes, colors and dither from here: the avatar (`Avatar`), the logo and the
- * favicon, the pixel agents in the sky, the landing's giant and the HTML
- * prototypes in docs/design/telas (which import this file as is, so it stays
- * plain JavaScript with types in engine.d.ts and no imports).
+ * favicon, the pixel agents in the sky, the landing's giant and plain HTML
+ * pages that import this file as is (so it stays plain JavaScript with types
+ * in engine.d.ts and no imports).
  *
  * Coordinates are fractions of the body's box (0..1, y down). The body is a
  * square with radius 29% on three corners and the cut corner at bottom-left;

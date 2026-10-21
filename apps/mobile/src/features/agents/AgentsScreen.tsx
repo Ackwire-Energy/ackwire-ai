@@ -20,7 +20,7 @@ import { agoText, workTitle } from "./work";
 const LIVE_ROWS = 8;
 
 /**
- * Agentes (MobileIntencional.html, "Aba Agentes"): the team in Conversas' rows, who needs you first.
+ * Agentes: the team in Conversas' rows, who needs you first.
  * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
  * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
  * ones waiting for their offline computer: "Esperando o MacBook Air"). Tapping an agent

@@ -122,7 +122,7 @@ async function readBody(req: Request, max: number) {
 }
 
 /**
- * Smart-HTTP git for agents' computers (D35): `/api/git/{orgId}/{connectionId}/{owner}/{repo}.git/…`.
+ * Smart-HTTP git for agents' computers (ADR 0024): `/api/git/{orgId}/{connectionId}/{owner}/{repo}.git/…`.
  * - The computer authenticates with our short-lived per-computer credential.
  * - Policy is checked here: the agent's `github:git.read` / `github:git.write`
  *   grants on that connection (and repo list, when set); pushes only to

@@ -3,7 +3,7 @@ import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 
 /**
- * Settings in a dialog (telas/MissaoConfig.html): sections with a title and
+ * Settings in a dialog: sections with a title and
  * one line, rows with a control on the right, quiet notes under a list, a
  * grouped list with hairline rows, and "Mais opções" folded by default. One
  * rhythm (8/12/16/24), body 14px, meta 13px, few boxes.

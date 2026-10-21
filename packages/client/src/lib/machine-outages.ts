@@ -1,5 +1,5 @@
 /**
- * "Computador desconectado" (telas/ComputadorOffline.html): when the computer that runs some agents' brain
+ * "Computador desconectado": when the computer that runs some agents' brain
  * (Claude Code / Codex) goes offline, the app says so once (a notice), each waiting agent says what it waits
  * for, and "Trocar computador" moves the agents to another computer that can run their brain. Pure helpers
  * shared by the web and the phone app: the notice's inputs, the waiting counts, which targets the switch

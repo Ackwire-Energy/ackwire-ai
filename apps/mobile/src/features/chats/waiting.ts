@@ -5,7 +5,7 @@ import { minutesLeft } from "../shared/logic";
 import { missionWaitingItems } from "./logic";
 
 /**
- * "Esperando você" (MobileRefinos.html, B + C): what waits on you as items in one order (requests, the one
+ * "Esperando você": what waits on you as items in one order (requests, the one
  * closest to expiring first, then missions, then agents' questions), the dark strip that shows the first one
  * with the others stacked behind it, and the card it opens into. Pure: the strip turns this into text.
  */

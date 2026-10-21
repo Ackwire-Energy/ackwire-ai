@@ -41,7 +41,7 @@ import { COMMAND_APPROVALS, ExecutorMark } from "./MissionBits";
 import { ruleText } from "./MissionCommandCard";
 
 /**
- * "Configurações da missão" (telas/MissaoConfig.html), opened from the
+ * "Configurações da missão", opened from the
  * header's ⋯: Autonomia (three rows with the agent's pixel illustrations),
  * O que já foi liberado (the "Aprovar sempre" rules, ×), Próximas missões
  * do agente ("Usar como padrão") and, folded, Mais opções (who does the

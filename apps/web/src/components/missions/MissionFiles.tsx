@@ -10,7 +10,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
- * "Arquivos da missão" (ThreadContexto.html, A3/A6): mission.md (plan and
+ * "Arquivos da missão": mission.md (plan and
  * rules, written by agentes.chat), decisions.md (approved decisions) and
  * notes.md (the executor's notes), rendered. Lines that arrived while the
  * panel was open fade in with a faint time; an edit found on the computer

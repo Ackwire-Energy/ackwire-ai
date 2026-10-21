@@ -94,7 +94,7 @@ test("an agent's question waits for the person who asked; answering resolves it"
     source: { channelId },
     latest: { text: "Qual ambiente?", suggestions: ["staging", "production"] },
   });
-  // Asked in the channel: the question is in the main timeline, not a thread (D67).
+  // Asked in the channel: the question is in the main timeline, not a thread.
   expect(q?.source.threadId).toBeUndefined();
   const res = await api(`/questions/${q?.source.questionId}/answer`, { json: { choice: "production" } });
   expect(res.status).toBe(200);

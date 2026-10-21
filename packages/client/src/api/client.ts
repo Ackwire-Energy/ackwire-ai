@@ -235,7 +235,7 @@ export interface ApiClient {
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
-    /** The agents as a team (D54): grouped by person, with who consulted whom in the last day. */
+    /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
@@ -534,7 +534,7 @@ export interface ApiClient {
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
     askAgent(orgId: string, id: string, agentId: string): Promise<Issue>;
-    /** The board's columns (D55), board order: by stage, then position. */
+    /** The board's columns, board order: by stage, then position. */
     columns(orgId: string): Promise<IssueColumn[]>;
     /** Adds a column to a stage (after `afterId` when it is in the same stage, else at the stage's end). */
     addColumn(
@@ -785,7 +785,7 @@ export interface ApiClient {
     /** "Agora não": the card stays, marked dismissed. */
     dismissSuggestion(orgId: string, messageId: string): Promise<{ suggestion: ForumSuggestion }>;
   };
-  /** My inbox in this organization: mentions, replies, what waits on me (telas/Notificacoes.html). */
+  /** My inbox in this organization: mentions, replies, what waits on me. */
   notifications: {
     /** Visible ones (not done, not snoozed), waiting first, then the newest; counts for every filter. */
     list(

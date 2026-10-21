@@ -33,10 +33,9 @@ import "./kit/kit.css";
 import "./Hero.css";
 
 /**
- * The hero (docs/design/telas/LandingNova.html, "B · Produto à vista"): the
- * sky, the headline and the waiting list, then the app itself rising from the
- * bottom of the sky with a live sample conversation, the giant agent sitting
- * on its window and watching it.
+ * The hero: the sky, the headline and the waiting list, then the app itself
+ * rising from the bottom of the sky with a live sample conversation, the giant
+ * agent sitting on its window and watching it.
  */
 export function Hero({
   giantLook,

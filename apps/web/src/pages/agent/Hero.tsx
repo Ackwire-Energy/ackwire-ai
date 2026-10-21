@@ -104,7 +104,7 @@ export function AgentHero({
   const g = agentGrammar(t, agent.name);
   return (
     <header className="agp-hero">
-      {/* One card holds who the agent is: cover, face, name and how it works (telas/AgenteFundo.html, B). */}
+      {/* One card holds who the agent is: cover, face, name and how it works. */}
       <section className="agp-idcard" aria-label={name}>
         <div className="agp-cover" data-busy={busy || undefined}>
           <AgentCover color={draft.look.color as AgentColor} busy={busy} />
@@ -192,7 +192,7 @@ export function AgentHero({
             )}
           </div>
         </div>
-        {/* In the middle, over the cover's edge, cut out by a ring of the card (telas/AgenteTopo.html, D). */}
+        {/* In the middle, over the cover's edge, cut out by a ring of the card. */}
         <span className="agp-face">
           <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} />
         </span>

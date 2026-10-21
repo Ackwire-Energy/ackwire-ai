@@ -156,7 +156,7 @@ describe("chat over HTTP", () => {
     expect(message.mentionedAgentIds).toEqual([agentId]);
 
     await t.drain();
-    // Asked in the channel, answered in the channel (D67).
+    // Asked in the channel, answered in the channel.
     const timeline = (await (await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`)).json()) as {
       messages: { author: { type: string }; body: string; threadId: string | null }[];
     };

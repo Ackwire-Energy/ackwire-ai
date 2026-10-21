@@ -201,7 +201,7 @@ export function agoOf(iso: string, now = Date.now()): Ago {
 }
 
 /**
- * "Este mês": money only when the API gives it to this person (D39: members
+ * "Este mês": money only when the API gives it to this person (ADR 0026: members
  * see a percentage), else the share of the budget used.
  */
 export type Spend =

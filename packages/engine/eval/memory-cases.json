@@ -56,8 +56,8 @@
   {
     "id": "same-09",
     "label": "same",
-    "existing": { "kind": "fact", "content": "Staging lives at staging.agentes.chat." },
-    "new": { "kind": "fact", "content": "The staging environment URL is staging.agentes.chat." }
+    "existing": { "kind": "fact", "content": "Staging lives at staging.example.com." },
+    "new": { "kind": "fact", "content": "The staging environment URL is staging.example.com." }
   },
   {
     "id": "same-10",

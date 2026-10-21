@@ -55,7 +55,7 @@ describe("mid-round queueing (ADR 0029 section 1)", () => {
     expect(f.provider.calls).toHaveLength(2);
     expect(requests[1]).toContain("New message from ana, while you were working");
     expect(requests[1]).toContain("also bump the version");
-    // Asked in the channel: it answers in the main timeline (D67).
+    // Asked in the channel: it answers in the main timeline.
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.at(-1)?.body).toBe("Built, version bumped.");
   });

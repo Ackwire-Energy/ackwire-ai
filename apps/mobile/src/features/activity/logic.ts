@@ -2,7 +2,7 @@ import type { AppNotification, NotificationActor, Routine } from "@agenteschat/c
 import { daysAgo } from "../shared/logic";
 
 /**
- * Atividade (D46): what waits on you on top, then the rest by day. Grouped
+ * Atividade: what waits on you on top, then the rest by day. Grouped
  * items (replies of a thread, reactions to a message) are one card that
  * says who and how many.
  */
@@ -82,7 +82,7 @@ export const placeOf = (n: AppNotification) => n.source.label ?? "";
 /** Emojis a reaction card shows (at most 5, from the server). */
 export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.latest.emojis ?? []).slice(0, 5) : []);
 
-// ── Esperando você as cards, and what comes next (MobileIntencional.html, Atividade) ─────────────
+// ── Esperando você as cards, and what comes next ─────────────────────────────────────────────────
 
 /** What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser. */
 export type WaitingCardKind = "approval" | "question" | "forum" | "browser";

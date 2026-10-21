@@ -38,7 +38,7 @@ const zoneName = (zone: string, locale: string) =>
   zoneDisplayName(zone, locale) ?? (zone.split("/").pop() ?? zone).replace(/_/g, " ");
 
 /**
- * Conta (MobileRefinos.html, `vAcc`): the photo and "Alterar foto", Nome (editable), E-mail (read only),
+ * Conta: the photo and "Alterar foto", Nome (editable), E-mail (read only),
  * then in this workspace your @ and the time zone, as the web's Perfil. "OK" saves; Apagar conta at the end.
  */
 export function AccountPage({

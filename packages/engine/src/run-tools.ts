@@ -380,13 +380,13 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
       threadRootId: run.threadRootId,
       triggerMessageId: run.triggerMessageId,
       ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
-      // Tools on demand (D65): the same list the run's turns see.
+      // Tools on demand (ADR 0043): the same list the run's turns see.
       loadedGroups: loadedGroupsOf(run.transcript),
     },
   };
 }
 
-/** The tool groups a run listed up front (`Transcript.toolGroups`, D65); null = every tool. */
+/** The tool groups a run listed up front (`Transcript.toolGroups`, ADR 0043); null = every tool. */
 const loadedGroupsOf = (transcript: unknown): string[] | null => {
   const groups = (transcript as { toolGroups?: unknown } | null)?.toolGroups;
   return Array.isArray(groups) ? groups.filter((g): g is string => typeof g === "string") : null;

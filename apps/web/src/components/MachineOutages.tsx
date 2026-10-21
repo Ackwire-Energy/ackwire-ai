@@ -37,7 +37,7 @@ import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
 /**
- * "Computador desconectado" (telas/ComputadorOffline.html): the notice at the top of the work area,
+ * "Computador desconectado": the notice at the top of the work area,
  * the "Trocar o computador" dialog, and the agent's one waiting card in the chat.
  */
 

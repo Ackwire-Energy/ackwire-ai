@@ -1,7 +1,7 @@
 import { ProviderError } from "./types";
 
 /**
- * Text embeddings for hybrid search (D9, D15). Provider-neutral; only the
+ * Text embeddings for hybrid search (ADR 0017). Provider-neutral; only the
  * Model Gateway calls it (`gateway.embed`), which records usage with kind
  * `embedding`. Vectors have `EMBEDDING_DIMENSIONS` entries (the database
  * column is fixed at that size).
