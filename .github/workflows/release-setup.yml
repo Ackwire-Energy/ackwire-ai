@@ -1,0 +1,50 @@
+name: Release setup
+
+# Publishes packages/setup (@agenteschat/setup, the self-host setup) at its current version to npm
+# through Trusted Publishing (OIDC): on npmjs.com, package @agenteschat/setup → Settings → Trusted
+# Publisher → GitHub Actions, repository agentes-chat/agentes-chat, workflow release-setup.yml. No
+# token is stored. npm only lets a Trusted Publisher be set on a package that already exists, so a
+# maintainer publishes the first version from a laptop (`npm publish` in packages/setup); every later
+# version comes from a `setup-v*` tag.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["setup-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # OIDC for npm Trusted Publishing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A tag publishes exactly the version packages/setup declares; a tag that disagrees is refused.
+      - name: Tag must match the package version
+        if: github.ref_type == 'tag'
+        run: test "setup-v$(jq -r .version packages/setup/package.json)" = "$GITHUB_REF_NAME"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: bun install --frozen-lockfile
+      - run: bun test packages/setup
+      - run: bun run --filter '@agenteschat/setup' typecheck
+      # The bundle as npx runs it: under Node, in a directory of its own, touching nothing.
+      - name: Build, then run the bundle under Node
+        run: |
+          bun run --filter '@agenteschat/setup' build
+          node packages/setup/dist/index.js --help
+          cd "$(mktemp -d)"
+          node "$GITHUB_WORKSPACE/packages/setup/dist/index.js" --dry-run --json | jq -e '.ok and .dryRun'
+      # npm ≥ 11.5.1 exchanges the OIDC token itself; publish runs prepublishOnly (the build) again.
+      - run: npm install -g npm@11.8.0
+      - run: npm publish
+        working-directory: packages/setup

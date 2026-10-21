@@ -102,6 +102,7 @@
         "@agenteschat/engine": "workspace:*",
         "@agenteschat/modules": "workspace:*",
         "@agenteschat/providers": "workspace:*",
+        "@agenteschat/setup": "workspace:*",
         "@better-auth/expo": "^1.7.7",
         "@hono/zod-openapi": "^1.6.3",
         "@scalar/hono-api-reference": "^0.12.9",
@@ -233,6 +234,16 @@
         "openai": "^7.33.0",
       },
     },
+    "packages/setup": {
+      "name": "@agenteschat/setup",
+      "version": "0.1.0",
+      "bin": {
+        "agentes-setup": "dist/index.js",
+      },
+      "dependencies": {
+        "uqr": "0.1.3",
+      },
+    },
     "packages/tokens": {
       "name": "@agenteschat/tokens",
       "version": "0.0.0",
@@ -281,6 +292,8 @@
     "@agenteschat/providers": ["@agenteschat/providers@workspace:packages/providers"],
 
     "@agenteschat/server": ["@agenteschat/server@workspace:apps/server"],
+
+    "@agenteschat/setup": ["@agenteschat/setup@workspace:packages/setup"],
 
     "@agenteschat/tokens": ["@agenteschat/tokens@workspace:packages/tokens"],
 
@@ -2163,6 +2176,8 @@
     "unplugin": ["unplugin@3.4.0", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "picomatch": "^4.0.7", "webpack-virtual-modules": "^0.6.2" }, "peerDependencies": { "@farmfe/core": "*", "@rsbuild/core": "*", "@rspack/core": "*", "bun-types-no-globals": "*", "esbuild": "*", "rolldown": "*", "rollup": "*", "unloader": "*", "vite": "*", "webpack": "*" }, "optionalPeers": ["@farmfe/core", "@rsbuild/core", "@rspack/core", "bun-types-no-globals", "esbuild", "rolldown", "rollup", "unloader", "vite", "webpack"] }, "sha512-9skdIFlCsPdFV7wUfZxNsFInlW+7nJmGu2gkTu0OUhF56aXGsHab9x52/QhdJ4lC7ZDPWTxbiC4ANqVlsuaW3w=="],
 
     "update-browserslist-db": ["update-browserslist-db@1.3.4", "", { "dependencies": { "escalade": "^3.2.0", "picocolors": "^1.1.1" }, "peerDependencies": { "browserslist": ">= 4.21.0" }, "bin": { "update-browserslist-db": "cli.js" } }, "sha512-t8wonIOdQyOjtPd2VktlBu6QjTVTks6v8bSi7kd0r2Vll8TK1JYDZtRRdbmCHOAMphkZgrzK+L+vXK4pyZ8t4A=="],
+
+    "uqr": ["uqr@0.1.3", "", {}, "sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA=="],
 
     "use-callback-ref": ["use-callback-ref@1.3.3", "", { "dependencies": { "tslib": "^2.0.0" }, "peerDependencies": { "@types/react": "*", "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc" }, "optionalPeers": ["@types/react"] }, "sha512-jQL3lRnocaFtu3V00JToYz/4QkNWswxijDaCVNZRiRTO3HQDLsdu1ZtmIUvV4yPp+rvWm5j0y0TG/S61cuijTg=="],
 
