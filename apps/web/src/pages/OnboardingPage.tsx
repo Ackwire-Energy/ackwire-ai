@@ -580,7 +580,8 @@ export function OnboardingPage() {
             : step.id === "team" && toSend.length > 0
               ? t("onboarding.actions.invite", { count: toSend.length })
               : t("onboarding.actions.continue");
-  const showSkip = step.optional && !(step.id === "agents" && agentsPhase === "key");
+  // "Pular esta etapa" only on optional steps ("agents" never is, so its key phase needs no exception).
+  const showSkip = step.optional;
   const back = () => {
     if (step.id === "agents" && agentsPhase === "key") setAgentsPhase("pick");
     else go(index - 1);
