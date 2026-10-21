@@ -4,10 +4,10 @@ import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { BROWSER_NOTIFY_PREF } from "../../control/browser";
 import { NOTCH_PREF } from "../../control/notch";
+import { siteOf } from "../../control/server";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
-import { SITE_URL } from "../../control/version";
-import { usePref } from "../../hooks";
+import { chosenServer, usePref } from "../../hooks";
 import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
@@ -149,7 +149,7 @@ export function General() {
               }
               end={
                 <>
-                  <Button size="sm" variant="ghost" onClick={() => void host.openExternal(SITE_URL)}>
+                  <Button size="sm" variant="ghost" onClick={() => void host.openExternal(siteOf([h], chosenServer()))}>
                     {t("desktop.common.open")}
                   </Button>
                   <Button size="sm" variant="ghost" className="dk-danger-text" onClick={() => setLeaving(h)}>

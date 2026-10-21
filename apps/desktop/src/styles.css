@@ -712,6 +712,21 @@ body[data-window="popover"] {
   flex-wrap: wrap;
   margin-top: 26px;
 }
+/* "Servidor: agentes.chat · Trocar", and the "Seu servidor" screen's one field and its answer. */
+.dk-server-line {
+  margin-top: 18px;
+}
+.dk-server-form {
+  margin-top: 26px;
+  max-width: 420px;
+}
+.dk-server-form .ac-input {
+  width: 100%;
+}
+.dk-server-error {
+  margin-top: 12px;
+  max-width: 420px;
+}
 .dk-codebox {
   margin-top: 26px;
 }

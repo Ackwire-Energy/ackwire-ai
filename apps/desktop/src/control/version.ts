@@ -1,10 +1,13 @@
+import { CLOUD_SERVER } from "@agenteschat/client/lib/server";
+
 /**
  * The "Versão nova" check (ADR 0036 §9): `GET https://agentes.chat/api/desktop/latest?target=darwin&arch=…`
  * at start and every 6 hours. A newer version shows the notes and "Atualizar e reabrir" (the Tauri
  * updater, `update_install`); the download link and the manual steps are the fallback.
  */
 
-export const SITE_URL = "https://agentes.chat";
+/** Where the app's own updates come from, whichever server it signs in to. */
+export const SITE_URL = CLOUD_SERVER;
 export const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
 export interface LatestRelease {

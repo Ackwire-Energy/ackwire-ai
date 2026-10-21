@@ -22,13 +22,17 @@ use tauri_plugin_updater::UpdaterExt;
 
 use runners::{RunnerInfo, Runners};
 
-/// The only site the app opens (in the person's browser, never inside the app).
+/// agentes.chat: always among the sites the app opens (in the person's browser, never inside the app).
 const SITE: &str = "https://agentes.chat";
 const WINDOWS: &[&str] = &["popover", "welcome", "prefs"];
 
 /// When the popover last hid because it lost focus: a click on the tray icon blurs it first,
 /// and that same click must not open it again.
 struct PopoverClock(Mutex<Option<Instant>>);
+
+/// The server the next sign-in goes to ("Seu servidor" in the welcome window), as an https origin.
+#[derive(Default)]
+struct ChosenServer(Mutex<Option<String>>);
 
 #[derive(Serialize)]
 struct AppInfo {
@@ -37,11 +41,22 @@ struct AppInfo {
     arch: &'static str,
 }
 
-fn is_site_url(url: &str) -> bool {
+/// `https://host[:port]` of an https URL; None for anything else.
+fn https_origin(url: &str) -> Option<String> {
+    let parsed = tauri::Url::parse(url).ok()?;
+    if parsed.scheme() != "https" || parsed.host_str().is_none() {
+        return None;
+    }
+    Some(parsed.origin().ascii_serialization())
+}
+
+/// A page of one of `sites` (https origins): agentes.chat, the servers the organizations here are
+/// signed in to, and the one chosen for the next sign-in.
+fn is_site_url(url: &str, sites: &[String]) -> bool {
     if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return false;
     }
-    url == SITE || url.starts_with("https://agentes.chat/") || url.starts_with("https://agentes.chat?")
+    https_origin(url).is_some_and(|origin| sites.contains(&origin))
 }
 
 /// The providers' own sign-in pages the runner gets from `claude auth login` / `codex login --device-auth`
@@ -162,10 +177,22 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn open_external(app: AppHandle, url: String) -> Result<(), String> {
-    if !is_site_url(&url) && !is_sign_in_url(&url) {
-        return Err("only agentes.chat and sign-in links open from the app".into());
+    let mut sites: Vec<String> =
+        app.state::<Runners>().servers().iter().filter_map(|s| https_origin(s)).collect();
+    sites.push(SITE.to_string());
+    let chosen = app.state::<ChosenServer>().0.lock().unwrap_or_else(|p| p.into_inner()).clone();
+    sites.extend(chosen);
+    if !is_site_url(&url, &sites) && !is_sign_in_url(&url) {
+        return Err("only our servers' pages and sign-in links open from the app".into());
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_server(chosen: tauri::State<'_, ChosenServer>, url: String) -> Result<(), String> {
+    let origin = https_origin(&url).ok_or("not an https address")?;
+    *chosen.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(origin);
+    Ok(())
 }
 
 #[tauri::command]
@@ -291,12 +318,14 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
+        .manage(ChosenServer::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
             runner_add,
             runner_remove,
             open_external,
+            set_server,
             reveal_folder,
             pick_folder,
             set_tray_state,

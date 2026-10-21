@@ -51,8 +51,10 @@ export interface Host {
   onRunnerState(cb: (change: RunnerStateChange) => void): () => void;
   /** A window was brought up (`show_window`). */
   onShown(cb: (name: WindowName) => void): () => void;
-  /** Opens an https://agentes.chat link in the person's browser. */
+  /** Opens a page of agentes.chat or of a server this app signs in to, in the person's browser. */
   openExternal(url: string): Promise<void>;
+  /** The server the next sign-in goes to, so its pages may open too (`openExternal`). */
+  setServer(url: string): Promise<void>;
   /** Shows a local folder in Finder. */
   revealFolder(path: string): Promise<void>;
   pickFolder(): Promise<string | null>;

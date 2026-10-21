@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "runner_add",
     "runner_remove",
     "open_external",
+    "set_server",
     "reveal_folder",
     "pick_folder",
     "set_tray_state",
