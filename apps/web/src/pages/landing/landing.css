@@ -69,6 +69,13 @@
   letter-spacing: -0.035em;
   line-height: 1;
 }
+.lp .ac-card__heading h2 {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
 .lp section {
   scroll-margin-top: 90px;
 }
@@ -143,13 +150,11 @@
 .lp .ac-work {
   margin-top: 8px;
   max-width: 520px;
-  background: var(--bg);
 }
 .lp .ac-approval {
   margin-top: 10px;
   max-width: 520px;
   border: 0;
-  border-radius: 16px;
   background: var(--raised2);
   box-shadow: var(--e2), var(--top);
   gap: 10px;
@@ -770,8 +775,13 @@
 }
 
 /* Sections */
+/* Space only above each section (the prototype's rhythm); the closing sky keeps the same gap above it. */
 .lp .lp-sec {
-  padding-block: clamp(72px, 10vw, 140px);
+  padding-block: clamp(72px, 10vw, 140px) 0;
+}
+.lp .lp-closing {
+  display: block;
+  padding-top: clamp(72px, 10vw, 140px);
 }
 .lp .lp-sec--flush {
   padding-top: 0;
