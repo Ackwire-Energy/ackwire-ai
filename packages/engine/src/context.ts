@@ -46,8 +46,16 @@ export const HOW_YOU_WORK = [
   "- Work in one go: chain tool calls in the same turn until you can give a real answer.",
 ].join("\n");
 
-/** True when a reply is the routine's "nothing to report" (tolerates spacing and a trailing period). */
-export const isNoReply = (text: string) => text.trim().replace(/\.$/, "") === ROUTINE_NO_REPLY;
+/**
+ * True when a reply is the routine's "nothing to report" (tolerates spacing, a trailing period and
+ * markdown marks). Models often explain first and close with the word on its own line ("Nothing new
+ * since… \n\nNO_REPLY"): the last line decides, since the word means stay quiet wherever it lands.
+ */
+export const isNoReply = (text: string) =>
+  (text.trim().split("\n").at(-1) ?? "")
+    .trim()
+    .replace(/^[`*]+|[`*]+$/g, "")
+    .replace(/\.$/, "") === ROUTINE_NO_REPLY;
 
 /**
  * True when the text after a `react` only restates the reaction: empty, the
