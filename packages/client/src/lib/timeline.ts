@@ -28,12 +28,18 @@ export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefin
 }
 
 /**
- * Top-level messages whose threads we load: the latest ones written by people (agents answer those).
- * Not the root of a thread made from a range, nor a mission's: their conversation lives in the thread view.
+ * Top-level messages whose threads we load: the latest ones agents answer (written by people, or an
+ * agent's message that mentions another agent, as the backend starts runs for). Not the root of a thread
+ * made from a range, nor a mission's: their conversation lives in the thread view.
  */
 export function threadRootsToLoad(topLevel: Message[], max = 20): string[] {
   return topLevel
-    .filter((m) => m.author.type === "person" && !threadStartOf(m.meta) && !m.meta?.missionStart)
+    .filter(
+      (m) =>
+        (m.author.type === "person" || m.mentionedAgentIds.length > 0) &&
+        !threadStartOf(m.meta) &&
+        !m.meta?.missionStart,
+    )
     .slice(-max)
     .map((m) => m.id);
 }

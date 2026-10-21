@@ -72,6 +72,9 @@ describe("timeline", () => {
       "later",
     ]);
     expect(threadRootsToLoad([root, msg("x", 2, ada), later])).toEqual(["root", "later"]);
+    // An agent calling another agent (a routine's message mentioning @Ada): its thread holds the answer.
+    const call = { ...msg("call", 4, ada), mentionedAgentIds: ["other"] };
+    expect(threadRootsToLoad([root, call])).toEqual(["root", "call"]);
   });
 
   test("days, grouping by author within 5 minutes, approvals and live runs", () => {

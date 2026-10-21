@@ -30,10 +30,19 @@ export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefin
   return [...seen.values()].sort(byTime);
 }
 
-/** Person messages whose replies (the agents' answers) are shown inline: the latest ones, not thread or mission roots. */
+/**
+ * Messages whose replies (the agents' answers) are shown inline: the latest ones written by people or by an
+ * agent mentioning another agent (as the backend starts runs for), not thread or mission roots.
+ */
 export function threadRootsToLoad(topLevel: Message[], skip: ReadonlySet<string>, max = 20): string[] {
   return topLevel
-    .filter((m) => m.author.type === "person" && !skip.has(m.id) && !m.meta?.threadStart && !m.meta?.missionStart)
+    .filter(
+      (m) =>
+        (m.author.type === "person" || m.mentionedAgentIds.length > 0) &&
+        !skip.has(m.id) &&
+        !m.meta?.threadStart &&
+        !m.meta?.missionStart,
+    )
     .slice(-max)
     .map((m) => m.id);
 }

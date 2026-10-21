@@ -61,8 +61,9 @@ describe("timeline", () => {
       message({ id: "x", author: { type: "agent", id: "dev" } }),
       message({ id: "p2", meta: { missionStart: true } }),
       message({ id: "p3" }),
+      message({ id: "call", author: { type: "agent", id: "dev" }, mentionedAgentIds: ["qa"] }),
     ];
-    expect(threadRootsToLoad(list, new Set(["p3"]))).toEqual(["p1"]);
+    expect(threadRootsToLoad(list, new Set(["p3"]))).toEqual(["p1", "call"]);
   });
 
   test("same author within 5 minutes groups; a day starts a new group; cards stand alone", () => {
