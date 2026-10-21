@@ -241,7 +241,14 @@ export function accountRoutes(deps: AppDeps) {
       description:
         "For the QR code of “Abrir no celular”: `agenteschat://connect?server=…&token=…`. The phone trades the token at `POST /api/auth/sign-in/one-time-token` for a session of its own: once, within a few minutes, and only while this session lasts.",
       responses: {
-        201: json(z.object({ token: z.string(), server: z.string(), expiresAt: z.string() }), "Created"),
+        201: json(
+          z.object({
+            token: z.string(),
+            server: z.string(),
+            expiresIn: z.number().int().openapi({ description: "Seconds the token lasts, from this answer." }),
+          }),
+          "Created",
+        ),
         401: errors[401],
         429: errorResponse("Too many codes"),
       },
@@ -257,8 +264,8 @@ export function accountRoutes(deps: AppDeps) {
         windowMs: 3600_000,
       });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many codes; try again later");
-      const { token, expiresAt } = await mintPhoneSignIn(deps.auth, current.session.token);
-      return c.json({ token, server: new URL(config.PUBLIC_URL).origin, expiresAt: expiresAt.toISOString() }, 201);
+      const { token, expiresIn } = await mintPhoneSignIn(deps.auth, current.session.token);
+      return c.json({ token, server: new URL(config.PUBLIC_URL).origin, expiresIn }, 201);
     },
   );
 

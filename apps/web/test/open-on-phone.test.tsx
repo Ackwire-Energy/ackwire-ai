@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -9,7 +9,10 @@ import { encode } from "uqr";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  setSystemTime();
+});
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 
@@ -62,5 +65,21 @@ describe("Abrir no celular", () => {
       "Instale o Tailscale no celular e entre na mesma rede (tailnet) deste servidor.",
       "Aponte a câmera do celular para o código.",
     ]);
+  });
+
+  test("back on the tab after the code ran low, a new one takes its place", async () => {
+    const state = seedState();
+    await openPhoneDialog(state);
+    const mints = () => state.calls.filter((c) => c.method === "account.phoneSignIn").length;
+    // The renewal timer doesn't run in a hidden tab; showing the tab again is what renews.
+    const showTab = () => act(async () => void window.dispatchEvent(new Event("visibilitychange")));
+    setSystemTime(new Date(Date.now() + 100_000));
+    await showTab();
+    await settle(4);
+    expect(mints()).toBe(1);
+    setSystemTime(new Date(Date.now() + 70_000));
+    await showTab();
+    await settle(4);
+    expect(mints()).toBe(2);
   });
 });

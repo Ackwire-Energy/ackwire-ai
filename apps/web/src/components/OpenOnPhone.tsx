@@ -35,14 +35,21 @@ function PhoneCode() {
   const api = useApi();
   const code = useQuery({
     queryKey: keys.phoneSignIn,
-    queryFn: () => api.account.phoneSignIn(),
+    // When it runs out by this computer's clock, counted from its arrival: the server's clock may differ.
+    queryFn: async () => {
+      const minted = await api.account.phoneSignIn();
+      return { ...minted, endsAt: Date.now() + minted.expiresIn * 1000 };
+    },
     // Minted fresh each time the dialog opens, never served from cache.
     gcTime: 0,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
-    refetchOnWindowFocus: false,
+    // Renewed before it runs out. A hidden tab skips the timer, so coming back renews a code that ran low
+    // meanwhile; after a failed renewal, "Tentar de novo" takes over.
     refetchInterval: (q) =>
-      q.state.data ? Math.max(1000, Date.parse(q.state.data.expiresAt) - Date.now() - RENEW_BEFORE_MS) : false,
+      q.state.data && !q.state.error ? Math.max(1000, q.state.data.endsAt - RENEW_BEFORE_MS - Date.now()) : false,
+    refetchOnWindowFocus: (q) =>
+      q.state.data && !q.state.error && q.state.data.endsAt - RENEW_BEFORE_MS <= Date.now() ? "always" : false,
   });
   const now = useNow(code.isSuccess);
 
@@ -64,7 +71,7 @@ function PhoneCode() {
       </div>
       {code.data && (
         <span className="small muted">
-          {t("openOnPhone.validFor", { time: formatTimeLeft(Math.max(0, Date.parse(code.data.expiresAt) - now)) })}
+          {t("openOnPhone.validFor", { time: formatTimeLeft(Math.max(0, code.data.endsAt - now)) })}
         </span>
       )}
       <ol className="machine-pair__steps small">

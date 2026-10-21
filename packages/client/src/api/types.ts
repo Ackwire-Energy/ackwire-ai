@@ -54,7 +54,8 @@ export interface PhoneSignIn {
   token: string;
   /** The server's own address (`PUBLIC_URL`). */
   server: string;
-  expiresAt: string;
+  /** Seconds it lasts from the answer: counted on the device's clock, which may disagree with the server's. */
+  expiresIn: number;
 }
 
 export interface User {

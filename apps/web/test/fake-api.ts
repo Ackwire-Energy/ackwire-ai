@@ -677,7 +677,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return {
           token: `tok-${state.calls.filter((c) => c.method === "account.phoneSignIn").length}`,
           server: state.phoneServer ?? "https://agentes.chat",
-          expiresAt: new Date(Date.now() + 180_000).toISOString(),
+          expiresIn: 180,
         };
       },
     },

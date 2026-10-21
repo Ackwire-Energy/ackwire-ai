@@ -34,7 +34,7 @@ const cookiesOf = (res: Response) =>
 async function mint(b: ReturnType<typeof browser>) {
   const res = await b("/api/app/phone-sign-in", { json: {} });
   expect(res.status).toBe(201);
-  return (await res.json()) as { token: string; server: string; expiresAt: string };
+  return (await res.json()) as { token: string; server: string; expiresIn: number };
 }
 
 describe("one-time sign-in for the phone", () => {
@@ -42,11 +42,10 @@ describe("one-time sign-in for the phone", () => {
     t = await createTestServer();
     const web = browser(t);
     await signUp(web, "ana@example.com");
-    const { token, server, expiresAt } = await mint(web);
+    const { token, server, expiresIn } = await mint(web);
     expect(server).toBe(ORIGIN);
-    const ttl = Date.parse(expiresAt) - Date.now();
-    expect(ttl).toBeGreaterThan(60_000);
-    expect(ttl).toBeLessThanOrEqual(5 * 60_000);
+    expect(expiresIn).toBeGreaterThan(60);
+    expect(expiresIn).toBeLessThanOrEqual(5 * 60);
     const stored = await t.db
       .select()
       .from(schema.verifications)

@@ -223,7 +223,7 @@ export async function mintPhoneSignIn(auth: Auth, sessionToken: string) {
   const expiresAt = new Date(Date.now() + PHONE_SIGN_IN_TTL_MS);
   const { internalAdapter } = await auth.$context;
   await internalAdapter.createVerificationValue({ identifier: phoneSignInKey(token), value: sessionToken, expiresAt });
-  return { token, expiresAt };
+  return { token, expiresIn: PHONE_SIGN_IN_TTL_MS / 1000 };
 }
 
 /**
