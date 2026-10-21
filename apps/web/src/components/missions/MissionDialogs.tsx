@@ -14,6 +14,7 @@ import {
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { executorName } from "@agenteschat/client/lib/missions";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Dialog,
@@ -40,6 +41,7 @@ import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { ThisMacButton } from "@/components/ThisMac";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { CommandApprovalSelect, executorOptions } from "./MissionBits";
@@ -182,6 +184,8 @@ export function NewMissionDialog({
               <Icon name="computer" size={14} /> <b>{t("missions.new.noEligibleTitle")}</b>
             </span>
             <span>{t("missions.new.noEligibleText")}</span>
+            {/* agentes for Mac: this Mac first, then the agent points at it (D79). */}
+            <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />
             {setupAgent && (
               <Link
                 className="mi-lnk"

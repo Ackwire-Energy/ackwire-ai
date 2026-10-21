@@ -14,9 +14,16 @@ export function createBetterAuthClient(origin = window.location.origin): AuthCli
       toResult((await client.signIn.social({ provider, callbackURL, errorCallbackURL: "/login" })).error),
     requestPasswordReset: async ({ email, redirectTo }) =>
       toResult((await client.requestPasswordReset({ email, redirectTo })).error),
-    resetPassword: async ({ token, newPassword }) => toResult((await client.resetPassword({ token, newPassword })).error),
+    resetPassword: async ({ token, newPassword }) =>
+      toResult((await client.resetPassword({ token, newPassword })).error),
     signOut: async () => {
       await client.signOut();
+    },
+    desktopHandoff: async (challenge) =>
+      toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { challenge } })).error),
+    desktopRedeem: async (verifier) => {
+      const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } });
+      return res.data?.signedIn === true;
     },
   };
 }

@@ -8,11 +8,14 @@ import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
 import { createI18n, savedLocale } from "./i18n";
 import { snapshotStore } from "./lib/snapshot-store";
+import { inDesktopApp } from "./lib/desktop";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
 const i18n = createI18n(savedLocale());
 document.documentElement.lang = i18n.language;
+// In agentes for Mac (D79): the site draws the window's title bar (desktop.css).
+if (inDesktopApp()) document.documentElement.dataset.desktop = "mac";
 const toasts = createToastStore();
 const api = createApiClient();
 

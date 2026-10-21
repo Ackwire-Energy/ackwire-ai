@@ -18,6 +18,7 @@ import { useStreams } from "@/realtime/context";
 import { AgentAvatar } from "../AgentAvatar";
 import { CommandBlock } from "../Machines";
 import { useOrg } from "../org-context";
+import { OpenPrefsButton, useIsThisMac } from "../ThisMac";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
 
@@ -40,6 +41,8 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   const toast = useToast();
   const actions = useBrowserHandoffMutations(org.id);
   const [confirming, setConfirming] = useState<string | null>(null);
+  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (D79).
+  const here = useIsThisMac(org.id, m.id);
   const [seeing, setSeeing] = useState<string | null>(null);
   const agentIds = m.agents.map((a) => a.id);
   const handoffs = useQueries({
@@ -132,7 +135,14 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
       {!switchedOn && (
         <div className="brw-note">
           <Icon name="computer" size={16} />
-          <div>{t("browser.machine.offHelp")}</div>
+          {here ? (
+            <div className="row" style={{ flex: 1, gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ flex: 1, minWidth: 200 }}>{t("machines.thisMac.toolsHere")}</span>
+              <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+            </div>
+          ) : (
+            <div>{t("browser.machine.offHelp")}</div>
+          )}
         </div>
       )}
       {switchedOn && !ready && m.browser?.reason && (

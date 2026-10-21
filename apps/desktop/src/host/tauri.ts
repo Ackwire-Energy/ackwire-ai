@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 import {
   type AppInfo,
@@ -59,5 +60,8 @@ export function createTauriHost(): Host {
     notchInfo: () => invoke<NotchInfo | null>("notch_info"),
     notchPlace: (width, height) => invoke<NotchInfo | null>("notch_place", { width, height }),
     resize: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
+    onThisMac: (cb) =>
+      subscribe<{ id: number; request: ThisMacRequest }>("this-mac://request", (p) => cb(p.id, p.request)),
+    thisMacReply: (id, ok, data) => invoke<void>("this_mac_reply", { id, ok, data }),
   };
 }

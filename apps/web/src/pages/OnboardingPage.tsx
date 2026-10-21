@@ -1,5 +1,5 @@
 import type { Machine, Role } from "@agenteschat/client";
-import { keys, useMachines, useModels, useSandboxSettings } from "@agenteschat/client";
+import { keys, useConfirmDevice, useMachines, useModels, useSandboxSettings } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind } from "@agenteschat/client/lib/machines";
@@ -49,6 +49,7 @@ import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImpo
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
+import { OpenPrefsButton } from "@/components/ThisMac";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
@@ -60,6 +61,7 @@ import {
   parseImport,
   uniqueHandle,
 } from "@/lib/agent-import";
+import { inDesktopApp, thisMac } from "@/lib/desktop";
 import { importVault } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
 
@@ -1213,6 +1215,7 @@ function ChoiceCard({
 /**
  * Where the agents work: the workspace's cloud computer, or this computer / a
  * server (the Mac app or the terminal; the computer shows a code to confirm, live until it connects).
+ * In agentes for Mac (D79) the second choice is "Este Mac", and choosing it connects it.
  */
 function ComputerStep({
   orgId,
@@ -1240,8 +1243,36 @@ function ComputerStep({
     if (found && !machine) onPaired(found);
   }, [found, machine, onPaired]);
 
+  // In the app: picking "Este Mac" is the consent; the app hands the runner's code over and we confirm it.
+  const app = inDesktopApp();
+  const confirm = useConfirmDevice();
+  const [linking, setLinking] = useState<"idle" | "connecting" | "failed">("idle");
+  const [other, setOther] = useState(false);
+  const linkThisMac = async () => {
+    setLinking("connecting");
+    try {
+      const { userCode } = await thisMac.connect(orgId);
+      if (userCode) {
+        onPaired(await confirm.mutateAsync({ orgId, userCode }));
+      } else {
+        // Already in this organization: that machine.
+        const id = (await thisMac.status()).orgs.find((o) => o.orgId === orgId)?.machineId;
+        const here = (await api.machines.list(orgId)).find((m) => m.id === id);
+        if (!here) throw new Error("not found");
+        onPaired(here);
+      }
+      setLinking("idle");
+    } catch {
+      setLinking("failed");
+    }
+  };
+
   const chooseMachine = () => {
     onChoose("machine");
+    if (app) {
+      if (!machine && linking !== "connecting") void linkThisMac();
+      return;
+    }
     if (known) return;
     void api.machines
       .list(orgId)
@@ -1263,8 +1294,8 @@ function ComputerStep({
         />
         <ChoiceCard
           art={<ComputerPortrait kind={machine ? computerKind(machine.os) : "mac"} state="online" />}
-          title={t("onboarding.computer.mine")}
-          desc={t("onboarding.computer.mineDesc")}
+          title={app ? t("onboarding.computer.thisMac") : t("onboarding.computer.mine")}
+          desc={app ? t("onboarding.computer.thisMacDesc") : t("onboarding.computer.mineDesc")}
           pressed={computer === "machine"}
           onClick={chooseMachine}
         />
@@ -1277,7 +1308,41 @@ function ComputerStep({
         </p>
       )}
 
-      {computer === "machine" && (
+      {computer === "machine" && app && (
+        <Card as="div">
+          {machine ? (
+            <>
+              <p className="onb__status" role="status">
+                <Icon name="check" />
+                <span>{t("onboarding.computer.thisMacConnected", { name: machine.name })}</span>
+              </p>
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <OpenPrefsButton tab="folders">{t("onboarding.computer.thisMacFolders")}</OpenPrefsButton>
+                <Button size="sm" variant="ghost" aria-expanded={other} onClick={() => setOther((o) => !o)}>
+                  {t("onboarding.computer.otherComputer")}
+                </Button>
+              </div>
+              {other && <ConnectComputer orgId={orgId} download />}
+            </>
+          ) : linking === "failed" ? (
+            <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <span className="small" style={{ flex: 1, minWidth: 200 }}>
+                {t("machines.thisMac.failed")}
+              </span>
+              <Button size="sm" onClick={() => void linkThisMac()}>
+                {t("common.retry")}
+              </Button>
+            </div>
+          ) : (
+            <span className="row small muted" role="status" style={{ gap: 8 }}>
+              <Spinner />
+              {t("onboarding.computer.thisMacConnecting")}
+            </span>
+          )}
+        </Card>
+      )}
+
+      {computer === "machine" && !app && (
         <Card as="div">
           {machine ? (
             <p className="onb__status" role="status">
@@ -1291,7 +1356,7 @@ function ComputerStep({
             </p>
           ) : (
             <>
-              <ConnectComputer />
+              <ConnectComputer orgId={orgId} />
               <span className="row small muted" role="status" style={{ gap: 8 }}>
                 <Spinner />
                 {t("machines.download.waiting")}
