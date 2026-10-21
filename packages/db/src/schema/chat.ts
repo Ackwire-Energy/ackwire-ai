@@ -255,3 +255,26 @@ export const messagePins = pgTable(
     index().on(t.channelId, t.createdAt),
   ],
 );
+
+/**
+ * Idempotent sends: the `clientId` a person's app gave a message it posted. A resend with the same
+ * (org, person, clientId), e.g. a retry after the response was lost, gets the message already written
+ * instead of a second one (and second runs). Claimed in the same statement that writes the message
+ * (`insertMessageWithRuns`); old rows are pruned (`pruneMessageClientIds`). No foreign key to the
+ * partitioned `messages`.
+ */
+export const messageClientIds = pgTable(
+  "message_client_ids",
+  {
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text().notNull(),
+    messageId: uuid().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.userId, t.clientId] }), index().on(t.createdAt)],
+);

@@ -144,6 +144,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
           connectorLabel: connection.label,
           // A sensitive tool never runs without approval, whatever is stored.
           sensitive: access === "approval" || row.sensitive,
+          external: true, // whatever the server returns is third-party text
           describe: (input) => ({
             title: `${connection.label}: ${row.label}`,
             detail: `${tool.name} · ${Object.entries(input)
@@ -200,6 +201,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
             connectionId: connection.id,
             connectorLabel: def.label,
             sensitive: mapped.sensitive === true,
+            external: true, // whatever the server returns is third-party text
             describe: (input) => ({
               title: mapped.title ? fillTitle(mapped.title, input) : `${def.label}: ${tool.name}`,
               detail: `${def.id}.${tool.name} · ${Object.entries(input)

@@ -17,6 +17,7 @@ import {
   listenForRunCancels,
   type MailDeps,
   pollImapWatches,
+  pruneMessageClientIds,
   purgeDeletedArtifacts,
   queueApprovalDigests,
   reconcileComposioAccounts,
@@ -128,6 +129,9 @@ export function startWorkers(deps: WorkerDeps) {
   every("partitions", WORKER_INTERVALS_MS.partitions, async () => {
     const created = await ensureMessagePartitions(db);
     if (created > 0) log.info("created message partitions", { created });
+    // Old send ids (idempotent resends) are no longer needed.
+    const pruned = await pruneMessageClientIds(db);
+    if (pruned > 0) log.info("pruned message client ids", { pruned });
   });
 
   every("approvals", WORKER_INTERVALS_MS.approvals, async () => {
