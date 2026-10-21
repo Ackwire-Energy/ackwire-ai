@@ -207,7 +207,7 @@
 }
 .lp .lp-story-float--pad {
   padding: 16px;
-  overflow-x: auto;
+  overflow: hidden;
 }
 .lp .lp-story-float--you {
   justify-self: end;

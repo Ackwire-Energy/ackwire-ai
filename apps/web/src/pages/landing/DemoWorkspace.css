@@ -60,21 +60,24 @@
   box-shadow: 0 0 0 2px var(--raised);
 }
 
-/* Only the feed scrolls (to the bottom as things arrive). */
+/*
+ * The feed never scrolls (a scroll inside the page would catch the page's
+ * wheel): the newest message sits on the composer, older ones fade out at the top.
+ */
 .lp .lp-demo-feed {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   padding: 16px 12px 8px;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 2px;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 64px);
+  mask-image: linear-gradient(180deg, transparent, #000 64px);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .lp .lp-demo-feed {
-    scroll-behavior: smooth;
-  }
+.lp .lp-demo-feed > * {
+  flex: none;
 }
 
 .lp .lp-demo-sys {

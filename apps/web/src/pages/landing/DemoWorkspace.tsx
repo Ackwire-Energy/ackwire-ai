@@ -133,12 +133,6 @@ export function DemoWorkspace() {
   const [pending, setPending] = useState(0);
   const [draft, setDraft] = useState("");
 
-  // Only the feed scrolls, never the page.
-  useEffect(() => {
-    const el = feed.current;
-    if (el && items.length) el.scrollTop = el.scrollHeight;
-  }, [items]);
-
   useEffect(() => {
     const timers = joyTimers.current;
     return () => {
