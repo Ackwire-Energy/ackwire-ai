@@ -1,11 +1,20 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
-import { buildRunContext, insertMessage, type Message, postPersonMessage, toTurns } from "../src";
+import { buildRunContext, insertMessage, type Message, nowLine, postPersonMessage, toTurns } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 const msg = (over: Partial<Message>): Message =>
   ({ authorUserId: null, authorAgentId: null, body: "", ...over }) as Message;
+
+test("nowLine: the person's local time with its zone and how long since the previous message", () => {
+  const now = new Date("2026-10-21T10:40:00Z");
+  expect(nowLine("America/Sao_Paulo", "Ana", new Date("2026-10-20T20:40:00Z"), now)).toBe(
+    "# Now\nWed, Oct 21, 2026, 07:40 for Ana (America/Sao_Paulo); the previous message here was 14 h ago.",
+  );
+  // A bad zone falls back to UTC; no person (an agent asked) and nothing before.
+  expect(nowLine("Mars/Olympus", null, null, now)).toBe("# Now\nWed, Oct 21, 2026, 10:40 (UTC).");
+});
 
 test("toTurns: own messages are assistant turns, others are prefixed user turns, merged and user-bounded", () => {
   const names = new Map([

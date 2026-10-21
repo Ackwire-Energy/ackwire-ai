@@ -141,7 +141,7 @@ function useGuideMood() {
  * time); one big action under the answer, "Pular esta etapa" on optional steps.
  */
 export function OnboardingPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -245,6 +245,12 @@ export function OnboardingPage() {
         target = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
         setCreated(target);
         await api.orgs.updateSettings(target.orgId, { timezone: zone });
+        // The person's own zone and language, detected here: agents read the local time from it.
+        const mine = browserTimezone();
+        await Promise.all([
+          mine ? api.orgs.updateMe(target.orgId, { timezone: mine }) : null,
+          api.account.updateMe({ locale: i18n.language.startsWith("en") ? "en" : "pt-BR" }),
+        ]).catch(() => undefined);
         // The platform key is only offered where the server has one (Cloud).
         const available = await api.agents.platformKeyAvailable(target.orgId).catch(() => false);
         setPlatform(available);

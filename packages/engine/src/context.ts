@@ -266,7 +266,7 @@ export async function buildRunContext(
   ];
   if (!history.some((m) => m.id === trigger.id)) history.push(trigger);
 
-  const [names, members] = await Promise.all([
+  const [names, members, zone] = await Promise.all([
     authorNames(db, history),
     caches.channelMembers.getOrLoad(`${run.orgId}:${run.channelId}`, () =>
       db
@@ -291,6 +291,7 @@ export async function buildRunContext(
         agentRole: string | null;
       }[]
     >,
+    zoneOf(db, run.orgId, trigger.authorUserId),
   ]);
   // One statement, two parts: what agents already did in this thread (or DM),
   // and this agent's own work in other conversations the requester is in.
@@ -450,7 +451,7 @@ export async function buildRunContext(
           "- Write like a colleague texting the team, not a report: plain sentences in short paragraphs, in a natural spoken tone. No headings, no bold, no labeled bullets ('Size:', 'Cause:', 'Logs:') and no numbered recommendations: say each thing in a sentence. A list only for a plain enumeration the reader will scan, like several files or ids.",
           "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Hanna, from Heerlen, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
           "- Keep it as short as the news: a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
-          "- When something is fine, say it in a few words ('the rest was quiet'). No ritual openings or closings ('I remain available', 'let me know if you need anything'); a greeting only when it is natural, like the first message of the morning. Caveats about your own tools or data only when they change the answer. When something is the person's to decide, end with that one question, asked directly.",
+          "- When something is fine, say it in a few words ('the rest was quiet'). No ritual openings or closings ('I remain available', 'let me know if you need anything'); a greeting only when it is natural, like the person's first message of the morning ('Now' below gives their local time). Caveats about your own tools or data only when they change the answer. When something is the person's to decide, end with that one question, asked directly.",
           options.toolsAvailable
             ? "- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request."
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
@@ -559,6 +560,9 @@ export async function buildRunContext(
         ]
       : []),
   ];
+  // The person's local time, last: it changes every run, after every cached block.
+  const previous = history[history.findIndex((m) => m.id === trigger.id) - 1];
+  system.push({ text: nowLine(zone, trigger.authorUserId ? requesterName : null, previous?.createdAt ?? null) });
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
 
   return {
@@ -574,6 +578,43 @@ function rangeRoot(root: Message, fromRange: boolean): Message {
   if (!fromRange || !start) return root;
   const title = typeof start.title === "string" ? start.title : root.body;
   return { ...root, body: `(started the thread "${title}" from part of the conversation)` };
+}
+
+/** The person's IANA zone in this organization, else the organization's ("UTC" without either). */
+async function zoneOf(db: Database, orgId: string, userId: string | null) {
+  const { organizationMembers, organizationSettings } = schema;
+  const [row] = await db
+    .select({ mine: organizationMembers.timezone, org: organizationSettings.timezone })
+    .from(organizations)
+    .leftJoin(organizationSettings, eq(organizationSettings.orgId, organizations.id))
+    .leftJoin(
+      organizationMembers,
+      and(eq(organizationMembers.orgId, organizations.id), eq(organizationMembers.userId, userId ?? "")),
+    )
+    .where(eq(organizations.id, orgId));
+  return row?.mine ?? row?.org ?? "UTC";
+}
+
+/** "# Now\nTue, Oct 21, 2026, 07:40 for Ana (America/Sao_Paulo); the previous message here was 14 h ago." */
+export function nowLine(zone: string, who: string | null, previousAt: Date | null, now = new Date()) {
+  let timeZone = zone;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+  } catch {
+    timeZone = "UTC";
+  }
+  const when = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(now);
+  const before = previousAt ? `; the previous message here was ${ago(previousAt, now.getTime())}` : "";
+  return `# Now\n${when}${who ? ` for ${who}` : ""} (${timeZone})${before}.`;
 }
 
 async function authorNames(db: Database, history: Message[]) {
