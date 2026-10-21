@@ -111,13 +111,15 @@ import {
   DialogFooter,
   DialogSearchList,
   EmptyState,
-  Field,
   FORMAT_KINDS,
   type FormatKind,
   Icon,
   type IconName,
-  Input,
   Kbd,
+  Menu,
+  MenuItem,
+  MenuRadioGroup,
+  MenuSeparator,
   Mention,
   Message,
   MessageText,
@@ -127,7 +129,6 @@ import {
   SkeletonGroup,
   SkeletonMessage,
   Spinner,
-  Switch,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -3239,7 +3240,14 @@ function MessageApproval({
   return <InlineApproval approval={approval} agent={agent} members={members} />;
 }
 
-/** "Detalhes do canal": topic, and members (people and agents) with "Responde sem menção" per agent. */
+/** Above this many members the channel details list gets a search field. */
+const DETAILS_SEARCH_FROM = 8;
+
+/**
+ * "Detalhes do canal" (telas/CanalDetalhes.html B): the description edited in place under the name
+ * (saves on blur, Enter or close), members grouped as agents and people, one "⋯" per row with how an
+ * agent replies and "Tirar do canal".
+ */
 function ChannelDetails({
   open,
   onOpenChange,
@@ -3260,12 +3268,36 @@ function ChannelDetails({
   const editable = can(org.role, "configure");
   const [q, setQ] = useState("");
   const [topic, setTopic] = useState(channel.topic);
+  const [saved, setSaved] = useState(false);
   const [adding, setAdding] = useState(false);
   // Who is about to be removed: asked first, in a dialog of its own.
   const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
+  // The last description sent: blur and close both save, and closing with the X does both.
+  const sentTopic = useRef<string | null>(null);
   useEffect(() => {
-    if (open) setTopic(channel.topic);
+    if (!open) return;
+    setTopic(channel.topic);
+    sentTopic.current = null;
   }, [open, channel.topic]);
+  useEffect(() => {
+    if (!saved) return;
+    const id = setTimeout(() => setSaved(false), 1800);
+    return () => clearTimeout(id);
+  }, [saved]);
+  const saveTopic = () => {
+    const next = topic.trim();
+    if (!editable || next === channel.topic || next === sentTopic.current) return;
+    sentTopic.current = next;
+    update.mutate(
+      { topic: next },
+      {
+        onSuccess: () => setSaved(true),
+        onError: () => {
+          sentTopic.current = null;
+        },
+      },
+    );
+  };
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
@@ -3293,96 +3325,182 @@ function ChannelDetails({
     onSuccess: refresh,
   });
   const needle = q.trim().toLowerCase();
-  const rows = (roster.data ?? [])
-    .map((m) => ({
-      key: `${m.type}-${m.id}`,
-      kind: m.type,
-      id: m.id,
-      name: m.name,
-      sub: m.type === "agent" ? `@${m.handle ?? ""}` : (dir.memberById.get(m.id)?.email ?? ""),
-      image: m.type === "person" ? (dir.memberById.get(m.id)?.image ?? null) : null,
-      initials: m.type === "agent" ? dir.agentInitials(m.id) : undefined,
-      autoReply: m.autoReply,
-    }))
-    .filter((r) => !needle || `${r.name} ${r.sub}`.toLowerCase().includes(needle));
+  const all = (roster.data ?? []).map((m) => ({
+    key: `${m.type}-${m.id}`,
+    kind: m.type,
+    id: m.id,
+    name: m.name,
+    handle: m.handle ?? "",
+    email: m.type === "person" ? (dir.memberById.get(m.id)?.email ?? "") : "",
+    autoReply: Boolean(m.autoReply),
+  }));
+  const shown = all.filter((r) => !needle || `${r.name} ${r.handle} ${r.email}`.toLowerCase().includes(needle));
+  const agents = shown.filter((r) => r.kind === "agent");
+  const people = shown.filter((r) => r.kind === "person");
+  const agentCount = all.filter((r) => r.kind === "agent").length;
   const inChannel = new Set((roster.data ?? []).map((m) => `${m.type}:${m.id}` as PickKey));
+  const group = (label: string, count: number) => (
+    <p className="member-group">
+      <span className="ac-eyebrow">{label}</span>
+      <span className="member-group__count">{count}</span>
+    </p>
+  );
   return (
     <>
       <Dialog
         open={open && !adding && !removing}
-        onOpenChange={onOpenChange}
-        title={t("channel.detailsTitle", { channel: channel.name })}
+        onOpenChange={(o) => {
+          if (!o) saveTopic();
+          onOpenChange(o);
+        }}
+        title={
+          <>
+            {t("channel.detailsTitle", { channel: channel.name })}
+            {editable && (
+              <span className="channel-topic__saved" data-show={saved || undefined} aria-live="polite">
+                {saved && (
+                  <>
+                    <Icon name="check" />
+                    {t("common.saved")}
+                  </>
+                )}
+              </span>
+            )}
+          </>
+        }
         description={editable ? undefined : channel.topic || t("channel.noTopic")}
         closeLabel={t("common.close")}
       >
         {editable && (
-          <form
-            className="ac-dialog__tools row row--end"
-            onSubmit={(e) => {
-              e.preventDefault();
-              update.mutate({ topic: topic.trim() });
-            }}
-          >
-            <Field label={t("channel.topic")} id={`topic-${channel.id}`} style={{ flex: "1 1 260px" }}>
-              <Input
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder={t("channel.topicPlaceholder")}
-              />
-            </Field>
-            <Button type="submit" disabled={update.isPending || topic.trim() === channel.topic}>
-              {t("channel.saveTopic")}
-            </Button>
-          </form>
+          <div className="channel-topic">
+            <input
+              className="channel-topic__input"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onBlur={saveTopic}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              placeholder={t("channel.topicPlaceholder")}
+              aria-label={t("channel.topicLabel")}
+              maxLength={250}
+            />
+          </div>
         )}
-        <div className="ac-dialog__tools row" style={{ justifyContent: "space-between" }}>
-          <span className="ac-eyebrow">{t("channelMembers.title")}</span>
-          {editable && (
-            <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
-              {t("channelMembers.add")}
-            </Button>
-          )}
-        </div>
         <DialogSearchList
           query={q}
           onQueryChange={setQ}
+          search={all.length > DETAILS_SEARCH_FROM}
           searchLabel={t("channel.detailsSearch")}
           searchPlaceholder={t("channel.detailsSearch")}
-          isEmpty={roster.isSuccess && rows.length === 0}
+          isEmpty={roster.isSuccess && shown.length === 0 && Boolean(needle)}
           emptyText={t("channel.detailsEmpty", { q })}
         >
-          {rows.map((r) => (
+          {agents.length > 0 && group(t("channelMembers.agents"), agentCount)}
+          {agents.map((r) => (
             <div key={r.key} className="member-row">
-              <ActorAvatar actor={{ type: r.kind, id: r.id }} size="sm" name={r.name} />
+              <ActorAvatar actor={{ type: "agent", id: r.id }} size="sm" name={r.name} />
               <span className="list-col">
                 <span style={{ fontWeight: 600 }}>{r.name}</span>
-                <span className="small muted">{r.sub}</span>
+                <span className="small muted">
+                  {r.autoReply ? t("channelMembers.aloneLine") : t("channelMembers.mentionLine", { handle: r.handle })}
+                </span>
               </span>
-              {r.kind === "agent" && (
-                <label htmlFor={`auto-${r.id}`} className="member-row__switch small">
-                  <Switch
-                    id={`auto-${r.id}`}
-                    aria-label={t("channelMembers.autoReplyFor", { name: r.name })}
-                    checked={Boolean(r.autoReply)}
-                    disabled={!editable || (autoReply.isPending && autoReply.variables?.agentId === r.id)}
-                    onCheckedChange={(on) => autoReply.mutate({ agentId: r.id, on })}
+              {editable && (
+                <Menu
+                  align="end"
+                  label={t("channelMembers.actions", { name: r.name })}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon="more"
+                      aria-label={t("channelMembers.actions", { name: r.name })}
+                      disabled={autoReply.isPending && autoReply.variables?.agentId === r.id}
+                    />
+                  }
+                >
+                  <MenuRadioGroup
+                    label={t("channelMembers.replyHeading")}
+                    value={r.autoReply ? "alone" : "mention"}
+                    onValueChange={(v) => autoReply.mutate({ agentId: r.id, on: v === "alone" })}
+                    options={[
+                      {
+                        value: "alone",
+                        label: (
+                          <>
+                            {t("channelMembers.replyAlone")}
+                            <span className="ac-menu__desc">{t("channelMembers.replyAloneHelp")}</span>
+                          </>
+                        ),
+                      },
+                      {
+                        value: "mention",
+                        label: (
+                          <>
+                            {t("channelMembers.replyMention")}
+                            <span className="ac-menu__desc">
+                              {t("channelMembers.replyMentionHelp", { handle: r.handle })}
+                            </span>
+                          </>
+                        ),
+                      },
+                    ]}
                   />
-                  {t("channelMembers.autoReply")}
-                </label>
-              )}
-              {/* Not on my own row: removing myself from my own list reads as a mistake. */}
-              {editable && !(r.kind === "person" && r.id === me.user.id) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="close"
-                  aria-label={t("channelMembers.remove", { name: r.name })}
-                  onClick={() => setRemoving({ kind: r.kind, id: r.id, name: r.name })}
-                />
+                  <MenuSeparator />
+                  <MenuItem icon="close" danger onSelect={() => setRemoving({ kind: "agent", id: r.id, name: r.name })}>
+                    {t("channelMembers.remove")}
+                  </MenuItem>
+                </Menu>
               )}
             </div>
           ))}
+          {people.length > 0 && group(t("channelMembers.people"), all.length - agentCount)}
+          {people.map((r) => (
+            <div key={r.key} className="member-row">
+              <ActorAvatar actor={{ type: "person", id: r.id }} size="sm" name={r.name} />
+              <span className="list-col">
+                <span style={{ fontWeight: 600 }}>
+                  {r.name}
+                  {r.id === me.user.id && <span className="member-row__you">{t("common.you")}</span>}
+                </span>
+                <span className="small muted">{r.email}</span>
+              </span>
+              {/* Not on my own row: removing myself from my own list reads as a mistake. */}
+              {editable && r.id !== me.user.id && (
+                <Menu
+                  align="end"
+                  label={t("channelMembers.actions", { name: r.name })}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon="more"
+                      aria-label={t("channelMembers.actions", { name: r.name })}
+                    />
+                  }
+                >
+                  <MenuItem
+                    icon="close"
+                    danger
+                    onSelect={() => setRemoving({ kind: "person", id: r.id, name: r.name })}
+                  >
+                    {t("channelMembers.remove")}
+                  </MenuItem>
+                </Menu>
+              )}
+            </div>
+          ))}
+          {editable && !needle && (
+            <button type="button" className="member-row member-row--add" onClick={() => setAdding(true)}>
+              <span className="member-row__plus" aria-hidden="true">
+                <Icon name="plus" />
+              </span>
+              {t("channelMembers.addRow")}
+            </button>
+          )}
         </DialogSearchList>
         <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
       </Dialog>

@@ -957,8 +957,70 @@ p {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: var(--radius-sm);
+}
+.member-row:hover {
+  background: var(--plate-soft);
+}
+.member-row .list-col {
+  flex: 1;
+  min-width: 0;
+}
+.member-row__you {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--plate);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  vertical-align: 1px;
+}
+/* "Adicionar pessoa ou agente": the last row of the channel's member list. */
+.member-row--add {
+  width: calc(100% + 16px);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink2);
+  text-align: left;
+  cursor: pointer;
+}
+.member-row--add:focus-visible {
+  outline: none;
+  box-shadow: var(--field-ring);
+}
+.member-row__plus {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 30%;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.member-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0 2px;
+}
+.member-group:first-child {
+  margin-top: 0;
+}
+.member-group__count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
 }
 
 /* Agent profile and lists */
@@ -6649,13 +6711,61 @@ button.live-call__head:hover {
 .routine-when__head .ac-btn {
   flex-shrink: 0;
 }
-/* "Responde sem menção" in the channel's member list: the v2 switch with its label. */
-.member-row__switch {
+/* Channel details: the description under the name, edited in place (saves on blur, Enter or close). */
+.channel-topic {
+  flex: none;
+  padding: 0 20px 12px;
+  margin-top: -8px;
+}
+.channel-topic__input {
+  box-sizing: border-box;
+  display: block;
+  width: calc(100% + 16px);
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink2);
+  outline: none;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.channel-topic__input::placeholder {
+  color: var(--faint);
+}
+.channel-topic__input:hover {
+  background: var(--plate-soft);
+}
+.channel-topic__input:focus {
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line), var(--field-ring);
+}
+.channel-topic__saved {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--ink2);
-  cursor: pointer;
+  gap: 4px;
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  vertical-align: 2px;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.channel-topic__saved[data-show] {
+  opacity: 1;
+}
+.channel-topic__saved .ac-icon {
+  width: 13px;
+  height: 13px;
+}
+@media (max-width: 640px) {
+  .channel-topic {
+    padding: 0 16px 12px;
+  }
 }
 /* Channel header: the members stack and its glass list */
 .members-stack {

@@ -170,20 +170,16 @@ describe("Canal", () => {
     expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
   });
 
-  test("channel details: searchable list of people and agents", async () => {
+  test("channel details: agents and people in groups, no search on a short list", async () => {
     await open();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
-    expect(dialog.textContent).toContain("Responde sem menção");
+    expect(dialog.textContent).toContain("Agentes");
+    expect(dialog.textContent).toContain("Pessoas");
     expect(dialog.textContent).toContain("João");
-    expect(dialog.textContent).toContain("@atlas");
-    await act(async () =>
-      fireEvent.change(within(dialog).getByRole("searchbox", { name: "Buscar pessoa ou agente" }), {
-        target: { value: "zzz" },
-      }),
-    );
-    expect(dialog.textContent).toContain("Ninguém encontrado com “zzz”.");
+    expect(dialog.textContent).toContain("Entra na conversa sozinho");
+    expect(within(dialog).queryByRole("searchbox", { name: "Buscar pessoa ou agente" })).toBeNull();
   });
 
   test("agent replies: 👍/👎 toggle with the API and Corrigir resposta sends a correction", async () => {
@@ -243,7 +239,8 @@ describe("Canal", () => {
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("Descrição do canal"), { target: { value: "Código e deploys" } }),
     );
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Salvar descrição" })));
+    // Saves on blur, without a button.
+    await act(async () => fireEvent.blur(within(dialog).getByLabelText("Descrição do canal")));
     await settle(4);
     expect(state.calls.find((c) => c.method === "chat.update")?.args[2]).toEqual({ topic: "Código e deploys" });
   });

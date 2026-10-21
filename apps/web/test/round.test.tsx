@@ -111,16 +111,27 @@ describe("Detalhes do canal: membros", () => {
     await settle(3);
     return screen().getByRole("dialog", { name: "#eng" });
   };
+  /** Opens a row's "⋯" (Radix: keyboard) and returns its menu. */
+  const openMenu = async (name: string) => {
+    const button = screen().getByRole("button", { name: `Opções de ${name}` });
+    button.focus();
+    await act(async () => {
+      fireEvent.keyDown(button, { key: "Enter" });
+      fireEvent.keyUp(button, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    return screen().getByRole("menu");
+  };
 
-  test("toggle 'Responde sem menção' keeps the agent's other channels; remove and add members", async () => {
+  test("'⋯' sets how an agent replies, keeping its other channels; remove and add members", async () => {
     const state = seedState();
     state.channelMembers[GENERAL_ID]?.push({ type: "agent", id: ATLAS_ID });
     await go(`c/${ENG_ID}`, state);
     let dialog = await openDetails();
-    expect(within(dialog).getByRole("switch", { name: "Ada responde sem menção" })).toBeTruthy();
-    const atlasAuto = within(dialog).getByRole("switch", { name: "Atlas responde sem menção" });
-    expect(atlasAuto.getAttribute("aria-checked")).toBe("true");
-    await click(atlasAuto);
+    expect(dialog.textContent).toContain("Entra na conversa sozinho");
+    const menu = await openMenu("Atlas");
+    expect(within(menu).getByRole("menuitemradio", { name: /^Sozinho/ }).getAttribute("aria-checked")).toBe("true");
+    await click(within(menu).getByRole("menuitemradio", { name: /^Quando chamado/ }));
     await settle(4);
     const put = state.calls.find((c) => c.method === "agents.setChannels");
     expect(put?.args[1]).toBe(ATLAS_ID);
@@ -129,11 +140,11 @@ describe("Detalhes do canal: membros", () => {
       { channelId: GENERAL_ID, autoReply: true },
     ]);
     // Not on my own row; on another, it asks first.
-    expect(within(dialog).queryByRole("button", { name: "Remover Walter" })).toBeNull();
-    await click(within(dialog).getByRole("button", { name: "Remover João" }));
-    const confirm = screen().getByRole("dialog", { name: "Remover João de #eng?" });
+    expect(within(dialog).queryByRole("button", { name: "Opções de Walter" })).toBeNull();
+    await click(within(await openMenu("João")).getByRole("menuitem", { name: "Tirar do canal" }));
+    const confirm = screen().getByRole("dialog", { name: "Tirar João de #eng?" });
     expect(state.calls.find((c) => c.method === "chat.removeMember")).toBeUndefined();
-    await click(within(confirm).getByRole("button", { name: "Remover" }));
+    await click(within(confirm).getByRole("button", { name: "Tirar do canal" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "chat.removeMember")?.args).toEqual([
       ORG_ID,
@@ -141,7 +152,7 @@ describe("Detalhes do canal: membros", () => {
       { userId: "u-joao" },
     ]);
     dialog = screen().getByRole("dialog", { name: "#eng" });
-    await click(within(dialog).getByRole("button", { name: "Adicionar" }));
+    await click(within(dialog).getByRole("button", { name: "Adicionar pessoa ou agente" }));
     const add = screen().getByRole("dialog", { name: "Adicionar a #eng" });
     // Only who isn't in the channel.
     expect(
@@ -166,9 +177,9 @@ describe("Detalhes do canal: membros", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(`c/${ENG_ID}`, state);
     const dialog = await openDetails();
-    expect(within(dialog).queryByRole("button", { name: "Adicionar" })).toBeNull();
-    expect(within(dialog).queryByRole("button", { name: /Remover/ })).toBeNull();
-    expect(within(dialog).getByRole("switch", { name: "Ada responde sem menção" }).hasAttribute("disabled")).toBe(true);
+    expect(within(dialog).queryByRole("button", { name: "Adicionar pessoa ou agente" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: /^Opções de/ })).toBeNull();
+    expect(within(dialog).queryByRole("textbox", { name: "Descrição do canal" })).toBeNull();
     expect(dialog.textContent).toContain("Só quem criou o canal e os admins mudam os membros.");
   });
 });

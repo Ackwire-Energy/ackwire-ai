@@ -109,6 +109,8 @@ export interface DialogSearchListProps {
   isEmpty: boolean;
   children: ReactNode;
   listLabel?: string;
+  /** False hides the search field (a short list doesn't need one). */
+  search?: boolean;
 }
 
 /** The searchable-list variant: search box on top, scrolling list, empty message. */
@@ -121,18 +123,21 @@ export function DialogSearchList({
   isEmpty,
   children,
   listLabel,
+  search = true,
 }: DialogSearchListProps) {
   return (
     <>
-      <div className="ac-dialog__tools">
-        <SearchField
-          size="sm"
-          aria-label={searchLabel}
-          placeholder={searchPlaceholder}
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-        />
-      </div>
+      {search && (
+        <div className="ac-dialog__tools">
+          <SearchField
+            size="sm"
+            aria-label={searchLabel}
+            placeholder={searchPlaceholder}
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+          />
+        </div>
+      )}
       {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
       <div className="ac-dialog__list" role="region" aria-label={listLabel}>
         {isEmpty ? <p className="ac-dialog__empty">{emptyText}</p> : children}
