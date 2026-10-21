@@ -9973,8 +9973,9 @@ textarea.onb__big.ac-input {
 .agp-workcard {
   padding: 6px;
   border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
-  background: var(--bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  /* Raised off the page (white in light) so it reads as one card. */
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
 }
 .agp-cells {
   display: grid;
