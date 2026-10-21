@@ -18,7 +18,7 @@ import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
-import { afterMachineTaskEnded } from "./mission-worktree";
+import { afterMachineTaskEnded, afterMissionRunEnded } from "./mission-worktree";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
@@ -349,6 +349,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await queryTrace.run({ count: 0 }, () =>
         executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait } : ctx),
       );
+      // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
+      await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
     },
     "search.index": async (job) => {
       if (!deps.search) return;

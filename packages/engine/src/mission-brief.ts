@@ -1,6 +1,6 @@
 import { and, type Database, desc, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { MISSION_RULES } from "./mission-rules";
-import { missionCwd, shortSha } from "./mission-worktree";
+import { missionCwd, onlyReadsWhileWriting, shortSha } from "./mission-worktree";
 
 const {
   missions,
@@ -109,9 +109,9 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
           )
           .join("; ")}.`
       : `Nothing running on ${computer} now.`,
-    ...(running.some((t) => t.mode === "write" && !t.startRequest)
+    ...(running.some((t) => t.mode === "write")
       ? [
-          "An item that writes is working in the mission's folder now: until it ends, you only read (your turns are read-only).",
+          `An item that writes is working in (or waiting for) the mission's folder: until it ends, ${onlyReadsWhileWriting(mission.executor)}.`,
         ]
       : []),
     ...(pending.length

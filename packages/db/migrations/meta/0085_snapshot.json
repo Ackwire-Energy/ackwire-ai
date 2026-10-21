@@ -1,5 +1,5 @@
 {
-  "id": "aeba33a0-0ae3-455b-8301-217cbfc7588d",
+  "id": "3096460c-0fb3-4e5a-a68e-0790b4ea364a",
   "prevId": "97e606ff-89b3-44ce-bbd5-95afb4266dc6",
   "version": "7",
   "dialect": "postgresql",
@@ -7823,12 +7823,6 @@
         },
         "worktree_error": {
           "name": "worktree_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "worktree_fail_reason": {
-          "name": "worktree_fail_reason",
           "type": "text",
           "primaryKey": false,
           "notNull": false

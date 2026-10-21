@@ -48,7 +48,20 @@ export const RESUME_PROMPT =
   "You were interrupted (the computer went offline). Look at your folder (git status when it is a git repository) and continue where you stopped.";
 export const TASK_TEXT_LIMITS = { title: 120, command: 2000, prompt: 20_000, wakeResult: 4000 } as const;
 
-const ACTIVE: MachineTaskStatus[] = ["queued", "running", "interrupted"];
+/**
+ * A live task: it runs or may (queued, in our queue or being started;
+ * running; interrupted and may come back) and hasn't ended. The one
+ * predicate for "a task of the mission is live" (ADR 0044): rows
+ * (`isLiveTaskRow`), Drizzle queries (`liveTaskWhere`) and raw SQL over an
+ * alias (`liveTaskSqlAs`).
+ */
+export const LIVE_TASK_STATUSES: readonly MachineTaskStatus[] = ["queued", "running", "interrupted"];
+const ACTIVE = LIVE_TASK_STATUSES as MachineTaskStatus[];
+export const isLiveTaskRow = (t: Pick<MachineTaskRow, "status" | "endedAt"> | null | undefined) =>
+  Boolean(t && LIVE_TASK_STATUSES.includes(t.status) && !t.endedAt);
+export const liveTaskWhere = () => and(isNull(machineTasks.endedAt), inArray(machineTasks.status, ACTIVE));
+export const liveTaskSqlAs = (alias: string) =>
+  sql.raw(`${alias}.ended_at is null and ${alias}.status in (${ACTIVE.map((s) => `'${s}'`).join(", ")})`);
 /** `machine_tasks.recent_lines` keeps this many human lines ("Ver saída" while the computer is offline). */
 export const RECENT_LINES = 50;
 
@@ -396,8 +409,12 @@ export async function queueMachineTask(deps: TaskDeps, input: StartTaskInput) {
  * (ADR 0044): its mission is active and its folder ready (a setup task needs
  * neither), and a write item waits while another write item of its mission
  * holds the folder (running, being started, or interrupted and may come
- * back). One claim at a time per machine (an advisory lock), so two write
- * items of a mission never start together. Null: nothing may start.
+ * back) and while a turn of the mission's main session that began before it
+ * was queued still runs (that turn may be writing in the folder: the item
+ * starts when it ends, `afterMissionRunEnded`; a turn that began after sees
+ * the item and only reads). One claim at a time per machine (an advisory
+ * lock), so two write items of a mission never start together. Null:
+ * nothing may start.
  */
 export async function claimQueuedTask(
   db: Database,
@@ -414,9 +431,13 @@ export async function claimQueuedTask(
           where q.machine_id = ${machineId}::uuid and q.status = 'queued' and q.ended_at is null
             and q.start_request is not null
             and (q.mode = 'setup' or (m.status in ('active', 'awaiting_close') and m.worktree_state = 'ready'))
-            and (q.mode is distinct from 'write' or not exists (select 1 from ${machineTasks} w
-              where w.mission_id = q.mission_id and w.id <> q.id and w.mode = 'write' and w.ended_at is null
-                and w.start_request is null and w.status in ('queued', 'running', 'interrupted')))
+            and (q.mode is distinct from 'write' or (
+              not exists (select 1 from ${machineTasks} w
+                where w.mission_id = q.mission_id and w.id <> q.id and w.mode = 'write'
+                  and w.start_request is null and ${liveTaskSqlAs("w")})
+              and not exists (select 1 from ${agentRuns} r
+                where r.thread_root_id = m.thread_root_id and r.agent_id = m.agent_id
+                  and r.status = 'running' and r.started_at <= q.created_at)))
           order by q.created_at, q.id
           limit 1)`,
       );
@@ -700,6 +721,7 @@ export async function settleInterruptedTask(
           status: schema.missions.status,
           resumeTasks: schema.missions.resumeTasks,
           branch: schema.missions.branch,
+          worktreeState: schema.missions.worktreeState,
         })
         .from(schema.missions)
         .where(eq(schema.missions.id, claimed.missionId))
@@ -776,11 +798,16 @@ export async function settleInterruptedTask(
         target: { type: "machine", id: claimed.machineId },
         details: { taskId: next.id, resumedFromId: claimed.id, executor: "claude", title: claimed.title },
       }).catch(() => undefined);
+      // Queued behind a folder that isn't ready (being prepared again, or failed and left for the person):
+      // it resumes once the project is ready, not now.
+      const waits = queue && mission?.worktreeState !== "ready";
       await postTaskNotice(deps, claimed, {
-        body: `The computer ${machine.name} is back: resumed "${claimed.title}" where it stopped.`,
-        code: "machine_task_resumed",
+        body: waits
+          ? `The computer ${machine.name} is back: "${claimed.title}" resumes where it stopped once the project is ready.`
+          : `The computer ${machine.name} is back: resumed "${claimed.title}" where it stopped.`,
+        code: waits ? "machine_task_resume_waits" : "machine_task_resumed",
         params: { title: claimed.title, computer: machine.name },
-        meta: { machineTaskResumed: { fromId: claimed.id, taskId: next.id } },
+        meta: { machineTaskResumed: { fromId: claimed.id, taskId: next.id, ...(waits ? { waits: true } : {}) } },
       });
       await publishTaskEvent(deps.pubsub, linked ?? claimed);
       if (queue) {

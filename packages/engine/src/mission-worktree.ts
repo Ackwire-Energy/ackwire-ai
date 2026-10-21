@@ -1,5 +1,5 @@
 import { MISSION_WORKTREE_PROTOCOL, parseMissionWorktreeEnsured } from "@agenteschat/adapters";
-import { and, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ConflictError } from "./errors";
@@ -8,7 +8,9 @@ import { MachineRequestError } from "./machine-hub";
 import {
   claimQueuedTask,
   getTask,
+  isLiveTaskRow,
   launchTask,
+  liveTaskWhere,
   type MachineTaskMode,
   type MachineTaskRow,
   queueMachineTask,
@@ -20,7 +22,6 @@ import {
   deliverInbox,
   getMission,
   getMissionRow,
-  isLiveTask,
   type MissionDeps,
   type MissionRow,
   missionBranchPrefix,
@@ -36,7 +37,7 @@ import {
   tellSession,
 } from "./missions";
 
-const { missions, machineTasks, missionEvents } = schema;
+const { missions, machineTasks, missionEvents, agentRuns } = schema;
 
 /**
  * One worktree per mission (ADR 0044), server side. At Start the runner makes
@@ -109,6 +110,16 @@ export const missionFilesDir = (mission: Pick<MissionRow, "repoDir" | "worktreeP
     : mission.worktreeState === "none"
       ? mission.repoDir
       : null;
+
+/**
+ * How the main session is told it only reads while a write item is live:
+ * Claude Code's turns are made read-only (plan mode); other brains (Codex
+ * keeps its sandbox, which has the network) get it as a firm instruction.
+ */
+export const onlyReadsWhileWriting = (executor: string) =>
+  executor === "claude"
+    ? "you only read (your turns are read-only)"
+    : "you only read: don't change any file in the folder until it ends (its commit takes every change)";
 
 /** A commit id as people see it (7 characters, like the app). */
 export const shortSha = (sha: string) => sha.slice(0, 7);
@@ -265,7 +276,7 @@ export async function ensureMissionWorktree(
   const needsSetup = got.created || before === "preparing" || before === "failed";
   if (needsSetup) {
     const setup = await lastSetupTask(deps, mission.id);
-    if (isLiveTask(setup)) return mission;
+    if (isLiveTaskRow(setup)) return mission;
     const alreadyDone = !got.created && setup?.status === "done" && before !== "failed";
     if (got.setupCommand && !alreadyDone) return startSetup(deps, mission, got.setupCommand);
   }
@@ -379,7 +390,7 @@ function setupError(task: MachineTaskRow) {
 export async function onSetupEnded(deps: MissionDeps, task: MachineTaskRow) {
   if (!task.missionId) return;
   const mission = await getMissionRow(deps.db, task.missionId);
-  if (!mission || mission.worktreeState !== "preparing" || !OPEN_MISSION_STATUSES.includes(mission.status)) return;
+  if (mission?.worktreeState !== "preparing" || !OPEN_MISSION_STATUSES.includes(mission.status)) return;
   if (task.status === "done") {
     await markReady(deps, mission, { startQueue: false });
   } else if (task.status === "failed") {
@@ -398,8 +409,7 @@ async function writeAhead(deps: MissionDeps, missionId: string, exceptId: string
       and(
         eq(machineTasks.missionId, missionId),
         eq(machineTasks.mode, "write"),
-        isNull(machineTasks.endedAt),
-        inArray(machineTasks.status, ["queued", "running", "interrupted"]),
+        liveTaskWhere(),
         sql`${machineTasks.id} <> ${exceptId}::uuid`,
         sql`${machineTasks.createdAt} <= (select created_at from ${machineTasks} where id = ${exceptId}::uuid)`,
       ),
@@ -484,10 +494,28 @@ async function queueItem(deps: MissionDeps, mission: MissionRow, input: ItemInpu
   return (await getTask(deps.db, row.id)) ?? row;
 }
 
+/** A turn of the mission's main session runs now (its run in the home thread). */
+async function mainTurnRunning(db: Executor, mission: Pick<MissionRow, "threadRootId" | "agentId">) {
+  const [row] = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.threadRootId, mission.threadRootId),
+        eq(agentRuns.agentId, mission.agentId),
+        eq(agentRuns.status, "running"),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 /**
  * Starts an item of the mission (`start_task`, a resumed item session):
  * queued, then started at once when it may. Returns the row (status
- * `queued` when it waits) and why it waits.
+ * `queued` when it waits) and why it waits: the write item ahead of it, the
+ * main session's turn (a write item never starts while that turn may still
+ * write: it starts when the turn ends), or a slot on the computer.
  */
 export async function startMissionItem(
   deps: MissionDeps,
@@ -498,13 +526,35 @@ export async function startMissionItem(
     ...input,
     executor: mission.executor === "codex" ? "codex" : "claude",
   });
-  const waitsFor =
-    row.status !== "queued" || row.endedAt
-      ? null
-      : input.mode === "write" && (await writeAhead(deps, mission.id, row.id))
-        ? ("write" as const)
-        : ("slot" as const);
+  let waitsFor: "write" | "turn" | "slot" | null = null;
+  if (row.status === "queued" && !row.endedAt) {
+    if (input.mode === "write" && (await writeAhead(deps, mission.id, row.id))) waitsFor = "write";
+    else if (input.mode === "write" && (await mainTurnRunning(deps.db, mission))) waitsFor = "turn";
+    else waitsFor = "slot";
+  }
   return { row, waitsFor };
+}
+
+/**
+ * A run ended (or stopped running): when it was a turn of a mission's main
+ * session, the write items queued behind it may start now (ADR 0044: one
+ * walk of the mission's machine queue). Called once per `agent_run.execute`.
+ */
+export async function afterMissionRunEnded(deps: MissionDeps, runId: string) {
+  const [run] = await deps.db
+    .select({
+      orgId: agentRuns.orgId,
+      agentId: agentRuns.agentId,
+      threadRootId: agentRuns.threadRootId,
+      status: agentRuns.status,
+    })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, runId));
+  if (!run || run.status === "running" || run.status === "queued") return 0;
+  const mission = await missionOfThread(deps.db, run.orgId, run.threadRootId);
+  if (!mission || mission.agentId !== run.agentId || !mission.machineId) return 0;
+  if (mission.status !== "active" && mission.status !== "awaiting_close") return 0;
+  return startQueuedMissionTasks(deps, mission.machineId);
 }
 
 /**
@@ -617,17 +667,11 @@ export async function removeMissionWorktree(
 }
 
 /** Whether a task of the mission still runs or may (queued, running, interrupted and may come back). */
-async function hasLiveTasks(db: Executor, missionId: string) {
+export async function hasLiveTasks(db: Executor, missionId: string) {
   const [row] = await db
     .select({ id: machineTasks.id })
     .from(machineTasks)
-    .where(
-      and(
-        eq(machineTasks.missionId, missionId),
-        isNull(machineTasks.endedAt),
-        inArray(machineTasks.status, ["queued", "running", "interrupted"]),
-      ),
-    )
+    .where(and(eq(machineTasks.missionId, missionId), liveTaskWhere()))
     .limit(1);
   return Boolean(row);
 }
@@ -698,43 +742,46 @@ export async function removeLeftWorktrees(deps: MissionDeps, machineId: string) 
 
 /**
  * The mission moves to another computer: its folder on the old one is taken
- * away (best effort; the branch stays). Offline or refused: the copy stays
- * on that computer (recorded; the caller says so). Returns that computer's
- * name when the copy was left there, else null.
+ * away, best effort and in the background (the branch stays; the request
+ * never waits for that computer). Away: the copy stays there (recorded, and
+ * the caller says so); refused or failed later: recorded
+ * (`worktree_left_behind`). Returns that computer's name when it is away and
+ * the copy is left there, else null.
  */
 export async function leaveMachineWorktree(deps: MissionDeps, mission: MissionRow): Promise<string | null> {
   if (!mission.machineId || !mission.branch || !mission.worktreePath) return null;
   if (mission.worktreeState === "none" || mission.worktreeState === "removed") return null;
-  const status = await deps.hub?.status(mission.machineId).catch(() => null);
+  const machineId = mission.machineId;
+  const status = await deps.hub?.status(machineId).catch(() => null);
   const computer = status?.name ?? "the computer";
-  try {
-    if (!deps.hub) throw new Error("no computer");
-    await deps.hub.call<"mission.worktree">(
-      mission.machineId,
-      {
-        op: "mission.worktree",
-        action: "remove",
-        repo: mission.repoDir,
-        path: mission.worktreePath,
-        branch: mission.branch,
-        agent: await agentScope(deps, mission),
-      },
-      { timeoutMs: ENSURE_TIMEOUT_MS },
-    );
-  } catch (error) {
-    await recordMissionEvent(deps.db, mission, "worktree_left_behind", {
-      machineId: mission.machineId,
+  const leftBehind = (error: unknown) =>
+    recordMissionEvent(deps.db, mission, "worktree_left_behind", {
+      machineId,
       computer,
       path: mission.worktreePath,
       error: (error instanceof Error ? error.message : String(error)).slice(0, 500),
     }).catch(() => undefined);
+  const hub = deps.hub;
+  if (!hub || !status?.online) {
+    await leftBehind(new MachineOfflineError(computer));
     return computer;
   }
-  await recordMissionEvent(deps.db, mission, "worktree_removed", {
-    deleteBranch: false,
-    machineId: mission.machineId,
-    moved: true,
-  });
+  const remove = async () => {
+    await hub.call<"mission.worktree">(
+      machineId,
+      {
+        op: "mission.worktree",
+        action: "remove",
+        repo: mission.repoDir,
+        path: mission.worktreePath as string,
+        branch: mission.branch as string,
+        agent: await agentScope(deps, mission),
+      },
+      { timeoutMs: ENSURE_TIMEOUT_MS },
+    );
+    await recordMissionEvent(deps.db, mission, "worktree_removed", { deleteBranch: false, machineId, moved: true });
+  };
+  void remove().catch(leftBehind);
   return null;
 }
 
@@ -805,42 +852,47 @@ export async function resumeFailedWorktree(
   return (await ensureMissionWorktree(deps, row.id, { fresh, ...options }).catch(() => null)) ?? row;
 }
 
-/** A write item of the mission holds its folder now (running, being started, or interrupted and may come back). */
+/**
+ * A write item of the mission is live: running, being started, waiting in
+ * the queue, or interrupted and may come back. From `start_task` until it
+ * ends the main session only reads (its end-of-item commit takes every
+ * change in the folder).
+ */
 export async function writeItemLive(db: Executor, missionId: string) {
   const [row] = await db
     .select({ id: machineTasks.id })
     .from(machineTasks)
-    .where(
-      and(
-        eq(machineTasks.missionId, missionId),
-        eq(machineTasks.mode, "write"),
-        isNull(machineTasks.endedAt),
-        sql`${machineTasks.startRequest} is null`,
-        inArray(machineTasks.status, ["queued", "running", "interrupted"]),
-      ),
-    )
+    .where(and(eq(machineTasks.missionId, missionId), eq(machineTasks.mode, "write"), liveTaskWhere()))
     .limit(1);
   return Boolean(row);
 }
 
+type Turn = { orgId: string; agentId: string; threadRootId: string | null };
+
+async function turnMission(db: Executor, turn: Turn) {
+  if (!turn.threadRootId) return null;
+  const mission = await missionOfThread(db, turn.orgId, turn.threadRootId).catch(() => null);
+  return mission && mission.agentId === turn.agentId ? mission : null;
+}
+
+/** A mission turn only reads before Start and while a write item is live in the folder. */
+const readsOnly = async (db: Executor, mission: MissionRow) =>
+  mission.status === "proposed" || (await writeItemLive(db, mission.id));
+
 /**
  * A mission run's command policy for a computer brain's turn (`brain.turn`
  * `permissions`): plan before Start, and while a write item of the mission
- * works in its folder (ADR 0044: the item's end-of-item commit takes every
- * change there, so the main session only reads until it ends); work
- * otherwise. Its branches and allowed commands. Null: not a mission run.
+ * is live (ADR 0044: the item's end-of-item commit takes every change
+ * there, so the main session only reads until it ends); work otherwise. Its
+ * branches and allowed commands. Null: not a mission run.
  */
-export async function missionTurnPermissions(
-  db: Executor,
-  turn: { orgId: string; agentId: string; threadRootId: string | null },
-) {
-  if (!turn.threadRootId) return null;
-  const mission = await missionOfThread(db, turn.orgId, turn.threadRootId).catch(() => null);
-  if (!mission || mission.agentId !== turn.agentId) return null;
-  const plan = mission.status === "proposed" || (await writeItemLive(db, mission.id));
+export async function missionTurnPermissions(db: Executor, turn: Turn) {
+  const mission = await turnMission(db, turn);
+  if (!mission) return null;
+  const [plan, allow] = await Promise.all([readsOnly(db, mission), missionAllowRules(db, mission.id)]);
   return {
     mode: plan ? ("plan" as const) : ("work" as const),
     branchPrefix: missionBranchPrefix(mission.id),
-    allow: await missionAllowRules(db, mission.id),
+    allow,
   };
 }

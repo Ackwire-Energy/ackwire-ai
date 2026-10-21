@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { type ServerFrame } from "@agenteschat/adapters";
+import type { ServerFrame } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
+  afterMissionRunEnded,
   closeMission,
   createMission,
   createMissionRunToolSource,
@@ -12,6 +13,7 @@ import {
   missionTurnFor,
   missionTurnPermissions,
   missionWorktreePath,
+  onlyReadsWhileWriting,
   resumeMission,
   retryMissionWorktree,
   START_PROMPT,
@@ -32,7 +34,7 @@ afterEach(async () => {
 
 type Request = Extract<ServerFrame, { type: "request" }>;
 type TaskStart = Extract<Request, { op: "task.start" }>;
-type Worktree = Extract<Request, { op: "mission.worktree" }>;
+type Worktree = Extract<Request, { op: "mission.worktree" }> & { baseSha?: string; deleteBranch?: boolean };
 
 const BASE = "0123456789abcdef0123456789abcdef01234567";
 
@@ -47,6 +49,7 @@ interface EnsurePlan {
 function runner(hub: MachineHub) {
   const started: TaskStart[] = [];
   const worktree: Worktree[] = [];
+  const acks: string[] = [];
   const state = {
     ensure: [] as EnsurePlan[],
     noSlot: false,
@@ -56,6 +59,7 @@ function runner(hub: MachineHub) {
   const socket = {
     send(text: string) {
       const frame = JSON.parse(text) as ServerFrame;
+      if (frame.type === "task.ack") acks.push(frame.taskId);
       if (frame.type !== "request") return;
       setTimeout(() => {
         const ok = (data: unknown) => void reply({ type: "result", id: frame.id, ok: true, data });
@@ -103,6 +107,7 @@ function runner(hub: MachineHub) {
   return {
     started,
     worktree,
+    acks,
     state,
     hello: (token: string) => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
     /** The socket closes and a new one says hello (the computer came back). */
@@ -152,8 +157,26 @@ async function started(ensure: EnsurePlan[] = [], options: { start?: boolean } =
   return { view, r, paired };
 }
 
-/** The main session (a computer brain's run in the home thread) calls `start_task`. */
-async function startTask(args: Record<string, unknown>) {
+/** A turn of the main session (its run in the home thread) ends: write items queued behind it may start. */
+async function endTurn(runId: string) {
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "done", finishedAt: new Date() })
+    .where(eq(schema.agentRuns.id, runId));
+  await afterMissionRunEnded(f.missionDeps, runId);
+}
+
+/**
+ * The main session (a computer brain's run in the home thread) calls
+ * `start_task`; its turn then ends (unless `keepTurn`: the caller ends it).
+ */
+async function startTask(args: Record<string, unknown>, options: { keepTurn?: boolean } = {}) {
+  const out = await startTaskInTurn(args);
+  if (!options.keepTurn) await endTurn(out.runId);
+  return out;
+}
+
+async function startTaskInTurn(args: Record<string, unknown>) {
   const mission = await missionRow();
   const [run] = await f.db
     .insert(schema.agentRuns)
@@ -182,7 +205,8 @@ async function startTask(args: Record<string, unknown>) {
   const { db: _db, ...deps } = f.missionDeps;
   const tool = (await createMissionRunToolSource(deps).tools(ctx)).find((t) => t.name === "start_task");
   if (!tool) throw new Error("no start_task");
-  return tool.execute(args, ctx);
+  const out = await tool.execute(args, ctx);
+  return { ...out, content: String(out.content), runId: run?.id as string };
 }
 
 const taskIdOf = (text: string) => text.match(/task ([0-9a-f-]{36})/)?.[1] as string;
@@ -267,8 +291,11 @@ describe("one worktree per mission (ADR 0044)", () => {
     expect((await missionRow()).worktreeState).toBe("ready");
     const path = missionWorktreePath(view.id);
     const a = await startTask({ title: "Tabs", prompt: "Build the tabs" });
-    expect(a.content).toContain("Started task");
+    // Started during the main session's turn: it waits for the turn to end, then starts by itself.
+    expect(a.content).toContain("Queued task");
+    expect(a.content).toContain("this turn of yours ends");
     const first = r.started.at(-1) as TaskStart;
+    expect(first.taskId).toBe(taskIdOf(a.content));
     expect(first).toMatchObject({
       cwd: path,
       commit: { message: "agentes: Tabs" },
@@ -343,9 +370,9 @@ describe("one worktree per mission (ADR 0044)", () => {
     const mission = await missionRow();
     expect(mission).toMatchObject({ worktreeState: "ready", worktreePath: "app", branch: null, baseSha: null });
     const r = (await startTask({ title: "Photos", prompt: "Resize them" })).content;
-    expect(r).toContain("Started task");
+    expect(r).toContain("Queued task");
     const all = await f.db.select().from(schema.machineTasks);
-    expect(all.at(-1)).toMatchObject({ cwd: "app", mode: "write" });
+    expect(all.at(-1)).toMatchObject({ cwd: "app", mode: "write", status: "running" });
   });
 
   test("the computer back: the folder is checked with its base; a lost branch pauses the mission", async () => {
@@ -478,7 +505,7 @@ describe("one worktree per mission (ADR 0044)", () => {
     await startTask({ title: "Review", prompt: "Review the API", mode: "read" });
     expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "work" });
     const out = await startTask({ title: "Tabs", prompt: "Build the tabs" });
-    expect(out.content).toContain("you only read");
+    expect(out.content).toContain(onlyReadsWhileWriting(mission.executor));
     const item = r.started.at(-1) as TaskStart;
     expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "plan" });
     await r.done(item.taskId);
@@ -490,25 +517,132 @@ describe("one worktree per mission (ADR 0044)", () => {
   test("moving to another computer removes the copy on the old one (the branch stays)", async () => {
     const { view, r } = await started();
     const old = await missionRow();
-    const other = await pairMachine(
-      { db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.chat" },
-      f.owner.id,
-      f.org.id,
-      {
-        name: "Studio",
-        ...RUNNER,
-        exec: true,
-      },
-    );
+    const other = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      name: "Studio",
+      ...RUNNER,
+      exec: true,
+    });
     const r2 = runner(f.machineHub as MachineHub);
     await r2.hello(other.token);
     const out = await setMissionMachine(f.missionDeps, f.owner.id, f.org.id, view.id, { machineId: other.machineId });
+    // Removed in the background: the request doesn't wait for the old computer.
+    await settle();
     expect(r.worktree.at(-1)).toMatchObject({ action: "remove", path: old.worktreePath, branch: old.branch });
     expect(r.worktree.at(-1)?.deleteBranch).toBeUndefined();
     expect(out).not.toHaveProperty("code");
     // The new computer makes its copy from the branch.
     expect(r2.worktree.at(-1)).toMatchObject({ action: "ensure", branch: old.branch });
     expect(await missionRow()).toMatchObject({ machineId: other.machineId, worktreeState: "ready" });
+  });
+
+  test("a write item started mid-turn waits for the turn to end; the main session reads from start_task on", async () => {
+    const { r } = await started();
+    const mission = await missionRow();
+    const turn = { orgId: f.org.id, agentId: f.agent.id, threadRootId: mission.threadRootId };
+    const before = r.started.length;
+    const out = await startTask({ title: "Tabs", prompt: "Build the tabs" }, { keepTurn: true });
+    expect(out.content).toContain("this turn of yours ends");
+    expect(out.content).toContain(onlyReadsWhileWriting(mission.executor));
+    const id = taskIdOf(out.content);
+    expect(r.started).toHaveLength(before);
+    expect(await taskRow(id)).toMatchObject({ status: "queued", mode: "write" });
+    // Queued counts: the next turns only read (#3).
+    expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "plan" });
+    // A turn that began after the item was queued reads only: it doesn't hold the item back.
+    const later = await startTaskInTurn({ title: "Look", prompt: "Look around", mode: "read" });
+    // The first turn ends: the item starts, though the later turn still runs.
+    await endTurn(out.runId);
+    expect(r.started.at(-1)?.taskId).toBe(id);
+    expect((await taskRow(id))?.status).toBe("running");
+    await endTurn(later.runId);
+    // A queued write item with a start request (a resumed one) counts too.
+    await f.db
+      .update(schema.machineTasks)
+      .set({ status: "queued", startRequest: { x: 1 } as never })
+      .where(eq(schema.machineTasks.id, id));
+    expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "plan" });
+  });
+
+  test("moving is refused while a task is live; away, the old copy is left there", async () => {
+    const { view, r, paired } = await started();
+    await startTask({ title: "Tabs", prompt: "Build the tabs" });
+    const item = r.started.at(-1) as TaskStart;
+    const other = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      name: "Studio",
+      ...RUNNER,
+      exec: true,
+    });
+    const r2 = runner(f.machineHub as MachineHub);
+    await r2.hello(other.token);
+    await expect(
+      setMissionMachine(f.missionDeps, f.owner.id, f.org.id, view.id, { machineId: other.machineId }),
+    ).rejects.toMatchObject({ code: "mission.tasks_live" });
+    expect(await missionRow()).toMatchObject({ machineId: paired.machineId });
+    await r.done(item.taskId);
+    await drainOutbox(f.db, f.handlers);
+    // The old computer goes away: the move goes on, its copy stays there (the branch has the work).
+    await f.db.update(schema.machines).set({ online: false }).where(eq(schema.machines.id, paired.machineId));
+    const hub = f.machineHub as MachineHub;
+    const status = hub.status.bind(hub);
+    hub.status = async (id: string) => {
+      const s = await status(id);
+      return s && id === paired.machineId ? { ...s, online: false } : s;
+    };
+    const out = await setMissionMachine(f.missionDeps, f.owner.id, f.org.id, view.id, { machineId: other.machineId });
+    expect(out).toMatchObject({ code: "mission.old_copy_left" });
+    expect(r.worktree.some((w) => w.action === "remove")).toBe(false);
+    const events = await f.db.select().from(schema.missionEvents).where(eq(schema.missionEvents.missionId, view.id));
+    expect(events.some((e) => e.kind === "worktree_left_behind")).toBe(true);
+  });
+
+  test("the computer back: an active mission with no folder yet gets one, then its queued items start", async () => {
+    const { r, paired } = await started();
+    const id = taskIdOf((await startTask({ title: "Tabs", prompt: "Build the tabs" }, { keepTurn: true })).content);
+    // As if Start happened while the computer was away: no folder yet.
+    await f.db
+      .update(schema.missions)
+      .set({ worktreeState: "none", branch: null, worktreePath: null, baseSha: null, baseBranch: null })
+      .where(eq(schema.missions.id, (await missionRow()).id));
+    await f.db.update(schema.agentRuns).set({ status: "done" });
+    const before = r.worktree.length;
+    await r.reconnect(paired.token);
+    await settle();
+    expect(r.worktree.slice(before).some((w) => w.action === "ensure")).toBe(true);
+    expect((await missionRow()).worktreeState).toBe("ready");
+    expect(r.started.at(-1)?.taskId).toBe(id);
+  });
+
+  test("an interrupted item behind a failed folder: the notice says it resumes once the project is ready", async () => {
+    const { r } = await started();
+    await startTask({ title: "Tabs", prompt: "Build the tabs" });
+    const item = r.started.at(-1) as TaskStart;
+    await f.db
+      .update(schema.missions)
+      .set({ worktreeState: "failed", worktreeFailReason: "setup" })
+      .where(eq(schema.missions.id, (await missionRow()).id));
+    await r.done(item.taskId, { interrupted: true, session: item.session });
+    await drainOutbox(f.db, f.handlers);
+    await settle();
+    const codes = (
+      await f.db
+        .select()
+        .from(schema.messages)
+        .where(eq(schema.messages.threadId, (await missionRow()).threadRootId))
+    ).map((m) => m.meta.bodyCode);
+    expect(codes).toContain("machine_task_resume_waits");
+    expect(codes).not.toContain("machine_task_resumed");
+    const resumed = (await f.db.select().from(schema.machineTasks)).find((t) => t.resumedFromId === item.taskId);
+    expect(resumed).toMatchObject({ status: "queued" });
+  });
+
+  test("an interrupted item's ack never waits for the queue walk", async () => {
+    const { r } = await started();
+    await startTask({ title: "Tabs", prompt: "Build the tabs" });
+    const item = r.started.at(-1) as TaskStart;
+    // A queue walk that never ends.
+    (f.machineHub as MachineHub).setMissionHooks({ queue: () => new Promise(() => undefined) });
+    await r.done(item.taskId, { interrupted: true, session: item.session });
+    expect(r.acks).toContain(item.taskId);
   });
 
   test("a runner older than protocol 14 can't start a mission", async () => {

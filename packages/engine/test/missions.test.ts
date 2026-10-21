@@ -3,6 +3,7 @@ import { MACHINE_PROTOCOL_VERSION, PERMISSION_TIMEOUT_MESSAGE, type ServerFrame 
 import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   addChannelMember,
+  afterMissionRunEnded,
   approveProvisionalDecisions,
   buildRunContext,
   chooseDecision,
@@ -259,7 +260,14 @@ async function mainCall(tool: string, args: Record<string, unknown>) {
   const { db: _db, ...deps } = f.missionDeps;
   const found = (await createMissionRunToolSource(deps).tools(ctx)).find((t) => t.name === tool);
   if (!found) throw new Error(`the main session has no ${tool}`);
-  return found.execute(args, ctx);
+  const out = await found.execute(args, ctx);
+  // The turn ends: write items queued behind it start (ADR 0044).
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "done" })
+    .where(eq(schema.agentRuns.id, run?.id as string));
+  await afterMissionRunEnded(f.missionDeps, run?.id as string);
+  return out;
 }
 const done = (out: { content: string; isError?: boolean }) => {
   if (out.isError) throw new Error(`refused: ${out.content}`);
@@ -592,9 +600,7 @@ describe("missions (ADR 0029)", () => {
     expect(item.branch).toBeUndefined();
     expect(item.session).not.toBe(plan.session);
     // Only the main session starts tasks; an item session is told so.
-    expect(ok(await runner.mcp(plan.taskId, "start_task", { title: "x", prompt: "y" }))).toContain(
-      "main session",
-    );
+    expect(ok(await runner.mcp(plan.taskId, "start_task", { title: "x", prompt: "y" }))).toContain("main session");
     expect(runner.started.at(-1)).toBe(item);
     await pauseMission(md(), f.owner.id, f.org.id, view.id);
     const refused = await mainCall("start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" });

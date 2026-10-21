@@ -265,7 +265,7 @@ export function buildEngine(o: EngineOptions) {
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
-  /** A mission run's command policy (plan before Start and while a write item works, work otherwise; ADR 0044). */
+  /** A mission run's command policy (plan before Start and while a write item is live, work otherwise; ADR 0044). */
   const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) =>
     (await missionTurnPermissions(db, turn)) ?? undefined;
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
@@ -299,7 +299,6 @@ export function buildEngine(o: EngineOptions) {
         mcp: async () => ({ token: setup.mcpToken() }),
         agent: agentScope,
         prepare: prepareCode,
-        permissions: missionPermissions,
       }),
   };
   const handlers = createJobHandlers({

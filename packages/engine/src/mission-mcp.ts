@@ -16,7 +16,13 @@ import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./
 import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
 import { completeMission } from "./mission-delivery";
 import { onMachineOnline } from "./mission-sync";
-import { startQueuedMissionTasks } from "./mission-worktree";
+import {
+  ensureMissionWorktree,
+  missionCwd,
+  onlyReadsWhileWriting,
+  startMissionItem,
+  startQueuedMissionTasks,
+} from "./mission-worktree";
 import {
   askDecision,
   checkMissionToolRate,
@@ -33,7 +39,6 @@ import {
   requestReview,
   updatePlan,
 } from "./missions";
-import { ensureMissionWorktree, missionCwd, startMissionItem } from "./mission-worktree";
 import { missionBrain } from "./missions-engine";
 import { resumeRunsWaitingForMachine } from "./run-resume";
 import { type BridgeIdentity, verifyRunToolToken } from "./run-tool-tokens";
@@ -582,11 +587,14 @@ async function run(
         const when =
           waitsFor === "write"
             ? "the write item ahead of it ends (write items run one at a time)"
-            : "the computer has a free slot (or is back)";
-        return `Queued task ${row.id} ("${title}", ${mode}): it starts by itself when ${when}. You'll be told when it ends; don't wait for it.`;
+            : waitsFor === "turn"
+              ? "this turn of yours ends (an item that writes never starts while you may be writing in the folder)"
+              : "the computer has a free slot (or is back)";
+        const readOnly = mode === "write" ? ` From now until it ends, ${onlyReadsWhileWriting(mission.executor)}.` : "";
+        return `Queued task ${row.id} ("${title}", ${mode}) in ${where}: it starts by itself when ${when}.${readOnly} You'll be told when it ends; don't wait for it.`;
       }
       // While a write item works in the folder, the main session only reads (ADR 0044: its commit takes every change).
-      const readOnly = mode === "write" ? " Until it ends you only read: your turns are read-only meanwhile." : "";
+      const readOnly = mode === "write" ? ` Until it ends, ${onlyReadsWhileWriting(mission.executor)}.` : "";
       return `Started task ${row.id} ("${title}", ${mode}) in ${where}.${readOnly} You'll be told when it ends; don't wait for it.`;
     }
     default:

@@ -1094,6 +1094,7 @@ export function MissionPlanChangeLine({ message }: { message: Message }) {
 const NOTICE_ICON: Record<string, IconName> = {
   machine_offline: "computer",
   machine_task_resumed: "refresh",
+  machine_task_resume_waits: "waiting",
   machine_task_done: "check",
   machine_task_failed: "alert",
   machine_task_canceled: "stop",
@@ -1412,7 +1413,7 @@ export function MissionSetupCard({ setup, threadId }: { setup: MissionSetupMeta;
       <h3 className="mi-setup__title">{title}</h3>
       {lost && <p className="mi-hint">{t("missions.setup.lostText", { branch: setup.branch ?? m?.branch ?? "" })}</p>}
       {tail && (
-        <pre className="mi-cmd__line mi-setup__error" aria-label={t("missions.setup.errorLabel")}>
+        <pre className="mi-cmd__line mi-setup__error" role="log" aria-label={t("missions.setup.errorLabel")}>
           <code>{tail}</code>
         </pre>
       )}

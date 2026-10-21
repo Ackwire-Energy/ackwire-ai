@@ -31,6 +31,8 @@ import type { Judge } from "./judge";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
   formatDuration,
+  isLiveTaskRow,
+  liveTaskWhere,
   type MachineTaskMode,
   type MachineTaskRow,
   publishTaskEvent,
@@ -44,15 +46,9 @@ import { insertMessage, type Message, messageView } from "./messages";
 import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import {
-  cancelMainRuns,
-  deliverMissionInbox,
-  type MissionEngine,
-  type TellOptions,
-  tellMainSession,
-} from "./missions-engine";
-import {
   closeMissionWorktree,
   ensureMissionWorktree,
+  hasLiveTasks,
   leaveMachineWorktree,
   missionCwd,
   resumeFailedWorktree,
@@ -63,6 +59,13 @@ import {
   worktreeFailReasonOf,
   worktreeStateOf,
 } from "./mission-worktree";
+import {
+  cancelMainRuns,
+  deliverMissionInbox,
+  type MissionEngine,
+  type TellOptions,
+  tellMainSession,
+} from "./missions-engine";
 import { notifyMissionEnded } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -1242,8 +1245,6 @@ export async function homeThreadOf(
 
 // ── Sessions on the machine ──────────────────────────────────────────────────
 
-const ACTIVE_TASK: MachineTaskRow["status"][] = ["queued", "running", "interrupted"];
-
 /** Starts (or resumes) one item session of the mission as a machine task (the main session is a run). */
 export async function startSessionTask(
   deps: MissionDeps,
@@ -1332,9 +1333,8 @@ const lastMode = (t: MachineTaskRow | null) => {
   return mode === "write" || mode === "read" ? mode : null;
 };
 
-const isLive = (t: MachineTaskRow | null) => Boolean(t && ACTIVE_TASK.includes(t.status) && !t.endedAt);
 /** Whether a session's latest task still holds it (queued, running, or interrupted and may come back). */
-export const isLiveTask = isLive;
+const isLive = isLiveTaskRow;
 
 export async function queueForSession(db: Executor, mission: MissionRow, entry: schema.MissionInboxEntry) {
   await db
@@ -1707,13 +1707,7 @@ async function cancelMissionTasks(deps: MissionDeps, mission: MissionRow, actorI
   const rows = await deps.db
     .select()
     .from(machineTasks)
-    .where(
-      and(
-        eq(machineTasks.missionId, mission.id),
-        inArray(machineTasks.status, ACTIVE_TASK),
-        isNull(machineTasks.endedAt),
-      ),
-    );
+    .where(and(eq(machineTasks.missionId, mission.id), liveTaskWhere()));
   const agent = await getAgentCached(deps.db, mission.orgId, mission.agentId);
   let canceled = 0;
   for (const row of rows) {
@@ -2326,7 +2320,14 @@ export async function setMissionMachine(
     );
   }
   const moved = machine.id !== mission.machineId;
-  // The old computer's copy goes away (the branch stays); offline, it stays there and the person is told.
+  // Items (or setup) still running or queued there would work in a copy that is going away: stopped first.
+  if (moved && (await hasLiveTasks(deps.db, mission.id))) {
+    throw new ConflictError(
+      "The mission still has items running or waiting on its computer: stop them first",
+      "mission.tasks_live",
+    );
+  }
+  // The old computer's copy goes away in the background (the branch stays); away, it stays there and the person is told.
   const leftOn = moved && mission.status !== "proposed" ? await leaveMachineWorktree(deps, mission) : null;
   const [row] = await deps.db
     .update(missions)
@@ -3120,13 +3121,7 @@ export async function missionSummary(deps: MissionDeps, userId: string, orgId: s
     deps.db
       .select()
       .from(machineTasks)
-      .where(
-        and(
-          eq(machineTasks.missionId, mission.id),
-          inArray(machineTasks.status, ACTIVE_TASK),
-          isNull(machineTasks.endedAt),
-        ),
-      )
+      .where(and(eq(machineTasks.missionId, mission.id), liveTaskWhere()))
       .orderBy(desc(machineTasks.createdAt))
       .limit(10),
     deps.db

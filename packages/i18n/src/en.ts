@@ -2958,6 +2958,7 @@ export const en: Translations = {
       machine_offline_one: "{{computer}} went offline: “{{title}}” stopped until it's back. Nothing is lost.",
       machine_offline_other: "{{computer}} went offline: {{count}} tasks stopped until it's back. Nothing is lost.",
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped",
+      machine_task_resume_waits: "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready",
       machine_task_done: "“{{title}}” finished in {{span}} on {{computer}}",
       machine_task_failed: "“{{title}}” failed after {{span}} on {{computer}}",
       machine_task_canceled: "“{{title}}” was stopped on {{computer}}",
@@ -6746,6 +6747,8 @@ export const en: Translations = {
       machine_task_canceled: "“{{title}}” was stopped on {{computer}}.",
       machine_task_interrupted: "“{{title}}” was interrupted on {{computer}}.",
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped.",
+      machine_task_resume_waits:
+        "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready.",
       machine_offline: "{{computer}} went offline.",
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",

@@ -352,7 +352,13 @@ test("missions API: the copy of the project (ADR 0044) — DTO fields, setup fai
         }
         if (frame.op === "task.start") {
           started.push(frame);
-          return ok({ taskId: frame.taskId, pid: 7, startedAt: new Date().toISOString(), cwd: frame.cwd ?? "", command: "x" });
+          return ok({
+            taskId: frame.taskId,
+            pid: 7,
+            startedAt: new Date().toISOString(),
+            cwd: frame.cwd ?? "",
+            command: "x",
+          });
         }
         if (frame.op === "read") return ok({ base64: null, size: 0 });
         return ok({ size: 0 });
@@ -371,6 +377,11 @@ test("missions API: the copy of the project (ADR 0044) — DTO fields, setup fai
   expect(String(startRes.branch)).toMatch(/^agentes\/[0-9a-f]{8}\/mobile-app$/);
   const setup = started[0];
   expect(setup).toMatchObject({ executor: "shell", command: "bun install" });
+  // Moving it while its setup runs there: refused until the tasks stop.
+  const studio = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "Studio" });
+  const move = await api(`/missions/${created.id}/machine`, { method: "PUT", json: { machineId: studio.machineId } });
+  expect(move.status).toBe(409);
+  expect(((await move.json()) as { error: { code: string } }).error.code).toBe("mission.tasks_live");
 
   // Retry before anything failed: refused.
   expect((await api(`/missions/${created.id}/worktree/retry`, { json: {} })).status).toBe(409);
@@ -386,11 +397,16 @@ test("missions API: the copy of the project (ADR 0044) — DTO fields, setup fai
 
   const retried = await api(`/missions/${created.id}/worktree/retry`, { json: {} });
   expect(retried.status).toBe(200);
-  expect((await retried.json()) as Record<string, unknown>).toMatchObject({ status: "active", worktreeState: "preparing" });
+  expect((await retried.json()) as Record<string, unknown>).toMatchObject({
+    status: "active",
+    worktreeState: "preparing",
+  });
   expect(started).toHaveLength(2);
   await reply({ type: "task.done", taskId: started[1]?.taskId, exitCode: 0, seconds: 3 });
   await t.drain();
-  expect(((await (await api(`/missions/${created.id}`)).json()) as Record<string, unknown>).worktreeState).toBe("ready");
+  expect(((await (await api(`/missions/${created.id}`)).json()) as Record<string, unknown>).worktreeState).toBe(
+    "ready",
+  );
 
   const closed = await api(`/missions/${created.id}/close`, { json: { outcome: "canceled", deleteBranch: true } });
   expect(closed.status).toBe(200);

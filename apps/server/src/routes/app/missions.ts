@@ -822,7 +822,7 @@ export function missionRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "Its owner points it at a computer they paired (new sessions start from the mission files). The old computer's copy is removed; when it is away, `code: mission.old_copy_left` and `oldComputer` say the copy stays there",
+        "Its owner points it at a computer they paired (new sessions start from the mission files). Refused (409 `mission.tasks_live`) while any of its tasks is running or queued: stop them first. The old computer's copy is removed in the background; when it is away, `code: mission.old_copy_left` and `oldComputer` say the copy stays there",
       request: {
         params: MissionParams,
         body: body(z.object({ machineId: z.uuid(), repoDir: z.string().max(300).optional() })),

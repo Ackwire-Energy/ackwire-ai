@@ -4,6 +4,16 @@ import { getAgentCached } from "./agents";
 import { formatDuration, getTask, isAgentTask, type MachineTaskRow, taskEndNotice, taskSeconds } from "./machine-tasks";
 import { getMachineById } from "./machines";
 import {
+  ensureMissionWorktree,
+  missionCwd,
+  missionFilesDir,
+  onSetupEnded,
+  removeClosedWorktree,
+  removeLeftWorktrees,
+  shortSha,
+  startQueuedMissionTasks,
+} from "./mission-worktree";
+import {
   deliverInbox,
   getMissionRow,
   latestPlan,
@@ -18,16 +28,6 @@ import {
   scheduleDoneCheck,
   tellSession,
 } from "./missions";
-import {
-  ensureMissionWorktree,
-  missionCwd,
-  missionFilesDir,
-  onSetupEnded,
-  removeClosedWorktree,
-  removeLeftWorktrees,
-  shortSha,
-  startQueuedMissionTasks,
-} from "./mission-worktree";
 import { tellMainSession } from "./missions-engine";
 
 const { missions, missionFiles, missionDecisions, missionReviews, missionParticipants, messages, users } = schema;
@@ -430,7 +430,12 @@ export async function onMachineOnline(deps: MissionDeps, machineId: string) {
   for (const listed of await missionsOnMachine(deps.db, machineId)) {
     let mission: MissionRow = listed;
     const working = mission.status === "active" || mission.status === "awaiting_close";
-    if (working && (mission.worktreeState === "preparing" || (mission.worktreeState === "ready" && mission.branch))) {
+    // `none`: a mission that has no folder yet (started while the computer was away): made now, so its queued items can start.
+    const check =
+      mission.worktreeState === "none" ||
+      mission.worktreeState === "preparing" ||
+      (mission.worktreeState === "ready" && mission.branch);
+    if (working && check) {
       // The queue is walked once below, for every mission of the machine.
       mission = (await ensureMissionWorktree(deps, mission.id, { startQueue: false }).catch(() => null)) ?? mission;
     }

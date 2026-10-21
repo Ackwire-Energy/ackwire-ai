@@ -2969,6 +2969,8 @@ export const ptBR = {
       machine_offline_one: "{{computer}} ficou offline: “{{title}}” parou até ele voltar. Nada se perde.",
       machine_offline_other: "{{computer}} ficou offline: {{count}} tarefas pararam até ele voltar. Nada se perde.",
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou",
+      machine_task_resume_waits:
+        "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto",
       machine_task_done: "“{{title}}” terminou em {{span}} no {{computer}}",
       machine_task_failed: "“{{title}}” falhou depois de {{span}} no {{computer}}",
       machine_task_canceled: "“{{title}}” foi parada no {{computer}}",
@@ -6765,6 +6767,8 @@ export const ptBR = {
       machine_task_canceled: "“{{title}}” foi parada no {{computer}}.",
       machine_task_interrupted: "“{{title}}” foi interrompida no {{computer}}.",
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou.",
+      machine_task_resume_waits:
+        "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto.",
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora; respondo quando ele voltar.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",

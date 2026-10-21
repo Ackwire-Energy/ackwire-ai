@@ -545,7 +545,7 @@ export interface BrainTurnRequest {
   keepAlive?: boolean;
   /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`). */
   personalMcp?: boolean;
-  /** Command policy (as missions): `work` (default) edits and asks a person for the rest; `plan` reads only (Codex: its read-only sandbox, protocol 14). */
+  /** Command policy (as missions): `work` (default) edits and asks a person for the rest; `plan` reads only. */
   permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
   /** Protocol 13: the account folder to run in (`accounts/<kind>/<id>`); absent: the machine's own sign-in. */
   account?: string;

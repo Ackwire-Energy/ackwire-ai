@@ -95,8 +95,6 @@ export interface CodexBrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks. */
   effort?: BrainEffort;
-  /** Protocol 14: `plan` runs the turn in Codex's read-only sandbox (a mission while an item writes, ADR 0044). */
-  permissions?: { mode?: "plan" | "work" };
 }
 
 /** Codex's `model_reasoning_effort` for a brain effort (it has no `xhigh` or `max`). */
@@ -213,8 +211,6 @@ export function codexTurnArgs(input: {
   writableRoots?: string[];
   /** Protocol 13: `-c model_reasoning_effort` (anything else is left out). */
   effort?: BrainEffort;
-  /** Protocol 14: no writes at all (`--sandbox read-only`, no writable roots). */
-  readOnly?: boolean;
 }): string[] {
   const instructions = input.instructions?.trim();
   return [
@@ -224,14 +220,10 @@ export function codexTurnArgs(input: {
     "-C",
     input.cwd,
     "--sandbox",
-    ...(input.readOnly
-      ? ["read-only"]
-      : [
-          "workspace-write",
-          "-c",
-          "sandbox_workspace_write.network_access=true",
-          ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
-        ]),
+    "workspace-write",
+    "-c",
+    "sandbox_workspace_write.network_access=true",
+    ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
     ...(instructions && !input.thread ? ["-c", `developer_instructions=${JSON.stringify(instructions)}`] : []),
     ...(input.mcp ? codexBridgeOverrides({ runId: input.runId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
     ...(isBrainEffort(input.effort)
@@ -449,7 +441,6 @@ export async function runCodexTurn(
     /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
     account?: { id: string; home: string };
     effort?: BrainEffort;
-    readOnly?: boolean;
   },
   opts: CodexTurnOptions,
 ): Promise<void> {
@@ -479,7 +470,6 @@ export async function runCodexTurn(
     mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
     ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
-    ...(input.readOnly ? { readOnly: true } : {}),
   });
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -658,7 +648,6 @@ export async function handleCodexBrainTurn(
       ...(writableRoots.length ? { writableRoots } : {}),
       ...(account ? { account } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
-      ...(req.permissions?.mode === "plan" ? { readOnly: true } : {}),
     },
     {
       threads,
