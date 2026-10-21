@@ -358,6 +358,12 @@ export const ptBR = {
       cloudReady: "Computador na nuvem ligado. Fica pronto quando o primeiro agente precisar.",
       mine: "Este computador ou um servidor",
       mineDesc: "Usa o Claude Code que você já tem, sem chave. O app agentes conecta para fora, sem abrir porta.",
+      thisMac: "Este Mac",
+      thisMacDesc: "Os agentes trabalham aqui, só nas pastas que você liberar. Conecta com um clique.",
+      thisMacConnecting: "Conectando este Mac…",
+      thisMacConnected: "{{name}} conectado. Os agentes escolhidos vão trabalhar neste Mac.",
+      thisMacFolders: "Escolher pastas",
+      otherComputer: "Conectar outro computador",
       connected: "{{name}} conectado · {{os}}. Os agentes escolhidos vão usar este computador.",
     },
     team: {

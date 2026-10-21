@@ -351,6 +351,12 @@ export const en: Translations = {
       mine: "This computer or a server",
       mineDesc:
         "Uses the Claude Code you already have, no key needed. The agentes app connects outward, no open ports.",
+      thisMac: "This Mac",
+      thisMacDesc: "Agents work here, only in the folders you allow. Connects in one click.",
+      thisMacConnecting: "Connecting this Mac…",
+      thisMacConnected: "{{name}} connected. The chosen agents will work on this Mac.",
+      thisMacFolders: "Choose folders",
+      otherComputer: "Connect another computer",
       connected: "{{name}} connected · {{os}}. The chosen agents will use this computer.",
     },
     team: {

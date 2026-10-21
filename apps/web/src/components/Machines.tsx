@@ -162,9 +162,10 @@ export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
  * the latest release (version, size, SHA-256), the first-run steps (the app
  * is signed and notarized), and the terminal installer for servers and Linux. The
  * computer shows a code and the person confirms it on `/conectar`. In the app
- * itself (D79): "Usar este Mac" in one click instead of the download.
+ * itself (D79): "Usar este Mac" in one click instead of the download, unless
+ * `download` (connecting another computer from the app).
  */
-export function ConnectComputer({ orgId }: { orgId: string }) {
+export function ConnectComputer({ orgId, download = false }: { orgId: string; download?: boolean }) {
   const { t, i18n } = useTranslation();
   const copy = useCopy();
   const latest = useDesktopLatest(DESKTOP_TARGET.target, DESKTOP_TARGET.arch);
@@ -172,7 +173,7 @@ export function ConnectComputer({ orgId }: { orgId: string }) {
   const otherId = useId();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const release = latest.data ?? null;
-  const app = inDesktopApp();
+  const app = inDesktopApp() && !download;
   return (
     <div className="machine-connect">
       <p className="small muted" style={{ margin: 0 }}>
