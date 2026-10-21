@@ -3,10 +3,13 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { openPalette } from "./CommandMenu";
+import { useMediaQuery } from "./NavDrawer";
+import { TABLET_QUERY, useSidebarCollapsed } from "./Sidebar";
 
 /**
  * The Mac app's title bar (D79, telas/AppDesktop.html B): room for the
- * window's own buttons, back and forward, and ⌘K in the middle. Anywhere
+ * window's own buttons, the sidebar toggle, back and forward, and ⌘K in the
+ * middle (the sidebar's own ⌘K row goes, desktop.css). Anywhere
  * that isn't a button drags the window (`data-tauri-drag-region`, the only
  * thing the window may ask of the app). In the workspace only; elsewhere
  * `DesktopDragStrip` keeps the top draggable.
@@ -14,6 +17,9 @@ import { openPalette } from "./CommandMenu";
 export function DesktopTitleBar() {
   const { t } = useTranslation();
   const router = useRouter();
+  const [collapsed, toggleSidebar] = useSidebarCollapsed();
+  // Tablet widths always show the icon rail: nothing to toggle.
+  const tablet = useMediaQuery(TABLET_QUERY);
 
   // ⌘[ and ⌘], as in every Mac app.
   useEffect(() => {
@@ -31,6 +37,18 @@ export function DesktopTitleBar() {
   return (
     <header className="titlebar" data-tauri-drag-region="deep">
       <nav className="titlebar__nav">
+        {!tablet && (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="sidebar"
+            aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+            title={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+            aria-expanded={!collapsed}
+            onClick={toggleSidebar}
+          />
+        )}
         <Button
           variant="ghost"
           size="sm"

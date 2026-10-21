@@ -34,7 +34,7 @@
   height: 28px;
   margin: 0 auto;
   /* Centred on the window, not on what's left after the buttons. */
-  transform: translateX(calc((var(--titlebar-lights) + 64px) / -2));
+  transform: translateX(calc((var(--titlebar-lights) + 96px) / -2));
   padding: 0 8px 0 10px;
   border: 0;
   border-radius: var(--control-r-md);
@@ -78,17 +78,14 @@
   z-index: 50;
 }
 
-/* The workspace sits under the bar; ⌘K lives in the bar, so the sidebar's copy goes. */
+/* The workspace sits under the bar; ⌘K and the sidebar toggle live in the bar, so the sidebar's row goes. */
 html[data-desktop] .shell {
   height: calc(100vh - var(--titlebar-h));
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
   height: calc(100dvh - var(--titlebar-h));
 }
-html[data-desktop] .sidebar__jump {
-  display: none;
-}
 html[data-desktop] .sidebar__jump-row {
-  justify-content: flex-end;
+  display: none;
 }
 /* Sign-in: the logo clears the window's buttons. */
 html[data-desktop] .auth__logo {
