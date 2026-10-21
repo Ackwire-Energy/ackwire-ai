@@ -82,6 +82,13 @@ test("command line: first turn with instructions, resume by id without them, opt
   expect(resumed.some((a) => a.startsWith("developer_instructions="))).toBe(false);
 });
 
+test("command line: a read-only turn (a mission while an item writes) gets Codex's read-only sandbox", () => {
+  const args = codexTurnArgs({ cwd: "/w/app", lastFile: "/l.txt", runId: RUN, readOnly: true, writableRoots: ["/w"] });
+  expect(args.slice(5, 7)).toEqual(["--sandbox", "read-only"]);
+  expect(args).not.toContain("workspace-write");
+  expect(args.some((a) => a.includes("network_access") || a.includes("writable_roots"))).toBe(false);
+});
+
 test("MCP bridge overrides: stdio by run with the token through env_vars, or HTTP with a bearer from the env", () => {
   const key = `mcp_servers.${CODEX_MCP_SERVER}`;
   expect(codexBridgeOverrides({ runId: RUN, command: ["/usr/bin/bun", "/r/runner.js"] })).toEqual([

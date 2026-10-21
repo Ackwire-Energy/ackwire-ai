@@ -103,6 +103,18 @@ test("a first turn sends the context and the conversation; events pass through; 
   expect(l.sent[0]?.prompt).toBe(
     "The conversation so far:\n\nUser: hi\n\nYou: hello\n\nNow answer this:\n\nrun the tests",
   );
+  expect(l.sent[0]).not.toHaveProperty("permissions");
+});
+
+test("a mission's read-only turn tells the runner (plan: Codex's read-only sandbox)", async () => {
+  const l = link({ events: [{ type: "done", text: "ok", session: { id: "x" } }] });
+  const brain = new CodexBrain({
+    link: l,
+    mcp: async () => ({ token: "tok" }),
+    permissions: async () => ({ mode: "plan", branchPrefix: "agentes/x/" }),
+  });
+  await collect(brain.run(turn(), io()));
+  expect(l.sent[0]?.permissions).toEqual({ mode: "plan" });
 });
 
 test("a resumed turn sends only what came after the brain's last reply", () => {

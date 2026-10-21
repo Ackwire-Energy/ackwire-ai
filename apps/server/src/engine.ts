@@ -299,6 +299,7 @@ export function buildEngine(o: EngineOptions) {
         mcp: async () => ({ token: setup.mcpToken() }),
         agent: agentScope,
         prepare: prepareCode,
+        permissions: missionPermissions,
       }),
   };
   const handlers = createJobHandlers({

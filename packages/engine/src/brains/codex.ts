@@ -61,6 +61,8 @@ export interface CodexBrainDeps {
   agent?(turn: BrainTurn): Promise<AgentScope | undefined>;
   /** Before a chat turn: the agent's checkouts updated, where it starts and the "# Your code" block (`prepareAgentCode`). */
   prepare?(turn: BrainTurn, signal: AbortSignal): Promise<{ cwd: string; prompt: string } | null>;
+  /** Command policy for the turn: `plan` is Codex's read-only sandbox (missions, ADR 0044). */
+  permissions?(turn: BrainTurn): Promise<BrainTurnRequest["permissions"] | undefined>;
 }
 
 /** `codex-cli 0.163.0` is new enough (`CODEX_MIN_VERSION`). */
@@ -170,10 +172,11 @@ export class CodexBrain implements Brain {
       return;
     }
 
-    const [mcp, agent, code] = await Promise.all([
+    const [mcp, agent, code, permissions] = await Promise.all([
       this.deps.mcp(turn),
       this.deps.agent?.(turn),
       this.deps.prepare?.(turn, io.signal).catch(() => null),
+      this.deps.permissions?.(turn),
     ]);
     const request: BrainTurnRequest & { agent?: AgentScope } = {
       runId: turn.runId,
@@ -185,6 +188,7 @@ export class CodexBrain implements Brain {
       prompt: computerPrompt(turn),
       mcp,
       ...(agent ? { agent } : {}),
+      ...(permissions?.mode ? { permissions: { mode: permissions.mode } } : {}),
       ...accountFields(status.protocol, turn),
     };
 
