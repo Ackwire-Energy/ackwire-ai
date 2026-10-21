@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 13;
+export const MACHINE_PROTOCOL_VERSION = 14;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -107,6 +107,15 @@ export const BROWSER_PROTOCOL = 12;
  * The server never sends these to an older runner.
  */
 export const ACCOUNTS_PROTOCOL = 13;
+/**
+ * From this protocol on (ADR 0044): a mission has one worktree and one
+ * branch (`mission.worktree`: `ensure` creates or checks it and copies the
+ * files git ignores, `remove` takes the folder away). A task can end in a
+ * commit (`TaskStart.commit`, `TaskDone.startSha` / `endSha`) and can check
+ * how far the mission's base moved (`TaskStart.baseCheck`). The server never
+ * starts a mission on an older runner.
+ */
+export const MISSION_WORKTREE_PROTOCOL = 14;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -281,6 +290,49 @@ export const GIT_SYNC_LIMITS = {
   message: 1000,
 } as const;
 
+/**
+ * `mission.worktree` (protocol 14, ADR 0044). Paths are relative to the
+ * agent's folder.
+ *
+ * `ensure`: makes sure `path` is a worktree of the repository at `repo` on
+ * `branch`. When the folder is missing and the branch exists, it is added
+ * again from the branch (after `git worktree prune`); when both are missing
+ * and `baseSha` is absent, the branch is created from `repo`'s checked-out
+ * branch (when `baseSha` is given and the branch is gone, the answer is
+ * `branch_missing`: the work is lost and the server must say so). A new
+ * folder gets the files git ignores copied from `repo` (`agentes.json`
+ * `copy`, default: untracked `.env*` at the root) and its `.agentes/` stays
+ * out of git. Loose changes in an existing folder are left as they are.
+ *
+ * `remove`: `git worktree remove --force` on `path`, then `git branch -D`
+ * when `deleteBranch` is set. A folder that is already gone is not an error.
+ */
+export type MissionWorktreeRequest =
+  | { action: "ensure"; repo: string; path: string; branch: string; baseSha?: string }
+  | { action: "remove"; repo: string; path: string; branch: string; deleteBranch?: boolean };
+
+/** `mission.worktree` `ensure` answer. */
+export interface MissionWorktreeEnsured {
+  path: string;
+  branch: string;
+  /** The branch the mission started from (`repo`'s checked-out branch when it was created). */
+  baseBranch: string;
+  baseSha: string;
+  /** The folder was (re)made now: the server runs `setupCommand` before any item. */
+  created: boolean;
+  /** Whether the folder has loose changes (after a crash mid-item). */
+  dirty: boolean;
+  /**
+   * What prepares the folder: `agentes.json` `setup`, else the install for
+   * the root lockfile (`bun install`, `pnpm install --frozen-lockfile`,
+   * `npm ci`, `yarn install --frozen-lockfile`); null when there is nothing
+   * to run. Only meaningful when `created`.
+   */
+  setupCommand: string | null;
+  /** Files copied from `repo`, relative to the folder. */
+  copied: string[];
+}
+
 /** `git.sync` (protocol 11): clone or update an agent's checkouts through our proxy. */
 export interface GitSyncRequest {
   /** Our proxy for the org's GitHub connection (`…/api/git/{orgId}/{connectionId}/`) and this agent's credential there. */
@@ -404,6 +456,15 @@ export interface TaskStart {
      */
     mcpToken?: string;
   };
+  /**
+   * Protocol 14 (ADR 0044), for a task in a git folder: record `HEAD` when it
+   * starts and, when it ends (any way: done, failed, canceled), `git add -A`
+   * and commit what changed with this message (nothing when the tree is
+   * clean). `TaskDone` then carries `startSha` and `endSha`.
+   */
+  commit?: { message: string };
+  /** Protocol 14: answer how many commits `branch` has beyond `sha` (`task.start` `baseBehind`). */
+  baseCheck?: { branch: string; sha: string };
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -528,6 +589,9 @@ export interface TaskDone {
    * task's end notice lists them ("Liberar e repetir").
    */
   denials?: TaskDenial[];
+  /** Protocol 14, with `TaskStart.commit`: `HEAD` when the task started and after its commit (equal: nothing changed). */
+  startSha?: string;
+  endSha?: string;
 }
 
 /** One command an executor was refused. */
@@ -673,6 +737,8 @@ export type MachineRequest = (
   | ({ op: "brain.turn" } & BrainTurnRequest)
   /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
   | ({ op: "git.sync" } & GitSyncRequest)
+  /** Protocol 14: the mission's worktree (ADR 0044). */
+  | ({ op: "mission.worktree" } & MissionWorktreeRequest)
   /**
    * Protocol 10: the request's agent asks for a folder outside its own. The
    * runner shows it to the person and answers right away (`pending`, or
@@ -734,6 +800,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.output",
   "brain.turn",
   "git.sync",
+  "mission.worktree",
   "access.request",
   "access.reduce",
   "browser.act",
@@ -769,7 +836,16 @@ export interface MachineReplies {
     error?: string;
   };
   /** `cwd`: where it runs, relative to the agent's folder (`.worktrees/<taskId>` with a branch). */
-  "task.start": { taskId: string; pid: number; startedAt: string; cwd: string; branch?: string; command: string };
+  "task.start": {
+    taskId: string;
+    pid: number;
+    startedAt: string;
+    cwd: string;
+    branch?: string;
+    command: string;
+    /** Protocol 14, with `baseCheck`: commits the base branch has beyond the mission's base (absent: unknown). */
+    baseBehind?: number;
+  };
   "task.status": { tasks: RunnerTask[] };
   /** `false`: it had already ended. */
   "task.cancel": { canceled: boolean };
@@ -778,6 +854,8 @@ export interface MachineReplies {
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
   "git.sync": { repos: GitSyncRepo[] };
+  /** `remove` answers `{ removed }` (`false`: the folder was already gone). */
+  "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };
   "access.request": { requestId: string; status: "pending" | "granted" };
   "access.reduce": { access: RunnerAccess };
   /** `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered click). */
@@ -806,6 +884,8 @@ export type MachineErrorCode =
   | "not_allowed"
   /** Protocol 12: the agent browser can't run here (no binary, no Chrome, too many sessions); the message says why. */
   | "browser_unavailable"
+  /** Protocol 14: `mission.worktree` `ensure` with `baseSha` found neither the folder nor the branch. */
+  | "branch_missing"
   | "bad_request"
   | "internal";
 

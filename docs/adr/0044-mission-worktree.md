@@ -26,7 +26,7 @@ Most long coding tasks are sequential anyway (step 2 builds on step 1). What run
 - The base is the branch checked out in `repo_dir` at Start (its tip becomes `base_sha`). The plan card shows it ("a partir de main").
 - The main session and every item work in this folder. The person's project (`repo_dir`) is never written by a mission.
 - `.agentes/` (mission.md, decisions.md, notes.md) lives inside the mission's worktree and stays out of git (`info/exclude`). The server stays the source of truth (`syncMissionFiles`).
-- A folder without git keeps today's fallback, but per mission: one `work/<mission slug>/` folder instead of one per item.
+- A folder without git has no worktree: the mission works in `repo_dir` itself, items still one writer at a time, with no commits.
 
 ### Recorded on the mission, not in the agent's memory
 
