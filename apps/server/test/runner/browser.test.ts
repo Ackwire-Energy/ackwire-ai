@@ -858,7 +858,8 @@ test.skipIf(!posix)(
   "tray state: open with host, what it did and the conversation; a person's turn; closed",
   async () => {
     let changes = 0;
-    const t = setup({ onChange: () => changes++ });
+    const now = 1_000_000;
+    const t = setup({ onChange: () => changes++, now: () => now });
     expect(t.manager.states()).toEqual([]);
     await t.manager.act(dev, await t.folder(), {
       op: "browser.act",
@@ -869,7 +870,14 @@ test.skipIf(!posix)(
     });
     await t.act("click", ["@e3"]);
     expect(t.manager.states()).toEqual([
-      { agentId: dev.id, open: true, host: "app.acme.example", doing: "clicking", link: "/org/o1/c/c1" },
+      {
+        agentId: dev.id,
+        open: true,
+        host: "app.acme.example",
+        doing: "clicking",
+        actedAt: new Date(now).toISOString(),
+        link: "/org/o1/c/c1",
+      },
     ]);
     expect(changes).toBeGreaterThan(0);
 

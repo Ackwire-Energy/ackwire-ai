@@ -186,7 +186,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       {
         id: "m-2",
         channelId: ENG_ID,
-        threadId: "m-1",
+        // Asked in the channel, answered in the channel (D67).
+        threadId: null,
         author: { type: "agent", id: ADA_ID },
         body: "Achei a causa: o refresh compara `expires_at` em segundos com milissegundos.",
         mentionedAgentIds: [],
@@ -196,7 +197,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       {
         id: "msg-card",
         channelId: ENG_ID,
-        threadId: "m-1",
+        threadId: null,
         author: { type: "agent", id: ADA_ID },
         body: "",
         mentionedAgentIds: [],
@@ -217,14 +218,18 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       },
     ],
     approvals: [
-      approval(
-        "ap-merge",
-        ADA_ID,
-        "Merge PR #42 into main",
-        "github.merge_pull_request · agentes-chat/app · PR 42",
-        2,
-        "msg-card",
-      ),
+      {
+        ...approval(
+          "ap-merge",
+          ADA_ID,
+          "Merge PR #42 into main",
+          "github.merge_pull_request · agentes-chat/app · PR 42",
+          2,
+          "msg-card",
+        ),
+        // Its card is in the channel itself (D67).
+        threadId: null,
+      },
       approval(
         "ap-deploy",
         ATLAS_ID,

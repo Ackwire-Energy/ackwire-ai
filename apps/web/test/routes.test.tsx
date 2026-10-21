@@ -17,7 +17,7 @@ describe("route guards", () => {
   test("signed out: / shows the landing page", async () => {
     const { router } = await renderApp("/", { api: createFakeApi(seedState({ me: null })) });
     expect(router.state.location.pathname).toBe("/");
-    expect(screen().getByRole("heading", { level: 1, name: /na mesma conversa/ })).toBeTruthy();
+    expect(screen().getByRole("heading", { level: 1, name: /trabalham com o seu time/ })).toBeTruthy();
   });
 
   test("signed in without organizations: / goes to onboarding", async () => {
@@ -25,7 +25,7 @@ describe("route guards", () => {
     if (state.me) state.me.organizations = [];
     const { router } = await renderApp("/", { api: createFakeApi(state) });
     expect(router.state.location.pathname).toBe("/onboarding");
-    expect(screen().getByRole("heading", { name: "Comece pelo seu workspace" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
   });
 
   test("signed in: / → the organization → #general", async () => {

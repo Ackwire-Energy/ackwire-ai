@@ -1496,7 +1496,9 @@ body[data-window="notch"] {
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every component's own animation */
     animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every component's own transition */
     transition: none !important;
   }
 }
