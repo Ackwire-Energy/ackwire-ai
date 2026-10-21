@@ -2,11 +2,12 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { createApiClient } from "@agenteschat/client";
+import { createApiClient, createSnapshot, meQuery } from "@agenteschat/client";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
 import { createI18n, savedLocale } from "./i18n";
+import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
@@ -29,6 +30,15 @@ const queryClient = createQueryClient({
   onMutationError: (message) => toasts.show(message, "error"),
   unknownError: () => i18n.t("common.unknownError"),
 });
+
+// The last lists and chats saved on this device show at once; everything revalidates as usual.
+const snapshot = createSnapshot(queryClient, snapshotStore);
+snapshot.start();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") void snapshot.flush();
+});
+/** Opening never waits longer than this for the snapshot (a slow disk loads from the server instead). */
+const SNAPSHOT_WAIT_MS = 300;
 
 const router = createRouter({
   routeTree,
@@ -58,10 +68,22 @@ const services: AppServices = { api, auth: createBetterAuthClient(), queryClient
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");
 
-createRoot(root).render(
-  <StrictMode>
-    <AppProviders services={services}>
-      <RouterProvider router={router} />
-    </AppProviders>
-  </StrictMode>,
-);
+const restored = snapshot.restore().then((found) => {
+  // The saved `me` let the app open without asking: ask now (no session: sign-in, and the snapshot goes).
+  if (!found) return;
+  void queryClient
+    .fetchQuery({ ...meQuery(api), staleTime: 0 })
+    .then((me) => {
+      if (!me) onUnauthorized();
+    })
+    .catch(() => {});
+});
+void Promise.race([restored, new Promise((resolve) => setTimeout(resolve, SNAPSHOT_WAIT_MS))]).then(() => {
+  createRoot(root).render(
+    <StrictMode>
+      <AppProviders services={services}>
+        <RouterProvider router={router} />
+      </AppProviders>
+    </StrictMode>,
+  );
+});

@@ -1,8 +1,9 @@
+import { usePrefetchRecent } from "@agenteschat/client";
 import { Stack } from "expo-router";
 import { View } from "react-native";
 import { useRememberAgentLooks } from "@/features/shared/hooks";
 import { useUserEvents } from "@/features/shared/userEvents";
-import { useOrgGate } from "@/providers/org";
+import { useOrg, useOrgGate } from "@/providers/org";
 import { coverBarOptions, useFormSheetOptions, usePushedOptions, useScrollUnderPushedOptions, useTheme } from "@/ui";
 
 /** A link straight to a pushed screen or a sheet still has the tabs under it (the back button works). */
@@ -28,6 +29,8 @@ function AppStack() {
   const { colors } = useTheme();
   useUserEvents();
   useRememberAgentLooks();
+  // The unread and latest conversations load while the app is idle: opening them is instant.
+  usePrefetchRecent(useOrg().orgId);
   const pushed = usePushedOptions();
   const scrollUnder = useScrollUnderPushedOptions();
   const approvalSheet = useFormSheetOptions([0.62, 1], "raised");

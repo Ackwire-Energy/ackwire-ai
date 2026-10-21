@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { artifactRefs } from "../lib/artifacts";
 import {
   allItems,
@@ -17,6 +17,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
 import { upsertMessage } from "../lib/timeline";
@@ -97,7 +98,13 @@ import type {
 // ── Shared query options (also used by route guards) ─────────────────────────
 
 export const meQuery = (api: ApiClient) =>
-  queryOptions({ queryKey: keys.me, queryFn: () => api.account.me(), staleTime: 30_000 });
+  // Kept for good: the device snapshot (`snapshot.ts`) is dropped when `me` leaves the cache.
+  queryOptions({
+    queryKey: keys.me,
+    queryFn: () => api.account.me(),
+    staleTime: 30_000,
+    gcTime: Number.POSITIVE_INFINITY,
+  });
 export const authConfigQuery = (api: ApiClient) =>
   queryOptions({ queryKey: keys.authConfig, queryFn: () => api.account.authConfig(), staleTime: 60_000 });
 export const channelsQuery = (api: ApiClient, orgId: string) =>
@@ -264,13 +271,15 @@ export const MESSAGES_PAGE = 100;
 /**
  * The latest page of a conversation. Cached per channel and fresh for 30 s
  * (real-time events keep it current), so switching back is instant; then it
- * revalidates in the background.
+ * revalidates in the background. Kept 30 min after leaving it, so going back
+ * later still shows it at once.
  */
 export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
     queryKey: keys.messages(orgId, channelId),
     queryFn: () => api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE }),
     staleTime: 30_000,
+    gcTime: 30 * 60_000,
   });
 
 export const useMessages = (orgId: string, channelId: string, enabled = true) => {
@@ -288,6 +297,39 @@ export function usePrefetchMessages(orgId: string) {
     },
     [api, qc, orgId],
   );
+}
+
+/** Conversations loaded when the workspace opens (no hover on a phone, nor before the first click). */
+export const RECENT_PREFETCH = 5;
+
+/**
+ * Once the lists arrive, loads the unread and most recent conversations while
+ * the app is idle, once per organization: opening them is then instant.
+ */
+export function usePrefetchRecent(orgId: string, count = RECENT_PREFETCH) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const channels = useChannels(orgId);
+  const dms = useDms(orgId);
+  const ready = Boolean(channels.data && dms.data);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once the lists are in; later updates don't run it again
+  useEffect(() => {
+    if (!ready) return;
+    const ids = recentConversations(channels.data ?? [], dms.data ?? [], count);
+    const run = () => {
+      for (const id of ids) void qc.prefetchQuery(messagesQuery(api, orgId, id));
+    };
+    const idle = globalThis as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (idle.requestIdleCallback) {
+      const handle = idle.requestIdleCallback(run, { timeout: 2_000 });
+      return () => idle.cancelIdleCallback?.(handle);
+    }
+    const timer = setTimeout(run, 300);
+    return () => clearTimeout(timer);
+  }, [ready, orgId, count, api, qc]);
 }
 
 export function useJoinChannel(orgId: string, channelId: string) {
