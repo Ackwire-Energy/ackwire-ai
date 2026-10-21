@@ -1123,6 +1123,8 @@ export interface AgentQuestion {
   /** The person message the agent's run answers (receipts: "esperando sua resposta"). */
   threadId: string | null;
   messageId: string | null;
+  /** The run that asked: the receipt finds the message it answers (a channel question has no thread). */
+  runId?: string | null;
   text: string;
   /** Buttons to answer with; null = free answer in the composer. */
   choices: string[] | null;

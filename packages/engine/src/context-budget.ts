@@ -193,7 +193,15 @@ function taskOf(messages: ModelMessage[], task: string | undefined): string {
  */
 async function scoreToolResults(
   judge: Judge,
-  input: { orgId: string; task: string; now: string; candidates: ToolResultCandidate[]; timeoutMs?: number },
+  input: {
+    orgId: string;
+    agentId?: string;
+    runId?: string;
+    task: string;
+    now: string;
+    candidates: ToolResultCandidate[];
+    timeoutMs?: number;
+  },
 ): Promise<{ scores: Record<string, number> | null; source: "judge" | "timeout" | "error" }> {
   const judged = [...input.candidates].sort((a, b) => b.chars - a.chars).slice(0, MAX_JUDGED);
   const questions = Object.fromEntries(
@@ -217,6 +225,8 @@ async function scoreToolResults(
     const answers = await Promise.race([
       judge.ask({
         orgId: input.orgId,
+        agentId: input.agentId,
+        runId: input.runId,
         kind: "context_budget",
         calibrated: true,
         state: { task: input.task.slice(0, 2000), now: input.now.slice(0, 1500) },
@@ -264,6 +274,9 @@ export async function fitContextWindow(
   judge: Judge | null | undefined,
   input: {
     orgId: string;
+    /** The agent and run, for the judge's usage record. */
+    agentId?: string;
+    runId?: string;
     model: string;
     /** Overrides the catalog's window (tests). */
     windowTokens?: number;
@@ -291,6 +304,8 @@ export async function fitContextWindow(
     const last = input.messages[lastIndexOf(input.messages, (m) => m.role === "assistant")];
     const judged = await scoreToolResults(judge, {
       orgId: input.orgId,
+      agentId: input.agentId,
+      runId: input.runId,
       task: taskOf(input.messages, input.task),
       now: last ? textOf(last.content) : "",
       candidates,

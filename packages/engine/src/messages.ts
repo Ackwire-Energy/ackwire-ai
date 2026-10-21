@@ -872,7 +872,13 @@ export async function postPersonMessage(
       if (judge) {
         const judgeStop = async () => {
           const agentName = (await getAgentCached(deps.db, orgId, s.agentId))?.name ?? "the agent";
-          const stop = await isStopRequest(judge, { orgId, text: message.body, agentName }).catch(() => false);
+          const stop = await isStopRequest(judge, {
+            orgId,
+            text: message.body,
+            agentName,
+            agentId: s.agentId,
+            runId: s.id,
+          }).catch(() => false);
           if (!stop) return;
           await publishChannelEvent(deps.pubsub, {
             type: "agent.run.steered",

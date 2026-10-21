@@ -9,6 +9,7 @@ import {
   drainOutbox,
   insertMessage,
   isShortFollowUp,
+  isStopRequest,
   type JudgeQuestion,
   mentionHandoffs,
   postPersonMessage,
@@ -124,6 +125,25 @@ describe("an agent's @mention of another agent", () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]).toContain("@jorge");
     expect(usage).toMatchObject([{ orgId: "o", provider: "typesafe", inputTokens: 50 }]);
+  });
+
+  test("a judgment inside an agent's run records that agent and run on its usage", async () => {
+    const usage: unknown[] = [];
+    const judge = createJevJudge({
+      apiKey: "tk",
+      gateway: {
+        recordExternalUsage: async (u) => {
+          usage.push(u);
+          return null;
+        },
+      },
+      fetch: (async () =>
+        Response.json({ answers: { stop: { noul: 0.9 } }, usage: { input_tokens: 20 } })) as unknown as typeof fetch,
+    });
+    expect(await isStopRequest(judge, { orgId: "o", text: "para", agentName: "Dev", agentId: "a1", runId: "r1" })).toBe(
+      true,
+    );
+    expect(usage).toMatchObject([{ orgId: "o", agentId: "a1", runId: "r1", provider: "typesafe" }]);
   });
 });
 

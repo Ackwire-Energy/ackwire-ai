@@ -230,10 +230,10 @@ export function applyReceiptEvent(
         event.status === "waiting_approval",
       );
     case "question.asked":
-      // The agent waits for the person: "Theo está esperando sua resposta".
-      return event.threadId ? set(state, event.threadId, event.question.agentId, "asking", true) : state;
+      // The agent waits for the person: "Theo está esperando sua resposta" (on the message its run answers).
+      return setForRun(state, event.question.runId, event.threadId, event.question.agentId, "asking", true);
     case "question.answered":
-      return event.threadId ? set(state, event.threadId, event.question.agentId, "claimed", true) : state;
+      return setForRun(state, event.question.runId, event.threadId, event.question.agentId, "claimed", true);
     case "message.created": {
       const m = event.message;
       if (m?.author?.type === "agent" && m.author.id && m.threadId && !m.meta?.approvalId) {
