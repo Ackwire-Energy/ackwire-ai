@@ -27,6 +27,9 @@ export interface JudgeAnswer {
 
 export interface JudgeRequest {
   orgId: string;
+  /** The agent (and run) the judgment is for: recorded on its usage, not billed to its budget. */
+  agentId?: string | null;
+  runId?: string;
   /** Stable name of the judgment, for usage records, fakes and logs (`stop_request`…). */
   kind: string;
   /** What the questions are about; message text goes in as written. */
@@ -82,6 +85,8 @@ export function createJevJudge(options: {
       await options.gateway
         .recordExternalUsage({
           orgId: request.orgId,
+          agentId: request.agentId,
+          runId: request.runId,
           kind: "router",
           provider: "typesafe",
           model: body.model ?? options.model ?? "jev-latest",
@@ -126,6 +131,8 @@ export function createLlmJudge(deps: {
       const outputSchema = { type: "object", properties, required: ids, additionalProperties: false };
       const result = await deps.gateway.complete({
         orgId: request.orgId,
+        agentId: request.agentId,
+        runId: request.runId,
         kind: "router",
         model: await deps.resolveModel(request.orgId),
         system: LLM_SYSTEM,
@@ -185,11 +192,16 @@ const STOP_MAX_LENGTH = 80;
  * to stop or cancel that task ("para", "stop", "deixa pra lá", "basta")? A
  * correction or new instruction is not a stop: it steers the task instead.
  */
-export async function isStopRequest(judge: Judge, input: { orgId: string; text: string; agentName: string }) {
+export async function isStopRequest(
+  judge: Judge,
+  input: { orgId: string; text: string; agentName: string; agentId?: string; runId?: string },
+) {
   const text = input.text.trim();
   if (!text || text.length > STOP_MAX_LENGTH) return false;
   const answers = await judge.ask({
     orgId: input.orgId,
+    agentId: input.agentId,
+    runId: input.runId,
     kind: "stop_request",
     state: { agent: input.agentName, agent_is_working_on_a_task: true, message: text },
     questions: {

@@ -49,6 +49,9 @@ export async function chooseToolGroups(
   judge: Judge,
   input: {
     orgId: string;
+    /** The agent and run, for the judge's usage record. */
+    agentId?: string;
+    runId?: string;
     /** The agent's role and instructions, short. */
     agent: { name: string; role: string; instructions: string };
     /** What the run answers. */
@@ -87,6 +90,8 @@ export async function chooseToolGroups(
     const answers = await Promise.race([
       judge.ask({
         orgId: input.orgId,
+        agentId: input.agentId,
+        runId: input.runId,
         kind: "tool_groups",
         calibrated: true,
         state: {

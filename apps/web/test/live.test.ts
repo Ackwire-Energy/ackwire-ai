@@ -110,6 +110,20 @@ describe("receipts", () => {
     );
     expect(receiptView(seeded.m1)).toMatchObject({ seen: ["ada", "atlas"], status: { kind: "handled" } });
   });
+
+  test("a question asked in the channel (no thread) reaches the message its run answers", () => {
+    let s = step(seedReceipt({}, person(["ada"])), {
+      type: "message.claimed",
+      messageId: "m1",
+      agentId: "ada",
+      runId: "r",
+    });
+    const question = { id: "q", agentId: "ada", runId: "r" };
+    s = step(s, { type: "question.asked", threadId: null, question } as never);
+    expect(receiptView(s.m1).status).toEqual({ kind: "asking", agents: ["ada"] });
+    s = step(s, { type: "question.answered", threadId: null, question } as never);
+    expect(receiptView(s.m1).status?.kind).toBe("claimed");
+  });
 });
 
 describe("server confirmation and the safety timeout", () => {

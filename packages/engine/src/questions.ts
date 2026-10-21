@@ -23,6 +23,8 @@ export interface AgentQuestion {
   channelId: string;
   threadId: string | null;
   messageId: string | null;
+  /** The run that asked: the app's receipt finds the message it answers (a channel question has no thread). */
+  runId: string;
   text: string;
   choices: string[] | null;
   status: "open" | "answered";
@@ -37,6 +39,7 @@ export function questionView(q: AgentQuestionRow): AgentQuestion {
     channelId: q.channelId,
     threadId: q.threadId,
     messageId: q.messageId,
+    runId: q.runId,
     text: q.text,
     choices: q.choices && q.choices.length > 0 ? q.choices : null,
     // An expired question is closed for the app; it shows as answered without an answer.

@@ -577,6 +577,9 @@ export function createModelGateway(deps: ModelGatewayDeps) {
      */
     async recordExternalUsage(input: {
       orgId: string;
+      /** The agent and run the call was for (recorded, not billed to its budget). */
+      agentId?: string | null;
+      runId?: string;
       kind: "router";
       provider: string;
       model: string;
@@ -588,7 +591,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         .insert(usageRecords)
         .values({
           orgId: input.orgId,
-          agentId: null,
+          agentId: input.agentId ?? null,
+          runId: input.runId,
           kind: input.kind,
           credentialId: null,
           provider: input.provider,
