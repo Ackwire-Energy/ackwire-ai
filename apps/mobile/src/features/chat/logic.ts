@@ -59,6 +59,7 @@ export function standsAlone(m: Message) {
       meta.missionPlan ||
       meta.missionReview ||
       meta.missionDecision ||
+      meta.missionSetup ||
       meta.missionStart ||
       meta.missionLink ||
       meta.threadStart ||
@@ -199,6 +200,7 @@ export const hidesBody = (m: Message) =>
       m.meta?.threadStart ||
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
+      m.meta?.missionSetup ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );
 

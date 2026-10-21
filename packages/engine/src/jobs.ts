@@ -18,6 +18,7 @@ import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
+import { afterMachineTaskEnded } from "./mission-worktree";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
@@ -427,6 +428,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       });
       // A mission's task: its notes come back, its main session hears, queued messages go out.
       if (woke && "missionTask" in woke) await onMissionTaskEnded(missions, String(job.payload.taskId));
+      // A slot on that computer is free: queued mission items may start (ADR 0044).
+      await afterMachineTaskEnded(missions, String(job.payload.taskId)).catch(() => 0);
     },
     // The `.agentes/` files of a mission changed (debounced): written to its machine.
     "mission.sync_files": async (job) => {

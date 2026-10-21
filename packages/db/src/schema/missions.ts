@@ -105,6 +105,21 @@ export const missions = pgTable(
     mainSessionId: text().notNull(),
     /** The repository folder on the machine, relative to the agent's folder ('' = the folder itself). */
     repoDir: text().notNull().default(""),
+    /**
+     * The mission's own copy of the project (ADR 0044): one git worktree on
+     * one branch, made at Start from the branch checked out in `repo_dir`
+     * (`base_branch` at `base_sha`). The main session and every item work in
+     * `worktree_path` (relative to the agent's folder). A folder without git
+     * has no worktree: `worktree_path` = `repo_dir`, `branch` null.
+     */
+    branch: text(),
+    baseBranch: text(),
+    baseSha: text(),
+    worktreePath: text(),
+    /** `none | preparing | ready | failed | removed`; validated in code. Work waits while `preparing` or `failed`. */
+    worktreeState: text().notNull().default("none"),
+    /** The last lines of a failed setup (or why the folder couldn't be made). */
+    worktreeError: text(),
     /** Interrupted mission tasks resume by themselves when the machine comes back. */
     resumeTasks: boolean().notNull().default(true),
     /**

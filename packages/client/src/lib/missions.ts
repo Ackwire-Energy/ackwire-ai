@@ -10,6 +10,7 @@ import type {
   MissionPlanChangeMeta,
   MissionPlanMeta,
   MissionReportMeta,
+  MissionSetupMeta,
   MissionSuggestionMeta,
   MissionSummary,
   PlanItem,
@@ -322,6 +323,39 @@ export function machineTaskOf(meta: Message["meta"]): MachineTaskMeta | null {
         }
       : {}),
   };
+}
+
+/**
+ * `meta.missionSetup` (ADR 0044): preparing the mission's copy of the project failed
+ * (the card "Não consegui preparar o projeto" with "Tentar de novo").
+ */
+export function missionSetupOf(meta: Message["meta"]): MissionSetupMeta | null {
+  const p = obj(meta?.missionSetup);
+  if (!p || str(p.state) !== "failed") return null;
+  const reason = str(p.reason);
+  return {
+    state: "failed",
+    reason: reason === "ensure" || reason === "branch_missing" ? reason : "setup",
+    error: str(p.error),
+    ...(str(p.branch) ? { branch: str(p.branch) } : {}),
+    ...(str(p.missionId) ? { missionId: str(p.missionId) } : {}),
+  };
+}
+
+/** The last `n` non-empty lines of an error's output (the setup card shows only the end). */
+export function lastLines(text: string | null | undefined, n = 8): string {
+  const lines = (text ?? "").replace(/\s+$/, "").split("\n");
+  while (lines.length > 0 && !lines[0]?.trim()) lines.shift();
+  return lines.slice(-n).join("\n");
+}
+
+/** A commit as people may see it: the first 7 characters ("a1b2c3d"). */
+export const shortSha = (sha: string | null | undefined) => (sha ? sha.slice(0, 7) : "");
+
+/** "a1b2c3d..e4f5a6b": the range a session changed, when the server knows both ends. */
+export function taskRange(task: Pick<MachineTask, "startSha" | "endSha">): string | null {
+  if (!task.startSha || !task.endSha || task.startSha === task.endSha) return null;
+  return `${shortSha(task.startSha)}..${shortSha(task.endSha)}`;
 }
 
 /** `meta.missionAutoApproved`: a command allowed without a card (the quiet line). */

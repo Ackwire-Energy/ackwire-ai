@@ -7,6 +7,7 @@ import {
   type SessionState,
   sessionState,
   taskPr,
+  taskRange,
   taskSeconds,
 } from "@agenteschat/client/lib/missions";
 import { Button, DetailsDialog, Icon, type IconName, Segmented } from "@agenteschat/ui";
@@ -158,6 +159,10 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
   const live = state === "running";
   const files = task.files ?? [];
   const shown = all ? files : files.slice(0, 3);
+  // ADR 0044: the session that prepares the mission's copy of the project, and sessions that only read.
+  const title = task.mode === "setup" ? t("missions.sessions.setupTitle") : task.title;
+  const readOnly = task.mode === "read";
+  const range = taskRange(task);
   const line =
     state === "interrupted"
       ? task.endedAt
@@ -178,7 +183,8 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
         </span>
         <button type="button" className="mi-session__title" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           <b>
-            <span>{task.title}</span>
+            <span>{title}</span>
+            {readOnly && <small className="mi-session__mode">{t("missions.sessions.readOnly")}</small>}
             <Icon name="chevronRight" size={14} />
           </b>
           {line && (
@@ -219,6 +225,7 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
               <h4>
                 {t("missions.sessions.changed")}
                 <span>{t("missions.sessions.files", { count: files.length })}</span>
+                {range && <code className="mi-mono">{range}</code>}
               </h4>
               <ul className="mi-session__files">
                 {shown.map((f) => (
@@ -235,8 +242,13 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
             </>
           ) : (
             <>
-              <h4>{t("missions.sessions.changed")}</h4>
-              <span className="mi-session__none">{t("missions.sessions.nothingYet")}</span>
+              <h4>
+                {t("missions.sessions.changed")}
+                {range && <code className="mi-mono">{range}</code>}
+              </h4>
+              <span className="mi-session__none">
+                {readOnly ? t("missions.sessions.readOnlyText") : t("missions.sessions.nothingYet")}
+              </span>
             </>
           )}
           {output && <TaskLog task={task} live={live} />}

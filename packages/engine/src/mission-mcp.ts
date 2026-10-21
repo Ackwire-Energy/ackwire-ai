@@ -23,7 +23,6 @@ import {
   MISSION_LIMITS,
   type MissionDeps,
   type MissionRow,
-  missionBranchPrefix,
   missionOfThread,
   noMentions,
   postMissionMessage,
@@ -31,9 +30,9 @@ import {
   reactivateMission,
   recordMissionEvent,
   requestReview,
-  startSessionTask,
   updatePlan,
 } from "./missions";
+import { ensureMissionWorktree, missionCwd, startMissionItem } from "./mission-worktree";
 import { missionBrain } from "./missions-engine";
 import { resumeRunsWaitingForMachine } from "./run-resume";
 import { type BridgeIdentity, verifyRunToolToken } from "./run-tool-tokens";
@@ -257,7 +256,7 @@ export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolS
           sessionId: m.mainSessionId,
           executor: missionBrain(m).brain === "codex" ? "codex" : "claude",
           machineId,
-          cwd: m.repoDir,
+          cwd: missionCwd(m),
           missionId: m.id,
         }) as unknown as MachineTaskRow;
       const call = async (tool: string, input: Record<string, unknown>, c: typeof ctx): Promise<ToolOutput> => {
@@ -530,30 +529,54 @@ async function run(
         throw Object.assign(new Error("The mission is paused: don't start new work now."), { code: "mission.paused" });
       }
       if (mission.status !== "active") return "The plan isn't approved yet: wait for the people to press Start.";
+      // The mission's own folder (ADR 0044): a mission without one yet gets it before its first item.
+      if (mission.worktreeState === "none") mission = (await ensureMissionWorktree(deps, mission.id)) ?? mission;
+      if (mission.worktreeState !== "ready") {
+        throw Object.assign(
+          new Error(
+            mission.worktreeState === "failed"
+              ? "The project copy couldn't be prepared and the people were asked to try again: don't start work now."
+              : "The project copy is being prepared; you'll be told when it's ready. Don't start work until then.",
+          ),
+          { code: "mission.not_ready" },
+        );
+      }
       const title = str(args.title).trim().slice(0, 120);
-      // Item branches live under the mission's prefix: the only ones its executors may push.
-      const prefix = missionBranchPrefix(mission.id);
-      const asked = str(args.branch).trim().replace(/^\/+/, "").slice(0, 100);
-      const branch = asked.startsWith(prefix) ? asked : `${prefix}${asked}`;
+      const mode = str(args.mode) === "read" ? "read" : "write";
+      const folder = missionCwd(mission) || "the agent's folder";
+      const where = mission.branch ? `the mission's folder ${folder} (branch ${mission.branch})` : `the mission's folder ${folder}`;
       const prompt = [
         `You work on one item of the mission "${mission.title}": ${title}.`,
-        // The runner adds where it works (its branch, or its own subfolder when the mission folder has no git).
+        `You work in ${where}, shared with the mission's other items.${
+          mission.branch ? " Stay on this branch: don't create or switch branches." : ""
+        }`,
+        mode === "read"
+          ? "This item only reads: don't change, create or delete any file."
+          : mission.branch
+            ? "When you end, whatever you changed is committed for you as one commit (you may commit along the way too)."
+            : "Other items work in this folder after you: leave it tidy.",
         "Read .agentes/ first. When you are done, report, and request_review if there is something to show.",
         "",
         str(args.prompt).slice(0, MISSION_LIMITS.sendText * 2),
       ].join("\n");
-      const row = await startSessionTask(deps, mission, {
+      const { row, waitsFor } = await startMissionItem(deps, mission, {
         title,
         prompt,
         sessionId: crypto.randomUUID(),
-        cwd: mission.repoDir,
         resume: false,
-        branch,
+        mode,
       });
-      await recordMissionEvent(deps.db, mission, "task_started", { taskId: row.id, title, branch });
+      await recordMissionEvent(deps.db, mission, "task_started", { taskId: row.id, title, mode, queued: Boolean(waitsFor) });
       await publishMissionEvent(deps, mission, "task", { taskId: row.id });
-      const place = row.branch ? `on branch ${row.branch}` : `in its own folder ${row.cwd || "work/"}`;
-      return `Started task ${row.id} ("${title}") ${place}. You'll be told when it ends; don't wait for it.`;
+      if (row.status === "failed") return `Task ${row.id} ("${title}") couldn't start: ${row.lastLine ?? "the computer refused it"}.`;
+      if (waitsFor) {
+        const when =
+          waitsFor === "write"
+            ? "the write item ahead of it ends (write items run one at a time)"
+            : "the computer has a free slot (or is back)";
+        return `Queued task ${row.id} ("${title}", ${mode}): it starts by itself when ${when}. You'll be told when it ends; don't wait for it.`;
+      }
+      return `Started task ${row.id} ("${title}", ${mode}) in ${where}. You'll be told when it ends; don't wait for it.`;
     }
     default:
       return `Unknown tool ${tool}.`;

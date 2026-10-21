@@ -36,6 +36,7 @@ import {
   requestToJoin,
   resumeMission,
   retryBlockedCommand,
+  retryMissionWorktree,
   sendMissionMessage,
   setAgentMissionApproval,
   setCommandApproval,
@@ -70,6 +71,10 @@ const Executor = z
   .enum(["claude", "codex", "agent"])
   .openapi({ description: "Who programs: Claude Code, Codex (experimental) or the agent itself with its own tools." });
 const Role = z.enum(["owner", "decide", "comment", "none"]);
+const WorktreeState = z.enum(["none", "preparing", "ready", "failed", "removed"]).openapi({
+  description:
+    "The mission's copy of the project (ADR 0044): none (not made yet), preparing (made, setup running: work waits), ready, failed (the mission paused; retry with …/worktree/retry), removed (closed).",
+});
 const PlanItem = z.object({
   id: z.string(),
   title: z.string(),
@@ -110,6 +115,17 @@ const Mission = z
       .openapi({ description: "The `decision` finding's text: the one question left for the person (null: none)." }),
     status: Status,
     repoDir: z.string(),
+    branch: z.string().nullable().openapi({
+      description:
+        "The mission's own branch (`agentes/<id>/<slug>`), its copy of the project works on it; null before Start and for a folder without git.",
+    }),
+    baseBranch: z.string().nullable().openapi({ description: "The branch it started from (\"a partir de main\")." }),
+    baseSha: z.string().nullable().openapi({ description: "That branch's tip at Start: the whole change is baseSha..branch." }),
+    worktreeState: WorktreeState,
+    worktreeError: z
+      .string()
+      .nullable()
+      .openapi({ description: "The last lines of a failed setup, or why the copy couldn't be made." }),
     resumeTasks: z.boolean(),
     commandApproval: CommandApproval,
     plan: z.object({
@@ -252,6 +268,15 @@ const Task = z
     prUrl: z.string().nullable().openapi({ description: "A pull request it opened." }),
     branch: z.string().nullable(),
     cwd: z.string().nullable(),
+    mode: z.enum(["write", "read", "setup"]).nullable().openapi({
+      description:
+        "A mission task's kind: write (one at a time, ends in a commit), read (in parallel, read only), setup (prepares the copy of the project); null for other tasks. status queued = waiting its turn or a free slot.",
+    }),
+    startSha: z.string().nullable().openapi({ description: "A write item's HEAD when it started." }),
+    endSha: z
+      .string()
+      .nullable()
+      .openapi({ description: "Its HEAD after its commit at the end (equal to startSha: nothing changed)." }),
     resumedFromId: z.string().nullable(),
     resumedTaskId: z.string().nullable(),
     startedAt: z.string().nullable(),
@@ -563,6 +588,10 @@ export function missionRoutes(deps: AppDeps) {
             outcome: z.enum(["done", "canceled"]),
             saveToWiki: z.boolean().optional(),
             note: z.string().max(500).optional(),
+            deleteBranch: z.boolean().optional().openapi({
+              description:
+                "Canceled only: also delete the mission's branch (\"apagar tudo\"); by default the branch stays and only its copy of the project goes away.",
+            }),
           }),
         ),
       },
@@ -574,6 +603,23 @@ export function missionRoutes(deps: AppDeps) {
         after(await closeMission(missions(), c.get("user").id, orgId, missionId, c.req.valid("json"))),
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/worktree/retry",
+      tags,
+      security,
+      summary:
+        '"Tentar de novo" (owner or deciders): the copy of the project is made or prepared again after a failure, and the mission resumes (mission.worktree_not_failed unless it failed)',
+      request: { params: MissionParams, body: Empty },
+      responses: { 200: json(Mission), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json(after(await retryMissionWorktree(missions(), c.get("user").id, orgId, missionId)), 200);
     },
   );
 

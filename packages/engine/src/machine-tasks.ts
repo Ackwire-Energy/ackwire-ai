@@ -14,7 +14,7 @@ import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, s
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents, requesterOf } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
-import { getMachineById, machineOnline } from "./machines";
+import { getMachineById, MachineOfflineError, MachinePausedError, machineOnline } from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
@@ -51,6 +51,16 @@ const ACTIVE: MachineTaskStatus[] = ["queued", "running", "interrupted"];
 /** `machine_tasks.recent_lines` keeps this many human lines ("Ver saída" while the computer is offline). */
 export const RECENT_LINES = 50;
 
+/**
+ * A mission task's kind (ADR 0044): `write` items run one at a time in the
+ * mission's folder and end in a commit, `read` items run in parallel with no
+ * write access, `setup` prepares the folder before any item.
+ */
+export type MachineTaskMode = "write" | "read" | "setup";
+export const MACHINE_TASK_MODES: readonly MachineTaskMode[] = ["write", "read", "setup"];
+export const taskModeOf = (v: unknown): MachineTaskMode | null =>
+  typeof v === "string" && (MACHINE_TASK_MODES as readonly string[]).includes(v) ? (v as MachineTaskMode) : null;
+
 /** A task as the app and the agent's tools see it. */
 export interface MachineTaskView {
   id: string;
@@ -71,6 +81,11 @@ export interface MachineTaskView {
   prUrl: string | null;
   branch: string | null;
   cwd: string | null;
+  /** A mission task's kind (ADR 0044): `write`, `read` or `setup`; null for other tasks. */
+  mode: MachineTaskMode | null;
+  /** A write item's `HEAD` when it started and after its commit (equal: it changed nothing). */
+  startSha: string | null;
+  endSha: string | null;
   resumedFromId: string | null;
   resumedTaskId: string | null;
   startedAt: string | null;
@@ -97,6 +112,9 @@ export function machineTaskView(row: MachineTaskRow): MachineTaskView {
     prUrl: row.prUrl ?? null,
     branch: row.branch,
     cwd: row.cwd,
+    mode: taskModeOf(row.mode),
+    startSha: row.startSha ?? null,
+    endSha: row.endSha ?? null,
     resumedFromId: row.resumedFromId,
     resumedTaskId: row.resumedTaskId,
     startedAt: row.startedAt?.toISOString() ?? null,
@@ -185,7 +203,18 @@ export interface StartTaskInput {
   } | null;
   /** Tags the task as the mission's without the MCP server (our agent's own tasks in agent mode; protocol 4). */
   missionId?: string | null;
+  /** A mission task's kind (ADR 0044). */
+  mode?: MachineTaskMode | null;
+  /** Protocol 14: commit what changed when it ends (`TaskStart.commit`). */
+  commit?: { message: string } | null;
+  /** Protocol 14: how far the mission's base moved (`TaskStart.baseCheck`). */
+  baseCheck?: { branch: string; sha: string } | null;
+  /** The mission's branch the folder is on (recorded on the row; the runner makes no branch for it). */
+  worktreeBranch?: string | null;
 }
+
+/** What a task waiting in our queue keeps to start later (`machine_tasks.start_request`). */
+export type QueuedTaskStart = Omit<StartTaskInput, "protocol" | "machineName">;
 
 /** A runner older than protocol 4 can't run background tasks: the person has to update it. */
 export class RunnerOutdatedError extends Error {
@@ -207,10 +236,19 @@ export class RunnerOutdatedError extends Error {
  * kept as `failed` with the reason, and the error goes up.
  */
 export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, input: StartTaskInput) {
+  checkTaskProtocol(input);
+  const row = await insertTask(deps.db, input, null);
+  return (await launchTask(deps, row, input)).row;
+}
+
+function checkTaskProtocol(input: Pick<StartTaskInput, "protocol" | "machineName" | "mission">) {
   if (input.protocol < TASKS_PROTOCOL) throw new RunnerOutdatedError(input.machineName);
   if (input.mission && input.protocol < MISSION_PROTOCOL) throw new RunnerOutdatedError(input.machineName, true);
+}
+
+async function insertTask(db: Executor, input: QueuedTaskStart, queued: QueuedTaskStart | null) {
   const now = new Date();
-  const [row] = await deps.db
+  const [row] = await db
     .insert(machineTasks)
     .values({
       orgId: input.orgId,
@@ -226,7 +264,10 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
       command: (input.command ?? "").slice(0, TASK_TEXT_LIMITS.command),
       prompt: input.prompt ? input.prompt.slice(0, TASK_TEXT_LIMITS.prompt) : null,
       sessionId: input.sessionId ?? null,
-      branch: input.branch ?? null,
+      branch: input.branch ?? input.worktreeBranch ?? null,
+      cwd: input.cwd ?? null,
+      mode: input.mode ?? null,
+      startRequest: queued as unknown as Record<string, unknown> | null,
       resumedFromId: input.resumedFromId ?? null,
       resumeCount: input.resumeCount ?? 0,
       createdAt: now,
@@ -234,6 +275,26 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
     })
     .returning();
   if (!row) throw new Error("machine_tasks insert returned nothing");
+  return row;
+}
+
+/** The runner said its slots are full, or the computer is away: a queued task waits for the next chance. */
+export const isWaitError = (error: unknown) =>
+  error instanceof MachineOfflineError ||
+  ["no_slot", "offline", "paused"].includes(String((error as { code?: unknown })?.code ?? "")) ||
+  error instanceof MachinePausedError;
+
+/**
+ * Asks the machine to start a recorded task (status `queued`). `requeue`: a
+ * full or absent computer puts it back in our queue (`start_request`) instead
+ * of failing it; any other refusal fails the row and goes up.
+ */
+export async function launchTask(
+  deps: TaskDeps & { call: TaskCall },
+  row: MachineTaskRow,
+  input: QueuedTaskStart,
+  options: { requeue?: boolean } = {},
+): Promise<{ row: MachineTaskRow; queued: boolean; baseBehind?: number }> {
   try {
     // The mission tools' token (ADR 0032): the runner sends it with each of the executor's calls.
     const mcpToken = input.mission
@@ -257,6 +318,8 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
       ...(input.maxSeconds ? { maxSeconds: input.maxSeconds } : {}),
       ...(input.cwd ? { cwd: input.cwd } : {}),
       ...(input.mission ? { mission: { ...input.mission, ...(mcpToken ? { mcpToken } : {}) } } : {}),
+      ...(input.commit ? { commit: input.commit } : {}),
+      ...(input.baseCheck ? { baseCheck: input.baseCheck } : {}),
     });
     const at = new Date(started.startedAt);
     const [running] = await deps.db
@@ -266,7 +329,8 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
         command: String(started.command ?? row.command).slice(0, TASK_TEXT_LIMITS.command),
         cwd: started.cwd ?? null,
         // A runner answers the branch it made; none when the folder had no git (the item got its own subfolder).
-        branch: started.branch ?? null,
+        // A task in the mission's worktree asked for no branch: it keeps the mission's (ADR 0044).
+        branch: started.branch ?? (input.branch ? null : (input.worktreeBranch ?? null)),
         startedAt: Number.isNaN(at.getTime()) ? new Date() : at,
         lastEventAt: new Date(),
         updatedAt: new Date(),
@@ -276,9 +340,25 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
       .returning();
     const fresh = running ?? (await getTask(deps.db, row.id)) ?? row;
     await publishTaskEvent(deps.pubsub, fresh);
-    return fresh;
+    const behind = (started as { baseBehind?: unknown }).baseBehind;
+    return {
+      row: fresh,
+      queued: false,
+      ...(typeof behind === "number" && Number.isInteger(behind) && behind >= 0 ? { baseBehind: behind } : {}),
+    };
   } catch (error) {
-    await deps.db
+    if (options.requeue && isWaitError(error)) {
+      const [back] = await deps.db
+        .update(machineTasks)
+        .set({ startRequest: input as unknown as Record<string, unknown>, updatedAt: new Date() })
+        .where(and(eq(machineTasks.id, row.id), eq(machineTasks.status, "queued"), isNull(machineTasks.endedAt)))
+        .returning();
+      if (back) {
+        await publishTaskEvent(deps.pubsub, back);
+        return { row: back, queued: true };
+      }
+    }
+    const [failed] = await deps.db
       .update(machineTasks)
       .set({
         status: "failed",
@@ -286,9 +366,83 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
         lastLine: (error instanceof Error ? error.message : String(error)).slice(0, TASK_LIMITS.line),
         updatedAt: new Date(),
       })
-      .where(and(eq(machineTasks.id, row.id), eq(machineTasks.status, "queued")));
+      .where(and(eq(machineTasks.id, row.id), eq(machineTasks.status, "queued")))
+      .returning();
+    if (failed && options.requeue) {
+      // A queued task started by the server: its end is told like any other (the mission hears it failed).
+      await enqueueWake(deps.db, failed);
+      await publishTaskEvent(deps.pubsub, failed);
+    }
     throw error;
   }
+}
+
+/**
+ * Records a task in our queue (ADR 0044): status `queued` with what to send
+ * the runner when it may start (`claimQueuedTask`). Returns the row.
+ */
+export async function queueMachineTask(deps: TaskDeps, input: StartTaskInput) {
+  checkTaskProtocol(input);
+  const { protocol: _p, machineName: _n, ...queued } = input;
+  const row = await insertTask(deps.db, queued, queued);
+  await publishTaskEvent(deps.pubsub, row);
+  return row;
+}
+
+/**
+ * Claims the next task of a machine's queue that may start now, oldest first
+ * (ADR 0044): its mission is active and its folder ready (a setup task needs
+ * neither), and a write item waits while another write item of its mission
+ * holds the folder (running, being started, or interrupted and may come
+ * back). One claim at a time per machine (an advisory lock), so two write
+ * items of a mission never start together. Null: nothing may start.
+ */
+export async function claimQueuedTask(
+  db: Database,
+  machineId: string,
+): Promise<{ row: MachineTaskRow; start: QueuedTaskStart } | null> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`machine-queue:${machineId}`}))`);
+    const [next] = await tx
+      .select()
+      .from(machineTasks)
+      .where(
+        sql`${machineTasks.id} = (select q.id from ${machineTasks} q
+          join ${schema.missions} m on m.id = q.mission_id
+          where q.machine_id = ${machineId}::uuid and q.status = 'queued' and q.ended_at is null
+            and q.start_request is not null
+            and (q.mode = 'setup' or (m.status in ('active', 'awaiting_close') and m.worktree_state = 'ready'))
+            and (q.mode is distinct from 'write' or not exists (select 1 from ${machineTasks} w
+              where w.mission_id = q.mission_id and w.id <> q.id and w.mode = 'write' and w.ended_at is null
+                and w.start_request is null and w.status in ('queued', 'running', 'interrupted')))
+          order by q.created_at, q.id
+          limit 1)`,
+      );
+    if (!next?.startRequest) return null;
+    const [row] = await tx
+      .update(machineTasks)
+      .set({ startRequest: null, updatedAt: new Date() })
+      .where(and(eq(machineTasks.id, next.id), sql`${machineTasks.startRequest} is not null`))
+      .returning();
+    return row ? { row, start: next.startRequest as unknown as QueuedTaskStart } : null;
+  });
+}
+
+/** Whether a machine has tasks waiting in our queue (a cheap look before claiming). */
+export async function hasQueuedTasks(db: Executor, machineId: string) {
+  const [row] = await db
+    .select({ id: machineTasks.id })
+    .from(machineTasks)
+    .where(
+      and(
+        eq(machineTasks.machineId, machineId),
+        eq(machineTasks.status, "queued"),
+        isNull(machineTasks.endedAt),
+        sql`${machineTasks.startRequest} is not null`,
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function getTask(db: Executor, taskId: string): Promise<MachineTaskRow | null> {
@@ -473,6 +627,8 @@ export async function applyTaskDone(
         ...(frame.files ? { files: frame.files.slice(0, TASK_LIMITS.files) } : {}),
         result: frame.result ? frame.result.slice(0, TASK_LIMITS.result) : null,
         ...(frame.session ? { sessionId: frame.session } : {}),
+        // Protocol 14: a write item's commit at its end (ADR 0044).
+        ...(frame.startSha && frame.endSha ? { startSha: frame.startSha, endSha: frame.endSha } : {}),
         endedAt: now,
         lastEventAt: now,
         updatedAt: now,
@@ -539,6 +695,7 @@ export async function settleInterruptedTask(
       ...(frame?.files ? { files: frame.files } : {}),
       ...(frame?.result ? { result: frame.result.slice(0, TASK_LIMITS.result) } : {}),
       ...(frame?.session ? { sessionId: frame.session } : {}),
+      ...(frame?.startSha && frame.endSha ? { startSha: frame.startSha, endSha: frame.endSha } : {}),
       endedAt: now,
       updatedAt: now,
     })
@@ -553,6 +710,7 @@ export async function settleInterruptedTask(
           id: schema.missions.id,
           status: schema.missions.status,
           resumeTasks: schema.missions.resumeTasks,
+          branch: schema.missions.branch,
         })
         .from(schema.missions)
         .where(eq(schema.missions.id, claimed.missionId))
@@ -594,6 +752,11 @@ export async function settleInterruptedTask(
         resumeCount: claimed.resumeCount + 1,
         // The session lives in its folder (a worktree for a branch): resume it there.
         cwd: claimed.cwd || null,
+        // In the mission's worktree (ADR 0044): the same kind, and a write item still ends in a commit.
+        mode: taskModeOf(claimed.mode),
+        ...(claimed.mode === "write" && mission?.branch
+          ? { commit: { message: `agentes: ${claimed.title}` }, worktreeBranch: mission.branch }
+          : {}),
         // The main session's own task: only tagged; an item session gets the mission's tools again.
         ...(mission && isAgentTask(claimed)
           ? { missionId: mission.id }
@@ -604,6 +767,7 @@ export async function settleInterruptedTask(
                     rules: MISSION_RULES,
                     branchPrefix: `agentes/${mission.id.replace(/-/g, "").slice(-8)}/`,
                     allow: await missionAllowRules(deps.db, mission.id),
+                    ...(claimed.mode === "read" ? { mode: "plan" as const } : {}),
                   }
                 : null,
             }),
@@ -727,6 +891,8 @@ export async function reconcileMachineTasks(
       continue;
     }
     if (there) continue;
+    // Waiting in our queue (ADR 0044): the runner never had it.
+    if (row.status === "queued" && row.startRequest) continue;
     // Being started right now (its `task.start` may still be on the way).
     if (row.status === "queued" && Date.now() - row.createdAt.getTime() < 2 * 60_000) continue;
     await settleInterruptedTask(deps, row);
@@ -859,7 +1025,9 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
   const agentLike = isAgentTask(row);
   // Commands it was refused: the people see them and can allow them ("Liberar e repetir").
   const blocked = row.missionId && !agentLike ? await blockedOfTask(deps.db, row.missionId, row.id) : [];
-  const notice = !agentLike && (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
+  // A setup task's end is the mission's own card (ADR 0044): no task notice.
+  const notice =
+    !agentLike && row.mode !== "setup" && (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
   const claimed = await deps.db.transaction(async (tx) => {
     const [won] = await tx
       .update(machineTasks)

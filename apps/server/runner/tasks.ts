@@ -48,7 +48,10 @@ import {
   newMcpToken,
   shellArg,
 } from "./mcp";
+import { excludeLocally, git, gitWhy } from "./mission-worktree";
 import { isInside, resolveForAgent } from "./paths";
+
+export { excludeLocally };
 
 /**
  * Background tasks (protocol 4, ADR 0029): commands that outlive a request,
@@ -141,6 +144,9 @@ interface Entry {
   done?: TaskDone;
   /** The server acknowledged `done`. */
   delivered?: boolean;
+  /** Protocol 14: commit what changed at the end with this message; `HEAD` when it started. */
+  commit?: string;
+  startSha?: string;
 }
 
 interface Journal {
@@ -921,6 +927,13 @@ export class TaskManager {
     } else if (missionTask) {
       excludeLocally(cwd, ".agentes/");
     }
+    // Protocol 14 (ADR 0044): where the task starts from, kept in the journal (the commit at its end survives a restart).
+    const commitMessage =
+      typeof req.commit?.message === "string" && req.commit.message.trim()
+        ? req.commit.message.trim().slice(0, COMMIT_MESSAGE_MAX)
+        : undefined;
+    const startSha = commitMessage ? headSha(cwd) : undefined;
+    const baseBehind = req.baseCheck ? commitsBehind(cwd, req.baseCheck) : undefined;
     // Claude Code resumes a session it has (this folder, or any project folder), else starts it with that id.
     let resume = req.resume === true;
     if (executor === "claude" && session) {
@@ -937,6 +950,8 @@ export class TaskManager {
       executor !== "shell" && typeof req.mission?.id === "string" && TASK_ID.test(req.mission.id)
         ? req.mission.id
         : undefined;
+    // Protocol 14: a read item (ADR 0044) can't edit, whatever its prompt says.
+    const readOnly = Boolean(missionId) && req.mission?.mode === "plan";
     let extra: string[] = [];
     let mcpToken: string | undefined;
     const input = where ? `${where}\n\n${prompt}` : prompt;
@@ -965,7 +980,14 @@ export class TaskManager {
         const away = missionTask && path.resolve(cwd) !== path.resolve(missionRoot);
         writeFileSync(
           settingsFile,
-          JSON.stringify(claudePermissionSettings("work", prefix, allow, away ? path.resolve(missionRoot) : undefined)),
+          JSON.stringify(
+            claudePermissionSettings(
+              readOnly ? "plan" : "work",
+              prefix,
+              allow,
+              away ? path.resolve(missionRoot) : undefined,
+            ),
+          ),
           { mode: 0o600 },
         );
       }
@@ -990,6 +1012,7 @@ export class TaskManager {
     }
     const command = executorCommand(executor, {
       command: req.command,
+      ...(readOnly && executor === "claude" ? { permissionMode: "dontAsk" as const } : {}),
       session,
       resume,
       extra,
@@ -998,7 +1021,7 @@ export class TaskManager {
         ? {
             codex: {
               cwd,
-              sandbox: "workspace-write" as const,
+              sandbox: readOnly ? ("read-only" as const) : ("workspace-write" as const),
               lastFile: path.join(dir, "last.txt"),
               ...(codexThread ? { thread: codexThread } : {}),
             },
@@ -1061,6 +1084,7 @@ export class TaskManager {
       ...(missionId ? { missionId } : {}),
       ...(mcpToken ? { mcpToken } : {}),
       ...(mcpToken && isRunToolToken(req.mission?.mcpToken) ? { serverToken: req.mission.mcpToken } : {}),
+      ...(commitMessage && startSha ? { commit: commitMessage, startSha } : {}),
       status: "running",
       pid,
       startedAt: new Date(this.now()).toISOString(),
@@ -1072,7 +1096,15 @@ export class TaskManager {
     await this.watch(entry, false, secrets?.redact);
     this.updateCaffeinate();
     this.log(`[${entry.agentHandle}] task ${taskId} started: ${command.slice(0, 80)}`);
-    return { taskId, pid, startedAt: entry.startedAt, cwd: rel, ...(branch ? { branch } : {}), command };
+    return {
+      taskId,
+      pid,
+      startedAt: entry.startedAt,
+      cwd: rel,
+      ...(branch ? { branch } : {}),
+      command,
+      ...(baseBehind !== undefined ? { baseBehind } : {}),
+    };
   }
 
   /** For the MCP bridge: a mission task's token and whether it still runs. */
@@ -1366,13 +1398,45 @@ export class TaskManager {
     }
   }
 
+  /**
+   * A task ended. Protocol 14: one with `commit` first commits what changed
+   * (`git add -A`, then `git commit`; hooks run as usual), with " (stopped)"
+   * after the message when it didn't end well. It stays `running` in the
+   * journal until then, so a runner restart mid-commit commits again.
+   */
   private settle(t: Entry, w: Watch, exit: ExitFile | null) {
+    // Canceled and the wrapper gone without an exit: make sure nothing of the command is left.
+    if (!exit && t.canceling) this.hardKill(t, this.dirOf(t.taskId));
+    if (!t.commit || !t.startSha) return this.settleNow(t, w, exit);
+    const ok = exit !== null && exit.exitCode === 0 && !exit.reason;
+    const message = ok ? t.commit : `${t.commit} (stopped)`;
+    void (async () => {
+      const secrets = await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null);
+      let commit: { startSha: string; endSha: string; error?: string };
+      try {
+        commit = await commitChanges(t.cwd, message, {
+          env: secrets?.env ?? {},
+          handle: t.agentHandle,
+          startSha: t.startSha as string,
+        });
+      } catch (err) {
+        commit = { startSha: t.startSha as string, endSha: t.startSha as string, error: String(err) };
+      }
+      if (commit.error) this.log(`[${t.agentHandle}] task ${t.taskId}: couldn't commit: ${commit.error}`);
+      this.settleNow(t, w, exit, commit);
+    })();
+  }
+
+  private settleNow(
+    t: Entry,
+    w: Watch,
+    exit: ExitFile | null,
+    commit?: { startSha: string; endSha: string; error?: string },
+  ) {
     const endedAt = exit?.endedAt ?? new Date(this.now()).toISOString();
     const seconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(t.startedAt)) / 1000));
     const canceled = exit ? exit.reason === "canceled" : t.canceling === true;
     const interrupted = !exit && !t.canceling;
-    // Canceled and the wrapper gone without an exit: make sure nothing of the command is left.
-    if (!exit && t.canceling) this.hardKill(t, this.dirOf(t.taskId));
     // Codex writes its final message to `last.txt` (`-o`): the result when the stream had none.
     const codexLast =
       t.executor === "codex" && !w.result
@@ -1384,7 +1448,12 @@ export class TaskManager {
             }
           })()
         : undefined;
-    const result = w.redact(w.result ?? codexLast ?? w.tail.join("\n")).slice(0, TASK_LIMITS.result);
+    // A commit that failed (a hook said no): the changes stay in the folder and the reason goes with the result.
+    const note = commit?.error ? `\n\nThe changes were not committed: ${commit.error}`.slice(0, 600) : "";
+    const text = w.result ?? codexLast ?? w.tail.join("\n");
+    const result = w
+      .redact(note ? `${text.slice(0, TASK_LIMITS.result - note.length)}${note}`.trim() : text)
+      .slice(0, TASK_LIMITS.result);
     t.status = interrupted ? "interrupted" : "done";
     t.endedAt = endedAt;
     t.done = {
@@ -1400,6 +1469,7 @@ export class TaskManager {
       ...(interrupted ? { interrupted: true } : {}),
       ...(t.session ? { session: t.session } : {}),
       ...(w.denials.length ? { denials: w.denials } : {}),
+      ...(commit ? { startSha: commit.startSha, endSha: commit.endSha } : {}),
     };
     t.delivered = false;
     this.save();
@@ -1461,6 +1531,75 @@ export class TaskManager {
   }
 }
 
+/** `TaskStart.commit.message`, cut. */
+const COMMIT_MESSAGE_MAX = 500;
+/** A commit's hooks may take this long (a pre-commit that runs the linter). */
+const COMMIT_TIMEOUT_MS = 10 * 60_000;
+const SHA = /^[0-9a-f]{7,64}$/;
+
+/** `git rev-parse HEAD` in `cwd`; undefined outside git or before the first commit. */
+export function headSha(cwd: string): string | undefined {
+  const r = spawnSync("git", ["rev-parse", "--verify", "-q", "HEAD^{commit}"], {
+    cwd,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const sha = !r.error && r.status === 0 ? r.stdout.trim() : "";
+  return SHA.test(sha) ? sha : undefined;
+}
+
+/** `TaskStart.baseCheck`: commits `branch` has beyond `sha` (`git rev-list --count`); undefined when git can't say. */
+export function commitsBehind(cwd: string, check: { branch?: unknown; sha?: unknown }): number | undefined {
+  const branch = typeof check.branch === "string" ? check.branch.trim() : "";
+  const sha = typeof check.sha === "string" ? check.sha.trim() : "";
+  if (!branch || branch.startsWith("-") || branch.length > 200 || !SHA.test(sha)) return undefined;
+  const r = spawnSync("git", ["rev-list", "--count", `${sha}..${branch}`, "--"], {
+    cwd,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const n = !r.error && r.status === 0 ? Number(r.stdout.trim()) : Number.NaN;
+  return Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+/**
+ * The end of a task with `commit` (ADR 0044): everything that changed in its
+ * folder becomes one commit. Nothing when the tree is clean. Hooks run (never
+ * `--no-verify`); when the commit fails the changes stay and `error` says why.
+ * The author is whoever the checkout has (`git.sync` sets the agent), else
+ * the agent by its handle.
+ */
+export async function commitChanges(
+  cwd: string,
+  message: string,
+  opts: { env: Record<string, string>; handle: string; startSha: string },
+): Promise<{ startSha: string; endSha: string; error?: string }> {
+  const { env } = opts;
+  const end = async () => {
+    const r = await git(cwd, ["rev-parse", "--verify", "-q", "HEAD^{commit}"], { env });
+    const sha = r.code === 0 ? r.stdout.trim() : "";
+    return SHA.test(sha) ? sha : opts.startSha;
+  };
+  const status = await git(cwd, ["status", "--porcelain"], { env });
+  if (status.code !== 0)
+    return { startSha: opts.startSha, endSha: await end(), error: gitWhy(status, "git status failed") };
+  if (!status.stdout.trim()) return { startSha: opts.startSha, endSha: await end() };
+  const add = await git(cwd, ["add", "-A"], { env });
+  if (add.code !== 0) return { startSha: opts.startSha, endSha: await end(), error: gitWhy(add, "git add failed") };
+  const email = await git(cwd, ["config", "user.email"], { env });
+  const handle = opts.handle.replace(/[^a-zA-Z0-9_-]/g, "") || "agent";
+  const author =
+    email.code === 0 && email.stdout.trim()
+      ? []
+      : ["-c", `user.name=${handle} (agentes)`, "-c", `user.email=${handle}@agents.agentes.chat`];
+  const commit = await git(cwd, [...author, "commit", "-q", "-m", message], { env, timeoutMs: COMMIT_TIMEOUT_MS });
+  return {
+    startSha: opts.startSha,
+    endSha: await end(),
+    ...(commit.code !== 0 ? { error: gitWhy(commit, "git commit failed") } : {}),
+  };
+}
+
 /** Whether `cwd` is inside a git work tree (false when git isn't installed). */
 export function isGitRepo(cwd: string): boolean {
   const r = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, encoding: "utf8", windowsHide: true });
@@ -1516,22 +1655,6 @@ export function createWorktree(cwd: string, folder: string, taskId: string, bran
   }
   excludeLocally(cwd, ".worktrees/");
   return target;
-}
-
-/** Adds a pattern to the repository's `info/exclude` (never committed, never shown as untracked). Best effort. */
-export function excludeLocally(cwd: string, pattern: string) {
-  const gitDir = spawnSync("git", ["rev-parse", "--git-common-dir"], { cwd, encoding: "utf8", windowsHide: true });
-  if (gitDir.error || gitDir.status !== 0) return;
-  const exclude = path.join(path.resolve(cwd, gitDir.stdout.trim()), "info", "exclude");
-  try {
-    const current = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
-    if (!current.split("\n").includes(pattern)) {
-      mkdirSync(path.dirname(exclude), { recursive: true });
-      writeFileSync(exclude, `${current}${current && !current.endsWith("\n") ? "\n" : ""}${pattern}\n`);
-    }
-  } catch {
-    // only cosmetic
-  }
 }
 
 /**

@@ -315,3 +315,85 @@ test("missions API: deliveries — list, check per person, Pedir ajustes (active
   const all = (await (await api(`/missions/${mission.id}/deliveries`)).json()) as { status: string }[];
   expect(all.map((d) => d.status)).toEqual(["accepted", "changes_requested"]);
 });
+
+test("missions API: the copy of the project (ADR 0044) — DTO fields, setup failure, worktree/retry, cancel deleting the branch", async () => {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["ok"] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const paired = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "MacBook" });
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
+  // A runner whose setup fails once; it keeps its worktree requests.
+  const hub = t.engine.machineHub;
+  const started: Extract<ServerFrame, { type: "request"; op: "task.start" }>[] = [];
+  const worktree: Extract<ServerFrame, { type: "request"; op: "mission.worktree" }>[] = [];
+  const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
+  const conn = hub.open({
+    send(text: string) {
+      const frame = JSON.parse(text) as ServerFrame;
+      if (frame.type !== "request") return;
+      setTimeout(() => {
+        const ok = (data: unknown) => void reply({ type: "result", id: frame.id, ok: true, data });
+        if (frame.op === "mission.worktree") {
+          worktree.push(frame);
+          if (frame.action === "remove") return ok({ removed: true });
+          return ok({
+            path: frame.path,
+            branch: frame.branch,
+            baseBranch: "main",
+            baseSha: "0123456789abcdef0123456789abcdef01234567",
+            created: !frame.baseSha,
+            dirty: false,
+            setupCommand: "bun install",
+            copied: [],
+          });
+        }
+        if (frame.op === "task.start") {
+          started.push(frame);
+          return ok({ taskId: frame.taskId, pid: 7, startedAt: new Date().toISOString(), cwd: frame.cwd ?? "", command: "x" });
+        }
+        if (frame.op === "read") return ok({ base64: null, size: 0 });
+        return ok({ size: 0 });
+      }, 1);
+    },
+    close() {},
+  });
+  await hub.message(conn, JSON.stringify({ type: "hello", token: paired.token, ...RUNNER, exec: true }));
+
+  const created = (await (
+    await api("/missions", { json: { agentId, channelId, goal: "Build our mobile app", title: "Mobile app" } })
+  ).json()) as Mission & { worktreeState: string; branch: string | null };
+  expect(created).toMatchObject({ worktreeState: "none", branch: null });
+  const startRes = (await (await api(`/missions/${created.id}/start`, { json: {} })).json()) as Record<string, unknown>;
+  expect(startRes).toMatchObject({ status: "active", worktreeState: "preparing", baseBranch: "main" });
+  expect(String(startRes.branch)).toMatch(/^agentes\/[0-9a-f]{8}\/mobile-app$/);
+  const setup = started[0];
+  expect(setup).toMatchObject({ executor: "shell", command: "bun install" });
+
+  // Retry before anything failed: refused.
+  expect((await api(`/missions/${created.id}/worktree/retry`, { json: {} })).status).toBe(409);
+  await reply({ type: "task.done", taskId: setup?.taskId, exitCode: 1, seconds: 3, lastLine: "install failed" });
+  await t.drain();
+  const failed = (await (await api(`/missions/${created.id}`)).json()) as Record<string, unknown>;
+  expect(failed).toMatchObject({ status: "paused", worktreeState: "failed" });
+  expect(String(failed.worktreeError)).toContain("install failed");
+  const tasks = (await (await api(`/threads/${created.threadId}/tasks`)).json()) as {
+    tasks: { mode: string | null; startSha: string | null; endSha: string | null }[];
+  };
+  expect(tasks.tasks[0]).toMatchObject({ mode: "setup", startSha: null, endSha: null });
+
+  const retried = await api(`/missions/${created.id}/worktree/retry`, { json: {} });
+  expect(retried.status).toBe(200);
+  expect((await retried.json()) as Record<string, unknown>).toMatchObject({ status: "active", worktreeState: "preparing" });
+  expect(started).toHaveLength(2);
+  await reply({ type: "task.done", taskId: started[1]?.taskId, exitCode: 0, seconds: 3 });
+  await t.drain();
+  expect(((await (await api(`/missions/${created.id}`)).json()) as Record<string, unknown>).worktreeState).toBe("ready");
+
+  const closed = await api(`/missions/${created.id}/close`, { json: { outcome: "canceled", deleteBranch: true } });
+  expect(closed.status).toBe(200);
+  expect(((await closed.json()) as Record<string, unknown>).worktreeState).toBe("removed");
+  expect(worktree.at(-1)).toMatchObject({ action: "remove", deleteBranch: true });
+});

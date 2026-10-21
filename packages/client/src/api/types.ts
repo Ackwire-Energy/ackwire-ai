@@ -2668,6 +2668,28 @@ export interface Mission {
   closedAt: string | null;
   closeReason: string | null;
   wikiPageId: string | null;
+  /** ADR 0044: the mission's own branch in its copy of the project (null until it is prepared). */
+  branch?: string | null;
+  /** The branch it started from ("a partir de main"). */
+  baseBranch?: string | null;
+  baseSha?: string | null;
+  /** Its copy of the project: being prepared, ready, failed (`worktreeError`), or removed at close. */
+  worktreeState?: MissionWorktreeState;
+  /** Why preparing failed (the last lines of the output). */
+  worktreeError?: string | null;
+}
+
+export type MissionWorktreeState = "none" | "preparing" | "ready" | "failed" | "removed";
+
+/** `meta.missionSetup`: preparing the mission's copy of the project failed ("Tentar de novo"). */
+export interface MissionSetupMeta {
+  state: "failed";
+  /** `branch_missing`: the mission's branch is gone from the computer; trying again starts over from the base. */
+  reason: "setup" | "ensure" | "branch_missing";
+  error: string;
+  branch?: string;
+  /** The thread's mission is used when absent. */
+  missionId?: string;
 }
 
 export type MissionListStatus = "open" | "closed" | "waiting_you" | MissionStatus;
@@ -2981,6 +3003,11 @@ export interface MachineTask {
   endedAt: string | null;
   lastEventAt: string | null;
   createdAt: string;
+  /** ADR 0044 (missions): writes in the mission's copy, only reads, or prepares the copy. */
+  mode?: "write" | "read" | "setup" | null;
+  /** The commits it started from and ended at ("O que mudou" per session). */
+  startSha?: string | null;
+  endSha?: string | null;
 }
 
 export type MissionFileName = "mission.md" | "decisions.md" | "notes.md";

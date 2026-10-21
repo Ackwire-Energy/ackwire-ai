@@ -83,6 +83,9 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
     m.pending.decisions + m.pending.reviews + m.pending.provisional + m.pending.commands + (m.pending.deliveries ?? 0);
   // Running: the live session rows when loaded (`machine.task` updates them at once), else the mission's count.
   const running = tasks.data ? sessions.filter((x) => x.status === "running").length : m.runningTasks;
+  // ADR 0044: the mission's own copy of the project is prepared first ("Preparando o projeto…").
+  const preparing = open && m.worktreeState === "preparing";
+  const setupFailed = open && m.worktreeState === "failed";
   const agentName = dir.agentById.get(m.agentId)?.name ?? "";
   const act = (action: MissionControl) =>
     control.mutate(
@@ -142,7 +145,16 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
               </span>
             )}
           </div>
-          <span className="channel__topic mh__meta">{t("missions.header.meta", { where })}</span>
+          <span className="channel__topic mh__meta">
+            {t("missions.header.meta", { where })}
+            {m.branch && (
+              <span className="mh__branch">
+                {" · "}
+                <code>{m.branch}</code>
+                {m.baseBranch && ` ${t("missions.header.base", { base: m.baseBranch })}`}
+              </span>
+            )}
+          </span>
         </div>
         <span className="mh__mini">{strip}</span>
         <div className="mh__end">
@@ -236,7 +248,19 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
             {t("missions.pinned.interrupted", { count: interrupted })}
           </span>
         )}
-        {!offline && running > 0 && (
+        {!offline && preparing && (
+          <span className="mi-pill">
+            <AgentSpinner agentId={m.agentId} />
+            {t("missions.setup.preparing")}
+          </span>
+        )}
+        {setupFailed && (
+          <span className={m.canAct ? "mi-pill mi-pill--need" : "mi-pill"} title={m.worktreeError ?? undefined}>
+            <Icon name="alert" size={14} />
+            {t("missions.setup.failedShort")}
+          </span>
+        )}
+        {!offline && !preparing && running > 0 && (
           <span className="mi-pill">
             <AgentSpinner agentId={m.agentId} />
             {t("missions.pinned.running", { count: running })}

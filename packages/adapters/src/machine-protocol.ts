@@ -455,12 +455,17 @@ export interface TaskStart {
      * it is this machine's, for this task, and still live.
      */
     mcpToken?: string;
+    /** Protocol 14: `plan` for a read item (ADR 0044): no edits (Claude Code's plan rules, Codex's read-only sandbox). Default `work`. */
+    mode?: "plan" | "work";
   };
   /**
    * Protocol 14 (ADR 0044), for a task in a git folder: record `HEAD` when it
    * starts and, when it ends (any way: done, failed, canceled), `git add -A`
    * and commit what changed with this message (nothing when the tree is
-   * clean). `TaskDone` then carries `startSha` and `endSha`.
+   * clean; the runner adds " (stopped)" when the task didn't exit 0: failed,
+   * canceled, timed out, interrupted). `TaskDone` then carries `startSha` and
+   * `endSha`; a commit a hook refused leaves the changes and says why at the
+   * end of `result`.
    */
   commit?: { message: string };
   /** Protocol 14: answer how many commits `branch` has beyond `sha` (`task.start` `baseBehind`). */
@@ -1004,6 +1009,37 @@ const fileList = (v: unknown) =>
         .map((p) => p.slice(0, TASK_LIMITS.filePath))
     : undefined;
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+/** A full or short git commit id (lowercase hex). */
+export const isSha = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{7,64}$/.test(v);
+
+/** Protocol 14: `task.start`'s `baseBehind` (a count of commits; absent when the runner couldn't tell). */
+export function parseBaseBehind(data: unknown): number | undefined {
+  const n = isObject(data) ? data.baseBehind : undefined;
+  return typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+/** Protocol 14: a `mission.worktree` `ensure` answer, checked (null when it isn't one). */
+export function parseMissionWorktreeEnsured(data: unknown): MissionWorktreeEnsured | null {
+  if (!isObject(data) || !isString(data.path) || !isString(data.branch) || typeof data.created !== "boolean") {
+    return null;
+  }
+  return {
+    path: data.path.slice(0, 500),
+    branch: data.branch.slice(0, 200),
+    baseBranch: isString(data.baseBranch) ? data.baseBranch.slice(0, 200) : "",
+    baseSha: isSha(data.baseSha) ? data.baseSha : "",
+    created: data.created,
+    dirty: data.dirty === true,
+    setupCommand: isString(data.setupCommand) && data.setupCommand.trim() ? data.setupCommand.slice(0, 2000) : null,
+    copied: Array.isArray(data.copied)
+      ? data.copied
+          .filter(isString)
+          .slice(0, 100)
+          .map((p) => p.slice(0, 300))
+      : [],
+  };
+}
+
 /** `task.done.denials`: at most `TASK_LIMITS.denials`, each cut, duplicates dropped. */
 const denialList = (v: unknown): TaskDenial[] => {
   if (!Array.isArray(v)) return [];
@@ -1278,6 +1314,8 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const files = fileList(f.files);
       const session = cut(f.session, 64);
       const denials = denialList(f.denials);
+      // Protocol 14: both or neither.
+      const shas = isSha(f.startSha) && isSha(f.endSha) ? { startSha: f.startSha, endSha: f.endSha } : {};
       return {
         type: "task.done",
         taskId: f.taskId.slice(0, 64),
@@ -1292,6 +1330,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(f.interrupted === true ? { interrupted: true } : {}),
         ...(session !== undefined ? { session } : {}),
         ...(denials.length ? { denials } : {}),
+        ...shas,
       };
     }
     case "mcp.call": {
@@ -1388,7 +1427,7 @@ const RULES_END =
  * (`--append-system-prompt`) and written in `.agentes/mission.md`. Plain
  * characters only: the runner passes it as one shell argument (`cleanRules`).
  */
-export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back directly: ask with request_approval and wait. Work on your own branch, commit work in progress after each step and push the branch now and then. ${RULES_END}`;
+export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back directly: ask with request_approval and wait. Work on the mission's own branch in the mission's folder (don't create or switch branches), commit work in progress after each step and push the branch now and then. ${RULES_END}`;
 
 /**
  * The same rules for a mission folder that is not a git repository (images,
@@ -1396,7 +1435,7 @@ export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back di
  * pushes; results go to the people with upload_artifact or request_review.
  * The runner picks this one when the task's folder isn't a repository.
  */
-export const MISSION_RULES_NO_GIT = `${RULES_START} Never deploy or publish anything directly: ask with request_approval and wait. This mission folder is not a git repository and doesn't need one: don't create one. Work in your folder (an item started with start_task gets its own subfolder under work/), and deliver results with upload_artifact or request_review. ${RULES_END}`;
+export const MISSION_RULES_NO_GIT = `${RULES_START} Never deploy or publish anything directly: ask with request_approval and wait. This mission folder is not a git repository and doesn't need one: don't create one. Work in the mission folder (items started with start_task work there too, one that writes at a time), and deliver results with upload_artifact or request_review. ${RULES_END}`;
 
 const PLAN_STATUSES = ["todo", "doing", "waiting_you", "done", "dropped"];
 
@@ -1526,15 +1565,15 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "start_task",
     description:
-      "Main session only: start one plan item as its own background session that runs in parallel. In a git repository it works on a new branch in its own worktree; otherwise in its own subfolder work/<branch>/ of the mission folder (branch is then just that subfolder's name). You are told when it ends. Give it everything it needs in prompt. Small work you can just do yourself.",
+      'Main session only: start one plan item as its own background session in the mission\'s folder (the mission\'s own copy of the project, on its branch). mode "write" (default): it may change files; write items run one at a time, in the order you start them (one started while another runs waits in a queue and starts by itself), and each ends in one commit you are told about. mode "read": research, analysis or review with no write access; read items may run in parallel. An item that finds the computer full waits in the queue too. You are told when it ends. Give it everything it needs in prompt. Small work you can just do yourself.',
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", minLength: 1, maxLength: 120 },
         prompt: { type: "string", minLength: 1, maxLength: 20000 },
-        branch: { type: "string", minLength: 1, maxLength: 120 },
+        mode: { enum: ["write", "read"] },
       },
-      required: ["title", "prompt", "branch"],
+      required: ["title", "prompt"],
       additionalProperties: false,
     },
   },

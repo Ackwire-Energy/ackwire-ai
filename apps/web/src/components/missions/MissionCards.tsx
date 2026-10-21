@@ -7,6 +7,7 @@ import type {
   MissionLinkMeta,
   MissionPlanMeta,
   MissionReportMeta,
+  MissionSetupMeta,
   MissionSuggestionMeta,
 } from "@agenteschat/client";
 import {
@@ -19,8 +20,10 @@ import {
   useMissionDeliveries,
   useMissionPlan,
   useMissionReviews,
+  useRetryMissionWorktree,
   useSetCommandApproval,
   useSetMissionExecutor,
+  useThreadMission,
   useThreadTasks,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -31,6 +34,7 @@ import {
   findingRefUrl,
   findingsRepo,
   formatSpan,
+  lastLines,
   machineTaskOf,
   missionAutoApprovedOf,
   missionCardRef,
@@ -251,6 +255,14 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
             })}
           </span>
         </div>
+        {m?.baseBranch && (
+          <div className="mi-plan__meta">
+            <span className="mi-plan__label mi-plan__label--wide">
+              <Icon name="pullRequest" size={14} />
+              {t("missions.plan.base", { base: m.baseBranch })}
+            </span>
+          </div>
+        )}
         {m && choices.length > 1 && (
           <div className="mi-plan__meta">
             <span className="mi-plan__label">
@@ -1368,6 +1380,74 @@ export function MissionEphemeral({
         <Skeleton width="60%" />
       )}
       <p className="mi-ephemeral__foot">{t("missions.ephemeral.onlyYou")}</p>
+    </section>
+  );
+}
+
+/**
+ * `meta.missionSetup` (ADR 0044): preparing the mission's copy of the project
+ * failed. The end of the error in a code block and "Tentar de novo" for whoever
+ * can act on the mission; once retried, the card says where it stands now.
+ */
+export function MissionSetupCard({ setup, threadId }: { setup: MissionSetupMeta; threadId: string | null }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const byId = useMission(org.id, setup.missionId);
+  const ofThread = useThreadMission(org.id, threadId, !setup.missionId);
+  const m = setup.missionId ? byId.data : ofThread.data;
+  const retry = useRetryMissionWorktree(org.id, m?.id ?? "");
+  const lost = setup.reason === "branch_missing";
+  const tail = lost ? "" : lastLines(setup.error);
+  const state = m?.worktreeState;
+  const title = t(lost ? "missions.setup.lostTitle" : "missions.setup.failedTitle");
+  const open = m ? m.status !== "done" && m.status !== "canceled" : false;
+  return (
+    <section className="mi-card mi-setup" aria-label={title}>
+      <div className="mi-tags">
+        <Chip icon="alert" tone={m?.canAct && state === "failed" && open ? "waiting" : "neutral"}>
+          {t("missions.setup.cap")}
+        </Chip>
+      </div>
+      <h3 className="mi-setup__title">{title}</h3>
+      {lost && <p className="mi-hint">{t("missions.setup.lostText", { branch: setup.branch ?? m?.branch ?? "" })}</p>}
+      {tail && (
+        <pre className="mi-cmd__line mi-setup__error" aria-label={t("missions.setup.errorLabel")}>
+          <code>{tail}</code>
+        </pre>
+      )}
+      {state === "preparing" ? (
+        <p className="mi-hint mi-setup__now">
+          <AgentSpinner agentId={m?.agentId} />
+          {t("missions.setup.preparing")}
+        </p>
+      ) : state === "ready" ? (
+        <p className="mi-hint mi-setup__now">
+          <Icon name="check" size={14} />
+          {t("missions.setup.ready")}
+        </p>
+      ) : m && open && state === "failed" ? (
+        m.canAct ? (
+          <div className="mi-foot">
+            <Button
+              variant="primary"
+              size="sm"
+              icon="refresh"
+              loading={retry.isPending}
+              onClick={() =>
+                retry.mutate(undefined, {
+                  onSuccess: () => toast.show(t("missions.setup.retrying")),
+                  onError: (error) => toast.show(errorText(t, error), "error"),
+                })
+              }
+            >
+              {t(lost ? "missions.setup.restart" : "missions.setup.retry")}
+            </Button>
+          </div>
+        ) : (
+          <p className="mi-hint mi-setup__now">{t("missions.setup.waiting")}</p>
+        )
+      ) : null}
     </section>
   );
 }

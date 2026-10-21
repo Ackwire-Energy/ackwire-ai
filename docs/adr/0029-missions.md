@@ -288,6 +288,10 @@ Runner isolation (ADR 0030) interleaves: its level 1 before parallel tasks, shor
 
 This supersedes the parts above where the executor's main session is a machine task. The main session is now the agent's run in the home thread with the mission's brain (the API model, Claude Code or Codex); proposing, Start, people's messages, suggestions, decisions, reviews and items' ends are notices that start or join its run (the executor-agent flow, now for every brain). Item sessions stay machine tasks (work mode only) with their own MCP tools, without `request_approval` (merges, deploys and rollbacks are the main session's ADR 0015 approvals). `send_to_mission`, the `plan` mode of `task.start`, the task-bound approvals (`mission.approval_decided`) and the `MISSIONS_ON_ENGINE` flag are gone. MVP decision: missions open before this change are not migrated (they may stop or need a new message). Details in ADR 0032, "Missions on the engine".
 
+### One worktree per mission (2026-10-21, ADR 0044)
+
+This supersedes "the task's own git worktree and branch" in section 4, the item branches and `work/<item>/` subfolders in "Missions as built" and "Polish round", and `start_task`'s `branch`. At Start the runner makes the mission's own copy of the project (`.worktrees/m-<short id>` on `agentes/<short id>/<slug>`, from the branch checked out in `repo_dir`; migration 0085: `missions.branch`, `base_branch`, `base_sha`, `worktree_path`, `worktree_state`, `worktree_error`); setup runs there first; the main session and every item work in it. `start_task` takes `mode` (`write`, one at a time, each ending in a commit with `machine_tasks.start_sha`/`end_sha`; `read`, in parallel) and items that can't start wait in a queue (`machine_tasks.start_request`) instead of failing with `no_slot`. Runner protocol 14 is required for missions. Details in ADR 0044.
+
 ## Consequences
 
 - Long work costs us almost nothing in model tokens: the executor thinks, our code renders and guards.

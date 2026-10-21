@@ -273,6 +273,12 @@ export function createFakeMissions(
       touch(m, { status: input.outcome, closedAt: ctx.now().toISOString(), runningTasks: 0 });
       return clone(m);
     },
+    retryWorktree: async (orgId, missionId) => {
+      log("missions.retryWorktree", orgId, missionId);
+      const m = await find(orgId, missionId);
+      touch(m, { worktreeState: "preparing", worktreeError: null });
+      return clone(m);
+    },
     message: async (orgId, missionId, text) => {
       log("missions.message", orgId, missionId, text);
       await find(orgId, missionId);

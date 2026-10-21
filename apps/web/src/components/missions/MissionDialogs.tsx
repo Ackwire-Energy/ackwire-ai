@@ -368,11 +368,19 @@ export function CloseMissionDialog({
   const close = useCloseMission(org.id);
   const [outcome, setOutcome] = useState<"done" | "canceled">("done");
   const [wiki, setWiki] = useState(true);
+  // Canceling: keep the mission's branch (default) or delete it with the copy of the project (ADR 0044).
+  const [branch, setBranch] = useState<"keep" | "delete">("keep");
   const wikiId = useId();
   const agent = dir.agentById.get(mission.agentId)?.name ?? "";
+  const hasBranch = Boolean(mission.branch);
   const submit = () =>
     close.mutate(
-      { missionId: mission.id, outcome, saveToWiki: wiki },
+      {
+        missionId: mission.id,
+        outcome,
+        saveToWiki: wiki,
+        ...(outcome === "canceled" && hasBranch ? { deleteBranch: branch === "delete" } : {}),
+      },
       {
         onSuccess: () => {
           onOpenChange(false);
@@ -420,6 +428,29 @@ export function CloseMissionDialog({
             description={t("missions.close.canceledText")}
           />
         </RadioGroup>
+        {outcome === "canceled" && hasBranch && (
+          <RadioGroup
+            value={branch}
+            onValueChange={setBranch}
+            aria-label={t("missions.close.branch")}
+            style={{ display: "grid", gap: 8 }}
+          >
+            <RadioCard
+              value="keep"
+              id="mission-close-keep"
+              checked={branch === "keep"}
+              title={t("missions.close.keepBranch")}
+              description={t("missions.close.keepBranchText", { branch: mission.branch })}
+            />
+            <RadioCard
+              value="delete"
+              id="mission-close-delete"
+              checked={branch === "delete"}
+              title={t("missions.close.deleteBranch")}
+              description={t("missions.close.deleteBranchText", { branch: mission.branch })}
+            />
+          </RadioGroup>
+        )}
         <div className="mi-optrow">
           <div>
             <label htmlFor={wikiId}>{t("missions.close.wiki")}</label>

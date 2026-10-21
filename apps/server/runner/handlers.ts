@@ -21,6 +21,7 @@ import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
 import type { McpTaskInfo } from "./mcp";
+import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { agentSecrets, handleSecret } from "./secrets";
@@ -322,6 +323,13 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
         },
         req,
       );
+    case "mission.worktree":
+      // The runner's own git in the agent's folder (like `git.sync`). Making a folder is new work; removing one isn't.
+      if (!req.agent) throw new RunnerError("bad_request", "A mission's folder belongs to an agent");
+      if (req.action === "ensure" && ctx.paused?.()) {
+        throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+      }
+      return missionWorktree(ctx.workspaceReal, req);
     case "exec":
       return doExec(ctx, req, scope, secrets);
     case "read":
@@ -592,6 +600,8 @@ function describeOp(req: MachineRequest): string {
       const repos = Array.isArray(req.repos) ? req.repos.map((r) => String(r?.repo ?? "")).join(", ") : "";
       return `git.sync ${repos || "(existing checkouts)"}`;
     }
+    case "mission.worktree":
+      return `mission.worktree ${String(req.action ?? "")} ${String(req.path ?? "")}`;
     case "access.request":
       return `access.request ${String(req.path ?? "")}`;
     case "browser.act": {

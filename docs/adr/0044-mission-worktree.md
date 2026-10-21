@@ -44,7 +44,7 @@ The runner prepares the worktree right after creating it (`worktree_state = prep
 
 1. **Copy local files git ignores** from `repo_dir`: by default the `.env*` files at the root that git doesn't track. They are copied on the computer only and never sent to the server.
 2. **Install dependencies**: by default from the lockfile at the root (`bun.lock` → `bun install`, `pnpm-lock.yaml` → `pnpm install --frozen-lockfile`, `package-lock.json` → `npm ci`, `yarn.lock` → `yarn install --frozen-lockfile`); nothing when there is none.
-3. **Project override:** an optional `agentes.json` at the repository root, meant to be committed: `{ "copy": [".env", "apps/web/.env.local"], "setup": "bun install && bun run db:generate" }`. When present it replaces both defaults.
+3. **Project override:** an optional `agentes.json` at the repository root, meant to be committed: `{ "copy": [".env", "apps/web/.env.local"], "setup": "bun install && bun run db:generate" }`. Each field present replaces only its own default (`"setup": ""` runs nothing). Copied files that git doesn't ignore are added to `info/exclude`, so the end-of-item commit never takes a `.env`.
 
 Setup has a 10-minute limit and its output goes to the task journal. On failure the state becomes `failed`, the mission pauses and the thread gets a card ("Não consegui preparar o projeto", the last lines, "Tentar de novo"). No item starts in a broken folder.
 
@@ -54,9 +54,9 @@ Shared `node_modules` through links (Orca's `sharedDirectories`) is left out: on
 
 - `start_task` gains `mode`: `write` (default) or `read`.
 - **Write items** run one at a time in the mission's folder. A write item started while another runs is stored as `queued` and starts by itself when the folder is free, in order.
-- **Read items** run in parallel in the same folder with no write access (Claude Code with edit tools denied, Codex with its read-only sandbox, as the planning turn already does).
+- **Read items** run in parallel in the same folder with no write access, enforced on the computer (`task.start` `mission.mode: "plan"`: Claude Code's plan rules, Codex's read-only sandbox).
 - **Full machine:** any item that finds no slot is `queued` too ("aguardando vaga") instead of failing with `task.no_slot`. The server starts queued items when the runner reports a free slot or the computer comes back.
-- **Every write item ends in a commit.** At its end the runner records `start_sha`, commits whatever changed as `agentes: <item title>` (or `agentes: <item title> (stopped)` when it failed or was canceled), and records `end_sha`. The folder never carries loose changes from one item to the next, and the main session is told what each item changed (`start_sha..end_sha`).
+- **Every write item ends in a commit.** At its end the runner records `start_sha`, commits whatever changed as `agentes: <item title>` (the runner adds " (stopped)" when it failed or was canceled; a commit refused by a hook leaves the changes staged and says why), and records `end_sha`. The folder never carries loose changes from one item to the next, and the main session is told what each item changed (`start_sha..end_sha`).
 - **Base drift:** when an item starts, the runner compares the base branch's tip with `base_sha`. If it moved, the main session is told how many commits behind the mission is. Nothing rebases by itself.
 
 ### Recovery
