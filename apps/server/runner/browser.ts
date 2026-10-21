@@ -64,8 +64,10 @@ import { agentFolderName, isInside } from "./paths";
  *   profiles, so navigations are checked before they go and the page after
  *   each action (top-level pages only; sub-resources aren't filtered).
  * - Live view: the session's local stream (JPEG frames over a WebSocket) is
- *   relayed as `browser.frame` only while the server asked for it, and a
- *   person's input goes back over the same socket.
+ *   relayed as `browser.frame` only while the server asked for it, with the
+ *   active tab's address and title; a page that isn't repainting gets one
+ *   screenshot as its first frame. A stream can't start on a closed browser
+ *   (`browser_closed`): a command opens it first.
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -92,6 +94,8 @@ const INPUT_TIMEOUT_MS = 5_000;
 /** After a failed download or install, wait this long before trying again. */
 const RETRY_FAILURE_MS = 10 * 60_000;
 const STREAM_OPEN_MS = 5000;
+/** A new stream with no frame from Chrome after this sends one screenshot instead (`firstFrame`). */
+const FIRST_FRAME_MS = 1000;
 /** A session that answered this long before its idle timeout is checked again before a read. */
 const ALIVE_MARGIN_MS = 60_000;
 
@@ -601,6 +605,8 @@ export interface BrowserManagerOptions {
   now?: () => number;
   /** Tests: opens the session's stream socket. */
   connectStream?: (url: string) => StreamSocket;
+  /** Tests: how long a new stream waits for Chrome's first frame (`FIRST_FRAME_MS`). */
+  firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
   startChrome?: (exe: string, args: string[], profile: string) => Promise<OwnChrome>;
   /** Tests: whether a pid left in `chromes.json` is still that Chrome (default: asks the system). */
@@ -618,9 +624,21 @@ interface Stream {
   /** Input batches run one after another, in order. */
   inputQueue: Promise<unknown>;
   url?: string;
+  /** The active tab's title, from the stream's tab list (cleared when the URL moves on). */
+  title?: string;
+  /** The page's size in CSS pixels, from the stream's status. */
+  viewport?: { width: number; height: number };
+  /** A frame went out on this stream. */
+  framed?: boolean;
   /** Closed by us (stop, mode off): no `ended` frame for an expected close. */
   closing: boolean;
 }
+
+/** What a frame says about the page besides its size: the active tab's address and title. */
+const pageMeta = (stream: Stream) => ({
+  ...(stream.url ? { url: stream.url } : {}),
+  ...(stream.title ? { title: stream.title } : {}),
+});
 
 interface Session {
   agentId: string;
@@ -1470,7 +1488,7 @@ export class BrowserManager {
   async streamStart(agent: AgentScope, mode: BrowserStreamMode): Promise<MachineReplies["browser.stream.start"]> {
     if (mode !== "watch" && mode !== "control") throw new RunnerError("bad_request", "mode must be watch or control");
     const session = this.sessions.get(String(agent.id ?? ""));
-    if (!session) throw new RunnerError("bad_request", "The agent's browser isn't open");
+    if (!session) throw new RunnerError("browser_closed", "The agent's browser isn't open");
     session.lastUsed = this.now();
     // One socket per session: a start while another opens waits for it, then only changes the mode.
     while (session.streamOpening) await session.streamOpening.catch(() => undefined);
@@ -1503,7 +1521,7 @@ export class BrowserManager {
       }
       return isRecord(status.data) && typeof status.data.port === "number" ? status.data.port : null;
     });
-    if (port === null) throw new RunnerError("bad_request", "The agent's browser isn't open");
+    if (port === null) throw new RunnerError("browser_closed", "The agent's browser isn't open");
     const url = `ws://127.0.0.1:${port}/?maxFps=${STREAM_FPS[mode]}`;
     const socket = (this.opts.connectStream ?? ((u: string) => new WebSocket(u) as unknown as StreamSocket))(url);
     const stream: Stream = {
@@ -1542,6 +1560,7 @@ export class BrowserManager {
     session.stream = stream;
     this.changed();
     socket.onmessage = (event) => this.onStreamMessage(session, stream, event.data);
+    void this.firstFrame(session, stream);
     socket.onerror = () => undefined;
     socket.onclose = () => {
       if (session.stream !== stream) return;
@@ -1564,10 +1583,36 @@ export class BrowserManager {
       return;
     }
     if (!isRecord(msg)) return;
-    if (msg.type === "url" && typeof msg.url === "string") {
+    const setUrl = (raw: string) => {
+      const url = raw.slice(0, BROWSER_LIMITS.url);
+      if (url === stream.url) return;
       const before = stream.url ? pageHost(stream.url) : null;
-      stream.url = msg.url.slice(0, BROWSER_LIMITS.url);
-      if (pageHost(stream.url) !== before) this.changed();
+      stream.url = url;
+      // Another page: its title comes with the next tab list.
+      stream.title = undefined;
+      if (pageHost(url) !== before) this.changed();
+    };
+    if (msg.type === "url" && typeof msg.url === "string") {
+      setUrl(msg.url);
+      return;
+    }
+    // Sent on connect and after every command: the active tab's address and title.
+    if (msg.type === "tabs" && Array.isArray(msg.tabs)) {
+      const active = msg.tabs.find((t) => isRecord(t) && t.active === true);
+      if (isRecord(active) && typeof active.url === "string") {
+        setUrl(active.url);
+        if (typeof active.title === "string" && active.title) {
+          stream.title = active.title.slice(0, BROWSER_LIMITS.title);
+        }
+      }
+      return;
+    }
+    if (msg.type === "status") {
+      const width = Number(msg.viewportWidth);
+      const height = Number(msg.viewportHeight);
+      if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+        stream.viewport = { width, height };
+      }
       return;
     }
     if (msg.type !== "frame" || typeof msg.data !== "string" || msg.data.length > BROWSER_LIMITS.frameBytes) return;
@@ -1578,6 +1623,7 @@ export class BrowserManager {
     if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(seq)) return;
     const scale = Number(m.pageScaleFactor);
     session.lastUsed = this.now();
+    stream.framed = true;
     // Newest wins: a frame the connection can't take now is dropped, never queued.
     this.opts.send({
       type: "browser.frame",
@@ -1588,9 +1634,48 @@ export class BrowserManager {
         deviceWidth: width,
         deviceHeight: height,
         ...(Number.isFinite(scale) ? { pageScaleFactor: scale } : {}),
-        ...(stream.url ? { url: stream.url } : {}),
+        ...pageMeta(stream),
       },
     });
+  }
+
+  /**
+   * Chrome doesn't reliably send a screencast frame for a page that isn't
+   * repainting (`agent-browser` seeds its own recordings for that reason), and
+   * its stream only replays a frame it already has: an idle page would show
+   * nothing. A stream still without a frame after `FIRST_FRAME_MS` sends one
+   * screenshot as its first (in the session's queue, after the agent's command).
+   */
+  private async firstFrame(session: Session, stream: Stream) {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, this.opts.firstFrameMs ?? FIRST_FRAME_MS);
+      (timer as { unref?: () => void }).unref?.();
+    });
+    const waiting = () => session.stream === stream && !stream.framed && !this.closed && !!stream.viewport;
+    if (!waiting()) return;
+    const file = path.join(this.opts.home, "browser", `${session.name}-frame.jpg`);
+    await this.enqueue(session, async () => {
+      if (!waiting()) return;
+      try {
+        const shot = await this.run(
+          session,
+          ["screenshot", file, "--screenshot-format", "jpeg", "--screenshot-quality", "70"],
+          { timeoutMs: QUICK_TIMEOUT_MS },
+        );
+        const data = shot.success ? (await readFile(file)).toString("base64") : "";
+        const size = stream.viewport;
+        if (!data || data.length > BROWSER_LIMITS.frameBytes || !size || !waiting()) return;
+        this.opts.send({
+          type: "browser.frame",
+          agentId: session.agentId,
+          seq: 0,
+          data,
+          metadata: { deviceWidth: size.width, deviceHeight: size.height, ...pageMeta(stream) },
+        });
+      } finally {
+        await rm(file, { force: true }).catch(() => undefined);
+      }
+    }).catch(() => undefined);
   }
 
   /** `browser.stream.stop` (after a stream still opening, so it doesn't outlive the stop). */

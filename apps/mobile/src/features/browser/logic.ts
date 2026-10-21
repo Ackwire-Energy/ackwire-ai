@@ -1,4 +1,9 @@
-import type { BrowserHandoff } from "@agenteschat/client";
+import {
+  type AgentAccess,
+  BROWSER_TOOL_SCOPE,
+  type BrowserHandoff,
+  type BrowserLiveUnavailable,
+} from "@agenteschat/client";
 
 /**
  * The agent's browser on the phone (ADR 0040, NavegadorAgente.html): what only the app decides. The
@@ -48,3 +53,47 @@ export type LiveKey = (typeof LIVE_KEYS)[number];
 /** Quick reasons on "Não consegui" (the person may also write their own). */
 export const FAILED_REASONS = ["code", "password", "blocked"] as const;
 export type FailedReason = (typeof FAILED_REASONS)[number];
+
+/** The longest note the server takes on Pronto, Devolver or Não consegui. */
+export const NOTE_MAX = 1000;
+
+/** The agent may use its browser: `browser:use` granted to it ("all tools" doesn't cover it). */
+export const browserGranted = (access: Pick<AgentAccess, "builtins"> | null | undefined) =>
+  Boolean(access?.builtins.some((s) => s.scope === BROWSER_TOOL_SCOPE && s.state === "granted"));
+
+/**
+ * The agent's browser on its profile: its card (watch, take over) for whoever may take it over (its owner
+ * and admins, while its computer serves the browser) and while a person is in it; a request still waiting,
+ * for anyone else, as the row that opens the request's conversation; else nothing.
+ */
+export function profileBrowserOf(
+  open: Pick<BrowserHandoff, "status"> | null,
+  mayTakeOver: boolean,
+): "card" | "waiting" | null {
+  if (mayTakeOver) return "card";
+  if (!open) return null;
+  return open.status === "pending" ? "waiting" : "card";
+}
+
+/** Why the card has no live page: the server's reason, or the stream ended. */
+export type PageGap = BrowserLiveUnavailable | "ended";
+
+export interface PageNote {
+  say: PageGap | "starting" | "hidden";
+  /** Only while the page may still come by itself. */
+  spin: boolean;
+  help: "grace" | "closedHelp" | null;
+}
+
+/**
+ * The page box with no page to show: opening, hidden while someone else is in control (their screen
+ * stays theirs), or why it can't be shown, with a line of help where waiting means something. A closed
+ * or ended browser holds until a frame comes, and none comes to a hidden view: there, who holds it wins.
+ */
+export function pageNoteOf(gap: PageGap | null, hidden: boolean, mine: boolean): PageNote {
+  if (gap && !(hidden && (gap === "closed" || gap === "ended"))) {
+    const help = gap === "closed" ? "closedHelp" : gap === "reconnecting" && mine ? "grace" : null;
+    return { say: gap, spin: gap === "reconnecting", help };
+  }
+  return hidden ? { say: "hidden", spin: false, help: null } : { say: "starting", spin: true, help: null };
+}

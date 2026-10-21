@@ -949,8 +949,11 @@ export interface ApiClient {
     handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
     /** Take control of a request (one person at a time; 409 when someone else has it). */
     takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;
-    /** "Pronto" (also hands back a take over): the agent reads the page again and goes on. */
-    done(orgId: string, handoffId: string): Promise<BrowserHandoff>;
+    /**
+     * "Pronto", or "Devolver" for a take over: the agent reads the page again and goes on, told who
+     * had it, for how long, the pages, and `note` as the person's own words.
+     */
+    done(orgId: string, handoffId: string, note?: string): Promise<BrowserHandoff>;
     /** "Não consegui", with an optional reason the agent reads. */
     failed(orgId: string, handoffId: string, note?: string): Promise<BrowserHandoff>;
     cancel(orgId: string, handoffId: string): Promise<BrowserHandoff>;
@@ -959,6 +962,12 @@ export interface ApiClient {
      * was taken from (the take over is bound to it, so its card stays in that conversation).
      */
     takeover(orgId: string, agentId: string, runId?: string): Promise<BrowserHandoff>;
+    /**
+     * The person in control opens a site (a bare host gets https://); a closed browser opens. 409
+     * `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
+     * `browser.bad_address` or `browser.open_failed`.
+     */
+    open(orgId: string, agentId: string, url: string): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). */
     stop(orgId: string, agentId: string): Promise<void>;
   };

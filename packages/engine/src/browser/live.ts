@@ -5,7 +5,7 @@ import {
   type RunnerFrame,
 } from "@agenteschat/adapters";
 import { and, eq, inArray, schema } from "@agenteschat/db";
-import type { MachineHub } from "../machine-hub";
+import { type MachineHub, MachineRequestError } from "../machine-hub";
 import { getMachineById, machineOnline } from "../machines";
 import {
   BROWSER_HANDOFF_TOPIC,
@@ -24,7 +24,7 @@ import {
   setControlDeadline,
   touchControl,
 } from "./handoff";
-import type { BrowserFrame, BrowserViewer, StreamRelay } from "./types";
+import type { BrowserFrame, BrowserPage, BrowserViewer, StreamRelay } from "./types";
 
 const { agents, browserHandoffs } = schema;
 
@@ -100,24 +100,31 @@ export function createMemoryStreamRelay(): StreamRelay {
 /** What a viewer's socket receives (`/api/ws`, wrapped by the realtime layer). */
 export type BrowserLiveMessage =
   | ({ type: "browser.frame" } & BrowserFrame)
-  /** Who is in control and the open handoff, on watch and whenever it changes. */
+  /**
+   * Who is in control and the open handoff, on watch and whenever it changes.
+   * `hidden`: someone else is in control, so this viewer gets no frames until
+   * they hand it back (what a person types in the agent's browser stays theirs).
+   */
   | {
       type: "browser.status";
       agentId: string;
       mode: BrowserStreamMode;
       controllerUserId: string | null;
       handoff: BrowserHandoffView | null;
+      hidden: boolean;
     }
   /**
    * The browser can't be shown from here now: `reconnecting` (the computer is
    * held by another server or is coming back: retry with backoff), `offline`,
-   * `no_computer`, `unavailable` (the runner said why in `message`),
-   * `forbidden` (this person may no longer see it: the view stopped).
+   * `no_computer`, `closed` (the agent's browser isn't open: retry with
+   * backoff, it shows once something opens it), `unavailable` (the runner said
+   * why in `message`), `forbidden` (this person may no longer see it: the
+   * view stopped).
    */
   | {
       type: "browser.unavailable";
       agentId: string;
-      reason: "reconnecting" | "offline" | "no_computer" | "unavailable" | "forbidden";
+      reason: "reconnecting" | "offline" | "no_computer" | "closed" | "unavailable" | "forbidden";
       message?: string;
     }
   /**
@@ -150,6 +157,13 @@ interface AgentLive {
   mode: BrowserStreamMode | null;
   controllerUserId: string | null;
   handoff: BrowserHandoffView | null;
+  /** The page of the latest frame (address and title), for what the agent is told after a person's turn. */
+  page: BrowserPage | null;
+  /**
+   * The newest frame of the running stream, in memory only: a viewer who joins (or whose view
+   * is no longer hidden) sees the page at once, since a page that isn't repainting sends none.
+   */
+  frame: BrowserFrame | null;
   /** The person in control left: control ends when this fires, unless they come back. */
   grace: ReturnType<typeof setTimeout> | null;
   /** Stream changes run one after the other (a start never races a mode change or a stop). */
@@ -157,6 +171,10 @@ interface AgentLive {
   /** The last viewer left: the stream stops when this fires, unless someone watches again. */
   stopTimer: ReturnType<typeof setTimeout> | null;
 }
+
+/** While a person is in control only they get the page: nobody else watches what they type there. */
+const hiddenFrom = (state: Pick<AgentLive, "controllerUserId">, userId: string) =>
+  state.controllerUserId !== null && state.controllerUserId !== userId;
 
 export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
   hub: Pick<MachineHub, "call" | "isLocal"> & Partial<Pick<MachineHub, "sendBrowserHandoff">>;
@@ -174,8 +192,10 @@ export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
  * per agent, the runner's stream started with the first viewer (`watch`,
  * about 1 fps), switched to `control` while the person in control watches,
  * and stopped with the last; a person's input forwarded only for whoever is
- * in control. The machine hub hands it the runner's frames (`hubHooks`), the
- * handoff tells it when control changes hands (`handoffHooks`).
+ * in control, and while someone is in control only they get frames (the
+ * others' status says `hidden`). The machine hub hands it the runner's
+ * frames (`hubHooks`), the handoff tells it when control changes hands and
+ * asks it for the page (`handoffHooks`).
  */
 export function createBrowserLive(deps: BrowserLiveDeps) {
   const relay = createMemoryStreamRelay();
@@ -197,13 +217,23 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     }
   };
 
-  const status = (agentId: string, state: AgentLive): BrowserLiveMessage => ({
+  const status = (agentId: string, state: AgentLive, userId: string): BrowserLiveMessage => ({
     type: "browser.status",
     agentId,
     mode: state.mode ?? "watch",
     controllerUserId: state.controllerUserId,
     handoff: state.handoff,
+    hidden: hiddenFrom(state, userId),
   });
+
+  /** Each viewer's own status: whether the page is hidden from them depends on who they are. */
+  const broadcastStatus = (agentId: string, state: AgentLive) => {
+    for (const v of state.viewers) {
+      try {
+        v.send(status(agentId, state, v.userId));
+      } catch {}
+    }
+  };
 
   /** The mode the stream should run in now: control while the person in control watches. */
   const wanted = (state: AgentLive): BrowserStreamMode | null => {
@@ -246,21 +276,28 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       return;
     }
     const agent = { id: agentId, handle: state.handle };
+    // A fresh stream (or none): the page is known again from its first frame.
+    if (state.mode === null || mode === null) {
+      state.page = null;
+      state.frame = null;
+    }
     state.mode = mode;
     try {
       if (mode === null) await deps.hub.call(state.machineId, { op: "browser.stream.stop", agent });
       else {
         await deps.hub.call(state.machineId, { op: "browser.stream.start", mode, agent });
-        broadcast(state, status(agentId, state));
+        broadcastStatus(agentId, state);
       }
     } catch (error) {
       // Stopping a stream that is already gone is fine; a stream that can't start is told to the viewers.
       if (mode === null) return;
       state.mode = null;
+      // An older runner says `bad_request` for a closed browser: still `unavailable`, with its message.
+      const closed = error instanceof MachineRequestError && error.code === "browser_closed";
       broadcast(state, {
         type: "browser.unavailable",
         agentId,
-        reason: "unavailable",
+        reason: closed ? "closed" : "unavailable",
         message: error instanceof Error ? error.message : String(error),
       });
     }
@@ -277,13 +314,55 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     }
   };
 
+  /** The newest frame to one viewer (joining, or no longer hidden), while the stream runs. */
+  const sendLatest = (state: AgentLive, viewer: LiveViewer) => {
+    if (state.mode === null || !state.frame || hiddenFrom(state, viewer.userId)) return;
+    try {
+      viewer.send({ type: "browser.frame", ...state.frame });
+    } catch {}
+  };
+
+  /** The open handoff changed: everyone hears who is in control, and views it no longer hides get the page now. */
+  const handoffChanged = (agentId: string, state: AgentLive, row: BrowserHandoffRow | null) => {
+    const wasHidden = [...state.viewers].filter((v) => hiddenFrom(state, v.userId));
+    applyHandoff(state, row);
+    broadcastStatus(agentId, state);
+    for (const v of wasHidden) sendLatest(state, v);
+    void sync(agentId, state);
+  };
+
   const handoffHooks: HandoffLiveHooks = {
     changed(row) {
       const state = live.get(row.agentId);
-      if (!state) return;
-      applyHandoff(state, row);
-      broadcast(state, status(row.agentId, state));
-      void sync(row.agentId, state);
+      if (state) handoffChanged(row.agentId, state, row);
+    },
+    /** The latest frame's page while the stream runs here; otherwise the computer is asked for the address. */
+    async page(row) {
+      const state = live.get(row.agentId);
+      if (state && state.machineId === row.machineId && state.mode !== null && state.page) return state.page;
+      const [agent] = await deps.db
+        .select({ handle: agents.handle })
+        .from(agents)
+        .where(and(eq(agents.id, row.agentId), eq(agents.orgId, row.orgId)));
+      if (!agent) return null;
+      try {
+        // Short: a hand back waits on this answer before the agent is told.
+        const reply = await deps.hub.call<"browser.act">(
+          row.machineId,
+          {
+            op: "browser.act",
+            agent: { id: row.agentId, handle: agent.handle },
+            command: "get",
+            args: ["url"],
+            timeoutSeconds: 3,
+          },
+          { timeoutMs: 4000 },
+        );
+        const data = reply.success ? (reply.data as { url?: unknown } | null) : null;
+        return typeof data?.url === "string" && data.url ? { url: data.url.slice(0, BROWSER_LIMITS.url) } : null;
+      } catch {
+        return null;
+      }
     },
   };
 
@@ -324,12 +403,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       });
       return;
     }
+    // Also `browser.opened` (a person opened a page): a stream that failed on a closed browser starts now.
     void openHandoffOf(deps.db, state.orgId, agentId)
       .then((row) => {
-        if (live.get(agentId) !== state) return;
-        applyHandoff(state, row);
-        broadcast(state, status(agentId, state));
-        void sync(agentId, state);
+        if (live.get(agentId) === state) handoffChanged(agentId, state, row);
       })
       .catch((error) => deps.log?.warn("browser handoff reload failed", { agentId, error: String(error) }));
   });
@@ -443,6 +520,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           mode: null,
           controllerUserId: null,
           handoff: null,
+          page: null,
+          frame: null,
           grace: null,
           syncing: Promise.resolve(),
           stopTimer: null,
@@ -455,7 +534,9 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       current.unsubscribe.set(
         viewer,
         relay.subscribe(agentId, {
-          send: (frame) => viewer.send({ type: "browser.frame", ...frame }),
+          send: (frame) => {
+            if (!hiddenFrom(current, viewer.userId)) viewer.send({ type: "browser.frame", ...frame });
+          },
           ...(viewer.busy ? { busy: viewer.busy } : {}),
         } as BrowserViewer),
       );
@@ -467,7 +548,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       if (current.handoff && current.controllerUserId === viewer.userId) {
         await touchControl(deps.db, current.handoff.id, viewer.userId, new Date(), true).catch(() => {});
       }
-      viewer.send(status(agentId, current));
+      viewer.send(status(agentId, current, viewer.userId));
+      sendLatest(current, viewer);
       checked.set(`${viewer.userId}:${agentId}`, Date.now());
       // Access can end while watching (removed from the org, no longer the agent's owner…): checked again now and then.
       const recheck = setInterval(() => {
@@ -543,6 +625,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     async sendInput(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]) {
       const open = await openHandoffOf(deps.db, orgId, agentId);
       if (open?.status !== "active" || open.controllerUserId !== userId) return { accepted: 0, refused: true };
+      // Control changed where this process didn't hear it (another replica, a lost event): the others'
+      // view is hidden here before any of the person's typing reaches the page.
+      const state = live.get(agentId);
+      if (state && state.controllerUserId !== open.controllerUserId) handoffChanged(agentId, state, open);
       const key = `${userId}:${agentId}`;
       if (Date.now() - (checked.get(key) ?? 0) > recheckMs) {
         try {
@@ -572,14 +658,12 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     hubHooks: {
       frame(machineId: string, frame: Extract<RunnerFrame, { type: "browser.frame" }>) {
         const state = live.get(frame.agentId);
-        // Only from the agent's own computer, and only while someone watches.
-        if (!state || state.machineId !== machineId || state.viewers.size === 0) return;
-        relay.publish(frame.agentId, {
-          agentId: frame.agentId,
-          seq: frame.seq,
-          data: frame.data,
-          metadata: frame.metadata,
-        });
+        // Only from the agent's own computer.
+        if (!state || state.machineId !== machineId) return;
+        const { url, title } = frame.metadata;
+        if (url) state.page = { url, ...(title ? { title } : {}) };
+        state.frame = { agentId: frame.agentId, seq: frame.seq, data: frame.data, metadata: frame.metadata };
+        if (state.viewers.size > 0) relay.publish(frame.agentId, state.frame);
       },
       streamEnded(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>) {
         const state = live.get(frame.agentId);

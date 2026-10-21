@@ -22,6 +22,8 @@ const VALUED = new Set([
   "--idle-timeout",
   "--download-path",
   "--screenshot-dir",
+  "--screenshot-format",
+  "--screenshot-quality",
   "--executable-path",
   "--args",
   "--cdp",

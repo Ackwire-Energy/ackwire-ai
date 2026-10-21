@@ -185,10 +185,22 @@ export interface TakeoverInput {
   runId?: string;
 }
 
+/** "Pronto" or "Devolver" with what the person wants the agent to know (it reads it as their words). */
+export interface DoneInput {
+  handoffId: string;
+  note?: string;
+}
+
+/** A site the person in control opens in the agent's browser (a bare host gets https://). */
+export interface OpenPageInput {
+  agentId: string;
+  url: string;
+}
+
 /**
- * "Abrir" (take control), "Pronto", "Não consegui", cancel, "Assumir" while watching,
- * and "Parar" (close the agent's browser), as React Query mutations (`.mutate`,
- * `.isPending`). Each answer updates the cached request.
+ * "Abrir" (take control), "Pronto"/"Devolver", "Não consegui", cancel, "Assumir" while
+ * watching, opening a site while in control, and "Parar" (close the agent's browser), as
+ * React Query mutations (`.mutate`, `.isPending`). Each answer updates the cached request.
  */
 export function useBrowserHandoffMutations(orgId: string) {
   const api = useApi();
@@ -201,9 +213,15 @@ export function useBrowserHandoffMutations(orgId: string) {
       onSuccess: apply,
     }),
     done: useMutation({
-      mutationFn: (handoffId: string) => api.browser.done(orgId, handoffId),
+      mutationFn: (v: string | DoneInput) =>
+        typeof v === "string" ? api.browser.done(orgId, v) : api.browser.done(orgId, v.handoffId, v.note),
       meta: { silent: true },
       onSuccess: apply,
+    }),
+    /** 403 `browser.not_allowed` (outside the agent's sites), 409 `browser.not_in_control`, 400 `browser.bad_address` / `browser.open_failed`. */
+    open: useMutation({
+      mutationFn: ({ agentId, url }: OpenPageInput) => api.browser.open(orgId, agentId, url),
+      meta: { silent: true },
     }),
     failed: useMutation({
       mutationFn: ({ handoffId, note }: { handoffId: string; note?: string }) =>
@@ -238,11 +256,14 @@ export function useBrowserHandoffActions(orgId: string) {
   const m = useBrowserHandoffMutations(orgId);
   return {
     takeControl: (handoffId: string) => m.takeControl.mutateAsync(handoffId),
-    done: (handoffId: string) => m.done.mutateAsync(handoffId),
+    done: (handoffId: string, note?: string) => m.done.mutateAsync(note ? { handoffId, note } : handoffId),
     failed: (handoffId: string, note?: string) => m.failed.mutateAsync({ handoffId, ...(note ? { note } : {}) }),
     cancel: (handoffId: string) => m.cancel.mutateAsync(handoffId),
     takeover: (agentId: string, runId?: string) => m.takeover.mutateAsync(runId ? { agentId, runId } : agentId),
     stop: (agentId: string) => m.stop.mutateAsync(agentId),
+    /** Not in `pending`: a page may take a while to open, and the rest stays usable meanwhile. */
+    open: (agentId: string, url: string) => m.open.mutateAsync({ agentId, url }),
+    opening: m.open.isPending,
     pending:
       m.takeControl.isPending ||
       m.done.isPending ||

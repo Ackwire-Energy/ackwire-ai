@@ -24,8 +24,10 @@ import {
   handoffResultText,
   listMessages,
   type MachineCaller,
+  MachineRequestError,
   type MachineStatus,
   markPageRead,
+  openPageInControl,
   postPersonMessage,
   renderPush,
   requireBrowserAccess,
@@ -175,6 +177,28 @@ describe("browser_ask_person", () => {
     await drainOutbox(f.db, f.handlers);
     expect((await handoffs())[0]).toMatchObject({ status: "failed", note: "it asked for Ana's code" });
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("it asked for Ana's code");
+  });
+
+  test("a note on Pronto reaches the agent only: the card and the conversation's events carry Couldn't's alone", async () => {
+    await start();
+    const heard: RealtimeEvent[] = [];
+    f.pubsub.subscribe(channelTopic(f.general.id), (e) => heard.push(e));
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    await finishHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "", {
+      result: "done",
+      note: "usei meu cartão, código 4821",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("usei meu cartão, código 4821");
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.find((m) => m.id === h?.id)?.meta.browserHandoff).toMatchObject({ status: "done", note: null });
+    const updates = heard.filter((e) => e.type === "browser.handoff.updated") as unknown as {
+      handoff: { status: string; note: string | null };
+    }[];
+    expect(updates.at(-1)?.handoff).toMatchObject({ status: "done", note: null });
+    expect(JSON.stringify(heard)).not.toContain("4821");
   });
 
   test("past its deadline it expires and the run goes on", async () => {
@@ -445,13 +469,13 @@ describe("take over", () => {
     ).toBe("done");
   });
 
-  test("a take over from the agent's or computer's page has no run: the tray opens the computer's page", async () => {
-    const machine = await start();
+  test("a take over from the agent's or computer's page has no run: the tray opens the agent's browser on its page", async () => {
+    await start();
     await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
     const [row] = await handoffs();
     if (!row) throw new Error("no handoff");
     expect(row.runId).toBeNull();
-    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/settings/computers/${machine.machineId}`);
+    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/agents/${f.agent.id}?browser=1`);
   });
 
   test("a run that isn't the agent's can't carry a take over; one that already ended binds nothing", async () => {
@@ -482,6 +506,28 @@ describe("take over", () => {
     await drainOutbox(f.db, f.handlers);
     expect((await runs())[0]?.status).toBe("done");
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("left without handing it back");
+  });
+
+  test("the hand back's facts: who, how long, the pages (titles quoted as the site's words) and the note as theirs", () => {
+    expect(
+      handoffResultText({ result: "done", note: "Entrei com a conta da loja" }, "takeover", {
+        person: "Ana",
+        forMs: 125_000,
+        taken: { url: "https://shop.example.com/login", title: "Entrar" },
+        returned: { url: "https://shop.example.com/orders" },
+      }),
+    ).toBe(
+      "A person used your browser and handed it back. The page may have changed: read it again (browser_read) before acting.\n" +
+        'Ana had control for 2 min. When they took it, the page was "Entrar" at https://shop.example.com/login. ' +
+        "When they handed it back, it was https://shop.example.com/orders. " +
+        'Their note, in their own words: "Entrei com a conta da loja"',
+    );
+    // A canceled request isn't the person's failure, and with nothing known nothing is added.
+    expect(handoffResultText({ result: "cancelled" })).toBe(
+      "A person canceled the request. Read the page again and decide what to do; if you are stuck, say what you need in your reply.",
+    );
+    // Who answered, when how long they had it isn't known (they answered from the card).
+    expect(handoffResultText({ result: "failed" }, "ask", { person: "Ana", forMs: null })).toContain("\nAna answered.");
   });
 
   test("the run under a take over is canceled: the person keeps the browser, and the next run waits on it", async () => {
@@ -542,19 +588,26 @@ describe("live view", () => {
     metadata: { deviceWidth: 1280, deviceHeight: 720 },
   });
 
-  function fakeHub() {
+  /** The runner's side: `answer` may reply (or throw) first; otherwise every call works. */
+  function fakeHub(answer: (request: MachineRequest) => unknown = () => undefined) {
     const calls: MachineRequest[] = [];
     const hub = {
       isLocal: () => true,
+      status: (id: string) => readyHub.status(id),
       call: async (_machineId: string, request: MachineRequest) => {
         calls.push(request);
+        const answered = answer(request);
+        if (answered !== undefined) return answered;
         if (request.op === "browser.input") return { accepted: request.events.length };
         if (request.op === "browser.stream.start") return { mode: request.mode };
         return { stopped: true };
       },
-    } as unknown as BrowserLiveDeps["hub"];
+    } as unknown as BrowserLiveDeps["hub"] & MachineCaller;
     return { hub, calls };
   }
+
+  /** What the stream was asked (starts, mode changes, stops), without the reads of the page. */
+  const streams = (calls: MachineRequest[]) => calls.filter((c) => c.op.startsWith("browser.stream"));
 
   const viewer = (userId: string, busy = false) => {
     const got: BrowserLiveMessage[] = [];
@@ -586,7 +639,7 @@ describe("live view", () => {
     expect(await live.input(f.owner.id, f.org.id, f.agent.id, events)).toEqual({ accepted: 0, refused: true });
     await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
     await Bun.sleep(5);
-    expect(calls.at(-1)).toMatchObject({ op: "browser.stream.start", mode: "control" });
+    expect(streams(calls).at(-1)).toMatchObject({ op: "browser.stream.start", mode: "control" });
     expect(a.got.some((m) => m.type === "browser.status" && m.controllerUserId === f.owner.id)).toBe(true);
     expect(await live.input(f.owner.id, f.org.id, f.agent.id, events)).toEqual({ accepted: 1, refused: false });
     expect(await live.input("someone-else", f.org.id, f.agent.id, events)).toMatchObject({ refused: true });
@@ -594,14 +647,14 @@ describe("live view", () => {
     // The person in control leaves: back to watching, and control ends after the grace.
     stopA();
     await Bun.sleep(5);
-    expect(calls.at(-1)).toMatchObject({ op: "browser.stream.start", mode: "watch" });
+    expect(streams(calls).at(-1)).toMatchObject({ op: "browser.stream.start", mode: "watch" });
     await Bun.sleep(40);
     expect((await handoffs())[0]?.status).toBe("expired");
 
     stopB();
     stopSlow();
     await Bun.sleep(5);
-    expect(calls.at(-1)).toMatchObject({ op: "browser.stream.stop" });
+    expect(streams(calls).at(-1)).toMatchObject({ op: "browser.stream.stop" });
     expect(live.watching(f.agent.id)).toBe(false);
   });
 
@@ -724,6 +777,8 @@ describe("live view", () => {
     const hub = {
       isLocal: () => true,
       call: async (_m: string, request: MachineRequest) => {
+        // A read of the page (who took control on which page) isn't a stream change.
+        if (request.op === "browser.act") return { success: false, data: null };
         inFlight++;
         if (inFlight > 1) overlapped = true;
         await Bun.sleep(10);
@@ -849,5 +904,222 @@ describe("live view", () => {
     expect(await remote.keepAlive()).toBe(0);
     expect(calls).toHaveLength(0);
     remote.close();
+  });
+
+  const unavailable = (got: BrowserLiveMessage[]) => got.find((m) => m.type === "browser.unavailable");
+  const lastStatus = (got: BrowserLiveMessage[]) => got.filter((m) => m.type === "browser.status").at(-1);
+  const seqs = (got: BrowserLiveMessage[]) => got.flatMap((m) => (m.type === "browser.frame" ? [m.seq] : []));
+
+  test("a closed browser says closed (an older runner: unavailable); a site the person in control opens shows at once", async () => {
+    await start();
+    const older = fakeHub((r) => {
+      if (r.op === "browser.stream.start")
+        throw new MachineRequestError("bad_request", "The agent's browser isn't open");
+    });
+    const before = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub: older.hub });
+    const o = viewer(f.owner.id);
+    await before.watch(o.viewer, f.org.id, f.agent.id);
+    expect(unavailable(o.got)).toMatchObject({ reason: "unavailable", message: "The agent's browser isn't open" });
+    before.close();
+
+    let open = false;
+    const { hub, calls } = fakeHub((r) => {
+      if (r.op === "browser.stream.start" && !open) {
+        throw new MachineRequestError("browser_closed", "The agent's browser isn't open");
+      }
+      if (r.op === "browser.act" && r.command === "open") {
+        open = true;
+        return { success: true, data: { url: r.args[0] } };
+      }
+      return undefined;
+    });
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    const a = viewer(f.owner.id);
+    await live.watch(a.viewer, f.org.id, f.agent.id);
+    expect(unavailable(a.got)).toMatchObject({ reason: "closed" });
+
+    // Taking over a closed browser, the person opens a site: the computer starts it, and the view starts with it.
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await openPageInControl(live.handoffDeps, hub, f.owner.id, f.org.id, f.agent.id, "shop.example.com/login");
+    await Bun.sleep(20);
+    expect(calls.find((c) => c.op === "browser.act" && c.command === "open")).toMatchObject({
+      args: ["https://shop.example.com/login"],
+      link: `/org/${f.org.id}/agents/${f.agent.id}?browser=1`,
+    });
+    expect(streams(calls).at(-1)).toMatchObject({ op: "browser.stream.start", mode: "control" });
+    expect(lastStatus(a.got)).toMatchObject({ mode: "control", controllerUserId: f.owner.id, hidden: false });
+    live.close();
+  });
+
+  test("only the person in control opens a site: web addresses only, and the agent's sites hold (the computer checks)", async () => {
+    await start();
+    const { hub, calls } = fakeHub((r) => {
+      if (r.op !== "browser.act" || r.command !== "open") return undefined;
+      if (r.args[0]?.includes("evil")) {
+        throw new MachineRequestError("not_allowed", "evil.example is outside the sites this agent may use");
+      }
+      if (r.args[0]?.includes("nowhere")) return { success: false, data: null, error: "net::ERR_NAME_NOT_RESOLVED" };
+      return { success: true, data: { url: r.args[0] } };
+    });
+    const open = (who: string, url: string) => openPageInControl(deps(), hub, who, f.org.id, f.agent.id, url);
+    const member = await addMember(f.db, f.org.id, "member", "caio");
+    await expect(open(member.id, "https://shop.example.com")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(open(f.owner.id, "https://shop.example.com")).rejects.toMatchObject({
+      code: "browser.not_in_control",
+    });
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    const admin = await addMember(f.db, f.org.id, "admin", "bia");
+    await expect(open(admin.id, "https://shop.example.com")).rejects.toBeInstanceOf(ConflictError);
+    for (const bad of ["file:///etc/passwd", "javascript:alert(1)", "chrome://settings", "  "]) {
+      await expect(open(f.owner.id, bad)).rejects.toMatchObject({ code: "browser.bad_address" });
+    }
+    expect(calls).toHaveLength(0);
+
+    await f.db
+      .update(schema.agents)
+      .set({ browserAllowedDomains: ["shop.example.com"] })
+      .where(eq(schema.agents.id, f.agent.id));
+    await open(f.owner.id, "shop.example.com/login");
+    expect(calls.at(-1)).toMatchObject({
+      op: "browser.act",
+      command: "open",
+      args: ["https://shop.example.com/login"],
+      allowedDomains: ["shop.example.com"],
+    });
+    await expect(open(f.owner.id, "https://evil.example")).rejects.toMatchObject({ code: "browser.not_allowed" });
+    await expect(open(f.owner.id, "https://nowhere.example")).rejects.toMatchObject({ code: "browser.open_failed" });
+  });
+
+  test("a site opens only while the agent may use its browser and its computer serves it, as for its own tools", async () => {
+    const machine = await start();
+    const { hub, calls } = fakeHub((r) =>
+      r.op === "browser.act" && r.command === "open" ? { success: true, data: { url: r.args[0] } } : undefined,
+    );
+    const open = () => openPageInControl(deps(), hub, f.owner.id, f.org.id, f.agent.id, "shop.example.com");
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.agentId, f.agent.id));
+    await expect(open()).rejects.toBeInstanceOf(ForbiddenError);
+    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+    ready.delete(machine.machineId);
+    await expect(open()).rejects.toBeInstanceOf(ForbiddenError);
+    expect(calls).toHaveLength(0);
+    ready.add(machine.machineId);
+    await open();
+    expect(calls.at(-1)).toMatchObject({ op: "browser.act", command: "open", args: ["https://shop.example.com/"] });
+  });
+
+  test("nobody takes over the browser of an agent that may not use it", async () => {
+    await start();
+    await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.agentId, f.agent.id));
+    await expect(startTakeover(deps(), f.owner.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await f.db.select().from(schema.browserHandoffs)).toEqual([]);
+  });
+
+  test("input from the person in control hides the page from the others here, even when the change wasn't heard", async () => {
+    const machine = await start();
+    const { hub } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    const admin = await addMember(f.db, f.org.id, "admin", "bia");
+    const a = viewer(f.owner.id);
+    const b = viewer(admin.id);
+    await live.watch(a.viewer, f.org.id, f.agent.id);
+    await live.watch(b.viewer, f.org.id, f.agent.id);
+    // Taken on another server whose word never came here (no live view, no pub/sub).
+    await startTakeover({ db: f.db }, f.owner.id, f.org.id, f.agent.id);
+    expect(lastStatus(b.got)).toMatchObject({ controllerUserId: null, hidden: false });
+
+    expect(await live.sendInput(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: "4821" }])).toMatchObject({
+      refused: false,
+    });
+    expect(lastStatus(b.got)).toMatchObject({ controllerUserId: f.owner.id, hidden: true });
+    live.hubHooks.frame(machine.machineId, frame(f.agent.id, 7));
+    expect(seqs(b.got)).toEqual([]);
+    expect(seqs(a.got)).toEqual([7]);
+    live.close();
+  });
+
+  test("while a person is in control only they see the page; the others are told it's hidden, and see it again on hand back", async () => {
+    const machine = await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    const admin = await addMember(f.db, f.org.id, "admin", "bia");
+    const a = viewer(f.owner.id);
+    const b = viewer(admin.id);
+    await live.watch(a.viewer, f.org.id, f.agent.id);
+    await live.watch(b.viewer, f.org.id, f.agent.id);
+    live.hubHooks.frame(machine.machineId, frame(f.agent.id, 1));
+
+    const t = await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    expect(lastStatus(a.got)).toMatchObject({ controllerUserId: f.owner.id, hidden: false });
+    expect(lastStatus(b.got)).toMatchObject({ controllerUserId: f.owner.id, hidden: true });
+    expect(streams(calls).at(-1)).toMatchObject({ op: "browser.stream.start", mode: "control" });
+    live.hubHooks.frame(machine.machineId, frame(f.agent.id, 2));
+    expect(seqs(a.got)).toEqual([1, 2]);
+    expect(seqs(b.got)).toEqual([1]);
+    // Joining meanwhile: told who has it, nothing of the page.
+    const c = viewer(admin.id);
+    await live.watch(c.viewer, f.org.id, f.agent.id);
+    expect(lastStatus(c.got)).toMatchObject({ hidden: true });
+    expect(seqs(c.got)).toEqual([]);
+
+    // Handed back: the others get the page as it is now, without waiting for it to repaint.
+    await finishHandoff(live.handoffDeps, f.owner.id, f.org.id, t.id, { result: "done" });
+    await Bun.sleep(5);
+    expect(lastStatus(b.got)).toMatchObject({ controllerUserId: null, hidden: false });
+    expect(seqs(b.got)).toEqual([1, 2]);
+    expect(seqs(c.got)).toEqual([2]);
+    expect(seqs(a.got)).toEqual([1, 2]);
+    // So does anyone who joins a stream already running.
+    const d = viewer(f.owner.id);
+    await live.watch(d.viewer, f.org.id, f.agent.id);
+    expect(seqs(d.got)).toEqual([2]);
+    live.close();
+  });
+
+  test("handing back tells the agent who had it, for how long, the pages and their note, in their own words", async () => {
+    const machine = await start();
+    const { hub } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    const on = (seq: number, url: string, title: string) => ({
+      ...frame(f.agent.id, seq),
+      metadata: { deviceWidth: 1280, deviceHeight: 720, url, title },
+    });
+    live.hubHooks.frame(machine.machineId, on(1, "https://shop.example.com/login", "Entrar"));
+    await post("@dev probe the page");
+    const [run] = await runs();
+    const t = await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id, run?.id);
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("waiting_input");
+    live.hubHooks.frame(machine.machineId, on(2, "https://shop.example.com/orders", "Pedidos"));
+    await finishHandoff(live.handoffDeps, f.owner.id, f.org.id, t.id, {
+      result: "done",
+      note: "Entrei com a conta da loja",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    const told = lastText(f.provider.calls.at(-1)?.request as ModelRequest);
+    for (const fact of [
+      "handed it back",
+      "ana had control for",
+      "Entrar",
+      "https://shop.example.com/login",
+      "Pedidos",
+      "https://shop.example.com/orders",
+      "Their note, in their own words",
+      "Entrei com a conta da loja",
+    ]) {
+      expect(told).toContain(fact);
+    }
+    // Its next action on the page waits for a fresh read, saying the same.
+    const ctx = { orgId: f.org.id, agentId: f.agent.id };
+    const stale = await requirePageRead(f.db, ctx);
+    expect(stale?.content).toContain("Read the page again first");
+    expect(stale?.content).toContain("Entrei com a conta da loja");
+    expect(stale?.content).toContain("https://shop.example.com/orders");
+    await markPageRead(f.db, ctx);
+    expect(await requirePageRead(f.db, ctx)).toBeNull();
+    live.close();
   });
 });

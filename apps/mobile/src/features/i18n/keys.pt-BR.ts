@@ -1150,6 +1150,7 @@ export const featureKeysPtBR = {
       watchOnly: "{{name}} está no controle. Você só assiste.",
       takeOver: "Assumir",
       done: "Pronto",
+      handBack: "Devolver",
       couldnt: "Não consegui",
       typeHere: "Digite aqui",
       typeMarked: "Digite no campo marcado",
@@ -1162,6 +1163,9 @@ export const featureKeysPtBR = {
       page: "A página do navegador. Toque para clicar.",
       graceF: "Se você sair, a {{name}} espera 2 min.",
       graceM: "Se você sair, o {{name}} espera 2 min.",
+      closedHelpF: "Abre quando a {{name}} navegar de novo. Os logins continuam salvos.",
+      closedHelpM: "Abre quando o {{name}} navegar de novo. Os logins continuam salvos.",
+      hidden: "{{name}} está no controle · tela oculta",
       key: {
         Tab: "Tab",
         Enter: "Enter",
@@ -1181,12 +1185,20 @@ export const featureKeysPtBR = {
         endedM: "O navegador do {{name}} fechou.",
         forbiddenF: "Você não pode ver este navegador.",
         forbiddenM: "Você não pode ver este navegador.",
+        closedF: "O navegador da {{name}} está fechado.",
+        closedM: "O navegador do {{name}} está fechado.",
       },
     },
     profile: {
       title: "Navegador",
       waitingF: "A {{name}} precisa de você",
       waitingM: "O {{name}} precisa de você",
+    },
+    done: {
+      title: "Algum recado?",
+      introF: "Opcional. A {{name}} lê isso antes de seguir.",
+      introM: "Opcional. O {{name}} lê isso antes de seguir.",
+      placeholder: "Ex.: entrei com a conta de teste",
     },
     failed: {
       title: "O que aconteceu?",

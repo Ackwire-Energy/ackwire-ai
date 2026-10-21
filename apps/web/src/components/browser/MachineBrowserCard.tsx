@@ -1,12 +1,12 @@
 import type { BrowserHandoff, Machine, ScopeGrant } from "@agenteschat/client";
 import {
+  agentStateOfRun,
   BROWSER_TOOL_SCOPE,
-  isActiveStatus,
-  isBrowserTool,
   isOpenHandoff,
   keys,
   useApi,
   useBrowserHandoffMutations,
+  usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
@@ -64,10 +64,11 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
       retry: false,
     })),
   });
-  // Agents whose run is in the browser right now (its current tool), from the live store.
+  // Agents at work whose latest call is in the browser, from the live store: between two calls the run
+  // has no current tool, and while it works its status reads "thinking", so neither alone says it.
   const busy = useStreams((s) =>
     Object.values(s.runs)
-      .filter((r) => agentIds.includes(r.agentId) && isActiveStatus(r.status) && isBrowserTool(r.tool))
+      .filter((r) => agentIds.includes(r.agentId) && agentStateOfRun(r) !== "idle" && usesBrowser(r))
       .map((r) => r.agentId)
       .sort()
       .join(","),

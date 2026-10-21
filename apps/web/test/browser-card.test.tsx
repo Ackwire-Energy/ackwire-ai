@@ -88,10 +88,17 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
         .map((b) => b.getAttribute("aria-label")),
     ).toEqual(["Tab", "Enter", "Apagar", "Esc"]);
 
-    // Pronto hands back: the card folds away, the request says it's done.
+    // Pronto takes an optional word for Ada (Enter sends), then hands back: the card folds away.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
+    expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
+    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
+    expect(document.activeElement).toBe(note);
+    await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
+    await act(async () => fireEvent.keyDown(note, { key: "Enter" }));
     await settle(4);
-    expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
+    expect(state.calls.filter((c) => c.method === "browser.done").map((c) => c.args)).toEqual([
+      [ORG_ID, HANDOFF_ID, "Entrei com a conta de teste"],
+    ]);
     expect(document.querySelector(".brw-ac")).toBeNull();
   });
 });

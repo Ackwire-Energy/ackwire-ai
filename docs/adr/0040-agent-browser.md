@@ -1,7 +1,7 @@
 # 0040. The agent browser on connected computers, built on `agent-browser`
 
 - Status: Accepted (2026-10-19)
-- Date: 2026-10-19
+- Date: 2026-10-19. Revised 2026-10-21: an honest closed state and a first frame (§7), a person opening a site, facts in the hand back, the page hidden from others while a person is in control (§6), the browser always reachable from the agent (§9)
 - Planning: D57
 - First slice of: ADR 0031 (computer use). Where the two disagree, this ADR wins for the browser.
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets), ADR 0032 (one engine, the runner MCP as a bridge), ADR 0036 (desktop app, access on the machine), ADR 0010 (realtime)
@@ -99,18 +99,20 @@ Modeled on Cloudflare's handoff:
 
 1. The agent calls `browser_ask_person("Sign in to Stripe with the shop's test account", 30 min)`. The run suspends, like `request_secret` and approvals.
 2. A card in the chat ("Dev needs you · Sign in to Stripe · Open"), at the top of "Waiting for you" in notifications, and a push to the phone. It goes to both the person who asked for the work and the agent's responsible person (once when they are the same); the first to open takes control, the other sees "Walter is helping".
-3. The person opens a full-screen live view (§7) with the agent's instructions on top, a "you're in control" badge, and two buttons: **Done** and **Couldn't** (optional reason).
-4. The agent resumes with `{ result: done | failed | expired, note? }`, reads the page again and checks the outcome (still on the login page → it says so in the chat instead of carrying on). The card resolves itself.
+3. The person opens a full-screen live view (§7) with the agent's instructions on top, a "you're in control" badge, and two buttons: **Done** and **Couldn't**, each with an optional note. The agent reads every note; the card and the conversation's events carry only Couldn't's (the card shows it).
+4. The agent resumes with `{ result: done | failed | cancelled | expired, note? }` and the facts of the person's turn (below), reads the page again and checks the outcome (still on the login page → it says so in the chat instead of carrying on). The card resolves itself.
 
-A person watching can also **take over** on their own: the same screen; the agent pauses and, when handed back, is told "a person changed the page" and reads again before acting.
+A person watching can also **take over** on their own, while the agent may use its browser (`browser:use`, §3; 403 otherwise): the same screen; the agent pauses and, when handed back (**Hand back**, with an optional note), is told a person used its browser, with the same facts, and reads again before acting.
 
-- Taken from a run's card, the take over is bound to that run (`runId`): its card stays in that run's conversation (on the run's last message, else at the end) while the person holds control, even after the run's live block goes, and `browser.handoff.updated` goes to that conversation. Taken from the agent's or the computer's page it has no run until a run's browser call waits on it; the tray links to the run's conversation, else to the computer's page.
+- **Facts, not a diff:** what the agent reads on resume says who had control, for how long, the page (address and title) when they took it and when it ended, and their note, quoted and marked as the person's own words. The pages come from the live view's newest frame, else a quick `get url` on the computer; they are kept in memory only (like the frames), so after a restart or on another replica the text says less. The site's title is quoted as data, never instructions.
+- **A person can open a site** while in control (`POST …/agents/{agentId}/browser/open {url}` → 204): only the person in control (409 `browser.not_in_control`), only while the agent may use its browser (`browser:use`, §3) and its computer serves it (403, the same checks as its tools), http(s) only (a bare host gets `https://`; anything else 400 `browser.bad_address`), and the agent's site list holds: the runner checks it as for the agent's own `open` (403 `browser.not_allowed`). A closed browser opens (the runner starts Chrome), so a person can open the agent's browser from its page to sign in before giving it work; the live view starts its stream at once (`browser.opened` on the handoff topic). A page that fails to load is 400 `browser.open_failed`, and Chrome's error page shows.
+- Taken from a run's card, the take over is bound to that run (`runId`): its card stays in that run's conversation (on the run's last message, else at the end) while the person holds control, even after the run's live block goes, and `browser.handoff.updated` goes to that conversation. Taken from the agent's or the computer's page it has no run until a run's browser call waits on it; the tray links to the run's conversation, else to the agent's page with its browser open (`/org/{orgId}/agents/{agentId}?browser=1`).
 - If the run under a take over ends (done, failed, canceled) while the person keeps control, the person keeps the browser and the card stays; the agent's next run that needs the browser takes the take over over (it waits on it, and the card moves to it), so it is never "busy" forever. A run still going keeps it (other runs are refused).
 - Leaving without handing back (expired) is told to the agent as such, not as handed back. "Parar" is heard by everyone watching (`browser.stopped` → `browser.ended` with who and when).
 
-- One person in control per agent browser; others watch ("Ana is in control").
+- One person in control per agent browser. While someone is in control only they get frames (at the control rate): the other viewers' `browser.status` says `hidden` and who is in control ("Ana is in control · screen hidden"), and they get the page again, the newest frame at once, when it is handed back. What a person types in the agent's browser isn't watched by others.
 - Timing, as in OpenBot and OpenMausBot: a request waits 10 minutes for someone to open it (the agent may ask for up to 30), then expires; once a person is in control there is no deadline; if their view drops, control is kept for 2 minutes (presence renewed every 30 s and stored in the database, so it holds across replicas and restarts), then it ends as `expired`.
-- While a request is open (waiting or in control) the agent's browser tools wait or refuse; after a person had control, only `browser_read` works until the agent reads the page again (`page_read_at`, migration 0080), as OpenBot requires a fresh snapshot after hand back.
+- While a request is open (waiting or in control) the agent's browser tools wait or refuse; after a person had control, only `browser_read` works until the agent reads the page again (`page_read_at`, migration 0080), as OpenBot requires a fresh snapshot after hand back. The refusal repeats the facts of the person's turn.
 - The agent's browser stays alive while a request is open (the server keeps the session active so the 15-minute idle shutdown doesn't close it).
 - Who may watch, take control or cancel: org admins, the agent's owner, the people the request went to and whoever asked for the work; a channel reader can't. Access is checked again every 30 s while watching and before each input.
 - Nothing reaches the model during a handoff: no frames, no keys.
@@ -119,8 +121,10 @@ A person watching can also **take over** on their own: the same screen; the agen
 
 ### 7. Live view: `agent-browser`'s JPEG stream, in memory
 
-- The runner opens the session's local stream only while someone watches and forwards frames over its machine socket. The server relays them to the viewers' sockets in memory: nothing written to Postgres, nothing stored.
+- The runner opens the session's local stream only while someone watches and forwards frames over its machine socket, with the active tab's address and title. The server relays them to the viewers' sockets in memory: nothing written to Postgres, nothing stored.
 - Adaptive: about 1 fps while watching, 10–15 fps while a person is in control. Chrome only sends frames when the page changes; newest frame wins, stale frames are dropped. Smaller frames on the phone.
+- **First frame:** Chrome sends no screencast frame for a page that isn't repainting, and `agent-browser`'s stream only replays a frame it already has (checked in 0.39.1's source: its own recordings seed a screenshot for that reason). So a new stream with no frame after 1 s gets one JPEG screenshot as its first (through the session's command queue), and the relay holds the newest frame of a running stream in memory: a viewer who joins, or whose view stops being hidden, sees the page at once. An idle open browser shows a picture, not a spinner.
+- **Closed:** a stream can't start on a closed browser (never opened, idle shutdown, Stop, the agent's `close`): the runner says `browser_closed` and viewers get `browser.unavailable` with reason `closed` (an older runner's `bad_request` stays `unavailable`, with its message). The app keeps watching with backoff (up to 10 s), so the view shows the browser once something opens it (the agent, or a person in control opening a site, which also restarts the stream at once). No frame is kept for a closed browser: the app shows that it is closed, and that logins stay.
 - Input from the person: mouse and touch as stream input events (coordinates mapped from the displayed frame to the page); special keys as key events, completed with `agent-browser`'s key resolver; Command mapped to Control where the shortcut expects it; paste forwarded.
 - **Typing through a native text field:** the app shows its own text field (secure for passwords) and sends the whole text into the focused page field (`keyboard inserttext`). Accents work, and the phone's and password manager's autofill fill it.
 - Popups and new tabs (OAuth windows) followed: the view switches to the active tab.
@@ -130,20 +134,21 @@ A person watching can also **take over** on their own: the same screen; the agen
 
 ### 8. What is stored
 
-- Not stored: frames, screenshots (they stay in the agent's folder), the profile and cookies (on the computer), what a person types.
+- Not stored: frames (the relay holds only the newest frame of a running stream, in memory; the first-frame screenshot is deleted on the computer once sent), screenshots (they stay in the agent's folder), the profile and cookies (on the computer), what a person types, the pages of a person's turn (in memory until the agent reads the page again).
 - Stored: the run's transcript as for any tool (the `browser_*` calls and results), model usage and cost as for any model call, and one record per handoff or take over (who, when, result). No per-action audit table.
 - After the run, the agent's message keeps where it browsed (`meta.browser.steps`: each `browser_*` call's tool, the site of an open without its query string, the time, whether it failed) for the card that stays in the chat (telas/NavegadorDepois.html). It shows a drawn page, never a picture of the real one.
 
 ### 9. Watching and stopping
 
 - Live view on the run and on the machine page ("Dev is in the browser · shop.example/checkout"), with Watch and Stop.
+- Always there, run or not (status, preview, take over, as Grok Bot and OpenMausBot do; the card in the chat stays the default): a "Navegador" entry on the agent's page and its side panel, in the agent's DM header, and on the phone's agent profile, for the agent's owner and admins once it has `browser:use` and its computer serves the browser (the others who may watch, §6, get it where the request or the run is; the phone's profile also shows them a waiting request and a person's turn). It opens the same live view: Watch, Take over, Stop, and while in control an address field and Hand back with a note. The phone has no address field yet, so it offers Take over and Stop only while a page shows. The tray's Ver opens it too (`?browser=1` on the agent's web page).
 - Stop closes the session at once.
 - Checkout only in test mode; a real payment or any sensitive action the agent recognizes becomes an approval card as usual. Page text never grants permissions or skips an approval.
 
 ### 10. Runner protocol 12
 
 - `access.tools.browser`; `hello.browser { available, version, chrome, reason? }`.
-- Ops: `browser.act { agentId, command, args }` (one `agent-browser` command, returns its JSON), `browser.stop { agentId }`, `browser.stream.start | stop { agentId, mode: watch | control }`, `browser.input { agentId, events[] }`; frames come back as `browser.frame` on the machine socket.
+- Ops: `browser.act { agentId, command, args }` (one `agent-browser` command, returns its JSON), `browser.stop { agentId }`, `browser.stream.start | stop { agentId, mode: watch | control }`, `browser.input { agentId, events[] }`; frames come back as `browser.frame` on the machine socket (`metadata: { deviceWidth, deviceHeight, pageScaleFactor?, url?, title? }`). A stream start on a closed browser fails with the error code `browser_closed` (older runners: `bad_request`).
 - The server only offers the tools to agents whose machine reports protocol 12 with the browser on.
 
 ## Order

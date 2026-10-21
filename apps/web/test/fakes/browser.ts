@@ -68,9 +68,9 @@ export function createFakeBrowser(
       handoffs.set(handoffId, h);
       return h;
     },
-    done: async (orgId, handoffId) => {
-      log("browser.done", orgId, handoffId);
-      return end(handoffId, "done");
+    done: async (orgId, handoffId, note) => {
+      log("browser.done", orgId, handoffId, ...(note ? [note] : []));
+      return end(handoffId, "done", note ?? null);
     },
     failed: async (orgId, handoffId, note) => {
       log("browser.failed", orgId, handoffId, note);
@@ -99,6 +99,28 @@ export function createFakeBrowser(
       };
       handoffs.set(h.id, h);
       return h;
+    },
+    // Like the server: only the person in control, web addresses only, the agent's sites when it has a list.
+    open: async (orgId, agentId, url) => {
+      log("browser.open", orgId, agentId, url);
+      const held = [...handoffs.values()].find((h) => h.agentId === agentId && h.status === "active");
+      if (held?.controllerUserId !== me) {
+        throw new ApiError(409, "browser.not_in_control", "Take control of the browser first");
+      }
+      let host: string;
+      try {
+        const u = new URL(url.includes("://") ? url : `https://${url}`);
+        if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("not a web page");
+        host = u.hostname;
+      } catch {
+        throw new ApiError(400, "browser.bad_address", "Type a web address (https://…)");
+      }
+      const sites = settings.get(agentId)?.allowedDomains;
+      const listed = (d: string) =>
+        host === d.replace(/^\*\./, "") || (d.startsWith("*.") && host.endsWith(d.slice(1)));
+      if (sites && !sites.some(listed)) {
+        throw new ApiError(403, "browser.not_allowed", `${host} is outside the sites this agent may use`);
+      }
     },
     stop: async (orgId, agentId) => {
       log("browser.stop", orgId, agentId);

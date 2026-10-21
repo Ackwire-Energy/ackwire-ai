@@ -662,6 +662,47 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(section.textContent).not.toContain(DOCS);
     expect(section.textContent).toContain("Liberar outra pasta é no próprio computador");
   });
+
+  test("browser: an agent at work in its browser stays in use between its calls (ADR 0040)", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
+    const m = machines.pair(
+      mac({
+        access: { folders: [], tools: { claude: true, codex: false, commands: true, browser: true } },
+        browser: { available: true, version: "0.39.1", chrome: "Chrome 141", reason: null },
+      }),
+    );
+    // Ada works in its browser in #eng (a conversation this tab listens to); then that call ends.
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const threadId = state.messages.filter((x) => x.channelId === ENG_ID).at(-1)?.id;
+    const ev = (event: Record<string, unknown>) =>
+      act(async () =>
+        socket.push({
+          type: "event",
+          channelId: ENG_ID,
+          event: { channelId: ENG_ID, threadId, runId: "r-browse", agentId: ADA_ID, ...event },
+        }),
+      );
+    await ev({ type: "agent.thinking" });
+    await ev({ type: "agent.tool", tool: "browser_open", detail: "loja.example.com" });
+    await ev({ type: "agent.tool", tool: null });
+    await act(() =>
+      r.router.navigate({
+        to: "/org/$orgId/settings/computers/$machineId",
+        params: { orgId: ORG_ID, machineId: m.id },
+      }),
+    );
+    await settle(8);
+    const card = document.querySelector('[aria-labelledby="sec-machine-browser"]') as HTMLElement;
+    expect(card.textContent).toContain("Em uso agora");
+    expect(card.textContent).not.toContain("Ninguém usa o navegador agora.");
+    expect(card.querySelector(".brw-use")?.textContent).toContain("No navegador");
+    expect(within(card).getByRole("button", { name: "Ver" })).toBeTruthy();
+  });
 });
 
 describe("agent page: which computer", () => {

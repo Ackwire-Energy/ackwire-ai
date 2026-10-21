@@ -192,6 +192,9 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
     port: config.PORT,
+    // Bun's default (10 s) cuts a request still waiting on its answer: opening a site in an agent's
+    // browser waits for the page, and a closed browser starts first (up to 90 s on the computer).
+    idleTimeout: 120,
     fetch: (req, srv) => realtime.fetch(req, srv, (r) => app.fetch(r)),
     websocket: realtime.websocket,
   });

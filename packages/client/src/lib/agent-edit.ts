@@ -26,12 +26,17 @@ export const AGENT_SECTIONS = [
 export type AgentSection = (typeof AGENT_SECTIONS)[number];
 export const isAgentSection = (v: unknown): v is AgentSection => AGENT_SECTIONS.includes(v as AgentSection);
 
-/** `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa"). */
-export function agentSearch(search: Record<string, unknown>): { tab?: AgentTab; sec?: AgentSection } {
+/**
+ * `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa").
+ * `?browser=1` opens the agent's browser (the desktop tray's and the notifications' link).
+ */
+export function agentSearch(search: Record<string, unknown>): { tab?: AgentTab; sec?: AgentSection; browser?: 1 } {
   const sec = search.sec === "model" ? "brain" : search.sec;
+  const browser = search.browser === 1 || search.browser === "1" || search.browser === true;
   return {
     tab: isAgentTab(search.tab) ? search.tab : undefined,
     sec: isAgentSection(sec) ? sec : undefined,
+    ...(browser ? { browser: 1 as const } : {}),
   };
 }
 
