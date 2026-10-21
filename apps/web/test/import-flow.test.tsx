@@ -47,7 +47,9 @@ const pick = async (label: string, files: File[]) => {
 const folder = (name: string): File[] => {
   const root = join(FIXTURES, name);
   const walk = (dir: string): string[] =>
-    readdirSync(dir).flatMap((n) => (statSync(join(dir, n)).isDirectory() ? walk(join(dir, n)) : [join(dir, n)]));
+    readdirSync(dir)
+      .sort()
+      .flatMap((n) => (statSync(join(dir, n)).isDirectory() ? walk(join(dir, n)) : [join(dir, n)]));
   return walk(root).map((path) => {
     const file = new File([readFileSync(path)], basename(path));
     Object.defineProperty(file, "webkitRelativePath", { value: `${name}/${relative(root, path)}` });
@@ -61,7 +63,9 @@ const folderEntry = (dir: string, path: string): unknown => {
   if (!statSync(abs).isDirectory()) {
     return { isFile: true, isDirectory: false, fullPath: path, file: (ok: (f: File) => void) => ok(fixture(dir)) };
   }
-  const children = readdirSync(abs).map((n) => folderEntry(join(dir, n), `${path}/${n}`));
+  const children = readdirSync(abs)
+    .sort()
+    .map((n) => folderEntry(join(dir, n), `${path}/${n}`));
   return {
     isFile: false,
     isDirectory: true,
@@ -163,7 +167,7 @@ describe("Configurações → Importar e exportar", () => {
     const routines = screen().getByRole("region", { name: "Rotinas" });
     expect(routines.textContent).toContain("Chegam pausadas");
     // Skills land off: "Ligar" is the person's choice, for the agents that had them.
-    expect(screen().getByRole("switch", { name: "Ligar para Linus e Ada" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen().getByRole("switch", { name: "Ligar para Ada e Linus" }).getAttribute("aria-checked")).toBe("false");
 
     const bring = (name: string) => screen().getByRole("checkbox", { name: `Trazer ${name}` });
     await click(bring("Ada"), 2);
@@ -176,7 +180,7 @@ describe("Configurações → Importar e exportar", () => {
     // After importing, and what doesn't come along.
     const todo = screen().getByRole("region", { name: "Depois de importar" });
     expect(todo.textContent).toContain("GH_TOKEN: não vem no arquivo. Se um agente precisar, ele pede no chat.");
-    expect(todo.textContent).toContain("Para Linus e Ada");
+    expect(todo.textContent).toContain("Para Ada e Linus");
     const left = screen().getByRole("region", { name: "O que não vem junto" });
     for (const what of ["gpt-imaginary-2", "Landing page", "Engineering"]) expect(left.textContent).toContain(what);
 
