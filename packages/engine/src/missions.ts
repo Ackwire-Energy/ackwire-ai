@@ -1,4 +1,10 @@
-import { MISSION_PROTOCOL, type PubSub, TASK_OUTPUT_PROTOCOL, TASKS_PROTOCOL } from "@agenteschat/adapters";
+import {
+  MISSION_PROTOCOL,
+  MISSION_WORKTREE_PROTOCOL,
+  type PubSub,
+  TASK_OUTPUT_PROTOCOL,
+  TASKS_PROTOCOL,
+} from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -25,16 +31,34 @@ import type { Judge } from "./judge";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
   formatDuration,
+  isLiveTaskRow,
+  liveTaskWhere,
+  type MachineTaskMode,
   type MachineTaskRow,
   publishTaskEvent,
   RECENT_LINES,
   startMachineTask,
+  taskModeOf,
   taskSeconds,
 } from "./machine-tasks";
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
 import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
+import {
+  closeMissionWorktree,
+  ensureMissionWorktree,
+  hasLiveTasks,
+  leaveMachineWorktree,
+  missionCwd,
+  resumeFailedWorktree,
+  startMissionItem,
+  startQueuedMissionTasks,
+  type WorktreeFailReason,
+  type WorktreeState,
+  worktreeFailReasonOf,
+  worktreeStateOf,
+} from "./mission-worktree";
 import {
   cancelMainRuns,
   deliverMissionInbox,
@@ -236,7 +260,7 @@ export function planPrompt(mission: Pick<MissionRow, "title" | "goal"> & { findi
 
 /** What the main session is told when the owner presses Start (with what was found before, if anything). */
 export const START_PROMPT =
-  "The person approved the plan. Do the work now on the computer: start_task for anything long (each gets its own branch in a git repository, its own subfolder otherwise; it wakes you when it ends), small work yourself; keep the plan with update_plan, report milestones, ask decisions with ask_decision, request_review when there is something to show, and request_approval before any merge, deploy or rollback.";
+  "The person approved the plan. Do the work now on the computer: start_task for anything long (it works in the mission's folder: items that write run one at a time and each ends in a commit, items with mode read may run in parallel; it wakes you when it ends), small work yourself; keep the plan with update_plan, report milestones, ask decisions with ask_decision, request_review when there is something to show, and request_approval before any merge, deploy or rollback.";
 
 export function startPrompt(mission: { findings?: MissionFinding[] }) {
   const found = findingsText(mission.findings ?? []);
@@ -467,6 +491,10 @@ export async function reactivateMission(
   await recordMissionEvent(deps.db, row, "reactivated", { reason });
   await requestFilesSync(deps.db, row);
   await publishMissionEvent(deps, row, "status", { reason });
+  // Its folder is checked again (ADR 0044): made again from the branch when it went away.
+  if (row.branch && "hub" in deps) {
+    return (await ensureMissionWorktree(deps as MissionDeps, row.id).catch(() => null)) ?? row;
+  }
   return row;
 }
 
@@ -547,6 +575,20 @@ export interface MissionView {
   openQuestion: string | null;
   status: MissionStatus;
   repoDir: string;
+  /**
+   * The mission's own copy of the project (ADR 0044): its branch and where it
+   * started from (`baseBranch` at `baseSha`); null before Start and for a
+   * folder without git.
+   */
+  branch: string | null;
+  baseBranch: string | null;
+  baseSha: string | null;
+  /** `none` (not made yet), `preparing` (made, setup running), `ready`, `failed` (paused; "Tentar de novo"), `removed`. */
+  worktreeState: WorktreeState;
+  /** The last lines of a failed setup, or why the copy couldn't be made. */
+  worktreeError: string | null;
+  /** Why it is `failed`: the setup, making the copy (`ensure`), or the branch gone (`branch_missing`); null otherwise. */
+  worktreeFailReason: WorktreeFailReason | null;
   resumeTasks: boolean;
   /** "Pedir aprovação de comandos". */
   commandApproval: CommandApproval;
@@ -705,6 +747,12 @@ export async function missionViews(
       openQuestion: openQuestionOf(r.findings),
       status: r.status,
       repoDir: r.repoDir,
+      branch: r.branch,
+      baseBranch: r.baseBranch,
+      baseSha: r.baseSha,
+      worktreeState: worktreeStateOf(r.worktreeState),
+      worktreeError: r.worktreeError,
+      worktreeFailReason: r.worktreeState === "failed" ? worktreeFailReasonOf(r.worktreeFailReason) : null,
       resumeTasks: r.resumeTasks,
       commandApproval: commandApprovalOf(r.commandApproval),
       plan: {
@@ -906,7 +954,12 @@ async function usableMachine(
     });
   }
   const { available, codexTooOld } = machineExecutors(status);
-  if (available.length === 0 || (asked && asked !== "agent" && status.protocol < MISSION_PROTOCOL)) {
+  // Every mission works in its own copy of the project (ADR 0044): runner protocol 14.
+  if (
+    available.length === 0 ||
+    status.protocol < MISSION_WORKTREE_PROTOCOL ||
+    (asked && asked !== "agent" && status.protocol < MISSION_PROTOCOL)
+  ) {
     throw new ConflictError(
       `The runner on ${status.name} is too old for missions: run agentes-runner update`,
       "mission.runner_outdated",
@@ -1192,8 +1245,6 @@ export async function homeThreadOf(
 
 // ── Sessions on the machine ──────────────────────────────────────────────────
 
-const ACTIVE_TASK: MachineTaskRow["status"][] = ["queued", "running", "interrupted"];
-
 /** Starts (or resumes) one item session of the mission as a machine task (the main session is a run). */
 export async function startSessionTask(
   deps: MissionDeps,
@@ -1207,8 +1258,27 @@ export async function startSessionTask(
     branch?: string | null;
     runId?: string | null;
     requestedBy?: string | null;
+    /**
+     * An item in the mission's folder (ADR 0044): through the queue, write
+     * items one at a time ending in a commit. Without it the task starts at
+     * once where it is told (sessions from before the mission's folder).
+     */
+    mode?: Exclude<MachineTaskMode, "setup"> | null;
   },
 ) {
+  if (input.mode) {
+    const { row } = await startMissionItem(deps, mission, {
+      title: input.title,
+      prompt: input.prompt,
+      sessionId: input.sessionId,
+      resume: input.resume,
+      cwd: input.cwd || null,
+      mode: input.mode,
+      runId: input.runId ?? null,
+      requestedBy: input.requestedBy ?? null,
+    });
+    return row;
+  }
   const hub = hubOf(deps);
   if (!mission.machineId) throw new ConflictError("This mission has no computer", "mission.needs_computer");
   const status = await hub.status(mission.machineId);
@@ -1258,9 +1328,13 @@ export async function sessionTask(db: Executor, missionId: string, sessionId: st
   return row ?? null;
 }
 
-const isLive = (t: MachineTaskRow | null) => Boolean(t && ACTIVE_TASK.includes(t.status) && !t.endedAt);
+const lastMode = (t: MachineTaskRow | null) => {
+  const mode = taskModeOf(t?.mode);
+  return mode === "write" || mode === "read" ? mode : null;
+};
+
 /** Whether a session's latest task still holds it (queued, running, or interrupted and may come back). */
-export const isLiveTask = isLive;
+const isLive = isLiveTaskRow;
 
 export async function queueForSession(db: Executor, mission: MissionRow, entry: schema.MissionInboxEntry) {
   await db
@@ -1314,7 +1388,7 @@ export async function tellSession(
     });
   }
   const last = await sessionTask(deps.db, mission.id, target.sessionId);
-  const cwd = target.cwd ?? last?.cwd ?? mission.repoDir;
+  const cwd = target.cwd ?? last?.cwd ?? missionCwd(mission);
   const entry = {
     sessionId: target.sessionId,
     cwd: cwd ?? "",
@@ -1335,6 +1409,8 @@ export async function tellSession(
       cwd: entry.cwd,
       resume: true,
       requestedBy: options.requestedBy ?? null,
+      // An item of the mission's folder resumes as the same kind, through the queue.
+      mode: lastMode(last),
     });
     return { delivered: true, taskId: row.id };
   } catch (error) {
@@ -1475,7 +1551,7 @@ export async function sendToMainSession(
   const out = await tellSession(
     deps,
     mission,
-    { sessionId: mission.mainSessionId, cwd: mission.repoDir },
+    { sessionId: mission.mainSessionId, cwd: missionCwd(mission) },
     `Message from ${from.name}: ${body}`,
     {
       requestedBy: from.userId ?? null,
@@ -1541,15 +1617,33 @@ async function setStatus(
 export async function startMission(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
   const { mission, role, isAdmin } = await requireMission(deps, userId, orgId, missionId);
   if (role !== "owner") throw new ForbiddenError("Only the mission's owner can start it", "mission.not_owner");
-  const row = await setStatus(
+  // The mission's own copy of the project needs runner protocol 14 (ADR 0044).
+  const machine = deps.hub && mission.machineId ? await deps.hub.status(mission.machineId).catch(() => null) : null;
+  if (machine && machine.protocol < MISSION_WORKTREE_PROTOCOL) {
+    throw new ConflictError(
+      `The runner on ${machine.name} is too old for missions: run agentes-runner update`,
+      "mission.runner_outdated",
+      { computer: machine.name },
+    );
+  }
+  let row = await setStatus(
     deps,
     mission,
     userId,
     ["proposed"],
-    { status: "active", startedAt: new Date() },
+    {
+      status: "active",
+      startedAt: new Date(),
+      ...(deps.hub && mission.machineId ? { worktreeState: "preparing" } : {}),
+    },
     "mission.started",
   );
-  await tellSession(deps, row, { sessionId: row.mainSessionId, cwd: row.repoDir }, startPrompt(row), {
+  // The mission's folder first (offline: when the computer is back); the start prompt waits for it in the inbox.
+  if (row.worktreeState === "preparing") {
+    await publishMissionEvent(deps, row, "worktree", { worktreeState: row.worktreeState });
+    row = (await ensureMissionWorktree(deps, row.id).catch(() => null)) ?? row;
+  }
+  await tellSession(deps, row, { sessionId: row.mainSessionId, cwd: missionCwd(row) }, startPrompt(row), {
     requestedBy: userId,
     from: await nameOf(deps.db, userId),
     kind: "person",
@@ -1593,7 +1687,15 @@ export async function resumeMission(deps: MissionDeps, userId: string, orgId: st
     { status: "active", pausedAt: null, idleWakeups: 0 },
     "mission.resumed",
   );
+  // Its folder checked (or prepared again) before work goes on (ADR 0044); a failed one is made or prepared
+  // again, as "Tentar de novo" does. The queue is walked once below.
+  if (row.worktreeState === "failed") {
+    await resumeFailedWorktree(deps, row, { startQueue: false }).catch(() => null);
+  } else if (row.worktreeState !== "none" && row.worktreeState !== "removed") {
+    await ensureMissionWorktree(deps, row.id, { startQueue: false }).catch(() => null);
+  }
   await deliverInbox(deps, row.id);
+  if (row.machineId) await startQueuedMissionTasks(deps, row.machineId).catch(() => 0);
   await requestFilesSync(deps.db, row);
   await scheduleDoneCheck(deps.db, row);
   await publishMissionEvent(deps, row, "resumed");
@@ -1605,13 +1707,7 @@ async function cancelMissionTasks(deps: MissionDeps, mission: MissionRow, actorI
   const rows = await deps.db
     .select()
     .from(machineTasks)
-    .where(
-      and(
-        eq(machineTasks.missionId, mission.id),
-        inArray(machineTasks.status, ACTIVE_TASK),
-        isNull(machineTasks.endedAt),
-      ),
-    );
+    .where(and(eq(machineTasks.missionId, mission.id), liveTaskWhere()));
   const agent = await getAgentCached(deps.db, mission.orgId, mission.agentId);
   let canceled = 0;
   for (const row of rows) {
@@ -1621,13 +1717,15 @@ async function cancelMissionTasks(deps: MissionDeps, mission: MissionRow, actorI
       .where(eq(machineTasks.id, row.id));
     let reply: { canceled: boolean } | null = null;
     try {
-      reply = deps.hub
-        ? await deps.hub.call<"task.cancel">(row.machineId, {
-            agent: { id: mission.agentId, handle: agent?.handle ?? "agent" },
-            op: "task.cancel",
-            taskId: row.id,
-          })
-        : null;
+      // Waiting in our queue: the runner never had it.
+      reply =
+        deps.hub && !row.startRequest
+          ? await deps.hub.call<"task.cancel">(row.machineId, {
+              agent: { id: mission.agentId, handle: agent?.handle ?? "agent" },
+              op: "task.cancel",
+              taskId: row.id,
+            })
+          : null;
     } catch (error) {
       if (!(error instanceof MachineOfflineError) && !(error instanceof MachineRequestError)) throw error;
     }
@@ -1689,7 +1787,7 @@ export async function closeMission(
   userId: string,
   orgId: string,
   missionId: string,
-  input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string | null },
+  input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string | null; deleteBranch?: boolean },
 ) {
   const { mission, role, isAdmin } = await requireMission(deps, userId, orgId, missionId);
   if (role !== "owner" && !isAdmin) {
@@ -1709,7 +1807,7 @@ export async function concludeMission(
   mission: MissionRow,
   userId: string,
   isAdmin: boolean,
-  input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string | null },
+  input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string | null; deleteBranch?: boolean },
 ) {
   const orgId = mission.orgId;
   await cancelMainRuns(deps, mission, userId, "closed");
@@ -1729,6 +1827,11 @@ export async function concludeMission(
     },
     "mission.closed",
   );
+  // The folder goes away once its tasks ended (a canceled write item still commits its partial work); the
+  // branch stays unless the person chose to delete everything on cancel (ADR 0044).
+  row = await closeMissionWorktree(deps, row, {
+    deleteBranch: input.outcome === "canceled" && input.deleteBranch === true,
+  }).catch(() => row);
   if (input.saveToWiki) {
     const page = await createWikiPage(
       { db: deps.db, pubsub: deps.pubsub },
@@ -2206,7 +2309,10 @@ export async function setMissionMachine(
   if (machine.pairedByUserId !== actorId) {
     throw new ForbiddenError("Choose a computer you paired", "mission.not_your_computer");
   }
-  if (!machineExecutors(machine).available.includes(mission.executor as MissionExecutor)) {
+  if (
+    machine.protocol < MISSION_WORKTREE_PROTOCOL ||
+    !machineExecutors(machine).available.includes(mission.executor as MissionExecutor)
+  ) {
     throw new ConflictError(
       `The runner on ${machine.name} can't run this mission: run agentes-runner update`,
       "mission.runner_outdated",
@@ -2214,6 +2320,15 @@ export async function setMissionMachine(
     );
   }
   const moved = machine.id !== mission.machineId;
+  // Items (or setup) still running or queued there would work in a copy that is going away: stopped first.
+  if (moved && (await hasLiveTasks(deps.db, mission.id))) {
+    throw new ConflictError(
+      "The mission still has items running or waiting on its computer: stop them first",
+      "mission.tasks_live",
+    );
+  }
+  // The old computer's copy goes away in the background (the branch stays); away, it stays there and the person is told.
+  const leftOn = moved && mission.status !== "proposed" ? await leaveMachineWorktree(deps, mission) : null;
   const [row] = await deps.db
     .update(missions)
     .set({
@@ -2222,6 +2337,10 @@ export async function setMissionMachine(
       ...(input.repoDir !== undefined ? { repoDir: cleanRepoDir(input.repoDir) } : {}),
       // Another disk: a new main session, which starts by reading the mission files.
       ...(moved ? { mainSessionId: crypto.randomUUID(), inbox: [] } : {}),
+      // And a new copy of the project there (from its branch when it was pushed, else from the base).
+      ...(moved && mission.status !== "proposed"
+        ? { worktreeState: "preparing", worktreePath: null, baseSha: null, baseBranch: null, worktreeError: null }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(missions.id, mission.id))
@@ -2240,7 +2359,13 @@ export async function setMissionMachine(
   });
   await requestFilesSync(deps.db, row as MissionRow);
   await publishMissionEvent(deps, row as MissionRow, "machine");
-  return viewFor(deps, row as MissionRow, actorId, isAdmin);
+  const now =
+    moved && mission.status !== "proposed" ? await ensureMissionWorktree(deps, mission.id).catch(() => null) : null;
+  return {
+    ...(await viewFor(deps, now ?? (row as MissionRow), actorId, isAdmin)),
+    // The old computer was away: the mission's copy stays there (its branch has the work).
+    ...(leftOn ? { code: "mission.old_copy_left", oldComputer: leftOn } : {}),
+  };
 }
 
 /**
@@ -2996,13 +3121,7 @@ export async function missionSummary(deps: MissionDeps, userId: string, orgId: s
     deps.db
       .select()
       .from(machineTasks)
-      .where(
-        and(
-          eq(machineTasks.missionId, mission.id),
-          inArray(machineTasks.status, ACTIVE_TASK),
-          isNull(machineTasks.endedAt),
-        ),
-      )
+      .where(and(eq(machineTasks.missionId, mission.id), liveTaskWhere()))
       .orderBy(desc(machineTasks.createdAt))
       .limit(10),
     deps.db
@@ -3160,7 +3279,7 @@ export interface EligibleAgent {
 /**
  * "Nova missão": every agent of the organization, each saying whether it can
  * run a mission for the caller: a connected computer that allows commands
- * with a runner on protocol 4 or later, and the caller in its audience (D31).
+ * with a runner on protocol 14 or later (ADR 0044), and the caller in its audience (D31).
  * The others carry the reason (`cloud`: the server has cloud computers, so an
  * agent without a connected one is on the cloud computer). Eligible first. One query.
  */
@@ -3219,7 +3338,7 @@ export async function eligibleMissionAgents(
           : "no_computer"
         : !r.exec_allowed
           ? "exec_off"
-          : protocol < TASKS_PROTOCOL
+          : protocol < MISSION_WORKTREE_PROTOCOL
             ? "runner_outdated"
             : null;
     const base = {

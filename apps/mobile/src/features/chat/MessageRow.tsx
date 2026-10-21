@@ -12,6 +12,7 @@ import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/e
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
+import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
@@ -35,7 +36,7 @@ import {
 } from "@/ui";
 import { HandoffCard } from "../browser/HandoffCard";
 import { MessageFiles } from "../files/MessageFiles";
-import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/cards";
+import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -118,6 +119,8 @@ export const MessageRow = memo(function MessageRow({
   const review = missionCardRef(meta, "missionReview");
   const decision = missionCardRef(meta, "missionDecision");
   const plan = missionPlanOf(meta);
+  // Preparing the mission's copy of the project failed (ADR 0044): the card with "Tentar de novo".
+  const setup = missionSetupOf(meta);
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
   const question = isAgent ? questionOf(meta) : null;
@@ -145,6 +148,14 @@ export const MessageRow = memo(function MessageRow({
       {plan ? <PlanCard missionId={plan.missionId} goal={plan.goal} /> : null}
       {review ? <ReviewCard missionId={review.missionId} reviewId={review.id} /> : null}
       {decision ? <DecisionCard missionId={decision.missionId} decisionId={decision.id} /> : null}
+      {setup ? (
+        <SetupFailedCard
+          {...(setup.missionId ? { missionId: setup.missionId } : {})}
+          threadId={m.threadId}
+          error={setup.error}
+          {...(setup.reason === "branch_missing" ? { lostBranch: setup.branch ?? null } : {})}
+        />
+      ) : null}
       <View style={mine ? styles.meEnd : undefined}>
         <Reactions message={m} meId={meId} />
       </View>

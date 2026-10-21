@@ -5,6 +5,7 @@ import { publishMessageCreated, publishUserEvent } from "./events";
 import type { MachineTaskRow } from "./machine-tasks";
 import { messageView } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
+import { missionCwd } from "./mission-worktree";
 import {
   cleanMissionText,
   concludeMission,
@@ -168,7 +169,14 @@ async function createDelivery(
         ? "Everything in the plan is done. Conclude the mission, or ask for changes."
         : `Delivered: ${input.summary.split("\n")[0]?.slice(0, 300) ?? ""}`,
       {
-        missionDelivery: { missionId: mission.id, id: row.id },
+        // "O que mudou": the mission's whole change (`baseSha..branch`, ADR 0044) when it has a branch.
+        missionDelivery: {
+          missionId: mission.id,
+          id: row.id,
+          ...(mission.branch
+            ? { branch: mission.branch, baseBranch: mission.baseBranch, baseSha: mission.baseSha }
+            : {}),
+        },
         ...(input.artifactIds.length ? { artifacts: input.artifactIds.map((id) => ({ id })) } : {}),
         bodyCode: input.auto ? "mission_all_done" : "mission_delivery",
         bodyParams: input.auto ? {} : { summary: input.summary.split("\n")[0]?.slice(0, 300) ?? "" },
@@ -427,7 +435,7 @@ export async function requestDeliveryChanges(
   await tellSession(
     deps,
     live,
-    { sessionId: live.mainSessionId, cwd: live.repoDir },
+    { sessionId: live.mainSessionId, cwd: missionCwd(live) },
     `Changes requested on the delivery (by ${name}): ${note}`,
     { requestedBy: userId, from: name, kind: "person" },
   );

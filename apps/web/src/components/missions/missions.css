@@ -469,6 +469,10 @@ a.mi-ref:hover code {
   flex: none;
 }
 /* Beside the title the executor chip has the state chip's height (22px), not a pill's. */
+/* "· mission/x a partir de main": the branch in the meta line, code at the line's size. */
+.mh__branch code {
+  font-size: 12px;
+}
 .mh__exec .mi-pill {
   height: 22px;
   padding: 0 8px 0 6px;
@@ -653,6 +657,13 @@ a.mi-ref:hover code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* "só leitura": a quiet note after the title, never a badge. */
+.mi-session__mode {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--faint);
 }
 .mi-session__title b > .ac-icon {
   flex: none;
@@ -1754,4 +1765,18 @@ a.mi-pr:hover {
   flex-direction: column;
   gap: 4px;
   padding-left: 22px;
+}
+
+/* "Não consegui preparar o projeto" (ADR 0044): a neutral mission card; the error's end in the command block. */
+.mi-setup__title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.mi-setup__error {
+  max-height: 200px;
+  font-size: 12px;
+}
+.mi-setup__now {
+  margin: 12px 0 0;
 }

@@ -9,8 +9,10 @@ import {
   useMissionControl,
   useMissionDecisions,
   useMissionReviews,
+  useRetryMissionWorktree,
   useThreadMission,
 } from "@agenteschat/client";
+import { lastLines } from "@agenteschat/client/lib/missions";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
@@ -105,6 +107,111 @@ export function MissionCardView({ mission: m, pinned = false }: { mission: Missi
         <Icon name="right" size={16} color={c.faint} />
       </View>
     </Pressable>
+  );
+}
+
+// ── Preparing the project failed (ADR 0044) ──────────────────────────────────
+
+/**
+ * `meta.missionSetup` in the conversation, or the mission screen while its copy
+ * of the project failed: the end of the error and "Tentar de novo" for whoever
+ * can act on the mission; once retried, where it stands now.
+ */
+export function SetupFailedCard({
+  missionId,
+  threadId,
+  error,
+  lostBranch,
+}: {
+  missionId?: string;
+  threadId?: string | null;
+  error: string;
+  /** The mission's branch is gone (`branch_missing`): trying again starts over from the base. */
+  lostBranch?: string | null;
+}) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const c = useColors();
+  const { colors, fonts } = useTheme();
+  const surface = useSurface();
+  const toast = useToast();
+  const byId = useMission(orgId, missionId);
+  const byThread = useThreadMission(orgId, missionId ? null : threadId);
+  const m = byId.data ?? byThread.data ?? null;
+  const retry = useRetryMissionWorktree(orgId, m?.id ?? "");
+  const lost = lostBranch !== undefined;
+  const tail = lost ? "" : lastLines(error);
+  const state = m?.worktreeState;
+  const open = m ? m.status !== "done" && m.status !== "canceled" : false;
+  return (
+    <View style={[styles.askcard, surface]}>
+      <View style={styles.row}>
+        <Icon name="code" size={15} color={c.muted} />
+        <Text variant="caption" tone="muted" style={styles.bold}>
+          {t("mobile.mission.setup.cap")}
+        </Text>
+      </View>
+      <Text variant="body" style={[styles.bold, styles.title]}>
+        {t(lost ? "mobile.mission.setup.lostTitle" : "mobile.mission.setup.failedTitle")}
+      </Text>
+      {lost ? (
+        <Text variant="small" tone="muted">
+          {t("mobile.mission.setup.lostText", { branch: lostBranch ?? m?.branch ?? "" })}
+        </Text>
+      ) : null}
+      {tail ? (
+        <View style={[styles.log, { backgroundColor: colors.sunken }]}>
+          <RNText
+            numberOfLines={8}
+            maxFontSizeMultiplier={CHROME_MAX_SCALE}
+            style={{ fontFamily: fonts.mono, fontSize: 12, lineHeight: 17, color: colors.ink2 }}
+          >
+            {tail}
+          </RNText>
+        </View>
+      ) : null}
+      {state === "preparing" ? (
+        <View style={styles.row}>
+          <PixelOrbit color={agentLook(dir.agentById.get(m?.agentId ?? "")).color} size={11} />
+          <Text variant="small" tone="muted">
+            {t("mobile.mission.setup.preparing")}
+          </Text>
+        </View>
+      ) : state === "ready" ? (
+        <View style={styles.row}>
+          <Icon name="check" size={15} color={c.ok} />
+          <Text variant="small" tone="muted">
+            {t("mobile.mission.setup.ready")}
+          </Text>
+        </View>
+      ) : m && open && state === "failed" ? (
+        m.canAct ? (
+          <View style={styles.acts}>
+            <View style={styles.grow}>
+              <Button
+                variant="primary"
+                size="sm"
+                wide
+                icon="undo"
+                label={t(lost ? "mobile.mission.setup.restart" : "mobile.mission.setup.retry")}
+                disabled={retry.isPending}
+                onPress={() =>
+                  retry.mutate(undefined, {
+                    onSuccess: () => toast({ title: t("mobile.mission.setup.retrying") }),
+                    onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+                  })
+                }
+              />
+            </View>
+          </View>
+        ) : (
+          <Text variant="small" tone="muted">
+            {t("mobile.mission.setup.waiting")}
+          </Text>
+        )
+      ) : null}
+    </View>
   );
 }
 
@@ -531,6 +638,7 @@ const styles = StyleSheet.create({
   ft: { marginTop: 8, gap: 6 },
   askcard: { marginTop: 8, padding: 12, borderRadius: 16 },
   summary: { marginBottom: 10 },
+  log: { padding: 10, borderRadius: 12, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8, marginTop: 4 },
   done: {
     marginTop: 8,

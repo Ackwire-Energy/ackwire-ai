@@ -6,6 +6,7 @@ import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { RunIdentity } from "./executor";
 import { insertMessage, messageView } from "./messages";
 import { enqueueRunJob } from "./mission-runs";
+import { missionCwd, worktreeBlocksWork } from "./mission-worktree";
 import {
   agentAnswers,
   getMissionRow,
@@ -39,7 +40,7 @@ const { missions, missionEvents, agentRuns, approvals, agentQuestions, outbox } 
  * end, the inbox — is a notice in the thread (`meta.missionInbox` / `meta.machineTask`) that starts a run of the
  * engine (`MissionEngine.startRun`), joins the run already working there, or
  * resumes a run paused on that very decision (`MissionEngine.resumeRun`).
- * Item work stays machine tasks (their own branch and session), started by the
+ * Item work stays machine tasks (their own session, in the mission's one folder: ADR 0044), started by the
  * run with the gateway tool `start_task`.
  *
  * This is the only path: the main session is never a machine task.
@@ -142,10 +143,14 @@ export async function sessionStarted(db: Executor, missionId: string, sessionId:
   return yes === true || yes === "t";
 }
 
-/** The session a computer brain works in: the mission's main session, in its folder, on its computer. */
+/**
+ * The session a computer brain works in: the mission's main session, in its
+ * folder (the mission's own copy of the project once it is ready, ADR 0044),
+ * on its computer.
+ */
 export async function missionSession(
   db: Executor,
-  mission: Pick<MissionRow, "id" | "mainSessionId" | "machineId" | "repoDir">,
+  mission: Pick<MissionRow, "id" | "mainSessionId" | "machineId" | "repoDir" | "worktreePath" | "worktreeState">,
   brain: BrainKind,
   options: { fresh?: boolean; exceptRunId?: string | null } = {},
 ): Promise<BrainSession | undefined> {
@@ -153,7 +158,7 @@ export async function missionSession(
   const resume = options.fresh
     ? false
     : await sessionStarted(db, mission.id, mission.mainSessionId, options.exceptRunId);
-  return { id: mission.mainSessionId, resume, machineId: mission.machineId, cwd: mission.repoDir };
+  return { id: mission.mainSessionId, resume, machineId: mission.machineId, cwd: missionCwd(mission) };
 }
 
 /**
@@ -178,10 +183,15 @@ export async function missionTurnFor(
 
 // ── Telling the main session ─────────────────────────────────────────────────
 
-/** Whether the main session may work now (an active mission, or a proposed one being planned, with a computer). */
-const canWork = (mission: Pick<MissionRow, "status" | "machineId">) =>
+/**
+ * Whether the main session may work now (an active mission, or a proposed one
+ * being planned, with a computer), and not while its folder is being prepared
+ * or failed to be (ADR 0044: what it is told waits in the inbox until ready).
+ */
+const canWork = (mission: Pick<MissionRow, "status" | "machineId" | "worktreeState">) =>
   Boolean(mission.machineId) &&
-  (mission.status === "active" || mission.status === "awaiting_close" || mission.status === "proposed");
+  (mission.status === "active" || mission.status === "awaiting_close" || mission.status === "proposed") &&
+  !worktreeBlocksWork(mission);
 
 export interface TellOptions {
   requestedBy?: string | null;
@@ -236,7 +246,7 @@ export async function tellMainSession(
   if (fresh.status === "awaiting_close" && (options.requestedBy || kind === "person")) {
     fresh = await reactivateMission(deps, fresh, "message");
   }
-  const entry = { sessionId: fresh.mainSessionId, cwd: fresh.repoDir, text: body, at: new Date().toISOString() };
+  const entry = { sessionId: fresh.mainSessionId, cwd: missionCwd(fresh), text: body, at: new Date().toISOString() };
   if (!canWork(fresh)) {
     await queueForSession(deps.db, fresh, entry);
     return { delivered: false };

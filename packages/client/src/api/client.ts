@@ -578,8 +578,10 @@ export interface ApiClient {
     close(
       orgId: string,
       missionId: string,
-      input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string },
+      input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string; deleteBranch?: boolean },
     ): Promise<Mission>;
+    /** "Tentar de novo" after preparing the mission's copy of the project failed. */
+    retryWorktree(orgId: string, missionId: string): Promise<Mission>;
     /** "Mudar algo": to the executor's main session (queued when it can't hear now). */
     message(orgId: string, missionId: string, text: string): Promise<{ delivered: boolean; taskId?: string }>;
     participants(orgId: string, missionId: string): Promise<MissionParticipants>;

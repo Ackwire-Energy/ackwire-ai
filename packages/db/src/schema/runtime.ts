@@ -698,6 +698,21 @@ export const machineTasks = pgTable(
      * `review` or `approval`. Its end then means "waiting", not "done".
      */
     waitingFor: text(),
+    /**
+     * A mission task's kind (ADR 0044): `write` (one at a time in the
+     * mission's folder, ending in a commit), `read` (in parallel, read only)
+     * or `setup` (prepares the folder); null for other tasks. Validated in code.
+     */
+    mode: text(),
+    /** `HEAD` when a write item started and after its commit at the end (equal: nothing changed). */
+    startSha: text(),
+    endSha: text(),
+    /**
+     * A task waiting in our queue (status `queued`): what to send the runner
+     * when it may start (its mission's folder is free, the computer has a
+     * slot or is back). Cleared when it is claimed to start.
+     */
+    startRequest: jsonb().$type<Record<string, unknown>>(),
     /** The conversation was woken for its end (the `machine.task_done` job ran). */
     wokeAt: timestamp({ withTimezone: true }),
     startedAt: timestamp({ withTimezone: true }),

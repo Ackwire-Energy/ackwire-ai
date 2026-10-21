@@ -738,6 +738,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         control: (orgId, missionId, action) =>
           request<Mission & { canceledTasks?: number }>(`${one(orgId, missionId)}/${action}`, { json: {} }),
         close: (orgId, missionId, input) => request<Mission>(`${one(orgId, missionId)}/close`, { json: input }),
+        retryWorktree: (orgId, missionId) => request<Mission>(`${one(orgId, missionId)}/worktree/retry`, { json: {} }),
         message: (orgId, missionId, text) =>
           request<{ delivered: boolean; taskId?: string }>(`${one(orgId, missionId)}/messages`, { json: { text } }),
         participants: (orgId, missionId) => request<MissionParticipants>(`${one(orgId, missionId)}/participants`),

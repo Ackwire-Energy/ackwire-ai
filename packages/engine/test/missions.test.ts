@@ -3,6 +3,7 @@ import { MACHINE_PROTOCOL_VERSION, PERMISSION_TIMEOUT_MESSAGE, type ServerFrame 
 import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   addChannelMember,
+  afterMissionRunEnded,
   approveProvisionalDecisions,
   buildRunContext,
   chooseDecision,
@@ -30,6 +31,7 @@ import {
   machineExecutors,
   missionBranchPrefix,
   missionSummary,
+  missionWorktreePath,
   openDm,
   opineDecision,
   pauseMission,
@@ -81,6 +83,8 @@ function missionRunner(hub: MachineHub) {
   const started: TaskStartRequest[] = [];
   const files = new Map<string, string>();
   const canceled: string[] = [];
+  /** `mission.worktree` requests (ADR 0044). */
+  const worktree: Extract<Request, { op: "mission.worktree" }>[] = [];
   /** What `task.output` answers, per task. */
   const outputs = new Map<string, string[]>();
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
@@ -105,6 +109,20 @@ function missionRunner(hub: MachineHub) {
         if (frame.op === "task.cancel") {
           canceled.push(frame.taskId);
           return ok({ canceled: true });
+        }
+        if (frame.op === "mission.worktree") {
+          worktree.push(frame);
+          if (frame.action === "remove") return ok({ removed: true });
+          return ok({
+            path: frame.path,
+            branch: frame.branch,
+            baseBranch: "main",
+            baseSha: frame.baseSha ?? "0123456789abcdef0123456789abcdef01234567",
+            created: !frame.baseSha,
+            dirty: false,
+            setupCommand: null,
+            copied: [],
+          });
         }
         if (frame.op === "task.output") {
           const lines = outputs.get(frame.taskId) ?? [];
@@ -136,6 +154,7 @@ function missionRunner(hub: MachineHub) {
     started,
     files,
     canceled,
+    worktree,
     outputs,
     close: () => hub.close(conn),
     frame: (frame: Record<string, unknown>) => reply(frame),
@@ -241,7 +260,14 @@ async function mainCall(tool: string, args: Record<string, unknown>) {
   const { db: _db, ...deps } = f.missionDeps;
   const found = (await createMissionRunToolSource(deps).tools(ctx)).find((t) => t.name === tool);
   if (!found) throw new Error(`the main session has no ${tool}`);
-  return found.execute(args, ctx);
+  const out = await found.execute(args, ctx);
+  // The turn ends: write items queued behind it start (ADR 0044).
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "done" })
+    .where(eq(schema.agentRuns.id, run?.id as string));
+  await afterMissionRunEnded(f.missionDeps, run?.id as string);
+  return out;
 }
 const done = (out: { content: string; isError?: boolean }) => {
   if (out.isError) throw new Error(`refused: ${out.content}`);
@@ -560,22 +586,21 @@ describe("missions (ADR 0029)", () => {
   test("pause refuses new tasks (mission.paused); stop cancels the running ones", async () => {
     const { view, runner, task: plan } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
-    const started = done(
-      await mainCall("start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }),
-    );
-    // Item branches live under the mission's prefix (the only ones its executors may push).
-    expect(started).toContain(`on branch ${missionBranchPrefix(view.id)}nav`);
+    const started = done(await mainCall("start_task", { title: "Navigation", prompt: "Build the tabs" }));
+    // Items work in the mission's own folder, on its branch under the mission's prefix (ADR 0044).
+    const branch = `${missionBranchPrefix(view.id)}mobile-app`;
+    expect(started).toContain(`branch ${branch}`);
     const item = runner.started.at(-1) as TaskStartRequest;
     expect(item).toMatchObject({
-      branch: `${missionBranchPrefix(view.id)}nav`,
-      cwd: "app",
+      cwd: missionWorktreePath(view.id),
+      commit: { message: "agentes: Navigation" },
+      baseCheck: { branch: "main", sha: "0123456789abcdef0123456789abcdef01234567" },
       mission: { id: view.id, rules: MISSION_RULES, branchPrefix: missionBranchPrefix(view.id) },
     });
+    expect(item.branch).toBeUndefined();
     expect(item.session).not.toBe(plan.session);
     // Only the main session starts tasks; an item session is told so.
-    expect(ok(await runner.mcp(plan.taskId, "start_task", { title: "x", prompt: "y", branch: "x" }))).toContain(
-      "main session",
-    );
+    expect(ok(await runner.mcp(plan.taskId, "start_task", { title: "x", prompt: "y" }))).toContain("main session");
     expect(runner.started.at(-1)).toBe(item);
     await pauseMission(md(), f.owner.id, f.org.id, view.id);
     const refused = await mainCall("start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" });
@@ -753,7 +778,7 @@ describe("missions (ADR 0029)", () => {
     });
     expect(await prOf(item.taskId)).toBe("https://github.com/acme/app/pull/12");
 
-    done(await mainCall("start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" }));
+    done(await mainCall("start_task", { title: "Auth", prompt: "Sign-in", mode: "read" }));
     const auth = runner.started.at(-1) as TaskStartRequest;
     ok(
       await runner.mcp(auth.taskId, "report", {
@@ -763,7 +788,7 @@ describe("missions (ADR 0029)", () => {
     );
     expect(await prOf(auth.taskId)).toBe("https://github.com/acme/app/pull/13");
 
-    done(await mainCall("start_task", { title: "Build", prompt: "Dev build", branch: "build" }));
+    done(await mainCall("start_task", { title: "Build", prompt: "Dev build", mode: "read" }));
     const build = runner.started.at(-1) as TaskStartRequest;
     ok(
       await runner.mcp(build.taskId, "request_review", {
@@ -922,12 +947,9 @@ describe("missions (ADR 0029)", () => {
     await runner.close();
     const offline = (await elig()).find((a) => a.agentId === f.agent.id);
     expect(offline).toMatchObject({ eligible: true, ready: false, machine: { online: false } });
-    // Protocol 4: only the agent itself can program there (no mission tools for executors).
-    await f.db.update(schema.machines).set({ protocol: 4 }).where(eq(schema.machines.id, paired.machineId));
-    expect((await elig()).find((a) => a.agentId === f.agent.id)).toMatchObject({
-      executors: ["agent"],
-      defaultExecutor: "agent",
-    });
+    // Below protocol 14 a mission can't get its own copy of the project (ADR 0044): runner outdated.
+    await f.db.update(schema.machines).set({ protocol: 13 }).where(eq(schema.machines.id, paired.machineId));
+    expect((await elig()).find((a) => a.agentId === f.agent.id)?.reason).toBe("runner_outdated");
     await f.db.update(schema.machines).set({ protocol: 3 }).where(eq(schema.machines.id, paired.machineId));
     expect((await elig()).find((a) => a.agentId === f.agent.id)?.reason).toBe("runner_outdated");
     await f.db
