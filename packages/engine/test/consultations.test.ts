@@ -51,7 +51,7 @@ const consultReply = (infraSays: (req: ModelRequest) => ReturnType<typeof answer
   if (inAgentDm(req)) return infraSays(req);
   const last = lastText(req);
   if (last.includes("tool_result"))
-    return { chunks: [`Relaying: ${/answered:\\n\\n([^"]+)/.exec(last)?.[1] ?? last}`] };
+    return { chunks: [`Relaying: ${/instructions\):\\n\\n([^"]+)/.exec(last)?.[1] ?? last}`] };
   if (last.includes("deploy"))
     return {
       chunks: [],

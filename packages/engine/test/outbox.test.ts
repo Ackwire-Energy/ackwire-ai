@@ -11,6 +11,7 @@ import {
   failJob,
   PermanentJobError,
   processOutbox,
+  renewLease,
   retryDelayMs,
 } from "../src";
 
@@ -61,6 +62,36 @@ test("claimed jobs are leased: a second worker gets nothing until the lease expi
   // Worker a finishing late doesn't overwrite b's ownership.
   expect(await completeJob(db, a[0] as NonNullable<(typeof a)[0]>)).toBe(false);
   expect(await completeJob(db, b[0] as NonNullable<(typeof b)[0]>)).toBe(true);
+});
+
+test("a running job's lease is renewed: a handler that outlives the lease is not re-claimed", async () => {
+  await enqueue(db, job("long"));
+  let stolen: unknown[] | undefined;
+  await processOutbox(
+    db,
+    {
+      long: async () => {
+        await Bun.sleep(450);
+        // Past the original 300ms lease: without renewal worker b would take the job over here.
+        stolen = await claimJobs(db, { workerId: "b", leaseMs: 300 });
+        await Bun.sleep(250);
+      },
+    },
+    { workerId: "a", leaseMs: 300 },
+  );
+  expect(stolen).toEqual([]);
+  const [row] = await rows();
+  expect([row?.status, row?.lockedBy, row?.attempts]).toEqual(["done", "a", 1]);
+});
+
+test("renewLease does not extend a job another worker took over", async () => {
+  await enqueue(db, job());
+  const [a] = await claimJobs(db, { workerId: "a" });
+  const [b] = await claimJobs(db, { workerId: "b", now: at(DEFAULT_LEASE_MS + 1000) });
+  const owned = a as NonNullable<typeof a>;
+  expect(await renewLease(db, owned, DEFAULT_LEASE_MS, at(DEFAULT_LEASE_MS * 5))).toBe(false);
+  expect((await rows())[0]?.lockedUntil?.getTime()).toBe(b?.lockedUntil?.getTime());
+  expect(await renewLease(db, b as NonNullable<typeof b>)).toBe(true);
 });
 
 test("future jobs wait for their time", async () => {

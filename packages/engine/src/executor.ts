@@ -40,6 +40,7 @@ import {
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
+import { fitContextWindow } from "./context-budget";
 import { createAgentRuns } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
@@ -115,6 +116,8 @@ export interface EngineDeps {
   gateway: ModelGateway;
   pubsub: PubSub;
   maxOutputTokens: number;
+  /** Overrides the model's context window from the catalog (tests). */
+  contextWindowTokens?: number;
   contextMessages: number;
   /** Coalesce stream deltas for this long before publishing (0 = publish every delta). */
   deltaFlushMs?: number;
@@ -1232,6 +1235,26 @@ async function executeRunInner(
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
       /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
       const executedNow: { id: string; name: string }[] = [];
+      // Context budget: a request that wouldn't fit the model's window sends old tool results as a
+      // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
+      if (turnPlan.kind === "model") {
+        const fitted = await fitContextWindow(judge, {
+          orgId: run.orgId,
+          model: agent.model,
+          windowTokens: deps.contextWindowTokens,
+          maxOutputTokens: deps.maxOutputTokens,
+          system: transcript.system,
+          messages: transcript.messages,
+          tools: turnTools,
+          task: triggerText,
+        }).catch(() => null);
+        if (fitted) {
+          transcript.messages = fitted.messages;
+          await saveTranscript(db, transcript);
+          const report = fitted.report;
+          later(() => addRunStep(db, run, "context", { contextBudget: report }));
+        }
+      }
       let result: BrainStep;
       try {
         result = await thinkOnce(
