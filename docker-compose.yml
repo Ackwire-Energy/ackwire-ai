@@ -30,12 +30,39 @@ services:
       timeout: 5s
       retries: 10
 
+  backup:
+    # A pg_dump a day to an S3-compatible bucket, and the restore: SELF_HOSTING.md, Backups. On with
+    # backup in COMPOSE_PROFILES and S3_BACKUP_BUCKET with the S3_* credentials in .env.
+    image: "${AGENTES_BACKUP_IMAGE:-ghcr.io/agentes-chat/backup:latest}"
+    profiles: ["backup"]
+    # Its own variables only, not the whole .env: it has no use for the app's secrets.
+    environment:
+      DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
+      S3_ENDPOINT: "${S3_ENDPOINT:-}"
+      S3_REGION: "${S3_REGION:-}"
+      S3_PROVIDER: "${S3_PROVIDER:-}"
+      S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-}"
+      S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:-}"
+      S3_BACKUP_BUCKET: "${S3_BACKUP_BUCKET:-}"
+      BACKUP_RETENTION_DAYS: "${BACKUP_RETENTION_DAYS:-}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   agentes:
     image: "${AGENTES_IMAGE:-ghcr.io/agentes-chat/agentes:latest}"
     env_file: .env
     environment:
       DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
       FILES_DIR: /data/files
+      # deploy/deploy.sh rolls back with false: a version refuses a database that a newer one migrated.
+      RUN_MIGRATIONS_ON_BOOT: "${RUN_MIGRATIONS_ON_BOOT:-true}"
     volumes:
       - files:/data/files
     ports:

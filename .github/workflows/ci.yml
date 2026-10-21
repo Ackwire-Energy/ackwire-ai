@@ -17,6 +17,7 @@ permissions:
 
 env:
   APP_IMAGE: ghcr.io/agentes-chat/agentes
+  BACKUP_IMAGE: ghcr.io/agentes-chat/backup
 
 # A newer push supersedes a running check of the same branch or PR (on main only the newest
 # commit's image matters); a release tag's run is never cancelled.
@@ -78,6 +79,7 @@ jobs:
               - "Dockerfile"
               - ".dockerignore"
               - "docker-compose*.yml"
+              - "deploy/backup/**"
       # A group counts only when code changed, not just docs or READMEs. The image holds the server
       # and the web app.
       - name: What runs
@@ -122,6 +124,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Lint and format
         run: bun run lint
+      - name: Shell scripts
+        if: success() || failure()
+        run: shellcheck deploy/*.sh deploy/backup/*.sh
       # No test shard covers scripts/, so the checks' own tests run here. The boundaries check itself runs in
       # the secrets job, which docs-only changes run too.
       - name: Boundaries check's own test
@@ -278,8 +283,9 @@ jobs:
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health
   # probe, the first sign-up (the installation's owner), an organization, a second sign-up refused
   # (sign-up is closed by default), the web app and the runner download, then an upgrade's steps on
-  # the same volumes. amd64 only, nothing pushed. Only pushes write the layer cache, which the image
-  # build below then reuses: PR-scoped entries would crowd main's out of the repository's cache quota.
+  # the same volumes, and the backup profile: a dump and its restore. amd64 only, nothing pushed.
+  # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
+  # would crowd main's out of the repository's cache quota.
   compose:
     name: Image boots with docker compose
     needs: changes
@@ -288,6 +294,7 @@ jobs:
     timeout-minutes: 20
     env:
       AGENTES_IMAGE: agentes:ci
+      AGENTES_BACKUP_IMAGE: agentes-backup:ci
       URL: http://localhost:3000
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -299,6 +306,13 @@ jobs:
           tags: ${{ env.AGENTES_IMAGE }}
           cache-from: type=gha,scope=app-amd64
           cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=app-amd64,mode=max' || '' }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: deploy/backup
+          load: true
+          tags: ${{ env.AGENTES_BACKUP_IMAGE }}
+          cache-from: type=gha,scope=backup-amd64
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=backup-amd64,mode=max' || '' }}
       - name: Boot and use it
         run: |
           docker image ls "$AGENTES_IMAGE"
@@ -335,6 +349,18 @@ jobs:
           docker compose up -d
           healthy
           curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.organizations | length == 1'
+      # The bucket is rclone serving a folder over the S3 API, on the compose network.
+      - name: Back up and restore
+        run: |
+          printf 'S3_ENDPOINT=http://s3:8080\nS3_PROVIDER=Rclone\nS3_ACCESS_KEY_ID=ci\nS3_SECRET_ACCESS_KEY=ci-secret\nS3_BACKUP_BUCKET=backups\n' >> .env
+          docker compose run -d --name s3 --entrypoint sh backup -c \
+            'mkdir -p /tmp/s3/backups && exec rclone serve s3 --auth-key ci,ci-secret --addr :8080 /tmp/s3'
+          docker compose run --rm backup now
+          name=$(docker compose run --rm -T backup list | awk '{print $NF}')
+          docker compose run --rm -T backup fetch "$name" > ci.dump
+          docker compose exec -T postgres createdb -U agentes restored
+          docker compose exec -T postgres pg_restore -U agentes -d restored --exit-on-error < ci.dump
+          docker compose exec -T postgres psql -U agentes -d restored -tAc 'select email from users' | grep -x owner@ci.invalid
       - name: Logs
         if: failure()
         run: docker compose logs --no-color
@@ -343,7 +369,8 @@ jobs:
   # never point at a build the tests rejected. main → :edge (moving head); version tags → :1.2.3,
   # :1.2 and :latest (metadata-action adds :latest to semver tags by itself). While the repository
   # is private only tags publish: an edge image per push to main costs about 10 runner minutes, and
-  # public repositories run them free.
+  # public repositories run them free. The backup service's image ships on the same tags, so the
+  # standalone compose file needs no build context.
   #
   # Each platform builds on its own native runner (Bun under QEMU emulation is slow and fragile) and
   # pushes by digest only; publish then stitches the digests into one tag per image.
@@ -394,12 +421,24 @@ jobs:
           outputs: type=image,name=${{ env.APP_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=app-${{ matrix.slug }}
           cache-to: type=gha,scope=app-${{ matrix.slug }},mode=max
-      - name: Export the digest
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        id: backup
+        with:
+          context: deploy/backup
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          outputs: type=image,name=${{ env.BACKUP_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=backup-${{ matrix.slug }}
+          cache-to: type=gha,scope=backup-${{ matrix.slug }},mode=max
+      - name: Export the digests
         env:
           DIGEST: ${{ steps.app.outputs.digest }}
+          BACKUP_DIGEST: ${{ steps.backup.outputs.digest }}
         run: |
-          mkdir -p /tmp/digests
-          touch "/tmp/digests/${DIGEST#sha256:}"
+          mkdir -p /tmp/digests/app /tmp/digests/backup
+          touch "/tmp/digests/app/${DIGEST#sha256:}" "/tmp/digests/backup/${BACKUP_DIGEST#sha256:}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digests-${{ matrix.slug }}
@@ -408,7 +447,7 @@ jobs:
           retention-days: 1
 
   publish:
-    name: Publish the image
+    name: Publish the images
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -435,15 +474,17 @@ jobs:
             type=edge,branch=main
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-      - name: Create the multi-arch manifest
+      - name: Create the multi-arch manifests
         working-directory: /tmp/digests
         env:
           META: ${{ steps.meta.outputs.json }}
         run: |
-          args=()
-          for tag in $(jq -r '.tags[]' <<<"$META"); do args+=(-t "$tag"); done
-          for digest in *; do args+=("$APP_IMAGE@sha256:$digest"); done
-          docker buildx imagetools create "${args[@]}"
+          app=() backup=()
+          for tag in $(jq -r '.tags[]' <<<"$META"); do app+=(-t "$tag"); backup+=(-t "$BACKUP_IMAGE:${tag##*:}"); done
+          for digest in app/*; do app+=("$APP_IMAGE@sha256:${digest#app/}"); done
+          for digest in backup/*; do backup+=("$BACKUP_IMAGE@sha256:${digest#backup/}"); done
+          docker buildx imagetools create "${app[@]}"
+          docker buildx imagetools create "${backup[@]}"
           docker buildx imagetools inspect "$(jq -r '.tags[0]' <<<"$META")"
 
   # The one check to require once branch protection is on: red when any job failed or was

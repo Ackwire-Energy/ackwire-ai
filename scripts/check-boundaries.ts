@@ -20,7 +20,6 @@ export const PRIVATE_PATHS = [
   "docs/frontend-progress.md",
   "docs/prototipo/",
   "docs/design/telas/",
-  "railway.json",
   ".claude/rules/internal-docs.md",
 ];
 
