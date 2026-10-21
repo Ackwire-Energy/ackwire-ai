@@ -21,6 +21,7 @@ import {
   listMessages,
   postPersonMessage,
   redoAgentAction,
+  replyThreadOf,
   type ToolContext,
   type ToolDefinition,
   toTurns,
@@ -38,11 +39,23 @@ afterEach(async () => {
 
 const person = (userId: string) => ({ type: "person" as const, userId });
 
-/** A run's tool context whose trigger is a real message by the owner (tools act for them). */
-async function runContext(fx: Fixture, body = "please organize this"): Promise<ToolContext> {
+/**
+ * A run's tool context whose trigger is a real message by the owner (tools act for them): in the
+ * channel (the run answers there, D67), or `inThread` (a reply under another message).
+ */
+async function runContext(fx: Fixture, body = "please organize this", inThread = false): Promise<ToolContext> {
+  const root = inThread
+    ? await insertMessage(fx.db, {
+        orgId: fx.org.id,
+        channelId: fx.general.id,
+        author: { type: "person", userId: fx.owner.id },
+        body: "deploy notes",
+      })
+    : null;
   const trigger = await insertMessage(fx.db, {
     orgId: fx.org.id,
     channelId: fx.general.id,
+    threadId: root?.id ?? null,
     author: { type: "person", userId: fx.owner.id },
     body,
   });
@@ -52,17 +65,17 @@ async function runContext(fx: Fixture, body = "please organize this"): Promise<T
     agentId: fx.agent.id,
     runId: crypto.randomUUID(),
     channelId: fx.general.id,
-    threadRootId: trigger.id,
+    threadRootId: root?.id ?? trigger.id,
     triggerMessageId: trigger.id,
   };
 }
 
-/** The run's reply: links the receipts to it, as the executor does when it posts. */
+/** The run's reply: links the receipts to it, as the executor does when it posts (where the run answers). */
 async function reply(fx: Fixture, ctx: ToolContext) {
   const m = await insertMessage(fx.db, {
     orgId: fx.org.id,
     channelId: fx.general.id,
-    threadId: ctx.threadRootId,
+    threadId: replyThreadOf(ctx),
     author: { type: "agent", agentId: fx.agent.id, runId: ctx.runId, hop: 0 },
     body: "Done.",
   });
@@ -101,9 +114,7 @@ describe("act with undo: issues", () => {
 
     const events = f.listen(f.general.id);
     const m = await reply(f, ctx);
-    const [view] = (
-      await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ctx.threadRootId })
-    ).filter((x) => x.id === m.id);
+    const [view] = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).filter((x) => x.id === m.id);
     expect(view?.actions?.map((a) => [a.kind, a.target.number, a.params.title])).toEqual([
       ["issue.created", 1, "Prompt de avaliação após a assinatura"],
     ]);
@@ -117,7 +128,7 @@ describe("act with undo: issues", () => {
     const issue = await getIssue(f.db, person(f.owner.id), f.org.id, { id: action.target.id });
     expect(issue.status).toBe("canceled");
     const live = events.find((e) => e.type === "message.actions");
-    expect(live).toMatchObject({ messageId: m.id, threadId: ctx.threadRootId });
+    expect(live).toMatchObject({ messageId: m.id, threadId: null });
     expect((live as unknown as { actions: { undoneAt: string | null }[] }).actions[0]?.undoneAt).not.toBeNull();
 
     // The agent reads it next time, on the people's side of its history.
@@ -218,10 +229,8 @@ describe("act with undo: issues", () => {
     await drainOutbox(f.db, f.handlers);
     const [action] = await rows(f);
     expect(action?.messageId).not.toBeNull();
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, {
-      threadId: (await f.db.select().from(schema.messages)).find((x) => x.authorType === "person")?.id,
-    });
-    const agentReply = thread.find((x) => x.author.type === "agent");
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const agentReply = timeline.find((x) => x.author.type === "agent");
     expect(agentReply?.body).toBe("Abri a #1 e deixei comigo.");
     expect(agentReply?.actions?.map((a) => a.kind)).toEqual(["issue.created"]);
     expect(events.some((e) => e.type === "message.actions" && e.messageId === agentReply?.id)).toBe(true);
@@ -294,7 +303,8 @@ describe("act with undo: memory, routines, channels, wiki, threads", () => {
 
   test("an agent added to a channel; wiki pages created and edited; a thread renamed and closed", async () => {
     f = await setup();
-    const ctx = await runContext(f, "organiza: chama a lia no #produto, salva na wiki e fecha a thread");
+    // Asked in a thread: it is the thread the agent renames and closes.
+    const ctx = await runContext(f, "organiza: chama a lia no #produto, salva na wiki e fecha a thread", true);
     const [lia] = await f.db
       .insert(schema.agents)
       .values({

@@ -28,7 +28,7 @@ import {
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
-import { onConsultedRunFinished } from "./consultations";
+import { consultationCardThread, onConsultedRunFinished } from "./consultations";
 import {
   buildRunContext,
   getChannelCached,
@@ -76,12 +76,19 @@ import {
   invokeWithChip,
   mergeToolEffects,
   type RunToolScope,
-  replyThreadOf,
   storedTranscript,
   takeBridgeEffects,
   waitOf,
 } from "./run-tools";
-import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, transitionRun } from "./runs";
+import {
+  type AgentRun,
+  addRunStep,
+  isTerminal,
+  type RunStatus,
+  replyThreadOf,
+  runErrorDetail,
+  transitionRun,
+} from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
 import { enabledSkills } from "./skills";
 import { FIND_AGENT_TOOL } from "./team";
@@ -391,16 +398,14 @@ async function executeRunInner(
   // status is `running` here.
   prof.mark("claim");
   const claimedAt = Date.now();
-  // DMs are flat: a reply to a top-level DM message goes in the main timeline, not a thread.
-  // So is a routine's answer in a channel: the routine's own message isn't shown, so its
-  // result can't hang in a thread under it.
+  // Asked in the main timeline, the run answers there; asked in a thread, in that thread (D67).
   // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
   const [channelRow, topTrigger] = await Promise.all([
     getChannelCached(db, run.orgId, run.channelId),
     topLevel ? getMessage(db, run.orgId, run.triggerMessageId) : Promise.resolve(null),
   ]);
-  const replyThreadId = replyThreadOf(run, channelRow?.kind, topTrigger);
+  const replyThreadId = replyThreadOf(run);
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where });
   await publishChannelEvent(deps.pubsub, {
@@ -1540,7 +1545,7 @@ async function executeRunInner(
                 : await insertMessage(tx, {
                     orgId: run.orgId,
                     channelId: approval.channelId,
-                    threadId: approval.threadRootId,
+                    threadId: await consultationCardThread(tx, run.orgId, run.id, approval.threadRootId),
                     author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
                     body: cardText,
                     meta: cardMeta,

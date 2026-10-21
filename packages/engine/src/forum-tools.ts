@@ -8,6 +8,7 @@ import {
   postInForumAsAgent,
   suggestForumTopic,
 } from "./forum";
+import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 export const FORUM_SCOPE = "forum:write";
@@ -89,8 +90,7 @@ export function createForumToolSource(deps: { pubsub?: PubSub; artifacts?: Artif
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)
             .where(eq(schema.agentRuns.id, ctx.runId));
-          // The card goes where the run replies: the thread (or the DM's timeline).
-          const flat = channel[0]?.kind === "dm" && ctx.threadRootId === ctx.triggerMessageId;
+          // The card goes where the run replies.
           const { message } = await suggestForumTopic(
             forumDeps(ctx),
             {
@@ -98,7 +98,7 @@ export function createForumToolSource(deps: { pubsub?: PubSub; artifacts?: Artif
               agentId: ctx.agentId,
               runId: ctx.runId,
               channelId: ctx.channelId,
-              threadId: flat ? null : ctx.threadRootId,
+              threadId: replyThreadOf(ctx),
               hop: run?.hop ?? 0,
             },
             {

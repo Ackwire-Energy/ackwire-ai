@@ -338,12 +338,12 @@ test("end to end: the waiting note names the computer and the agent; after the m
       }),
     },
   });
-  const question = await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
   await drainOutbox(f.db, handlers);
   const [waiting] = await f.db.select().from(schema.agentRuns);
   expect(waiting?.status).toBe("waiting_input");
-  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.meta).toMatchObject({
+  let timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(timeline.at(-1)?.meta).toMatchObject({
     bodyCode: "brain_unavailable",
     brainUnavailable: { brain: "claude_code", code: "machine_offline", machineId: air, agentId: f.agent.id },
   });
@@ -361,6 +361,6 @@ test("end to end: the waiting note names the computer and the agent; after the m
   expect(run?.waitingMachineId).toBeNull();
   expect(seen).toHaveLength(1);
   expect(seen[0]?.session?.machineId).toBe(pro);
-  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.body).toBe("Pronto, daqui.");
+  timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(timeline.at(-1)?.body).toBe("Pronto, daqui.");
 });

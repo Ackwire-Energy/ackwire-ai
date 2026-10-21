@@ -87,11 +87,11 @@ test("a fake brain's text deltas become the agent's message; usage lands on the 
     { type: "done", text: "Olá, tudo certo." },
   ]);
   const events = f.listen(f.general.id);
-  const question = await post(f, "@dev oi");
+  await post(f, "@dev oi");
   await drainOutbox(f.db, handlersWith(f, brain));
 
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
+  const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(timeline.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
   const deltas = events.flatMap((e) => (e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : []));
   expect(deltas.join("")).toBe("Olá, tudo certo.");
   expect(events.at(-1)).toMatchObject({ type: "message.handled", status: "done" });
@@ -126,15 +126,15 @@ test("a tool_call runs through the Tool Gateway and its result is fed back on th
         ]
       : [{ type: "done", text: "Go não está instalado." }],
   );
-  const question = await post(f, "@dev tem Go aí?");
+  await post(f, "@dev tem Go aí?");
   await drainOutbox(f.db, handlersWith(f, brain));
 
   expect(env.calls).toEqual([{ what: "go" }]);
   expect(seen.length).toBe(2);
   expect(seen[0]?.tools).toContain("check_env");
   expect(seen[1]?.messages.at(-1)).toEqual({ role: "user", content: "[tool result: go: not found]" });
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toEqual(["@dev tem Go aí?", "Go não está instalado."]);
+  const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(timeline.map((m) => m.body)).toEqual(["@dev tem Go aí?", "Go não está instalado."]);
 
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");

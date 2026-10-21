@@ -508,7 +508,7 @@ test("live text end to end: the runner's partial deltas reach the channel as age
         }),
     },
   });
-  const question = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+  await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
     body: "@dev oi",
   });
   await drainOutbox(fx.db, handlers);
@@ -519,8 +519,8 @@ test("live text end to end: the runner's partial deltas reach the channel as age
   expect(events.findIndex((e) => e.type === "agent.typing")).toBeLessThan(
     events.findIndex((e) => e.type === "agent.delta"),
   );
-  const thread = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
+  const timeline = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
+  expect(timeline.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
 });
 
 // A pure check (no fixture): what counts as restating a reaction after `react`.

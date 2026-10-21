@@ -12,7 +12,7 @@ import {
   askDecision,
   checkMissionToolRate,
   getMissionRow,
-  homeThreadForDm,
+  homeThreadOf,
   MISSION_LIMITS,
   type MissionDeps,
   type MissionExecutor,
@@ -26,6 +26,7 @@ import {
   requestReview,
   updatePlan,
 } from "./missions";
+import { replyThreadOf } from "./runs";
 import { SANDBOX_SCOPE } from "./sandbox";
 import { grantedScopeKeys, grantKey, toolAllowScope } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -134,11 +135,11 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
         const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
         if (!channel || channel.kind === "forum")
           return { content: "Missions live in a channel or a DM.", isError: true };
-        const flat = channel.kind === "dm" && ctx.threadRootId === ctx.triggerMessageId;
+        const flat = replyThreadOf(ctx) === null;
         const trigger = flat ? await getMessage(ctx.db, ctx.orgId, ctx.triggerMessageId) : null;
-        // A flat DM: the mission gets a thread of its own, started from the message that asked.
+        // Asked in the main timeline: the mission gets a thread of its own, started from the message that asked.
         const home = flat
-          ? await homeThreadForDm(missionDeps(ctx), trigger?.authorUserId ?? owner, {
+          ? await homeThreadOf(missionDeps(ctx), trigger?.authorUserId ?? owner, {
               orgId: ctx.orgId,
               channelId: ctx.channelId,
               messageId: ctx.triggerMessageId,
@@ -159,7 +160,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           plan: Array.isArray(input.plan) ? input.plan.map(String) : null,
         });
         const planned = Array.isArray(input.plan) && input.plan.length > 0;
-        // Its home is a new thread (a flat DM): the reply here gets a link card to it.
+        // Its home is a new thread (asked in the main timeline): the reply here gets a link card to it.
         const elsewhere = home !== ctx.threadRootId;
         const shown = elsewhere
           ? "The app shows a link card to the mission's thread under your reply, and the plan card there has the button to start."

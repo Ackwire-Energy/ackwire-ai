@@ -16,7 +16,6 @@ import {
   threadStatus,
   timeSpan,
 } from "../src/lib/threads";
-import { threadRootsToLoad } from "../src/lib/timeline";
 
 const at = (minute: number) => new Date(2026, 9, 16, 10, minute).toISOString();
 const msg = (id: string, minute: number, extra: Partial<Message> = {}): Message => ({
@@ -192,10 +191,6 @@ describe("what the channel shows", () => {
     expect(hidden(msg("y", 6))).toBe(true);
     expect(hidden(msg("r2", 8, { threadId: "root" }))).toBe(true);
     expect(hidden(msg("d", 4))).toBe(false);
-  });
-
-  test("a range thread's root is not loaded as a channel thread", () => {
-    expect(threadRootsToLoad(list)).toEqual(["a", "b", "c", "d"]);
   });
 
   test("markers, status and counts", () => {

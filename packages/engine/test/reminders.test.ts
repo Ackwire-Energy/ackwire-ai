@@ -308,7 +308,7 @@ describe("reminders from the chat", () => {
     expect(routines.map((r) => r.target)).toEqual([{ type: "channel", channelId: f.general.id }]);
   });
 
-  test("in a channel thread it lands in that thread; ask_agent makes the agent do it then", async () => {
+  test("asked in a channel it lands in the channel itself, flat (D67); ask_agent makes the agent do it then", async () => {
     await world((req) => {
       const last = JSON.stringify(req.messages.at(-1)?.content);
       if (last.includes("tool_result")) return { chunks: ["Combinado."] };
@@ -324,17 +324,22 @@ describe("reminders from the chat", () => {
         };
       return { chunks: ["ok"] };
     });
-    const root = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev daqui a 2 horas verifica o deploy",
     });
     await drainOutbox(f.db, f.handlers);
     const [routine] = await listRoutines(f.db, f.owner.id, f.org.id);
-    expect(routine?.target).toMatchObject({ type: "conversation", threadId: root.id, reminder: false });
+    expect(routine?.target).toMatchObject({
+      type: "conversation",
+      channelId: f.general.id,
+      threadId: null,
+      reminder: false,
+    });
     await fireNow();
     const asked = (await f.db.select().from(schema.messages)).find(
       (m) => typeof m.meta.routineId === "string" && m.authorType === "person",
     );
-    expect(asked).toMatchObject({ threadId: root.id, body: "@dev verifique o deploy e conte aqui" });
+    expect(asked).toMatchObject({ threadId: null, body: "@dev verifique o deploy e conte aqui" });
     const runs = (await f.db.select().from(schema.agentRuns)).filter((r) => r.triggerMessageId === asked?.id);
     expect(runs).toHaveLength(1);
   });

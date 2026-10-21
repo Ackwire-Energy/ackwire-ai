@@ -1835,13 +1835,21 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
   });
   const link = `/org/${topic.orgId}/forum/${topic.id}`;
   if (topic.originChannelId && run && artifact) {
-    // Back where it was asked: the agent's message with the synthesis card.
+    // Back where it was asked: the agent's message with the synthesis card, in the message's thread
+    // when it has one, else in the channel (asked there, D67).
+    const [inThread] = topic.originMessageId
+      ? await db
+          .select({ id: messages.id })
+          .from(messages)
+          .where(and(eq(messages.orgId, topic.orgId), eq(messages.threadId, topic.originMessageId)))
+          .limit(1)
+      : [];
     const { message } = await insertMessageWithRuns(
       db,
       {
         orgId: topic.orgId,
         channelId: topic.originChannelId,
-        threadId: topic.originMessageId,
+        threadId: inThread ? topic.originMessageId : null,
         author: { type: "agent", agentId: run.agentId, runId: null, hop: 0 },
         body: `The forum "${topic.title}" is over. The ${format === "plan" ? "plan" : "synthesis"}${revision > 1 ? ` (version ${revision})` : ""} is in the file below${suggested.length ? `, with ${suggested.length} suggested issue(s) to approve` : ""}.`,
         meta: {

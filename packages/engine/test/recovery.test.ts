@@ -52,13 +52,13 @@ async function interruptedRun() {
         ? { chunks: ["Trabalhando nisso."], toolUses: [{ name: "long_task", input: {} }] }
         : { chunks: ["Pronto."] },
   });
-  const question = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev faz a tarefa longa",
   });
   await drainOutbox(f.db, f.handlers);
   const [run] = await f.db.select().from(schema.agentRuns);
   if (!run) throw new Error("no run");
-  return { run, question };
+  return { run };
 }
 
 const jobOf = async (runId: string) =>
@@ -80,7 +80,7 @@ describe("server restarts", () => {
   });
 
   test("on boot, an orphan (dead worker still holding the lease) is resumed and finishes", async () => {
-    const { run, question } = await interruptedRun();
+    const { run } = await interruptedRun();
     // As if the old process held the job when it died: lease still valid, no heartbeat for minutes.
     const job = await jobOf(run.id);
     await f.db
@@ -102,13 +102,13 @@ describe("server restarts", () => {
     await drainOutbox(f.db, f.handlers);
     const [after] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
     expect(after?.status).toBe("done");
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Pronto.");
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.at(-1)?.body).toBe("Pronto.");
     expect(await activeRunsIn(f.db, f.org.id, f.general.id)).toEqual([]);
   });
 
   test("an orphan cut in the middle of a tool call fails with the notice, keeps its text, and the app hears it", async () => {
-    const { run, question } = await interruptedRun();
+    const { run } = await interruptedRun();
     const job = await jobOf(run.id);
     await f.db
       .update(schema.outbox)
@@ -125,8 +125,8 @@ describe("server restarts", () => {
     expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).failed).toEqual([run.id]);
     const [after] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
     expect(after).toMatchObject({ status: "failed", error: INTERRUPTED_BY_RESTART });
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toContain(INTERRUPTED_BY_RESTART);
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.at(-1)?.body).toContain(INTERRUPTED_BY_RESTART);
     expect(events.find((e) => e.type === "run.finished")).toMatchObject({ status: "failed", runId: run.id });
     expect((await jobOf(run.id))?.status).toBe("failed");
     await drainOutbox(f.db, f.handlers);

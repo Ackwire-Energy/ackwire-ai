@@ -30,11 +30,12 @@ test("an agent reacts to a thanks instead of replying: no message, its reaction 
     author: { type: string };
     reactions?: { reaction: string; count: number; userIds: string[]; agentIds: string[] }[];
   };
-  const thread = (await (await api(`/channels/${channelId}/messages?threadId=${thanks.id}`)).json()) as {
+  // Asked in the channel: a reply would be in the main timeline (D67); there is none.
+  const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
     messages: Msg[];
   };
-  expect(thread.messages.filter((m) => m.author.type === "agent")).toEqual([]);
-  const reactions = thread.messages.find((m) => m.id === thanks.id)?.reactions;
+  expect(timeline.messages.filter((m) => m.author.type === "agent")).toEqual([]);
+  const reactions = timeline.messages.find((m) => m.id === thanks.id)?.reactions;
   expect(reactions).toHaveLength(1);
   expect(reactions?.[0]).toMatchObject({ reaction: "🙌", count: 1, userIds: [] });
   expect(reactions?.[0]?.agentIds).toHaveLength(1);

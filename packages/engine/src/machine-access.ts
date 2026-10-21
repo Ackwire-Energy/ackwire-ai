@@ -13,7 +13,7 @@ import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { MachineCaller } from "./machine-hub";
-import { taskRequester, taskThreadOf } from "./machine-tasks";
+import { taskRequester } from "./machine-tasks";
 import {
   assertNotPaused,
   getMachineById,
@@ -24,6 +24,7 @@ import {
 } from "./machines";
 import { insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
+import { replyThreadOf } from "./runs";
 import type { ToolContext } from "./tools/types";
 
 const { machines, machineAccessRequests, agentRuns } = schema;
@@ -162,7 +163,7 @@ export async function requestFolderAccess(
       agentId: ctx.agentId,
       machineId: machine.id,
       channelId: ctx.channelId,
-      threadRootId: await taskThreadOf(ctx),
+      threadRootId: replyThreadOf(ctx),
       runId: ctx.runId || null,
       requestedByUserId: await taskRequester(ctx).catch(() => null),
       path,
@@ -344,7 +345,7 @@ export async function wakeForAccessDecision(deps: AccessDeps, requestId: string,
     await publishChannelEvent(deps.pubsub, {
       type: "agent.thinking",
       channelId: row.channelId,
-      threadId: run.threadRootId,
+      threadId: replyThreadOf(run),
       agentId: run.agentId,
       runId: run.id,
     });

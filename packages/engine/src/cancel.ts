@@ -5,7 +5,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
 import { can, getMembership } from "./organizations";
-import { isTerminal, type RunStatus, transitionRun } from "./runs";
+import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 
 const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels } = schema;
@@ -266,10 +266,9 @@ export async function stopRun(
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
   // The app drops "pensando…" right away.
-  const flat = (channelKind === "dm" || channelKind === "forum") && run.threadRootId === run.triggerMessageId;
   const where = {
     channelId: run.channelId,
-    threadId: flat ? null : run.threadRootId,
+    threadId: replyThreadOf(run),
     agentId: run.agentId,
     runId: run.id,
   };

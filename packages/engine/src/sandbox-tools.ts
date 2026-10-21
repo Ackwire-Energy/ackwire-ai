@@ -24,7 +24,6 @@ import {
   updateArtifact,
 } from "./artifacts";
 import { recordAudit } from "./audit";
-import { getChannelCached } from "./context";
 import { publishChannelEvent } from "./events";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
@@ -40,10 +39,10 @@ import {
   startMachineTask,
   taskRequester,
   taskSeconds,
-  taskThreadOf,
 } from "./machine-tasks";
 import { MachineOfflineError, pausedMessage } from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
+import { replyThreadOf } from "./runs";
 import {
   agentComputerInfo,
   type ComputerHandle,
@@ -168,7 +167,7 @@ const actorOf = (ctx: ToolContext): ArtifactActor => ({
   type: "agent",
   agentId: ctx.agentId,
   channelId: ctx.channelId,
-  threadId: ctx.threadRootId,
+  threadId: replyThreadOf(ctx),
   runId: ctx.runId,
 });
 
@@ -422,10 +421,8 @@ export function createSandboxToolSource(
     const request: ExecRequest = ctx.signal ? { ...plain, signal: ctx.signal } : plain;
     const { id, provider } = computer;
     if (!provider.execStream || !deps.pubsub || !ctx.toolUseId) return provider.exec(id, request);
-    // The same thread as the run's other events (DMs and the forum are flat).
-    const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
-    const flat = (channel?.kind === "dm" || channel?.kind === "forum") && ctx.threadRootId === ctx.triggerMessageId;
-    const threadId = flat ? null : ctx.threadRootId;
+    // Where the run's other events go.
+    const threadId = replyThreadOf(ctx);
     const pending = { stdout: "", stderr: "" };
     let sent = 0;
     let capped = false;
@@ -502,7 +499,7 @@ export function createSandboxToolSource(
       agentId: ctx.agentId,
       runId: ctx.runId,
       channelId: ctx.channelId,
-      threadId: ctx.threadRootId,
+      threadId: replyThreadOf(ctx),
       computer: computer.ref,
       machineId: computer.machineId ?? null,
       path,
@@ -1080,7 +1077,7 @@ export function createSandboxToolSource(
                 protocol: status?.protocol ?? 0,
                 machineName: status?.name ?? info.name,
                 channelId: ctx.channelId,
-                threadRootId: await taskThreadOf(ctx),
+                threadRootId: replyThreadOf(ctx),
                 runId: ctx.runId,
                 requestedByUserId: await taskRequester(ctx),
                 title: str(input.title),

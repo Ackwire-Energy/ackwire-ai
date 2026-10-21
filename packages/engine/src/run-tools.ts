@@ -2,10 +2,10 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
-import { getChannelCached } from "./context";
+import { consultationCardThread } from "./consultations";
 import { NotFoundError } from "./errors";
 import { type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
-import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
 import { notifyQuestion } from "./notification-producers";
 import {
@@ -16,7 +16,7 @@ import {
   syncQuestionMessage,
 } from "./questions";
 import type { BridgeIdentity } from "./run-tool-tokens";
-import type { AgentRun } from "./runs";
+import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
 import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
@@ -57,42 +57,11 @@ export interface RunWhere {
   runId: string;
 }
 
-/**
- * Where the run's replies go. DMs are flat (a reply to a top-level DM message
- * goes in the main timeline), and so are forum posts and a routine's answer
- * (the routine's own message isn't shown, so nothing can hang under it);
- * everything else answers in the thread. The one rule for the engine and the
- * bridge: cards and events of a run always land where its replies do.
- */
-export function replyThreadOf(
-  run: Pick<AgentRun, "threadRootId" | "triggerMessageId">,
-  channelKind: string | undefined,
-  topTrigger: Pick<Message, "meta"> | null,
-): string | null {
-  const topLevel = run.threadRootId === run.triggerMessageId;
-  // A run that continues a stopped reply in the main timeline ("Continuar") answers there too.
-  const flatHere = channelKind === "dm" || channelKind === "forum";
-  const flatTrigger = Boolean(topTrigger?.meta.routine || topTrigger?.meta.canceled);
-  const flat = topLevel && (flatHere || flatTrigger);
-  return flat ? null : run.threadRootId;
-}
-
-/** `replyThreadOf` for a run row: reads its channel and (when top-level) its trigger. */
-export async function runWhere(
-  db: Database,
-  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
-): Promise<RunWhere> {
-  const topLevel = run.threadRootId === run.triggerMessageId;
-  const [channel, topTrigger] = await Promise.all([
-    getChannelCached(db, run.orgId, run.channelId),
-    topLevel ? getMessage(db, run.orgId, run.triggerMessageId) : Promise.resolve(null),
-  ]);
-  return {
-    channelId: run.channelId,
-    threadId: replyThreadOf(run, channel?.kind, topTrigger),
-    agentId: run.agentId,
-    runId: run.id,
-  };
+/** Where a run's events and cards go (`replyThreadOf`). */
+export function runWhere(
+  run: Pick<AgentRun, "id" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+): RunWhere {
+  return { channelId: run.channelId, threadId: replyThreadOf(run), agentId: run.agentId, runId: run.id };
 }
 
 /**
@@ -466,7 +435,7 @@ export async function invokeToolForRun(
   const input = (
     call.input && typeof call.input === "object" && !Array.isArray(call.input) ? call.input : {}
   ) as Record<string, unknown>;
-  const where = run ? await runWhere(deps.db, run) : null;
+  const where = run ? runWhere(run) : null;
   const use = { id: call.id, name: call.name, input };
   const outcome = where
     ? await invokeWithChip({ deps, tools, ctx, where, turnTools: null }, use)
@@ -533,7 +502,7 @@ export async function suspendRunForTool(
   gated: RunPause,
 ): Promise<ToolResult> {
   const { db } = deps;
-  const where = await runWhere(db, run);
+  const where = runWhere(run);
   const threadId = where.threadId;
   const wanted = gated.type === "approval" ? "waiting_approval" : "waiting_input";
   const questionId = gated.type === "question" ? Bun.randomUUIDv7() : null;
@@ -598,7 +567,7 @@ export async function suspendRunForTool(
           : await insertMessage(tx, {
               orgId: run.orgId,
               channelId: gated.approval.channelId,
-              threadId: gated.approval.threadRootId,
+              threadId: await consultationCardThread(tx, run.orgId, run.id, gated.approval.threadRootId),
               author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
               body: cardText,
               meta: cardMeta,

@@ -10,13 +10,13 @@ import { insertMessage, messageView } from "./messages";
 import { can, getMembership, requirePermission } from "./organizations";
 import { routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
+import { replyThreadOf } from "./runs";
 
 const {
   calendarEvents,
   calendarAttendees,
   calendarProposals,
   channelMembers,
-  channels,
   issues,
   routines,
   organizationMembers,
@@ -1041,9 +1041,8 @@ export async function proposeCalendarEvent(
 ): Promise<CalendarProposalView> {
   const { db } = deps;
   const [trigger] = await db
-    .select({ userId: schema.messages.authorUserId, channelKind: channels.kind })
+    .select({ userId: schema.messages.authorUserId })
     .from(schema.messages)
-    .innerJoin(channels, eq(channels.id, schema.messages.channelId))
     .where(and(eq(schema.messages.id, run.triggerMessageId), eq(schema.messages.orgId, run.orgId)));
   if (!trigger?.userId) throw new ValidationError("Only a person's request can lead to an event proposal");
   const start = new Date(input.start);
@@ -1054,7 +1053,6 @@ export async function proposeCalendarEvent(
   await checkParticipants(db, run.orgId, input.participants);
   const zone = (await getOrgSettings(db, trigger.userId, run.orgId).catch(() => null))?.timezone ?? "UTC";
   const rule = checkEventRule(input.recurrence ?? null, start, zone);
-  const flat = trigger.channelKind === "dm" && run.threadRootId === run.triggerMessageId;
   const proposal = await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(calendarProposals)
@@ -1077,7 +1075,7 @@ export async function proposeCalendarEvent(
     const card = await insertMessage(tx, {
       orgId: run.orgId,
       channelId: run.channelId,
-      threadId: flat ? null : run.threadRootId,
+      threadId: replyThreadOf(run),
       author: { type: "agent", agentId: run.agentId, runId: run.runId, hop: 1 },
       body: `Proposta de evento: ${row.title}`,
       meta: { calendarProposalId: row.id, calendarProposal: proposalView(row) },

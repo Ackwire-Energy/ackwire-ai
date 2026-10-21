@@ -171,7 +171,7 @@ describe("who can talk to the agent", () => {
         {
           orgId: f.org.id,
           channelId: f.general.id,
-          threadId: asked.id,
+          threadId: null, // asked in the channel, dev answers there (D67)
           author: { type: "agent", agentId: f.agent.id, runId: run?.id ?? "", hop: 1 },
           body: "@ops pode olhar o deploy?",
         },

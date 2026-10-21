@@ -149,12 +149,14 @@ test("forum API: an agent's suggestion card is accepted or dismissed by a person
     owner(`/api/app/organizations/${orgId}${path}`, init);
   const cards: string[] = [];
   for (const body of ["@dev vale um fórum?", "@dev vale um fórum de novo?"]) {
-    const asked = (await (await api(`/channels/${channelId}/messages`, { json: { body } })).json()) as { id: string };
+    await api(`/channels/${channelId}/messages`, { json: { body } });
     await t.drain();
-    const thread = (await (await api(`/channels/${channelId}/messages?threadId=${asked.id}`)).json()) as {
+    // Asked in the channel: the card is in the main timeline (D67), the newest one is this ask's.
+    const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
       messages: { id: string; meta?: Record<string, unknown> }[];
     };
-    const card = thread.messages.find((m) => m.meta?.forumSuggestion);
+    const card = timeline.messages.filter((m) => m.meta?.forumSuggestion).at(-1);
+    expect(cards).not.toContain(card?.id ?? "");
     expect(card?.meta?.forumSuggestion).toMatchObject({ title: "Link mágico?", state: "pending" });
     cards.push(card?.id ?? "");
   }

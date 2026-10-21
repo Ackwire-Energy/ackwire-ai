@@ -508,7 +508,8 @@ export interface Approval {
   missionId?: string | null;
   agentId: string;
   channelId: string;
-  threadId: string;
+  /** Where its card is; null: the channel's main timeline. */
+  threadId: string | null;
   /** The approval card in the chat. */
   messageId: string | null;
   tool: string;
@@ -1021,7 +1022,8 @@ export type AgentForYouItem =
         title: string;
         status: ApprovalStatus;
         channelId: string;
-        threadId: string;
+        /** Where its card is; null: the main timeline. */
+        threadId: string | null;
         /** Pending, and the viewer may decide it ("espera seu ok"). */
         waitingOnYou: boolean;
       };

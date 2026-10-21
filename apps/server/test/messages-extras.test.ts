@@ -18,31 +18,33 @@ test("agent messages carry model, tokens and cost; include=replies summarizes th
   };
   await t.drain();
   await api(`/channels/${channelId}/messages`, { json: { body: "valeu", threadId: root.id } });
+  await api(`/channels/${channelId}/messages`, { json: { body: "até mais", threadId: root.id } });
   await api(`/channels/${channelId}/messages`, { json: { body: "sem thread" } });
 
   type Msg = {
     id: string;
+    body: string;
     author: { type: string };
     usage?: { model: string; inputTokens: number; outputTokens: number; costUsd?: number };
     replies?: { count: number; lastAt: string | null; latest: { body: string }[] };
   };
-  const thread = (await (await api(`/channels/${channelId}/messages?threadId=${root.id}`)).json()) as {
-    messages: Msg[];
-  };
-  const reply = thread.messages.find((m) => m.author.type === "agent");
+  // Asked in the channel: the agent answers in the main timeline (D67).
+  const plain = (await (await api(`/channels/${channelId}/messages`)).json()) as { messages: Msg[] };
+  const reply = plain.messages.find((m) => m.author.type === "agent");
   expect(reply?.usage).toMatchObject({ model: "claude-sonnet-5-5", inputTokens: 100, outputTokens: 10 });
   // Everyone in the channel reads it: tokens, never money.
   expect(reply?.usage).not.toHaveProperty("costUsd");
-  expect(thread.messages.find((m) => m.author.type === "person")?.usage).toBeUndefined();
+  expect(plain.messages.find((m) => m.id === root.id)?.usage).toBeUndefined();
 
-  const plain = (await (await api(`/channels/${channelId}/messages`)).json()) as { messages: Msg[] };
   expect(plain.messages.every((m) => m.replies === undefined)).toBe(true);
   const top = (await (await api(`/channels/${channelId}/messages?include=replies`)).json()) as { messages: Msg[] };
   const summary = top.messages.find((m) => m.id === root.id)?.replies;
   expect(summary?.count).toBe(2);
-  expect(summary?.latest.map((m) => m.body)).toEqual(["done", "valeu"]);
+  expect(summary?.latest.map((m) => m.body)).toEqual(["valeu", "até mais"]);
   expect(summary?.lastAt).toBeTruthy();
-  expect(top.messages.find((m) => m.id !== root.id)?.replies).toEqual({ count: 0, lastAt: null, latest: [] });
+  const others = top.messages.filter((m) => m.id !== root.id);
+  expect(others.map((m) => m.body)).toEqual(["done", "sem thread"]);
+  for (const m of others) expect(m.replies).toEqual({ count: 0, lastAt: null, latest: [] });
 });
 
 test("quote reply over HTTP: meta.replyTo from the server, other channels refused; reactions come with the list", async () => {

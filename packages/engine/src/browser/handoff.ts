@@ -269,7 +269,7 @@ async function runPlace(db: Executor, orgId: string, runId: string | null) {
     .from(agentRuns)
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!run) return null;
-  const where = await runWhere(db as Database, run);
+  const where = runWhere(run);
   return { channelId: where.channelId, threadId: where.threadId };
 }
 
@@ -424,7 +424,7 @@ export function createBrowserHandoffToolSource(
           isError: true,
         };
       }
-      const where = await runWhere(ctx.db, run);
+      const where = runWhere(run);
       const recipient = await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
       const busy = {
         content: "A person is using your browser, or was just asked to; wait for that before asking.",

@@ -37,7 +37,7 @@ afterEach(async () => {
 
 const SANDBOX = [{ connectionId: null, scope: "sandbox:run" }];
 
-/** A real run (steps and usage rows reference it) in #general, in a thread of its own unless given. */
+/** A real run (steps and usage rows reference it) in #general, top-level unless a thread is given. */
 async function runCtx(threadRootId?: string, channelId?: string): Promise<ToolContext> {
   const channel = channelId ?? f.general.id;
   const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, channel, {
@@ -301,7 +301,8 @@ describe("what the agent is running", () => {
       threadId: string | null;
     }[];
     expect(out.length).toBeGreaterThan(0);
-    expect(out.every((o) => o.toolUseId === start?.toolUseId && o.threadId !== null)).toBe(true);
+    // Asked in the channel: the output streams where the run answers, the channel itself (D67).
+    expect(out.every((o) => o.toolUseId === start?.toolUseId && o.threadId === null)).toBe(true);
     const streamed = out.map((o) => o.text).join("");
     expect(streamed.length).toBeLessThan(66 * 1024);
     expect(streamed).toContain("more output");

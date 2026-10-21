@@ -49,24 +49,26 @@ describe("ask_user", () => {
   test("an ambiguous request asks; the answer from the card resumes the run with it", async () => {
     f = await setup({ askUser: true, reply });
     const events = f.listen(f.general.id);
-    const ask = await post("@dev deploy it");
+    await post("@dev deploy it");
     await drainOutbox(f.db, f.handlers);
 
     const [run] = await runs();
     expect(run?.status).toBe("waiting_input");
     const [q] = await questions();
     expect(q).toMatchObject({ text: "Qual ambiente?", choices: ["staging", "production"], status: "open" });
-    expect(q?.threadId).toBe(ask.id);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    const card = thread.find((m) => m.id === q?.messageId);
+    // Asked in the channel: the card is in the main timeline (D67).
+    expect(q?.threadId).toBeNull();
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const card = main.find((m) => m.id === q?.messageId);
+    expect(card?.threadId).toBeNull();
     expect(card?.meta.questionId).toBe(q?.id);
     expect(card?.meta.question).toMatchObject({ id: q?.id, messageId: q?.messageId, status: "open", answer: null });
     await Bun.sleep(5);
     const asked = events.find((e) => e.type === "question.asked") as unknown as {
-      threadId: string;
+      threadId: string | null;
       question: { id: string; choices: string[] };
     };
-    expect(asked.threadId).toBe(ask.id);
+    expect(asked.threadId).toBeNull();
     expect(asked.question.choices).toEqual(["staging", "production"]);
 
     await expect(
@@ -83,24 +85,29 @@ describe("ask_user", () => {
 
     expect((await runs())[0]?.status).toBe("done");
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("The person answered: staging");
-    const after = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
+    const after = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(after.at(-1)?.body).toBe("Ok: staging");
     expect(after.find((m) => m.id === q?.messageId)?.meta.question).toMatchObject({ status: "answered" });
     await Bun.sleep(5);
     expect(events.some((e) => e.type === "question.answered")).toBe(true);
   });
 
-  test("the next reply in the thread answers it, without starting another run", async () => {
+  test("the next message in the channel answers it, without starting another run", async () => {
     f = await setup({ askUser: true, reply });
-    const ask = await post("@dev deploy it");
+    await post("@dev deploy it");
     await drainOutbox(f.db, f.handlers);
-    const answer = await post("production, por favor", ask.id);
+    const answer = await post("production, por favor");
     expect(answer.meta.answersQuestionId).toBe((await questions())[0]?.id);
     await drainOutbox(f.db, f.handlers);
     expect((await runs()).map((r) => r.status)).toEqual(["done"]);
     expect((await questions())[0]).toMatchObject({ status: "answered", answer: "production, por favor" });
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    expect(thread.at(-1)?.body).toBe("Ok: production");
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual([
+      "@dev deploy it",
+      "Qual ambiente?",
+      "production, por favor",
+      "Ok: production",
+    ]);
   });
 
   test("in a DM the question and the answer stay in the main timeline", async () => {

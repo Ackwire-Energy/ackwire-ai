@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
+import { approvalCardThreads } from "./approvals";
 import { threadFollowChoices } from "./follows";
 import {
   type NotificationActor,
@@ -307,10 +308,15 @@ export async function resolveQuestionNotifications(deps: NotificationDeps, orgId
 
 /** A sensitive action waits: everyone who may decide it. */
 export async function notifyApproval(deps: NotificationDeps, approval: ApprovalRow, deciders: string[]) {
-  const [channel] = await deps.db
-    .select({ kind: channels.kind, name: channels.name })
-    .from(channels)
-    .where(eq(channels.id, approval.channelId));
+  const [[channel], cardThreads] = await Promise.all([
+    deps.db
+      .select({ kind: channels.kind, name: channels.name })
+      .from(channels)
+      .where(eq(channels.id, approval.channelId)),
+    approvalCardThreads(deps.db, [approval]),
+  ]);
+  // Where its card is (the main timeline, D67, has no thread).
+  const threadId = cardThreads.get(approval.id) ?? null;
   await notify(deps, {
     orgId: approval.orgId,
     userIds: deciders,
@@ -321,7 +327,7 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
     source: {
       approvalId: approval.id,
       channelId: approval.channelId,
-      threadId: approval.threadRootId,
+      ...(threadId ? { threadId } : {}),
       ...(approval.messageId ? { messageId: approval.messageId } : {}),
       ...(approval.missionId ? { missionId: approval.missionId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),

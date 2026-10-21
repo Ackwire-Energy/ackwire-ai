@@ -290,17 +290,6 @@ export function usePrefetchMessages(orgId: string) {
   );
 }
 
-export function useThreads(orgId: string, channelId: string, rootIds: string[]) {
-  const api = useApi();
-  return useQueries({
-    queries: rootIds.map((rootId) => ({
-      queryKey: keys.thread(orgId, channelId, rootId),
-      queryFn: () => api.chat.messages(orgId, channelId, { threadId: rootId, limit: 200 }),
-      staleTime: 60_000,
-    })),
-  });
-}
-
 export function useJoinChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();

@@ -1174,8 +1174,8 @@ export async function createMission(
   return viewFor(deps, mission, userId, can(membership.role, "manage_members"));
 }
 
-/** A DM is flat: its mission gets a thread of its own, started from the message that asked. */
-export async function homeThreadForDm(
+/** Asked in the main timeline: the mission gets a thread of its own, started from the message that asked. */
+export async function homeThreadOf(
   deps: MissionDeps,
   userId: string,
   input: { orgId: string; channelId: string; messageId: string; title: string },

@@ -345,7 +345,7 @@ describe("LLM strategy (end to end through the outbox)", () => {
           : { chunks: ["On it."] },
     });
     const handlers = createJobHandlers({ ...f.jobDeps, router: { enabled: true, model: "claude-haiku-5-5" } });
-    const question = await post("why is the build failing?");
+    await post("why is the build failing?");
     await drainOutbox(f.db, handlers);
 
     const routerCall = f.provider.calls[0]?.request;
@@ -354,8 +354,9 @@ describe("LLM strategy (end to end through the outbox)", () => {
     expect(JSON.stringify(routerCall?.outputSchema)).toContain('"enum":["dev"]');
     expect(textOf(routerCall?.messages[0]?.content ?? "")).toContain("<message>\n[ana]: why is the build failing?");
 
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.map((m) => m.body)).toEqual(["why is the build failing?", "On it."]);
+    // Asked in the channel: the reply is in the main timeline (D67).
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual(["why is the build failing?", "On it."]);
     const usage = await f.db.select().from(schema.usageRecords);
     expect(usage.map((u) => [u.kind, u.agentId]).sort()).toEqual([
       ["agent", f.agent.id],
@@ -387,16 +388,16 @@ describe("LLM strategy (end to end through the outbox)", () => {
     );
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: qa.id });
     const handlers = createJobHandlers({ ...f.jobDeps, router: { enabled: true, model: "claude-haiku-5-5" } });
-    const question = await post("why are the tests slow?");
+    await post("why are the tests slow?");
     await drainOutbox(f.db, handlers);
 
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    const byDev = thread.find((m) => m.author.id === f.agent.id);
-    const byQa = thread.find((m) => m.author.id === qa.id);
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const byDev = main.find((m) => m.author.id === f.agent.id);
+    const byQa = main.find((m) => m.author.id === qa.id);
     expect(byDev?.meta.joined).toBeUndefined();
     expect(byQa?.meta.joined).toBe(true);
     // QA's answer to an answer brings in nobody else.
-    expect(thread.filter((m) => m.author.type === "agent")).toHaveLength(2);
+    expect(main.filter((m) => m.author.type === "agent")).toHaveLength(2);
   });
 
   test("an org can override the router model; the router is off when disabled", async () => {

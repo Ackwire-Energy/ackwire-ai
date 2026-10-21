@@ -23,7 +23,8 @@ test("knowledge API: search, context items (add, pin, edit), reactions, correcti
   const replyHit = search.hits.find((h) => h.snippet === "Builds run on Jenkins.");
   expect(replyHit).toMatchObject({ kind: "message", author: { type: "agent", id: agentId, name: "Dev" } });
   expect(replyHit?.messageId).toBeTruthy();
-  expect(replyHit?.threadId).toBeTruthy();
+  // Asked in the channel: the reply is in the main timeline (D67).
+  expect(replyHit?.threadId).toBeNull();
 
   const created = await api("/context-items", { json: { kind: "fact", content: "Our CI is Buildkite", pinned: true } });
   expect(created.status).toBe(201);

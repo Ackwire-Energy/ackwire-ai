@@ -21,6 +21,7 @@ import {
   updateRoutine,
 } from "./routines";
 import { timezoneName } from "./rrule";
+import { replyThreadOf } from "./runs";
 import { describeWhen, parseWhen } from "./schedule";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -50,10 +51,10 @@ async function conversationOf(ctx: ToolContext) {
     const origin = await consultationOrigin(ctx.db, ctx.orgId, ctx.runId);
     if (origin) {
       const home = await getChannelCached(ctx.db, ctx.orgId, origin.channelId);
-      return { channelId: origin.channelId, threadId: home?.kind === "dm" ? null : origin.threadRootId };
+      return { channelId: origin.channelId, threadId: home?.kind === "dm" ? null : origin.threadId };
     }
   }
-  return { channelId: ctx.channelId, threadId: channel?.kind === "dm" ? null : ctx.threadRootId };
+  return { channelId: ctx.channelId, threadId: channel?.kind === "dm" ? null : replyThreadOf(ctx) };
 }
 
 /**

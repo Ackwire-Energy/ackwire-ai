@@ -569,9 +569,9 @@ describe("from issues, the chat and routines", () => {
     expect(detail.artifacts.map((a) => a.id)).toContain(done.synthesis?.artifactId ?? "missing");
   });
 
-  test("@dev leva isso pro fórum: the tool opens it; the synthesis comes back to the thread", async () => {
+  test("@dev leva isso pro fórum: the tool opens it; the synthesis comes back where it was asked", async () => {
     f = await setup({ reply: forumReply(), artifactTools: true, forumTools: true });
-    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev leva isso pro fórum: qual plano de entrada?",
     });
     await drainOutbox(f.db, f.handlers);
@@ -584,7 +584,8 @@ describe("from issues, the chat and routines", () => {
       origin: { kind: "agent", agentId: f.agent.id },
     });
     const back = (await f.db.select().from(schema.messages)).find((m) => m.meta.forumTopicId === topic?.id);
-    expect(back).toMatchObject({ channelId: f.general.id, threadId: ask.id, authorAgentId: f.agent.id });
+    // Asked in the channel, with no thread under the message: back in the channel (D67).
+    expect(back).toMatchObject({ channelId: f.general.id, threadId: null, authorAgentId: f.agent.id });
     expect(back?.meta.artifacts).toEqual([{ id: topic?.synthesis?.artifactId, version: 1 }]);
   });
 

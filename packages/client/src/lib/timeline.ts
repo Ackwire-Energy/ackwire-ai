@@ -2,7 +2,6 @@ import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
 import { quoteExcerpt } from "./reply";
 import { isRoutineCall, routineOfMessage } from "./routines";
-import { threadStartOf } from "./threads";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
   a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1;
@@ -25,23 +24,6 @@ export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefin
   for (const m of topLevel) seen.set(m.id, m);
   for (const thread of threads) for (const m of thread ?? []) seen.set(m.id, m);
   return [...seen.values()].sort(byTime);
-}
-
-/**
- * Top-level messages whose threads we load: the latest ones agents answer (written by people, or an
- * agent's message that mentions another agent, as the backend starts runs for). Not the root of a thread
- * made from a range, nor a mission's: their conversation lives in the thread view.
- */
-export function threadRootsToLoad(topLevel: Message[], max = 20): string[] {
-  return topLevel
-    .filter(
-      (m) =>
-        (m.author.type === "person" || m.mentionedAgentIds.length > 0) &&
-        !threadStartOf(m.meta) &&
-        !m.meta?.missionStart,
-    )
-    .slice(-max)
-    .map((m) => m.id);
 }
 
 export type TimelineItem =

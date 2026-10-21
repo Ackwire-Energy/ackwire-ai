@@ -1017,7 +1017,7 @@ function ApprovalDetails({
           className="ap-link"
           to="/org/$orgId/c/$channelId"
           params={{ orgId: org.id, channelId: a.channelId }}
-          search={{ m: a.messageId ?? a.threadId }}
+          search={{ m: a.messageId ?? a.threadId ?? undefined }}
         >
           {t("approvals.panel.viewChannel", { channel })}
         </Link>

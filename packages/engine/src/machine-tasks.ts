@@ -12,7 +12,6 @@ import {
 } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
-import { getChannelCached } from "./context";
 import { createAgentRuns, eligibleChannelAgents, requesterOf } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { getMachineById, machineOnline } from "./machines";
@@ -21,6 +20,7 @@ import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-c
 import { MISSION_RULES } from "./mission-rules";
 import { enqueue } from "./outbox";
 import { issueRunToolToken } from "./run-tool-tokens";
+import { replyThreadOf } from "./runs";
 import type { ToolContext } from "./tools/types";
 
 const { machineTasks, agentRuns } = schema;
@@ -509,10 +509,11 @@ export const enqueueWake = (tx: Executor, row: Pick<MachineTaskRow, "id" | "orgI
 /**
  * A task the agent started itself with `start_task` (a shell command, or
  * Claude Code in the conversation's session), not one of a mission
- * executor's sessions (those have their own session id).
+ * executor's sessions (those have their own session id, in the mission's
+ * thread). Started from the main timeline (D67), it reports to no thread.
  */
 export const isAgentTask = (row: Pick<MachineTaskRow, "sessionId" | "threadRootId">) =>
-  !row.sessionId || row.sessionId === row.threadRootId;
+  !row.sessionId || row.threadRootId === null || row.sessionId === row.threadRootId;
 
 /** Starts a task on the machine whose socket is here (resume after an interruption). */
 export type LocalTaskStarter = (input: StartTaskInput) => Promise<MachineTaskRow>;
@@ -836,7 +837,7 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     await publishChannelEvent(deps.pubsub, {
       type: "agent.thinking",
       channelId: row.channelId,
-      threadId: run.threadRootId,
+      threadId: replyThreadOf(run),
       agentId: run.agentId,
       runId: run.id,
     });
@@ -920,11 +921,4 @@ export async function taskRequester(ctx: ToolContext): Promise<string | null> {
   if (inbox && trigger.authorAgentId === ctx.agentId)
     return typeof inbox.requestedBy === "string" ? inbox.requestedBy : null;
   return requesterOf(ctx.db, trigger);
-}
-
-/** The thread a task started from this run reports to: null for a flat DM (or forum) conversation. */
-export async function taskThreadOf(ctx: ToolContext): Promise<string | null> {
-  const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
-  const flat = (channel?.kind === "dm" || channel?.kind === "forum") && ctx.threadRootId === ctx.triggerMessageId;
-  return flat ? null : ctx.threadRootId;
 }

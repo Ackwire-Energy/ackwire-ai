@@ -19,6 +19,7 @@ import {
   type ConnectionStatus,
   consultsIn,
   heldRowsIn,
+  inMainTimeline,
   isBrowserTool,
   isQuiet,
   keys,
@@ -51,7 +52,6 @@ import {
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
-  useThreads,
   useUpdateChannel,
   useWikiTree,
 } from "@agenteschat/client";
@@ -90,13 +90,7 @@ import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import {
-  buildTimeline,
-  groupsWith,
-  mergeTimeline,
-  type TimelineItem,
-  threadRootsToLoad,
-} from "@agenteschat/client/lib/timeline";
+import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
   Avatar,
@@ -116,11 +110,11 @@ import {
   Icon,
   type IconName,
   Kbd,
+  Mention,
   Menu,
   MenuItem,
   MenuRadioGroup,
   MenuSeparator,
-  Mention,
   Message,
   MessageText,
   PixelSpinner,
@@ -493,8 +487,6 @@ function ChannelView({
   // Thread view: the thread's root and replies (the channel's page still holds my unsent replies).
   const threadMessages = useThreadMessages(org.id, thread && isMember ? channel.id : undefined, thread?.id ?? "");
   const messages = thread ? threadMessages : channelMessages;
-  const roots = useMemo(() => threadRootsToLoad(channelMessages.data ?? []), [channelMessages.data]);
-  const threads = useThreads(org.id, channel.id, isMember && !thread ? roots : []);
   // The channel's threads: closed lines, context marks, markers (not in a thread view or while adjusting).
   const listsThreads = isMember && !thread;
   const openThreads = useChannelThreads(org.id, channel.id, "all", listsThreads);
@@ -503,19 +495,15 @@ function ChannelView({
     () => [...(openThreads.data?.threads ?? []), ...(archivedThreads.data?.threads ?? [])],
     [openThreads.data, archivedThreads.data],
   );
-  // Live runs shown here: a thread view shows its own; the channel hides those of threads it draws as
-  // one line (closed, or answered with "Responder") or a marker (made from a range): their replies
-  // don't land in the channel.
-  const hiddenRunThreads = useMemo(
-    () =>
-      new Set([
-        ...threadList.filter((x) => x.state !== "open" || x.openedByReplyAt).map((x) => x.id),
-        ...(channelMessages.data ?? []).filter((m) => threadStartOf(m.meta) || m.meta?.missionStart).map((m) => m.id),
-      ]),
-    [threadList, channelMessages.data],
+  // Live runs shown here: a thread view shows its own; the channel, those answering in the channel
+  // (asked there, D67). A thread's runs are in its panel; the channel shows its line. A "pensando…"
+  // the app guessed hangs off the message sent: shown here when that message is in the channel.
+  const topLevelIds = useMemo(
+    () => new Set((channelMessages.data ?? []).flatMap((m) => (m.threadId ? [] : [m.id]))),
+    [channelMessages.data],
   );
-  const runVisible = useRef<(r: { threadId: string }) => boolean>(() => true);
-  runVisible.current = thread ? (r) => r.threadId === thread.id : (r) => !hiddenRunThreads.has(r.threadId);
+  const runVisible = useRef<(r: { threadId: string | null; provisional?: boolean }) => boolean>(() => true);
+  runVisible.current = thread ? (r) => r.threadId === thread.id : (r) => inMainTimeline(r, topLevelIds);
   const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
   const join = useJoinChannel(org.id, channel.id);
@@ -753,38 +741,22 @@ function ChannelView({
     el.scrollTop = el.scrollHeight - a.height + a.top;
   }, [older]);
 
-  // The channel's messages with the thread replies it shows: "Responder" threads keep in the channel only
-  // what was said before someone answered from the panel (from then on, one line where the thread left).
+  // The channel's messages: only what was said in the channel (agents asked there answer there, D67).
+  // Every thread with replies is one line under its root; its replies live in the panel.
   const channelList = useMemo(() => {
     if (thread) return null;
-    const merged = mergeTimeline(
-      [...older, ...(channelMessages.data ?? [])],
-      threads.map((q) => q.data),
-    );
-    const hidden = hiddenByThreads(threadList, merged);
-    const opened = new Map(
-      threadList.flatMap((x) => (x.state === "open" && x.openedByReplyAt ? [[x.id, x] as const] : [])),
-    );
-    const inPanel = (m: MessageType) => {
-      if (!m.threadId) return false;
-      // My reply from the panel, on its way or just sent (before the thread says it was opened).
-      if (m.meta?.[OPEN_THREAD] === true) return true;
-      const at = opened.get(m.threadId)?.openedByReplyAt;
-      return Boolean(at && m.createdAt >= at);
-    };
-    const visible = merged.filter((m) => !hidden(m) && !inPanel(m));
-    // Each "Responder" thread's line sits under its last message still in the channel (its root, or the
-    // reply someone answered); its count is what went to the panel.
+    const top = [...older, ...(channelMessages.data ?? [])];
+    const hidden = hiddenByThreads(threadList, top);
+    // My replies from the panel wait in the channel's page until sent: they belong to the thread.
+    const visible = top.filter((m) => !m.threadId && !hidden(m));
     const lines = new Map<string, { thread: ThreadInfo; count: number }>();
-    for (const x of opened.values()) {
-      const own = visible.filter((m) => m.id === x.id || m.threadId === x.id);
-      const last = own.at(-1);
-      if (!last) continue;
-      const before = own.filter((m) => m.threadId === x.id).length;
-      lines.set(last.id, { thread: x, count: Math.max(1, x.replyCount - before) });
+    for (const x of threadList) {
+      // A range thread has its marker, a mission its card, a closed thread its own line.
+      if (x.state !== "open" || x.context || x.mission || x.replyCount === 0) continue;
+      lines.set(x.id, { thread: x, count: x.replyCount });
     }
     return { visible, lines };
-  }, [thread, older, channelMessages.data, threads, threadList]);
+  }, [thread, older, channelMessages.data, threadList]);
   // The channel's threads as the timeline draws them (none in a thread view).
   const threadsView = useMemo<ChannelThreadsView | null>(() => {
     if (thread || !channelList) return null;
@@ -1953,7 +1925,7 @@ const Timeline = memo(function Timeline({
   divider: { key: string; fading: boolean } | null;
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
-  runVisible: { current: (r: { threadId: string }) => boolean };
+  runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
   /** A DM with a person: my message they read last ("Visto" under it). */
   seenId?: string | null;
 }) {
@@ -2035,7 +2007,7 @@ const Timeline = memo(function Timeline({
     () =>
       heldRowsIn(heldPlaces, {
         channelId,
-        visible: (threadId) => runVisible.current({ threadId: threadId ?? "" }),
+        visible: (threadId) => runVisible.current({ threadId: threadId ?? null }),
         live: new Set(slots.map((x) => x.runId)),
         landed: new Set(lastByRun.keys()),
       }),
@@ -2572,7 +2544,7 @@ function ActivityBar({
 }: {
   channelId: string;
   /** Which runs belong here (a thread view shows only its own). */
-  visible?: { current: (r: { threadId: string }) => boolean };
+  visible?: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
   /** The run's block is not on screen ("Ver" brings it back). */
   outOfView: (runId: string) => boolean;
   /** "Ver": back to that block. */

@@ -3,6 +3,7 @@ import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { addChannelMember } from "./channels";
 import { getChannelCached } from "./context";
+import { replyThreadOf } from "./runs";
 import { closeThread, getThread, updateThread } from "./threads";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -136,8 +137,7 @@ export function createWorkspaceToolSource(deps: { pubsub?: PubSub }): ToolSource
           if (!requester) return noRequester;
           const title = str(input.title).trim();
           if (!title && input.close !== true) return { content: "Give a new `title` or `close: true`.", isError: true };
-          const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
-          if (channel?.kind === "dm" && ctx.threadRootId === ctx.triggerMessageId) {
+          if (replyThreadOf(ctx) === null) {
             return { content: "This conversation is not a thread.", isError: true };
           }
           const rootId = ctx.threadRootId;

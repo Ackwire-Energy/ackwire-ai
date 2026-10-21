@@ -58,10 +58,10 @@ test("for-you: the viewer's receipts (not memory, not undone), the agent's files
   const [create] = (await createIssueToolSource({ db: t.db }).tools(ctx)).filter((x) => x.name === "create_issue");
   await create?.execute({ title: "Login no Safari" }, ctx);
   await create?.execute({ title: "Outra" }, ctx);
+  // Asked in the channel: the reply is in the main timeline (D67).
   const reply = await insertMessage(t.db, {
     orgId,
     channelId,
-    threadId: ask.id,
     author: { type: "agent", agentId, runId: ctx.runId, hop: 0 },
     body: "Abri duas.",
   });

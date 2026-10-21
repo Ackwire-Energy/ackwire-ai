@@ -491,7 +491,7 @@ export async function routeMessage(
   const candidateIds = new Set(candidates.map((c) => c.agentId));
   // The agent this person last talked to: the agent whose message is right before this one ("did you
   // check?" is for whoever just spoke), else the one they addressed in their previous message, else the
-  // first agent that answered it (in its thread, for top-level messages), else whoever spoke last here.
+  // first agent that answered it, else whoever spoke last here.
   let continuityAgentId: string | null = null;
   // Continuity is a person's: an agent's message has none.
   const justSpoke = byAgent ? null : recent[0]?.authorAgentId;
@@ -501,21 +501,8 @@ export async function routeMessage(
     const addressed = previous.mentionedAgentIds.filter((id) => candidateIds.has(id));
     if (addressed.length === 1) continuityAgentId = addressed[0] ?? null;
     else {
-      const answers: { authorAgentId: string | null; createdAt: Date }[] = message.threadId
-        ? recent.filter((m) => m.createdAt > previous.createdAt && m.authorAgentId)
-        : await db
-            .select({ authorAgentId: messages.authorAgentId, createdAt: messages.createdAt })
-            .from(messages)
-            .where(
-              and(
-                eq(messages.orgId, message.orgId),
-                eq(messages.threadId, previous.id),
-                isNull(messages.deletedAt),
-                lte(messages.createdAt, message.createdAt),
-              ),
-            )
-            .orderBy(desc(messages.createdAt))
-            .limit(20);
+      // Its answers come after it, where it was asked (D67).
+      const answers = recent.filter((m) => m.createdAt > previous.createdAt && m.authorAgentId);
       const first = answers
         .filter((m) => m.authorAgentId && candidateIds.has(m.authorAgentId))
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];

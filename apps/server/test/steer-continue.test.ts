@@ -22,8 +22,9 @@ test('steer "now" is accepted; active runs list what is unread; continue answers
     return (await res.json()) as { id: string; meta: Record<string, unknown> };
   };
 
-  const question = await post({ body: "@dev revisa o PR" });
-  const steer = await post({ body: "usa a dev", threadId: question.id, steer: "now" });
+  await post({ body: "@dev revisa o PR" });
+  // Asked in the channel, the run answers there (D67): a new message there joins it.
+  const steer = await post({ body: "@dev usa a dev", steer: "now" });
   expect(steer.meta.steeredRunIds).toBeArrayOfSize(1);
   const runId = (steer.meta.steeredRunIds as string[])[0] as string;
 

@@ -28,6 +28,7 @@ import { can } from "./organizations";
 import { enqueue } from "./outbox";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun } from "./run-scope";
+import { replyThreadOf } from "./runs";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 
 const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions, threads } = schema;
@@ -401,6 +402,13 @@ export async function insertMessageWithRuns(
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
               and oq.status = 'open' and oq.expires_at > now()
               and oq.thread_id is not distinct from ${threadId}::uuid
+              -- In a channel's main timeline (D67) many talk at once: who asked the agent answers it, or
+              -- whoever addresses it.
+              and (${threadId}::uuid is not null
+                or not exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
+                or oq.agent_id in (select id from mentioned)
+                or exists (select 1 from ${agentRuns} ar join ${messages} tm on tm.id = ar.trigger_message_id
+                  where ar.id = oq.run_id and tm.author_user_id = ${userId}))
             order by oq.created_at desc limit 1)
           and (not exists (select 1 from mentioned) or q.agent_id in (select id from mentioned))
           and q.agent_id not in (select agent_id from muted)
@@ -742,10 +750,7 @@ export async function postPersonMessage(
     const activeRuns = await deps.db.select().from(agentRuns).where(inArray(agentRuns.id, steeredIds));
     for (const s of steered) {
       const active = activeRuns.find((r) => r.id === s.id);
-      const threadId =
-        active && !(channel.kind === "dm" && active.threadRootId === active.triggerMessageId)
-          ? active.threadRootId
-          : null;
+      const threadId = active ? replyThreadOf(active) : null;
       await publishChannelEvent(deps.pubsub, {
         type: "agent.run.steered",
         channelId,
@@ -826,8 +831,8 @@ export async function postPersonMessage(
     });
   }
   if (runs.length > 0) {
-    // DMs are flat: replies to a top-level DM message go in the main timeline.
-    const threadId = message.threadId ?? (channel.kind === "dm" ? null : message.id);
+    // The runs answer where the message is (D67).
+    const threadId = message.threadId;
     for (const run of runs) {
       await publishChannelEvent(deps.pubsub, {
         type: "agent.thinking",

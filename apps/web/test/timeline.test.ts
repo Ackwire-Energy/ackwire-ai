@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Approval, Message } from "@agenteschat/client";
-import { buildTimeline, mergeTimeline, threadRootsToLoad, upsertMessage } from "@agenteschat/client/lib/timeline";
+import { buildTimeline, mergeTimeline, upsertMessage } from "@agenteschat/client/lib/timeline";
 import { tokenizeBody } from "@/chat/body";
 
 const msg = (id: string, minute: number, author: Message["author"], threadId: string | null = null): Message => ({
@@ -62,7 +62,7 @@ describe("timeline", () => {
     ]);
   });
 
-  test("agent replies live in threads; the channel shows them inline in time order", () => {
+  test("a thread's replies merge with the messages around them in time order", () => {
     const root = msg("root", 1, joao);
     const reply = msg("reply", 2, ada, "root");
     const later = msg("later", 3, joao);
@@ -71,10 +71,6 @@ describe("timeline", () => {
       "reply",
       "later",
     ]);
-    expect(threadRootsToLoad([root, msg("x", 2, ada), later])).toEqual(["root", "later"]);
-    // An agent calling another agent (a routine's message mentioning @Ada): its thread holds the answer.
-    const call = { ...msg("call", 4, ada), mentionedAgentIds: ["other"] };
-    expect(threadRootsToLoad([root, call])).toEqual(["root", "call"]);
   });
 
   test("days, grouping by author within 5 minutes, approvals and live runs", () => {

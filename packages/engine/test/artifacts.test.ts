@@ -86,13 +86,14 @@ describe("artifacts made by agents", () => {
     f = await setup({ artifactTools: true, reply: driveAgent() });
     await grantScopes(f.db, f.org.id, f.agent.id, DRIVE);
     const events = f.listen(f.general.id);
-    const ask = await post("@dev faz um relatório de março");
+    await post("@dev faz um relatório de março");
     await drainOutbox(f.db, f.handlers);
 
     const [created] = await f.db.select().from(schema.artifacts);
     expect(created).toMatchObject({ kind: "document", title: "Relatório de março", currentVersion: 1 });
-    expect(created).toMatchObject({ channelId: f.general.id, threadId: ask.id, createdByType: "agent" });
-    const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id })).at(-1);
+    // Asked in the channel: the file and the reply are in the channel itself (D67).
+    expect(created).toMatchObject({ channelId: f.general.id, threadId: null, createdByType: "agent" });
+    const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1);
     expect(reply?.meta.artifacts).toEqual([{ id: created?.id, version: 1 }]);
     await Bun.sleep(5);
     expect(events.some((e) => e.type === "artifact.created")).toBe(true);

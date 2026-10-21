@@ -70,21 +70,22 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     pickedBy: [f.agent.id],
     strategy: "mention",
   });
-  expect(events[2]).toMatchObject({ agentId: f.agent.id, runId: run?.id, threadId: question.id });
+  // Asked in the channel: the run's events and reply are in the main timeline (D67).
+  expect(events[2]).toMatchObject({ agentId: f.agent.id, runId: run?.id, threadId: null });
   expect(events.at(-1)).toMatchObject({ type: "message.handled", messageId: question.id, status: "done" });
   const deltas = events.filter((e) => e.type === "agent.delta");
   expect(deltas.map((e) => e.text).join("")).toBe("Sure, I'll check the build.");
   expect(deltas.map((e) => e.seq)).toEqual([0, 1, 2]);
   expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "done", runId: run?.id });
 
-  // The reply is persisted in the thread of the question, authored by the agent.
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => [m.author.type, m.body])).toEqual([
-    ["person", "@dev can you look at the failing build?"],
-    ["agent", "Sure, I'll check the build."],
+  // The reply is persisted in the main timeline, under the question, authored by the agent.
+  const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(main.map((m) => [m.author.type, m.body, m.threadId])).toEqual([
+    ["person", "@dev can you look at the failing build?", null],
+    ["agent", "Sure, I'll check the build.", null],
   ]);
-  expect(thread[1]?.agentRunId).toBe(run?.id ?? "");
-  expect(run?.replyMessageId).toBe(thread[1]?.id ?? "");
+  expect(main[1]?.agentRunId).toBe(run?.id ?? "");
+  expect(run?.replyMessageId).toBe(main[1]?.id ?? "");
 
   // Usage is recorded with org and agent, linked to the run.
   const usage = await f.db.select().from(schema.usageRecords);
@@ -130,7 +131,8 @@ test("agents answer each other at most once in a row without a person", async ()
   const root = await post(f, "@dev start the ping-pong");
   await drainOutbox(f.db, f.handlers);
 
-  const replies = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id })).slice(1);
+  // Each answers in the main timeline, where it was asked.
+  const replies = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).slice(1);
   // Dev hands off to QA once; QA's hand-back doesn't start another round.
   expect(replies.map((m) => m.body)).toEqual(["@qa over to you", "@dev back to you"]);
   expect(f.provider.calls).toHaveLength(2);

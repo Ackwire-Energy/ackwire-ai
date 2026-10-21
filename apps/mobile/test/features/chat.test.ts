@@ -23,7 +23,6 @@ import {
   standsAlone,
   stoppableInLine,
   threadFaces,
-  threadRootsToLoad,
   threadTitleFrom,
   toggleReaction,
   workingEntries,
@@ -53,17 +52,6 @@ describe("timeline", () => {
     const b = message({ id: "b", createdAt: at(8), threadId: "a", author: { type: "agent", id: "dev" } });
     const c = message({ id: "c", createdAt: at(5) });
     expect(mergeTimeline([a, c], [[b, a]]).map((m) => m.id)).toEqual(["a", "b", "c"]);
-  });
-
-  test("the agents' answers load for the latest person messages, not thread or mission roots", () => {
-    const list = [
-      message({ id: "p1" }),
-      message({ id: "x", author: { type: "agent", id: "dev" } }),
-      message({ id: "p2", meta: { missionStart: true } }),
-      message({ id: "p3" }),
-      message({ id: "call", author: { type: "agent", id: "dev" }, mentionedAgentIds: ["qa"] }),
-    ];
-    expect(threadRootsToLoad(list, new Set(["p3"]))).toEqual(["p1", "call"]);
   });
 
   test("same author within 5 minutes groups; a day starts a new group; cards stand alone", () => {

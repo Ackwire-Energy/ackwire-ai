@@ -223,7 +223,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         runs: AgentRun[],
         reason?: string,
       ) => {
-        const threadId = message.threadId ?? message.id;
+        // The runs answer where the message is (D67).
+        const threadId = message.threadId;
         await publishChannelEvent(deps.pubsub, {
           type: "message.routed",
           channelId: message.channelId,

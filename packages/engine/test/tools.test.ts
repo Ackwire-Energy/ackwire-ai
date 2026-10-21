@@ -256,23 +256,25 @@ describe("approval flow (end to end)", () => {
     f = await setup({ toolSources: [gh.source], reply: script });
     await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
     const events = f.listen(f.general.id);
-    const question = await post(f, "@dev merge PR 42 if the tests pass");
+    await post(f, "@dev merge PR 42 if the tests pass");
     await drainOutbox(f.db, f.handlers);
 
     let [run] = await f.db.select().from(schema.agentRuns);
     expect(run?.status).toBe("waiting_approval");
     expect(gh.executed.map((e) => e.tool)).toEqual(["github_get_pr"]);
     const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
-    expect(approval).toMatchObject({ title: "Merge PR #42 in acme/app", canDecide: true, threadId: question.id });
+    // Its card is where it was asked: the main timeline (D67).
+    expect(approval).toMatchObject({ title: "Merge PR #42 in acme/app", canDecide: true, threadId: null });
 
-    // The chat shows what the agent said before the approval and the card; earlier narration is a step.
-    let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.map((m) => m.body)).toEqual([
+    // The chat shows what the agent said before the approval and the card, in the main timeline where it
+    // was asked (D67); earlier narration is a step.
+    let main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual([
       "@dev merge PR 42 if the tests pass",
       "Tests pass, merging.",
       "Approval request: Merge PR #42 in acme/app",
     ]);
-    expect(thread[2]?.meta).toEqual({
+    expect(main[2]?.meta).toEqual({
       approvalId: approval?.id,
       bodyCode: "approval_request",
       bodyParams: { title: "Merge PR #42 in acme/app" },
@@ -297,8 +299,8 @@ describe("approval flow (end to end)", () => {
       { tool: "github_get_pr", input: { repo: "acme/app", pr: 42 } },
       { tool: "github_merge_pr", input: { repo: "acme/app", pr: 42 } },
     ]);
-    thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Merge done.");
+    main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.at(-1)?.body).toBe("Merge done.");
 
     // The resumed call sent the same history (append-only, thinking block intact) plus the tool result.
     const calls = f.provider.calls.map((c) => c.request);
@@ -343,7 +345,7 @@ describe("approval flow (end to end)", () => {
     const gh = fakeGithub();
     f = await setup({ toolSources: [gh.source], reply: script });
     await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
-    const question = await post(f, "@dev merge PR 42");
+    await post(f, "@dev merge PR 42");
     await drainOutbox(f.db, f.handlers);
     const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
     await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
@@ -357,8 +359,8 @@ describe("approval flow (end to end)", () => {
     const last = f.provider.calls.at(-1)?.request.messages.at(-1);
     expect(textOf(last?.content ?? "")).toBe("");
     expect(JSON.stringify(last?.content)).toContain("Reason: freeze until Monday");
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Understood, I won't merge it.");
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.at(-1)?.body).toBe("Understood, I won't merge it.");
     const [decided] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "decided" });
     expect(decided).toMatchObject({ status: "refused", reason: "freeze until Monday", decidedByUserId: f.owner.id });
     // A second decision is a conflict.

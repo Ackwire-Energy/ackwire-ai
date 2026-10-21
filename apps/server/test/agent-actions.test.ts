@@ -38,10 +38,10 @@ test("receipts: listed on the agent's reply, undo/redo/undo-all over the API, co
   const [create] = (await createIssueToolSource({ db: t.db }).tools(ctx)).filter((x) => x.name === "create_issue");
   await create?.execute({ title: "Uma" }, ctx);
   await create?.execute({ title: "Outra" }, ctx);
+  // Asked in the channel: the reply is in the main timeline (D67).
   const reply = await insertMessage(t.db, {
     orgId,
     channelId,
-    threadId: ask.id,
     author: { type: "agent", agentId, runId: ctx.runId, hop: 0 },
     body: "Abri duas issues.",
   });
@@ -49,10 +49,10 @@ test("receipts: listed on the agent's reply, undo/redo/undo-all over the API, co
   const events: { type: string; messageId?: string }[] = [];
   await t.adapters.pubsub.subscribe(channelTopic(channelId), (e) => events.push(e as (typeof events)[number]));
 
-  const thread = (await (await api(`/channels/${channelId}/messages?threadId=${ask.id}`)).json()) as {
+  const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
     messages: { id: string; actions?: Action[] }[];
   };
-  const actions = thread.messages.find((m) => m.id === reply.id)?.actions ?? [];
+  const actions = timeline.messages.find((m) => m.id === reply.id)?.actions ?? [];
   expect(actions.map((a) => [a.kind, a.target.number])).toEqual([
     ["issue.created", 1],
     ["issue.created", 2],

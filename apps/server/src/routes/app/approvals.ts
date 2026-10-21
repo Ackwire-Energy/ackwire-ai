@@ -11,7 +11,7 @@ export const Approval = z
     missionId: z.uuid().nullable(),
     agentId: z.uuid(),
     channelId: z.uuid(),
-    threadId: z.uuid(),
+    threadId: z.uuid().nullable().openapi({ description: "Where its card is; null: the channel's main timeline." }),
     messageId: z.uuid().nullable().openapi({ description: "The approval card in the chat." }),
     tool: z.string(),
     scope: z.string(),

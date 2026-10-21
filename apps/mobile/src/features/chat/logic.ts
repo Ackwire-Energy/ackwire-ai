@@ -30,23 +30,6 @@ export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefin
   return [...seen.values()].sort(byTime);
 }
 
-/**
- * Messages whose replies (the agents' answers) are shown inline: the latest ones written by people or by an
- * agent mentioning another agent (as the backend starts runs for), not thread or mission roots.
- */
-export function threadRootsToLoad(topLevel: Message[], skip: ReadonlySet<string>, max = 20): string[] {
-  return topLevel
-    .filter(
-      (m) =>
-        (m.author.type === "person" || m.mentionedAgentIds.length > 0) &&
-        !skip.has(m.id) &&
-        !m.meta?.threadStart &&
-        !m.meta?.missionStart,
-    )
-    .slice(-max)
-    .map((m) => m.id);
-}
-
 export const GROUP_WINDOW_MS = 5 * 60_000;
 
 /** Same author again within 5 minutes, nothing special in between: the row drops its name and avatar. */

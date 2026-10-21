@@ -7,7 +7,7 @@ import { publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
 import { insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
-import { type AgentRun, addRunStep, runErrorDetail, transitionRun } from "./runs";
+import { type AgentRun, addRunStep, replyThreadOf, runErrorDetail, transitionRun } from "./runs";
 
 const { agentRuns, agentRunSteps, outbox, channels } = schema;
 
@@ -133,8 +133,7 @@ async function resume(db: Database, run: AgentRun) {
 async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: AgentRun) {
   const { db } = deps;
   const [channel] = await db.select({ kind: channels.kind }).from(channels).where(eq(channels.id, run.channelId));
-  const flat = (channel?.kind === "dm" || channel?.kind === "forum") && run.threadRootId === run.triggerMessageId;
-  const threadId = flat ? null : run.threadRootId;
+  const threadId = replyThreadOf(run);
   const t = (run.transcript ?? {}) as StoredTranscript;
   const said = (t.messages ?? [])
     .slice(t.postedUpTo ?? 0)

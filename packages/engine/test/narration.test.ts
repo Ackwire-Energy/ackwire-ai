@@ -47,15 +47,15 @@ test("a 3-call tool loop: narration goes to steps and live events, the message i
     },
   });
   const events = f.listen(f.general.id);
-  const question = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev compila o projeto",
   });
   await drainOutbox(f.db, f.handlers);
   expect(env.calls()).toBe(2);
 
   // The message holds only the final answer, whole.
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toEqual([
+  const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(timeline.map((m) => m.body)).toEqual([
     "@dev compila o projeto",
     "Não dá para compilar aqui: faltam Go e gcc no computador.",
   ]);
@@ -106,12 +106,12 @@ test("a final call with no text closes with the last narration instead of an emp
         ? { chunks: ["Instalando e testando."], toolUses: [{ name: "check_env", input: {} }] }
         : { chunks: [] },
   });
-  const question = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev prepara o ambiente",
   });
   await drainOutbox(f.db, f.handlers);
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.body).toBe("Instalando e testando.");
+  const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(timeline.at(-1)?.body).toBe("Instalando e testando.");
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
 });

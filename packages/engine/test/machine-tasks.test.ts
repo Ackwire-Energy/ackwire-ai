@@ -142,7 +142,8 @@ describe("background tasks (ADR 0029)", () => {
       status: "running",
       title: "Build the app",
       channelId: f.general.id,
-      threadRootId: ask.id,
+      // Asked in the channel: the task reports to the main timeline (D67); the session is the conversation's.
+      threadRootId: null,
       requestedByUserId: f.owner.id,
       sessionId: ask.id,
     });
@@ -182,11 +183,11 @@ describe("background tasks (ADR 0029)", () => {
     expect(wake).toContain(`[Background task ${start.taskId}]`);
     expect(wake).toContain("Built. Tests pass.");
     expect(wake).toContain("Tell the people what came of it");
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    const notice = thread.find((m) => m.meta.machineTask);
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const notice = main.find((m) => m.meta.machineTask);
     expect(notice?.body).toBe('Task "Build the app" finished on MacBook after 13 min.');
     expect(notice?.meta).toMatchObject({ bodyCode: "machine_task_done", machineTask: { status: "done" } });
-    expect(thread.at(-1)?.body).toBe("The app builds and the tests pass.");
+    expect(main.at(-1)?.body).toBe("The app builds and the tests pass.");
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs).toHaveLength(2);
     expect(runs.find((r) => r.triggerMessageId === notice?.id)).toMatchObject({ status: "done", hop: 2 });

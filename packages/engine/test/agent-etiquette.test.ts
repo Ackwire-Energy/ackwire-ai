@@ -149,7 +149,7 @@ describe("short follow-ups without a mention", () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy feito."] }) });
     const qa = await addQa();
     await post("@dev status do deploy?");
-    await drainOutbox(f.db, f.handlers); // Dev answers in the thread
+    await drainOutbox(f.db, f.handlers); // Dev answers in the channel (D67)
     const followUp = await post("e agora?");
     const one = await routeMessage(
       { db: f.db, strategy: scoreAll, policy },
@@ -170,7 +170,7 @@ describe("short follow-ups without a mention", () => {
   test("a short message the router hears as for a person wakes nobody, even right after an agent spoke", async () => {
     f = await setup({ reply: () => ({ chunks: ["Oi!"] }) });
     await post("@dev tá acordado?");
-    await drainOutbox(f.db, f.handlers); // Dev answers in the thread
+    await drainOutbox(f.db, f.handlers); // Dev answers in the channel (D67)
     const quiet: RouterStrategy = {
       name: "fixed",
       async decide(input) {
@@ -189,12 +189,11 @@ describe("short follow-ups without a mention", () => {
   test("go to the agent that spoke right before; a name the router is sure of goes to that agent", async () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy feito."] }) });
     const qa = await addQa();
-    const question = await post("@dev status do deploy?");
-    await drainOutbox(f.db, f.handlers); // Dev answers in the thread
+    await post("@dev status do deploy?");
+    await drainOutbox(f.db, f.handlers); // Dev answers in the channel (D67)
     await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      threadId: question.id,
       author: { type: "agent", agentId: qa.id, runId: null, hop: 1 },
       body: "Os testes de integração falharam no deploy.",
     });
@@ -287,8 +286,9 @@ describe("the judge decides every agent-to-agent mention (the 20:35 loop)", () =
     expect(runs.filter((r) => r.hop >= 3)).toEqual([]);
 
     const decisions = await f.db.select().from(schema.routingDecisions);
-    const judged = decisions.filter((d) => d.strategy === "mention-fake");
+    const judged = decisions.filter((d) => d.strategy.startsWith("mention-"));
     expect(judged.length).toBeGreaterThanOrEqual(2);
+    // QA spoke to @ops by name (its message opens with it): Ops is the one hand-off.
     expect(judged.find((d) => d.selectedAgentIds.length === 1)?.selectedAgentIds).toEqual([ops.id]);
   });
 

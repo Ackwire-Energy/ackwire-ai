@@ -125,7 +125,7 @@ describe("organizations, agents and credentials", () => {
 });
 
 describe("chat over HTTP", () => {
-  test("post a mention, workers run the agent, the reply appears in the thread, usage is billed", async () => {
+  test("post a mention, workers run the agent, the reply appears in the channel, usage is billed", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
     const { orgId, channelId, agentId } = await seedOrg(owner);
@@ -137,14 +137,13 @@ describe("chat over HTTP", () => {
     expect(message.mentionedAgentIds).toEqual([agentId]);
 
     await t.drain();
-    const thread = (await (
-      await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages?threadId=${message.id}`)
-    ).json()) as {
-      messages: { author: { type: string }; body: string }[];
+    // Asked in the channel, answered in the channel (D67).
+    const timeline = (await (await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`)).json()) as {
+      messages: { author: { type: string }; body: string; threadId: string | null }[];
     };
-    expect(thread.messages.map((m) => [m.author.type, m.body])).toEqual([
-      ["person", "@dev status?"],
-      ["agent", "Echo: [owner]: @dev status?."],
+    expect(timeline.messages.map((m) => [m.author.type, m.body, m.threadId])).toEqual([
+      ["person", "@dev status?", null],
+      ["agent", "Echo: [owner]: @dev status?.", null],
     ]);
     expect(t.provider.calls[0]?.apiKey).toBe("sk-ant-api-secret-9876");
     // Per-agent cost is an admin endpoint (the owner here); members get 403 (see above).

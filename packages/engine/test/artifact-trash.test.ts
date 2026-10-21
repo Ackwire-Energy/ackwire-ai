@@ -44,7 +44,7 @@ async function agentFile() {
   const card = await insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
-    threadId: ask.id,
+    threadId: null,
     author: { type: "agent", agentId: f.agent.id, runId: run?.id ?? null, hop: 1 },
     body: "Pronto.",
     meta: { artifacts: [{ id: file.id, version: 1 }] },
@@ -69,13 +69,13 @@ test("who may delete: who asked the agent, the agent's owner, admins; not other 
 });
 
 test("deleted files leave the Drive; messages show them removed; trash and restore", async () => {
-  const { bia, file, ask } = await agentFile();
+  const { bia, file } = await agentFile();
   await deleteArtifact(f.artifactDeps, bia.id, f.org.id, file.id);
   expect((await listArtifacts(f.db, { type: "person", userId: bia.id }, f.org.id)).map((a) => a.id)).not.toContain(
     file.id,
   );
-  const thread = await listMessages(f.db, bia.id, f.org.id, f.general.id, { threadId: ask.id });
-  expect(thread.at(-1)?.meta.artifacts).toEqual([{ id: file.id, deleted: true, title: "Relatório" }]);
+  const timeline = await listMessages(f.db, bia.id, f.org.id, f.general.id);
+  expect(timeline.at(-1)?.meta.artifacts).toEqual([{ id: file.id, deleted: true, title: "Relatório" }]);
 
   const trash = await listDeletedArtifacts(f.db, bia.id, f.org.id);
   expect(trash.map((t) => [t.id, t.title])).toEqual([[file.id, "Relatório"]]);
@@ -83,7 +83,7 @@ test("deleted files leave the Drive; messages show them removed; trash and resto
 
   await restoreArtifact(f.artifactDeps, bia.id, f.org.id, file.id);
   expect((await listArtifacts(f.db, { type: "person", userId: bia.id }, f.org.id)).map((a) => a.id)).toContain(file.id);
-  const again = await listMessages(f.db, bia.id, f.org.id, f.general.id, { threadId: ask.id });
+  const again = await listMessages(f.db, bia.id, f.org.id, f.general.id);
   expect(again.at(-1)?.meta.artifacts).toEqual([{ id: file.id, version: 1 }]);
 });
 

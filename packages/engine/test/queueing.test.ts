@@ -36,7 +36,7 @@ function slowTool(during: () => Promise<unknown>): ToolSource {
 }
 
 describe("mid-round queueing (ADR 0029 section 1)", () => {
-  test("a reply in the thread while the agent works there joins that run: no mention, no second run", async () => {
+  test("a reply in the thread of the message it works on joins that run: no mention, no second run", async () => {
     let threadId = "";
     const requests: string[] = [];
     f = await setup({
@@ -55,8 +55,9 @@ describe("mid-round queueing (ADR 0029 section 1)", () => {
     expect(f.provider.calls).toHaveLength(2);
     expect(requests[1]).toContain("New message from ana, while you were working");
     expect(requests[1]).toContain("also bump the version");
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId });
-    expect(thread.at(-1)?.body).toBe("Built, version bumped.");
+    // Asked in the channel: it answers in the main timeline (D67).
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.at(-1)?.body).toBe("Built, version bumped.");
   });
 
   test("a new message in the channel calling the agent while it works there joins that run: one agent, not two", async () => {
@@ -78,22 +79,15 @@ describe("mid-round queueing (ADR 0029 section 1)", () => {
     expect(requests[1]).toContain("and fix the login too");
   });
 
-  test("a new message in the channel doesn't join a run working in a thread's panel", async () => {
-    let threadId = "";
+  test("a new message in the channel doesn't join a run working in a thread", async () => {
     f = await setup({
       toolSources: [slowTool(() => post("@dev something else"))],
       reply: (_req: ModelRequest, call: number) =>
         call === 1 ? { chunks: ["Building."], toolUses: [{ name: "build", input: {} }] } : { chunks: ["Done."] },
     });
-    const ask = await post("@dev build the project");
-    threadId = ask.id;
-    // The thread was opened with "Responder": its run answers in the panel, not in the channel.
-    await f.db.insert(schema.threads).values({
-      orgId: f.org.id,
-      channelId: f.general.id,
-      rootMessageId: threadId,
-      openedByReplyAt: new Date(),
-    });
+    const root = await post("the release");
+    // Asked in the thread: its run answers there, not in the channel.
+    await post("@dev build the project", root.id);
     await drainOutbox(f.db, f.handlers);
     expect(await runs()).toHaveLength(2);
   });
@@ -107,8 +101,11 @@ describe("mid-round queueing (ADR 0029 section 1)", () => {
     const all = await runs();
     expect(all.map((r) => r.status)).toEqual(["done", "done"]);
     expect(all[1]?.threadRootId).toBe(ask.id);
+    // Each answers where it was asked: the first in the main timeline, the second in the thread.
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual(["@dev first thing", "First."]);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    expect(thread.map((m) => m.body)).toEqual(["@dev first thing", "First.", "@dev one more thing", "Second."]);
+    expect(thread.map((m) => m.body)).toEqual(["@dev first thing", "@dev one more thing", "Second."]);
   });
 
   test("a message queued into a run that then fails is not lost: it gets a run of its own", async () => {

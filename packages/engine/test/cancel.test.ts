@@ -50,7 +50,7 @@ describe("canceling a run", () => {
         call === 1 ? { chunks: ["Começando a análise. ", "Isto nunca chega."], hold } : { chunks: ["não deveria"] },
     });
     const events = f.listen(f.general.id);
-    const question = await ask("@dev analisa os logs");
+    await ask("@dev analisa os logs");
     onFirst("agent.delta", (e) => {
       void cancelRun(deps(), f.owner.id, f.org.id, String(e.runId)).finally(release);
     });
@@ -59,9 +59,10 @@ describe("canceling a run", () => {
     const run = await runOf();
     expect(run?.status).toBe("canceled");
     expect(f.provider.calls).toHaveLength(1);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Começando a análise.\n\n_Stopped by ana._");
-    expect(thread.at(-1)?.meta).toMatchObject({ canceled: { byUserId: f.owner.id } });
+    // Asked in the channel: the stopped reply is in the main timeline (D67).
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.at(-1)?.body).toBe("Começando a análise.\n\n_Stopped by ana._");
+    expect(main.at(-1)?.meta).toMatchObject({ canceled: { byUserId: f.owner.id } });
 
     const usage = await f.db
       .select()
@@ -92,7 +93,7 @@ describe("canceling a run", () => {
           : { chunks: ["não deveria"] },
     });
     await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "sandbox:run" }]);
-    const question = await ask("@dev compila");
+    await ask("@dev compila");
     onFirst("agent.tool", (e) => {
       if (e.tool === "run_code") void cancelRun(deps(), f.owner.id, f.org.id, String(e.runId));
     });
@@ -103,8 +104,8 @@ describe("canceling a run", () => {
     expect((await runOf())?.status).toBe("canceled");
     expect(sandbox.calls.some((c) => c.op === "kill")).toBe(true);
     expect(f.provider.calls).toHaveLength(1);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Vou compilar.\n\n_Stopped by ana._");
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.at(-1)?.body).toBe("Vou compilar.\n\n_Stopped by ana._");
   });
 
   test("while queued: it never starts and its job is dropped", async () => {
@@ -204,12 +205,11 @@ describe("one active run per agent and conversation", () => {
     expect(requests[1]).toContain("usa a branch dev, por favor");
     expect(requests[1]).toContain("build ok");
     expect(events.find((e) => e.type === "agent.run.steered")).toMatchObject({ runId: runs[0]?.id });
+    // The reply is in the main timeline, where it was asked; the message sent to it, in the thread.
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual(["@dev compila o projeto", "Feito, na branch dev."]);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.map((m) => m.body)).toEqual([
-      "@dev compila o projeto",
-      "usa a branch dev, por favor",
-      "Feito, na branch dev.",
-    ]);
+    expect(thread.map((m) => m.body)).toEqual(["@dev compila o projeto", "usa a branch dev, por favor"]);
   });
 
   test("coalescing: a second message while queued joins the same run", async () => {

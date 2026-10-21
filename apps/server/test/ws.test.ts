@@ -146,9 +146,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   c.send({ type: "subscribe", channelId });
   await c.next((f) => f.type === "subscribed");
 
-  const posted = (await (
-    await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "@dev hi" } })
-  ).json()) as { id: string };
+  await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "@dev hi" } });
   await t.drain();
 
   const done = await c.next((f) => f.type === "event" && (f.event as { type: string }).type === "message.handled");
@@ -177,10 +175,13 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
       .map((e) => e.text)
       .join(""),
   ).toBe("Hello there");
-  const reply = events[10] as { message: { body: string; threadId: string; author: { type: string; id: string } } };
+  const reply = events[10] as {
+    message: { body: string; threadId: string | null; author: { type: string; id: string } };
+  };
+  // Asked in the channel, answered in the channel (D67).
   expect(reply.message).toMatchObject({
     body: "Hello there",
-    threadId: posted.id,
+    threadId: null,
     author: { type: "agent", id: agentId },
   });
   expect(await t.adapters.presence.online(orgId)).toHaveLength(1);

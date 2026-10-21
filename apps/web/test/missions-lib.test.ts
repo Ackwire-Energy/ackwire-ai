@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { MachineTask, Message, Mission } from "@agenteschat/client";
+import type { MachineTask, Mission } from "@agenteschat/client";
 import {
   appendOutputLine,
   cellsFromCounts,
@@ -35,7 +35,6 @@ import {
   waitingParts,
   waitingText,
 } from "@agenteschat/client/lib/missions";
-import { threadRootsToLoad } from "@agenteschat/client/lib/timeline";
 import { bodyTones, iconNames, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { executorOptions } from "@/components/missions/MissionBits";
@@ -393,22 +392,6 @@ describe("message meta", () => {
     expect(taskNoticeOf({ bodyCode: "machine_task_done", bodyParams: {} })?.code).toBe("machine_task_done");
     expect(taskNoticeOf({ bodyCode: "mission_plan" })).toBeNull();
     expect(taskNoticeOf(undefined)).toBeNull();
-  });
-
-  test("the channel doesn't load a mission's thread (its work lives in the thread view)", () => {
-    const base = {
-      channelId: "c",
-      threadId: null,
-      author: { type: "person" as const, id: "u1" },
-      mentionedAgentIds: [],
-      agentRunId: null,
-      createdAt: "2026-10-16T10:00:00.000Z",
-    };
-    const list = [
-      { ...base, id: "plain", body: "oi" },
-      { ...base, id: "mission", body: "goal", meta: { missionStart: { title: "App" } } },
-    ] as Message[];
-    expect(threadRootsToLoad(list)).toEqual(["plain"]);
   });
 });
 

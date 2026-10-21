@@ -33,7 +33,8 @@ export type ForYouItem =
         title: string;
         status: ApprovalView["status"];
         channelId: string;
-        threadId: string;
+        /** Where its card is; null: the main timeline (D67). */
+        threadId: string | null;
         /** Pending and this person may decide it ("espera seu ok"). */
         waitingOnYou: boolean;
       };

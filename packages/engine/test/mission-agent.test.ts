@@ -155,12 +155,14 @@ describe("missions with executor agent (ADR 0029)", () => {
     });
     await drainOutbox(f.db, f.handlers);
     let mission = await missionRow();
-    expect(mission).toMatchObject({ executor: "agent", status: "proposed", threadRootId: ask.id });
+    expect(mission).toMatchObject({ executor: "agent", status: "proposed" });
+    // Asked in the channel: the mission's home is a thread of its own (D67).
+    expect(mission.threadRootId).not.toBe(ask.id);
     // No executor session on the machine: the agent planned it itself.
     expect(runner.started).toHaveLength(0);
     expect(mission.planVersion).toBe(1);
     expect(mission.planTotal).toBe(2);
-    let lines = await threadMessages(ask.id);
+    let lines = await threadMessages(mission.threadRootId);
     expect(lines.some((m) => (m.meta.missionReport as { executor?: string } | undefined)?.executor === "agent")).toBe(
       true,
     );
@@ -177,7 +179,7 @@ describe("missions with executor agent (ADR 0029)", () => {
     // The task's end: a notice in the thread and a run of the agent (hop reset: its own wake-ups are hop 0).
     await runner.done(task.taskId, { exitCode: 0, result: "12 passed" });
     await drainOutbox(f.db, f.handlers);
-    lines = await threadMessages(ask.id);
+    lines = await threadMessages(mission.threadRootId);
     const notice = lines.find((m) => (m.meta.machineTask as { id?: string } | undefined)?.id === task.taskId);
     expect(notice?.hop).toBe(0);
     const woken = (await f.db.select().from(schema.agentRuns)).find((r) => r.triggerMessageId === notice?.id);
@@ -225,16 +227,19 @@ describe("missions with executor agent (ADR 0029)", () => {
     const paired = await pairedMachine(f);
     const runner = missionRunner(f.machineHub as MachineHub, { executors: {} });
     await runner.hello(paired.token);
-    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev build the app",
     });
     await drainOutbox(f.db, f.handlers);
     expect((await missionRow()).planTotal).toBe(2);
-    const fromAgent = (await threadMessages(ask.id)).filter((m) => m.authorAgentId === f.agent.id);
+    // The proposal's reply is in the channel (D67), the planning turn in the mission's own thread: both count.
+    const fromAgent = await f.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, f.agent.id));
     expect(fromAgent.some((m) => m.meta.missionReport)).toBe(true);
     // The planning turn left only its cards: no reply repeating the report, no empty or failed one.
     expect(fromAgent.map((m) => m.body)).not.toContain("I made the plan: 2 steps.");
-    expect(fromAgent.filter((m) => m.body.trim() === "" && !m.meta.missionReport && !m.meta.missionPlan)).toEqual([]);
+    const blank = (m: (typeof fromAgent)[number]) =>
+      m.body.trim() === "" && !m.meta.missionReport && !m.meta.missionPlan && !m.meta.missionLink;
+    expect(fromAgent.filter(blank)).toEqual([]);
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs.map((r) => r.status)).not.toContain("failed");
   });
@@ -602,14 +607,15 @@ describe("missions arrive investigated (ADR 0037 round 2)", () => {
     const paired = await pairedMachine(f);
     const runner = missionRunner(f.machineHub as MachineHub, { executors: {} });
     await runner.hello(paired.token);
-    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev why does the review prompt show right after subscribing?",
     });
     await drainOutbox(f.db, f.handlers);
     const mission = await missionRow();
     expect(mission).toMatchObject({ status: "proposed", planVersion: 1, planTotal: 3 });
     expect(mission.findings).toHaveLength(3);
-    const lines = await threadMessages(ask.id);
+    // Asked in the channel: the mission's cards are in its own thread (D67).
+    const lines = await threadMessages(mission.threadRootId);
     // Arrives planned: no plan-mode notice to the main session.
     expect(lines.some((m) => JSON.stringify(m.meta.missionInbox ?? "").includes("PLAN MODE"))).toBe(false);
     const card = lines.find((m) => m.meta.missionPlan);
@@ -625,7 +631,7 @@ describe("missions arrive investigated (ADR 0037 round 2)", () => {
 
     // Writing waits for Start; Start tells the main session what was found.
     await startMission(md(), f.owner.id, f.org.id, mission.id);
-    const after = await threadMessages(ask.id);
+    const after = await threadMessages(mission.threadRootId);
     const start = after
       .map((m) => (m.meta.missionInbox as { text?: string } | undefined)?.text ?? "")
       .find((t) => t.startsWith("The person approved the plan"));

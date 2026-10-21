@@ -235,7 +235,7 @@ describe("MCP tools through the Tool Gateway", () => {
       connectorGrantValidator,
     );
 
-    const q = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev merge PR 42",
     });
     await drainOutbox(f.db, f.handlers);
@@ -256,8 +256,8 @@ describe("MCP tools through the Tool Gateway", () => {
       { tool: "get_pull_request", args: { owner: "acme", repo: "app", pullNumber: 42 } },
       { tool: "merge_pull_request", args: { owner: "acme", repo: "app", pullNumber: 42 } },
     ]);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: q.id });
-    expect(thread.at(-1)?.body).toBe("Merge feito.");
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.at(-1)?.body).toBe("Merge feito.");
   });
 });
 

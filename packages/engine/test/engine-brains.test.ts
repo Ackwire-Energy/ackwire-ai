@@ -105,6 +105,9 @@ function scriptedComputerBrain(script: (n: number, turn: BrainTurn) => AsyncIter
 const post = (fx: Fixture, body: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body });
 
+/** The channel's main timeline: a run asked there answers there (D67). */
+const timeline = (fx: Fixture) => listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
+
 test("brainFor: the mission's brain first, then the agent's; unknown values are the model brain", () => {
   const run = { id: "r" };
   expect(brainFor({ brain: "codex" }, run, { brain: "claude_code" })).toBe("claude_code");
@@ -186,7 +189,7 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const question = await post(f, "@dev roda os testes");
+  await post(f, "@dev roda os testes");
   await drainOutbox(f.db, handlers);
 
   expect(seen.length).toBe(1);
@@ -196,17 +199,18 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
   expect(system).not.toContain("Beyond this, you can't.");
   expect(seen[0]?.model).toBe("sonnet");
   const [run] = await f.db.select().from(schema.agentRuns);
-  // A new session for this run, kept on it (a pause resumes the same one).
+  // A new session for this run, kept on it (a pause resumes the same one). Asked in the channel, its
+  // conversation is the channel's main timeline (D67).
   expect(seen[0]?.session).toEqual({
-    id: brainSessionId(f.agent.id, `${question.id}:${run?.id}`, "claude_code"),
+    id: brainSessionId(f.agent.id, `${f.general.id}:${run?.id}`, "claude_code"),
     resume: false,
     machineId,
     cwd: "",
   });
   expect(run?.brainSessionId).toBe(seen[0]?.session?.id ?? "");
   expect(run?.status).toBe("done");
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toEqual(["@dev roda os testes", "Rodei os testes: tudo verde."]);
+  const main = await timeline(f);
+  expect(main.map((m) => m.body)).toEqual(["@dev roda os testes", "Rodei os testes: tudo verde."]);
   // The transcript stays valid for the model brain: no tool_use without its result.
   expect(JSON.stringify(run?.transcript)).not.toContain('"type":"tool_use"');
   const usage = await f.db
@@ -306,16 +310,16 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const question = await post(f, "@dev faz o merge do PR 42");
+  await post(f, "@dev faz o merge do PR 42");
   await drainOutbox(f.db, handlers);
 
   let [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_approval");
   expect(gh.executed).toEqual([]);
   expect(seen.length).toBe(1);
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toContain("Pedi aprovação para o merge.");
-  expect(thread.some((m) => typeof m.meta.approvalId === "string")).toBe(true);
+  const main = await timeline(f);
+  expect(main.map((m) => m.body)).toContain("Pedi aprovação para o merge.");
+  expect(main.some((m) => typeof m.meta.approvalId === "string")).toBe(true);
   const transcript = run?.transcript as { pending?: { calls: { toolUseId: string; bridged?: boolean }[] } };
   expect(transcript.pending?.calls).toMatchObject([{ toolUseId: "call-1", bridged: true }]);
 
@@ -361,19 +365,19 @@ test("a question asked through the bridge: the text written before it comes firs
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const asked = await post(f, "@dev cria a viagem para o Chile");
+  await post(f, "@dev cria a viagem para o Chile");
   await drainOutbox(f.db, handlers);
 
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_input");
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: asked.id });
-  const fromAgent = thread.filter((m) => m.author.type === "agent");
+  const main = await timeline(f);
+  const fromAgent = main.filter((m) => m.author.type === "agent");
   // The context first, then the card; the repeated question after the call is never posted.
   expect(fromAgent.map((m) => (m.meta.question ? "card" : m.body))).toEqual([
     "Estou criando a viagem no meu navegador; o formulário pede as datas.",
     "card",
   ]);
-  expect(thread.some((m) => m.body.includes("você me passa a ida e a volta"))).toBe(false);
+  expect(main.some((m) => m.body.includes("você me passa a ida e a volta"))).toBe(false);
 });
 
 test("a plan limit falls back to the model brain; the reply carries a quiet note", async () => {
@@ -388,14 +392,14 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const question = await post(f, "@dev oi");
+  await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
 
   expect(seen.length).toBe(1);
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  const reply = thread.at(-1);
+  const main = await timeline(f);
+  const reply = main.at(-1);
   expect(reply?.body).toBe("Respondi pela API.");
   expect(reply?.meta.brainFallback).toMatchObject({ from: "claude_code", code: "plan_limit" });
   // The model brain that stood in has no computer tools: no computer note in its prompt.
@@ -506,14 +510,14 @@ test("with no model credential, an offline computer: the agent says so once and 
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id, { online }) },
   });
-  const question = await post(f, "@dev oi");
+  await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
 
   let [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_input");
   expect(seen.length).toBe(0);
-  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.meta).toMatchObject({
+  let main = await timeline(f);
+  expect(main.at(-1)?.meta).toMatchObject({
     bodyCode: "brain_unavailable",
     brainUnavailable: { brain: "claude_code", code: "machine_offline" },
   });
@@ -533,8 +537,8 @@ test("with no model credential, an offline computer: the agent says so once and 
   // Nothing waits for that computer anymore.
   expect(await resumeRunsWaitingForMachine(f.db, machineId)).toEqual([]);
   expect(seen.length).toBe(1);
-  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.body).toBe("Voltei e respondo.");
+  main = await timeline(f);
+  expect(main.at(-1)?.body).toBe("Voltei e respondo.");
 });
 
 test("the computer drops mid-turn after a tool ran: the run stops working, resumes there when it is back, nothing runs twice", async () => {
@@ -577,7 +581,7 @@ test("the computer drops mid-turn after a tool ran: the run stops working, resum
   });
   const events: string[] = [];
   f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(String(e.type)));
-  const question = await post(f, "@dev tem Go aí?");
+  await post(f, "@dev tem Go aí?");
   await drainOutbox(f.db, handlers);
 
   // Not working anymore: waiting for that computer, quietly (no note yet), nothing redone by the API.
@@ -585,8 +589,8 @@ test("the computer drops mid-turn after a tool ran: the run stops working, resum
   expect(run?.status).toBe("waiting_input");
   expect(run?.waitingMachineId).toBe(machineId);
   expect(seen.length).toBe(1);
-  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.length).toBe(1);
+  let main = await timeline(f);
+  expect(main.length).toBe(1);
   // The "working" indicator cleared.
   expect(events).toContain("agent.idle");
 
@@ -602,8 +606,8 @@ test("the computer drops mid-turn after a tool ran: the run stops working, resum
   expect(seen[1]?.trigger).toContain("tem Go aí?");
   expect(seen[1]?.session?.machineId).toBe(machineId);
   expect(checks).toBe(1);
-  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.body).toBe("Tem Go 1.23.");
+  main = await timeline(f);
+  expect(main.at(-1)?.body).toBe("Tem Go 1.23.");
   const usage = await f.db
     .select()
     .from(schema.usageRecords)
@@ -629,14 +633,14 @@ test("the computer drops mid-turn and is already back: the turn is sent again ri
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const question = await post(f, "@dev oi");
+  await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   expect(seen.length).toBe(2);
   // No fallback to the API and no "unavailable" note.
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toEqual(["@dev oi", "Pronto."]);
+  const main = await timeline(f);
+  expect(main.map((m) => m.body)).toEqual(["@dev oi", "Pronto."]);
 });
 
 test("the computer drops mid-turn and stays away: after the grace the agent says so once, and answers when it is back", async () => {
@@ -654,7 +658,7 @@ test("the computer drops mid-turn and stays away: after the grace the agent says
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id, { online }) },
   });
-  const question = await post(f, "@dev oi");
+  await post(f, "@dev oi");
   await drainOutbox(f.db, handlers);
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
 
@@ -662,8 +666,8 @@ test("the computer drops mid-turn and stays away: after the grace the agent says
   let [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_input");
   expect(run?.waitingMachineId).toBe(machineId);
-  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.meta).toMatchObject({ brainUnavailable: { brain: "claude_code", code: "machine_offline" } });
+  let main = await timeline(f);
+  expect(main.at(-1)?.meta).toMatchObject({ brainUnavailable: { brain: "claude_code", code: "machine_offline" } });
   expect(seen.length).toBe(1);
 
   online = true;
@@ -673,8 +677,8 @@ test("the computer drops mid-turn and stays away: after the grace the agent says
   expect(run?.status).toBe("done");
   expect(seen.length).toBe(2);
   expect(seen[1]?.trigger).toContain("cut off because the computer disconnected");
-  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.body).toBe("Voltei.");
+  main = await timeline(f);
+  expect(main.at(-1)?.body).toBe("Voltei.");
 });
 
 test("a message to a run parked for its computer: looked at again now; resumes with it, or parks again quietly", async () => {
@@ -709,8 +713,8 @@ test("a message to a run parked for its computer: looked at again now; resumes w
   expect(runs[0]?.waitingMachineId).toBe(machineId);
   expect(events.some((e) => e.type === "run.finished" && e.status === "waiting_input")).toBe(true);
   expect(events.some((e) => e.type === "agent.idle")).toBe(true);
-  let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.filter((m) => m.meta.bodyCode === "brain_unavailable")).toHaveLength(1);
+  let main = await timeline(f);
+  expect(main.filter((m) => m.meta.bodyCode === "brain_unavailable")).toHaveLength(1);
   expect(seen.length).toBe(0);
 
   // Actually there (a "not available" that was wrong, no reconnect coming): the next message resumes it.
@@ -724,8 +728,8 @@ test("a message to a run parked for its computer: looked at again now; resumes w
   expect(seen[0]?.trigger).toContain("@dev oi");
   expect(seen[0]?.trigger).toContain("oi?");
   expect(seen[0]?.trigger).toContain("oi!!");
-  thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.at(-1)?.body).toBe("Oi! Aqui.");
+  main = await timeline(f);
+  expect(main.at(-1)?.body).toBe("Oi! Aqui.");
 });
 
 test("the mission engine: one run per agent and notice; a resume answers the call waiting on that id", async () => {
@@ -861,7 +865,7 @@ test("a routine's run: a bridged gated call posts its card and events in the mai
     .set({ meta: { routine: { id: crypto.randomUUID(), name: "Daily" } } })
     .where(eq(schema.messages.id, call.id));
   const run = await runningRun(f, call);
-  expect((await runWhere(f.db, run)).threadId).toBeNull();
+  expect(runWhere(run).threadId).toBeNull();
   const events = f.listen(f.general.id);
 
   const out = await invokeToolForRun(
@@ -894,13 +898,13 @@ test("bridged side effects reach the engine: a bridged react ends the turn silen
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const question = await post(f, "@dev valeu!");
+  await post(f, "@dev valeu!");
   await drainOutbox(f.db, handlers);
 
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  expect(thread.map((m) => m.body)).toEqual(["@dev valeu!"]);
+  const main = await timeline(f);
+  expect(main.map((m) => m.body)).toEqual(["@dev valeu!"]);
   // Taken by the engine: nothing left over on the run.
   expect(JSON.stringify(run?.transcript)).not.toContain("bridgeEffects");
 });
@@ -922,14 +926,16 @@ test("a bridged react followed by the emoji as text posts nothing (no 👍 messa
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const first = await post(f, "@dev valeu, perfeito!");
+  await post(f, "@dev valeu, perfeito!");
   await drainOutbox(f.db, handlers);
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: first.id });
-  expect(thread.map((m) => m.body)).toEqual(["@dev valeu, perfeito!"]);
-  const second = await post(f, "@dev valeu, e o deploy?");
+  expect((await timeline(f)).map((m) => m.body)).toEqual(["@dev valeu, perfeito!"]);
+  await post(f, "@dev valeu, e o deploy?");
   await drainOutbox(f.db, handlers);
-  const other = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: second.id });
-  expect(other.map((m) => m.body)).toEqual(["@dev valeu, e o deploy?", "Valeu! Qualquer coisa me chama."]);
+  expect((await timeline(f)).map((m) => m.body)).toEqual([
+    "@dev valeu, perfeito!",
+    "@dev valeu, e o deploy?",
+    "Valeu! Qualquer coisa me chama.",
+  ]);
 });
 
 test("a computer brain with the react tool is told to end with an empty reply after reacting", async () => {
@@ -970,11 +976,11 @@ test("bridged side effects reach the engine: artifacts and memory cards on the r
     machines: { status: async (id) => statusOf(id) },
   });
   const events = f.listen(f.general.id);
-  const question = await post(f, "@dev anota que deploy é na sexta");
+  await post(f, "@dev anota que deploy é na sexta");
   await drainOutbox(f.db, handlers);
 
   const reply = (await f.db.select().from(schema.messages)).find((m) => m.body === "Anotado.");
-  expect(reply?.threadId).toBe(question.id);
+  expect(reply?.threadId).toBeNull();
   expect(reply?.meta.artifacts).toEqual([{ id: fx.artifactId, version: 1 }]);
   expect(reply?.meta.memoryUpdates).toMatchObject([{ action: "remembered", text: "Deploys happen on Fridays" }]);
   expect(events.some((e) => e.type === "memory.updated")).toBe(true);
@@ -1011,7 +1017,7 @@ test("a computer brain that fails after a bridged tool ran: no fallback, what it
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id) },
   });
-  const question = await post(f, "@dev tem Go aí?");
+  await post(f, "@dev tem Go aí?");
   await drainOutbox(f.db, handlers);
 
   expect(seen.length).toBe(1);
@@ -1024,8 +1030,8 @@ test("a computer brain that fails after a bridged tool ran: no fallback, what it
     .from(schema.usageRecords)
     .where(eq(schema.usageRecords.runId, run?.id ?? ""));
   expect(usage.some((u) => u.provider === "anthropic")).toBe(false);
-  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-  const last = thread.at(-1);
+  const main = await timeline(f);
+  const last = main.at(-1);
   expect(last?.body).toContain("Verifiquei o ambiente.");
   expect(last?.meta.brainInterrupted).toMatchObject({
     brain: "claude_code",
@@ -1187,13 +1193,18 @@ test("waiting for its computer isn't working: left out of 'working now' and a th
     brains: { claude_code: () => scriptedComputerBrain(() => []).brain },
     machines: { status: async (id) => statusOf(id, { online: false }) },
   });
-  const question = await post(f, "@dev oi");
+  // Asked in a thread, so the run (and its note) live there.
+  const root = await post(f, "deploy de hoje");
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev oi",
+    threadId: root.id,
+  });
   await drainOutbox(f.db, handlers);
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("waiting_input");
   expect(await listWorkingRuns(f.db, f.owner.id, f.org.id)).toEqual([]);
   const threads = await listThreads(f.db, f.owner.id, { orgId: f.org.id });
-  const thread = threads.threads.find((t) => t.id === question.id);
+  const thread = threads.threads.find((t) => t.id === root.id);
   expect(thread?.working).toBe(false);
   // The list's last line says it in the reader's language: the note's code comes with it.
   expect(thread?.lastMessage?.meta).toMatchObject({

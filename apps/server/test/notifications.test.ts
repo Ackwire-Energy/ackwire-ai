@@ -85,17 +85,17 @@ test("an agent's question waits for the person who asked; answering resolves it"
     },
   });
   const { api, channelId } = await signedIn();
-  const ask = (await (await api(`/channels/${channelId}/messages`, { json: { body: "@dev deploy it" } })).json()) as {
-    id: string;
-  };
+  await api(`/channels/${channelId}/messages`, { json: { body: "@dev deploy it" } });
   await t.drain();
   const page = (await (await api("/notifications?filter=mentions")).json()) as Page;
   const q = page.items.find((i) => i.kind === "agent_question");
   expect(q).toMatchObject({
     waiting: true,
-    source: { channelId, threadId: ask.id },
+    source: { channelId },
     latest: { text: "Qual ambiente?", suggestions: ["staging", "production"] },
   });
+  // Asked in the channel: the question is in the main timeline, not a thread (D67).
+  expect(q?.source.threadId).toBeUndefined();
   const res = await api(`/questions/${q?.source.questionId}/answer`, { json: { choice: "production" } });
   expect(res.status).toBe(200);
   const after = (await (await api("/notifications")).json()) as Page;

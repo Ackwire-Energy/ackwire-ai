@@ -184,6 +184,7 @@ describe("calendar", () => {
       .from(schema.messages)
       .where(eq(schema.messages.id, proposal?.messageId ?? ""));
     expect(card?.meta.calendarProposalId).toBe(proposal?.id);
+    expect(card?.threadId).toBeNull(); // asked in the channel: the card is there (D67)
 
     const deps = { db: f.db, pubsub: f.pubsub };
     await expect(dismissCalendarProposal(deps, bia.id, f.org.id, proposal?.id ?? "")).rejects.toBeInstanceOf(

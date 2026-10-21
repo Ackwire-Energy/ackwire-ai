@@ -27,7 +27,7 @@ const ForYouItem = z
         title: z.string(),
         status: z.enum(["pending", "approved", "refused", "expired", "canceled"]),
         channelId: z.string(),
-        threadId: z.string(),
+        threadId: z.string().nullable().openapi({ description: "Where its card is; null: the main timeline." }),
         waitingOnYou: z.boolean().openapi({ description: "Pending, and the viewer may decide it." }),
       }),
     }),

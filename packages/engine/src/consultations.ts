@@ -7,7 +7,7 @@ import { openAgentDm } from "./dms";
 import { publishChannelEvent } from "./events";
 import { getMessage, insertMessage } from "./messages";
 import { resumeRunWithResult } from "./run-resume";
-import { isTerminal } from "./runs";
+import { isTerminal, replyThreadOf } from "./runs";
 import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agents, messages } = schema;
@@ -143,7 +143,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
       await publishChannelEvent(deps.pubsub, {
         type: "agent.consulting",
         channelId: ctx.channelId,
-        threadId: ctx.threadRootId,
+        threadId: replyThreadOf(ctx),
         runId: ctx.runId,
         agentId: ctx.agentId,
         consultedAgentId: target.id,
@@ -259,14 +259,18 @@ async function closeConsultation(
   });
   if (resumed) {
     const [asker] = await deps.db
-      .select({ channelId: agentRuns.channelId, threadRootId: agentRuns.threadRootId })
+      .select({
+        channelId: agentRuns.channelId,
+        threadRootId: agentRuns.threadRootId,
+        triggerMessageId: agentRuns.triggerMessageId,
+      })
       .from(agentRuns)
       .where(eq(agentRuns.id, closed.askerRunId));
     if (asker) {
       await publishChannelEvent(deps.pubsub, {
         type: "agent.consulted",
         channelId: asker.channelId,
-        threadId: asker.threadRootId,
+        threadId: replyThreadOf(asker),
         runId: closed.askerRunId,
         agentId: closed.askerAgentId,
         consultedAgentId: closed.targetAgentId,
@@ -370,9 +374,9 @@ export async function consultationOrigin(
   db: Executor,
   orgId: string,
   runId: string,
-): Promise<{ channelId: string; threadRootId: string } | null> {
+): Promise<{ channelId: string; threadRootId: string; threadId: string | null } | null> {
   let current = runId;
-  let origin: { channelId: string; threadRootId: string } | null = null;
+  let origin: { channelId: string; threadRootId: string; threadId: string | null } | null = null;
   for (let depth = 0; depth <= MAX_CONSULTATION_CHAIN; depth++) {
     const [row] = await db
       .select({ askerRunId: agentConsultations.askerRunId })
@@ -383,12 +387,22 @@ export async function consultationOrigin(
       .limit(1);
     if (!row) break;
     const [asker] = await db
-      .select({ channelId: agentRuns.channelId, threadRootId: agentRuns.threadRootId })
+      .select({
+        channelId: agentRuns.channelId,
+        threadRootId: agentRuns.threadRootId,
+        triggerMessageId: agentRuns.triggerMessageId,
+      })
       .from(agentRuns)
       .where(eq(agentRuns.id, row.askerRunId));
     if (!asker) break;
-    origin = asker;
+    origin = { channelId: asker.channelId, threadRootId: asker.threadRootId, threadId: replyThreadOf(asker) };
     current = row.askerRunId;
   }
   return origin;
+}
+
+/** Where a consulted run's cards go: the thread of whoever asked, or null for its main timeline (D67). */
+export async function consultationCardThread(db: Executor, orgId: string, runId: string, fallback: string) {
+  const origin = await consultationOrigin(db, orgId, runId);
+  return origin ? origin.threadId : fallback;
 }

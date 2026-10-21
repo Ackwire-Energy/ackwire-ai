@@ -412,14 +412,14 @@ describe("pause (protocol 9)", () => {
       brains: { claude_code: () => brain },
       machines: { status: async (id) => status({ id, orgId: f.org.id }) },
     });
-    const question = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev oi",
     });
     await drainOutbox(f.db, handlers);
     expect(seen).toEqual([]);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Respondi pela API.");
-    expect(thread.at(-1)?.meta.brainFallback).toMatchObject({ from: "claude_code", code: "machine_paused" });
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.at(-1)?.body).toBe("Respondi pela API.");
+    expect(timeline.at(-1)?.meta.brainFallback).toMatchObject({ from: "claude_code", code: "machine_paused" });
 
     // Fallback off: the agent says the computer is paused and waits (until the pause ends, or it resumes).
     await f.db.update(schema.agents).set({ brainFallback: false }).where(eq(schema.agents.id, f.agent.id));
@@ -429,7 +429,7 @@ describe("pause (protocol 9)", () => {
     await drainOutbox(f.db, handlers);
     const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, again.id));
     expect(run).toMatchObject({ status: "waiting_input", waitingMachineId: paired.machineId });
-    const waiting = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: again.id });
+    const waiting = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(waiting.at(-1)?.meta).toMatchObject({ brainUnavailable: { code: "machine_paused", resetsAt: until } });
     expect(waiting.at(-1)?.body).toContain("paused");
   });
@@ -561,7 +561,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
     ).rejects.toMatchObject({ code: "machine.access_outdated" });
   });
 
-  test("request_folder_access: granted at once, or pending; the decision wakes the agent in its thread", async () => {
+  test("request_folder_access: granted at once, or pending; the decision wakes the agent where it was asked", async () => {
     f = await setup({ machines: true, reply: () => ({ chunks: ["Ok"] }) });
     const hub = f.machineHub as MachineHub;
     const paired = await pairMachine(deps(), f.owner.id, f.org.id, COMPUTER);
@@ -599,7 +599,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
       agentId: f.agent.id,
       machineId: paired.machineId,
       channelId: f.general.id,
-      threadRootId: ctx.threadRootId,
+      threadRootId: null, // asked in the channel: the notes land there (D67)
       runId: ctx.runId,
       requestedByUserId: f.owner.id,
       status: "pending",
@@ -643,8 +643,8 @@ describe("folders and tools on the machine (protocol 10)", () => {
       .where(and(eq(schema.outbox.kind, "machine.access_decided"), eq(schema.outbox.orgId, f.org.id)));
     expect(jobs).toHaveLength(1);
     await drainOutbox(f.db, f.handlers);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ctx.threadRootId });
-    const requested = thread.find((m) => m.meta.bodyCode === "machine_access_requested");
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const requested = timeline.find((m) => m.meta.bodyCode === "machine_access_requested");
     expect(requested).toMatchObject({
       author: { type: "agent", id: f.agent.id },
       meta: {
@@ -656,7 +656,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
         machineAccess: { requestId: asked?.id, decision: "pending" },
       },
     });
-    const note = thread.find((m) => m.meta.bodyCode === "machine_access_granted");
+    const note = timeline.find((m) => m.meta.bodyCode === "machine_access_granted");
     expect(note).toMatchObject({
       author: { type: "agent", id: f.agent.id },
       body: "The owner allowed /Users/ana/Documents on MacBook.",
@@ -679,7 +679,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
       .where(eq(schema.machineAccessRequests.path, "/Users/ana/Music"));
     await runner.send({ type: "access.decided", requestId: music?.id, decision: "expired" });
     await drainOutbox(f.db, f.handlers);
-    const later = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ctx.threadRootId });
+    const later = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(later.some((m) => m.meta.bodyCode === "machine_access_expired")).toBe(true);
   });
 

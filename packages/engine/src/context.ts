@@ -187,6 +187,8 @@ export async function buildRunContext(
 
   const upToTrigger = lte(messages.createdAt, trigger.createdAt);
   const rootIsTrigger = run.threadRootId === trigger.id;
+  // Asked in the main timeline: the run answers there, not in a thread (D67).
+  const flat = rootIsTrigger;
   const rootTime = rootIsTrigger
     ? sql`${trigger.createdAt.toISOString()}::timestamptz`
     : sql`(select ${messages.createdAt} from ${messages} where ${messages.id} = ${run.threadRootId} and ${messages.orgId} = ${run.orgId})`;
@@ -288,6 +290,10 @@ export async function buildRunContext(
   // A quote reply ("why did the clone hang?"): what the run behind the quoted message did counts as here.
   const quoted = (trigger.meta?.replyTo as { messageId?: unknown } | undefined)?.messageId;
   const quotedId = typeof quoted === "string" ? quoted : null;
+  // A channel's conversations: its main timeline (runs asked there answer there, D67) and each thread.
+  const sameConversation = flat
+    ? sql`r.thread_root_id = r.trigger_message_id`
+    : sql`r.thread_root_id = ${run.threadRootId}::uuid`;
   const actionRows = rowsOf<ActionRow>(
     await db.execute(sql`(select s.data, s.created_at, a.handle, false as elsewhere, c.kind, c.name
         from agent_run_steps s
@@ -299,9 +305,9 @@ export async function buildRunContext(
             channel.kind !== "channel"
               ? sql``
               : quotedId
-                ? sql`and (r.thread_root_id = ${run.threadRootId}::uuid or r.id = (select q.agent_run_id from messages q
+                ? sql`and (${sameConversation} or r.id = (select q.agent_run_id from messages q
                     where q.id = ${quotedId}::uuid and q.org_id = ${run.orgId}::uuid))`
-                : sql`and r.thread_root_id = ${run.threadRootId}::uuid`
+                : sql`and ${sameConversation}`
           }
           and r.id <> ${run.id}::uuid and s.kind = 'tool_result'
         order by s.created_at desc limit 40)
@@ -320,7 +326,7 @@ export async function buildRunContext(
           )})
           and coalesce((s.data->>'isError')::boolean, false) = false
           and not (r.channel_id = ${run.channelId}::uuid
-            ${channel.kind !== "channel" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`})
+            ${channel.kind !== "channel" ? sql`` : sql`and ${sameConversation}`})
           and exists (select 1 from channel_members m
             where m.channel_id = r.channel_id and m.user_id = ${requester ?? ""})
         order by s.created_at desc limit 30)`),
@@ -476,7 +482,7 @@ export async function buildRunContext(
       ? [
           {
             text: [
-              `# Recent actions ${channel.kind === "dm" ? "in this DM" : "in this thread"}`,
+              `# Recent actions ${channel.kind === "dm" ? "in this DM" : flat ? "in this channel" : "in this thread"}`,
               "What the agents already did here, with the tools' real results:",
               ...recentActions,
               "This really happened. Never say you didn't do, or deny, something that shows here as ok. To check details (criteria, labels, content), use the specific tool (`list_issues`, `read_artifact`, `list_events`…), not `search_context`.",
@@ -504,7 +510,7 @@ export async function buildRunContext(
             ? `# Where you are\nA private conversation between agents: ${memberList}. Another agent is asking you for help with a task it is doing for ${requesterName} (\`ask_agent\`); your reply goes back to it, and no person reads this conversation. Answer its question directly and completely with your own knowledge and tools, as one agent briefing another (facts, values, steps; no greetings). Don't ask questions back: if something is missing, say what in your answer. You act for the person behind the request: tools that need a person's request (routines, reminders) accept it, within your own permissions. Anything sensitive still needs a person's approval.`
             : channel.kind === "dm"
               ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
-              : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
+              : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying ${flat ? "in the channel" : "in a thread"}. Members: ${memberList}.${
                   otherAgents
                     ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. Never name your tools to people.`
                     : ""

@@ -124,15 +124,16 @@ const deps = () => ({ db: f.db, pubsub: f.pubsub });
 describe("browser_ask_person", () => {
   test("asks with a card and a waiting notification; Done resumes the run, which checks the page", async () => {
     await start();
-    const ask = await post("@dev sign in please");
+    await post("@dev sign in please");
     await drainOutbox(f.db, f.handlers);
 
     expect((await runs())[0]?.status).toBe("waiting_input");
     const [h] = await handoffs();
     expect(h).toMatchObject({ kind: "ask", status: "pending", instructions: "Sign in to Stripe" });
     expect(h?.requestedForUserId).toBe(f.owner.id);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    const card = thread.find((m) => m.id === h?.id);
+    // Asked in the channel: the card is in the channel itself (D67).
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const card = timeline.find((m) => m.id === h?.id);
     expect(card?.meta.bodyCode).toBe("browser_handoff");
     expect(card?.meta.browserHandoff).toMatchObject({ id: h?.id, status: "pending" });
     const [n] = await f.db
@@ -150,7 +151,7 @@ describe("browser_ask_person", () => {
 
     expect((await runs())[0]?.status).toBe("done");
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("The person says it's done");
-    const after = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
+    const after = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(after.find((m) => m.id === h?.id)?.meta.browserHandoff).toMatchObject({ status: "done" });
     const [resolved] = await f.db
       .select()
@@ -424,10 +425,11 @@ describe("take over", () => {
       handoff: { id: string; runId: string; kind: string };
     }[];
     expect(updates.some((e) => e.handoff.id === t.id && e.handoff.runId === run.id)).toBe(true);
-    expect(updates[0]?.threadId).toBe(run.threadRootId);
+    // Asked in the channel: the run's conversation is the channel itself (D67).
+    expect(updates[0]?.threadId).toBeNull();
     const [row] = await handoffs();
     if (!row) throw new Error("no handoff");
-    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/threads/${run.threadRootId}`);
+    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/c/${f.general.id}`);
 
     // The run reaches its browser call and waits; handing back wakes it.
     await drainOutbox(f.db, f.handlers);

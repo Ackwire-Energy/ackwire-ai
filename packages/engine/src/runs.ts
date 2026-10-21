@@ -6,6 +6,17 @@ export type AgentRun = typeof agentRuns.$inferSelect;
 export type RunStatus = AgentRun["status"];
 
 /**
+ * Where a run's replies go (D67): asked in the main timeline (a channel, a DM
+ * or a forum post), it answers in the main timeline; asked in a thread, in
+ * that thread. The run keeps `threadRootId` (its trigger, when top-level) as
+ * the conversation it belongs to. The one rule for the engine, its tools and
+ * the bridge: cards and events of a run always land where its replies do.
+ */
+export function replyThreadOf(run: Pick<AgentRun, "threadRootId" | "triggerMessageId">): string | null {
+  return run.threadRootId === run.triggerMessageId ? null : run.threadRootId;
+}
+
+/**
  * Allowed transitions of `agent_runs.status` (docs/adr/0008-agent-runs.md):
  * `queued → running → ((waiting_approval | waiting_input) → running)* → done | failed`,
  * and any non-final state → `canceled` (a person stopped it). The last three are terminal. Suspending for an approval is a status

@@ -168,14 +168,15 @@ describe("receipts when no new run starts", () => {
         return { chunks: ["Done."] };
       },
     });
-    const ask = await post(f, "@dev deploy it");
+    await post(f, "@dev deploy it");
     await drainOutbox(f.db, f.handlers);
     const [run] = await f.db.select().from(schema.agentRuns);
     expect(run?.status).toBe("waiting_input");
     const events = f.listen(f.general.id);
-    const answer = await post(f, "staging @dev", ask.id);
+    // Asked in the channel, the question is there too (D67): the answer is the next message there.
+    const answer = await post(f, "staging @dev");
     expect(typeof answer.meta.answersQuestionId).toBe("string");
-    expect(await receiptOf(f, answer.id, ask.id)).toMatchObject({
+    expect(await receiptOf(f, answer.id)).toMatchObject({
       pickedBy: [f.agent.id],
       handled: [{ agentId: f.agent.id, runId: run?.id }],
       blocked: [],

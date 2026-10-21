@@ -2,9 +2,9 @@ import type { PubSub } from "@agenteschat/adapters";
 import { getAgentCached } from "../agents";
 import { connectorScope } from "../connectors/catalog";
 import { activeConnections, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
-import { getChannelCached } from "../context";
 import { publishChannelEvent } from "../events";
 import { missionOfRun } from "../mission-context";
+import { replyThreadOf } from "../runs";
 import { SANDBOX_SCOPE, type SandboxDeps, truncateOutput, withSandbox } from "../sandbox";
 import { grantedScopeKeys, grantKey } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
@@ -59,21 +59,16 @@ function progressPublisher(pubsub: PubSub | undefined, c: ToolContext) {
     sent++;
     const text = `${last}\n`;
     last = "";
-    void getChannelCached(c.db, c.orgId, c.channelId)
-      .then((channel) => {
-        const flat = (channel?.kind === "dm" || channel?.kind === "forum") && c.threadRootId === c.triggerMessageId;
-        return publishChannelEvent(pubsub, {
-          type: "agent.tool.output",
-          channelId: c.channelId,
-          threadId: flat ? null : c.threadRootId,
-          runId: c.runId,
-          agentId: c.agentId,
-          toolUseId,
-          stream: "stderr",
-          text,
-        });
-      })
-      .catch(() => undefined);
+    void publishChannelEvent(pubsub, {
+      type: "agent.tool.output",
+      channelId: c.channelId,
+      threadId: replyThreadOf(c),
+      runId: c.runId,
+      agentId: c.agentId,
+      toolUseId,
+      stream: "stderr",
+      text,
+    }).catch(() => undefined);
   };
 }
 

@@ -85,7 +85,8 @@ describe('"Leu": a message sent while it works', () => {
     const [run] = await runs();
     const types = events.map((e) => e.type);
     const read = events.find((e) => e.type === "agent.run.read");
-    expect(read).toMatchObject({ runId: run?.id, agentId: f.agent.id, threadId, messageIds: [steeredId] });
+    // Asked in the channel: the run's events are in the main timeline (D67).
+    expect(read).toMatchObject({ runId: run?.id, agentId: f.agent.id, threadId: null, messageIds: [steeredId] });
     expect(types.indexOf("agent.run.steered")).toBeLessThan(types.indexOf("agent.run.read"));
     expect(JSON.stringify(f.provider.calls[1]?.request.messages.at(-1))).toContain("usa a branch dev");
   });
@@ -127,8 +128,11 @@ describe('"Parar e mandar" (steer: "now")', () => {
     expect(events.find((e) => e.type === "agent.narration")).toMatchObject({ turn: 1, text: "Começando pelo main." });
     expect(events.find((e) => e.type === "agent.run.read")).toMatchObject({ messageIds: [steeredId] });
     expect(events.some((e) => e.type === "run.canceled")).toBe(false);
+    // The reply is in the main timeline, where it was asked; the message sent to it, in the thread.
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.map((m) => m.body)).toEqual(["@dev revisa o PR", "Certo, na dev."]);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.map((m) => m.body)).toEqual(["@dev revisa o PR", "na verdade, usa a branch dev", "Certo, na dev."]);
+    expect(thread.map((m) => m.body)).toEqual(["@dev revisa o PR", "na verdade, usa a branch dev"]);
     // The cut call's usage is recorded too.
     const usage = await f.db
       .select()
@@ -251,7 +255,7 @@ describe('"Continuar" after a stop', () => {
   }
 
   test("a new run picks up from the stopped one's conversation; the stopped reply says it continued", async () => {
-    const { question, stopped } = await stoppedRun();
+    const { stopped } = await stoppedRun();
     expect(stopped.status).toBe("canceled");
     const events = f.listen(f.general.id);
 
@@ -260,11 +264,12 @@ describe('"Continuar" after a stop', () => {
     expect(next).toMatchObject({
       agentId: f.agent.id,
       channelId: f.general.id,
-      threadRootId: question.id,
+      // The stopped reply is in the main timeline: the new run answers there too.
+      threadRootId: stopped.replyMessageId,
       triggerMessageId: stopped.replyMessageId,
       status: "queued",
     });
-    const before = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+    const before = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     const reply = before.find((m) => m.id === stopped.replyMessageId);
     expect(reply?.meta.canceled).toMatchObject({ byUserId: f.owner.id, continuedRunId: runId });
     expect(events).toContainEqual(
@@ -273,7 +278,7 @@ describe('"Continuar" after a stop', () => {
         runId: stopped.id,
         newRunId: runId,
         messageId: stopped.replyMessageId,
-        threadId: question.id,
+        threadId: null,
       }),
     );
     expect(events).toContainEqual(expect.objectContaining({ type: "agent.thinking", runId }));
@@ -290,8 +295,8 @@ describe('"Continuar" after a stop', () => {
     const sent = f.provider.calls[1]?.request.messages ?? [];
     expect(sent.filter((m) => m.role === "assistant").map((m) => textOf(m.content))).toEqual(["Analisando o log."]);
     expect(textOf(sent.at(-1)?.content ?? "")).toContain("[ana asked you to continue from where you stopped.]");
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Terminei a análise.");
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.at(-1)?.body).toBe("Terminei a análise.");
   });
 
   test("'Parar e mandar' to a computer brain: stopping it starts it again from that message", async () => {
@@ -303,7 +308,8 @@ describe('"Continuar" after a stop', () => {
       .update(schema.agentRuns)
       .set({ pendingMessageIds: [said.id] })
       .where(eq(schema.agentRuns.id, stopped.id));
-    const reply = { id: stopped.replyMessageId as string, threadId: question.id };
+    // The stopped reply is in the main timeline (asked there, D67).
+    const reply = { id: stopped.replyMessageId as string, threadId: null };
     const transcript = stopped.transcript as unknown as Transcript;
 
     // A model brain read it mid-task already: nothing to restart.
@@ -317,8 +323,8 @@ describe('"Continuar" after a stop', () => {
     expect(next).toMatchObject({ agentId: f.agent.id, triggerMessageId: said.id, threadRootId: question.id });
     const t = next?.transcript as unknown as Transcript;
     expect(t.continued?.prompt).toBe("[ana stopped you to say this:]\n\nna verdade só os 3 primeiros");
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.find((m) => m.id === reply.id)?.meta.canceled).toMatchObject({ continuedRunId: runId });
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.find((m) => m.id === reply.id)?.meta.canceled).toMatchObject({ continuedRunId: runId });
     expect(events).toContainEqual(
       expect.objectContaining({ type: "run.continued", runId: stopped.id, newRunId: runId }),
     );

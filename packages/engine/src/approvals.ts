@@ -18,6 +18,7 @@ const {
   agentRunSteps,
   connectorConnections,
   issues,
+  messages,
 } = schema;
 
 export interface ApprovalView {
@@ -27,7 +28,8 @@ export interface ApprovalView {
   missionId: string | null;
   agentId: string;
   channelId: string;
-  threadId: string;
+  /** Where its card is: the thread, or null for the main timeline (asked there, D67). */
+  threadId: string | null;
   messageId: string | null;
   tool: string;
   scope: string;
@@ -141,9 +143,31 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
   return out;
 }
 
+/**
+ * Where each approval's card is: its message's thread (null: the main timeline).
+ * `thread_root_id` is the run's conversation, which for a run asked in the main
+ * timeline is its trigger, not a thread (D67). No card yet: that conversation.
+ */
+export async function approvalCardThreads(db: Executor, rows: Pick<Approval, "id" | "messageId" | "threadRootId">[]) {
+  const ids = [...new Set(rows.flatMap((r) => (r.messageId ? [r.messageId] : [])))];
+  const cards = ids.length
+    ? await db.select({ id: messages.id, threadId: messages.threadId }).from(messages).where(inArray(messages.id, ids))
+    : [];
+  const threadOf = new Map(cards.map((m) => [m.id, m.threadId]));
+  return new Map(
+    rows.map((r) => {
+      const card = r.messageId && threadOf.has(r.messageId) ? r.messageId : null;
+      return [r.id, card ? (threadOf.get(card) ?? null) : r.threadRootId] as const;
+    }),
+  );
+}
+
 /** Views with their context (connector, why, issue); `trail` only when asked (one approval's details). */
 async function viewsOf(db: Database, rows: Approval[], canDecide: (row: Approval) => boolean, trail = false) {
-  const contexts = await approvalContexts(db, rows).catch(() => new Map<string, ApprovalContext>());
+  const [contexts, cardThreads] = await Promise.all([
+    approvalContexts(db, rows).catch(() => new Map<string, ApprovalContext>()),
+    approvalCardThreads(db, rows).catch(() => new Map<string, string | null>()),
+  ]);
   return rows.map((r) => {
     const { trail: steps, ...context } = contexts.get(r.id) ?? {
       connector: null,
@@ -152,7 +176,9 @@ async function viewsOf(db: Database, rows: Approval[], canDecide: (row: Approval
       issue: null,
       trail: [],
     };
-    return { ...approvalView(r, canDecide(r)), ...context, ...(trail ? { trail: steps } : {}) };
+    const view = approvalView(r, canDecide(r));
+    const threadId = cardThreads.has(r.id) ? (cardThreads.get(r.id) ?? null) : view.threadId;
+    return { ...view, threadId, ...context, ...(trail ? { trail: steps } : {}) };
   });
 }
 

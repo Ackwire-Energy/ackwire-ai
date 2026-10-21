@@ -697,6 +697,16 @@ export function dismissRun(state: StreamsState, runId: string): StreamsState {
   return finish(state, runId);
 }
 
+/**
+ * Shown in the channel itself, not in a thread: a run asked there (it answers
+ * there, D67: its events carry no thread), or a "pensando…" the app guessed
+ * for a message sent there (`topLevelIds`: the channel's own messages).
+ */
+export const inMainTimeline = (
+  r: { threadId: string | null; provisional?: boolean },
+  topLevelIds: ReadonlySet<string>,
+) => r.threadId === null || Boolean(r.provisional && topLevelIds.has(r.threadId));
+
 /** Runs to show in a channel, oldest first. */
 export const runsInChannel = (state: StreamsState, channelId: string) =>
   Object.values(state.runs).filter((r) => r.channelId === channelId);

@@ -161,7 +161,7 @@ describe("no duplicate requests between agents", () => {
     });
     await addInfra();
     // No judge: both agents act (fail-open), as in the incident.
-    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@infra ajusta a rotina de erros; @dev acompanha",
     });
     await drainOutbox(f.db, f.handlers);
@@ -170,8 +170,8 @@ describe("no duplicate requests between agents", () => {
     const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "tool_result"));
     const result = String((steps[0]?.data as { content?: string } | undefined)?.content ?? "");
     expect(result).toMatch(/@infra (is already working on|already answered) this person's request/);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    expect(thread.some((m) => m.meta.consulted)).toBe(false);
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.some((m) => m.meta.consulted)).toBe(false);
   });
 });
 

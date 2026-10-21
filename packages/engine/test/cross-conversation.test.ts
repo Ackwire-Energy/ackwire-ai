@@ -68,7 +68,7 @@ describe("work done in other conversations", () => {
     originalId = original?.id ?? "";
 
     // Same person, in #general: the block shows the DM work, and the file comes over as a copy here.
-    const ask = await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, {
+    await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, {
       body: "@dev manda aqui aquele pdf que tu gerou pra mim no privado",
     });
     await drainOutbox(f.db, f.handlers);
@@ -81,7 +81,7 @@ describe("work done in other conversations", () => {
     expect(shared?.content).toContain("bringing it over from our DM");
     const copies = (await f.db.select().from(schema.artifacts)).filter((a) => a.channelId === f.general.id);
     expect(copies.map((a) => a.title)).toEqual(["Relatório semanal de visitas"]);
-    const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id })).at(-1);
+    const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1);
     expect(reply?.meta.artifacts).toEqual([{ id: copies[0]?.id, version: 1 }]);
     const audit = await f.db.select().from(schema.auditLog);
     expect(audit.find((a) => a.action === "artifact.shared")).toMatchObject({

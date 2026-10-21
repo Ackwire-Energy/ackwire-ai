@@ -15,6 +15,7 @@ import {
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
+import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const MAX_READ_CHARS = 40_000;
@@ -84,7 +85,7 @@ const actorOf = (ctx: ToolContext): ArtifactActor => ({
   type: "agent",
   agentId: ctx.agentId,
   channelId: ctx.channelId,
-  threadId: ctx.threadRootId,
+  threadId: replyThreadOf(ctx),
   runId: ctx.runId,
 });
 

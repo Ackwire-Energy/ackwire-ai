@@ -66,7 +66,7 @@ describe("ask_agent", () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("Staging deploys with deploy.sh")) });
     const infra = await addInfra();
     const events = f.listen(f.general.id);
-    const ask = await post("@dev how do we deploy to staging?");
+    await post("@dev how do we deploy to staging?");
     await drainOutbox(f.db, f.handlers);
 
     const [c] = await consultations();
@@ -93,11 +93,11 @@ describe("ask_agent", () => {
     expect(members.every((m) => m.userId === null)).toBe(true);
     expect((await listDms(f.db, f.owner.id, f.org.id)).map((d) => d.channelId)).not.toContain(c?.channelId);
 
-    // The asking run heard the answer and replied in the thread, with the "message from @infra" card.
+    // The asking run heard the answer and replied where it was asked (D67), with the "message from @infra" card.
     const all = await runs();
     expect(all.every((r) => r.status === "done")).toBe(true);
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    const reply = thread.at(-1);
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const reply = timeline.at(-1);
     expect(reply?.body).toContain("deploy.sh");
     expect(reply?.meta.consulted).toEqual([
       {
@@ -140,8 +140,9 @@ describe("ask_agent", () => {
       threadRootId: ask.id,
       status: "pending",
     });
-    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
-    const card = thread.find((m) => m.meta.approvalId === approval?.id);
+    // The card is in the channel's timeline, where the person asked (D67); the approval keeps the conversation.
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const card = timeline.find((m) => m.meta.approvalId === approval?.id);
     expect(card?.author).toMatchObject({ type: "agent", id: infra.id });
     expect(github.executed).toHaveLength(0);
     expect((await consultations())[0]?.status).toBe("open");

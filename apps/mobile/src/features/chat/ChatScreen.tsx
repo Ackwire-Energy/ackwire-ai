@@ -4,6 +4,7 @@ import {
   type BrowserHandoff,
   type ConnectionStatus,
   heldTakeoversHere,
+  inMainTimeline,
   type LiveRun,
   MESSAGES_PAGE,
   type Message,
@@ -26,7 +27,6 @@ import {
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
-  useThreads,
 } from "@agenteschat/client";
 import { listNames } from "@agenteschat/client/lib/activity";
 import { issueTakenOf } from "@agenteschat/client/lib/issues";
@@ -69,7 +69,7 @@ import {
 } from "@/ui";
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
-import { isListedThread, threadTitle } from "../chats/logic";
+import { threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
@@ -83,16 +83,7 @@ import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
 import { browsingRuns, TurnRow, WorkingLine } from "./LiveRows";
 import { useChatLive } from "./live";
-import {
-  buildRows,
-  type ChatRow,
-  mayStopRun,
-  mergeTimeline,
-  parseSlash,
-  pinTarget,
-  stoppableInLine,
-  threadRootsToLoad,
-} from "./logic";
+import { buildRows, type ChatRow, mayStopRun, mergeTimeline, parseSlash, pinTarget, stoppableInLine } from "./logic";
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
 import { MessageRow } from "./MessageRow";
 import { insertMention, mentionQuery } from "./mentions";
@@ -208,34 +199,29 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const top = useMessages(orgId, channelId, member && !isThread);
   const threadMessages = useThreadMessages(orgId, isThread && member ? channelId : undefined, threadId ?? "");
   const channelThreads = useChannelThreads(orgId, channelId, "all", member && !isThread);
-  const { linkThreads, collapsed } = useMemo(() => {
-    const all = channelThreads.data?.threads ?? [];
-    return {
-      linkThreads: new Map(all.filter(isListedThread).map((x) => [x.id, x])),
-      collapsed: new Set(all.filter((x) => x.state !== "open").map((x) => x.id)),
-    };
-  }, [channelThreads.data]);
+  // Every thread with replies is a link under its root (as on the web, D67): agents asked in the
+  // channel answer in the channel, so a thread is always a conversation of its own.
+  const linkThreads = useMemo(
+    () =>
+      new Map(
+        (channelThreads.data?.threads ?? [])
+          .filter((x) => x.state !== "archived" && (x.replyCount > 0 || x.mission || x.context))
+          .map((x) => [x.id, x]),
+      ),
+    [channelThreads.data],
+  );
   const [older, setOlder] = useState<Message[]>([]);
   const [olderDone, setOlderDone] = useState(false);
-  const roots = useMemo(
-    () => threadRootsToLoad(top.data ?? [], new Set([...linkThreads.keys(), ...collapsed])),
-    [top.data, linkThreads, collapsed],
-  );
-  const threads = useThreads(orgId, channelId, isThread ? [] : roots);
-  // The thread lists are new arrays on every render: their update times say when the data changed.
-  const threadsAt = threads.map((q) => q.dataUpdatedAt).join(",");
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `threadsAt` stands for the thread lists' data
   const list = useMemo(() => {
     if (isThread) {
       // My replies still sending wait in the channel's list.
       const mine = (top.data ?? []).filter((m) => m.local && m.threadId === threadId);
       return mergeTimeline(threadMessages.data ?? [], [mine]);
     }
-    return mergeTimeline(
-      [...older, ...(top.data ?? [])],
-      threads.map((q) => q.data),
-    );
-  }, [isThread, threadId, top.data, threadMessages.data, older, threadsAt]);
+    return mergeTimeline([...older, ...(top.data ?? [])], []);
+  }, [isThread, threadId, top.data, threadMessages.data, older]);
+  // Messages said in the channel itself: a "thinking" row the app guessed hangs off one of them.
+  const topIds = useMemo(() => new Set(list.flatMap((m) => (m.threadId ? [] : [m.id]))), [list]);
   // A DM with a person: "Visto" under my latest message once they read it (live: `channel.read`).
   const reads = useDmReads(orgId, channelId, dm?.with.type === "person" && !isThread);
   const seenId = useMemo(
@@ -246,15 +232,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // ── Live ──
   const live = useChatLive(orgId, channelId, member);
   const runs = useMemo(
-    () =>
-      live.runs.filter((r) =>
-        isThread ? r.threadId === threadId : !linkThreads.has(r.threadId) && !collapsed.has(r.threadId),
-      ),
-    [live.runs, isThread, threadId, linkThreads, collapsed],
+    () => live.runs.filter((r) => (isThread ? r.threadId === threadId : inMainTimeline(r, topIds))),
+    [live.runs, isThread, threadId, topIds],
   );
   const consults = useMemo(
-    () => live.consults.filter((x) => (isThread ? x.threadId === threadId : !linkThreads.has(x.threadId))),
-    [live.consults, isThread, threadId, linkThreads],
+    () => live.consults.filter((x) => (isThread ? x.threadId === threadId : inMainTimeline(x, topIds))),
+    [live.consults, isThread, threadId, topIds],
   );
 
   // "Parar" in the working line (as on the web): admins, the agent's owner, or who started it.
@@ -426,29 +409,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         ...runRowsOf(openingRuns(shownRuns)),
       ];
     }
-    const hidden = (m: Message) =>
-      superseded.has(m.id) || Boolean(m.threadId && (linkThreads.has(m.threadId) || collapsed.has(m.threadId)));
+    // A thread's replies live in the thread; the channel shows its link.
+    const hidden = (m: Message) => superseded.has(m.id) || Boolean(m.threadId);
     return [
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
       ...runRowsOf(openingRuns(shownRuns)),
     ];
-  }, [
-    isThread,
-    threadId,
-    list,
-    thread.data,
-    channel?.name,
-    shownRuns,
-    turnKeyOf,
-    browsing,
-    held,
-    linkThreads,
-    collapsed,
-    superseded,
-    t,
-  ]);
+  }, [isThread, threadId, list, thread.data, channel?.name, shownRuns, turnKeyOf, browsing, held, superseded, t]);
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther

@@ -335,14 +335,15 @@ describe("missions (ADR 0029)", () => {
     expect(mission).toMatchObject({
       status: "proposed",
       ownerId: f.owner.id,
-      threadRootId: ask.id,
       title: "Mobile app",
       executor: "claude",
     });
+    // Asked in the channel: the mission's home is a thread of its own, like from a DM (D67).
+    expect(mission.threadRootId).not.toBe(ask.id);
     // No executor task: the main session is the agent's run in the thread, told to plan.
     expect(runner.started).toHaveLength(0);
-    expect((await notices(ask.id)).some((t) => t.includes("PLAN MODE"))).toBe(true);
-    const thread = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, ask.id));
+    expect((await notices(mission.threadRootId)).some((t) => t.includes("PLAN MODE"))).toBe(true);
+    const thread = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, mission.threadRootId));
     const card = thread.find((m) => m.meta.missionPlan);
     expect(card?.meta).toMatchObject({ missionPlan: { missionId: mission.id }, bodyCode: "mission_plan" });
     expect(card?.authorAgentId).toBe(f.agent.id);
@@ -355,7 +356,7 @@ describe("missions (ADR 0029)", () => {
     const started = await startMission(md(), f.owner.id, f.org.id, mission.id);
     expect(started.status).toBe("active");
     // "Proceed" is a notice that starts (or joins) the main session's run; nothing goes to the computer by itself.
-    const after = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, ask.id));
+    const after = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, mission.threadRootId));
     const notice = after.find((m) =>
       (m.meta.missionInbox as { text?: string } | undefined)?.text?.startsWith(START_PROMPT),
     );
