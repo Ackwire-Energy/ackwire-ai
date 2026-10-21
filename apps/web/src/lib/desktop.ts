@@ -53,3 +53,26 @@ export const browserChallenge = {
     }
   },
 };
+
+/**
+ * What the site may ask of this Mac (D79, `this_mac` in main_window.rs): which organizations it is
+ * connected to, connecting it to one (the site confirms the runner's code with its own session), and the
+ * app's Preferences on a tab. Nothing else reaches the Mac.
+ */
+export interface ThisMacStatus {
+  orgs: { orgId: string; machineId: string | null; connection: string }[];
+}
+
+type Invoke = (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
+const invoke = <T>(request: Record<string, unknown>): Promise<T> => {
+  const tauri = (window as { __TAURI_INTERNALS__?: { invoke?: Invoke } }).__TAURI_INTERNALS__;
+  if (!inDesktopApp() || typeof tauri?.invoke !== "function") return Promise.reject(new Error("not in the app"));
+  return tauri.invoke("this_mac", { request }) as Promise<T>;
+};
+
+export const thisMac = {
+  status: () => invoke<ThisMacStatus>({ kind: "status" }),
+  /** The runner's code for the site to confirm; null when this Mac is already in `orgId`. */
+  connect: (orgId: string) => invoke<{ userCode: string | null }>({ kind: "connect", orgId }),
+  openPrefs: (tab: "folders" | "tools") => invoke<unknown>({ kind: "prefs", tab }),
+};

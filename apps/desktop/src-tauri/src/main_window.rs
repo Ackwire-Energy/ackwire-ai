@@ -3,11 +3,17 @@
 //! only dragging the window by its title bar (capabilities/main.json). Links to anywhere else open in the
 //! person's browser, and so does social sign-in (Google and Apple refuse embedded web views): the site
 //! hands the session back through `/desktop/sign-in` and `/desktop/signed-in` (apps/server desktop-sign-in.ts).
+//! The site may ask three things of this Mac through `this_mac` (see `Bridge`), never more.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{mpsc, Mutex};
+use std::time::Duration;
 
+use serde_json::{json, Value};
 use tauri::webview::{DownloadEvent, NewWindowResponse};
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 pub const LABEL: &str = "main";
@@ -152,6 +158,84 @@ fn front(app: &AppHandle) -> Result<(), String> {
     window.set_focus().map_err(|e| e.to_string())
 }
 
+/// What the site may ask of this Mac (D79): which organizations it is connected to (`status`), connecting it
+/// to the person's organization (`connect`: the site confirms the code with its own session, as on
+/// `/conectar`), and Preferences on a tab (`prefs`). Rust only checks the request and relays it: the popover's
+/// code owns the runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The
+/// machine's token never leaves the runner.
+#[derive(Default)]
+pub struct Bridge {
+    next: AtomicU64,
+    waiting: Mutex<HashMap<u64, mpsc::Sender<Result<Value, String>>>>,
+}
+
+/// How long the popover has to answer (`connect` waits for the runner's code).
+const BRIDGE_TIMEOUT: Duration = Duration::from_secs(30);
+const PREF_TABS: &[&str] = &["folders", "tools"];
+
+/// The request rebuilt from the keys it may have; anything else is refused.
+fn checked(request: &Value) -> Result<Value, String> {
+    let text = |key: &str| request.get(key).and_then(Value::as_str);
+    match text("kind") {
+        Some("status") => Ok(json!({ "kind": "status" })),
+        Some("connect") => {
+            let org = text("orgId").unwrap_or_default();
+            let ok = !org.is_empty()
+                && org.len() <= 64
+                && org.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+            if !ok {
+                return Err("bad organization id".into());
+            }
+            Ok(json!({ "kind": "connect", "orgId": org }))
+        }
+        Some("prefs") => match text("tab") {
+            Some(tab) if PREF_TABS.contains(&tab) => Ok(json!({ "kind": "prefs", "tab": tab })),
+            _ => Err("unknown tab".into()),
+        },
+        _ => Err("unknown request".into()),
+    }
+}
+
+#[tauri::command]
+pub async fn this_mac(app: AppHandle, window: tauri::Window, request: Value) -> Result<Value, String> {
+    if window.label() != LABEL {
+        return Err("only the main window asks this".into());
+    }
+    let request = checked(&request)?;
+    let id = app.state::<Bridge>().next.fetch_add(1, Ordering::Relaxed);
+    let (tx, rx) = mpsc::channel();
+    app.state::<Bridge>().waiting.lock().map_err(|e| e.to_string())?.insert(id, tx);
+    if let Err(e) = app.emit_to("popover", "this-mac://request", json!({ "id": id, "request": request })) {
+        let _ = app.state::<Bridge>().waiting.lock().map(|mut w| w.remove(&id));
+        return Err(e.to_string());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let answer = rx.recv_timeout(BRIDGE_TIMEOUT);
+        let _ = app.state::<Bridge>().waiting.lock().map(|mut w| w.remove(&id));
+        answer.unwrap_or_else(|_| Err("this Mac didn't answer".into()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// The popover's answer to a `this_mac` request.
+#[tauri::command]
+pub fn this_mac_reply(app: AppHandle, window: tauri::Window, id: u64, ok: bool, data: Value) -> Result<(), String> {
+    if window.label() != "popover" {
+        return Err("only the popover answers".into());
+    }
+    let waiting = app.state::<Bridge>().waiting.lock().map_err(|e| e.to_string())?.remove(&id);
+    if let Some(tx) = waiting {
+        let answer = if ok {
+            Ok(data)
+        } else {
+            Err(data.as_str().unwrap_or("failed").to_string())
+        };
+        let _ = tx.send(answer);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,5 +254,19 @@ mod tests {
         assert_eq!(r("https://agentes.chat.evil.com/"), Route::Outside);
         assert_eq!(r("blob:https://agentes.chat/abc"), Route::Stay);
         assert_eq!(r("mailto:a@b.c"), Route::Outside);
+    }
+
+    #[test]
+    fn bridge_requests() {
+        assert_eq!(checked(&json!({ "kind": "status", "extra": 1 })), Ok(json!({ "kind": "status" })));
+        assert_eq!(
+            checked(&json!({ "kind": "connect", "orgId": "org_1-a" })),
+            Ok(json!({ "kind": "connect", "orgId": "org_1-a" }))
+        );
+        assert!(checked(&json!({ "kind": "connect", "orgId": "../x" })).is_err());
+        assert!(checked(&json!({ "kind": "connect" })).is_err());
+        assert_eq!(checked(&json!({ "kind": "prefs", "tab": "folders" })), Ok(json!({ "kind": "prefs", "tab": "folders" })));
+        assert!(checked(&json!({ "kind": "prefs", "tab": "advanced" })).is_err());
+        assert!(checked(&json!({ "kind": "runner_send" })).is_err());
     }
 }

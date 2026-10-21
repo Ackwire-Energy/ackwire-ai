@@ -6196,6 +6196,18 @@ export const ptBR = {
     nameHelp: "Como ele aparece para as pessoas e os agentes.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Outro sistema" },
     commandCopied: "Comando copiado. Cole no Terminal do computador.",
+    // agentes for Mac (D79): this Mac, from the site inside the app.
+    thisMac: {
+      text: "Este Mac pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
+      connect: "Usar este Mac",
+      connected: "Este Mac está conectado. Escolha as pastas que os agentes podem usar.",
+      failed: "Não deu para conectar este Mac. Tente de novo.",
+      folders: "Pastas deste Mac",
+      grantHere: "É este Mac: libere pastas nas Preferências do app.",
+      openFolders: "Abrir Pastas",
+      toolsHere: "É este Mac: ligue o navegador nas Preferências do app, em Ferramentas.",
+      openTools: "Abrir Ferramentas",
+    },
     download: {
       title: "Conectar um computador",
       text: "Baixe o app agentes no Mac. Ele fica na barra de menus: mostra o que os agentes fazem ali e pausa quando você quiser.",

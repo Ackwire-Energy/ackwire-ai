@@ -1291,7 +1291,7 @@ function ComputerStep({
             </p>
           ) : (
             <>
-              <ConnectComputer />
+              <ConnectComputer orgId={orgId} />
               <span className="row small muted" role="status" style={{ gap: 8 }}>
                 <Spinner />
                 {t("machines.download.waiting")}

@@ -6181,6 +6181,18 @@ export const en: Translations = {
     nameHelp: "How people and agents see it.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Other system" },
     commandCopied: "Command copied. Paste it in the computer's Terminal.",
+    // agentes for Mac (D79): this Mac, from the site inside the app.
+    thisMac: {
+      text: "This Mac can work with your agents. They only use the folders you allow, and you can pause anytime.",
+      connect: "Use this Mac",
+      connected: "This Mac is connected. Choose the folders agents may use.",
+      failed: "Couldn't connect this Mac. Try again.",
+      folders: "This Mac's folders",
+      grantHere: "It's this Mac: allow folders in the app's Preferences.",
+      openFolders: "Open Folders",
+      toolsHere: "It's this Mac: turn the browser on in the app's Preferences, under Tools.",
+      openTools: "Open Tools",
+    },
     download: {
       title: "Connect a computer",
       text: "Download the agentes app on your Mac. It lives in the menu bar: it shows what agents do there and pauses whenever you want.",

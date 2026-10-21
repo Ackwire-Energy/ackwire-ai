@@ -308,6 +308,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
+        .manage(main_window::Bridge::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
@@ -327,7 +328,9 @@ pub fn run() {
             update_install,
             notch_set,
             notch_info,
-            notch_place
+            notch_place,
+            main_window::this_mac,
+            main_window::this_mac_reply
         ])
         .on_window_event(|window, event| match event {
             WindowEvent::Focused(false) if window.label() == "popover" => {
