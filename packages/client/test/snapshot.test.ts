@@ -131,7 +131,8 @@ test("an old or other-version snapshot is ignored and dropped", async () => {
 test("recent conversations: unread first, then the latest activity, channels I'm in and DMs", () => {
   const channel = (id: string, at: string, over: object = {}) =>
     ({ id, isMember: true, unreadCount: 0, lastMessage: { createdAt: at }, ...over }) as never;
-  const dm = (channelId: string, at: string, unread = 0) => ({ channelId, unread, lastMessage: { createdAt: at } }) as never;
+  const dm = (channelId: string, at: string, unread = 0) =>
+    ({ channelId, unread, lastMessage: { createdAt: at } }) as never;
   const ids = recentConversations(
     [
       channel("old", "2026-10-01T00:00:00Z"),

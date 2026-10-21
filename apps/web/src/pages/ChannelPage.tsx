@@ -80,6 +80,7 @@ import {
   missionPlanChangeOf,
   missionPlanOf,
   missionReportOf,
+  missionSetupOf,
   missionSuggestionOf,
   parseMissionCommand,
   taskNoticeOf,
@@ -196,6 +197,7 @@ import {
   MissionPlanChangeLine,
   MissionReportExtras,
   MissionReviewCard,
+  MissionSetupCard,
   MissionStartLink,
   MissionSuggestionBar,
   TaskNoticeLine,
@@ -2814,7 +2816,11 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionSuggestion = m.author.type === "person" ? missionSuggestionOf(meta) : null;
   // A mission proposed from here whose thread lives elsewhere: its link card under the reply.
   const missionLink = m.author.type === "agent" ? missionLinkOf(meta) : null;
-  const missionCard = Boolean(missionPlan || missionDecision || missionReview || missionDelivery || missionCommand);
+  // Preparing the mission's copy of the project failed (ADR 0044): the card with "Tentar de novo".
+  const missionSetup = missionSetupOf(meta);
+  const missionCard = Boolean(
+    missionPlan || missionDecision || missionReview || missionDelivery || missionCommand || missionSetup,
+  );
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.openThread !== undefined;
   // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
@@ -3120,6 +3126,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           {missionReview && <MissionReviewCard message={missionReview} />}
           {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
           {missionCommand && <MissionCommandCard command={missionCommand} />}
+          {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
           {missionReport && <MissionReportExtras report={missionReport} message={m} />}
           {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
           {missionStart && <MissionStartLink message={m} />}

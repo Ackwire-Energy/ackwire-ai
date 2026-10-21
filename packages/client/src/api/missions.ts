@@ -352,10 +352,26 @@ export function useCloseMission(orgId: string) {
       outcome: "done" | "canceled";
       saveToWiki?: boolean;
       note?: string;
+      /** Canceling: "Apagar tudo" (else the branch stays). */
+      deleteBranch?: boolean;
     }) => api.missions.close(orgId, missionId, input),
     onSuccess: (mission) => {
       cacheMission(qc, orgId, mission);
       void qc.invalidateQueries({ queryKey: keys.threadInfo(orgId, mission.threadId) });
+    },
+  });
+}
+
+/** "Tentar de novo": prepare the mission's copy of the project again after it failed (ADR 0044). */
+export function useRetryMissionWorktree(orgId: string, missionId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: () => api.missions.retryWorktree(orgId, missionId),
+    onSuccess: (mission) => {
+      cacheMission(qc, orgId, mission);
+      void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, mission.threadId) });
     },
   });
 }

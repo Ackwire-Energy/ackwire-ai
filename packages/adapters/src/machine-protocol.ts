@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 13;
+export const MACHINE_PROTOCOL_VERSION = 14;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -107,6 +107,15 @@ export const BROWSER_PROTOCOL = 12;
  * The server never sends these to an older runner.
  */
 export const ACCOUNTS_PROTOCOL = 13;
+/**
+ * From this protocol on (ADR 0044): a mission has one worktree and one
+ * branch (`mission.worktree`: `ensure` creates or checks it and copies the
+ * files git ignores, `remove` takes the folder away). A task can end in a
+ * commit (`TaskStart.commit`, `TaskDone.startSha` / `endSha`) and can check
+ * how far the mission's base moved (`TaskStart.baseCheck`). The server never
+ * starts a mission on an older runner.
+ */
+export const MISSION_WORKTREE_PROTOCOL = 14;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -281,6 +290,58 @@ export const GIT_SYNC_LIMITS = {
   message: 1000,
 } as const;
 
+/**
+ * `mission.worktree` (protocol 14, ADR 0044). Paths are relative to the
+ * agent's folder.
+ *
+ * `ensure`: makes sure `path` is a worktree of the repository at `repo` on
+ * `branch`. When the folder is missing and the branch exists, it is added
+ * again from the branch (after `git worktree prune`); when both are missing
+ * and `baseSha` is absent, the branch is created from `repo`'s checked-out
+ * branch (when `baseSha` is given and the branch is gone, the answer is
+ * `branch_missing`: the work is lost and the server must say so). A new
+ * folder gets the files git ignores copied from `repo` (`agentes.json`
+ * `copy`, default: untracked `.env*` at the root) and its `.agentes/` stays
+ * out of git. Loose changes in an existing folder are left as they are.
+ *
+ * `remove`: `git worktree remove --force` on `path`, then `git branch -D`
+ * when `deleteBranch` is set. A folder that is already gone is not an error.
+ *
+ * Errors: `not_git` when `repo` is in no git repository (the mission then
+ * works in `repo` itself, with no branch); `outside_workspace` when `repo`
+ * only sits inside a repository whose top level is outside the agent's
+ * folder (never treated as "no git": the server fails the mission's folder).
+ *
+ * The files `ensure` copies are listed in the worktree's own git dir
+ * (`<git-dir>/agentes-copied`, one path per line, never the shared
+ * `info/exclude`), and a task's end-of-item commit leaves them out.
+ */
+export type MissionWorktreeRequest =
+  | { action: "ensure"; repo: string; path: string; branch: string; baseSha?: string }
+  | { action: "remove"; repo: string; path: string; branch: string; deleteBranch?: boolean };
+
+/** `mission.worktree` `ensure` answer. */
+export interface MissionWorktreeEnsured {
+  path: string;
+  branch: string;
+  /** The branch the mission started from (`repo`'s checked-out branch when it was created). */
+  baseBranch: string;
+  baseSha: string;
+  /** The folder was (re)made now: the server runs `setupCommand` before any item. */
+  created: boolean;
+  /** Whether the folder has loose changes (after a crash mid-item). */
+  dirty: boolean;
+  /**
+   * What prepares the folder: `agentes.json` `setup`, else the install for
+   * the root lockfile (`bun install`, `pnpm install --frozen-lockfile`,
+   * `npm ci`, `yarn install --frozen-lockfile`); null when there is nothing
+   * to run. Only meaningful when `created`.
+   */
+  setupCommand: string | null;
+  /** Files copied from `repo`, relative to the folder. */
+  copied: string[];
+}
+
 /** `git.sync` (protocol 11): clone or update an agent's checkouts through our proxy. */
 export interface GitSyncRequest {
   /** Our proxy for the org's GitHub connection (`…/api/git/{orgId}/{connectionId}/`) and this agent's credential there. */
@@ -403,7 +464,21 @@ export interface TaskStart {
      * it is this machine's, for this task, and still live.
      */
     mcpToken?: string;
+    /** Protocol 14: `plan` for a read item (ADR 0044): no edits (Claude Code's plan rules, Codex's read-only sandbox). Default `work`. */
+    mode?: "plan" | "work";
   };
+  /**
+   * Protocol 14 (ADR 0044), for a task in a git folder: record `HEAD` when it
+   * starts and, when it ends (any way: done, failed, canceled), `git add -A`
+   * and commit what changed with this message (nothing when the tree is
+   * clean; the runner adds " (stopped)" when the task didn't exit 0: failed,
+   * canceled, timed out, interrupted). `TaskDone` then carries `startSha` and
+   * `endSha`; a commit a hook refused leaves the changes and says why at the
+   * end of `result`.
+   */
+  commit?: { message: string };
+  /** Protocol 14: answer how many commits `branch` has beyond `sha` (`task.start` `baseBehind`). */
+  baseCheck?: { branch: string; sha: string };
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -528,6 +603,9 @@ export interface TaskDone {
    * task's end notice lists them ("Liberar e repetir").
    */
   denials?: TaskDenial[];
+  /** Protocol 14, with `TaskStart.commit`: `HEAD` when the task started and after its commit (equal: nothing changed). */
+  startSha?: string;
+  endSha?: string;
 }
 
 /** One command an executor was refused. */
@@ -673,6 +751,8 @@ export type MachineRequest = (
   | ({ op: "brain.turn" } & BrainTurnRequest)
   /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
   | ({ op: "git.sync" } & GitSyncRequest)
+  /** Protocol 14: the mission's worktree (ADR 0044). */
+  | ({ op: "mission.worktree" } & MissionWorktreeRequest)
   /**
    * Protocol 10: the request's agent asks for a folder outside its own. The
    * runner shows it to the person and answers right away (`pending`, or
@@ -734,6 +814,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.output",
   "brain.turn",
   "git.sync",
+  "mission.worktree",
   "access.request",
   "access.reduce",
   "browser.act",
@@ -769,7 +850,16 @@ export interface MachineReplies {
     error?: string;
   };
   /** `cwd`: where it runs, relative to the agent's folder (`.worktrees/<taskId>` with a branch). */
-  "task.start": { taskId: string; pid: number; startedAt: string; cwd: string; branch?: string; command: string };
+  "task.start": {
+    taskId: string;
+    pid: number;
+    startedAt: string;
+    cwd: string;
+    branch?: string;
+    command: string;
+    /** Protocol 14, with `baseCheck`: commits the base branch has beyond the mission's base (absent: unknown). */
+    baseBehind?: number;
+  };
   "task.status": { tasks: RunnerTask[] };
   /** `false`: it had already ended. */
   "task.cancel": { canceled: boolean };
@@ -778,6 +868,8 @@ export interface MachineReplies {
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
   "git.sync": { repos: GitSyncRepo[] };
+  /** `remove` answers `{ removed }` (`false`: the folder was already gone). */
+  "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };
   "access.request": { requestId: string; status: "pending" | "granted" };
   "access.reduce": { access: RunnerAccess };
   /** `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered click). */
@@ -806,6 +898,14 @@ export type MachineErrorCode =
   | "not_allowed"
   /** Protocol 12: the agent browser can't run here (no binary, no Chrome, too many sessions); the message says why. */
   | "browser_unavailable"
+  /** Protocol 14: `mission.worktree` `ensure` with `baseSha` found neither the folder nor the branch. */
+  | "branch_missing"
+  /**
+   * Protocol 14: `mission.worktree` on a folder that is in no git repository at
+   * all (the mission works in it with no branch). A folder inside a repository
+   * whose top level is outside the agent's folder is `outside_workspace`.
+   */
+  | "not_git"
   | "bad_request"
   | "internal";
 
@@ -924,6 +1024,37 @@ const fileList = (v: unknown) =>
         .map((p) => p.slice(0, TASK_LIMITS.filePath))
     : undefined;
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+/** A full or short git commit id (lowercase hex). */
+export const isSha = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{7,64}$/.test(v);
+
+/** Protocol 14: `task.start`'s `baseBehind` (a count of commits; absent when the runner couldn't tell). */
+export function parseBaseBehind(data: unknown): number | undefined {
+  const n = isObject(data) ? data.baseBehind : undefined;
+  return typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+/** Protocol 14: a `mission.worktree` `ensure` answer, checked (null when it isn't one). */
+export function parseMissionWorktreeEnsured(data: unknown): MissionWorktreeEnsured | null {
+  if (!isObject(data) || !isString(data.path) || !isString(data.branch) || typeof data.created !== "boolean") {
+    return null;
+  }
+  return {
+    path: data.path.slice(0, 500),
+    branch: data.branch.slice(0, 200),
+    baseBranch: isString(data.baseBranch) ? data.baseBranch.slice(0, 200) : "",
+    baseSha: isSha(data.baseSha) ? data.baseSha : "",
+    created: data.created,
+    dirty: data.dirty === true,
+    setupCommand: isString(data.setupCommand) && data.setupCommand.trim() ? data.setupCommand.slice(0, 2000) : null,
+    copied: Array.isArray(data.copied)
+      ? data.copied
+          .filter(isString)
+          .slice(0, 100)
+          .map((p) => p.slice(0, 300))
+      : [],
+  };
+}
+
 /** `task.done.denials`: at most `TASK_LIMITS.denials`, each cut, duplicates dropped. */
 const denialList = (v: unknown): TaskDenial[] => {
   if (!Array.isArray(v)) return [];
@@ -1198,6 +1329,8 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const files = fileList(f.files);
       const session = cut(f.session, 64);
       const denials = denialList(f.denials);
+      // Protocol 14: both or neither.
+      const shas = isSha(f.startSha) && isSha(f.endSha) ? { startSha: f.startSha, endSha: f.endSha } : {};
       return {
         type: "task.done",
         taskId: f.taskId.slice(0, 64),
@@ -1212,6 +1345,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(f.interrupted === true ? { interrupted: true } : {}),
         ...(session !== undefined ? { session } : {}),
         ...(denials.length ? { denials } : {}),
+        ...shas,
       };
     }
     case "mcp.call": {
@@ -1308,7 +1442,7 @@ const RULES_END =
  * (`--append-system-prompt`) and written in `.agentes/mission.md`. Plain
  * characters only: the runner passes it as one shell argument (`cleanRules`).
  */
-export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back directly: ask with request_approval and wait. Work on your own branch, commit work in progress after each step and push the branch now and then. ${RULES_END}`;
+export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back directly: ask with request_approval and wait. Work on the mission's own branch in the mission's folder (don't create or switch branches), commit work in progress after each step and push the branch now and then. ${RULES_END}`;
 
 /**
  * The same rules for a mission folder that is not a git repository (images,
@@ -1316,7 +1450,7 @@ export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back di
  * pushes; results go to the people with upload_artifact or request_review.
  * The runner picks this one when the task's folder isn't a repository.
  */
-export const MISSION_RULES_NO_GIT = `${RULES_START} Never deploy or publish anything directly: ask with request_approval and wait. This mission folder is not a git repository and doesn't need one: don't create one. Work in your folder (an item started with start_task gets its own subfolder under work/), and deliver results with upload_artifact or request_review. ${RULES_END}`;
+export const MISSION_RULES_NO_GIT = `${RULES_START} Never deploy or publish anything directly: ask with request_approval and wait. This mission folder is not a git repository and doesn't need one: don't create one. Work in the mission folder (items started with start_task work there too, one that writes at a time), and deliver results with upload_artifact or request_review. ${RULES_END}`;
 
 const PLAN_STATUSES = ["todo", "doing", "waiting_you", "done", "dropped"];
 
@@ -1446,15 +1580,15 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "start_task",
     description:
-      "Main session only: start one plan item as its own background session that runs in parallel. In a git repository it works on a new branch in its own worktree; otherwise in its own subfolder work/<branch>/ of the mission folder (branch is then just that subfolder's name). You are told when it ends. Give it everything it needs in prompt. Small work you can just do yourself.",
+      'Main session only: start one plan item as its own background session in the mission\'s folder (the mission\'s own copy of the project, on its branch). mode "write" (default): it may change files; write items run one at a time, in the order you start them (one started while another runs waits in a queue and starts by itself), and each ends in one commit you are told about. mode "read": research, analysis or review with no write access; read items may run in parallel. An item that finds the computer full waits in the queue too. You are told when it ends. Give it everything it needs in prompt. Small work you can just do yourself.',
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", minLength: 1, maxLength: 120 },
         prompt: { type: "string", minLength: 1, maxLength: 20000 },
-        branch: { type: "string", minLength: 1, maxLength: 120 },
+        mode: { enum: ["write", "read"] },
       },
-      required: ["title", "prompt", "branch"],
+      required: ["title", "prompt"],
       additionalProperties: false,
     },
   },

@@ -12,7 +12,7 @@ import { useColors, useDirectory, useNow, useOrgId, useWhen } from "../shared/ho
 import { agentLook } from "../shared/logic";
 import { MONO, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
-import { DecisionCardView, ReviewCardView } from "./cards";
+import { DecisionCardView, ReviewCardView, SetupFailedCard } from "./cards";
 import {
   hoursSince,
   liveSessions,
@@ -79,6 +79,10 @@ function Mission({ id }: { id: string }) {
   const rows = planRows(m.plan.items);
   const taken = takenDecisions(decisions.data);
   const channelName = thread.data?.channelName ?? "";
+  // ADR 0044: the mission's own copy of the project is prepared first.
+  const live = m.status !== "done" && m.status !== "canceled";
+  const preparing = live && m.worktreeState === "preparing";
+  const setupFailed = live && m.worktreeState === "failed";
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -122,6 +126,18 @@ function Mission({ id }: { id: string }) {
               .filter(Boolean)
               .join(" · ")}
           </Text>
+          {m.branch ? (
+            <View style={styles.row}>
+              <Text style={[styles.mono, styles.shrink, { color: c.muted }]} numberOfLines={1}>
+                {m.branch}
+              </Text>
+              {m.baseBranch ? (
+                <Text variant="small" tone="muted">
+                  {t("mobile.mission.base", { base: m.baseBranch })}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <Card style={styles.progCard}>
@@ -143,7 +159,11 @@ function Mission({ id }: { id: string }) {
                   })}
                 />
               ) : null}
-              {m.runningTasks > 0 ? (
+              {preparing ? (
+                <Chip leading={<PixelOrbit color={color} size={10} />} label={t("mobile.mission.setup.preparing")} />
+              ) : null}
+              {setupFailed ? <Chip icon="flag" label={t("mobile.mission.setup.failedShort")} /> : null}
+              {!preparing && m.runningTasks > 0 ? (
                 <Chip
                   leading={<PixelOrbit color={color} size={10} />}
                   label={t("mobile.mission.running", { count: m.runningTasks })}
@@ -162,6 +182,16 @@ function Mission({ id }: { id: string }) {
             onPress={() => router.push(chatHref(m.channelId, m.threadId))}
           />
         </View>
+
+        {setupFailed ? (
+          <View style={styles.setup}>
+            <SetupFailedCard
+              missionId={m.id}
+              error={m.worktreeError ?? ""}
+              {...(m.worktreeFailReason === "branch_missing" ? { lostBranch: m.branch ?? null } : {})}
+            />
+          </View>
+        ) : null}
 
         {waitingN > 0 ? (
           <Section title={t("mobile.home.waiting")} count={waitingN}>
@@ -187,7 +217,12 @@ function Mission({ id }: { id: string }) {
                   <ComputerPortrait kind={computer} state={m.machine?.online === false ? "offline" : "online"} />
                   <View style={styles.grow}>
                     <Text variant="body" style={styles.bold} numberOfLines={2}>
-                      {s.title}
+                      {s.mode === "setup" ? t("mobile.mission.setupTitle") : s.title}
+                      {s.mode === "read" ? (
+                        <Text variant="small" tone="faint">
+                          {` · ${t("mobile.mission.readOnly")}`}
+                        </Text>
+                      ) : null}
                     </Text>
                     {s.lastLine ? (
                       <View style={styles.row}>
@@ -200,7 +235,9 @@ function Mission({ id }: { id: string }) {
                   </View>
                   <View style={styles.meta}>
                     <Text variant="caption" tone="faint">
-                      {t("mobile.mission.minutes", { count: sessionMinutes(s, now) })}
+                      {s.status === "queued"
+                        ? t("mobile.mission.queued")
+                        : t("mobile.mission.minutes", { count: sessionMinutes(s, now) })}
                     </Text>
                     {s.branch ? (
                       <Text style={[styles.mono, { color: c.faint }]} numberOfLines={1}>
@@ -299,6 +336,7 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2 },
   btn: { flexDirection: "row", paddingHorizontal: 16, marginTop: 16 },
   stack: { gap: 8 },
+  setup: { paddingHorizontal: 16, marginTop: 8 },
   sess: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   caret: { width: 2, height: 12 },
   meta: { alignItems: "flex-end", gap: 4, maxWidth: 110 },

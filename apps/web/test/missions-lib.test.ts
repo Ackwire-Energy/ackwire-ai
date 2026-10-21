@@ -9,6 +9,7 @@ import {
   executorOnText,
   formatSpan,
   isOpenMission,
+  lastLines,
   machineTaskOf,
   mdLines,
   missionCardRef,
@@ -17,6 +18,7 @@ import {
   missionPlanChangeOf,
   missionPlanOf,
   missionReportOf,
+  missionSetupOf,
   missionSuggestionOf,
   missionTasks,
   newLineIndexes,
@@ -26,9 +28,11 @@ import {
   planChangeParts,
   planCounts,
   prOf,
+  shortSha,
   summaryParts,
   taskNoticeOf,
   taskPr,
+  taskRange,
   taskSeconds,
   tickFor,
   viaText,
@@ -495,5 +499,38 @@ describe("who programs, as a mark", () => {
     const options = executorOptions(t, ["claude", "codex", "agent"], "Ada", "a1");
     expect(options.map((o) => o.label)).toEqual(["Claude Code", "Codex (experimental)", "Ada (o próprio agente)"]);
     expect(options.every((o) => o.leading)).toBe(true);
+  });
+});
+
+describe("the mission's copy of the project (ADR 0044)", () => {
+  test("meta.missionSetup: only a failed setup makes the card; the mission id is optional", () => {
+    expect(missionSetupOf({ missionSetup: { state: "failed", error: "boom" } })).toEqual({
+      state: "failed",
+      reason: "setup",
+      error: "boom",
+    });
+    expect(
+      missionSetupOf({ missionSetup: { state: "failed", reason: "branch_missing", error: "", branch: "agentes/x/y" } }),
+    ).toEqual({ state: "failed", reason: "branch_missing", error: "", branch: "agentes/x/y" });
+    expect(missionSetupOf({ missionSetup: { state: "failed", error: "x", missionId: "m1" } })?.missionId).toBe("m1");
+    expect(missionSetupOf({ missionSetup: { state: "ready" } })).toBeNull();
+    expect(missionSetupOf({})).toBeNull();
+    expect(missionSetupOf(undefined)).toBeNull();
+  });
+
+  test("the error's last lines, without trailing blanks", () => {
+    const text = ["", "one", "two", "three", "four", ""].join("\n");
+    expect(lastLines(text, 2)).toBe("three\nfour");
+    expect(lastLines(text)).toBe("one\ntwo\nthree\nfour");
+    expect(lastLines(null)).toBe("");
+  });
+
+  test("short commits and a session's range only when both ends differ", () => {
+    expect(shortSha("0123456789abcdef")).toBe("0123456");
+    expect(shortSha(null)).toBe("");
+    expect(taskRange({ startSha: "aaaaaaaaaa", endSha: "bbbbbbbbbb" })).toBe("aaaaaaa..bbbbbbb");
+    expect(taskRange({ startSha: "aaaaaaaaaa", endSha: "aaaaaaaaaa" })).toBeNull();
+    expect(taskRange({ startSha: "aaaaaaaaaa", endSha: null })).toBeNull();
+    expect(taskRange({})).toBeNull();
   });
 });
