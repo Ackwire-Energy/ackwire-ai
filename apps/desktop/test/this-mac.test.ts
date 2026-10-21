@@ -61,7 +61,12 @@ function setup(statuses: Record<string, ControlStatus>) {
   const store = new DesktopStore(host, { idPrefix: "t" });
   const event = (homeId: string, e: ControlEvent) => onLine(homeId, JSON.stringify({ type: "event", event: e }));
   const prefs: string[] = [];
-  const deps = { store, openPrefs: async (tab: "folders" | "tools") => void prefs.push(tab), codeTimeoutMs: 500 };
+  const deps = {
+    store,
+    openPrefs: async (tab: "folders" | "tools" | "updates") => void prefs.push(tab),
+    showRequests: async () => void prefs.push("requests"),
+    codeTimeoutMs: 500,
+  };
   return { store, sent, event, deps, prefs };
 }
 
@@ -112,8 +117,18 @@ test("connect: a refused organization comes back on its own home; a failure reje
   await expect(answer).rejects.toThrow("network");
 });
 
-test("prefs: Preferences on the asked tab", async () => {
+test("prefs and requests: Preferences on the asked tab, the popover", async () => {
   const { deps, prefs } = setup({});
-  expect(await answerThisMac(deps, { kind: "prefs", tab: "folders" })).toEqual({});
-  expect(prefs).toEqual(["folders"]);
+  expect(await answerThisMac(deps, { kind: "prefs", tab: "updates" })).toEqual({});
+  expect(await answerThisMac(deps, { kind: "requests" })).toEqual({});
+  expect(prefs).toEqual(["updates", "requests"]);
+});
+
+test("reconnect: the organization's own runner; not connected there rejects", async () => {
+  const { store, sent, deps } = setup({ h1: paired("o1", "offline") });
+  store.start();
+  await settle();
+  expect(await answerThisMac(deps, { kind: "reconnect", orgId: "o1" })).toEqual({});
+  expect(sent.filter((s) => s.type === "reconnect")).toEqual([{ homeId: "h1", type: "reconnect" }]);
+  await expect(answerThisMac(deps, { kind: "reconnect", orgId: "o2" })).rejects.toThrow("not_connected");
 });

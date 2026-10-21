@@ -67,6 +67,40 @@ describe("Configurações → Computadores, in the app", () => {
     expect(asked).toContainEqual({ kind: "prefs", tab: "folders" });
   });
 
+  test("this Mac's page: allowing folders and turning the browser on open the app's Preferences", async () => {
+    const mac = { status: { orgs: [] } as ThisMacStatus, code: null };
+    const asked = inTheApp(mac);
+    const api = createFakeApi(seedState());
+    const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
+    const m = machines.pair({
+      name: "MacBook do Walter",
+      os: "darwin",
+      access: { folders: [], tools: { claude: true, codex: false, commands: false } },
+    });
+    mac.status = { orgs: [{ orgId: ORG_ID, machineId: m.id, connection: "online" }] };
+    await renderApp(`/org/${ORG_ID}/settings/computers/${m.id}`, { api });
+    await settle(8);
+    expect(screen().queryByText(/Liberar é no próprio computador/)).toBeNull();
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Abrir Pastas" })));
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Abrir Ferramentas" })));
+    expect(asked).toContainEqual({ kind: "prefs", tab: "folders" });
+    expect(asked).toContainEqual({ kind: "prefs", tab: "tools" });
+  });
+
+  test("another computer's page, in the app: the usual words", async () => {
+    const mac = { status: { orgs: [{ orgId: ORG_ID, machineId: "m-this", connection: "online" }] }, code: null };
+    inTheApp(mac);
+    const api = createFakeApi(seedState());
+    const m = fakeMachinesOf.get(api)?.pair({
+      name: "Servidor",
+      access: { folders: [], tools: { claude: true, codex: false, commands: false } },
+    });
+    await renderApp(`/org/${ORG_ID}/settings/computers/${m?.id}`, { api });
+    await settle(8);
+    expect(screen().getByText(/Liberar é no próprio computador/)).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Abrir Pastas" })).toBeNull();
+  });
+
   test("outside the app: the download, and nothing asks the Mac", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });

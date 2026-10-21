@@ -35,15 +35,22 @@ export function useIsThisMac(orgId: string, machineId: string) {
   return useThisMac(orgId).data?.machineId === machineId;
 }
 
-/** "Usar este Mac" (one click), or, once connected, "Pastas deste Mac". `canPair`: may connect a computer. */
+/**
+ * "Usar este Mac" (one click), or, once connected, "Pastas deste Mac" (`folders: false` hides it).
+ * `canPair`: may connect a computer. `onConnected`: the new machine, e.g. to pick it right away.
+ */
 export function ThisMacButton({
   orgId,
   canPair,
   primary = false,
+  folders = true,
+  onConnected,
 }: {
   orgId: string;
   canPair: boolean;
   primary?: boolean;
+  folders?: boolean;
+  onConnected?: (machineId: string) => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -53,14 +60,17 @@ export function ThisMacButton({
   const mine = useThisMac(orgId, connecting);
   const connected = Boolean(mine.data);
 
+  const machineId = mine.data?.machineId ?? null;
   useEffect(() => {
     if (!connecting || !connected) return;
     setConnecting(false);
     toast.show(t("machines.thisMac.connected"));
-  }, [connecting, connected, toast, t]);
+    if (machineId) onConnected?.(machineId);
+  }, [connecting, connected, machineId, onConnected, toast, t]);
 
   if (!inDesktopApp() || mine.isLoading) return null;
   if (connected) {
+    if (!folders) return null;
     return (
       <Button size="sm" icon="drive" onClick={() => void thisMac.openPrefs("folders").catch(() => {})}>
         {t("machines.thisMac.folders")}
@@ -93,11 +103,56 @@ export function ThisMacButton({
   );
 }
 
-/** "Abrir no app": Preferences on `tab`, for what is granted on this Mac itself (folders, tools). */
-export function OpenPrefsButton({ tab, children }: { tab: "folders" | "tools"; children: string }) {
+/** "Abrir no app": Preferences on `tab`, for what is decided on this Mac itself (folders, tools, updates). */
+export function OpenPrefsButton({ tab, children }: { tab: "folders" | "tools" | "updates"; children: string }) {
   return (
-    <Button size="sm" icon="settings" onClick={() => void thisMac.openPrefs(tab).catch(() => {})}>
+    <Button
+      size="sm"
+      icon={tab === "updates" ? "download" : "settings"}
+      onClick={() => void thisMac.openPrefs(tab).catch(() => {})}
+    >
       {children}
+    </Button>
+  );
+}
+
+/** "Reconectar": this Mac's connection to `orgId` again (the menu bar's "Reconectar"). */
+export function ReconnectThisMacButton({ orgId, primary = false }: { orgId: string; primary?: boolean }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const reconnect = async () => {
+    setBusy(true);
+    try {
+      await thisMac.reconnect(orgId);
+      toast.show(t("machines.thisMac.reconnecting"));
+      void qc.invalidateQueries({ queryKey: THIS_MAC_KEY });
+    } catch {
+      toast.show(t("machines.thisMac.failed"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button
+      size="sm"
+      variant={primary ? "primary" : "default"}
+      icon="refresh"
+      loading={busy}
+      onClick={() => void reconnect()}
+    >
+      {t("machines.thisMac.reconnect")}
+    </Button>
+  );
+}
+
+/** "Ver no app": the menu bar's popover, where this Mac answers access requests. */
+export function ShowRequestsButton() {
+  const { t } = useTranslation();
+  return (
+    <Button size="sm" icon="computer" onClick={() => void thisMac.showRequests().catch(() => {})}>
+      {t("machines.thisMac.seeRequest")}
     </Button>
   );
 }

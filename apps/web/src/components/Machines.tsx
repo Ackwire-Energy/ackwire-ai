@@ -493,7 +493,9 @@ export function MachinesSection() {
             <ComputerPortrait kind="mac" state="offline" size={96} />
             <span className="computers-empty__text">
               <b>{t("computers.mine.emptyTitle")}</b>
-              <span className="small muted">{t("computers.mine.emptyText")}</span>
+              <span className="small muted">
+                {inDesktopApp() ? t("machines.thisMac.emptyText") : t("computers.mine.emptyText")}
+              </span>
             </span>
           </div>
         )}
@@ -605,6 +607,8 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
   const nameOf = (id: string) =>
     agents.data?.find((a) => a.id === id)?.name ?? m.agents.find((a) => a.id === id)?.name ?? "";
   const access = m.access;
+  // This very Mac with an app too old to report: update it from here (agentes for Mac, D79).
+  const here = useIsThisMac(org.id, m.id);
   return (
     <Card aria-labelledby="sec-machine-folders">
       <div className="stack-4" style={{ gap: 2 }}>
@@ -613,7 +617,14 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
         </h2>
         <span className="small muted">{t("machines.access.foldersText")}</span>
       </div>
-      {!access ? (
+      {!access && m.canManage && here ? (
+        <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <p className="small muted" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+            {t("machines.thisMac.noReport")}
+          </p>
+          <OpenPrefsButton tab="updates">{t("machines.thisMac.update")}</OpenPrefsButton>
+        </div>
+      ) : !access ? (
         // The server only shows the folders to admins and whoever connected it.
         <p className="small muted" style={{ margin: 0 }}>
           {m.canManage ? t("machines.access.noReport") : t("machines.access.hidden")}

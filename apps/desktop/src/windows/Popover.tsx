@@ -18,7 +18,7 @@ import {
   siteLink,
 } from "../control/browser";
 import { NOTCH_PREF } from "../control/notch";
-import { answerThisMac } from "../control/this-mac";
+import { answerThisMac, type PrefsTab } from "../control/this-mac";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
@@ -120,11 +120,12 @@ export function Popover() {
   useEffect(
     () =>
       host.onThisMac((id, request) => {
-        const openPrefsOn = async (tab: "folders" | "tools") => {
+        const openPrefsOn = async (tab: PrefsTab) => {
           writePref("prefsTab", tab);
           await host.showWindow("prefs");
         };
-        answerThisMac({ store, openPrefs: openPrefsOn }, request)
+        const showRequests = () => host.showWindow("popover");
+        answerThisMac({ store, openPrefs: openPrefsOn, showRequests }, request)
           .then(
             (data) => host.thisMacReply(id, true, data ?? null),
             (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),

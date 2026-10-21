@@ -1,7 +1,8 @@
 /**
- * The site in the app's main window asks this Mac three things (D79), relayed by Rust (`this_mac` in
+ * The site in the app's main window asks this Mac a few things (D79), relayed by Rust (`this_mac` in
  * main_window.rs, which already checked the request): which organizations it is connected to, connecting it
- * to one, and Preferences on a tab. The popover answers, since it owns the runners. Connecting starts the
+ * to one, reconnecting it, Preferences on a tab, and the access requests (the popover). The popover answers,
+ * since it owns the runners. Connecting starts the
  * same sign-in as the welcome window, but the site confirms the code with its own session instead of the
  * person reading it in the browser; the machine's token stays with the runner.
  */
@@ -13,7 +14,11 @@ import { SITE_URL } from "./version";
 export type ThisMacRequest =
   | { kind: "status" }
   | { kind: "connect"; orgId: string }
-  | { kind: "prefs"; tab: "folders" | "tools" };
+  | { kind: "reconnect"; orgId: string }
+  | { kind: "prefs"; tab: PrefsTab }
+  | { kind: "requests" };
+
+export type PrefsTab = "folders" | "tools" | "updates";
 
 export interface ThisMacStatus {
   orgs: { orgId: string; machineId: string | null; connection: string }[];
@@ -27,7 +32,9 @@ export interface ThisMacConnect {
 export interface ThisMacDeps {
   store: DesktopStore;
   /** Preferences on a tab (the popover's own "Preferências…"). */
-  openPrefs(tab: "folders" | "tools"): Promise<void>;
+  openPrefs(tab: PrefsTab): Promise<void>;
+  /** The popover, where access requests are answered. */
+  showRequests(): Promise<void>;
   /** How long to wait for the runner's code. */
   codeTimeoutMs?: number;
 }
@@ -49,6 +56,17 @@ export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest):
   if (request.kind === "status") return thisMacStatus(deps.store);
   if (request.kind === "prefs") {
     await deps.openPrefs(request.tab);
+    return {};
+  }
+  if (request.kind === "requests") {
+    await deps.showRequests();
+    return {};
+  }
+  if (request.kind === "reconnect") {
+    // The socket again (as the popover's "Reconectar"). Refused by the organization: connecting again is `connect`.
+    const home = pairedHomes(deps.store.getSnapshot()).find((h) => orgOf(h) === request.orgId && !isRefusedHome(h));
+    if (!home) throw new Error("not_connected");
+    await deps.store.request(home.homeId, { type: "reconnect" });
     return {};
   }
   return connect(deps, request.orgId);

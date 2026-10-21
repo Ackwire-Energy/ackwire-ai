@@ -160,7 +160,8 @@ fn front(app: &AppHandle) -> Result<(), String> {
 
 /// What the site may ask of this Mac (D79): which organizations it is connected to (`status`), connecting it
 /// to the person's organization (`connect`: the site confirms the code with its own session, as on
-/// `/conectar`), and Preferences on a tab (`prefs`). Rust only checks the request and relays it: the popover's
+/// `/conectar`), reconnecting it (`reconnect`), Preferences on a tab (`prefs`) and the menu bar's access
+/// requests (`requests`). Rust only checks the request and relays it: the popover's
 /// code owns the runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The
 /// machine's token never leaves the runner.
 #[derive(Default)]
@@ -171,23 +172,26 @@ pub struct Bridge {
 
 /// How long the popover has to answer (`connect` waits for the runner's code).
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(30);
-const PREF_TABS: &[&str] = &["folders", "tools"];
+const PREF_TABS: &[&str] = &["folders", "tools", "updates"];
 
 /// The request rebuilt from the keys it may have; anything else is refused.
 fn checked(request: &Value) -> Result<Value, String> {
     let text = |key: &str| request.get(key).and_then(Value::as_str);
+    let org = || {
+        let org = text("orgId").unwrap_or_default();
+        let ok = !org.is_empty()
+            && org.len() <= 64
+            && org.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if ok {
+            Ok(org)
+        } else {
+            Err("bad organization id".to_string())
+        }
+    };
     match text("kind") {
         Some("status") => Ok(json!({ "kind": "status" })),
-        Some("connect") => {
-            let org = text("orgId").unwrap_or_default();
-            let ok = !org.is_empty()
-                && org.len() <= 64
-                && org.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
-            if !ok {
-                return Err("bad organization id".into());
-            }
-            Ok(json!({ "kind": "connect", "orgId": org }))
-        }
+        Some("requests") => Ok(json!({ "kind": "requests" })),
+        Some(kind @ ("connect" | "reconnect")) => Ok(json!({ "kind": kind, "orgId": org()? })),
         Some("prefs") => match text("tab") {
             Some(tab) if PREF_TABS.contains(&tab) => Ok(json!({ "kind": "prefs", "tab": tab })),
             _ => Err("unknown tab".into()),
@@ -267,6 +271,9 @@ mod tests {
         assert!(checked(&json!({ "kind": "connect" })).is_err());
         assert_eq!(checked(&json!({ "kind": "prefs", "tab": "folders" })), Ok(json!({ "kind": "prefs", "tab": "folders" })));
         assert!(checked(&json!({ "kind": "prefs", "tab": "advanced" })).is_err());
+        assert_eq!(checked(&json!({ "kind": "reconnect", "orgId": "o1" })), Ok(json!({ "kind": "reconnect", "orgId": "o1" })));
+        assert!(checked(&json!({ "kind": "reconnect" })).is_err());
+        assert_eq!(checked(&json!({ "kind": "requests", "x": 1 })), Ok(json!({ "kind": "requests" })));
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
     }
 }
