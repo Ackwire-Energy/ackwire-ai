@@ -3,31 +3,47 @@ import {
   type AgentAppearance,
   type AgentState,
   Avatar,
-  Chip,
   cx,
   drawAccessory,
   drawAgent,
   getGaze,
+  Icon,
   idlePose,
+  Message,
+  MessageText,
   type Pose,
+  Reaction,
+  Reactions,
+  WorkSummary,
 } from "@agenteschat/ui";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { CAST, type CastKey, PEOPLE, STARTUP_AGENTS, STARTUP_CHANNELS } from "./cast";
 import { useLanding } from "./context";
-import { AGENTS, type AgentKey, GIANT_LOOKS, PEOPLE } from "./data";
+import { GIANT_LOOKS } from "./data";
 import { useFormat } from "./format";
-import { useAimRef } from "./hooks";
-import { LpAvatar, SampleAgent } from "./LpAvatar";
+import { useAimRef, useRunner, useVisible } from "./hooks";
+import { LpApproval } from "./kit/Approval";
+import { MockSidebar } from "./kit/MockSidebar";
+import { LpAvatar } from "./LpAvatar";
 import { PixelSky } from "./PixelSky";
 import { RichText } from "./rich";
 import { HERO_SKY } from "./sky";
+import "./kit/kit.css";
+import "./Hero.css";
 
-/** The hero: the sky, the headline, the waiting list, the giant agent and its activity bubbles. */
+/**
+ * The hero (docs/design/telas/LandingNova.html, "B · Produto à vista"): the
+ * sky, the headline and the waiting list, then the app itself rising from the
+ * bottom of the sky with a live sample conversation, the giant agent sitting
+ * on its window and watching it.
+ */
 export function Hero({
   giantLook,
   giantState,
   giantJoy,
   onGiantClick,
+  onCelebrate,
   waitlist,
   waitlistRef,
 }: {
@@ -35,6 +51,8 @@ export function Hero({
   giantState: AgentState;
   giantJoy: string;
   onGiantClick: () => void;
+  /** Something good happened in the sample conversation: the giant hops. */
+  onCelebrate: () => void;
   /** The hero waiting list form. */
   waitlist: ReactNode;
   waitlistRef: RefObject<HTMLDivElement | null>;
@@ -69,7 +87,7 @@ export function Hero({
   const titleB = words(t("landing.hero.titleB"));
 
   return (
-    <section className="lp-hero">
+    <section className="lp-hero lp-hero--app">
       <div className="lp-sky">
         <PixelSky options={{ pixel: 4, sprites: true, calmV: 6 / 7, calm, halo, ...HERO_SKY }} />
         <div className="lp-hero-in">
@@ -91,7 +109,10 @@ export function Hero({
             <div className="lp-after">{waitlist}</div>
           </div>
         </div>
-        <Giant look={giantLook} state={giantState} joy={giantJoy} onClick={onGiantClick} buttonRef={giantRef} />
+        <div className="lp-hero-app-wrap">
+          <HeroApp onCelebrate={onCelebrate} />
+          <Giant look={giantLook} state={giantState} joy={giantJoy} onClick={onGiantClick} buttonRef={giantRef} />
+        </div>
       </div>
       <Ticker />
     </section>
@@ -267,7 +288,6 @@ function Giant({
   }, []);
   return (
     <div className="lp-giant-zone" ref={zone}>
-      <Bubbles />
       <button type="button" className="lp-giant" ref={setButton} aria-label={t("landing.hero.giant")} onClick={change}>
         <span className={cx("lp-giant__in", joy)}>
           <canvas className="lp-giant__body" ref={body} />
@@ -277,106 +297,242 @@ function Giant({
   );
 }
 
-type When = "now" | "twoMin" | [number, number];
-const EVENTS: [AgentKey, "pr" | "report" | "approval" | "cause" | "replied" | "saved" | "tests", When][] = [
-  ["lia", "pr", "now"],
-  ["teo", "report", [9, 0]],
-  ["bia", "approval", "now"],
-  ["lia", "cause", [14, 22]],
-  ["teo", "replied", "twoMin"],
-  ["bia", "saved", [11, 4]],
-  ["lia", "tests", "now"],
-];
+/* ---------- The app, live: a sample conversation that loops while the hero is on screen ---------- */
 
-/** Activity bubbles stacked above the giant; one changes every 2.6 s. */
-function Bubbles() {
-  const { reduced } = useLanding();
+type FeedItem =
+  | { id: string; kind: "ask" }
+  | { id: string; kind: "work"; done: number; summary: boolean }
+  | { id: string; kind: "found" }
+  | { id: string; kind: "approval"; decided: boolean }
+  | { id: string; kind: "done" };
+
+/** At most this many messages show; older ones leave through the fade at the top. */
+const SHOWN = 4;
+
+function HeroApp({ onCelebrate }: { onCelebrate: () => void }) {
   const { t } = useTranslation();
   const fmt = useFormat();
-  const [slots, setSlots] = useState([
-    { ev: 0, n: 0 },
-    { ev: 1, n: 1 },
-    { ev: 2, n: 2 },
-  ]);
+  const { aim } = useLanding();
+  const runner = useRunner();
+  const wrap = useRef<HTMLDivElement>(null);
+  const feed = useRef<HTMLDivElement>(null);
+  const visible = useVisible(wrap);
+  const seen = useRef(false);
+  seen.current = visible;
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [states, setStates] = useState<Partial<Record<CastKey, AgentState>>>({});
+  const decide = useRef<(() => void) | null>(null);
+  const celebrate = useRef(onCelebrate);
+  celebrate.current = onCelebrate;
+
+  // The giant looks at each new message for a moment.
+  const look = useCallback(() => {
+    const last = feed.current?.lastElementChild;
+    if (!last) return;
+    const r = last.getBoundingClientRect();
+    aim.at(r.left + r.width / 2, r.top + r.height / 2);
+  }, [aim]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: look again whenever a message arrives
+  useEffect(look, [items.length, look]);
+
+  const started = useRef(false);
   useEffect(() => {
-    if (reduced) return;
-    let next = 3;
-    let slot = 0;
-    const id = setInterval(() => {
-      if (document.hidden) return;
-      const at = slot++ % 3;
-      const ev = next++ % EVENTS.length;
-      setSlots((s) => s.map((x, i) => (i === at ? { ev, n: x.n + 3 } : x)));
-    }, 2600);
-    return () => clearInterval(id);
-  }, [reduced]);
+    if (!visible || started.current) return;
+    started.current = true;
+    runner.start(async (r) => {
+      const step = async (ms: number) => {
+        await r.sleep(ms);
+        // Paused while the hero is off screen or the tab is hidden.
+        while (r.alive() && (!seen.current || document.hidden)) await r.sleep(800);
+        return r.alive();
+      };
+      const patch = (id: string, fn: (x: FeedItem) => FeedItem) =>
+        setItems((xs) => xs.map((x) => (x.id === id ? fn(x) : x)));
+      for (let loop = 0; r.alive(); loop++) {
+        const k = (s: string) => `${loop}-${s}`;
+        setStates({});
+        setItems((xs) => [...xs, { id: k("ask"), kind: "ask" }]);
+        if (!(await step(1300))) return;
+        setStates({ dev: "thinking" });
+        setItems((xs) => [...xs, { id: k("work"), kind: "work", done: 0, summary: false }]);
+        if (!(await step(1300))) return;
+        patch(k("work"), (x) => (x.kind === "work" ? { ...x, done: 1 } : x));
+        setStates({ dev: "thinking", atlas: "thinking" });
+        if (!(await step(1300))) return;
+        patch(k("work"), (x) => (x.kind === "work" ? { ...x, done: 2 } : x));
+        setStates({ dev: "thinking" });
+        if (!(await step(900))) return;
+        patch(k("work"), (x) => (x.kind === "work" ? { ...x, done: 3, summary: true } : x));
+        setStates({});
+        setItems((xs) => [...xs, { id: k("found"), kind: "found" }]);
+        if (!(await step(1500))) return;
+        setItems((xs) => [...xs, { id: k("approval"), kind: "approval", decided: false }]);
+        // Approves by itself if nobody holds the button (HoldButton's `auto`).
+        await new Promise<void>((resolve) => {
+          decide.current = resolve;
+        });
+        decide.current = null;
+        if (!r.alive()) return;
+        patch(k("approval"), (x) => (x.kind === "approval" ? { ...x, decided: true } : x));
+        celebrate.current();
+        if (!(await step(1200))) return;
+        setStates({ atlas: "thinking" });
+        if (!(await step(1200))) return;
+        setStates({});
+        setItems((xs) => [...xs, { id: k("done"), kind: "done" }]);
+        if (!(await step(4500))) return;
+      }
+    });
+  }, [visible, runner]);
+  useEffect(() => () => decide.current?.(), []);
+
+  const shown = items.slice(-SHOWN);
+  const dev = CAST.dev;
+  const atlas = CAST.atlas;
+  const marina = PEOPLE.marina;
   return (
-    <div className="lp-bubs">
-      {slots.map((s) => {
-        const [agent, key, when] = EVENTS[s.ev] ?? EVENTS[0] ?? ["lia", "pr", "now"];
-        const time = Array.isArray(when) ? fmt.time(when[0], when[1]) : t(`landing.when.${when}`);
-        return (
-          <div className="lp-bub lp-pop" key={s.n}>
-            <SampleAgent agent={agent} size="sm" />
-            <span>
-              {t(`landing.bubbles.${key}`, { name: AGENTS[agent].name })} <small>· {time}</small>
-            </span>
-          </div>
-        );
-      })}
+    // biome-ignore lint/a11y/useSemanticElements: a labelled sample screen, not a form group
+    <div className="lp-hero-app" ref={wrap} role="group" aria-label={t("landing.hero.app")}>
+      <MockSidebar
+        org="startup"
+        channels={STARTUP_CHANNELS.map((key, i) => ({ key, unread: i === 2 ? 3 : 0 }))}
+        active="engineering"
+        agents={STARTUP_AGENTS.slice(0, 3)}
+        states={states}
+        tools={[]}
+        label={t("landing.hero.sidebar")}
+      />
+      <div className="lp-hero-chan">
+        <div className="lp-hero-chan__head">
+          <Icon name="channel" />
+          {t("landing.channel.engineering")}
+        </div>
+        <div className="lp-hero-feed" ref={feed}>
+          {shown.map((it) => {
+            if (it.kind === "ask")
+              return (
+                <Message
+                  key={it.id}
+                  entering
+                  avatar={<Avatar name={marina.name} initials={marina.initials} />}
+                  author={marina.short}
+                  time={fmt.time(14, 21)}
+                >
+                  <MessageText>{t("landing.heroFeed.ask")}</MessageText>
+                </Message>
+              );
+            if (it.kind === "work")
+              return (
+                <Message
+                  key={it.id}
+                  entering
+                  agent
+                  avatar={<LpAvatar look={dev.look} name={dev.name} state={it.summary ? "idle" : "thinking"} />}
+                  author={dev.name}
+                  time={fmt.time(14, 21)}
+                >
+                  <WorkSummary
+                    defaultOpen
+                    summary={it.summary ? t("landing.heroFeed.summary") : t("landing.working")}
+                    steps={(["s1", "s2", "s3"] as const).slice(0, Math.min(3, it.done + 1)).map((s, i) => ({
+                      key: s,
+                      label: t(`landing.heroFeed.${s}`),
+                      pending: i >= it.done,
+                    }))}
+                  />
+                </Message>
+              );
+            if (it.kind === "found")
+              return (
+                <Message
+                  key={it.id}
+                  entering
+                  agent
+                  avatar={<LpAvatar look={dev.look} name={dev.name} />}
+                  author={dev.name}
+                  time={fmt.time(14, 22)}
+                >
+                  <MessageText>{t("landing.heroFeed.found")}</MessageText>
+                </Message>
+              );
+            if (it.kind === "approval")
+              return (
+                <Message
+                  key={it.id}
+                  entering
+                  agent
+                  avatar={<LpAvatar look={atlas.look} name={atlas.name} />}
+                  author={atlas.name}
+                  time={fmt.time(14, 23)}
+                >
+                  <LpApproval
+                    who={<b>{atlas.name}</b>}
+                    title={t("landing.heroFeed.approval")}
+                    color={atlas.color}
+                    decided={it.decided ? "yes" : undefined}
+                    decidedLabel={t("landing.heroFeed.approved")}
+                    onDecide={() => decide.current?.()}
+                    hint={t("landing.heroFeed.tryIt")}
+                    auto={4500}
+                    noDecline
+                  />
+                </Message>
+              );
+            return (
+              <Message
+                key={it.id}
+                entering
+                agent
+                avatar={<LpAvatar look={atlas.look} name={atlas.name} />}
+                author={atlas.name}
+                time={fmt.time(14, 24)}
+              >
+                <MessageText>{t("landing.heroFeed.done")}</MessageText>
+                <Reactions label={t("landing.hero.reactions")}>
+                  <Reaction count={3} label="🎉 3">
+                    🎉
+                  </Reaction>
+                  <Reaction count={2} label="🙏 2">
+                    🙏
+                  </Reaction>
+                </Reactions>
+              </Message>
+            );
+          })}
+        </div>
+        <div className="lp-hero-composer" aria-hidden="true">
+          <span>{t("landing.hero.composer", { channel: t("landing.channel.engineering") })}</span>
+          <Icon name="send" size={16} />
+        </div>
+      </div>
     </div>
   );
 }
 
-type Tick = {
-  key: "pr" | "report" | "announce" | "closed" | "rollback" | "split" | "versions" | "lesson";
-  agent?: AgentKey;
-  time: [number, number];
-  tone?: "warn" | "ok";
-};
-const TICK: Tick[] = [
-  { agent: "lia", key: "pr", time: [14, 24] },
-  { agent: "teo", key: "report", time: [9, 0] },
-  { agent: "bia", key: "announce", time: [11, 6], tone: "warn" },
-  { agent: "lia", key: "closed", time: [15, 2], tone: "ok" },
-  { key: "rollback", time: [14, 23], tone: "ok" },
-  { agent: "teo", key: "split", time: [9, 14] },
-  { agent: "bia", key: "versions", time: [11, 4] },
-  { agent: "lia", key: "lesson", time: [16, 40] },
+/* ---------- The live ticker under the hero (two copies of the track for the loop) ---------- */
+
+const TICK: [CastKey, "consult" | "rollback" | "report" | "post" | "support" | "invoices" | "task" | "lesson"][] = [
+  ["dev", "consult"],
+  ["atlas", "rollback"],
+  ["nina", "report"],
+  ["theo", "post"],
+  ["sol", "support"],
+  ["cora", "invoices"],
+  ["ada", "task"],
+  ["dev", "lesson"],
 ];
 
-/** The live ticker under the hero (two copies of the track for the loop). */
 function Ticker() {
   const { t } = useTranslation();
-  const fmt = useFormat();
-  const marina = PEOPLE.marina;
   const items = (copy: number) =>
-    TICK.map((k) => (
-      <span className="lp-tk" key={`${copy}-${k.key}`}>
-        {k.agent ? (
-          <SampleAgent agent={k.agent} size="sm" />
-        ) : (
-          <Avatar name={marina.name} initials={marina.initials} size="sm" />
-        )}
+    TICK.map(([agent, key]) => (
+      <span className="lp-tk" key={`${copy}-${agent}-${key}`}>
+        <LpAvatar look={CAST[agent].look} size="sm" name={CAST[agent].name} />
         <span>
           <RichText
-            text={t(`landing.ticker.${k.key}`, {
-              name: k.agent ? AGENTS[k.agent].name : marina.short,
-              to: PEOPLE.camila.short,
-            })}
+            text={t(`landing.ticker.${key}`, { a: CAST[agent].name, b: CAST.atlas.name, person: PEOPLE.rafael.short })}
           />
         </span>
-        {k.tone === "warn" && (
-          <Chip icon="waiting" tone="waiting">
-            {t("landing.ticker.waiting")}
-          </Chip>
-        )}
-        {k.tone === "ok" && (
-          <Chip icon="check" tone="done">
-            {t("landing.ticker.done")}
-          </Chip>
-        )}
-        <time>{fmt.time(k.time[0], k.time[1])}</time>
       </span>
     ));
   return (

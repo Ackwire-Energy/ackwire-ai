@@ -1,11 +1,22 @@
 import type { AgentAppearance } from "@agenteschat/ui";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { CREW } from "./data";
+import { CAST, type CastKey } from "./cast";
 import { useAimRef, useJoy } from "./hooks";
 import { LpAvatar } from "./LpAvatar";
 import { PixelSky } from "./PixelSky";
 import { CLOSING_SKY } from "./sky";
+
+/** The crew at the bottom of the closing sky: the sample team, largest in the middle (size in px). */
+const CREW: [CastKey, number][] = [
+  ["cora", 64],
+  ["sol", 88],
+  ["nina", 112],
+  ["dev", 168],
+  ["atlas", 112],
+  ["theo", 88],
+  ["ada", 64],
+];
 
 /** The closing sky: the second waiting list form and the agent crew (they celebrate when someone joins). */
 export function Closing({
@@ -34,8 +45,8 @@ export function Closing({
           {waitlist}
         </div>
         <div className="lp-crew" aria-hidden="true">
-          {CREW.map(([look, px], i) => (
-            <CrewMember key={`${look.color}-${px}`} look={look} px={px} index={i} celebrate={celebrate} />
+          {CREW.map(([agent, px], i) => (
+            <CrewMember key={agent} look={CAST[agent].look} px={px} index={i} celebrate={celebrate} />
           ))}
         </div>
       </div>

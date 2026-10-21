@@ -1,41 +1,52 @@
-import { Icon } from "@agenteschat/ui";
+import { Card, Icon } from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./faq.css";
 
-const QUESTIONS = [1, 2, 3, 4, 5] as const;
+/** The questions, in the prototype's order (`landing.faq.items.<key>`). */
+const QUESTIONS = ["opens", "code", "models", "alone", "where", "data", "tools", "price"] as const;
+type Question = (typeof QUESTIONS)[number];
 
-/** "Perguntas": an accordion; any number of answers can be open. */
+/** "Perguntas": two columns of cards; any number of answers can be open. */
 export function Faq() {
   const { t } = useTranslation();
   const id = useId();
-  const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
-  const toggle = (n: number) =>
+  const [open, setOpen] = useState<ReadonlySet<Question>>(new Set());
+  const toggle = (q: Question) =>
     setOpen((prev) => {
       const next = new Set(prev);
-      if (next.has(n)) next.delete(n);
-      else next.add(n);
+      if (next.has(q)) next.delete(q);
+      else next.add(q);
       return next;
     });
   return (
-    <section className="lp-sec lp-sec--flush" id="perguntas">
-      <div className="lp-wrap lp-faq-grid">
-        <div className="lp-sec-head lp-sec-head--flush">
+    <section className="lp-sec" id="perguntas">
+      <div className="lp-wrap">
+        <div className="lp-sec-head">
           <span className="lp-eyebrow">{t("landing.faq.eyebrow")}</span>
           <h2>{t("landing.faq.title")}</h2>
         </div>
-        <div className="lp-faq">
-          {QUESTIONS.map((n) => {
-            const isOpen = open.has(n);
+        <div className="lp-faq-list">
+          {QUESTIONS.map((q) => {
+            const isOpen = open.has(q);
             return (
-              <div className="lp-qa" data-open={isOpen} key={n}>
-                <button type="button" aria-expanded={isOpen} aria-controls={`${id}-${n}`} onClick={() => toggle(n)}>
-                  {t(`landing.faq.q${n}`)}
-                  <Icon name="plus" />
-                </button>
-                <div className="lp-a" id={`${id}-${n}`} hidden={!isOpen}>
-                  <p>{t(`landing.faq.a${n}`)}</p>
+              <Card as="div" className="lp-faq-item" data-open={isOpen} key={q}>
+                <h3 className="lp-faq-h">
+                  <button
+                    type="button"
+                    className="lp-faq-q"
+                    aria-expanded={isOpen}
+                    aria-controls={`${id}-${q}`}
+                    onClick={() => toggle(q)}
+                  >
+                    <span>{t(`landing.faq.items.${q}.q`)}</span>
+                    <Icon name="plus" />
+                  </button>
+                </h3>
+                <div className="lp-faq-a" id={`${id}-${q}`} hidden={!isOpen}>
+                  <p>{t(`landing.faq.items.${q}.a`)}</p>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>

@@ -1,7 +1,6 @@
 import { type AgentAppearance, type AgentState, cx } from "@agenteschat/ui";
 import type { CSSProperties } from "react";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { AGENTS, type AgentKey } from "./data";
 
 type Size = "xs" | "sm" | "md" | "lg" | "xl";
 
@@ -37,32 +36,6 @@ export function LpAvatar({
       expression={joy ? "happy" : undefined}
       className={cx("lp-av", px !== undefined && "lp-av--px", className)}
       style={sized}
-    />
-  );
-}
-
-/** One of the sample agents (Lia, Teo, Bia). */
-export function SampleAgent({
-  agent,
-  size,
-  px,
-  state,
-  className,
-}: {
-  agent: AgentKey;
-  size?: Size;
-  px?: number;
-  state?: AgentState;
-  className?: string;
-}) {
-  return (
-    <LpAvatar
-      look={AGENTS[agent].look}
-      size={size}
-      px={px}
-      state={state}
-      className={className}
-      name={AGENTS[agent].name}
     />
   );
 }

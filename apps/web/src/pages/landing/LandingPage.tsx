@@ -8,25 +8,30 @@ import { type LocaleCode, setLocale } from "@/i18n";
 import { loadAnalytics, track } from "@/lib/analytics";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useTheme } from "@/lib/theme";
-import { AgentMaker } from "./AgentMaker";
 import { Bento } from "./Bento";
 import { Closing } from "./Closing";
+import { Computer } from "./Computer";
+import { Control } from "./Control";
 import { type AimRegistry, LandingContext, type LandingContextValue } from "./context";
 import { DemoWorkspace } from "./DemoWorkspace";
+import { Devices } from "./Devices";
 import { GIANT_LOOKS } from "./data";
 import { Faq } from "./Faq";
 import { Hero } from "./Hero";
 import { readReducedMotion, useJoy } from "./hooks";
 import { LpIcon } from "./icons";
-import { LiveLedger } from "./LiveLedger";
+import { Missions } from "./Missions";
+import { Onboarding } from "./Onboarding";
 import { StoryScroll } from "./StoryScroll";
+import { Team } from "./Team";
 import { type JoinResult, type LinkProblem, Waitlist } from "./Waitlist";
 import "./landing.css";
 
 const SECTIONS = [
-  ["como", "how"],
-  ["demo", "demo"],
-  ["rosto", "agents"],
+  ["conversa", "conversation"],
+  ["computador", "computer"],
+  ["missoes", "missions"],
+  ["equipe", "team"],
   ["controle", "control"],
   ["perguntas", "faq"],
 ] as const;
@@ -37,7 +42,7 @@ const AUTHOR_URL = "https://wescld.com";
 
 /**
  * The public landing page (signed-out `/`), ported from the approved
- * prototype docs/design/telas/Landing.html. Dark by default; the only call to
+ * prototype docs/design/telas/LandingNova.html. Dark by default; the only call to
  * action is the waiting list. Everything is scoped under `.lp`.
  */
 export function LandingPage() {
@@ -262,6 +267,7 @@ export function LandingPage() {
               setGiantLook((i) => (i + 1) % GIANT_LOOKS.length);
               giantJoy.trigger(900);
             }}
+            onCelebrate={() => giantJoy.trigger(1600)}
             waitlistRef={heroSlot}
             waitlist={
               <Waitlist
@@ -279,9 +285,13 @@ export function LandingPage() {
           />
           <StoryScroll />
           <DemoWorkspace />
-          <AgentMaker />
+          <Computer />
+          <Missions />
+          <Team />
           <Bento />
-          <LiveLedger />
+          <Devices />
+          <Control />
+          <Onboarding />
           <Faq />
           <Closing
             celebrate={celebrate}

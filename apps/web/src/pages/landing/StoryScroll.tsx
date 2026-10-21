@@ -1,19 +1,22 @@
 import { type AgentState, cx } from "@agenteschat/ui";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { CAST } from "./cast";
 import { useJoy } from "./hooks";
-import { SampleAgent } from "./LpAvatar";
-import { SceneApproval, SceneLedger, type SceneProps, SceneRequest, SceneRouter, SceneWork } from "./Scenes";
+import { LpAvatar } from "./LpAvatar";
+import { SceneApproval, SceneLedger, type SceneProps, SceneRequest, SceneWho, SceneWork } from "./Scenes";
+import "./Story.css";
 
 const STEPS = ["s1", "s2", "s3", "s4", "s5"] as const;
-const SCENES: ComponentType<SceneProps>[] = [SceneRequest, SceneRouter, SceneWork, SceneApproval, SceneLedger];
+const SCENES: ComponentType<SceneProps>[] = [SceneRequest, SceneWho, SceneWork, SceneApproval, SceneLedger];
 
 const bump = (list: number[], i: number) => list.map((v, j) => (j === i ? v + 1 : v));
 
 /**
- * "Como funciona": a sticky screen with five scenes driven by the scroll, and
- * a progress rail that ends in an agent (it thinks while the line travels and
- * celebrates when it arrives). Below 960px each step shows its scene inline.
+ * "01 · Como funciona": a sticky screen with five scenes driven by the
+ * scroll, and a progress rail from the person who asks to the agent who
+ * delivers (it works while the line travels and celebrates when it arrives).
+ * Below 960px each step shows its scene inline, played once.
  */
 export function StoryScroll() {
   const { t } = useTranslation();
@@ -25,7 +28,7 @@ export function StoryScroll() {
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    let current = -1;
+    let current = 0;
     const inlineDone = new Set<number>();
     const desktop = () => {
       const col = screenCol.current;
@@ -54,46 +57,44 @@ export function StoryScroll() {
   }, []);
 
   return (
-    <section className="lp-sec" id="como">
+    <section className="lp-sec" id="conversa">
       <div className="lp-wrap">
         <div className="lp-sec-head">
-          <span className="lp-eyebrow">{t("landing.how.eyebrow")}</span>
-          <h2>{t("landing.how.title")}</h2>
-          <p className="lp-lead">{t("landing.how.lead")}</p>
+          <span className="lp-eyebrow">{t("landing.story.eyebrow")}</span>
+          <h2>{t("landing.story.title")}</h2>
+          <p className="lp-lead">{t("landing.story.lead")}</p>
         </div>
         <div className="lp-story">
-          <div className="lp-steps">
+          <div className="lp-story-steps">
             <Rail />
             {STEPS.map((s, i) => {
               const Scene = SCENES[i] as ComponentType<SceneProps>;
               return (
                 <article
                   key={s}
-                  className={cx("lp-st", active === i && "lp-on")}
+                  className={cx("lp-story-step", i === 0 && "lp-story-step--first", active === i && "lp-on")}
                   data-i={i}
                   ref={(el) => {
                     steps.current[i] = el;
                   }}
                 >
-                  <div className="lp-n">
+                  <div className="lp-story-n">
                     <span>{i + 1}</span>
-                    {t(`landing.how.${s}.n`)}
+                    {t(`landing.story.${s}.n`)}
                   </div>
-                  <h3>{t(`landing.how.${s}.title`)}</h3>
-                  <p>{t(`landing.how.${s}.text`)}</p>
-                  <div className="lp-inline-vis">
-                    <div className="lp-vis lp-on">
-                      <Scene run={inlineRuns[i] ?? 0} />
-                    </div>
+                  <h3>{t(`landing.story.${s}.title`)}</h3>
+                  <p>{t(`landing.story.${s}.text`)}</p>
+                  <div className="lp-story-inline">
+                    <Scene run={inlineRuns[i] ?? 0} />
                   </div>
                 </article>
               );
             })}
           </div>
-          <div className="lp-screen-col" ref={screenCol}>
-            <div className="lp-screen">
+          <div className="lp-story-screen-col" ref={screenCol}>
+            <div className="lp-story-screen">
               {SCENES.map((Scene, i) => (
-                <div key={STEPS[i]} className={cx("lp-vis", active === i && "lp-on")} inert={active !== i}>
+                <div key={STEPS[i]} className={cx("lp-story-vis", active === i && "lp-on")} inert={active !== i}>
                   <Scene run={runs[i] ?? 0} />
                 </div>
               ))}
@@ -105,7 +106,7 @@ export function StoryScroll() {
   );
 }
 
-/** The progress line along the steps; it ends in an agent. */
+/** The progress line along the steps: from the person who asks to the agent who delivers. */
 function Rail() {
   const { t } = useTranslation();
   const box = useRef<HTMLDivElement>(null);
@@ -116,7 +117,9 @@ function Rail() {
   const { trigger } = joy;
   useEffect(() => {
     let arrived = false;
+    let frame = 0;
     const sync = () => {
+      frame = 0;
       const el = box.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -135,16 +138,27 @@ function Rail() {
         setState(p > 0.02 ? "thinking" : "idle");
       }
     };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(sync);
+    };
     sync();
-    window.addEventListener("scroll", sync, { passive: true });
-    return () => window.removeEventListener("scroll", sync);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, [trigger]);
   return (
-    <div className="lp-rail" ref={box}>
+    <div className="lp-story-rail" ref={box}>
+      <span className="lp-story-rail-start">
+        <LpAvatar look={CAST.ada.look} px={30} name={CAST.ada.name} />
+      </span>
       <i ref={fill} />
-      <span className={cx("lp-rail-end", done && "lp-done")}>
-        <SampleAgent agent="lia" px={30} state={state} className={joy.className} />
-        <span className="lp-lbl">{t("landing.how.railDone")}</span>
+      <span className={cx("lp-story-rail-end", done && "lp-done")}>
+        <LpAvatar look={CAST.dev.look} px={30} name={CAST.dev.name} state={state} className={joy.className} />
+        <span className="lp-story-rail-lbl">{t("landing.story.railDone")}</span>
       </span>
     </div>
   );

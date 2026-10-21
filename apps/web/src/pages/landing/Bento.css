@@ -1,0 +1,332 @@
+/*
+ * "05 · Um lugar só" (telas/LandingNova.html #lugar). Cards are the design
+ * system's (tato com canto); every card that changes on its own has a fixed
+ * height so nothing below it moves.
+ */
+.lp .lp-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+.lp .lp-bento-card {
+  gap: 14px;
+  min-height: 280px;
+  overflow: hidden;
+}
+.lp .lp-bento-w4 {
+  grid-column: span 4;
+}
+.lp .lp-bento-w5 {
+  grid-column: span 5;
+}
+.lp .lp-bento-w6 {
+  grid-column: span 6;
+}
+.lp .lp-bento-w7 {
+  grid-column: span 7;
+}
+.lp .lp-bento-w8 {
+  grid-column: span 8;
+}
+/* Fixed heights: the board, the lesson and the query never resize their row. */
+.lp .lp-bento-fixed.lp-bento-c-kan {
+  height: 340px;
+}
+.lp .lp-bento-fixed.lp-bento-c-row {
+  height: 300px;
+}
+.lp .lp-bento-card .ac-card__foot {
+  margin-top: auto;
+}
+.lp .lp-bento-card .ac-card__foot > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Tasks */
+.lp .lp-bento-kan {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  height: 236px;
+}
+.lp .lp-bento-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px;
+  border-radius: 12px 12px 12px 3px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+}
+.lp .lp-bento-col h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.lp .lp-bento-col h4 .ac-icon {
+  flex: none;
+}
+.lp .lp-bento-task {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 9px 9px 9px 3px;
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.lp .lp-bento-task__m {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.lp .lp-bento-task__m .ac-pixspin {
+  flex: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp .lp-bento-task--moved {
+    animation: lp-bento-pop 0.5s var(--spring);
+  }
+}
+@keyframes lp-bento-pop {
+  from {
+    transform: scale(0.9);
+    opacity: 0.4;
+  }
+}
+
+/* Inbox */
+.lp .lp-bento-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp .lp-bento-lab {
+  margin: 2px 0;
+  font-size: 11.5px;
+  font-weight: 650;
+}
+.lp .lp-bento-lab--quiet {
+  color: var(--faint);
+}
+.lp .lp-bento-it {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--plate-soft);
+  font-size: 13px;
+}
+.lp .lp-bento-it__t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lp .lp-bento-it small {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* Routines */
+.lp .lp-bento-chart {
+  display: block;
+  width: 100%;
+  height: 130px;
+  image-rendering: pixelated;
+}
+
+/* Memory */
+.lp .lp-bento-lesson {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 12px 12px 12px 3px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  font-size: 13.5px;
+}
+.lp .lp-bento-lesson__m {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  color: var(--faint);
+  font-size: 12px;
+}
+.lp .lp-bento-lesson__t {
+  min-height: 0;
+  overflow: hidden;
+}
+.lp .lp-bento-lesson__acts {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+/* Drive */
+.lp .lp-bento-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp .lp-bento-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--plate-soft);
+  font-size: 13px;
+}
+.lp .lp-bento-file__th {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px 8px 8px 3px;
+  background: linear-gradient(180deg, var(--surface-raised), var(--card-key-bottom));
+  box-shadow: var(--card-key);
+  color: var(--muted);
+}
+.lp .lp-bento-file small {
+  display: block;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+/* Wiki */
+.lp .lp-bento-wiki {
+  position: relative;
+  flex: 1;
+  min-height: 150px;
+}
+.lp .lp-bento-wiki svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.lp .lp-bento-wiki__edge {
+  stroke: var(--ink);
+  stroke-opacity: 0.25;
+  stroke-dasharray: 3 3;
+}
+.lp .lp-bento-wiki__node rect {
+  fill: var(--surface-raised);
+  stroke: var(--line2);
+}
+.lp .lp-bento-wiki__node text {
+  fill: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+}
+.lp .lp-bento-wiki__node--main text {
+  fill: var(--ink);
+  font-weight: 650;
+}
+
+/* Database */
+.lp .lp-bento-sql {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  padding: 10px 12px;
+  border-radius: 10px 10px 10px 3px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  color: var(--ink2);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lp .lp-bento-sql__ok {
+  color: var(--ok);
+}
+.lp .lp-bento-sql__no {
+  color: var(--danger);
+}
+
+/* Forum */
+.lp .lp-bento-views {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp .lp-bento-view {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--plate-soft);
+  font-size: 13px;
+}
+.lp .lp-bento-view .lp-av {
+  flex: none;
+}
+.lp .lp-bento-synth {
+  padding: 10px;
+  border-radius: 10px 10px 10px 3px;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  font-size: 13px;
+}
+
+/* Connectors */
+.lp .lp-bento-logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 980px) {
+  .lp .lp-bento-grid > .lp-bento-card {
+    grid-column: span 12;
+  }
+}
+@media (max-width: 620px) {
+  .lp .lp-bento-kan {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 150px;
+    height: 308px;
+  }
+  .lp .lp-bento-fixed.lp-bento-c-kan {
+    height: 420px;
+  }
+  .lp .lp-bento-fixed.lp-bento-c-row {
+    height: 320px;
+  }
+}
