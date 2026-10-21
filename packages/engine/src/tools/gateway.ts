@@ -114,7 +114,9 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           : output;
       return tool.external ? { ...capped, content: wrapExternal(tool.name, capped.content) } : capped;
     } catch (error) {
-      return { content: `Tool failed: ${error instanceof Error ? error.message : String(error)}`, isError: true };
+      const message = error instanceof Error ? error.message : String(error);
+      // An MCP server's error text is its own words too.
+      return { content: `Tool failed: ${tool.external ? wrapExternal(tool.name, message) : message}`, isError: true };
     }
   }
 

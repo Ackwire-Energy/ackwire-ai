@@ -227,7 +227,8 @@ async function scoreToolResults(
     if (answers === "timeout") return { scores: null, source: "timeout" };
     const scores: Record<string, number> = {};
     judged.forEach((c, i) => {
-      scores[c.toolUseId] = Math.round((answers[`r${i}`]?.noul ?? 0) * 1000) / 1000;
+      // Unanswered: kept, like an unscored result in `pickRemovals` (never removed ahead of one judged unneeded).
+      scores[c.toolUseId] = Math.round((answers[`r${i}`]?.noul ?? 1) * 1000) / 1000;
     });
     return { scores, source: "judge" };
   } catch {

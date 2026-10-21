@@ -44,6 +44,9 @@ export async function enqueue(db: Executor, input: EnqueueInput): Promise<void> 
 /** A claimed job is invisible to other workers for this long; `runJob` renews it every third of it while the handler runs. */
 export const DEFAULT_LEASE_MS = 10 * 60_000;
 
+/** A handler still running after this (hung on a socket) stops renewing: its lease expires and another worker retries. */
+export const MAX_RENEWED_MS = 6 * 3600_000;
+
 /** Delay before attempt n+1 after n failed attempts (last value repeats). */
 export const RETRY_BACKOFF_MS = [5_000, 30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000, 3 * 3600_000];
 
@@ -174,7 +177,15 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
   const handler = handlers[job.kind];
   // A long handler (an agent run can outlast the lease) keeps its lease so no other worker re-claims it mid-run.
   const leaseMs = options.leaseMs ?? DEFAULT_LEASE_MS;
-  const renew = setInterval(() => void renewLease(db, job, leaseMs).catch(() => undefined), leaseMs / 3);
+  const until = Date.now() + MAX_RENEWED_MS;
+  const renew = setInterval(() => {
+    if (Date.now() > until) return clearInterval(renew);
+    // Taken over (our lease lapsed, or a stale-run recovery freed it): renewing again can't help.
+    void renewLease(db, job, leaseMs).then(
+      (owned) => owned || clearInterval(renew),
+      () => undefined,
+    );
+  }, leaseMs / 3);
   try {
     if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
     await handler(job, { finalAttempt: job.attempts >= job.maxAttempts });

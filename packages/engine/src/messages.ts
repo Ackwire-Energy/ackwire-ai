@@ -274,6 +274,9 @@ export interface NewMessage {
   clientId?: string | null;
 }
 
+/** A `clientId` as it is stored and claimed: trimmed, at most 64 chars; empty is none. */
+const normalizeClientId = (id: string | null | undefined) => id?.trim().slice(0, 64) || null;
+
 /** How long a person's `clientId` keeps a resend from writing the message again. */
 export const MESSAGE_CLIENT_ID_TTL_MS = 7 * 24 * 3600_000;
 
@@ -384,7 +387,7 @@ export async function insertMessageWithRuns(
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
   const referenced = `{${(person ? referencedOf(input.meta ?? {}) : []).filter((v) => UUID.test(v)).join(",")}}`;
   // Idempotent send: a person's `clientId` is claimed with the message; a resend finds it taken.
-  const clientId = (person && input.clientId?.trim().slice(0, 64)) || null;
+  const clientId = person ? normalizeClientId(input.clientId) : null;
   // Where the message may go: no thread, or a top-level message of this channel (`m` checks it too).
   const threadOk = sql`(${threadId}::uuid is null or exists (
           select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
@@ -692,6 +695,16 @@ export async function stopChecksSettled() {
  * `post` permission are checked, then message + outbox event commit together,
  * then the message is published to real-time subscribers.
  */
+/**
+ * A resend's answer: the message already written. Its runs, receipts and jobs went out with the first send;
+ * only `message.created` goes again (idempotent), in case the first send died before publishing it.
+ */
+async function resendView(deps: { db: Database; pubsub: PubSub }, orgId: string, message: Message) {
+  const [view] = (await withWikiLinks(deps.db, orgId, [messageView(message)])) as [MessageView];
+  await publishMessageCreated(deps.pubsub, view);
+  return view;
+}
+
 export async function postPersonMessage(
   /** `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop). */
   deps: { db: Database; pubsub: PubSub; judge?: Judge },
@@ -726,7 +739,10 @@ export async function postPersonMessage(
   // A forum topic is written through the forum (its turns), never as a plain chat (D33).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
-  const clientId = input.clientId?.trim().slice(0, 64) || null;
+  const clientId = normalizeClientId(input.clientId);
+  // A resend found before the judge call (no cost again); a resend racing the first send is caught by the insert.
+  const resent = clientId ? await sentWithClientId(deps.db, orgId, userId, clientId) : null;
+  if (resent) return resendView(deps, orgId, resent);
   // Quote and files: checked and resolved here, so the run's context reads them from the meta (no query there).
   const [replyTo, files] = await Promise.all([
     input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo) : null,
@@ -769,9 +785,8 @@ export async function postPersonMessage(
     },
     { startRuns: true },
   );
+  if (duplicate) return resendView(deps, orgId, message);
   const [view] = (await withWikiLinks(deps.db, orgId, [messageView(message)])) as [MessageView];
-  // Its events, runs and receipts went out with the first send: the same message, nothing again.
-  if (duplicate) return view;
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
   if (addressees) await recordAddressees(deps.db, message, addressees);

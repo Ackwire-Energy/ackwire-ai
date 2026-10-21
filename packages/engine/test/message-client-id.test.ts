@@ -16,7 +16,7 @@ describe("idempotent sends (clientId)", () => {
   const runs = () => f.db.select().from(schema.agentRuns);
   const jobs = () => f.db.select().from(schema.outbox);
 
-  test("same clientId twice: one message, one run; the resend returns the first and publishes nothing", async () => {
+  test("same clientId twice: one message, one run; the resend returns the first and only republishes it", async () => {
     const events = f.listen(f.general.id);
     const first = await post(f.owner.id, "@dev please look", { clientId: "c-1" });
     const outboxAfterFirst = (await jobs()).length;
@@ -29,7 +29,8 @@ describe("idempotent sends (clientId)", () => {
     expect(await messages()).toHaveLength(1);
     expect(await runs()).toHaveLength(1);
     expect(await jobs()).toHaveLength(outboxAfterFirst);
-    expect(events.length).toBe(eventsAfterFirst);
+    // Only `message.created` again (the first send may have died before publishing it).
+    expect(events.slice(eventsAfterFirst).map((e) => e.type)).toEqual(["message.created"]);
   });
 
   test("different people with the same clientId: two messages", async () => {
