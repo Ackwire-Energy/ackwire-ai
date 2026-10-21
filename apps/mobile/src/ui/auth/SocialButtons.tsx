@@ -61,7 +61,7 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient.signIn.social({ provider, callbackURL: "/" });
+      const res = await authClient().signIn.social({ provider, callbackURL: "/" });
       if (res.error) onError(t("mobile.auth.social.failed"));
     } catch {
       onError(t("mobile.auth.errors.network"));
@@ -81,7 +81,7 @@ export function SocialButtons({
       if (!credential.identityToken) return onError(t("mobile.auth.social.failed"));
       setBusy(true);
       rememberSignIn("apple");
-      const res = await authClient.signIn.social({ provider: "apple", idToken: { token: credential.identityToken } });
+      const res = await authClient().signIn.social({ provider: "apple", idToken: { token: credential.identityToken } });
       if (res.error) onError(t("mobile.auth.social.failed"));
     } catch (e) {
       // Closing Apple's sheet is not an error.

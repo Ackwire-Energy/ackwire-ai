@@ -1,6 +1,6 @@
-import { API_URL } from "@/config";
 import { authClient, authedFetch } from "@/lib/auth";
-import { unregisterPush } from "@/lib/push";
+import { SIGN_OUT_WAIT_MS, unregisterPush } from "@/lib/push";
+import { serverUrl } from "@/lib/server";
 import { clearStoredValues } from "@/lib/storage";
 import { type DeleteAccountResult, readDeleteResponse } from "./result";
 
@@ -8,11 +8,14 @@ export type { DeleteAccountResult };
 
 /**
  * Signs out: removes this phone from pushes, ends the session (the Expo plugin clears its stored cookie
- * and session) and forgets the app's remembered values. The session gate then shows sign-in.
+ * and session before asking the server) and forgets the app's remembered values. The session gate then
+ * shows sign-in.
  */
 export async function signOut(): Promise<void> {
   await unregisterPush({ optOut: false });
-  await authClient.signOut().catch(() => {});
+  await authClient()
+    .signOut({ fetchOptions: { timeout: SIGN_OUT_WAIT_MS } })
+    .catch(() => {});
   await clearStoredValues();
 }
 
@@ -22,14 +25,16 @@ export async function signOut(): Promise<void> {
  * `t("mobile.account.deleteSoleOwner")`). On success the phone is signed out.
  */
 export async function deleteAccount(): Promise<DeleteAccountResult> {
-  const res = await authedFetch(`${API_URL}/api/app/account`, {
+  const res = await authedFetch(`${serverUrl()}/api/app/account`, {
     method: "DELETE",
     headers: { accept: "application/json" },
   }).catch(() => null);
   if (!res) return { ok: false, reason: "failed", status: 0 };
   const result = await readDeleteResponse(res);
   if (result.ok) {
-    await authClient.signOut().catch(() => {});
+    await authClient()
+      .signOut()
+      .catch(() => {});
     await clearStoredValues();
   }
   return result;

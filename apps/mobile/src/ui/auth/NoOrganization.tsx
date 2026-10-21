@@ -1,8 +1,8 @@
 import * as WebBrowser from "expo-web-browser";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { API_URL } from "@/config";
 import { signOut } from "@/features/account";
+import { serverUrl } from "@/lib/server";
 import { Button } from "../Button";
 import { useTheme } from "../theme";
 import { AuthScaffold } from "./AuthScaffold";
@@ -19,7 +19,7 @@ export function NoOrganization() {
           wide
           icon="globe"
           label={t("mobile.org.openSite")}
-          onPress={() => void WebBrowser.openBrowserAsync(API_URL)}
+          onPress={() => void WebBrowser.openBrowserAsync(serverUrl())}
         />
         <Button variant="ghost" wide label={t("mobile.org.signOut")} onPress={() => void signOut()} />
       </AuthScaffold>

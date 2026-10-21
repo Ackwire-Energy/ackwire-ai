@@ -9,6 +9,7 @@ import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
+import { ServerLine } from "@/ui/auth/ServerLine";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
@@ -106,7 +107,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setPending(true);
     setError(null);
     try {
-      const res = await authClient.signIn.email({ email: email.trim(), password });
+      const res = await authClient().signIn.email({ email: email.trim(), password });
       if (res.error) {
         haptics.warning();
         if (res.error.status === 401) setWrong(true);
@@ -126,7 +127,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setPending(true);
     setError(null);
     try {
-      const res = await authClient.signUp.email({ name: name.trim(), email: email.trim(), password });
+      const res = await authClient().signUp.email({ name: name.trim(), email: email.trim(), password });
       if (res.error) {
         haptics.warning();
         if (res.error.status === 403) go("closed");
@@ -148,7 +149,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     try {
       // The answer is the same whether or not the account exists. Relative: the server resolves it
       // against its own address, so the link opens its web page whatever address the app reached it at.
-      const res = await authClient.requestPasswordReset({ email: email.trim(), redirectTo: "/reset-password" });
+      const res = await authClient().requestPasswordReset({ email: email.trim(), redirectTo: "/reset-password" });
       if (res.error) return failed(res.error.status);
       haptics.success();
       go("sent");
@@ -214,6 +215,11 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const fix = step === "email" || step === "forgot" ? emailTypoFix(email) : null;
   const mail = webmailOf(email);
 
+  const terms =
+    (step === "email" || step === "newPassword") && termsUrl && privacyUrl ? (
+      <Terms termsUrl={termsUrl} privacyUrl={privacyUrl} />
+    ) : null;
+
   const submitLabel: Partial<Record<Step, string>> = {
     email: t("auth.flow.continue"),
     password: t("auth.signIn"),
@@ -231,9 +237,14 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       agentMode={pending ? "run" : "idle"}
       expression={expression}
       footer={
-        (step === "email" || step === "newPassword") && termsUrl && privacyUrl ? (
-          <Terms termsUrl={termsUrl} privacyUrl={privacyUrl} />
-        ) : null
+        step === "email" ? (
+          <View style={{ gap: 14, alignItems: "center" }}>
+            {terms}
+            <ServerLine />
+          </View>
+        ) : (
+          terms
+        )
       }
     >
       {step !== "email" && step !== "forgot" && step !== "sent" ? (

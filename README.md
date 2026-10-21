@@ -32,7 +32,7 @@ Cloud: both run this same codebase.
 | Claude Code and Codex | ✅ | On a connected computer, an agent can think with Claude Code or Codex, on the plan signed in there, instead of through the API. Codex is still in testing. |
 | Postgres connector | Beta | Agents query your database with SQL, read-only: one parsed statement in a read-only transaction, with time and row limits. |
 | Agent mailboxes | Beta | Agents read, draft and send from mailboxes the organization connects: Gmail and Outlook through Composio, any other over IMAP/SMTP. Sending asks for approval by default. |
-| Phone app | Beta | iPhone and Android (Expo). A self-hosted instance needs its own build. |
+| Phone app | Beta | iPhone and Android (Expo), on agentes.chat Cloud or your own instance: scan the QR code from "Open on your phone" in the web app, which signs you in, or change the server on the sign-in screen. |
 | Desktop app (macOS) | Beta | A menu bar app that connects your Mac as an agent computer. It works with agentes.chat Cloud only. |
 | Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from OpenClaw, Hermes Agent, OpenBot.Run, Paperclip, OpenMausBot, OpenBot or another agentes.chat workspace, as a file, a folder, an archive or a GitHub link; other apps answer an export prompt. A preview comes first; skills arrive off, routines paused, and keys never. A workspace exports as one file. |
 | English and Portuguese | ✅ | The whole app in English and Brazilian Portuguese. |
