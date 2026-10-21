@@ -64,8 +64,8 @@ describe("the agent's look", () => {
     await click(within(page.getByRole("group", { name: "Olhos" })).getByRole("button", { name: /Felizes/ }));
     await click(within(page.getByRole("group", { name: "Acessório" })).getByRole("button", { name: /Coroa/ }));
     expect(document.querySelector(".ac-carousel")).not.toBeNull();
-    // The agent on the cover is the draft.
-    const cover = document.querySelector(".agp-cover .ac-avatar") as HTMLElement;
+    // The agent's face over the cover's edge (telas/AgenteTopo.html D) is the draft.
+    const cover = document.querySelector(".agp-face .ac-avatar") as HTMLElement;
     expect(cover.getAttribute("data-eyes")).toBe("happy");
     expect(cover.getAttribute("data-accessory")).toBe("crown");
     expect(document.body.textContent).toContain("Antes: Céu · Redondos");

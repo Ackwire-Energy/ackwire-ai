@@ -267,6 +267,26 @@ export interface NewMessage {
   meta?: Record<string, unknown>;
   /** Placed at this time instead of now (an agent's text that came before a card already posted). */
   createdAt?: Date;
+  /**
+   * A person's app id for this send (trimmed, at most 64 chars): a resend with the same one by the same
+   * person returns the message already written (`duplicate`), with nothing else written. Ignored for agents.
+   */
+  clientId?: string | null;
+}
+
+/** A `clientId` as it is stored and claimed: trimmed, at most 64 chars; empty is none. */
+const normalizeClientId = (id: string | null | undefined) => id?.trim().slice(0, 64) || null;
+
+/** How long a person's `clientId` keeps a resend from writing the message again. */
+export const MESSAGE_CLIENT_ID_TTL_MS = 7 * 24 * 3600_000;
+
+/** Forgets `clientId`s older than the TTL (a resend that late writes a new message). Returns rows deleted. */
+export async function pruneMessageClientIds(db: Executor, olderThanMs = MESSAGE_CLIENT_ID_TTL_MS): Promise<number> {
+  const deleted = await db
+    .delete(schema.messageClientIds)
+    .where(lt(schema.messageClientIds.createdAt, new Date(Date.now() - olderThanMs)))
+    .returning({ id: schema.messageClientIds.messageId });
+  return deleted.length;
 }
 
 /**
@@ -345,6 +365,8 @@ export async function insertMessageWithRuns(
   answered: { id: string | null; agentId: string } | null;
   /** A person's reply reopened a closed thread. */
   reopened: boolean;
+  /** A resend (same person and `clientId`): `message` is the one already written; nothing was written now. */
+  duplicate: boolean;
 }> {
   const body = input.body.trim();
   // Files alone are a message (`meta.artifacts`): the text may be empty then.
@@ -364,12 +386,29 @@ export async function insertMessageWithRuns(
   const startRuns = options.startRuns && person;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
   const referenced = `{${(person ? referencedOf(input.meta ?? {}) : []).filter((v) => UUID.test(v)).join(",")}}`;
+  // Idempotent send: a person's `clientId` is claimed with the message; a resend finds it taken.
+  const clientId = person ? normalizeClientId(input.clientId) : null;
+  // Where the message may go: no thread, or a top-level message of this channel (`m` checks it too).
+  const threadOk = sql`(${threadId}::uuid is null or exists (
+          select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
+            and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))`;
   const rows = rowsOf<RawMessage>(
     await tx.execute(sql`with archived as (
         -- An archived thread is read only for people (ADR 0029); an agent's run already going still lands.
         select 1 from ${threads} th
         where ${person}::boolean and ${threadId}::uuid is not null and th.org_id = ${input.orgId}::uuid
           and th.root_message_id = ${threadId}::uuid and th.state = 'archived'
+      ), claimed as (
+        -- Only when the message will be written (same checks as m): a refused send claims nothing.
+        -- Taken already (a resend, or the same send racing): no row, so nothing below writes anything.
+        insert into ${schema.messageClientIds} (org_id, user_id, client_id, message_id)
+        select ${input.orgId}::uuid, ${userId}::text, ${clientId}::text, ${id}::uuid
+        where ${clientId}::text is not null and ${threadOk} and not exists (select 1 from archived)
+        on conflict do nothing
+        returning message_id
+      ), fresh as (
+        -- The write goes ahead: no client id, or this send claimed it.
+        select 1 where ${clientId}::text is null or exists (select 1 from claimed)
       ), muted as (
         -- A mission's thread (ADR 0029): only its owner and those who can decide make its agent act.
         -- Anyone else addressing it starts nothing: the message becomes a suggestion.
@@ -397,7 +436,8 @@ export async function insertMessageWithRuns(
         -- A person's reply where an agent asked something (same channel and thread) answers it.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
           answered_at = now()
-        where ${person}::boolean and q.status = 'open' and not exists (select 1 from archived) and q.id = (
+        where ${person}::boolean and q.status = 'open' and not exists (select 1 from archived)
+          and exists (select 1 from fresh) and q.id = (
             select oq.id from ${agentQuestions} oq
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
               and oq.status = 'open' and oq.expires_at > now()
@@ -472,11 +512,11 @@ export async function insertMessageWithRuns(
                 from muted mu where mu.agent_id in (select agent_id from addressed)
                   -- A plain reply there by someone who takes no part: a suggestion too, so the owner sees it.
                   or (mu.outsider and not exists (select 1 from mentioned)) limit 1), '{}'::jsonb)
-        where (${threadId}::uuid is null or exists (
-          select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
-            and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
+        where ${threadOk}
           -- An archived thread is read only for people (ADR 0029); an agent's run already going still lands.
           and not exists (select 1 from archived)
+          -- A resend (its client id already claimed) writes nothing.
+          and exists (select 1 from fresh)
         returning *
       ), reopened as (
         -- A person replying in a closed thread reopens it (one indexed update; no row = nothing to do).
@@ -545,6 +585,14 @@ export async function insertMessageWithRuns(
   );
   const row = rows[0];
   if (!row) {
+    // A resend (the response to the first send was lost): the message already written, nothing new.
+    if (clientId && userId) {
+      const sent = await sentWithClientId(tx, input.orgId, userId, clientId);
+      if (sent) {
+        const none = { runs: [], blocked: [], steered: [], answered: null, reopened: false };
+        return { message: sent, ...none, duplicate: true };
+      }
+    }
     // Only on the failure path: tell an archived thread from a wrong thread id.
     if (threadId && person && (await isThreadArchived(tx, input.orgId, threadId))) {
       throw new ConflictError("This thread is archived: unarchive it to reply", "thread.archived");
@@ -580,7 +628,28 @@ export async function insertMessageWithRuns(
     steered: parseJson(row.steered ?? null, [] as { id: string; agentId: string }[]),
     answered: parseJson<{ id: string | null; agentId: string } | null>(row.answered ?? null, null),
     reopened: row.reopened === true || (row.reopened as unknown) === "t",
+    duplicate: false,
   };
+}
+
+/** The message this person already sent with this `clientId` (a resend's lookup). */
+async function sentWithClientId(db: Executor, orgId: string, userId: string, clientId: string) {
+  const { messageClientIds } = schema;
+  const [claim] = await db
+    .select({ messageId: messageClientIds.messageId })
+    .from(messageClientIds)
+    .where(
+      and(
+        eq(messageClientIds.orgId, orgId),
+        eq(messageClientIds.userId, userId),
+        eq(messageClientIds.clientId, clientId),
+      ),
+    );
+  if (!claim) return null;
+  const message = await getMessage(db, orgId, claim.messageId);
+  // Claimed, but the message is gone: it was sent; never write it twice.
+  if (!message) throw new ConflictError("This message was already sent", "message.already_sent");
+  return message;
 }
 
 /**
@@ -626,6 +695,16 @@ export async function stopChecksSettled() {
  * `post` permission are checked, then message + outbox event commit together,
  * then the message is published to real-time subscribers.
  */
+/**
+ * A resend's answer: the message already written. Its runs, receipts and jobs went out with the first send;
+ * only `message.created` goes again (idempotent), in case the first send died before publishing it.
+ */
+async function resendView(deps: { db: Database; pubsub: PubSub }, orgId: string, message: Message) {
+  const [view] = (await withWikiLinks(deps.db, orgId, [messageView(message)])) as [MessageView];
+  await publishMessageCreated(deps.pubsub, view);
+  return view;
+}
+
 export async function postPersonMessage(
   /** `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop). */
   deps: { db: Database; pubsub: PubSub; judge?: Judge },
@@ -660,7 +739,10 @@ export async function postPersonMessage(
   // A forum topic is written through the forum (its turns), never as a plain chat (D33).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
-  const clientId = input.clientId?.trim().slice(0, 64) || null;
+  const clientId = normalizeClientId(input.clientId);
+  // A resend found before the judge call (no cost again); a resend racing the first send is caught by the insert.
+  const resent = clientId ? await sentWithClientId(deps.db, orgId, userId, clientId) : null;
+  if (resent) return resendView(deps, orgId, resent);
   // Quote and files: checked and resolved here, so the run's context reads them from the meta (no query there).
   const [replyTo, files] = await Promise.all([
     input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo) : null,
@@ -681,7 +763,8 @@ export async function postPersonMessage(
         }
       : input.meta;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
-  const { message, runs, blocked, steered, answered, reopened } = await insertMessageWithRuns(
+  // A resend with the same `clientId` (the first response was lost) gets the message already written.
+  const { message, runs, blocked, steered, answered, reopened, duplicate } = await insertMessageWithRuns(
     deps.db,
     {
       orgId,
@@ -689,6 +772,7 @@ export async function postPersonMessage(
       threadId: input.threadId,
       author: { type: "person", userId },
       body: input.body,
+      clientId,
       meta:
         clientId || meta || input.steer === "now"
           ? {
@@ -701,6 +785,7 @@ export async function postPersonMessage(
     },
     { startRuns: true },
   );
+  if (duplicate) return resendView(deps, orgId, message);
   const [view] = (await withWikiLinks(deps.db, orgId, [messageView(message)])) as [MessageView];
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);

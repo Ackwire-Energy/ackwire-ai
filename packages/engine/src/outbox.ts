@@ -9,8 +9,9 @@ export type OutboxJob = typeof outbox.$inferSelect;
  *
  * - `enqueue` runs inside the caller's transaction, so the job exists iff the
  *   change that caused it committed.
- * - Workers claim due rows with `FOR UPDATE SKIP LOCKED` and a lease; a
- *   worker that dies mid-job loses the lease and another worker retries it.
+ * - Workers claim due rows with `FOR UPDATE SKIP LOCKED` and a lease, renewed
+ *   while the handler runs; a worker that dies mid-job stops renewing, loses
+ *   the lease and another worker retries it.
  * - Failures retry with backoff until `max_attempts`, then the row is `failed`.
  *
  * Handlers must be idempotent: a job can run more than once (lease expiry).
@@ -40,8 +41,11 @@ export async function enqueue(db: Executor, input: EnqueueInput): Promise<void> 
     .onConflictDoNothing();
 }
 
-/** A claimed job is invisible to other workers for this long. Longer than any model call we allow. */
+/** A claimed job is invisible to other workers for this long; `runJob` renews it every third of it while the handler runs. */
 export const DEFAULT_LEASE_MS = 10 * 60_000;
+
+/** A handler still running after this (hung on a socket) stops renewing: its lease expires and another worker retries. */
+export const MAX_RENEWED_MS = 6 * 3600_000;
 
 /** Delay before attempt n+1 after n failed attempts (last value repeats). */
 export const RETRY_BACKOFF_MS = [5_000, 30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000, 3 * 3600_000];
@@ -90,6 +94,21 @@ export async function claimJobs(db: Database, options: ClaimOptions): Promise<Ou
     } else runnable.push(job);
   }
   return runnable;
+}
+
+/** Extends a running job's lease, unless another worker took it over. Returns whether it still owns the job. */
+export async function renewLease(
+  db: Database,
+  job: OutboxJob,
+  leaseMs = DEFAULT_LEASE_MS,
+  now = new Date(),
+): Promise<boolean> {
+  const rows = await db
+    .update(outbox)
+    .set({ lockedUntil: new Date(now.getTime() + leaseMs) })
+    .where(and(eq(outbox.id, job.id), eq(outbox.status, "processing"), eq(outbox.lockedBy, job.lockedBy ?? "")))
+    .returning({ id: outbox.id });
+  return rows.length > 0;
 }
 
 /** Marks a job done, unless another worker took it over after our lease expired. */
@@ -156,6 +175,17 @@ export interface ProcessOptions extends ClaimOptions {
 
 async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, options: ProcessOptions) {
   const handler = handlers[job.kind];
+  // A long handler (an agent run can outlast the lease) keeps its lease so no other worker re-claims it mid-run.
+  const leaseMs = options.leaseMs ?? DEFAULT_LEASE_MS;
+  const until = Date.now() + MAX_RENEWED_MS;
+  const renew = setInterval(() => {
+    if (Date.now() > until) return clearInterval(renew);
+    // Taken over (our lease lapsed, or a stale-run recovery freed it): renewing again can't help.
+    void renewLease(db, job, leaseMs).then(
+      (owned) => owned || clearInterval(renew),
+      () => undefined,
+    );
+  }, leaseMs / 3);
   try {
     if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
     await handler(job, { finalAttempt: job.attempts >= job.maxAttempts });
@@ -163,6 +193,8 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
   } catch (error) {
     const outcome = await failJob(db, job, error, { retryable: isRetryable(error) });
     options.onError?.(job, error, outcome);
+  } finally {
+    clearInterval(renew);
   }
 }
 

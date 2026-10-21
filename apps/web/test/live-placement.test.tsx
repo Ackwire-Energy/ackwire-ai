@@ -172,7 +172,7 @@ describe("stale runs: reconcile with the server", () => {
 });
 
 describe("live row in the timeline", () => {
-  const ids = { threadId: "m-1", runId: "r-live", agentId: ADA_ID };
+  const ids = { threadId: null, runId: "r-live", agentId: ADA_ID };
   const open = async (configure?: (state: ReturnType<typeof seedState>) => void) => {
     const state = seedState();
     configure?.(state);

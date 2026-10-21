@@ -25,6 +25,7 @@ import {
   type ToolContext,
   takeBridgeEffects,
   ValidationError,
+  wrapExternal,
 } from "../src";
 import { fakeGithubMcp } from "./fake-mcp";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -177,7 +178,10 @@ describe("enforcement in the Tool Gateway", () => {
     await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app", "walt/*"]);
     expect(
       await gateway.invoke(ctx, { toolUseId: "b", name: "github_get_pull_request", input: pr("acme", "app") }),
-    ).toMatchObject({ type: "result", output: { content: "PR #4: fix token refresh (checks passing)" } });
+    ).toMatchObject({
+      type: "result",
+      output: { content: wrapExternal("github_get_pull_request", "PR #4: fix token refresh (checks passing)") },
+    });
     expect(
       await gateway.invoke(ctx, { toolUseId: "c", name: "github_get_pull_request", input: pr("walt", "anything") }),
     ).toMatchObject({ type: "result", output: { data: { repo: "walt/anything" } } });

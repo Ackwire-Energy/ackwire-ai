@@ -166,7 +166,8 @@ for (const [key, make] of Object.entries(strategies)) {
         );
     }
     for (const l of labels) {
-      const m = per.get(l)!;
+      const m = per.get(l);
+      if (!m) continue;
       if (got.relation === l && c.label === l) m.tp++;
       else if (got.relation === l) m.fp++;
       else if (c.label === l) m.fn++;
@@ -177,7 +178,8 @@ for (const [key, make] of Object.entries(strategies)) {
   console.log(`relation right: ${pct(right, cases.length)}   action right: ${pct(rightAction, cases.length)}`);
   console.log(`harmful moves: ${harmful}   missed moves: ${missed}   errors: ${failed}   ${ms.toFixed(0)} ms/case`);
   for (const l of labels) {
-    const m = per.get(l)!;
+    const m = per.get(l);
+    if (!m) continue;
     console.log(`  ${l.padEnd(12)} precision ${pct(m.tp, m.tp + m.fp)}  recall ${pct(m.tp, m.tp + m.fn)}`);
   }
   if (s.name === "jev")

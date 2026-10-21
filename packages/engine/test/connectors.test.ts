@@ -20,6 +20,7 @@ import {
   setAgentScopes,
   startOAuth,
   ValidationError,
+  wrapExternal,
 } from "../src";
 import { fakeGithubMcp } from "./fake-mcp";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -175,11 +176,15 @@ describe("MCP tools through the Tool Gateway", () => {
         name: "github_get_pull_request",
         input: { owner: "acme", repo: "app", pullNumber: 42 },
       }),
-    ).toMatchObject({ type: "result", output: { content: "PR #42: fix token refresh (checks passing)" } });
+    ).toMatchObject({
+      type: "result",
+      // The MCP server's text is third-party data: wrapped for the model.
+      output: { content: wrapExternal("github_get_pull_request", "PR #42: fix token refresh (checks passing)") },
+    });
     expect(
       await gateway.invoke(rctx, { toolUseId: "t2", name: "github_get_issue", input: { number: 1 } }),
     ).toMatchObject({
-      output: { content: "boom", isError: true },
+      output: { content: wrapExternal("github_get_issue", "boom"), isError: true },
     });
     expect(
       await gateway.invoke(rctx, { toolUseId: "t3", name: "github_delete_repository", input: { repo: "app" } }),

@@ -9,9 +9,6 @@ import { renderApp, settle } from "./render";
 
 afterEach(() => cleanup());
 
-/** The newest message of #eng: the run answers it (its thread anchors the live row). */
-const lastIn = (state: ReturnType<typeof seedState>) => state.messages.filter((m) => m.channelId === ENG_ID).at(-1)?.id;
-
 describe("the activity bar while an agent is in its browser", () => {
   test("says 'No navegador'; a click on the bar opens the agent's browser card in the conversation", async () => {
     const state = seedState();
@@ -21,7 +18,7 @@ describe("the activity bar while an agent is in its browser", () => {
     await act(async () => socket.open());
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
-    const run = { threadId: lastIn(state), runId: "r-browser", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-browser", agentId: ADA_ID };
     await ev({ type: "agent.thinking", ...run });
     await settle();
     const bar = () => document.querySelector(".ac-typing") as HTMLElement;
@@ -60,7 +57,7 @@ describe("the activity bar while an agent is in its browser", () => {
     await act(async () => socket.open());
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
-    const run = { threadId: lastIn(state), runId: "r-browser-2", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-browser-2", agentId: ADA_ID };
     await ev({ type: "agent.thinking", ...run });
     await ev({ type: "agent.tool", ...run, tool: "browser_open" });
     await settle();

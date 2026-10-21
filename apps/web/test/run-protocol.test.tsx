@@ -153,7 +153,7 @@ describe("in the channel", () => {
     await act(async () => socket.open());
     await settle(2);
     // run-1 is "done" on the server (seed).
-    const ids = { threadId: "m-1", runId: "run-1", agentId: ADA_ID, channelId: ENG_ID };
+    const ids = { threadId: null, runId: "run-1", agentId: ADA_ID, channelId: ENG_ID };
     await act(async () =>
       socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.run", ...ids, status: "running" } }),
     );

@@ -94,6 +94,17 @@ function inbox(): AppNotification[] {
 }
 
 const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
+  // The "Login 401" thread: Ada's reply there (the seed's channel messages are all top-level, D67).
+  state.messages.push({
+    id: "m-thread-ada",
+    channelId: ENG_ID,
+    threadId: "m-1",
+    author: { type: "agent", id: ADA_ID },
+    body: "Corrigi o refresh: o PR #42 está aberto.",
+    mentionedAgentIds: [],
+    agentRunId: "r-1",
+    createdAt: ago(30),
+  });
   state.messages.push({
     id: "m-q",
     channelId: ENG_ID,
@@ -169,7 +180,7 @@ describe("Notificações", () => {
     const row = document.querySelector('[data-n="n-thread"]') as HTMLElement;
     await click(within(row).getByRole("button", { name: "Ver 2 respostas" }));
     await settle(4);
-    expect(row.textContent).toContain("Achei a causa");
+    expect(row.textContent).toContain("Corrigi o refresh: o PR #42 está aberto.");
     // Opening it marked it read.
     expect(state.calls.find((c) => c.method === "notifications.read")?.args).toEqual([ORG_ID, "n-thread", true]);
     await click(within(row).getByRole("button", { name: "Responder" }));

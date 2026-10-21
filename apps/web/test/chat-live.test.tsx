@@ -95,7 +95,7 @@ const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state
 
 describe("typing bar above the composer", () => {
   test("mention → 'Atlas está trabalhando…'; its block from the start, last in the timeline", async () => {
-    const { socket, state } = await open();
+    const { socket } = await open();
     await sendText("@atlas olha o deploy");
     expect(bar().textContent).toBe("Atlas está trabalhando…");
     // Agents at work: the pixel orbit (the dots are for people typing).
@@ -105,7 +105,7 @@ describe("typing bar above the composer", () => {
     // The words are the bar's; the block in the timeline opens with a short phrase.
     expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
-    const run = { threadId: lastPerson(state)?.id, runId: "r-live", agentId: ATLAS_ID };
+    const run = { threadId: null, runId: "r-live", agentId: ATLAS_ID };
     await push(socket, { type: "agent.thinking", ...run });
     expect(bar().textContent).toBe("Atlas está trabalhando…");
     await push(socket, { type: "agent.typing", ...run });
@@ -123,7 +123,7 @@ describe("typing bar above the composer", () => {
   });
 
   test("groups agents and people: 'Atlas está trabalhando · João está digitando…'; our typing frames are throttled", async () => {
-    const { socket, state } = await open();
+    const { socket } = await open();
     await sendText("@atlas tudo certo?");
     await settle(2);
     await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
@@ -131,7 +131,7 @@ describe("typing bar above the composer", () => {
     expect(bar().textContent).toBe("Atlas está trabalhando · João está digitando…");
     await push(socket, {
       type: "agent.delta",
-      threadId: lastPerson(state)?.id,
+      threadId: null,
       runId: "r-g",
       agentId: ATLAS_ID,
       seq: 1,

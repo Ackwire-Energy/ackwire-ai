@@ -27,7 +27,7 @@ describe("Canal", () => {
     const ask = articles.find((a) => a.textContent?.includes("o login está devolvendo 401"));
     expect(ask?.textContent).toContain("João");
     expect(ask?.querySelector(".ac-mention")?.textContent).toBe("@Ada");
-    // Ada's reply lives in the thread of João's message and shows inline.
+    // Ada was asked in the channel, so her reply is in the channel (D67).
     const reply = articles.find((a) => a.textContent?.includes("Achei a causa"));
     expect(reply?.querySelector(".ac-avatar--agent")).not.toBeNull();
     expect(reply?.querySelector("code")?.textContent).toBe("expires_at");
@@ -68,7 +68,8 @@ describe("Canal", () => {
     const { socket } = await open();
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
-    const run = { threadId: "m-1", runId: "r-9", agentId: ATLAS_ID };
+    // Asked in the channel: it answers there, its events carry no thread (D67).
+    const run = { threadId: null, runId: "r-9", agentId: ATLAS_ID };
     await ev({ type: "agent.run", ...run, status: "running" });
     await ev({ type: "agent.delta", ...run, seq: 1, text: "Os 401 no Sentry caíram de 312 para" });
     await settle();
@@ -87,7 +88,7 @@ describe("Canal", () => {
       message: {
         id: "m-final",
         channelId: ENG_ID,
-        threadId: "m-1",
+        threadId: null,
         author: { type: "agent", id: ATLAS_ID },
         body: "Os 401 no Sentry caíram de 312 para 4.",
         mentionedAgentIds: [],
@@ -110,7 +111,7 @@ describe("Canal", () => {
         event: {
           type: "agent.run",
           channelId: ENG_ID,
-          threadId: "m-1",
+          threadId: null,
           runId: "r-x",
           agentId: ATLAS_ID,
           status: "failed",

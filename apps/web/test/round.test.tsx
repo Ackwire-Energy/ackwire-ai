@@ -130,7 +130,11 @@ describe("Detalhes do canal: membros", () => {
     let dialog = await openDetails();
     expect(dialog.textContent).toContain("Entra na conversa sozinho");
     const menu = await openMenu("Atlas");
-    expect(within(menu).getByRole("menuitemradio", { name: /^Sozinho/ }).getAttribute("aria-checked")).toBe("true");
+    expect(
+      within(menu)
+        .getByRole("menuitemradio", { name: /^Sozinho/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     await click(within(menu).getByRole("menuitemradio", { name: /^Quando chamado/ }));
     await settle(4);
     const put = state.calls.find((c) => c.method === "agents.setChannels");
@@ -265,7 +269,7 @@ describe("agent questions (ask_user)", () => {
       id: "q1",
       agentId: ADA_ID,
       channelId: ENG_ID,
-      threadId: "m-1",
+      threadId: null,
       messageId: "msg-q",
       text: "Faço o deploy agora ou depois das 18h?",
       choices: ["Agora", "Depois das 18h"],
@@ -276,7 +280,7 @@ describe("agent questions (ask_user)", () => {
     state.messages.push({
       id: "msg-q",
       channelId: ENG_ID,
-      threadId: "m-1",
+      threadId: null,
       author: { type: "agent", id: ADA_ID },
       body: "",
       mentionedAgentIds: [],
@@ -284,12 +288,30 @@ describe("agent questions (ask_user)", () => {
       meta: { question },
       createdAt: new Date().toISOString(),
     });
+    // Asked in the channel (D67): the question has no thread, so the receipt follows the run that answers m-1.
+    const asked = state.messages.find((m) => m.id === "m-1");
+    if (asked)
+      asked.receipts = { seenBy: [], pickedBy: [], handled: [{ agentId: ADA_ID, runId: "r-q", status: "running" }] };
     const { socket } = await go(`c/${ENG_ID}`, state);
     await act(async () =>
       socket.push({
         type: "event",
         channelId: ENG_ID,
-        event: { type: "question.asked", channelId: ENG_ID, threadId: "m-1", question },
+        event: { type: "question.asked", channelId: ENG_ID, threadId: null, question },
+      }),
+    );
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: {
+          type: "agent.run",
+          channelId: ENG_ID,
+          threadId: null,
+          runId: "r-q",
+          agentId: ADA_ID,
+          status: "waiting_input",
+        },
       }),
     );
     await settle();
@@ -322,7 +344,7 @@ describe("agent questions (ask_user)", () => {
       id: "q3",
       agentId: ADA_ID,
       channelId: ENG_ID,
-      threadId: "m-1",
+      threadId: null,
       messageId: "msg-q3",
       text,
       choices: null,
@@ -333,7 +355,7 @@ describe("agent questions (ask_user)", () => {
     state.messages.push({
       id: "msg-q3",
       channelId: ENG_ID,
-      threadId: "m-1",
+      threadId: null,
       author: { type: "agent", id: ADA_ID },
       body: text,
       mentionedAgentIds: [],
@@ -353,7 +375,7 @@ describe("agent questions (ask_user)", () => {
       id: "q2",
       agentId: ADA_ID,
       channelId: ENG_ID,
-      threadId: "m-1",
+      threadId: null,
       messageId: "msg-q2",
       text: "Uso a branch main ou staging?",
       choices: ["main", "staging"],
@@ -364,7 +386,7 @@ describe("agent questions (ask_user)", () => {
     state.messages.push({
       id: "msg-q2",
       channelId: ENG_ID,
-      threadId: "m-1",
+      threadId: null,
       author: { type: "agent", id: ADA_ID },
       body: "",
       mentionedAgentIds: [],

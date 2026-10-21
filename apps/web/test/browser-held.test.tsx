@@ -13,8 +13,6 @@ afterEach(() => {
   resetHeldPlaces();
 });
 
-/** The newest message of #eng: the run answers it (its thread anchors the live row). */
-const lastIn = (state: ReturnType<typeof seedState>) => state.messages.filter((m) => m.channelId === ENG_ID).at(-1)?.id;
 const cards = () => [...document.querySelectorAll(".brw-ac")] as HTMLElement[];
 
 /** Ada at work in its browser in #eng: its live row with the browser card. */
@@ -33,7 +31,7 @@ describe("Assumir: the card stays the control while the agent waits (NavegadorNo
     const state = seedState();
     const api = createFakeApi(state);
     const { ev } = await browsing(api);
-    const run = { threadId: lastIn(state), runId: "r-held", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-held", agentId: ADA_ID };
     await ev({ type: "agent.thinking", ...run });
     await ev({ type: "agent.tool", ...run, tool: "browser_open" });
     await settle();
@@ -81,7 +79,7 @@ describe("Assumir: the card stays the control while the agent waits (NavegadorNo
   test("the run fails while I hold the browser: the card stays for me to hand back", async () => {
     const state = seedState();
     const { ev } = await browsing(createFakeApi(state));
-    const run = { threadId: lastIn(state), runId: "r-fail", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-fail", agentId: ADA_ID };
     await ev({ type: "agent.thinking", ...run });
     await ev({ type: "agent.tool", ...run, tool: "browser_open" });
     await settle();
@@ -103,7 +101,7 @@ describe("Assumir: the card stays the control while the agent waits (NavegadorNo
       throw new ApiError(409, "conflict", "Someone else is in control");
     };
     const { ev } = await browsing(api);
-    const run = { threadId: lastIn(state), runId: "r-busy", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-busy", agentId: ADA_ID };
     await ev({ type: "agent.thinking", ...run });
     await ev({ type: "agent.tool", ...run, tool: "browser_open" });
     await settle();
@@ -115,7 +113,7 @@ describe("Assumir: the card stays the control while the agent waits (NavegadorNo
   test("Parar by someone else reaches every viewer: the card says who stopped it", async () => {
     const state = seedState();
     const { ev, socket } = await browsing(createFakeApi(state));
-    const run = { threadId: lastIn(state), runId: "r-stop", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-stop", agentId: ADA_ID };
     await ev({ type: "agent.thinking", ...run });
     await ev({ type: "agent.tool", ...run, tool: "browser_open" });
     await settle();

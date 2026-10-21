@@ -39,7 +39,9 @@ describe("landing page", () => {
     const { api } = signedOut();
     const { router } = await renderApp("/", { api });
     expect(router.state.location.pathname).toBe("/");
-    expect(screen().getByRole("heading", { level: 1, name: /Seu time e seus.*na mesma conversa/ })).toBeTruthy();
+    expect(
+      screen().getByRole("heading", { level: 1, name: /Agentes de IA que.*trabalham com o seu time/ }),
+    ).toBeTruthy();
     // The only call to action is the waiting list: no sign-up or sign-in link.
     expect(screen().queryByRole("link", { name: /criar conta|entrar$/i })).toBeNull();
     expect(screen().getAllByRole("button", { name: "Entrar na lista" }).length).toBe(2);
@@ -140,9 +142,7 @@ describe("landing page", () => {
       await services.i18n.changeLanguage("en");
     });
     await settle();
-    expect(
-      screen().getByRole("heading", { level: 1, name: /Your team and your.*in the same conversation/ }),
-    ).toBeTruthy();
+    expect(screen().getByRole("heading", { level: 1, name: /AI agents that.*work with your team/ })).toBeTruthy();
     const input = screen().getAllByPlaceholderText("you@company.com")[0] as HTMLInputElement;
     const form = input.closest("form");
     if (!form) throw new Error("no waiting list form");
@@ -166,9 +166,7 @@ describe("landing page", () => {
       fireEvent.click(within(switcher).getByRole("radio", { name: "EN" }));
     });
     await settle();
-    expect(
-      screen().getByRole("heading", { level: 1, name: /Your team and your.*in the same conversation/ }),
-    ).toBeTruthy();
+    expect(screen().getByRole("heading", { level: 1, name: /AI agents that.*work with your team/ })).toBeTruthy();
     expect(screen().getByRole("radiogroup", { name: "Language" })).toBeTruthy();
     expect(screen().getByRole("radio", { name: "EN" }).getAttribute("aria-checked")).toBe("true");
     expect(localStorage.getItem("agentes.locale")).toBe("en");
