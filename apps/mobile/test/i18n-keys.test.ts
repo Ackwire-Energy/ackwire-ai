@@ -43,5 +43,5 @@ test("extra keys merge deeply into the app's strings", () => {
   const mobile = merged["pt-BR"]?.translation?.mobile as Record<string, Record<string, unknown>>;
   expect(mobile.home?.a).toBe("b");
   expect(mobile.auth?.extra).toBe("x");
-  expect((mobile.auth?.signIn as Record<string, string> | undefined)?.submit).toBe(mobilePtBR.auth.signIn.submit);
+  expect((mobile.auth?.social as Record<string, string> | undefined)?.failed).toBe(mobilePtBR.auth.social.failed);
 });

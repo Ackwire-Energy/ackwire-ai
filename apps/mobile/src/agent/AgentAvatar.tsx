@@ -1,4 +1,4 @@
-import { drawAccessory, drawAgent } from "@agenteschat/ui/agent/engine";
+import { drawAccessory, drawAgent, type Expression } from "@agenteschat/ui/agent/engine";
 import { avatarSkyCell, avatarSkyCells, avatarSkyTones } from "@agenteschat/ui/sky/avatar";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
 import { memo, useMemo } from "react";
@@ -25,6 +25,8 @@ export interface AgentAvatarProps {
    * framed from 20 to 63pt; the tiny faces and the big hero stand on their own.
    */
   framed?: boolean;
+  /** Holds one face (the sign-in screens: eyes shut while a password is typed); writing still wins. */
+  expression?: Expression;
 }
 
 /** One frame of an agent as drawing commands (the engine draws, the recorder keeps the commands). */
@@ -36,6 +38,7 @@ export function agentFrame(
   seed: number,
   reduced: boolean,
   frame?: { dark: boolean },
+  expression?: Expression,
 ) {
   const accessory = agent.accessory && agent.accessory !== "none" ? agent.accessory : undefined;
   const box = frame ? framedLayout(size, Boolean(accessory)) : agentLayout(size, Boolean(accessory));
@@ -55,7 +58,9 @@ export function agentFrame(
     color: agent.color,
     eyes: agent.eyes,
     cells: box.cells,
-    pose: poseFor(mode, t, seed, reduced),
+    pose: expression
+      ? { ...poseFor(mode, t, seed, reduced), expression, blink: false }
+      : poseFor(mode, t, seed, reduced),
     after:
       box.withAccessory && accessory
         ? (ctx, side, frame) => drawAccessory(ctx, side, accessory, frame, t, mode === "run")
@@ -64,7 +69,7 @@ export function agentFrame(
   return compile(rec.commands);
 }
 
-function AgentAvatarView({ agent, size, mode = "idle", live = true, name, framed }: AgentAvatarProps) {
+function AgentAvatarView({ agent, size, mode = "idle", live = true, name, framed, expression }: AgentAvatarProps) {
   const reduced = useReducedMotion();
   const { scheme, colors: c } = useTheme();
   const tile = framed ?? framedByDefault(size);
@@ -74,9 +79,18 @@ function AgentAvatarView({ agent, size, mode = "idle", live = true, name, framed
   const seed = useMemo(() => seedOf(id ?? `${color}:${eyes}:${accessory ?? ""}`), [id, color, eyes, accessory]);
   const t = useFrameTime(live && !reduced, STILL_T);
   const picture = useMemo(() => {
-    const frame = agentFrame({ color, eyes, accessory }, size, mode, t, seed, reduced, tile ? { dark } : undefined);
+    const frame = agentFrame(
+      { color, eyes, accessory },
+      size,
+      mode,
+      t,
+      seed,
+      reduced,
+      tile ? { dark } : undefined,
+      expression,
+    );
     return createPicture((canvas) => replay(canvas, frame), { width: size, height: size });
-  }, [color, eyes, accessory, size, mode, t, seed, reduced, tile, dark]);
+  }, [color, eyes, accessory, size, mode, t, seed, reduced, tile, dark, expression]);
   const label = name
     ? tr(mode === "run" ? "mobile.a11y.agentWorking" : "mobile.a11y.agent", { name })
     : tr("mobile.a11y.agentPlain");
@@ -115,6 +129,7 @@ export const AgentAvatar = memo(
     a.live === b.live &&
     a.name === b.name &&
     a.framed === b.framed &&
+    a.expression === b.expression &&
     a.agent.color === b.agent.color &&
     a.agent.eyes === b.agent.eyes &&
     a.agent.accessory === b.agent.accessory &&

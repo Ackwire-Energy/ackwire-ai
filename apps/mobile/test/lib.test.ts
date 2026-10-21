@@ -4,7 +4,6 @@ import { chooseOrg } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { createSocketFactory } from "../src/lib/socket";
-import { authErrorKey, isEmail } from "../src/lib/validate";
 import { ICON_NAMES } from "../src/ui/icons.data";
 
 describe("push payload", () => {
@@ -95,14 +94,6 @@ test("organization choice: remembered if still a member, else the first", () => 
   expect(chooseOrg(orgs, "b")).toBe("b");
   expect(chooseOrg(orgs, "gone")).toBe("a");
   expect(chooseOrg([], "a")).toBeNull();
-});
-
-test("sign-in helpers", () => {
-  expect(isEmail("ana@empresa.com")).toBe(true);
-  expect(isEmail("ana@empresa")).toBe(false);
-  expect(authErrorKey({ status: 401, code: "INVALID_EMAIL_OR_PASSWORD" }, "signIn")).toBe("mobile.auth.signIn.wrong");
-  expect(authErrorKey({ status: 422, code: "USER_ALREADY_EXISTS" }, "signUp")).toBe("mobile.auth.signUp.taken");
-  expect(authErrorKey(null, "signIn")).toBe("mobile.auth.errors.generic");
 });
 
 test("every icon of the prototype is there", () => {

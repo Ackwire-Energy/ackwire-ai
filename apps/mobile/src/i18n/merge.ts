@@ -23,7 +23,7 @@ export function deepMerge(a: object, b: object): Strings {
 
 /**
  * The shared resources (`@agenteschat/i18n`, i18next shape: locale -> namespace -> strings) with the app's
- * own strings added under `mobile` in every namespace, so `t("mobile.auth.signIn.submit")` works with
+ * own strings added under `mobile` in every namespace, so `t("mobile.auth.social.failed")` works with
  * whatever namespace the shared package uses. `extra` adds more `mobile.*` strings per locale (the
  * screens' keys); a locale without them falls back to pt-BR through i18next's `fallbackLng`.
  */
