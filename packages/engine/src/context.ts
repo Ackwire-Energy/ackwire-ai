@@ -603,16 +603,16 @@ export function nowLine(zone: string, who: string | null, previousAt: Date | nul
   } catch {
     timeZone = "UTC";
   }
-  const when = new Intl.DateTimeFormat("en-US", {
+  // Date and time apart: how ICU joins them ("," or "at") changes between versions.
+  const day = new Intl.DateTimeFormat("en-US", {
     timeZone,
     weekday: "short",
     year: "numeric",
     month: "short",
     day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
   }).format(now);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const when = `${day}, ${time.format(now)}`;
   const before = previousAt ? `; the previous message here was ${ago(previousAt, now.getTime())}` : "";
   return `# Now\n${when}${who ? ` for ${who}` : ""} (${timeZone})${before}.`;
 }
