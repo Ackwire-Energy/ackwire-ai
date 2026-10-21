@@ -25,10 +25,12 @@ import {
   readTailscaleStatus,
   resolveChoice,
   secretEntries,
+  stopCommand,
   tailscaleKeyEntries,
   tailscaleKeyProblem,
   upsertEnv,
   versionAtLeast,
+  wayIn,
   withNetworkProfile,
 } from "../src/lib";
 
@@ -154,11 +156,21 @@ describe(".env", () => {
     expect(envValue(null, "A")).toBeNull();
   });
 
-  test("lines change in place, duplicates go, new keys at the end, comments stay", () => {
+  test("a key set twice reads as its last line, as Compose reads it: .env.example, then values appended", () => {
+    // `cp .env.example .env`, then `echo AGENTES_SECRET=… >> .env`, and a domain added by hand later.
+    const env =
+      "# Required.\nAGENTES_SECRET=\nPUBLIC_URL=http://localhost:3000\nX=1\nAGENTES_SECRET=real-secret\nPUBLIC_URL=https://chat.example.com\n";
+    expect(envValue(env, "AGENTES_SECRET")).toBe("real-secret");
+    expect(envValue(env, "PUBLIC_URL")).toBe("https://chat.example.com");
+    expect(secretEntries(env)).not.toHaveProperty("AGENTES_SECRET");
+    expect(wayIn(env, networkOf(env) ?? "tailscale", null).entries).toEqual({});
+  });
+
+  test("a written key keeps its first line and loses the others, new keys at the end, comments stay", () => {
     const env = "# mine\nPUBLIC_URL=http://localhost:3000\nX=1\nPUBLIC_URL=http://old\n";
-    expect(upsertEnv(env, { PUBLIC_URL: "https://box.tail1234.ts.net", NEW: "v" })).toBe(
-      "# mine\nPUBLIC_URL=https://box.tail1234.ts.net\nX=1\nNEW=v\n",
-    );
+    const next = upsertEnv(env, { PUBLIC_URL: "https://box.tail1234.ts.net", NEW: "v" });
+    expect(next).toBe("# mine\nPUBLIC_URL=https://box.tail1234.ts.net\nX=1\nNEW=v\n");
+    expect(envValue(next, "PUBLIC_URL")).toBe("https://box.tail1234.ts.net");
     expect(upsertEnv("", { A: "1" })).toBe("A=1\n");
     expect(upsertEnv("A=1\n", {})).toBe("A=1\n");
   });
@@ -193,6 +205,54 @@ describe(".env", () => {
     expect(networkOf("COMPOSE_PROFILES=backup,tailscale\n")).toBe("tailscale");
     expect(networkOf("COMPOSE_PROFILES=https\n")).toBe("domain");
     expect(networkOf("DOMAIN=chat.example.com\nPUBLIC_URL=http://localhost:3000\n")).toBe("domain");
+    // An address no profile manages: nginx, a tunnel, Tailscale on the host.
+    expect(networkOf("PUBLIC_URL=https://chat.example.com\n")).toBe("proxy");
+    expect(networkOf("PUBLIC_URL=https://box.tail1234.ts.net\n")).toBe("proxy");
+  });
+
+  test("a second run writes PUBLIC_URL only where the way in owns it", () => {
+    const nginx = "PUBLIC_URL=https://chat.example.com\nSMTP_URL=smtps://u:p@smtp.example.com:465\n";
+    expect(wayIn(nginx, "proxy", null)).toEqual({ entries: {}, profile: null });
+    expect(upsertEnv(withNetworkProfile(nginx, null), {})).toBe(nginx);
+    const live = "DOMAIN=chat.example.com\nPUBLIC_URL=https://chat.example.com\nCOMPOSE_PROFILES=https\n";
+    expect(wayIn(live, "domain", "chat.example.com")).toEqual({
+      entries: { DOMAIN: "chat.example.com" },
+      profile: "https",
+    });
+    // Not live yet: localhost, without Caddy, until the owner exists.
+    expect(wayIn("HOST_PORT=3001\n", "domain", "chat.example.com")).toEqual({
+      entries: { DOMAIN: "chat.example.com", PUBLIC_URL: "http://localhost:3001" },
+      profile: null,
+    });
+    expect(wayIn("PUBLIC_URL=http://localhost:3000\n", "domain", "chat.example.com").entries).toEqual({
+      DOMAIN: "chat.example.com",
+    });
+    const tailnet = "COMPOSE_PROFILES=tailscale\nPUBLIC_URL=https://agentes.tail1234.ts.net\n";
+    expect(wayIn(tailnet, "tailscale", null)).toEqual({ entries: {}, profile: "tailscale" });
+    expect(wayIn("PUBLIC_URL=http://localhost:3000\n", "local", null).entries).toEqual({});
+    expect(wayIn(null, "local", null).entries).toEqual({ PUBLIC_URL: "http://localhost:3000" });
+    // Chosen, not inferred: this machine only replaces the address.
+    expect(wayIn(tailnet, "local", null)).toEqual({ entries: { PUBLIC_URL: "http://localhost:3000" }, profile: null });
+    // Leaving a public domain empties DOMAIN, or the next run would take the domain back.
+    const left = upsertEnv(withNetworkProfile(live, null), wayIn(live, "local", null).entries);
+    expect(networkOf(left)).toBe("local");
+    expect(wayIn(live, "tailscale", null).entries).toEqual({ DOMAIN: "" });
+  });
+
+  test("switching the way in removes the old one, which docker compose up leaves running", () => {
+    const domain = "COMPOSE_PROFILES=backup,https\n";
+    expect(stopCommand(domain, "tailscale")).toEqual(["compose", "--profile", "https", "rm", "-sf", "caddy"]);
+    expect(stopCommand("COMPOSE_PROFILES=tailscale\n", null)).toEqual([
+      "compose",
+      "--profile",
+      "tailscale",
+      "rm",
+      "-sf",
+      "tailscale",
+    ]);
+    expect(stopCommand(domain, "https")).toBeNull();
+    expect(stopCommand(null, "tailscale")).toBeNull();
+    expect(stopCommand("COMPOSE_PROFILES=backup\n", null)).toBeNull();
   });
 
   test("secrets are generated only when missing, never replaced", () => {
@@ -369,11 +429,16 @@ describe("the end", () => {
       "On a computer or phone signed in to your tailnet, open https://agentes.tail1234.ts.net and create your account: the first one owns this instance.",
     );
     expect(steps.join("\n")).toContain('"Disable Key Expiry", or it leaves your tailnet on 2027-04-19');
+    // The apps' English labels, with the Portuguese the phone may show.
+    expect(steps[1]).toContain('tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code"');
     const local = nextSteps({ network: "local", url: "http://localhost:3001", firstRun: false, keyExpiry: null });
     expect(local).toEqual([
       "Open http://localhost:3001 and sign in.",
       "On a server, open it from your computer through an SSH tunnel: ssh -L 3001:localhost:3001 you@your-server",
     ]);
+    const proxy = nextSteps({ network: "proxy", url: "https://chat.example.com", firstRun: false, keyExpiry: null });
+    expect(proxy[0]).toBe("Open https://chat.example.com and sign in.");
+    expect(proxy[1]).toStartWith("Phone: point the camera at the QR code above");
   });
 });
 
@@ -384,6 +449,8 @@ describe("the plan", () => {
     envExists: false,
     newSecrets: ["AGENTES_SECRET", "POSTGRES_PASSWORD"],
     network: "tailscale",
+    publicUrl: { now: null, next: null },
+    stop: null,
     hostname: "agentes",
     tailscale: "ask",
     domain: null,
@@ -432,6 +499,37 @@ describe("the plan", () => {
     const steps = planSteps({ ...base, network: "domain", domain: "chat.example.com" });
     expect(steps).toContain("network: public domain chat.example.com, HTTPS by Caddy on ports 80 and 443");
     expect(steps.some((s) => s.startsWith("owner: wait for the first account"))).toBe(true);
+    const live = planSteps({
+      ...base,
+      network: "domain",
+      domain: "chat.example.com",
+      publicUrl: { now: "https://chat.example.com", next: null },
+    });
+    expect(live.slice(-2)).toEqual([
+      "start: docker compose up -d, wait for https://chat.example.com",
+      "finish: the address, a QR code for the phone app, and what to do next",
+    ]);
+  });
+
+  test("your own proxy is kept; a changed PUBLIC_URL and a removed way in are said before they happen", () => {
+    const proxy = planSteps({
+      ...base,
+      envExists: true,
+      network: "proxy",
+      publicUrl: { now: "https://chat.example.com", next: null },
+    });
+    expect(proxy).toContain(
+      "network: your own proxy or tunnel at https://chat.example.com; PUBLIC_URL and COMPOSE_PROFILES stay",
+    );
+    expect(proxy.some((s) => s.startsWith("PUBLIC_URL:"))).toBe(false);
+    const local = planSteps({
+      ...base,
+      network: "local",
+      publicUrl: { now: "https://agentes.tail1234.ts.net", next: "http://localhost:3000" },
+      stop: ["compose", "--profile", "tailscale", "rm", "-sf", "tailscale"],
+    });
+    expect(local).toContain("PUBLIC_URL: http://localhost:3000, replacing https://agentes.tail1234.ts.net");
+    expect(local).toContain("stop: docker compose --profile tailscale rm -sf tailscale, the way in it no longer uses");
   });
 
   test("inside the image, and without starting: the commands to run", () => {
@@ -477,21 +575,34 @@ describe("the compose file the setup drives", () => {
       TS_STATE_DIR: "/var/lib/tailscale",
       TS_SERVE_CONFIG: "/config/serve.json",
     });
-    expect(tailscale.configs).toEqual([{ source: "tailscale-serve", target: "/config/serve.json" }]);
+    expect(tailscale.configs).toEqual([
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: Compose's interpolation, not a template literal
+      { source: "tailscale-serve-${TAILSCALE_FUNNEL:-false}", target: "/config/serve.json" },
+    ]);
     expect(tailscale.volumes).toEqual(["tailscale-state:/var/lib/tailscale"]);
     expect("tailscale-state" in compose.volumes).toBe(true);
     expect(tailscale.ports ?? tailscale.cap_add ?? tailscale.devices).toBeUndefined();
   });
 
-  test("the serve config: HTTPS on 443 to the app, Funnel off unless asked", () => {
-    // Compose turns $$ into $ and gives the variable its default; the container then fills in its name.
-    const content = compose.configs["tailscale-serve"]?.content
-      .replaceAll(/\$\$\{TS_CERT_DOMAIN\}/g, "agentes.tail1234.ts.net")
-      .replace(/\$\{TAILSCALE_FUNNEL:-false\}/, "false") as string;
-    expect(JSON.parse(content)).toEqual({
+  test("the serve config: HTTPS on 443 to the app, Funnel only with TAILSCALE_FUNNEL=true", () => {
+    // Compose turns $$ into $; the container then fills in its name.
+    const serve = (funnel: string) =>
+      JSON.parse(
+        (compose.configs[`tailscale-serve-${funnel}`]?.content ?? "").replaceAll(
+          "$${TS_CERT_DOMAIN}",
+          "agentes.tail1234.ts.net",
+        ),
+      );
+    const web = { "agentes.tail1234.ts.net:443": { Handlers: { "/": { Proxy: "http://agentes:3000" } } } };
+    expect(Object.keys(compose.configs).filter((name) => name.startsWith("tailscale-serve"))).toEqual([
+      "tailscale-serve-false",
+      "tailscale-serve-true",
+    ]);
+    expect(serve("false")).toEqual({ TCP: { "443": { HTTPS: true } }, Web: web });
+    expect(serve("true")).toEqual({
       TCP: { "443": { HTTPS: true } },
-      Web: { "agentes.tail1234.ts.net:443": { Handlers: { "/": { Proxy: "http://agentes:3000" } } } },
-      AllowFunnel: { "agentes.tail1234.ts.net:443": false },
+      Web: web,
+      AllowFunnel: { "agentes.tail1234.ts.net:443": true },
     });
   });
 });

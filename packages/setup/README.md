@@ -21,7 +21,8 @@ docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/
 ## What it does
 
 It looks at the current directory first and fills in only what's missing, so running it again is
-safe.
+safe. A `PUBLIC_URL` of your own (nginx, a tunnel) stays as it is, and choosing another way in
+removes the old one's container.
 
 1. **Docker:** checks Docker and Compose, and says how to install what's missing.
 2. **How people reach it:** Tailscale (private HTTPS on your tailnet, recommended), a public domain

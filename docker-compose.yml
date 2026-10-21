@@ -73,10 +73,8 @@ services:
       TS_SERVE_CONFIG: /config/serve.json
       TS_ENABLE_HEALTH_CHECK: "true"
       TS_LOCAL_ADDR_PORT: "127.0.0.1:9002"
-      # Read by the serve config below; here as well so that changing it recreates the container.
-      TAILSCALE_FUNNEL: "${TAILSCALE_FUNNEL:-false}"
     configs:
-      - source: tailscale-serve
+      - source: tailscale-serve-${TAILSCALE_FUNNEL:-false}
         target: /config/serve.json
     volumes:
       - tailscale-state:/var/lib/tailscale
@@ -114,14 +112,22 @@ services:
       - NET_BIND_SERVICE
 
 configs:
-  tailscale-serve:
-    # Tailscale's serve config. The container fills in TS_CERT_DOMAIN, its ts.net name ($$ keeps it from
-    # Compose); TAILSCALE_FUNNEL=true in .env opens it to the internet (SELF_HOSTING.md).
+  # Tailscale's serve config. The container fills in TS_CERT_DOMAIN, its ts.net name ($$ keeps it from
+  # Compose). TAILSCALE_FUNNEL in .env picks one: true opens it to the internet (SELF_HOSTING.md). Two
+  # configs rather than the variable inside the JSON: any other value then fails at docker compose up,
+  # where invalid JSON would make the container exit at every start.
+  tailscale-serve-false:
+    content: |
+      {
+        "TCP": { "443": { "HTTPS": true } },
+        "Web": { "$${TS_CERT_DOMAIN}:443": { "Handlers": { "/": { "Proxy": "http://agentes:3000" } } } }
+      }
+  tailscale-serve-true:
     content: |
       {
         "TCP": { "443": { "HTTPS": true } },
         "Web": { "$${TS_CERT_DOMAIN}:443": { "Handlers": { "/": { "Proxy": "http://agentes:3000" } } } },
-        "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": ${TAILSCALE_FUNNEL:-false} }
+        "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": true }
       }
 
 volumes:

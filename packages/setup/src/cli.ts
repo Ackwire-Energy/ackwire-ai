@@ -28,7 +28,6 @@ import {
   httpUrlProblem,
   IMAGE,
   ISSUES_URL,
-  isLocalUrl,
   isTailnetUrl,
   MIN_COMPOSE,
   type Network,
@@ -46,11 +45,13 @@ import {
   resolveChoice,
   secretEntries,
   smtpUrlProblem,
+  stopCommand,
   TS,
   tailscaleKeyEntries,
   tailscaleKeyProblem,
   upsertEnv,
   versionAtLeast,
+  wayIn,
   withNetworkProfile,
 } from "./lib";
 
@@ -63,6 +64,8 @@ It asks only for what it needs and fills in only what's missing, so running it a
   --network <tailscale|domain|local>  How people reach it. tailscale (the default): private HTTPS on
                                       your tailnet, no domain or open port. domain: a public domain with
                                       Caddy on ports 80 and 443. local: http://localhost on this machine.
+                                      Without it, a PUBLIC_URL of your own in .env (nginx, a tunnel)
+                                      stays as it is.
   --tailscale-key <key>               Auth key (tskey-auth-…) or OAuth client secret (tskey-client-…)
   --tailscale-tag <tag:name>          The tag for an OAuth client secret (default tag:agentes)
   --hostname <name>                   The server's name on the tailnet (default agentes)
@@ -302,14 +305,17 @@ Promise.all([get("/api/health"), get("/api/app/auth-config")]).then(
   () => process.exit(1),
 );`;
 
-async function waitForApp(timeoutS: number, until: (app: App) => boolean = () => true): Promise<App> {
+/** Waits for /api/health, and for `until`; `notYet` is the failure when the app answers but `until` never holds. */
+async function waitForApp(timeoutS: number, until: (app: App) => boolean = () => true, notYet?: Problem): Promise<App> {
   const deadline = Date.now() + timeoutS * 1000;
   for (;;) {
+    let healthy = false;
     const probe = docker(["compose", "exec", "-T", "agentes", "bun", "-e", APP_PROBE], 20_000);
     if (probe.code === 0) {
       try {
         const app = JSON.parse(probe.stdout) as App;
-        if (app.health.status === "ok" && until(app)) return app;
+        healthy = app.health.status === "ok";
+        if (healthy && until(app)) return app;
       } catch {
         // Not answering JSON yet.
       }
@@ -318,11 +324,15 @@ async function waitForApp(timeoutS: number, until: (app: App) => boolean = () =>
       if (problem) throw new SetupError(problem);
     }
     if (Date.now() > deadline) {
-      throw new SetupError({
-        check: "app.health",
-        error: `The app didn't answer /api/health within ${timeoutS} seconds.`,
-        fix: "docker compose logs agentes shows why. Run the setup again once it's fixed (--timeout waits longer).",
-      });
+      throw new SetupError(
+        healthy && notYet
+          ? notYet
+          : {
+              check: "app.health",
+              error: `The app didn't answer /api/health within ${timeoutS} seconds.`,
+              fix: "docker compose logs agentes shows why. Run the setup again once it's fixed (--timeout waits longer).",
+            },
+      );
     }
     await sleep(2000);
   }
@@ -369,13 +379,14 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   const ask = ui.canAsk;
   const listQuestions = opts.dryRun && !opts.json && opts.tailscaleStatus !== "-";
   const questions: string[] = [];
+  const current = networkOf(content);
   if (listQuestions && !opts.network) {
-    questions.push(`how people reach it (${networkOf(content) ?? "tailscale"} unless you choose otherwise)`);
+    questions.push(`how people reach it (${current ?? "tailscale"} unless you choose otherwise)`);
   }
   const network: Network =
     opts.network ??
     (ask
-      ? await ui.choose(
+      ? await ui.choose<Network>(
           "How will people reach this instance?",
           [
             {
@@ -384,10 +395,19 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
             },
             { value: "domain", label: "A public domain, with HTTPS on ports 80 and 443" },
             { value: "local", label: "This machine only (http://localhost)" },
+            // Last, so that piped answers 1 to 3 mean the same whatever the .env holds.
+            ...(current === "proxy"
+              ? [
+                  {
+                    value: "proxy" as const,
+                    label: `Keep ${envValue(content, "PUBLIC_URL")}: your own proxy or tunnel`,
+                  },
+                ]
+              : []),
           ],
-          networkOf(content) ?? "tailscale",
+          current ?? "tailscale",
         )
-      : (networkOf(content) ?? "tailscale"));
+      : (current ?? "tailscale"));
 
   const entries: Record<string, string> = secretEntries(content);
   const newSecrets = Object.keys(entries);
@@ -431,10 +451,10 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     }
     if (!domain && listQuestions) questions.push("the domain");
     if (!domain && !opts.dryRun) throw new SetupError(missing);
-    if (domain) entries.DOMAIN = domain;
-  } else if (!isLocalUrl(envValue(content, "PUBLIC_URL"))) {
-    entries.PUBLIC_URL = `http://localhost:${port}`;
   }
+  const way = wayIn(content, network, domain);
+  Object.assign(entries, way.entries);
+  const stop = stopCommand(content, way.profile);
 
   const preset = emailPreset(opts, content);
   if (listQuestions && preset === null) questions.push("email for invitations and password resets (skip by default)");
@@ -451,6 +471,8 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     envExists: content !== null,
     newSecrets,
     network,
+    publicUrl: { now: envValue(content, "PUBLIC_URL"), next: way.entries.PUBLIC_URL ?? null },
+    stop,
     hostname,
     tailscale,
     domain,
@@ -464,24 +486,31 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     return { ok: true, dryRun: true, network, plan };
   }
 
-  // A public domain stays off until the owner exists: whoever signs up first owns the instance.
-  const live = network === "domain" && envValue(content, "PUBLIC_URL") === `https://${domain}`;
-  if (network === "domain" && !live) entries.PUBLIC_URL = `http://localhost:${port}`;
-  const profile = network === "tailscale" ? "tailscale" : live ? "https" : null;
-  env.save(upsertEnv(withNetworkProfile(content ?? ENV_HEADER, profile), entries));
+  env.save(upsertEnv(withNetworkProfile(content ?? ENV_HEADER, way.profile), entries));
   const written = Object.keys(entries).filter((key) => key !== "TS_EXTRA_ARGS");
   ui.ok(`.env${written.length ? `: ${written.join(", ")}` : " kept as it was"} (readable by you only)`);
 
   await ensureComposeFile(ui, dir, composeFile, network);
 
-  if (image || !opts.start) return printCommands(ui, image, network, domain, content);
+  if (image || !opts.start) return printCommands(ui, image, network, domain, content, stop);
+  if (stop) {
+    ui.note(`Removing the way in .env no longer uses (docker ${stop.join(" ")})…`);
+    const removed = docker(stop, 120_000);
+    if (removed.code !== 0) {
+      throw new SetupError({
+        check: "compose",
+        error: `docker ${stop.join(" ")} failed: ${removed.stderr.trim().split("\n").pop() ?? ""}`,
+        fix: `Fix that, run docker ${stop.join(" ")} yourself, then run the setup again.`,
+      });
+    }
+  }
   if (network === "tailscale") return startTailscale(opts, ui, env);
   if (network === "domain") return startDomain(opts, ui, domain as string, env);
   ui.note("Starting agentes.chat (docker compose up -d). The first time downloads about 2 GB…");
   await composeUp(ui);
   const app = await waitForApp(opts.timeout);
   ui.ok(`agentes.chat ${app.health.version ?? ""} is up`);
-  return finish(ui, "local", envValue(env.read(), "PUBLIC_URL") ?? `http://localhost:${port}`, app, null);
+  return finish(ui, network, envValue(env.read(), "PUBLIC_URL") ?? `http://localhost:${port}`, app, null);
 }
 
 function tailscaleSteps(ui: Ui, hostname: string, tag: string) {
@@ -601,10 +630,11 @@ function printCommands(
   network: Network,
   domain: string | null,
   content: string | null,
+  stop: string[] | null,
 ): Result {
   const port = envValue(content, "HOST_PORT") || "3000";
   const setup = `docker run --rm -i --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ${envValue(content, "AGENTES_IMAGE") || IMAGE} setup`;
-  const commands =
+  const start =
     image && network === "tailscale"
       ? [
           "docker compose up -d tailscale",
@@ -621,6 +651,7 @@ function printCommands(
             "docker compose up -d",
             ...(image ? [] : ["Run the setup again: it waits for the instance and prints its address."]),
           ];
+  const commands = [...(stop ? [`docker ${stop.join(" ")} (the way in .env no longer uses)`] : []), ...start];
   ui.list("Next, in this directory", commands, true);
   return { ok: true, network, started: false, nextSteps: commands };
 }
@@ -629,24 +660,32 @@ async function startTailscale(opts: Options, ui: Ui, env: Env): Promise<Result> 
   ui.note("Starting Tailscale (docker compose up -d tailscale)…");
   await composeUp(ui, ["tailscale"]);
   const joined = await joinTailnet(opts, ui, env);
-  const host = new URL(joined.url).host;
-  ui.ok(`On your tailnet as ${host}`);
-  // The state volume keeps it logged in: the key is needed only once, and the app has no use for it.
-  const current = env.read() ?? "";
-  env.save(
-    upsertEnv(current, { PUBLIC_URL: joined.url, ...(envValue(current, "TS_AUTHKEY") ? { TS_AUTHKEY: "" } : {}) }),
-  );
-  ui.ok(`.env: PUBLIC_URL=${joined.url}`);
+  ui.ok(`On your tailnet as ${new URL(joined.url).host}`);
+  savePublicUrl(ui, env, joined.url);
 
   ui.note("Starting agentes.chat (docker compose up -d). The first time downloads about 2 GB…");
   await composeUp(ui);
   const tailnet = await joinTailnet(opts, ui, env);
+  // A new TS_HOSTNAME is set only once the node is back on the tailnet under its old name.
+  if (tailnet.url !== joined.url) {
+    ui.ok(`Renamed on your tailnet: ${new URL(tailnet.url).host}`);
+    savePublicUrl(ui, env, tailnet.url);
+    await composeUp(ui);
+  }
+  const host = new URL(tailnet.url).host;
   await ensureServe(opts, ui, env, host);
   await waitForCertificate(opts, ui, host);
   ui.ok("HTTPS certificate ready");
   const app = await waitForApp(opts.timeout);
   ui.ok(`agentes.chat ${app.health.version ?? ""} is up`);
   return finish(ui, "tailscale", tailnet.url, app, tailnet.keyExpiry);
+}
+
+/** PUBLIC_URL is the address Tailscale gives; the key goes, since the state volume keeps the node logged in. */
+function savePublicUrl(ui: Ui, env: Env, url: string) {
+  const current = env.read() ?? "";
+  env.save(upsertEnv(current, { PUBLIC_URL: url, ...(envValue(current, "TS_AUTHKEY") ? { TS_AUTHKEY: "" } : {}) }));
+  ui.ok(`.env: PUBLIC_URL=${url}`);
 }
 
 /** Waits for the tailnet; on a terminal, a refused or missing key is asked for again. */
@@ -767,8 +806,14 @@ async function startDomain(opts: Options, ui: Ui, domain: string, env: Env): Pro
         return { ok: true, network: "domain", stage: "owner", url: `http://localhost:${port}`, nextSteps: next };
       }
       ui.list(`Create your account before ${domain} goes live`, steps, true);
-      ui.note("Waiting for the account…");
-      await waitForApp(opts.timeout, (a) => !a.firstRun);
+      // A person has to open the tunnel and sign up: longer than any service gets to start.
+      const minutes = Math.max(30, Math.ceil(opts.timeout / 60));
+      ui.note(`Waiting for the account (up to ${minutes} minutes)…`);
+      await waitForApp(minutes * 60, (a) => !a.firstRun, {
+        check: "domain.owner",
+        error: `No account was created within ${minutes} minutes.`,
+        fix: `Create it through the tunnel (the steps above), then run the setup again: it turns on HTTPS for ${domain}.`,
+      });
       ui.ok("Account created");
     }
     env.save(upsertEnv(withNetworkProfile(env.read() ?? "", "https"), { PUBLIC_URL: url }));
@@ -824,18 +869,19 @@ function finishFromStatus(opts: Options, ui: Ui, env: Env): Result {
           },
     );
   }
-  const current = env.read();
-  if (current === null) {
+  if (env.read() === null) {
     throw new SetupError({
       check: "env",
       error: "There's no .env here.",
       fix: 'Run it in the directory with your .env and docker-compose.yml (that\'s what -v "$PWD":/work does).',
     });
   }
-  env.save(
-    upsertEnv(current, { PUBLIC_URL: state.url, ...(envValue(current, "TS_AUTHKEY") ? { TS_AUTHKEY: "" } : {}) }),
-  );
-  ui.ok(`.env: PUBLIC_URL=${state.url}`);
+  if (opts.dryRun) {
+    const plan = [`.env: PUBLIC_URL=${state.url}${envValue(env.read(), "TS_AUTHKEY") ? ", TS_AUTHKEY emptied" : ""}`];
+    ui.list("The plan (--dry-run: nothing is written or started)", plan);
+    return { ok: true, dryRun: true, network: "tailscale", plan };
+  }
+  savePublicUrl(ui, env, state.url);
   return finish(ui, "tailscale", state.url, null, state.keyExpiry, [
     "Run docker compose up -d: it starts the app with this address.",
   ]);

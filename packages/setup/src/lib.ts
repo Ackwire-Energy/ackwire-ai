@@ -32,7 +32,8 @@ export const TS = {
 } as const;
 
 export const NETWORKS = ["tailscale", "domain", "local"] as const;
-export type Network = (typeof NETWORKS)[number];
+/** The ways in the setup sets up, or "proxy": a PUBLIC_URL of your own (nginx, a tunnel), which it keeps. */
+export type Network = (typeof NETWORKS)[number] | "proxy";
 export const EMAIL_CHOICES = ["skip", "smtp", "api"] as const;
 export type EmailChoice = (typeof EMAIL_CHOICES)[number];
 
@@ -46,7 +47,7 @@ export interface Problem {
 // ── Options ─────────────────────────────────────────────────────────────────
 
 export interface Options {
-  network?: Network;
+  network?: (typeof NETWORKS)[number];
   tailscaleKey?: string;
   tailscaleTag: string;
   hostname?: string;
@@ -238,18 +239,22 @@ export const ENV_HEADER = `# agentes.chat settings, written by npx @agenteschat/
 
 const ENV_LINE = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/;
 
-/** The value of `KEY=` as Compose reads it; null when the line is absent, "" when it is empty. */
+/**
+ * The value of `KEY=` as Compose reads it: the last line wins, as in `cp .env.example .env` followed by
+ * appended values. Null when the line is absent, "" when it is empty.
+ */
 export function envValue(content: string | null, key: string): string | null {
+  let value: string | null = null;
   for (const line of content?.split("\n") ?? []) {
     const match = ENV_LINE.exec(line);
-    if (match?.[1] === key) return unquoteEnvValue((match[2] ?? "").trim());
+    if (match?.[1] === key) value = unquoteEnvValue((match[2] ?? "").trim());
   }
-  return null;
+  return value;
 }
 
 /**
- * Rewrites `KEY=` lines in place (the first one; later duplicates go) and appends the keys the file
- * lacks. Comments and every other line stay as they are.
+ * Rewrites a key where it first appears, drops its other lines so the new value is the one Compose
+ * reads, and appends the keys the file lacks. Comments and every other line stay as they are.
  */
 export function upsertEnv(content: string, entries: Record<string, string>): string {
   const wanted = new Map(Object.entries(entries));
@@ -306,14 +311,56 @@ export function networkOf(content: string | null): Network | null {
   const profiles = list(envValue(content, "COMPOSE_PROFILES"));
   if (profiles.includes("tailscale")) return "tailscale";
   if (profiles.includes("https") || envValue(content, "DOMAIN")) return "domain";
-  return envValue(content, "PUBLIC_URL") ? "local" : null;
+  const url = envValue(content, "PUBLIC_URL");
+  return !url ? null : isLocalUrl(url) ? "local" : "proxy";
+}
+
+type Profile = "tailscale" | "https" | null;
+
+/**
+ * What a run writes about the way in before anything starts: the .env lines (PUBLIC_URL only when it
+ * changes) and the profile in COMPOSE_PROFILES. Tailscale's address is written once it has joined, a
+ * public domain stays on localhost without Caddy until its owner exists (the first sign-up owns the
+ * instance), and your own proxy's address is kept.
+ */
+export function wayIn(
+  content: string | null,
+  network: Network,
+  domain: string | null,
+): { entries: Record<string, string>; profile: Profile } {
+  const now = envValue(content, "PUBLIC_URL");
+  const local = `http://localhost:${envValue(content, "HOST_PORT") || "3000"}`;
+  if (network === "domain") {
+    const live = now === `https://${domain}`;
+    return {
+      entries: { ...(domain ? { DOMAIN: domain } : {}), ...(live || now === local ? {} : { PUBLIC_URL: local }) },
+      profile: live ? "https" : null,
+    };
+  }
+  // A DOMAIN left behind would take the next run back to the public domain.
+  const entries: Record<string, string> = envValue(content, "DOMAIN") ? { DOMAIN: "" } : {};
+  if (network === "local" && !isLocalUrl(now)) entries.PUBLIC_URL = local;
+  return { entries, profile: network === "tailscale" ? "tailscale" : null };
+}
+
+/**
+ * The command that removes the containers of a way in the .env drops: `docker compose up` leaves a
+ * service of a disabled profile running, so a switch to Tailscale would keep Caddy serving the public
+ * domain. Null when nothing is dropped.
+ */
+export function stopCommand(content: string | null, profile: Profile): string[] | null {
+  const enabled = list(envValue(content, "COMPOSE_PROFILES"));
+  const off = (["tailscale", "https"] as const).filter((name) => name !== profile && enabled.includes(name));
+  if (off.length === 0) return null;
+  const service = { tailscale: "tailscale", https: "caddy" };
+  return ["compose", ...off.flatMap((name) => ["--profile", name]), "rm", "-sf", ...off.map((name) => service[name])];
 }
 
 /**
  * `COMPOSE_PROFILES` with one way in: `tailscale`, `https` (Caddy) or neither. Other profiles stay. The
  * content comes back unchanged when the profiles already match.
  */
-export function withNetworkProfile(content: string, profile: "tailscale" | "https" | null): string {
+export function withNetworkProfile(content: string, profile: Profile): string {
   const current = list(envValue(content, "COMPOSE_PROFILES"));
   const next = [...current.filter((p) => p !== "tailscale" && p !== "https"), ...(profile ? [profile] : [])];
   return next.join(",") === current.join(",") ? content : upsertEnv(content, { COMPOSE_PROFILES: next.join(",") });
@@ -548,6 +595,10 @@ export interface PlanInput {
   envExists: boolean;
   newSecrets: string[];
   network: Network;
+  /** PUBLIC_URL in .env now, and what the run writes before starting (null: unchanged). */
+  publicUrl: { now: string | null; next: string | null };
+  /** stopCommand's: the containers of the way in the run drops. */
+  stop: string[] | null;
   hostname: string;
   /** Where the Tailscale key comes from. */
   tailscale: "given" | "env" | "joined" | "ask" | "missing";
@@ -581,8 +632,13 @@ export function planSteps(p: PlanInput): string[] {
     );
   } else if (p.network === "domain") {
     steps.push(`network: public domain ${p.domain ?? "(asked)"}, HTTPS by Caddy on ports 80 and 443`);
+  } else if (p.network === "proxy") {
+    steps.push(`network: your own proxy or tunnel at ${p.publicUrl.now}; PUBLIC_URL and COMPOSE_PROFILES stay`);
   } else {
     steps.push("network: this machine only, http://localhost");
+  }
+  if (p.publicUrl.next) {
+    steps.push(`PUBLIC_URL: ${p.publicUrl.next}${p.publicUrl.now ? `, replacing ${p.publicUrl.now}` : ""}`);
   }
   steps.push(
     {
@@ -597,10 +653,13 @@ export function planSteps(p: PlanInput): string[] {
     steps.push("start: print the commands to run (docker compose up -d) and how to finish");
     return steps;
   }
+  if (p.stop) steps.push(`stop: docker ${p.stop.join(" ")}, the way in it no longer uses`);
   if (p.network === "tailscale") {
     steps.push("start: docker compose up -d tailscale, wait until it's on the tailnet with HTTPS");
     steps.push("PUBLIC_URL: write the address Tailscale gives it (https://<device>.<tailnet>.ts.net)");
     steps.push("start: docker compose up -d, wait for the HTTPS certificate and /api/health");
+  } else if (p.network === "domain" && p.publicUrl.now === `https://${p.domain}`) {
+    steps.push(`start: docker compose up -d, wait for https://${p.domain}`);
   } else if (p.network === "domain") {
     steps.push("start: docker compose up -d on localhost first, wait for /api/health");
     steps.push("owner: wait for the first account (through an SSH tunnel), so nobody else can take the instance");
@@ -624,7 +683,7 @@ export function nextSteps(p: {
   if (p.network === "tailscale") {
     steps.push(`On a computer or phone signed in to your tailnet, open ${p.url} and ${account}.`);
     steps.push(
-      `Phone: install Tailscale (${TS.download}), sign in to your tailnet, and install the agentes.chat app. Then point the camera at the QR code above, or in the app tap "Trocar" next to the server on the sign-in screen, then "Escanear QR code".`,
+      `Phone: install Tailscale (${TS.download}), sign in to your tailnet, and install the agentes.chat app. Then point the camera at the QR code above, or on the app's sign-in screen tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code".`,
     );
     steps.push(
       `People you invite need your tailnet too: invite them to it (${TS.users}, "Invite users"), or share this server with theirs (its … menu in ${TS.machines}, "Share").`,
@@ -634,10 +693,10 @@ export function nextSteps(p: {
         `In ${TS.machines}, open this server's … menu and choose "Disable Key Expiry", or it leaves your tailnet on ${p.keyExpiry.slice(0, 10)}.`,
       );
     }
-  } else if (p.network === "domain") {
+  } else if (p.network === "domain" || p.network === "proxy") {
     steps.push(`Open ${p.url} and ${account}.`);
     steps.push(
-      `Phone: point the camera at the QR code above, or in the agentes.chat app tap "Trocar" next to the server on the sign-in screen, then "Escanear QR code".`,
+      `Phone: point the camera at the QR code above, or on the agentes.chat app's sign-in screen tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code".`,
     );
   } else {
     const port = new URL(p.url).port || "80";
