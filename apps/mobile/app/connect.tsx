@@ -55,7 +55,7 @@ export default function Connect() {
       </AuthScaffold>
     );
 
-  const target = check?.ok ? check.server : server;
+  const target = check?.server ?? server;
   const moving = target !== serverUrl();
   const plan = connectPlan(serverUrl(), session.signedIn, { server: target, token });
 

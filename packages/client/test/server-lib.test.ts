@@ -91,14 +91,17 @@ describe("checking a server", () => {
   });
 
   test("not ours, or a version that doesn't match", () => {
-    expect(readInstance("https://x", { status: "ok" })).toEqual({ ok: false, problem: "not-agentes" });
-    expect(readInstance("https://x", null)).toEqual({ ok: false, problem: "not-agentes" });
-    expect(readInstance("https://x", instance({ api: APP_API - 1, minApi: APP_API - 1 }))).toEqual({
+    const x = "https://x";
+    expect(readInstance(x, { status: "ok" })).toEqual({ ok: false, server: x, problem: "not-agentes" });
+    expect(readInstance(x, null)).toEqual({ ok: false, server: x, problem: "not-agentes" });
+    expect(readInstance(x, instance({ api: APP_API - 1, minApi: APP_API - 1 }))).toEqual({
       ok: false,
+      server: x,
       problem: "server-too-old",
     });
-    expect(readInstance("https://x", instance({ api: APP_API + 2, minApi: APP_API + 1 }))).toEqual({
+    expect(readInstance(x, instance({ api: APP_API + 2, minApi: APP_API + 1 }))).toEqual({
       ok: false,
+      server: x,
       problem: "app-too-old",
     });
   });
@@ -109,10 +112,12 @@ describe("checking a server", () => {
     expect(ok).toMatchObject({ ok: true, server: box, instance: { signup: "invite" } });
     expect(await checkServer(box, fakeFetch({ [box]: { status: 404, body: { error: "nope" } } }))).toEqual({
       ok: false,
+      server: box,
       problem: "not-agentes",
     });
     expect(await checkServer(box, fakeFetch({ [box]: { status: 502 } }))).toEqual({
       ok: false,
+      server: box,
       problem: "unreachable",
     });
   });
@@ -120,13 +125,21 @@ describe("checking a server", () => {
   test("a name not found reads as unreachable; a bad certificate is said as such", async () => {
     const box = "https://box.tail1234.ts.net";
     const unknownHost = 'fetch failed: Unable to resolve host "box.tail1234.ts.net"';
-    expect(await checkServer(box, fakeFetch({ [box]: unknownHost }))).toEqual({ ok: false, problem: "unreachable" });
+    expect(await checkServer(box, fakeFetch({ [box]: unknownHost }))).toEqual({
+      ok: false,
+      server: box,
+      problem: "unreachable",
+    });
     for (const tls of [
       "fetch failed: The certificate for this server is invalid.",
       "fetch failed: O certificado deste servidor é inválido.",
       "fetch failed: javax.net.ssl.SSLHandshakeException: Trust anchor for certification path not found.",
     ])
-      expect(await checkServer(box, fakeFetch({ [box]: tls }))).toEqual({ ok: false, problem: "certificate" });
+      expect(await checkServer(box, fakeFetch({ [box]: tls }))).toEqual({
+        ok: false,
+        server: box,
+        problem: "certificate",
+      });
   });
 
   test("gives up after the timeout", async () => {
@@ -134,16 +147,20 @@ describe("checking a server", () => {
       new Promise((_resolve, reject) =>
         init.signal?.addEventListener("abort", () => reject(new Error("The operation was aborted."))),
       );
-    expect(await checkServer("https://box.tail1234.ts.net", hang, 10)).toEqual({ ok: false, problem: "unreachable" });
+    expect(await checkServer("https://box.tail1234.ts.net", hang, 10)).toMatchObject({
+      ok: false,
+      problem: "unreachable",
+    });
   });
 
-  test("the server's own address wins when it answers; otherwise the one typed stays", async () => {
-    const typed = "https://100.101.102.103";
+  test("a server is used at its own address, or not at all", async () => {
+    const typed = "https://chat.internal.example.com";
     const own = "https://box.tail1234.ts.net";
     const both = fakeFetch({ [typed]: { status: 200, body: instance() }, [own]: { status: 200, body: instance() } });
     expect(await checkServer(typed, both)).toMatchObject({ ok: true, server: own });
+    // Its own address doesn't answer here: its realtime and pairing page wouldn't either, so the host named is that one.
     const onlyTyped = fakeFetch({ [typed]: { status: 200, body: instance() } });
-    expect(await checkServer(typed, onlyTyped)).toMatchObject({ ok: true, server: typed });
+    expect(await checkServer(typed, onlyTyped)).toEqual({ ok: false, server: own, problem: "unreachable" });
     // A server that calls itself by an http address keeps the one typed.
     const local = fakeFetch({ [typed]: { status: 200, body: instance({ url: "http://localhost:3000" }) } });
     expect(await checkServer(typed, local)).toMatchObject({ ok: true, server: typed });

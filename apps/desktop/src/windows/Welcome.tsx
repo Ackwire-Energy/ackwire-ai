@@ -236,7 +236,7 @@ export function Welcome() {
     const check = await checkServer(typed);
     setChecking(false);
     if (check.ok) return chooseServer(check.server);
-    setServerError(t(PROBLEM_TEXT[check.problem], { host: serverHost(typed) }));
+    setServerError(t(PROBLEM_TEXT[check.problem], { host: serverHost(check.server) }));
   }
 
   async function addFolder() {

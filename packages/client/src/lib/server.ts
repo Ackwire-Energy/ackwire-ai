@@ -75,15 +75,18 @@ export function parseConnectLink(
 }
 
 export type ServerProblem = "unreachable" | "certificate" | "not-agentes" | "server-too-old" | "app-too-old";
-export type ServerCheck = { ok: true; server: string; instance: Instance } | { ok: false; problem: ServerProblem };
+/** `server`: the address to use, or the one that failed (a server's own address can differ from the one typed). */
+export type ServerCheck =
+  | { ok: true; server: string; instance: Instance }
+  | { ok: false; server: string; problem: ServerProblem };
 
 /** What `GET /api/instance` answered: an agentes.chat server these apps can use, or why not. */
 export function readInstance(server: string, body: unknown): ServerCheck {
   const instance = (body ?? {}) as Partial<Instance>;
   if (instance.name !== "agentes.chat" || typeof instance.api !== "number")
-    return { ok: false, problem: "not-agentes" };
-  if (instance.api < APP_API) return { ok: false, problem: "server-too-old" };
-  if ((instance.minApi ?? 1) > APP_API) return { ok: false, problem: "app-too-old" };
+    return { ok: false, server, problem: "not-agentes" };
+  if (instance.api < APP_API) return { ok: false, server, problem: "server-too-old" };
+  if ((instance.minApi ?? 1) > APP_API) return { ok: false, server, problem: "app-too-old" };
   return { ok: true, server, instance: instance as Instance };
 }
 
@@ -99,11 +102,11 @@ async function askInstance(server: string, fetchFn: FetchLike, timeoutMs: number
       headers: { accept: "application/json" },
       signal: abort.signal,
     });
-    if (res.status >= 500) return { ok: false, problem: "unreachable" };
+    if (res.status >= 500) return { ok: false, server, problem: "unreachable" };
     return readInstance(server, res.ok ? await res.json().catch(() => null) : null);
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
-    return { ok: false, problem: CERTIFICATE.test(text) ? "certificate" : "unreachable" };
+    return { ok: false, server, problem: CERTIFICATE.test(text) ? "certificate" : "unreachable" };
   } finally {
     clearTimeout(timer);
   }
@@ -111,14 +114,12 @@ async function askInstance(server: string, fetchFn: FetchLike, timeoutMs: number
 
 /**
  * Asks a server (an origin from `normalizeServer`) whether these apps can use it. A server that names
- * another address as its own (`PUBLIC_URL`) is used there when that answers too: its realtime accepts only
- * that address.
+ * another https address as its own (`PUBLIC_URL`) is used there or not at all: its realtime and its
+ * computer-pairing page accept only that address.
  */
 export async function checkServer(server: string, fetchFn: FetchLike = fetch, timeoutMs = 8000): Promise<ServerCheck> {
   const here = await askInstance(server, fetchFn, timeoutMs);
   if (!here.ok) return here;
   const own = normalizeServer(here.instance.url ?? "");
-  if (!own || own === server) return here;
-  const there = await askInstance(own, fetchFn, timeoutMs);
-  return there.ok ? there : here;
+  return own && own !== server ? askInstance(own, fetchFn, timeoutMs) : here;
 }

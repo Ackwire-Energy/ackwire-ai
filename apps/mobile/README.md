@@ -37,8 +37,9 @@ one the server considers its own.
 
 People can point the app at their own server ("Servidor: agentes.chat · Trocar" on sign-in, a QR code from the web
 app's "Abrir no celular", or an `agenteschat://connect?server=…` link). The app checks `GET /api/instance` first and,
-for the same reason, uses the address the server gives there (its `PUBLIC_URL`) when that one answers. Switching signs
-out of the previous server. Pushes from a self-hosted server reach the app only while the Expo project keeps "enhanced push security" off.
+for the same reason, uses the address the server gives there (its `PUBLIC_URL`); when that address doesn't answer from
+the phone, the server is refused with that host in the message. Switching signs out of the previous server. Pushes from
+a self-hosted server reach the app only while the Expo project keeps "enhanced push security" off.
 
 Server side (not in this folder): Better Auth's Expo plugin trusts `agenteschat://`; Sign in with Apple needs
 `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and the native iOS button sends an ID
