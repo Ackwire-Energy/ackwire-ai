@@ -349,12 +349,13 @@ jobs:
           docker compose up -d
           healthy
           curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.organizations | length == 1'
-      # The bucket is rclone serving a folder over the S3 API, on the compose network.
+      # The bucket is rclone serving a folder over the S3 API, on the compose network. Its access key
+      # id has at least 3 characters: rclone serve s3 answers a shorter one with 403 InvalidAccessKeyId.
       - name: Back up and restore
         run: |
-          printf 'S3_ENDPOINT=http://s3:8080\nS3_PROVIDER=Rclone\nS3_ACCESS_KEY_ID=ci\nS3_SECRET_ACCESS_KEY=ci-secret\nS3_BACKUP_BUCKET=backups\n' >> .env
+          printf 'S3_ENDPOINT=http://s3:8080\nS3_PROVIDER=Rclone\nS3_ACCESS_KEY_ID=ci-key\nS3_SECRET_ACCESS_KEY=ci-secret\nS3_BACKUP_BUCKET=backups\n' >> .env
           docker compose run -d --name s3 --entrypoint sh backup -c \
-            'mkdir -p /tmp/s3/backups && exec rclone serve s3 --auth-key ci,ci-secret --addr :8080 /tmp/s3'
+            'mkdir -p /tmp/s3/backups && exec rclone serve s3 --auth-key ci-key,ci-secret --addr :8080 /tmp/s3'
           docker compose run --rm backup now
           name=$(docker compose run --rm -T backup list | awk '{print $NF}')
           docker compose run --rm -T backup fetch "$name" > ci.dump
