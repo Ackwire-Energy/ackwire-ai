@@ -24,6 +24,18 @@ export function authClient() {
   return current.client;
 }
 
+/**
+ * Forgets the stored cookie and session without asking the server, for leaving a server nobody is signed in
+ * to: the Expo plugin clears both as a sign-out starts, and this one's request is cancelled before it is sent.
+ */
+export async function forgetSession(): Promise<void> {
+  const cancelled = new AbortController();
+  cancelled.abort();
+  await authClient()
+    .signOut({ fetchOptions: { signal: cancelled.signal } })
+    .catch(() => {});
+}
+
 let cookie = "";
 
 /** The session cookie, read fresh from SecureStore (and kept for the synchronous callers). */

@@ -140,11 +140,51 @@ describe("choosing a server", () => {
     expect(savedServer(cloud, cloud)).toBeNull();
   });
 
-  test("another server signs out first; a token on the same one replaces whoever is in", () => {
-    expect(connectPlan(cloud, true, { server: box })).toEqual({ move: true, signOut: true, token: null });
-    expect(connectPlan(cloud, false, { server: box, token: "t" })).toEqual({ move: true, signOut: true, token: "t" });
-    expect(connectPlan(box, true, { server: box, token: "t" })).toEqual({ move: false, signOut: true, token: "t" });
-    expect(connectPlan(box, false, { server: box, token: "t" })).toEqual({ move: false, signOut: false, token: "t" });
-    expect(connectPlan(box, true, { server: box })).toEqual({ move: false, signOut: false, token: null });
+  test("another server is left first: signing out, or only forgetting the cookie when nobody is in", () => {
+    expect(connectPlan(cloud, true, { server: box })).toEqual({
+      move: true,
+      signOut: true,
+      forget: false,
+      token: null,
+    });
+    expect(connectPlan(cloud, false, { server: box })).toEqual({
+      move: true,
+      signOut: false,
+      forget: true,
+      token: null,
+    });
+    expect(connectPlan(cloud, false, { server: box, token: "t" })).toEqual({
+      move: true,
+      signOut: false,
+      forget: true,
+      token: "t",
+    });
+    expect(connectPlan(cloud, true, { server: box, token: "t" })).toEqual({
+      move: true,
+      signOut: true,
+      forget: false,
+      token: "t",
+    });
+  });
+
+  test("a token on the same server replaces whoever is in", () => {
+    expect(connectPlan(box, true, { server: box, token: "t" })).toEqual({
+      move: false,
+      signOut: true,
+      forget: false,
+      token: "t",
+    });
+    expect(connectPlan(box, false, { server: box, token: "t" })).toEqual({
+      move: false,
+      signOut: false,
+      forget: false,
+      token: "t",
+    });
+    expect(connectPlan(box, true, { server: box })).toEqual({
+      move: false,
+      signOut: false,
+      forget: false,
+      token: null,
+    });
   });
 });

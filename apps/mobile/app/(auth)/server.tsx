@@ -28,6 +28,7 @@ export default function Server() {
   const [busy, setBusy] = useState(false);
 
   const switchTo = async (server: string) => {
+    setBusy(true);
     await connectToServer({ server }, session.signedIn);
     toast({ title: t("mobile.auth.server.now", { host: serverHost(server) }) });
     router.back();
@@ -41,7 +42,7 @@ export default function Server() {
     const check = await checkServer(server);
     if (check.ok) return switchTo(check.server);
     haptics.warning();
-    setError(t(PROBLEM_TEXT[check.problem], { host: serverHost(server) }));
+    setError(t(PROBLEM_TEXT[check.problem], { host: serverHost(check.server) }));
     setBusy(false);
   };
 
@@ -51,7 +52,7 @@ export default function Server() {
       subtitle={t("mobile.auth.server.subtitle")}
       onBack={() => router.back()}
       footer={
-        custom ? (
+        custom && !busy ? (
           <AuthLink
             label={t("mobile.auth.server.backTo", { host: serverHost(API_URL) })}
             onPress={() => void switchTo(API_URL)}

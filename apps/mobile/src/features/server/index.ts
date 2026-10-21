@@ -1,6 +1,6 @@
 import type { ServerProblem } from "@agenteschat/client/lib/server";
 import { signOut } from "@/features/account";
-import { authClient } from "@/lib/auth";
+import { authClient, forgetSession } from "@/lib/auth";
 import { serverUrl, setServer } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 
@@ -14,13 +14,14 @@ export const PROBLEM_TEXT: Record<ServerProblem, string> = {
 };
 
 /**
- * Moves the app to `target.server`, signing out of the current one first so nothing crosses servers, and
- * signs in there with the one-time token from the web app's QR code, when there is one. False when the
+ * Moves the app to `target.server`, leaving the current one first so nothing crosses servers (`connectPlan`),
+ * and signs in there with the one-time token from the web app's QR code, when there is one. False when the
  * token was refused (expired or already used).
  */
 export async function connectToServer(target: { server: string; token?: string }, signedIn: boolean) {
   const plan = connectPlan(serverUrl(), signedIn, target);
   if (plan.signOut) await signOut();
+  if (plan.forget) await forgetSession();
   if (plan.move) await setServer(target.server);
   if (!plan.token) return true;
   const res = await authClient()

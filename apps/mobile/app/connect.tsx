@@ -56,7 +56,6 @@ export default function Connect() {
     );
 
   const target = check?.server ?? server;
-  const moving = target !== serverUrl();
   const plan = connectPlan(serverUrl(), session.signedIn, { server: target, token });
 
   const confirm = async () => {
@@ -69,7 +68,7 @@ export default function Connect() {
       setBusy(false);
       return setRefused(true);
     }
-    router.replace(moving || !session.signedIn ? "/sign-in" : "/");
+    router.replace(plan.move || !session.signedIn ? "/sign-in" : "/");
   };
 
   const problem = check && !check.ok ? t(PROBLEM_TEXT[check.problem], { host: serverHost(target) }) : null;
@@ -79,7 +78,7 @@ export default function Connect() {
       subtitle={t(token ? "mobile.auth.connect.questionSignIn" : "mobile.auth.connect.question")}
       onBack={leave}
     >
-      {session.signedIn && plan.signOut && !refused ? (
+      {plan.signOut && !refused ? (
         <Text tone="muted" variant="small">
           {t("mobile.auth.connect.leave")}
         </Text>

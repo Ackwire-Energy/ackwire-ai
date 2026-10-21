@@ -1,9 +1,9 @@
 import { parseConnectLink } from "@agenteschat/client/lib/server";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Linking, StyleSheet, View } from "react-native";
+import { AppState, Linking, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ALLOW_HTTP } from "@/lib/server";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
@@ -20,9 +20,17 @@ import { Text } from "@/ui/Text";
 export default function Scan() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, readPermission] = useCameraPermissions();
   const [notOurs, setNotOurs] = useState(false);
   const done = useRef(false);
+
+  // Back from Ajustes: Android keeps the app running when the camera is allowed there, so read it again.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void readPermission();
+    });
+    return () => sub.remove();
+  }, [readPermission]);
 
   if (!permission) return null;
   if (!permission.granted)
