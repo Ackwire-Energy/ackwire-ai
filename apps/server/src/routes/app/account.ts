@@ -24,9 +24,9 @@ import {
   setMyLocale,
   setOrgLogo,
   signInOptions,
+  USER_LOCALES,
   updateOrganization,
   updateOrgSettings,
-  USER_LOCALES,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { authUiConfig } from "../../auth";
@@ -83,7 +83,7 @@ export function accountRoutes(deps: AppDeps) {
               .boolean()
               .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
             firstRun: z.boolean().openapi({ description: "No account exists yet: show first-run setup." }),
-            passwordReset: z.boolean().openapi({ description: "Offer \"forgot password\" (e-mail is configured)." }),
+            passwordReset: z.boolean().openapi({ description: 'Offer "forgot password" (e-mail is configured).' }),
           }),
         ),
       },
@@ -122,7 +122,9 @@ export function accountRoutes(deps: AppDeps) {
           z.object({
             account: z.boolean(),
             password: z.boolean().openapi({ description: "The account has a password." }),
-            providers: z.array(z.enum(["google", "github", "apple"])).openapi({ description: "Social sign-ins linked." }),
+            providers: z
+              .array(z.enum(["google", "github", "apple"]))
+              .openapi({ description: "Social sign-ins linked." }),
             canSignUp: z.boolean().openapi({ description: "No account, and this e-mail may create one." }),
           }),
         ),
