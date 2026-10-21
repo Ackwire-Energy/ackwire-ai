@@ -2,6 +2,7 @@
 name = "agentes-desktop"
 version = "0.5.1"
 description = "agentes: the menu bar app that lets agents use this computer (ADR 0036)"
+license = "AGPL-3.0-only"
 edition = "2021"
 rust-version = "1.77.2"
 publish = false

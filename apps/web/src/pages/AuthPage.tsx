@@ -47,7 +47,15 @@ export function PasswordHelp({ password }: { password: string }) {
   );
 }
 
-export function AuthPage({ start, redirect, email: initialEmail }: { start: "in" | "up"; redirect?: string; email?: string }) {
+export function AuthPage({
+  start,
+  redirect,
+  email: initialEmail,
+}: {
+  start: "in" | "up";
+  redirect?: string;
+  email?: string;
+}) {
   const { t } = useTranslation();
   const api = useApi();
   const auth = useAuth();
@@ -190,11 +198,19 @@ export function AuthPage({ start, redirect, email: initialEmail }: { start: "in"
   const first = name.trim().split(/\s+/)[0] ?? "";
   const providerNames = linkedProviders.map((p) => t(`auth.provider.${p}`)).join(" · ");
   const bubble: Record<Step, [string, string]> = {
-    email: start === "up" ? [t("auth.flow.emailUp"), t("auth.flow.emailUpLead")] : [t("auth.flow.email"), t("auth.flow.emailLead")],
-    password: wrong ? [t("auth.flow.wrong"), canReset ? t("auth.flow.wrongLead") : t("auth.flow.wrongLeadNoReset")] : [t("auth.flow.password"), t("auth.flow.passwordLead")],
+    email:
+      start === "up"
+        ? [t("auth.flow.emailUp"), t("auth.flow.emailUpLead")]
+        : [t("auth.flow.email"), t("auth.flow.emailLead")],
+    password: wrong
+      ? [t("auth.flow.wrong"), canReset ? t("auth.flow.wrongLead") : t("auth.flow.wrongLeadNoReset")]
+      : [t("auth.flow.password"), t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
-    newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"), t("auth.passwordHelp")],
+    newPassword: [
+      first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
+      t("auth.passwordHelp"),
+    ],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],

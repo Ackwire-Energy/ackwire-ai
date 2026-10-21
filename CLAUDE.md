@@ -4,7 +4,7 @@ Protótipo de referência: docs/prototipo/colmeia.html — só para fluxos e con
 
 ## Stack
 Mesma base do Tierbird (D18/D20 em docs/planejamento.md): Bun + Hono + Drizzle, front Vite + React + TanStack, WebSocket nativo do Bun, Better Auth. Postgres é a única dependência no self-host (fila em outbox no Postgres); Redis e Turbopuffer só como módulos da Cloud.
-Por enquanto: código fechado, só Cloud (D25 em docs/planejamento.md). Open source entra depois; pendências em "Pendências para o open source" no planejamento. Manter as interfaces/módulos (adaptadores trocáveis), mas sem gastar esforço em self-host agora.
+Código aberto (D80 em docs/planejamento.md; reverte a D25): AGPL-3.0-only em tudo o que é público, contribuições sob a mesma licença, sem `ee/`. Self-host por docker-compose, 100% grátis (`SELF_HOSTING.md`); a Cloud é a mesma imagem com variáveis de ambiente. O self-host funciona só com Postgres: serviço externo é opcional, ligado por variável, atrás das interfaces/módulos (adaptadores trocáveis). Lançamento: checklist na D80.
 
 ## Conceitos
 - Organização (multi-tenant): tudo tem org_id. Contexto da org entra no prompt de todos os agentes.
@@ -35,7 +35,7 @@ Product name in code and docs: **agentes.chat**. Package scope `@agenteschat/*`.
 ### Non-negotiables
 
 - PostgreSQL is the only required dependency (no Redis/BullMQ in core). Jobs = Postgres outbox, in-process workers (ADR 0005).
-- `apps/` and `packages/` never import `ee/` or any cloud package (`bun run check:boundaries`). Cloud extends through `AgentesModule` and adapters (ADR 0002).
+- `apps/` and `packages/` never import `ee/` or any cloud package (`bun run check:boundaries`). With no contributor license agreement, anything in the server process must be AGPL, so Cloud-only behavior is public code switched on by env vars (through `AgentesModule` and adapters) or a separate private service over the network, never a private in-process module (ADR 0002).
 - Every tenant-owned table has `org_id` (a test enforces it).
 - Model calls go only through the Model Gateway (`packages/engine/src/gateway.ts`): budget checked before the call, usage + cost recorded with `org_id` and `agent_id`. Provider keys are encrypted per org (envelope encryption) and never returned to clients (ADR 0007).
 - Env vars only in `packages/config/src/schema.ts`, then `bun run docs:env` (regenerates `.env.example`).
@@ -43,7 +43,7 @@ Product name in code and docs: **agentes.chat**. Package scope `@agenteschat/*`.
 
 ### Commands
 
-`bun test` · `bun run typecheck` · `bun run lint` · `bun run format` · `bun run check:boundaries` · `bun run db:generate <name>` · `bun run docs:env` · `bun run dev`
+`bun test` · `bun run typecheck` · `bun run lint` · `bun run format` · `bun run check:boundaries` · `bun run check:licenses` · `bun run db:generate <name>` · `bun run docs:env` · `bun run dev`
 
 Run lint, typecheck, tests and boundaries before declaring work done.
 

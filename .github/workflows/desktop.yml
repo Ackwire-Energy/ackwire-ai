@@ -151,6 +151,9 @@ jobs:
           codesign --verify --strict --verbose=2 "$APP/Contents/MacOS/agent-browser"
           "$APP/Contents/MacOS/agent-browser" --version
           test -s "$APP/Contents/Resources/licenses/agent-browser/LICENSE"
+          test -s "$APP/Contents/Resources/licenses/bun/LICENSE.md"
+          test -s "$APP/Contents/Resources/LICENSE"
+          test -s "$APP/Contents/Resources/NOTICE"
           xcrun stapler validate "$APP"
           spctl --assess --type execute --verbose=4 "$APP"
 

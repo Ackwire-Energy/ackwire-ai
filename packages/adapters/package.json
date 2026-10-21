@@ -27,5 +27,5 @@
     "@types/mailparser": "^3.9.0",
     "@types/nodemailer": "^8.0.2"
   },
-  "license": "UNLICENSED"
+  "license": "AGPL-3.0-only"
 }

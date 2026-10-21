@@ -17,5 +17,5 @@
     "openai": "^7.33.0"
   },
   "devDependencies": {},
-  "license": "UNLICENSED"
+  "license": "AGPL-3.0-only"
 }

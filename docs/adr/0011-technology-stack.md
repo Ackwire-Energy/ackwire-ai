@@ -8,7 +8,7 @@
 
 | Concern | Choice |
 | --- | --- |
-| Runtime, packages | Bun workspaces (`apps/*`, `packages/*`, `ee`) |
+| Runtime, packages | Bun workspaces (`apps/*`, `packages/*`) |
 | HTTP API | Hono + `@hono/zod-openapi` (Zod schemas drive validation and `/api/openapi.json`); Scalar at `/api/reference` |
 | Real-time | Native `Bun.serve` WebSocket (ADR 0010) |
 | Database | PostgreSQL 15+ with pgvector; Drizzle ORM + postgres.js; SQL migrations committed |

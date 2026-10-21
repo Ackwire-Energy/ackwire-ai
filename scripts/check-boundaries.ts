@@ -1,8 +1,8 @@
 /**
  * Enforces the edition boundary (docs/adr/0002-editions-and-modules.md):
  * open-source code under apps/ and packages/ must never import the
- * proprietary Cloud package (private agentes-chat-cloud repo) or the
- * commercially licensed `ee/` package. Run in CI via `bun run check:boundaries`.
+ * proprietary Cloud package (private agentes-chat-cloud repo) or a private
+ * commercial `@agenteschat/ee` module. Run in CI via `bun run check:boundaries`.
  */
 import { Glob } from "bun";
 

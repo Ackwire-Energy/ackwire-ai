@@ -14,7 +14,8 @@ export function createBetterAuthClient(origin = window.location.origin): AuthCli
       toResult((await client.signIn.social({ provider, callbackURL, errorCallbackURL: "/login" })).error),
     requestPasswordReset: async ({ email, redirectTo }) =>
       toResult((await client.requestPasswordReset({ email, redirectTo })).error),
-    resetPassword: async ({ token, newPassword }) => toResult((await client.resetPassword({ token, newPassword })).error),
+    resetPassword: async ({ token, newPassword }) =>
+      toResult((await client.resetPassword({ token, newPassword })).error),
     signOut: async () => {
       await client.signOut();
     },
