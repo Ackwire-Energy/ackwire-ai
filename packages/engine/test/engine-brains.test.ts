@@ -1141,47 +1141,54 @@ test("one 'computer away' note per outage and place: a second run waits quietly;
     brains: { claude_code: () => brain },
     machines: { status: async (id) => statusOf(id, { online: false }) },
   });
-  // A routine's message (the main timeline, like an hourly routine), twice.
-  const routineCall = async (channelId: string) => {
+  // A message in the main timeline; a routine's call when `routine` (like an hourly routine).
+  const call = async (channelId: string, routine = false) => {
     const m = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, channelId, {
-      body: "@dev hourly check",
+      body: "@dev check",
     });
-    await f.db
-      .update(schema.messages)
-      .set({ meta: { routine: { id: crypto.randomUUID(), name: "Hourly" } } })
-      .where(eq(schema.messages.id, m.id));
+    if (routine)
+      await f.db
+        .update(schema.messages)
+        .set({ meta: { routine: { id: crypto.randomUUID(), name: "Hourly" } } })
+        .where(eq(schema.messages.id, m.id));
     await drainOutbox(f.db, handlers);
     return m;
   };
   const notices = async () =>
     (await f.db.select().from(schema.messages)).filter((m) => m.meta.bodyCode === "brain_unavailable");
 
-  await routineCall(f.general.id);
-  await routineCall(f.general.id);
+  // A routine's run waits without a note (a computer that naps and wakes would post one every run).
+  await call(f.general.id, true);
   let runs = await f.db.select().from(schema.agentRuns);
-  expect(runs.map((r) => r.status)).toEqual(["waiting_input", "waiting_input"]);
+  expect(runs.map((r) => r.status)).toEqual(["waiting_input"]);
+  expect(await notices()).toHaveLength(0);
+
+  await call(f.general.id);
+  await call(f.general.id);
+  runs = await f.db.select().from(schema.agentRuns);
+  expect(runs.map((r) => r.status)).toEqual(["waiting_input", "waiting_input", "waiting_input"]);
   expect(runs.every((r) => r.waitingMachineId === machineId)).toBe(true);
   expect(await notices()).toHaveLength(1);
 
   // Another channel: its people didn't see the note, so it is said there once.
   const other = await createChannel(f.db, f.owner.id, f.org.id, { name: "tech" });
   await addChannelMember(f.db, f.owner.id, f.org.id, other.id, { agentId: f.agent.id });
-  await routineCall(other.id);
+  await call(other.id);
   // The conversation list's last line carries the note's code (the app says it in the reader's language).
   const tech = (await listChannels(f.db, f.owner.id, f.org.id)).find((c) => c.id === other.id);
   expect(tech?.lastMessage?.meta).toMatchObject({
     bodyCode: "brain_unavailable",
     bodyParams: { brain: "Claude Code" },
   });
-  await routineCall(other.id);
+  await call(other.id);
   const all = await notices();
   expect(all).toHaveLength(2);
   expect(all.filter((m) => m.channelId === other.id)).toHaveLength(1);
 
   // All of them still wait and come back together.
   runs = await f.db.select().from(schema.agentRuns);
-  expect(runs.filter((r) => r.status === "waiting_input")).toHaveLength(4);
-  expect((await resumeRunsWaitingForMachine(f.db, machineId)).length).toBe(4);
+  expect(runs.filter((r) => r.status === "waiting_input")).toHaveLength(5);
+  expect((await resumeRunsWaitingForMachine(f.db, machineId)).length).toBe(5);
 });
 
 test("waiting for its computer isn't working: left out of 'working now' and a thread's working flag", async () => {

@@ -458,20 +458,22 @@ async function executeRunInner(
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
-    // A routine's run ended: its creator hears it (D46).
+    // A routine's run ended: its creator hears it (D46). A silent run (NO_REPLY) found nothing: no notification.
     if (routineOfRun && (status === "done" || status === "failed")) {
       const routine = routineOfRun;
       const notifyDeps = { db, pubsub: deps.pubsub };
       await routineReplyText(notifyDeps, run.orgId, run.id)
         .then((text) =>
-          notifyRoutineRun(notifyDeps, {
-            orgId: run.orgId,
-            routineId: routine.id,
-            agentId: run.agentId,
-            ok: status === "done",
-            runKey: run.id,
-            text: status === "done" ? text : (error ?? text),
-          }),
+          status === "done" && !text
+            ? undefined
+            : notifyRoutineRun(notifyDeps, {
+                orgId: run.orgId,
+                routineId: routine.id,
+                agentId: run.agentId,
+                ok: status === "done",
+                runKey: run.id,
+                text: status === "done" ? text : (error ?? text),
+              }),
         )
         .catch(() => {});
     }
@@ -976,7 +978,10 @@ async function executeRunInner(
     const name = from === "codex" ? "Codex" : "Claude Code";
     // One note per outage and place: another run of this agent already waits for the same computer and
     // said so here (an hourly routine, a second message): this one waits quietly with it.
-    const said = t.brainNotice === u.code || (await noticeAlreadyPosted(db, run, machineId, replyThreadId));
+    // A routine's run waits quietly: it runs when the computer is back, the next ones are skipped meanwhile
+    // (`waitsForComputer`), and the outage card lists it; a note per run of a computer that naps and wakes is noise.
+    const quiet = routineOfRun !== null;
+    const said = quiet || t.brainNotice === u.code || (await noticeAlreadyPosted(db, run, machineId, replyThreadId));
     const say = !said;
     const note = say
       ? await db.transaction(async (tx) => {
@@ -997,7 +1002,8 @@ async function executeRunInner(
       : null;
     t.postedUpTo = t.messages.length;
     t.brainNotice = u.code;
-    t.brainNoticeIn = { channelId: run.channelId, threadId: replyThreadId };
+    // Nothing said here by a quiet run: a person's message in the same place still gets its note.
+    if (!quiet) t.brainNoticeIn = { channelId: run.channelId, threadId: replyThreadId };
     // `waitId`: one wait (its "computer is back" job is queued once per wait, `resumeRunsWaitingForMachine`).
     t.waitingForBrain = { kind: from, machineId, code: u.code, waitId: Bun.randomUUIDv7() };
     await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });

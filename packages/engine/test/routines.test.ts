@@ -289,6 +289,10 @@ describe("routines", () => {
     expect(listed?.recentRuns[0]?.id).toBe(listed?.lastRun?.id);
     const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
     expect(runs.map((r) => r.status)).toEqual(["done", "done"]);
+    // Only the run with news reaches the creator's inbox; a silent one doesn't.
+    const finished = async () =>
+      (await f.db.select().from(schema.notifications)).filter((n) => n.kind === "routine_finished");
+    expect(await finished()).toHaveLength(1);
 
     // An explanation that closes with the word on its own line is still silence, never a post.
     answer = "Nada novo desde a última checagem.\n\nNO_REPLY";
