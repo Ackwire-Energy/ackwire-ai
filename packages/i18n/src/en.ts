@@ -106,6 +106,18 @@ export const en: Translations = {
       openMail: "Open {{app}}",
       backToSignIn: "Back to sign in",
     },
+    desktop: {
+      browser: "Continue in your browser",
+      browserLead:
+        "We opened your browser so you can sign in with {{provider}}. When you're done, we'll come back here on our own.",
+      reopen: "Open the browser again",
+      otherWay: "Sign in another way",
+      opening: "Opening {{provider}}…",
+      done: "All set.",
+      doneLead: "You're signed in to the agentes app. You can close this tab.",
+      expired: "This request expired.",
+      expiredLead: "Go back to the app and choose {{provider}} again.",
+    },
     reset: {
       title: "Create a new password.",
       save: "Save password",
@@ -378,6 +390,8 @@ export const en: Translations = {
     skip: "Skip this step",
   },
   shell: {
+    // The Mac app's own title bar (D79).
+    titleBar: { back: "Back", forward: "Forward" },
     more: "More",
     moreGroups: { schedule: "Schedule", decisions: "Decisions" },
     moreWhat: {

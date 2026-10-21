@@ -81,7 +81,7 @@ export const desktopPtBR = {
     pauseHint: "O que já está rodando termina normalmente.",
     resume: "Retomar os agentes",
     addOrg: "Adicionar organização",
-    openSite: "Abrir agentes.chat",
+    openSite: "Abrir agentes",
     prefs: "Preferências…",
     quit: "Sair do agentes",
     pausedFor1h: "Pausado por 1 hora",

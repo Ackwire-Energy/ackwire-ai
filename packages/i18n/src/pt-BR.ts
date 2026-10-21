@@ -112,6 +112,18 @@ export const ptBR = {
       openMail: "Abrir o {{app}}",
       backToSignIn: "Voltar para entrar",
     },
+    desktop: {
+      browser: "Continue no navegador",
+      browserLead:
+        "Abrimos o navegador para você entrar com {{provider}}. Quando terminar, a gente volta para cá sozinho.",
+      reopen: "Abrir o navegador de novo",
+      otherWay: "Usar outro jeito de entrar",
+      opening: "Abrindo {{provider}}…",
+      done: "Tudo certo.",
+      doneLead: "Você entrou no app agentes. Pode fechar esta aba.",
+      expired: "Esse pedido expirou.",
+      expiredLead: "Volte ao app e escolha {{provider}} de novo.",
+    },
     reset: {
       title: "Crie uma senha nova.",
       save: "Salvar senha",
@@ -385,6 +397,8 @@ export const ptBR = {
     skip: "Pular esta etapa",
   },
   shell: {
+    // The Mac app's own title bar (D79).
+    titleBar: { back: "Voltar", forward: "Avançar" },
     more: "Mais",
     moreGroups: { schedule: "Agenda", decisions: "Decisões" },
     moreWhat: {

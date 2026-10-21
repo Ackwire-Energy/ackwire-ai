@@ -1,0 +1,7 @@
+{
+  "identifier": "main",
+  "description": "The main window loads agentes.chat itself (D79): it may only drag and zoom the window from its title bar. No app command, nothing of the Mac.",
+  "windows": ["main"],
+  "remote": { "urls": ["https://agentes.chat/*"] },
+  "permissions": ["core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize"]
+}
