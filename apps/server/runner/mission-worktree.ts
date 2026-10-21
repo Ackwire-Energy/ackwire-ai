@@ -168,11 +168,22 @@ async function repoRoot(folder: string, repo: unknown): Promise<string> {
     throw new RunnerError("bad_request", "git is not installed on this computer");
   }
   const root = out(top);
+  if (!root) {
+    // Truly no git here: the server lets the mission work in the folder itself.
+    if (/not a git repository/i.test(top.stderr)) throw new RunnerError("not_git", "not a git repository");
+    throw new RunnerError("bad_request", gitWhy(top, "git couldn't read the repository"));
+  }
   let real = "";
   try {
-    real = root ? realpathSync(root) : "";
+    real = realpathSync(root);
   } catch {}
-  if (!real || !isInside(folder, real)) throw new RunnerError("bad_request", "not a git repository");
+  if (!real || !isInside(folder, real)) {
+    // Inside a bigger repository (a workspace kept in git): never "no git", the person's checkout is not ours.
+    throw new RunnerError(
+      "outside_workspace",
+      `${String(repo) || "The folder"} is inside a git repository that starts outside the agent's folder`,
+    );
+  }
   return real;
 }
 
@@ -200,13 +211,57 @@ const commonDir = async (dir: string) => {
   }
 };
 
+/** Where a worktree lists the files `ensure` copied into it (in its own git dir, so per worktree). */
+const COPIED_LIST = "agentes-copied";
+
+/** The worktree's own git dir (`.git/worktrees/<name>` for a linked worktree); "" outside git. */
+async function ownGitDir(dir: string) {
+  const r = out(await git(dir, ["rev-parse", "--git-dir"]));
+  return r ? path.resolve(dir, r) : "";
+}
+
+/** The files `ensure` copied into the worktree at `dir` (none outside a mission's worktree). */
+export async function copiedFiles(dir: string): Promise<string[]> {
+  const gitDir = await ownGitDir(dir);
+  if (!gitDir) return [];
+  try {
+    return readFileSync(path.join(gitDir, COPIED_LIST), "utf8")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The pathspecs of an end-of-item commit in `dir`: the whole tree but the
+ * files `ensure` copied that git doesn't ignore already (a `.env` it would
+ * show as untracked; naming an ignored one makes `git add` fail). Empty when
+ * there is none (the plain `git add -A`).
+ */
+export async function commitPathspecs(dir: string): Promise<string[]> {
+  const copied = await copiedFiles(dir);
+  if (!copied.length) return [];
+  const top = out(await git(dir, ["rev-parse", "--show-toplevel"])) || dir;
+  const ignored = new Set(
+    (await git(top, ["check-ignore", "--", ...copied])).stdout
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean),
+  );
+  const shown = copied.filter((p) => !ignored.has(p));
+  return shown.length ? [":/", ...shown.map((p) => `:(top,exclude,literal)${p}`)] : [];
+}
+
 /**
  * Copies the files git ignores from the repository into the new worktree:
  * `agentes.json` `copy`, else the `.env*` files at the root. Only regular
  * files git doesn't track, whose real path stays inside the repository; never
- * over a file the worktree already has. A copied file git would otherwise
- * show (untracked, not ignored) is excluded locally, so the end-of-item
- * commit (`git add -A`) never takes it. Returns what was copied.
+ * over a file the worktree already has. What was copied is listed in the
+ * worktree's own git dir (never the repository's shared `info/exclude`,
+ * which would hide them in the person's checkout too), and the end-of-item
+ * commit leaves those paths out (`commitPathspecs`). Returns what was copied.
  */
 async function copyIgnored(root: string, target: string, config: ProjectConfig): Promise<string[]> {
   let wanted: string[];
@@ -226,6 +281,16 @@ async function copyIgnored(root: string, target: string, config: ProjectConfig):
         .sort();
     } catch {
       wanted = [];
+    }
+    // By default only what git ignores: an agent's own `git add -A` can't take it either.
+    if (wanted.length) {
+      const ignored = new Set(
+        (await git(root, ["check-ignore", "--", ...wanted])).stdout
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean),
+      );
+      wanted = wanted.filter((n) => ignored.has(n));
     }
   }
   const copied: string[] = [];
@@ -248,8 +313,15 @@ async function copyIgnored(root: string, target: string, config: ProjectConfig):
     } catch {
       continue;
     }
-    if ((await git(target, ["check-ignore", "-q", "--", rel])).code === 1) excludeLocally(root, `/${rel}`);
     copied.push(rel);
+  }
+  const gitDir = copied.length ? await ownGitDir(target) : "";
+  if (gitDir) {
+    try {
+      writeFileSync(path.join(gitDir, COPIED_LIST), `${copied.join("\n")}\n`);
+    } catch {
+      // Best effort: without the list a commit could take a copied file the repository doesn't ignore.
+    }
   }
   return copied;
 }
@@ -332,7 +404,8 @@ export async function ensureMissionWorktree(
   // The project's own file wins from the branch; the person's copy (not committed yet) otherwise.
   const config = existsSync(path.join(target, "agentes.json")) ? readProjectConfig(target) : readProjectConfig(root);
   const copied = created ? await copyIgnored(root, target, config) : [];
-  const dirty = out(await git(target, ["status", "--porcelain"])) !== "";
+  const specs = await commitPathspecs(target);
+  const dirty = out(await git(target, ["status", "--porcelain", ...(specs.length ? ["--", ...specs] : [])])) !== "";
   // An existing branch: the base the server gave, else where it left the repository's branch.
   const reportedBase =
     newBase ?? baseSha ?? (repoBranch ? out(await git(root, ["merge-base", repoBranch, branch])) : "");

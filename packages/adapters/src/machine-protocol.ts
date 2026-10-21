@@ -306,6 +306,15 @@ export const GIT_SYNC_LIMITS = {
  *
  * `remove`: `git worktree remove --force` on `path`, then `git branch -D`
  * when `deleteBranch` is set. A folder that is already gone is not an error.
+ *
+ * Errors: `not_git` when `repo` is in no git repository (the mission then
+ * works in `repo` itself, with no branch); `outside_workspace` when `repo`
+ * only sits inside a repository whose top level is outside the agent's
+ * folder (never treated as "no git": the server fails the mission's folder).
+ *
+ * The files `ensure` copies are listed in the worktree's own git dir
+ * (`<git-dir>/agentes-copied`, one path per line, never the shared
+ * `info/exclude`), and a task's end-of-item commit leaves them out.
  */
 export type MissionWorktreeRequest =
   | { action: "ensure"; repo: string; path: string; branch: string; baseSha?: string }
@@ -891,6 +900,12 @@ export type MachineErrorCode =
   | "browser_unavailable"
   /** Protocol 14: `mission.worktree` `ensure` with `baseSha` found neither the folder nor the branch. */
   | "branch_missing"
+  /**
+   * Protocol 14: `mission.worktree` on a folder that is in no git repository at
+   * all (the mission works in it with no branch). A folder inside a repository
+   * whose top level is outside the agent's folder is `outside_workspace`.
+   */
+  | "not_git"
   | "bad_request"
   | "internal";
 

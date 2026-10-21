@@ -109,6 +109,11 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
           )
           .join("; ")}.`
       : `Nothing running on ${computer} now.`,
+    ...(running.some((t) => t.mode === "write" && !t.startRequest)
+      ? [
+          "An item that writes is working in the mission's folder now: until it ends, you only read (your turns are read-only).",
+        ]
+      : []),
     ...(pending.length
       ? [`Waiting for a decision: ${pending.map((d) => `"${d.question}" (${d.options.join(" / ")})`).join("; ")}.`]
       : []),
@@ -129,8 +134,8 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
             mission.baseBranch ?? "the base branch"
           }${mission.baseSha ? ` at ${shortSha(mission.baseSha)}` : ""}. The person's own checkout (${
             mission.repoDir || "the agent's folder"
-          }) is never touched: stay in ${folder}, on that branch. Items started with start_task work there too: items that write run one at a time and each ends in one commit (you are told what it changed); items with mode "read" (research, analysis, review) may run in parallel.`
-        : `The mission works in the folder ${folder} (not a git repository: no branches or commits). Items that write run one at a time there; items with mode "read" may run in parallel.`
+          }) is never touched: stay in ${folder}, on that branch. Items started with start_task work there too: items that write run one at a time and each ends in one commit (you are told what it changed); while an item writes, you only read (its commit takes every change in the folder); items with mode "read" (research, analysis, review) may run in parallel.`
+        : `The mission works in the folder ${folder} (not a git repository: no branches or commits). Items that write run one at a time there and while one writes, you only read; items with mode "read" may run in parallel.`
       : mission.worktreeState === "preparing"
         ? "The mission's copy of the project is being prepared: wait until you are told it's ready before starting work."
         : mission.worktreeState === "failed"

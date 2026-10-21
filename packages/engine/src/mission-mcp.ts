@@ -16,6 +16,7 @@ import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./
 import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
 import { completeMission } from "./mission-delivery";
 import { onMachineOnline } from "./mission-sync";
+import { startQueuedMissionTasks } from "./mission-worktree";
 import {
   askDecision,
   checkMissionToolRate,
@@ -544,7 +545,9 @@ async function run(
       const title = str(args.title).trim().slice(0, 120);
       const mode = str(args.mode) === "read" ? "read" : "write";
       const folder = missionCwd(mission) || "the agent's folder";
-      const where = mission.branch ? `the mission's folder ${folder} (branch ${mission.branch})` : `the mission's folder ${folder}`;
+      const where = mission.branch
+        ? `the mission's folder ${folder} (branch ${mission.branch})`
+        : `the mission's folder ${folder}`;
       const prompt = [
         `You work on one item of the mission "${mission.title}": ${title}.`,
         `You work in ${where}, shared with the mission's other items.${
@@ -566,9 +569,15 @@ async function run(
         resume: false,
         mode,
       });
-      await recordMissionEvent(deps.db, mission, "task_started", { taskId: row.id, title, mode, queued: Boolean(waitsFor) });
+      await recordMissionEvent(deps.db, mission, "task_started", {
+        taskId: row.id,
+        title,
+        mode,
+        queued: Boolean(waitsFor),
+      });
       await publishMissionEvent(deps, mission, "task", { taskId: row.id });
-      if (row.status === "failed") return `Task ${row.id} ("${title}") couldn't start: ${row.lastLine ?? "the computer refused it"}.`;
+      if (row.status === "failed")
+        return `Task ${row.id} ("${title}") couldn't start: ${row.lastLine ?? "the computer refused it"}.`;
       if (waitsFor) {
         const when =
           waitsFor === "write"
@@ -576,7 +585,9 @@ async function run(
             : "the computer has a free slot (or is back)";
         return `Queued task ${row.id} ("${title}", ${mode}): it starts by itself when ${when}. You'll be told when it ends; don't wait for it.`;
       }
-      return `Started task ${row.id} ("${title}", ${mode}) in ${where}. You'll be told when it ends; don't wait for it.`;
+      // While a write item works in the folder, the main session only reads (ADR 0044: its commit takes every change).
+      const readOnly = mode === "write" ? " Until it ends you only read: your turns are read-only meanwhile." : "";
+      return `Started task ${row.id} ("${title}", ${mode}) in ${where}.${readOnly} You'll be told when it ends; don't wait for it.`;
     }
     default:
       return `Unknown tool ${tool}.`;
@@ -600,6 +611,7 @@ export function createMissionHooks(deps: HookDeps): MachineMissionHooks {
   return {
     mcp: (machineId, frame) => handleMissionMcpCall(deps, machineId, frame),
     mcpList: (machineId, frame) => handleMissionMcpList(deps, machineId, frame),
+    queue: (machineId) => startQueuedMissionTasks(deps, machineId),
     online: async (machineId) => {
       await onMachineOnline(deps, machineId);
       // Runs that waited for this computer's brain (ADR 0032 §5) try again.

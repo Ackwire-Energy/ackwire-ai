@@ -51,12 +51,16 @@ import {
   tellMainSession,
 } from "./missions-engine";
 import {
+  closeMissionWorktree,
   ensureMissionWorktree,
+  leaveMachineWorktree,
   missionCwd,
-  removeMissionWorktree,
+  resumeFailedWorktree,
   startMissionItem,
   startQueuedMissionTasks,
+  type WorktreeFailReason,
   type WorktreeState,
+  worktreeFailReasonOf,
   worktreeStateOf,
 } from "./mission-worktree";
 import { notifyMissionEnded } from "./notification-producers";
@@ -580,6 +584,8 @@ export interface MissionView {
   worktreeState: WorktreeState;
   /** The last lines of a failed setup, or why the copy couldn't be made. */
   worktreeError: string | null;
+  /** Why it is `failed`: the setup, making the copy (`ensure`), or the branch gone (`branch_missing`); null otherwise. */
+  worktreeFailReason: WorktreeFailReason | null;
   resumeTasks: boolean;
   /** "Pedir aprovação de comandos". */
   commandApproval: CommandApproval;
@@ -743,6 +749,7 @@ export async function missionViews(
       baseSha: r.baseSha,
       worktreeState: worktreeStateOf(r.worktreeState),
       worktreeError: r.worktreeError,
+      worktreeFailReason: r.worktreeState === "failed" ? worktreeFailReasonOf(r.worktreeFailReason) : null,
       resumeTasks: r.resumeTasks,
       commandApproval: commandApprovalOf(r.commandApproval),
       plan: {
@@ -1624,7 +1631,11 @@ export async function startMission(deps: MissionDeps, userId: string, orgId: str
     mission,
     userId,
     ["proposed"],
-    { status: "active", startedAt: new Date(), ...(deps.hub && mission.machineId ? { worktreeState: "preparing" } : {}) },
+    {
+      status: "active",
+      startedAt: new Date(),
+      ...(deps.hub && mission.machineId ? { worktreeState: "preparing" } : {}),
+    },
     "mission.started",
   );
   // The mission's folder first (offline: when the computer is back); the start prompt waits for it in the inbox.
@@ -1676,9 +1687,12 @@ export async function resumeMission(deps: MissionDeps, userId: string, orgId: st
     { status: "active", pausedAt: null, idleWakeups: 0 },
     "mission.resumed",
   );
-  // Its folder checked (or prepared again) before work goes on (ADR 0044).
-  if (row.worktreeState !== "none" && row.worktreeState !== "removed") {
-    await ensureMissionWorktree(deps, row.id).catch(() => null);
+  // Its folder checked (or prepared again) before work goes on (ADR 0044); a failed one is made or prepared
+  // again, as "Tentar de novo" does. The queue is walked once below.
+  if (row.worktreeState === "failed") {
+    await resumeFailedWorktree(deps, row, { startQueue: false }).catch(() => null);
+  } else if (row.worktreeState !== "none" && row.worktreeState !== "removed") {
+    await ensureMissionWorktree(deps, row.id, { startQueue: false }).catch(() => null);
   }
   await deliverInbox(deps, row.id);
   if (row.machineId) await startQueuedMissionTasks(deps, row.machineId).catch(() => 0);
@@ -1710,13 +1724,14 @@ async function cancelMissionTasks(deps: MissionDeps, mission: MissionRow, actorI
     let reply: { canceled: boolean } | null = null;
     try {
       // Waiting in our queue: the runner never had it.
-      reply = deps.hub && !row.startRequest
-        ? await deps.hub.call<"task.cancel">(row.machineId, {
-            agent: { id: mission.agentId, handle: agent?.handle ?? "agent" },
-            op: "task.cancel",
-            taskId: row.id,
-          })
-        : null;
+      reply =
+        deps.hub && !row.startRequest
+          ? await deps.hub.call<"task.cancel">(row.machineId, {
+              agent: { id: mission.agentId, handle: agent?.handle ?? "agent" },
+              op: "task.cancel",
+              taskId: row.id,
+            })
+          : null;
     } catch (error) {
       if (!(error instanceof MachineOfflineError) && !(error instanceof MachineRequestError)) throw error;
     }
@@ -1818,8 +1833,9 @@ export async function concludeMission(
     },
     "mission.closed",
   );
-  // The folder goes away; the branch stays unless the person chose to delete everything on cancel (ADR 0044).
-  row = await removeMissionWorktree(deps, row, {
+  // The folder goes away once its tasks ended (a canceled write item still commits its partial work); the
+  // branch stays unless the person chose to delete everything on cancel (ADR 0044).
+  row = await closeMissionWorktree(deps, row, {
     deleteBranch: input.outcome === "canceled" && input.deleteBranch === true,
   }).catch(() => row);
   if (input.saveToWiki) {
@@ -2310,6 +2326,8 @@ export async function setMissionMachine(
     );
   }
   const moved = machine.id !== mission.machineId;
+  // The old computer's copy goes away (the branch stays); offline, it stays there and the person is told.
+  const leftOn = moved && mission.status !== "proposed" ? await leaveMachineWorktree(deps, mission) : null;
   const [row] = await deps.db
     .update(missions)
     .set({
@@ -2340,8 +2358,13 @@ export async function setMissionMachine(
   });
   await requestFilesSync(deps.db, row as MissionRow);
   await publishMissionEvent(deps, row as MissionRow, "machine");
-  const now = moved && mission.status !== "proposed" ? await ensureMissionWorktree(deps, mission.id).catch(() => null) : null;
-  return viewFor(deps, now ?? (row as MissionRow), actorId, isAdmin);
+  const now =
+    moved && mission.status !== "proposed" ? await ensureMissionWorktree(deps, mission.id).catch(() => null) : null;
+  return {
+    ...(await viewFor(deps, now ?? (row as MissionRow), actorId, isAdmin)),
+    // The old computer was away: the mission's copy stays there (its branch has the work).
+    ...(leftOn ? { code: "mission.old_copy_left", oldComputer: leftOn } : {}),
+  };
 }
 
 /**

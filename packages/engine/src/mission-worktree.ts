@@ -1,5 +1,5 @@
-import { MISSION_WORKTREE_PROTOCOL } from "@agenteschat/adapters";
-import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { MISSION_WORKTREE_PROTOCOL, parseMissionWorktreeEnsured } from "@agenteschat/adapters";
+import { and, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ConflictError } from "./errors";
@@ -11,7 +11,6 @@ import {
   launchTask,
   type MachineTaskMode,
   type MachineTaskRow,
-  type QueuedTaskStart,
   queueMachineTask,
 } from "./machine-tasks";
 import { MachineOfflineError, MachinePausedError } from "./machines";
@@ -21,9 +20,11 @@ import {
   deliverInbox,
   getMission,
   getMissionRow,
+  isLiveTask,
   type MissionDeps,
   type MissionRow,
   missionBranchPrefix,
+  missionOfThread,
   OPEN_MISSION_STATUSES,
   postMissionMessage,
   publishMissionEvent,
@@ -109,42 +110,33 @@ export const missionFilesDir = (mission: Pick<MissionRow, "repoDir" | "worktreeP
       ? mission.repoDir
       : null;
 
-const SHA = /^[0-9a-f]{7,64}$/;
-const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-export const shortSha = (sha: string) => sha.slice(0, 12);
-
-/** The `ensure` answer, read leniently (what we asked for when a field is missing). */
-function ensuredOf(data: unknown, path: string, branch: string) {
-  const d = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
-  const baseSha = str(d.baseSha);
-  return {
-    path: str(d.path) || path,
-    branch: str(d.branch) || branch,
-    baseBranch: str(d.baseBranch) || null,
-    baseSha: SHA.test(baseSha) ? baseSha : null,
-    created: d.created === true,
-    dirty: d.dirty === true,
-    setupCommand: str(d.setupCommand) || null,
-    copied: Array.isArray(d.copied) ? d.copied.length : 0,
-  };
-}
+/** A commit id as people see it (7 characters, like the app). */
+export const shortSha = (sha: string) => sha.slice(0, 7);
 
 async function agentScope(deps: MissionDeps, mission: MissionRow) {
   const agent = await getAgentCached(deps.db, mission.orgId, mission.agentId);
   return { id: mission.agentId, handle: agent?.handle ?? "agent" };
 }
 
-/** Writes worktree columns; a changed state is told to the home conversation (`mission.updated change: worktree`). */
+/**
+ * Writes worktree columns; a changed state is told to the home conversation
+ * (`mission.updated change: worktree`). Any state but `failed` clears the
+ * failure's reason.
+ */
 async function setWorktree(
   deps: MissionDeps,
   mission: MissionRow,
   patch: Partial<
-    Pick<MissionRow, "branch" | "baseBranch" | "baseSha" | "worktreePath" | "worktreeState" | "worktreeError">
+    Pick<
+      MissionRow,
+      "branch" | "baseBranch" | "baseSha" | "worktreePath" | "worktreeState" | "worktreeError" | "worktreeFailReason"
+    >
   >,
 ) {
+  const clearReason = patch.worktreeState && patch.worktreeState !== "failed" ? { worktreeFailReason: null } : {};
   const [row] = await deps.db
     .update(missions)
-    .set({ ...patch, updatedAt: new Date() })
+    .set({ ...clearReason, ...patch, updatedAt: new Date() })
     .where(eq(missions.id, mission.id))
     .returning();
   const fresh = row ?? mission;
@@ -169,9 +161,6 @@ async function lastSetupTask(deps: MissionDeps, missionId: string) {
   return row ?? null;
 }
 
-const isLive = (t: MachineTaskRow | null) =>
-  Boolean(t && !t.endedAt && ["queued", "running", "interrupted"].includes(t.status));
-
 /**
  * Makes sure the mission's folder is there (ADR 0044): at Start, when the
  * computer comes back, on Resume and before the first item of a mission
@@ -179,14 +168,17 @@ const isLive = (t: MachineTaskRow | null) =>
  * setup first (`preparing`); otherwise the mission is `ready` and what waited
  * goes out. Offline, paused or a runner too old: nothing changes (it runs
  * again when the computer is back). Not a git repository: the mission works
- * in `repo_dir` with no branch. The branch gone: the mission pauses and the
- * thread says so (`fresh` starts again from the base: the person's "Tentar
- * de novo"). Returns the fresh row.
+ * in `repo_dir` with no branch (only the runner's `not_git`: a folder inside
+ * a repository that starts outside the agent's folder fails instead). The
+ * branch gone: the mission pauses and the thread says so (`fresh` starts
+ * again from the base: the person's "Tentar de novo"). `startQueue: false`:
+ * the caller walks the machine's queue itself once the folder is ready.
+ * Returns the fresh row.
  */
 export async function ensureMissionWorktree(
   deps: MissionDeps,
   missionId: string,
-  options: { fresh?: boolean } = {},
+  options: { fresh?: boolean; startQueue?: boolean } = {},
 ): Promise<MissionRow | null> {
   let mission = await getMissionRow(deps.db, missionId);
   if (!mission || !OPEN_MISSION_STATUSES.includes(mission.status) || mission.status === "proposed") return mission;
@@ -217,7 +209,7 @@ export async function ensureMissionWorktree(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const code = error instanceof MachineRequestError ? error.code : null;
-    if (code === "bad_request" && /not a git repository/i.test(message)) {
+    if (code === "not_git") {
       // No git: no copy, no commits; items still take turns writing in repo_dir.
       const row = await setWorktree(deps, mission, {
         worktreePath: mission.repoDir,
@@ -227,7 +219,7 @@ export async function ensureMissionWorktree(
         worktreeError: null,
       });
       await recordMissionEvent(deps.db, row, "worktree_no_git", {});
-      return markReady(deps, row);
+      return markReady(deps, row, options);
     }
     if (code === "branch_missing") return failWorktree(deps, mission, "branch_missing", message);
     // Away, paused or slow: tried again when the computer is back.
@@ -242,7 +234,18 @@ export async function ensureMissionWorktree(
     }
     return failWorktree(deps, mission, "ensure", message);
   }
-  const got = ensuredOf(reply, path, branch);
+  // Read leniently: what we asked for when the answer isn't one.
+  const parsed = parseMissionWorktreeEnsured(reply);
+  const got = {
+    path: parsed?.path || path,
+    branch: parsed?.branch || branch,
+    baseBranch: parsed?.baseBranch || null,
+    baseSha: parsed?.baseSha || null,
+    created: parsed?.created === true,
+    dirty: parsed?.dirty === true,
+    setupCommand: parsed?.setupCommand ?? null,
+    copied: parsed?.copied.length ?? 0,
+  };
   const keepBase = !options.fresh && mission.baseSha;
   const before = mission.worktreeState;
   mission = await setWorktree(deps, mission, {
@@ -262,11 +265,11 @@ export async function ensureMissionWorktree(
   const needsSetup = got.created || before === "preparing" || before === "failed";
   if (needsSetup) {
     const setup = await lastSetupTask(deps, mission.id);
-    if (isLive(setup)) return mission;
+    if (isLiveTask(setup)) return mission;
     const alreadyDone = !got.created && setup?.status === "done" && before !== "failed";
     if (got.setupCommand && !alreadyDone) return startSetup(deps, mission, got.setupCommand);
   }
-  return mission.worktreeState === "ready" ? mission : markReady(deps, mission);
+  return mission.worktreeState === "ready" ? mission : markReady(deps, mission, options);
 }
 
 /** The setup command as a task in the mission's folder (through the queue, like items). */
@@ -288,25 +291,36 @@ async function startSetup(deps: MissionDeps, mission: MissionRow, command: strin
   return (await getMissionRow(deps.db, row.id)) ?? row;
 }
 
-/** The folder is ready: what waited goes out (Start's prompt, messages), the files are written there, queued items start. */
-async function markReady(deps: MissionDeps, mission: MissionRow) {
+/**
+ * The folder is ready: what waited goes out (Start's prompt, messages), the
+ * files are written there, queued items start (unless `startQueue: false`:
+ * the caller walks the queue once, as at a task's end or the computer back).
+ */
+async function markReady(deps: MissionDeps, mission: MissionRow, options: { startQueue?: boolean } = {}) {
   const row = await setWorktree(deps, mission, { worktreeState: "ready", worktreeError: null });
   await requestFilesSync(deps.db, row);
   await deliverInbox(deps, row.id).catch(() => 0);
-  if (row.machineId) await startQueuedMissionTasks(deps, row.machineId).catch(() => 0);
+  if (row.machineId && options.startQueue !== false) await startQueuedMissionTasks(deps, row.machineId).catch(() => 0);
   return (await getMissionRow(deps.db, row.id)) ?? row;
 }
 
-type FailReason = "setup" | "ensure" | "branch_missing";
+export type WorktreeFailReason = "setup" | "ensure" | "branch_missing";
+export const WORKTREE_FAIL_REASONS: readonly WorktreeFailReason[] = ["setup", "ensure", "branch_missing"];
+export const worktreeFailReasonOf = (v: unknown): WorktreeFailReason | null =>
+  typeof v === "string" && (WORKTREE_FAIL_REASONS as readonly string[]).includes(v) ? (v as WorktreeFailReason) : null;
 
 /**
  * The folder couldn't be made or prepared: `failed` with the reason, the
  * mission pauses (no item starts in a broken folder) and the thread gets a
  * card (`meta.missionSetup`) with "Tentar de novo" for the owner and deciders.
  */
-async function failWorktree(deps: MissionDeps, mission: MissionRow, reason: FailReason, error: string) {
+async function failWorktree(deps: MissionDeps, mission: MissionRow, reason: WorktreeFailReason, error: string) {
   const text = error.slice(-SETUP_ERROR_CHARS);
-  let row = await setWorktree(deps, mission, { worktreeState: "failed", worktreeError: text });
+  let row = await setWorktree(deps, mission, {
+    worktreeState: "failed",
+    worktreeError: text,
+    worktreeFailReason: reason,
+  });
   const [paused] = await deps.db
     .update(missions)
     .set({ status: "paused", pausedAt: new Date(), updatedAt: new Date() })
@@ -357,17 +371,21 @@ function setupError(task: MachineTaskRow) {
   return (text || `exit code ${task.exitCode ?? "none"}`).slice(-SETUP_ERROR_CHARS);
 }
 
-/** A setup task ended: ready (exit 0), failed (the card), or interrupted (made again when the computer is back). */
+/**
+ * A setup task ended: ready (exit 0), failed (the card), or interrupted (made
+ * again when the computer is back). The queue moves after (`machine.task_done`
+ * walks it once per task end).
+ */
 export async function onSetupEnded(deps: MissionDeps, task: MachineTaskRow) {
   if (!task.missionId) return;
   const mission = await getMissionRow(deps.db, task.missionId);
   if (!mission || mission.worktreeState !== "preparing" || !OPEN_MISSION_STATUSES.includes(mission.status)) return;
   if (task.status === "done") {
-    await markReady(deps, mission);
+    await markReady(deps, mission, { startQueue: false });
   } else if (task.status === "failed") {
     await failWorktree(deps, mission, "setup", setupError(task));
   } else if (task.status === "interrupted") {
-    await ensureMissionWorktree(deps, mission.id);
+    await ensureMissionWorktree(deps, mission.id, { startQueue: false });
   }
 }
 
@@ -407,7 +425,8 @@ interface ItemInput {
 
 /** Records a task of the mission in the queue, then lets the queue start what may start. */
 async function queueItem(deps: MissionDeps, mission: MissionRow, input: ItemInput) {
-  if (!deps.hub || !mission.machineId) throw new ConflictError("This mission has no computer", "mission.needs_computer");
+  if (!deps.hub || !mission.machineId)
+    throw new ConflictError("This mission has no computer", "mission.needs_computer");
   const status = await deps.hub.status(mission.machineId);
   if (!status || status.orgId !== mission.orgId) {
     throw new ConflictError("The mission's computer was removed", "mission.needs_computer");
@@ -597,10 +616,74 @@ export async function removeMissionWorktree(
   return row;
 }
 
-/** Closed missions on a machine whose folder is still there (removing it failed or the computer was away). */
+/** Whether a task of the mission still runs or may (queued, running, interrupted and may come back). */
+async function hasLiveTasks(db: Executor, missionId: string) {
+  const [row] = await db
+    .select({ id: machineTasks.id })
+    .from(machineTasks)
+    .where(
+      and(
+        eq(machineTasks.missionId, missionId),
+        isNull(machineTasks.endedAt),
+        inArray(machineTasks.status, ["queued", "running", "interrupted"]),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+/**
+ * Closing (ADR 0044): the folder goes away once nothing of the mission runs
+ * there. A canceled write item still commits its partial work (" (stopped)")
+ * after `task.cancel`: while a task is live the removal waits (recorded with
+ * the person's choice) and happens when the last one ends
+ * (`removeClosedWorktree`) or the computer comes back.
+ */
+export async function closeMissionWorktree(
+  deps: MissionDeps,
+  mission: MissionRow,
+  options: { deleteBranch?: boolean } = {},
+) {
+  if (!mission.branch || !mission.worktreePath || mission.worktreeState === "removed") return mission;
+  if (mission.worktreeState === "none") return mission;
+  if (await hasLiveTasks(deps.db, mission.id)) {
+    await recordMissionEvent(deps.db, mission, "worktree_remove_deferred", {
+      deleteBranch: options.deleteBranch === true,
+    });
+    return mission;
+  }
+  return removeMissionWorktree(deps, mission, options);
+}
+
+/** The person's choice on cancel, from the last time the removal waited or failed. */
+async function pendingDeleteBranch(db: Executor, missionId: string) {
+  const [last] = await db
+    .select({ data: missionEvents.data })
+    .from(missionEvents)
+    .where(
+      and(
+        eq(missionEvents.missionId, missionId),
+        inArray(missionEvents.kind, ["worktree_remove_failed", "worktree_remove_deferred"]),
+      ),
+    )
+    .orderBy(desc(missionEvents.createdAt))
+    .limit(1);
+  return last?.data?.deleteBranch === true;
+}
+
+/** A closed mission whose folder is still there: removed now when nothing of it runs any more. */
+export async function removeClosedWorktree(deps: MissionDeps, missionId: string) {
+  const mission = await getMissionRow(deps.db, missionId);
+  if (!mission || (mission.status !== "done" && mission.status !== "canceled")) return mission;
+  if (!mission.branch || !["preparing", "ready", "failed"].includes(mission.worktreeState)) return mission;
+  if (await hasLiveTasks(deps.db, mission.id)) return mission;
+  return removeMissionWorktree(deps, mission, { deleteBranch: await pendingDeleteBranch(deps.db, mission.id) });
+}
+
+/** Closed missions on a machine whose folder is still there (removing it waited, failed or the computer was away). */
 export async function removeLeftWorktrees(deps: MissionDeps, machineId: string) {
   const left = await deps.db
-    .select()
+    .select({ id: missions.id })
     .from(missions)
     .where(
       and(
@@ -610,15 +693,49 @@ export async function removeLeftWorktrees(deps: MissionDeps, machineId: string) 
         sql`${missions.branch} is not null`,
       ),
     );
-  for (const mission of left) {
-    const [last] = await deps.db
-      .select({ data: missionEvents.data })
-      .from(missionEvents)
-      .where(and(eq(missionEvents.missionId, mission.id), eq(missionEvents.kind, "worktree_remove_failed")))
-      .orderBy(desc(missionEvents.createdAt))
-      .limit(1);
-    await removeMissionWorktree(deps, mission, { deleteBranch: last?.data?.deleteBranch === true });
+  for (const mission of left) await removeClosedWorktree(deps, mission.id);
+}
+
+/**
+ * The mission moves to another computer: its folder on the old one is taken
+ * away (best effort; the branch stays). Offline or refused: the copy stays
+ * on that computer (recorded; the caller says so). Returns that computer's
+ * name when the copy was left there, else null.
+ */
+export async function leaveMachineWorktree(deps: MissionDeps, mission: MissionRow): Promise<string | null> {
+  if (!mission.machineId || !mission.branch || !mission.worktreePath) return null;
+  if (mission.worktreeState === "none" || mission.worktreeState === "removed") return null;
+  const status = await deps.hub?.status(mission.machineId).catch(() => null);
+  const computer = status?.name ?? "the computer";
+  try {
+    if (!deps.hub) throw new Error("no computer");
+    await deps.hub.call<"mission.worktree">(
+      mission.machineId,
+      {
+        op: "mission.worktree",
+        action: "remove",
+        repo: mission.repoDir,
+        path: mission.worktreePath,
+        branch: mission.branch,
+        agent: await agentScope(deps, mission),
+      },
+      { timeoutMs: ENSURE_TIMEOUT_MS },
+    );
+  } catch (error) {
+    await recordMissionEvent(deps.db, mission, "worktree_left_behind", {
+      machineId: mission.machineId,
+      computer,
+      path: mission.worktreePath,
+      error: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+    }).catch(() => undefined);
+    return computer;
   }
+  await recordMissionEvent(deps.db, mission, "worktree_removed", {
+    deleteBranch: false,
+    machineId: mission.machineId,
+    moved: true,
+  });
+  return null;
 }
 
 /**
@@ -635,18 +752,8 @@ export async function retryMissionWorktree(deps: MissionDeps, userId: string, or
       worktreeState: mission.worktreeState,
     });
   }
-  const [last] = await deps.db
-    .select({ data: missionEvents.data })
-    .from(missionEvents)
-    .where(and(eq(missionEvents.missionId, mission.id), eq(missionEvents.kind, "worktree_failed")))
-    .orderBy(desc(missionEvents.createdAt))
-    .limit(1);
-  const fresh = last?.data?.reason === "branch_missing";
-  let row = await setWorktree(deps, mission, {
-    worktreeState: "preparing",
-    worktreeError: null,
-    ...(fresh ? { baseSha: null, baseBranch: null, worktreePath: null } : {}),
-  });
+  const { row: prepared, fresh } = await prepareAgain(deps, mission);
+  let row = prepared;
   const [resumed] = await deps.db
     .update(missions)
     .set({ status: "active", pausedAt: null, idleWakeups: 0, updatedAt: new Date() })
@@ -668,3 +775,72 @@ export async function retryMissionWorktree(deps: MissionDeps, userId: string, or
   return getMission(deps, userId, orgId, row.id);
 }
 
+/**
+ * A failed folder back to `preparing` (after a lost branch it starts over
+ * from the project as it is now). The caller then ensures it.
+ */
+async function prepareAgain(deps: MissionDeps, mission: MissionRow) {
+  const fresh = mission.worktreeFailReason === "branch_missing";
+  const row = await setWorktree(deps, mission, {
+    worktreeState: "preparing",
+    worktreeError: null,
+    ...(fresh ? { baseSha: null, baseBranch: null, worktreePath: null } : {}),
+  });
+  return { row, fresh };
+}
+
+/**
+ * Resume on a mission whose folder failed (the person pressed Resume, not
+ * "Tentar de novo"): the same as trying again, the folder is made or
+ * prepared again. Returns the fresh row.
+ */
+export async function resumeFailedWorktree(
+  deps: MissionDeps,
+  mission: MissionRow,
+  options: { startQueue?: boolean } = {},
+) {
+  if (mission.worktreeState !== "failed") return mission;
+  const { row, fresh } = await prepareAgain(deps, mission);
+  await recordMissionEvent(deps.db, row, "worktree_retried", { reason: "resume", fresh });
+  return (await ensureMissionWorktree(deps, row.id, { fresh, ...options }).catch(() => null)) ?? row;
+}
+
+/** A write item of the mission holds its folder now (running, being started, or interrupted and may come back). */
+export async function writeItemLive(db: Executor, missionId: string) {
+  const [row] = await db
+    .select({ id: machineTasks.id })
+    .from(machineTasks)
+    .where(
+      and(
+        eq(machineTasks.missionId, missionId),
+        eq(machineTasks.mode, "write"),
+        isNull(machineTasks.endedAt),
+        sql`${machineTasks.startRequest} is null`,
+        inArray(machineTasks.status, ["queued", "running", "interrupted"]),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+/**
+ * A mission run's command policy for a computer brain's turn (`brain.turn`
+ * `permissions`): plan before Start, and while a write item of the mission
+ * works in its folder (ADR 0044: the item's end-of-item commit takes every
+ * change there, so the main session only reads until it ends); work
+ * otherwise. Its branches and allowed commands. Null: not a mission run.
+ */
+export async function missionTurnPermissions(
+  db: Executor,
+  turn: { orgId: string; agentId: string; threadRootId: string | null },
+) {
+  if (!turn.threadRootId) return null;
+  const mission = await missionOfThread(db, turn.orgId, turn.threadRootId).catch(() => null);
+  if (!mission || mission.agentId !== turn.agentId) return null;
+  const plan = mission.status === "proposed" || (await writeItemLive(db, mission.id));
+  return {
+    mode: plan ? ("plan" as const) : ("work" as const),
+    branchPrefix: missionBranchPrefix(mission.id),
+    allow: await missionAllowRules(db, mission.id),
+  };
+}

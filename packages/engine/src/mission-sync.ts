@@ -23,6 +23,7 @@ import {
   missionCwd,
   missionFilesDir,
   onSetupEnded,
+  removeClosedWorktree,
   removeLeftWorktrees,
   shortSha,
   startQueuedMissionTasks,
@@ -313,7 +314,9 @@ export async function readNotesBack(deps: MissionDeps, mission: MissionRow, task
 /**
  * A mission task ended (after `machine.task_done` claimed it): notes read
  * back, an item's end told to the main session, and what waits in the inbox
- * delivered to sessions that can hear now.
+ * delivered to sessions that can hear now. A closed mission's folder goes
+ * away with its last task. The machine's queue moves after this, once per
+ * task end (`machine.task_done` → `afterMachineTaskEnded`).
  */
 export async function onMissionTaskEnded(deps: MissionDeps, taskId: string) {
   const task = await getTask(deps.db, taskId);
@@ -323,11 +326,13 @@ export async function onMissionTaskEnded(deps: MissionDeps, taskId: string) {
   // The folder's setup (ADR 0044): ready, the failure card, or prepared again.
   if (task.mode === "setup") {
     await onSetupEnded(deps, task).catch(() => undefined);
+    await removeClosedWorktree(deps, mission.id).catch(() => undefined);
     await publishMissionEvent(deps, mission, "task", { taskId: task.id });
-    await startQueuedMissionTasks(deps, task.machineId).catch(() => 0);
     return;
   }
   await readNotesBack(deps, mission, task).catch(() => null);
+  // Closed while it ran (its " (stopped)" commit is in now): the folder goes away with the last task.
+  await removeClosedWorktree(deps, mission.id).catch(() => undefined);
   const open = ["proposed", "active", "paused", "awaiting_close"].includes(mission.status);
   if (open && isAgentTask(task)) {
     // A task the main session's run started with its own tools: its end wakes the run.
@@ -350,8 +355,6 @@ export async function onMissionTaskEnded(deps: MissionDeps, taskId: string) {
     );
   }
   await deliverInbox(deps, mission.id).catch(() => 0);
-  // The folder (a write item) or a slot is free: the next queued item may start.
-  await startQueuedMissionTasks(deps, task.machineId).catch(() => 0);
   await publishMissionEvent(deps, mission, "task", { taskId: task.id });
   // The last task ended with every item done: the mission waits to be concluded (a bit later: the run may
   // still deliver by itself).
@@ -428,7 +431,8 @@ export async function onMachineOnline(deps: MissionDeps, machineId: string) {
     let mission: MissionRow = listed;
     const working = mission.status === "active" || mission.status === "awaiting_close";
     if (working && (mission.worktreeState === "preparing" || (mission.worktreeState === "ready" && mission.branch))) {
-      mission = (await ensureMissionWorktree(deps, mission.id).catch(() => null)) ?? mission;
+      // The queue is walked once below, for every mission of the machine.
+      mission = (await ensureMissionWorktree(deps, mission.id, { startQueue: false }).catch(() => null)) ?? mission;
     }
     if (mission.inbox.length > 0) await deliverInbox(deps, mission.id).catch(() => 0);
     if (mission.filesDirtyAt) await syncMissionFiles(deps, mission.id).catch(() => null);

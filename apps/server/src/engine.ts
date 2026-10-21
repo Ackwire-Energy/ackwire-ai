@@ -45,9 +45,7 @@ import {
   type Judge,
   type MailDeps,
   type McpConnect,
-  missionAllowRules,
-  missionBranchPrefix,
-  missionOfThread,
+  missionTurnPermissions,
   notifyOwnerOnBudget,
   prepareAgentCode,
   queueBudgetEmail,
@@ -267,17 +265,9 @@ export function buildEngine(o: EngineOptions) {
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
-  /** A mission run's command policy (plan before Start, work after; its branches and allowed commands). */
-  const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) => {
-    if (!turn.threadRootId) return undefined;
-    const mission = await missionOfThread(db, turn.orgId, turn.threadRootId).catch(() => null);
-    if (!mission || mission.agentId !== turn.agentId) return undefined;
-    return {
-      mode: mission.status === "proposed" ? ("plan" as const) : ("work" as const),
-      branchPrefix: missionBranchPrefix(mission.id),
-      allow: await missionAllowRules(db, mission.id),
-    };
-  };
+  /** A mission run's command policy (plan before Start and while a write item works, work otherwise; ADR 0044). */
+  const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) =>
+    (await missionTurnPermissions(db, turn)) ?? undefined;
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>

@@ -48,7 +48,7 @@ import {
   newMcpToken,
   shellArg,
 } from "./mcp";
-import { excludeLocally, git, gitWhy } from "./mission-worktree";
+import { commitPathspecs, excludeLocally, git, gitWhy } from "./mission-worktree";
 import { isInside, resolveForAgent } from "./paths";
 
 export { excludeLocally };
@@ -1564,7 +1564,8 @@ export function commitsBehind(cwd: string, check: { branch?: unknown; sha?: unkn
 
 /**
  * The end of a task with `commit` (ADR 0044): everything that changed in its
- * folder becomes one commit. Nothing when the tree is clean. Hooks run (never
+ * folder becomes one commit, but the files the mission's `ensure` copied
+ * there (`commitPathspecs`). Nothing when the tree is clean. Hooks run (never
  * `--no-verify`); when the commit fails the changes stay and `error` says why.
  * The author is whoever the checkout has (`git.sync` sets the agent), else
  * the agent by its handle.
@@ -1580,11 +1581,14 @@ export async function commitChanges(
     const sha = r.code === 0 ? r.stdout.trim() : "";
     return SHA.test(sha) ? sha : opts.startSha;
   };
-  const status = await git(cwd, ["status", "--porcelain"], { env });
+  // The files the mission's worktree got copied (a `.env`) stay out (ADR 0044).
+  const specs = await commitPathspecs(cwd);
+  const only = specs.length ? ["--", ...specs] : [];
+  const status = await git(cwd, ["status", "--porcelain", ...only], { env });
   if (status.code !== 0)
     return { startSha: opts.startSha, endSha: await end(), error: gitWhy(status, "git status failed") };
   if (!status.stdout.trim()) return { startSha: opts.startSha, endSha: await end() };
-  const add = await git(cwd, ["add", "-A"], { env });
+  const add = await git(cwd, ["add", "-A", ...only], { env });
   if (add.code !== 0) return { startSha: opts.startSha, endSha: await end(), error: gitWhy(add, "git add failed") };
   const email = await git(cwd, ["config", "user.email"], { env });
   const handle = opts.handle.replace(/[^a-zA-Z0-9_-]/g, "") || "agent";

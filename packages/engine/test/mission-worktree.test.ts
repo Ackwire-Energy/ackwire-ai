@@ -10,12 +10,16 @@ import {
   type MachineHub,
   missionBranchPrefix,
   missionTurnFor,
+  missionTurnPermissions,
   missionWorktreePath,
+  resumeMission,
   retryMissionWorktree,
   START_PROMPT,
+  setMissionMachine,
   startMission,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 import { pairedMachine, RUNNER } from "./mission-helpers";
 
 let f: Fixture;
@@ -100,8 +104,7 @@ function runner(hub: MachineHub) {
     started,
     worktree,
     state,
-    hello: (token: string) =>
-      hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
+    hello: (token: string) => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
     /** The socket closes and a new one says hello (the computer came back). */
     async reconnect(token: string) {
       await hub.close(conn);
@@ -118,7 +121,12 @@ const taskRow = async (id: string) =>
   (await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.id, id)))[0];
 /** What the mission told its main session (`meta.missionInbox` notices, plus item ends). */
 const told = async () =>
-  (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, (await missionRow()).threadRootId)))
+  (
+    await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.threadId, (await missionRow()).threadRootId))
+  )
     .map((m) => (m.meta.missionInbox as { text?: string } | undefined)?.text ?? "")
     .filter(Boolean);
 /** Waits for the hub's async online hooks (they run after `hello`). */
@@ -284,7 +292,7 @@ describe("one worktree per mission (ADR 0044)", () => {
     await r.done(first.taskId, { startSha: "1111111aaaaaaa", endSha: "2222222bbbbbbb" });
     await drainOutbox(f.db, f.handlers);
     expect(await taskRow(first.taskId)).toMatchObject({ startSha: "1111111aaaaaaa", endSha: "2222222bbbbbbb" });
-    expect((await told()).find((t) => t.includes('"Tabs"'))).toContain("Changed 1111111aaaaa..2222222bbbbb");
+    expect((await told()).find((t) => t.includes('"Tabs"'))).toContain("Changed 1111111..2222222");
     // The queued write item started by itself.
     expect(r.started.at(-1)?.taskId).toBe(queuedId);
     expect((await taskRow(queuedId))?.status).toBe("running");
@@ -331,7 +339,7 @@ describe("one worktree per mission (ADR 0044)", () => {
   });
 
   test("a folder without git: the mission works in repo_dir, no branch, no commits", async () => {
-    await started([{ error: { code: "bad_request", message: "app is not a git repository" } }]);
+    await started([{ error: { code: "not_git", message: "not a git repository" } }]);
     const mission = await missionRow();
     expect(mission).toMatchObject({ worktreeState: "ready", worktreePath: "app", branch: null, baseSha: null });
     const r = (await startTask({ title: "Photos", prompt: "Resize them" })).content;
@@ -351,11 +359,17 @@ describe("one worktree per mission (ADR 0044)", () => {
     const card = (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))).find(
       (m) => m.meta.missionSetup,
     );
-    expect(card?.meta).toMatchObject({ bodyCode: "mission_branch_missing", missionSetup: { reason: "branch_missing" } });
+    expect(card?.meta).toMatchObject({
+      bodyCode: "mission_branch_missing",
+      missionSetup: { reason: "branch_missing" },
+    });
+    expect(await getMission(f.missionDeps, f.owner.id, f.org.id, view.id)).toMatchObject({
+      worktreeFailReason: "branch_missing",
+    });
     // Trying again starts over from the base (the person's choice).
     await retryMissionWorktree(f.missionDeps, f.owner.id, f.org.id, view.id);
     expect(r.worktree.at(-1)?.baseSha).toBeUndefined();
-    expect((await missionRow()).worktreeState).toBe("ready");
+    expect(await missionRow()).toMatchObject({ worktreeState: "ready", worktreeFailReason: null });
   });
 
   test("conclude removes the folder and keeps the branch; cancel can delete everything", async () => {
@@ -373,10 +387,137 @@ describe("one worktree per mission (ADR 0044)", () => {
     expect((await missionRow()).worktreeState).toBe("removed");
   });
 
+  test("a folder inside a repository that starts outside the agent's folder fails; it never works in the checkout", async () => {
+    const { view } = await started([
+      {
+        error: {
+          code: "outside_workspace",
+          message: "app is inside a git repository that starts outside the agent's folder",
+        },
+      },
+    ]);
+    const mission = await missionRow();
+    expect(mission).toMatchObject({ status: "paused", worktreeState: "failed", worktreeFailReason: "ensure" });
+    expect(mission.worktreePath).toBeNull();
+    expect(await getMission(f.missionDeps, f.owner.id, f.org.id, view.id)).toMatchObject({
+      worktreeFailReason: "ensure",
+    });
+  });
+
+  test("Resume on a failed folder prepares it again (as Tentar de novo does)", async () => {
+    const { view, r } = await started([{ created: true, setupCommand: "bun install" }]);
+    await r.done((r.started[0] as TaskStart).taskId, { exitCode: 1, lastLine: "error: no network" });
+    await drainOutbox(f.db, f.handlers);
+    expect(await missionRow()).toMatchObject({
+      status: "paused",
+      worktreeState: "failed",
+      worktreeFailReason: "setup",
+    });
+    r.state.ensure.push({ created: false, setupCommand: "bun install" });
+    const out = await resumeMission(f.missionDeps, f.owner.id, f.org.id, view.id);
+    expect(out).toMatchObject({ status: "active", worktreeState: "preparing", worktreeFailReason: null });
+    const again = r.started.at(-1) as TaskStart;
+    expect(again.command).toBe("bun install");
+    await r.done(again.taskId);
+    await drainOutbox(f.db, f.handlers);
+    expect(await missionRow()).toMatchObject({ status: "active", worktreeState: "ready" });
+  });
+
+  test("closing while a write item runs: the folder goes away only after its stopped commit", async () => {
+    const { view, r } = await started();
+    await startTask({ title: "Tabs", prompt: "Build the tabs" });
+    const item = r.started.at(-1) as TaskStart;
+    await closeMission(f.missionDeps, f.owner.id, f.org.id, view.id, { outcome: "canceled", deleteBranch: true });
+    // task.cancel went out; the runner still commits " (stopped)": nothing is removed yet.
+    expect(r.worktree.some((w) => w.action === "remove")).toBe(false);
+    expect(await missionRow()).toMatchObject({ status: "canceled", worktreeState: "ready" });
+    await r.done(item.taskId, { exitCode: 130, startSha: "1111111aaaaaaa", endSha: "2222222bbbbbbb" });
+    await drainOutbox(f.db, f.handlers);
+    expect(r.worktree.at(-1)).toMatchObject({ action: "remove", deleteBranch: true });
+    expect((await missionRow()).worktreeState).toBe("removed");
+  });
+
+  test("the computer back: an interrupted write item resumes through the queue, ahead of the next, once ready", async () => {
+    const { r, paired } = await started();
+    await startTask({ title: "Tabs", prompt: "Build the tabs" });
+    const a = r.started.at(-1) as TaskStart;
+    const b = taskIdOf((await startTask({ title: "Sign-in", prompt: "Add sign-in" })).content);
+    expect(await taskRow(b)).toMatchObject({ status: "queued" });
+    // The folder is gone too: made again from the branch, setup first.
+    r.state.ensure.push({ created: true, setupCommand: "bun install" });
+    const before = r.started.length;
+    await r.reconnect(paired.token);
+    await settle();
+    expect((await taskRow(a.taskId))?.status).toBe("interrupted");
+    const resumed = (await f.db.select().from(schema.machineTasks)).find((t) => t.resumedFromId === a.taskId);
+    expect(resumed).toMatchObject({ status: "queued", mode: "write" });
+    // Only the setup runs while the folder is prepared: neither the resumed item nor the next one.
+    expect(r.started.slice(before).map((s) => s.command)).toEqual(["bun install"]);
+    await r.done((r.started.at(-1) as TaskStart).taskId);
+    await drainOutbox(f.db, f.handlers);
+    expect((await missionRow()).worktreeState).toBe("ready");
+    const next = r.started.slice(before + 1);
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({
+      taskId: resumed?.id,
+      resume: true,
+      session: a.session,
+      commit: { message: "agentes: Tabs" },
+    });
+    expect((await taskRow(b))?.status).toBe("queued");
+    await r.done(resumed?.id as string);
+    await drainOutbox(f.db, f.handlers);
+    expect(r.started.at(-1)?.taskId).toBe(b);
+  });
+
+  test("the main session only reads while a write item works in the folder", async () => {
+    const { r } = await started();
+    const mission = await missionRow();
+    const turn = { orgId: f.org.id, agentId: f.agent.id, threadRootId: mission.threadRootId };
+    expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "work" });
+    await startTask({ title: "Review", prompt: "Review the API", mode: "read" });
+    expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "work" });
+    const out = await startTask({ title: "Tabs", prompt: "Build the tabs" });
+    expect(out.content).toContain("you only read");
+    const item = r.started.at(-1) as TaskStart;
+    expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "plan" });
+    await r.done(item.taskId);
+    await drainOutbox(f.db, f.handlers);
+    expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "work" });
+    expect(await missionTurnPermissions(f.db, { ...turn, threadRootId: crypto.randomUUID() })).toBeNull();
+  });
+
+  test("moving to another computer removes the copy on the old one (the branch stays)", async () => {
+    const { view, r } = await started();
+    const old = await missionRow();
+    const other = await pairMachine(
+      { db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.chat" },
+      f.owner.id,
+      f.org.id,
+      {
+        name: "Studio",
+        ...RUNNER,
+        exec: true,
+      },
+    );
+    const r2 = runner(f.machineHub as MachineHub);
+    await r2.hello(other.token);
+    const out = await setMissionMachine(f.missionDeps, f.owner.id, f.org.id, view.id, { machineId: other.machineId });
+    expect(r.worktree.at(-1)).toMatchObject({ action: "remove", path: old.worktreePath, branch: old.branch });
+    expect(r.worktree.at(-1)?.deleteBranch).toBeUndefined();
+    expect(out).not.toHaveProperty("code");
+    // The new computer makes its copy from the branch.
+    expect(r2.worktree.at(-1)).toMatchObject({ action: "ensure", branch: old.branch });
+    expect(await missionRow()).toMatchObject({ machineId: other.machineId, worktreeState: "ready" });
+  });
+
   test("a runner older than protocol 14 can't start a mission", async () => {
     const { view } = await started([], { start: false });
     const mission = await missionRow();
-    await f.db.update(schema.machines).set({ protocol: 13 }).where(eq(schema.machines.id, mission.machineId as string));
+    await f.db
+      .update(schema.machines)
+      .set({ protocol: 13 })
+      .where(eq(schema.machines.id, mission.machineId as string));
     await expect(startMission(f.missionDeps, f.owner.id, f.org.id, view.id)).rejects.toMatchObject({
       code: "mission.runner_outdated",
     });

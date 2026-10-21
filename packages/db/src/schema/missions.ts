@@ -120,6 +120,8 @@ export const missions = pgTable(
     worktreeState: text().notNull().default("none"),
     /** The last lines of a failed setup (or why the folder couldn't be made). */
     worktreeError: text(),
+    /** Why it is `failed`: `setup | ensure | branch_missing`; validated in code (null otherwise). */
+    worktreeFailReason: text(),
     /** Interrupted mission tasks resume by themselves when the machine comes back. */
     resumeTasks: boolean().notNull().default(true),
     /**

@@ -160,10 +160,7 @@ function Mission({ id }: { id: string }) {
                 />
               ) : null}
               {preparing ? (
-                <Chip
-                  leading={<PixelOrbit color={color} size={10} />}
-                  label={t("mobile.mission.setup.preparing")}
-                />
+                <Chip leading={<PixelOrbit color={color} size={10} />} label={t("mobile.mission.setup.preparing")} />
               ) : null}
               {setupFailed ? <Chip icon="flag" label={t("mobile.mission.setup.failedShort")} /> : null}
               {!preparing && m.runningTasks > 0 ? (
@@ -188,7 +185,11 @@ function Mission({ id }: { id: string }) {
 
         {setupFailed ? (
           <View style={styles.setup}>
-            <SetupFailedCard missionId={m.id} error={m.worktreeError ?? ""} />
+            <SetupFailedCard
+              missionId={m.id}
+              error={m.worktreeError ?? ""}
+              {...(m.worktreeFailReason === "branch_missing" ? { lostBranch: m.branch ?? null } : {})}
+            />
           </View>
         ) : null}
 

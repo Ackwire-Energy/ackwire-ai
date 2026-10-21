@@ -257,6 +257,8 @@ export interface MachineMissionHooks {
     frame: Extract<RunnerFrame, { type: "mcp.list" }>,
   ): Promise<{ ok: true; tools: McpToolInfo[] } | { ok: false; error: { code: string; message: string } }>;
   online?(machineId: string): Promise<void>;
+  /** Starts what may start in the machine's queue of mission tasks (ADR 0044; a resumed item waits there). */
+  queue?(machineId: string): Promise<unknown>;
 }
 
 /**
@@ -344,7 +346,8 @@ export function createMachineHub(deps: MachineHubDeps) {
     if (frame.interrupted) {
       const row = await getTask(db, frame.taskId);
       if (row && row.machineId === machineId) {
-        await settleInterruptedTask({ db, pubsub, start: localStarter(conn) }, row, frame);
+        // A mission item's resume waits in the mission's queue (ADR 0044): walked now.
+        await settleInterruptedTask({ db, pubsub, start: localStarter(conn), startQueued: hooks.queue }, row, frame);
       }
     } else {
       await applyTaskDone({ db, pubsub }, machineId, frame);

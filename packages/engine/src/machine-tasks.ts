@@ -4,6 +4,7 @@ import {
   type MachineRequest,
   MISSION_PROTOCOL,
   type PubSub,
+  parseBaseBehind,
   type RunnerFrame,
   type RunnerTask,
   TASK_LIMITS,
@@ -246,7 +247,12 @@ function checkTaskProtocol(input: Pick<StartTaskInput, "protocol" | "machineName
   if (input.mission && input.protocol < MISSION_PROTOCOL) throw new RunnerOutdatedError(input.machineName, true);
 }
 
-async function insertTask(db: Executor, input: QueuedTaskStart, queued: QueuedTaskStart | null) {
+async function insertTask(
+  db: Executor,
+  input: QueuedTaskStart,
+  queued: QueuedTaskStart | null,
+  options: { createdAt?: Date } = {},
+) {
   const now = new Date();
   const [row] = await db
     .insert(machineTasks)
@@ -270,7 +276,7 @@ async function insertTask(db: Executor, input: QueuedTaskStart, queued: QueuedTa
       startRequest: queued as unknown as Record<string, unknown> | null,
       resumedFromId: input.resumedFromId ?? null,
       resumeCount: input.resumeCount ?? 0,
-      createdAt: now,
+      createdAt: options.createdAt ?? now,
       updatedAt: now,
     })
     .returning();
@@ -340,12 +346,8 @@ export async function launchTask(
       .returning();
     const fresh = running ?? (await getTask(deps.db, row.id)) ?? row;
     await publishTaskEvent(deps.pubsub, fresh);
-    const behind = (started as { baseBehind?: unknown }).baseBehind;
-    return {
-      row: fresh,
-      queued: false,
-      ...(typeof behind === "number" && Number.isInteger(behind) && behind >= 0 ? { baseBehind: behind } : {}),
-    };
+    const behind = parseBaseBehind(started);
+    return { row: fresh, queued: false, ...(behind !== undefined ? { baseBehind: behind } : {}) };
   } catch (error) {
     if (options.requeue && isWaitError(error)) {
       const [back] = await deps.db
@@ -426,23 +428,6 @@ export async function claimQueuedTask(
       .returning();
     return row ? { row, start: next.startRequest as unknown as QueuedTaskStart } : null;
   });
-}
-
-/** Whether a machine has tasks waiting in our queue (a cheap look before claiming). */
-export async function hasQueuedTasks(db: Executor, machineId: string) {
-  const [row] = await db
-    .select({ id: machineTasks.id })
-    .from(machineTasks)
-    .where(
-      and(
-        eq(machineTasks.machineId, machineId),
-        eq(machineTasks.status, "queued"),
-        isNull(machineTasks.endedAt),
-        sql`${machineTasks.startRequest} is not null`,
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
 }
 
 export async function getTask(db: Executor, taskId: string): Promise<MachineTaskRow | null> {
@@ -679,10 +664,14 @@ export type LocalTaskStarter = (input: StartTaskInput) => Promise<MachineTaskRow
  * { interrupted }`, or missing from the journal on reconnect): final as
  * `interrupted`. Claude Code with a session resumes by itself (the machine's
  * `resume_tasks`, at most `MAX_TASK_RESUMES` in a row) and the thread hears
- * "resumed"; anything else wakes the agent to tell the people.
+ * "resumed"; anything else wakes the agent to tell the people. A mission's
+ * task resumes through the mission's queue (ADR 0044: one writer at a time,
+ * only in a ready folder), ahead of what queued after it; `startQueued`
+ * walks the machine's queue then (without it, the caller does: the computer
+ * coming back walks it once its folders are checked).
  */
 export async function settleInterruptedTask(
-  deps: TaskDeps & { start?: LocalTaskStarter },
+  deps: TaskDeps & { start?: LocalTaskStarter; startQueued?: (machineId: string) => Promise<unknown> },
   row: MachineTaskRow,
   frame?: Extract<RunnerFrame, { type: "task.done" }>,
 ) {
@@ -733,7 +722,7 @@ export async function settleInterruptedTask(
       .where(eq(schema.agents.id, claimed.agentId))
       .then((r) => r[0]?.handle)) as string | undefined;
     try {
-      const next = await deps.start({
+      const input: StartTaskInput = {
         orgId: claimed.orgId,
         agent: { id: claimed.agentId, handle: handle ?? "agent" },
         machineId: claimed.machineId,
@@ -771,7 +760,10 @@ export async function settleInterruptedTask(
                   }
                 : null,
             }),
-      });
+      };
+      // A started mission's queue (planning before Start has no folder or queue: it resumes at once).
+      const queue = mission?.status === "active";
+      const next = queue ? await queueResumed(deps.db, input, claimed) : await deps.start(input);
       const [linked] = await deps.db
         .update(machineTasks)
         .set({ resumedTaskId: next.id, updatedAt: new Date() })
@@ -791,6 +783,10 @@ export async function settleInterruptedTask(
         meta: { machineTaskResumed: { fromId: claimed.id, taskId: next.id } },
       });
       await publishTaskEvent(deps.pubsub, linked ?? claimed);
+      if (queue) {
+        await publishTaskEvent(deps.pubsub, next);
+        await deps.startQueued?.(claimed.machineId).catch(() => undefined);
+      }
       return claimed;
     } catch {
       // Couldn't resume (no slot, runner refused): the agent hears it was interrupted.
@@ -799,6 +795,17 @@ export async function settleInterruptedTask(
   await enqueueWake(deps.db, claimed);
   await publishTaskEvent(deps.pubsub, claimed);
   return claimed;
+}
+
+/**
+ * A mission task's resume in our queue (ADR 0044): `queued` with what to send
+ * when it may start, at the interrupted task's place in the queue (its
+ * `created_at`), so it goes before items queued after it.
+ */
+async function queueResumed(db: Executor, input: StartTaskInput, from: MachineTaskRow) {
+  checkTaskProtocol(input);
+  const { protocol: _p, machineName: _n, ...queued } = input;
+  return insertTask(db, queued, queued, { createdAt: from.createdAt });
 }
 
 /**
@@ -1027,7 +1034,9 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
   const blocked = row.missionId && !agentLike ? await blockedOfTask(deps.db, row.missionId, row.id) : [];
   // A setup task's end is the mission's own card (ADR 0044): no task notice.
   const notice =
-    !agentLike && row.mode !== "setup" && (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
+    !agentLike &&
+    row.mode !== "setup" &&
+    (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
   const claimed = await deps.db.transaction(async (tx) => {
     const [won] = await tx
       .update(machineTasks)

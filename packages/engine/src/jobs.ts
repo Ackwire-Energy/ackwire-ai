@@ -428,7 +428,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       });
       // A mission's task: its notes come back, its main session hears, queued messages go out.
       if (woke && "missionTask" in woke) await onMissionTaskEnded(missions, String(job.payload.taskId));
-      // A slot on that computer is free: queued mission items may start (ADR 0044).
+      // A slot on that computer is free: queued mission items may start (ADR 0044). The one walk of the
+      // machine's queue per task end (also kicked for a resumed item queued with this job, its own id).
       await afterMachineTaskEnded(missions, String(job.payload.taskId)).catch(() => 0);
     },
     // The `.agentes/` files of a mission changed (debounced): written to its machine.

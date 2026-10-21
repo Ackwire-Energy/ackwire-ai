@@ -2677,6 +2677,8 @@ export interface Mission {
   worktreeState?: MissionWorktreeState;
   /** Why preparing failed (the last lines of the output). */
   worktreeError?: string | null;
+  /** Why it is `failed` (`branch_missing`: the branch is gone, trying again starts over); null otherwise. */
+  worktreeFailReason?: MissionSetupMeta["reason"] | null;
 }
 
 export type MissionWorktreeState = "none" | "preparing" | "ready" | "failed" | "removed";

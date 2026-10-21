@@ -11,7 +11,7 @@ import {
   type TaskDone,
 } from "@agenteschat/adapters/machine-protocol";
 import { handleRequest } from "../../runner/handlers";
-import { missionWorktree, readProjectConfig, setupCommandFor } from "../../runner/mission-worktree";
+import { copiedFiles, missionWorktree, readProjectConfig, setupCommandFor } from "../../runner/mission-worktree";
 import { agentWorkspace } from "../../runner/paths";
 import { TaskManager } from "../../runner/tasks";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
@@ -64,7 +64,7 @@ const ensure = (folder: string, extra: { baseSha?: string; path?: string; branch
   }) as Promise<MissionWorktreeEnsured>;
 
 test.skipIf(!posix || !hasGit)(
-  "ensure creates the branch from the checked-out branch's HEAD and copies only the untracked .env files",
+  "ensure creates the branch from the checked-out branch's HEAD and copies only the .env files git ignores",
   async () => {
     const { folder, repo, head } = await project();
     const made = await ensure(folder);
@@ -76,19 +76,25 @@ test.skipIf(!posix || !hasGit)(
       created: true,
       dirty: false,
       setupCommand: null,
-      copied: [".env", ".env.local"],
+      // `.env` is untracked but not ignored: by default it stays behind (an agent's `git add -A` would take it).
+      copied: [".env.local"],
     });
     const wt = path.join(folder, WT);
     expect(out(wt, "symbolic-ref", "--short", "HEAD")).toBe(BRANCH);
-    expect(readFileSync(path.join(wt, ".env"), "utf8")).toBe("KEY=1\n");
+    expect(readFileSync(path.join(wt, ".env.local"), "utf8")).toBe("LOCAL=1\n");
+    expect(existsSync(path.join(wt, ".env"))).toBe(false);
     expect(readFileSync(path.join(wt, ".env.example"), "utf8")).toBe("KEY=\n");
-    // `.agentes/` and the copied `.env` stay out of git: the end-of-item commit never takes them.
+    // `.agentes/` stays out of git; what was copied is listed in the worktree's own git dir, never in the
+    // shared info/exclude: the person's checkout is left as it was.
     mkdirSync(path.join(wt, ".agentes"));
     writeFileSync(path.join(wt, ".agentes", "mission.md"), "# Mission\n");
     expect(out(wt, "status", "--porcelain")).toBe("");
+    expect(out(repo, "status", "--porcelain")).toBe("?? .env");
     const exclude = readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8");
-    for (const p of [".worktrees/", ".agentes/", "/.env"]) expect(exclude.split("\n")).toContain(p);
-    expect(exclude).not.toContain("/.env.local");
+    for (const p of [".worktrees/", ".agentes/"]) expect(exclude.split("\n")).toContain(p);
+    expect(exclude).not.toContain(".env");
+    expect(await copiedFiles(wt)).toEqual([".env.local"]);
+    expect(await copiedFiles(repo)).toEqual([]);
 
     // Again: nothing to do; loose changes are reported and left alone.
     writeFileSync(path.join(wt, "wip.txt"), "x\n");
@@ -174,12 +180,12 @@ test.skipIf(!posix || !hasGit)(
     await ensure(folder);
     const wt = path.join(folder, WT);
     writeFileSync(path.join(wt, "step1.txt"), "done\n");
-    run(wt, "add", ".");
+    run(wt, "add", "step1.txt");
     run(wt, "commit", "-qm", "agentes: step 1");
     const tip = out(wt, "rev-parse", "HEAD");
     rmSync(wt, { recursive: true, force: true });
     const back = await ensure(folder, { baseSha: head });
-    expect(back).toMatchObject({ created: true, baseSha: head, copied: [".env", ".env.local"], dirty: false });
+    expect(back).toMatchObject({ created: true, baseSha: head, copied: [".env.local"], dirty: false });
     expect(out(wt, "rev-parse", "HEAD")).toBe(tip);
     expect(readFileSync(path.join(wt, "step1.txt"), "utf8")).toBe("done\n");
 
@@ -199,11 +205,14 @@ test.skipIf(!posix || !hasGit)(
 test.skipIf(!posix || !hasGit)(
   "not a git repository, a bad branch and paths out of the folder are refused",
   async () => {
-    const { folder } = await project();
+    const { ws, folder } = await project();
     mkdirSync(path.join(folder, "notes"));
-    await expect(
-      missionWorktree(folder, { action: "ensure", repo: "notes", path: WT, branch: BRANCH }),
-    ).rejects.toMatchObject({ code: "bad_request", message: "not a git repository" });
+    const notes = () => missionWorktree(folder, { action: "ensure", repo: "notes", path: WT, branch: BRANCH });
+    await expect(notes()).rejects.toMatchObject({ code: "not_git", message: "not a git repository" });
+    // Inside a repository that starts outside the agent's folder: never "no git".
+    run(ws, "init", "-q", "-b", "main");
+    expect(await errorCode(notes)).toBe("outside_workspace");
+    rmSync(path.join(ws, ".git"), { recursive: true, force: true });
     expect(await errorCode(() => ensure(folder, { path: "../elsewhere" }))).toBe("outside_workspace");
     expect(await errorCode(() => ensure(folder, { path: "" }))).toBe("bad_request");
     expect(await errorCode(() => ensure(folder, { branch: "-x" }))).toBe("bad_request");
@@ -312,7 +321,6 @@ test.skipIf(!posix || !hasGit)(
     expect(ok.done.endSha).not.toBe(head);
     expect(out(wt, "log", "-1", "--format=%s")).toBe("agentes: build the tabs");
     expect(out(wt, "status", "--porcelain")).toBe("");
-    // The copied `.env` never goes into a commit.
     expect(out(wt, "show", "--name-only", "--format=", "HEAD")).toBe("tabs.txt");
     expect(parseRunnerFrame(JSON.stringify({ type: "task.done", ...ok.done }))).toMatchObject({
       startSha: ok.done.startSha,
@@ -350,6 +358,42 @@ test.skipIf(!posix || !hasGit)(
     expect(
       parseRunnerFrame(JSON.stringify({ ...plainDone, type: "task.done", startSha: "zz", endSha: "nope" })),
     ).not.toHaveProperty("startSha");
+  },
+  30_000,
+);
+
+test.skipIf(!posix || !hasGit)(
+  "a copied file the repository doesn't ignore never goes into a commit, nor into info/exclude",
+  async () => {
+    const { ws, folder, repo } = await project();
+    writeFileSync(path.join(repo, ".gitignore"), "node_modules/\n");
+    run(repo, "commit", "-qam", "track less");
+    // Named in agentes.json, files git doesn't ignore are copied too.
+    writeFileSync(path.join(repo, "agentes.json"), JSON.stringify({ copy: [".env", ".env.local"] }));
+    const made = await ensure(folder);
+    expect(made.copied).toEqual([".env", ".env.local"]);
+    const wt = path.join(folder, WT);
+    const home = tempDir("home-");
+    dirs.push(home);
+    const tasks = manager(home, ws);
+    await tasks.init();
+    const frames: RunnerFrame[] = [];
+    tasks.attach((f) => frames.push(f));
+    const { done } = await runTask(tasks, frames, id(20), "echo x > x.txt && echo LOCAL=2 > .env.local");
+    expect(done.endSha).not.toBe(done.startSha as string);
+    expect(out(wt, "show", "--name-only", "--format=", "HEAD")).toBe("x.txt");
+    expect(out(wt, "status", "--porcelain").split("\n").sort()).toEqual(["?? .env", "?? .env.local"]);
+    // Only the copied files: nothing else to commit, the same sha.
+    const clean = await runTask(tasks, frames, id(21), "true");
+    expect(clean.done.endSha).toBe(clean.done.startSha as string);
+    expect(clean.done.result ?? "").not.toContain("not committed");
+    const exclude = readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8");
+    expect(exclude).not.toContain(".env");
+    expect(out(repo, "status", "--porcelain")).toContain("?? .env.local");
+    // By default (no agentes.json) a .env git doesn't ignore isn't copied at all.
+    rmSync(path.join(repo, "agentes.json"));
+    const other = await ensure(folder, { path: ".worktrees/m-000000cc", branch: "agentes/000000cc/x" });
+    expect(other.copied).toEqual([]);
   },
   30_000,
 );

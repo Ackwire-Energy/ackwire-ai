@@ -42,9 +42,9 @@ The mission brief (`mission-brief.ts`) gives the main session and every item the
 
 The runner prepares the worktree right after creating it (`worktree_state = preparing`), with the agent's environment (ADR 0030):
 
-1. **Copy local files git ignores** from `repo_dir`: by default the `.env*` files at the root that git doesn't track. They are copied on the computer only and never sent to the server.
+1. **Copy local files git ignores** from `repo_dir`: by default the `.env*` files at the root that git ignores (an untracked `.env` git doesn't ignore stays behind: an agent's own `git add -A` would take it). They are copied on the computer only and never sent to the server.
 2. **Install dependencies**: by default from the lockfile at the root (`bun.lock` → `bun install`, `pnpm-lock.yaml` → `pnpm install --frozen-lockfile`, `package-lock.json` → `npm ci`, `yarn.lock` → `yarn install --frozen-lockfile`); nothing when there is none.
-3. **Project override:** an optional `agentes.json` at the repository root, meant to be committed: `{ "copy": [".env", "apps/web/.env.local"], "setup": "bun install && bun run db:generate" }`. Each field present replaces only its own default (`"setup": ""` runs nothing). Copied files that git doesn't ignore are added to `info/exclude`, so the end-of-item commit never takes a `.env`.
+3. **Project override:** an optional `agentes.json` at the repository root, meant to be committed: `{ "copy": [".env", "apps/web/.env.local"], "setup": "bun install && bun run db:generate" }`. Each field present replaces only its own default (`"setup": ""` runs nothing). Files listed there that git doesn't ignore are recorded in the worktree's own git dir and left out of the end-of-item commit; the shared `info/exclude` is never touched for them.
 
 Setup has a 10-minute limit and its output goes to the task journal. On failure the state becomes `failed`, the mission pauses and the thread gets a card ("Não consegui preparar o projeto", the last lines, "Tentar de novo"). No item starts in a broken folder.
 
@@ -53,7 +53,7 @@ Shared `node_modules` through links (Orca's `sharedDirectories`) is left out: on
 ### Items: writes in sequence, reads in parallel
 
 - `start_task` gains `mode`: `write` (default) or `read`.
-- **Write items** run one at a time in the mission's folder. A write item started while another runs is stored as `queued` and starts by itself when the folder is free, in order.
+- **Write items** run one at a time in the mission's folder. While one is live, the main session's turns are read-only (`permissions.mode: "plan"`), so its edits never end up in the item's commit. A write item started while another runs is stored as `queued` and starts by itself when the folder is free, in order.
 - **Read items** run in parallel in the same folder with no write access, enforced on the computer (`task.start` `mission.mode: "plan"`: Claude Code's plan rules, Codex's read-only sandbox).
 - **Full machine:** any item that finds no slot is `queued` too ("aguardando vaga") instead of failing with `task.no_slot`. The server starts queued items when the runner reports a free slot or the computer comes back.
 - **Every write item ends in a commit.** At its end the runner records `start_sha`, commits whatever changed as `agentes: <item title>` (the runner adds " (stopped)" when it failed or was canceled; a commit refused by a hook leaves the changes staged and says why), and records `end_sha`. The folder never carries loose changes from one item to the next, and the main session is told what each item changed (`start_sha..end_sha`).
@@ -73,7 +73,7 @@ A mission with `worktree_state = none` (including missions opened before this AD
 ### End
 
 - The delivery card shows the whole change (`base_sha..branch`) and the PR when there is one. Push and PR still go through the existing approvals.
-- **Conclude:** the runner removes the folder (`git worktree remove`) and `worktree_state` becomes `removed`. The branch stays.
+- **Conclude:** once no item of the mission is live (a canceled write item first makes its "(stopped)" commit), the runner removes the folder (`git worktree remove`) and `worktree_state` becomes `removed`. The branch stays.
 - **Cancel:** the person chooses whether to keep the branch or delete everything. The branch is only deleted by that explicit choice.
 - **Reopen** (`reactivateMission`): the folder is created again from the branch through the same `ensure`.
 

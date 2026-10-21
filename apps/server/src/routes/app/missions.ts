@@ -119,13 +119,20 @@ const Mission = z
       description:
         "The mission's own branch (`agentes/<id>/<slug>`), its copy of the project works on it; null before Start and for a folder without git.",
     }),
-    baseBranch: z.string().nullable().openapi({ description: "The branch it started from (\"a partir de main\")." }),
-    baseSha: z.string().nullable().openapi({ description: "That branch's tip at Start: the whole change is baseSha..branch." }),
+    baseBranch: z.string().nullable().openapi({ description: 'The branch it started from ("a partir de main").' }),
+    baseSha: z
+      .string()
+      .nullable()
+      .openapi({ description: "That branch's tip at Start: the whole change is baseSha..branch." }),
     worktreeState: WorktreeState,
     worktreeError: z
       .string()
       .nullable()
       .openapi({ description: "The last lines of a failed setup, or why the copy couldn't be made." }),
+    worktreeFailReason: z.enum(["setup", "ensure", "branch_missing"]).nullable().openapi({
+      description:
+        "Why the copy is `failed`: setup (the install failed), ensure (it couldn't be made), branch_missing (the mission's branch is gone: trying again starts over); null otherwise.",
+    }),
     resumeTasks: z.boolean(),
     commandApproval: CommandApproval,
     plan: z.object({
@@ -590,7 +597,7 @@ export function missionRoutes(deps: AppDeps) {
             note: z.string().max(500).optional(),
             deleteBranch: z.boolean().optional().openapi({
               description:
-                "Canceled only: also delete the mission's branch (\"apagar tudo\"); by default the branch stays and only its copy of the project goes away.",
+                'Canceled only: also delete the mission\'s branch ("apagar tudo"); by default the branch stays and only its copy of the project goes away.',
             }),
           }),
         ),
@@ -814,12 +821,16 @@ export function missionRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/missions/{missionId}/machine",
       tags,
       security,
-      summary: "Its owner points it at a computer they paired (new sessions start from the mission files)",
+      summary:
+        "Its owner points it at a computer they paired (new sessions start from the mission files). The old computer's copy is removed; when it is away, `code: mission.old_copy_left` and `oldComputer` say the copy stays there",
       request: {
         params: MissionParams,
         body: body(z.object({ machineId: z.uuid(), repoDir: z.string().max(300).optional() })),
       },
-      responses: { 200: json(Mission), ...errors },
+      responses: {
+        200: json(Mission.extend({ code: z.string().optional(), oldComputer: z.string().optional() })),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, missionId } = c.req.valid("param");
