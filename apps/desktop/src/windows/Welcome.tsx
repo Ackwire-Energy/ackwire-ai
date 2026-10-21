@@ -25,7 +25,7 @@ type Failure = Extract<ControlEvent, { kind: "pair.failed" }>["code"];
 
 const STEP_INDEX: Record<Step, number> = { hello: 0, code: 1, folders: 2, tools: 3, done: 4 };
 
-/** The sky as a horizon at the bottom of the first screen (OnboardingV2: the surface, then the sky). */
+/** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
 const HORIZON: SkyOptions = {
   pixel: 4,
   palette: (bg) => glowTones("sky", bg),

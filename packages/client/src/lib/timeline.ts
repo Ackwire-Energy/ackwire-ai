@@ -16,7 +16,7 @@ export function upsertMessage(list: Message[] | undefined, message: Message): Me
  * Agents reply inside the thread of the message that called them (the
  * executor posts with `threadId = root`), but the channel lists only
  * top-level messages. The channel view shows the conversation as one
- * timeline, as in the approved screen: top-level messages plus the loaded
+ * timeline: top-level messages plus the loaded
  * thread replies, in time order.
  */
 export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefined)[]): Message[] {

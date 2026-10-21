@@ -45,7 +45,7 @@ function seedRequest() {
   return { state, handoff };
 }
 
-describe("a help request opens the agent's browser in its card (NavegadorNoChat A)", () => {
+describe("a help request opens the agent's browser in its card", () => {
   test("Abrir aqui takes control in place: Pronto in the header, the app's own text field, no page change", async () => {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
@@ -106,7 +106,7 @@ describe("a help request opens the agent's browser in its card (NavegadorNoChat 
 /** A JPEG's first bytes (SOI + a start-of-frame for 1280×800): enough for the page's size. */
 const FRAME_DATA = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 3, 32, 5, 0, 3, 0, 0, 0));
 
-describe("the card in the message (NavegadorCardScroll 4)", () => {
+describe("the card in the message", () => {
   test("closed it's a small live card; a click opens it in place", async () => {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);

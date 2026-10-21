@@ -858,7 +858,7 @@ function ChannelView({
     stick.current = false;
     autoScrollUntil.current = 0;
   };
-  // Long answers open at their start (RefinoUI "Nova leitura"): agent rows (`data-read-id`, the run's
+  // Long answers open at their start: agent rows (`data-read-id`, the run's
   // id, shared by the live row and its final message) that already landed, and whether one is held
   // with its first line at the top ("Fim da resposta" shows until the person reaches the end).
   const landed = useRef(new Set<string>());

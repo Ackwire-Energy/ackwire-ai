@@ -42,7 +42,7 @@ export function priceTier(model: Model, models: Model[]) {
   return prices.length <= 1 ? 2 : Math.min(3, 1 + Math.floor((3 * rank) / prices.length));
 }
 
-/** Model descriptions of the approved screen, by model family. */
+/** Model descriptions, by model family. */
 export function modelDescription(t: TFunction, locale: string, model: Model) {
   const id = model.id.toLowerCase();
   if (id.includes("sonnet")) return t("newAgent.modelDesc.sonnet");

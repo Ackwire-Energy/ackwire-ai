@@ -21,7 +21,7 @@ export function useDirectory(orgId: string) {
       author.type === "agent"
         ? (agentById.get(author.id ?? "")?.name ?? t("channel.unknownAgent"))
         : (memberById.get(author.id ?? "")?.name ?? t("channel.unknownPerson"));
-    // Agents sharing a first letter get two (Ada "A", Atlas "At"), as in the approved screens.
+    // Agents sharing a first letter get two (Ada "A", Atlas "At").
     const initials = new Map<string, string>();
     const used = new Set<string>();
     for (const a of agents.data ?? []) {

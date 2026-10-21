@@ -279,7 +279,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
 
   // ── Agents' blocks ──
-  // An agent at work in its browser: its card in the conversation (NavegadorNoChat A), open on demand.
+  // An agent at work in its browser: its card in the conversation, open on demand.
   const browsing = useMemo(() => browsingRuns(runs), [runs]);
   // A take over held here after its run's live row went (the run paused for the person, or ended): the
   // same card stays, at the end, until the browser is handed back. Its runs: recent ones of this

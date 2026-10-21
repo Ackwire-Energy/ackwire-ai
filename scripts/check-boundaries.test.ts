@@ -28,6 +28,8 @@ test("a planning decision id in running text is caught", () => {
     "Implements planejamento D18a.",
     "D9–D13",
     "D58's step 2",
+    "(D18/D20 in planning)",
+    "D104: the next hundred",
   ];
   for (const line of prose) expect(internalNotes(line)).toHaveLength(1);
   expect(internalNotes("ok\n(D33, revised by D45)\nok")).toEqual([
@@ -41,6 +43,7 @@ test("ids in code, data and product names are not decision ids", () => {
     "R2 e D1 da conta.",
     "color: #D1D5DB;",
     "sha512-ab/D45+x==",
+    "sha512-ab/D45/x==",
     "D2C",
     "3D",
   ];

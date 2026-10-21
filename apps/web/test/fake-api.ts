@@ -116,7 +116,7 @@ export interface FakeState {
   waitlistConfirmError?: ApiError;
 }
 
-/** A small in-memory backend with the data of the approved screens ("Acme"). */
+/** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   const walter: Member = {
     userId: "u-walter",

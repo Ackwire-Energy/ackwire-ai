@@ -1082,7 +1082,7 @@ p {
   gap: 4px;
   padding: 16px 8px 24px;
 }
-/* Turns are told apart by space (RefinoUI "Nova leitura"): ~10px between messages; the same author
+/* Turns are told apart by space: ~10px between messages; the same author
    within 5 minutes continues the row above. */
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: 6px;

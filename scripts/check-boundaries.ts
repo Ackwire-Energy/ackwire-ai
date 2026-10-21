@@ -31,8 +31,11 @@ export function isPrivate(path: string): boolean {
 /** Public files that hold the patterns on purpose: this check, its samples and the ignore rule for local prototypes. */
 const NAMES_PRIVATE_PATHS = new Set(["scripts/check-boundaries.ts", "scripts/check-boundaries.test.ts", ".gitignore"]);
 
-/** A planning decision id in running text: "(D46)", "D60: …", "D9–D13". Cloudflare's D1 is a product name. */
-const DECISION_ID = /(?<=^|[\s([,;–])D\d{1,2}[a-c]?(?=$|[\s)\],;:.'’–-])(?<!R2 (?:and|e) D1)/;
+/**
+ * A planning decision id in running text: "(D46)", "D60: …", "D9–D13", "D18/D20", "D104". A slash only joins
+ * two ids, so base64 like "ab/D45/x" passes. Cloudflare's D1 is a product name.
+ */
+const DECISION_ID = /(?<=^|[\s([,;–]|D\d{1,3}[a-c]?\/)D\d{1,3}[a-c]?(?=$|[\s)\],;:.'’–-]|\/D\d)(?<!R2 (?:and|e) D1)/;
 
 const NOTES: [RegExp, string][] = [
   [DECISION_ID, "cites a planning decision id: cite the ADR or state the reason itself"],

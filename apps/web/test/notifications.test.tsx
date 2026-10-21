@@ -40,7 +40,7 @@ const question: AgentQuestion = {
   answeredByUserId: null,
 };
 
-/** The inbox of the approved screen, on the fake backend's people and agents. */
+/** The design's sample inbox, on the fake backend's people and agents. */
 function inbox(): AppNotification[] {
   return [
     notification({
