@@ -61,8 +61,6 @@ services:
     environment:
       DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
       FILES_DIR: /data/files
-      # deploy/deploy.sh rolls back with false: a version refuses a database that a newer one migrated.
-      RUN_MIGRATIONS_ON_BOOT: "${RUN_MIGRATIONS_ON_BOOT:-true}"
     volumes:
       - files:/data/files
     ports:
