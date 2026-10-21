@@ -569,6 +569,8 @@ async function executeRunInner(
     ]);
     toolChoice = await chooseToolGroups(judge, {
       orgId: run.orgId,
+      agentId: agent.id,
+      runId: run.id,
       agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
       message: trigger?.body ?? "",
       recent,
@@ -1246,6 +1248,8 @@ async function executeRunInner(
       if (turnPlan.kind === "model") {
         const fitted = await fitContextWindow(judge, {
           orgId: run.orgId,
+          agentId: agent.id,
+          runId: run.id,
           model: agent.model,
           windowTokens: deps.contextWindowTokens,
           maxOutputTokens: deps.maxOutputTokens,

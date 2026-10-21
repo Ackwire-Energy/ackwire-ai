@@ -104,6 +104,7 @@ export async function commandLowRisk(
   const current = items.find((i) => i.status === "doing") ?? items.find((i) => i.status === "todo");
   const ask = deps.judge.ask({
     orgId: mission.orgId,
+    agentId: mission.agentId,
     kind: "mission_command_risk",
     state: {
       tool: call.tool,
