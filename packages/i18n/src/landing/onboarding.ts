@@ -13,7 +13,7 @@ export const pt = {
     steps: {
       company: {
         name: "Empresa",
-        say: "Oi! Eu sou a Ada e vou te ajudar a começar. Como se chama a empresa?",
+        say: "Oi, eu sou a Ada e vou te ajudar a começar. Como se chama a empresa?",
         cta: "Continuar",
       },
       about: {
@@ -75,7 +75,7 @@ export const en: Widen<typeof pt> = {
     steps: {
       company: {
         name: "Company",
-        say: "Hi! I'm Ada and I'll help you get started. What's the company called?",
+        say: "Hi, I'm Ada and I'll help you get started. What's the company called?",
         cta: "Continue",
       },
       about: {

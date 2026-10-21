@@ -15,6 +15,7 @@ export * from "./api/http-client";
 export * from "./api/keys";
 export * from "./api/missions";
 export * from "./api/queries";
+export * from "./api/snapshot";
 export * from "./api/types";
 export * from "./browser";
 export * from "./realtime/connection";

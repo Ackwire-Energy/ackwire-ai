@@ -17,6 +17,7 @@ import {
   setRoutineActive,
   updateOrgSettings,
 } from "../src";
+import { isNoReply } from "../src/context";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -288,6 +289,19 @@ describe("routines", () => {
     expect(listed?.recentRuns[0]?.id).toBe(listed?.lastRun?.id);
     const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
     expect(runs.map((r) => r.status)).toEqual(["done", "done"]);
+
+    // An explanation that closes with the word on its own line is still silence, never a post.
+    answer = "Nada novo desde a última checagem.\n\nNO_REPLY";
+    await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
+    await drainOutbox(f.db, f.handlers);
+    expect(await agentMessages()).toHaveLength(1);
+  });
+
+  test("isNoReply: the word alone or closing the reply; anywhere else it is a real reply", () => {
+    for (const t of ["NO_REPLY", " NO_REPLY. ", "**NO_REPLY**", "`NO_REPLY`", "Nada novo.\n\nNO_REPLY"])
+      expect(isNoReply(t)).toBe(true);
+    for (const t of ["", "Novidade: 3 avaliações.", "NO_REPLY\n\nNovidade: 3 avaliações.", "Sem NO_REPLY aqui"])
+      expect(isNoReply(t)).toBe(false);
   });
 
   test("event routines run when the event happens, with the event as data", async () => {

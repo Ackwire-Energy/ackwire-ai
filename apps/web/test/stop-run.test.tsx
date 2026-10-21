@@ -13,7 +13,7 @@ import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
-const ids = { threadId: "m-1", runId: "r-live", agentId: ADA_ID };
+const ids = { threadId: null, runId: "r-live", agentId: ADA_ID };
 
 const open = async (configure?: (s: ReturnType<typeof seedState>) => void) => {
   const state = seedState();
@@ -101,8 +101,8 @@ describe("Parar is immediate (telas/Mensagens.html)", () => {
       const o = s.me?.organizations[0];
       if (o) o.role = "member";
     });
-    // Someone else's message started it, on an agent owned by João.
-    await ev({ type: "agent.run", ...ids, threadId: "m-someone", status: "running" });
+    // Someone else's message in the channel started it (not mine), on an agent owned by João.
+    await ev({ type: "agent.run", ...ids, triggerMessageId: "m-1", status: "running" });
     await settle(2);
     expect(screen().queryByRole("button", { name: "Parar a Ada" })).toBeNull();
     const box = screen().getByRole("combobox", { name: /Mensagem para/ });

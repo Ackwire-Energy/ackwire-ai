@@ -71,11 +71,12 @@ describe("message action bars", () => {
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
     await click(within(bar).getByRole("button", { name: "Responder" }));
     await settle(6);
-    // The thread beside the channel: João's message on top and Ada's replies so far.
+    // The thread beside the channel: João's message on top. Ada answered in the channel (D67), so her
+    // reply stays there and is not repeated in the new thread.
     const panel = screen().getByRole("complementary", { name: "Thread" });
     expect(within(panel).getByRole("button", { name: "Fechar a thread" })).toBeTruthy();
     expect(panel.textContent).toContain("o login está devolvendo 401");
-    expect(panel.textContent).toContain("Achei a causa");
+    expect(panel.textContent).not.toContain("Achei a causa");
     const box = within(panel).getByRole("combobox", { name: "Responder na thread" });
     await act(async () => fireEvent.change(box, { target: { value: "vou olhar" } }));
     await click(within(panel).getByRole("button", { name: "Enviar" }));

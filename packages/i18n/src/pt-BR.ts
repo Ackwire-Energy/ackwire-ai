@@ -125,10 +125,10 @@ export const ptBR = {
       done: "Pronto",
     },
     hosts: {
-      ada: "Oi! Eu sou a Ada, vou montar tudo com você.",
-      lia: "Oi! Eu sou a Lia, cuido de pesquisa.",
+      ada: "Oi, eu sou a Ada, vou montar tudo com você.",
+      lia: "Oi, eu sou a Lia, cuido de pesquisa.",
       theo: "Prazer, sou o Theo. Organizo as tarefas do time.",
-      atlas: "E aí! Atlas aqui, cuido dos computadores.",
+      atlas: "E aí, Atlas aqui, cuido dos computadores.",
     },
     progress: {
       left_one: "Falta {{count}} etapa",

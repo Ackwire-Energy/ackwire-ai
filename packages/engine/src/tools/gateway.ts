@@ -29,6 +29,18 @@ export const APPROVAL_TTL_MS = 24 * 3600_000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_RESULT_CHARS = 50_000;
 
+const EXTERNAL_MARKER = /<\s*\/?\s*external_data\b[^>]*>/gi;
+/**
+ * An `external` tool's output (an MCP server's answer) reaches the model inside
+ * an `<external_data>` block, with any copy of the marker in it neutralised so
+ * the text can't close the block early. The system prompt says what it means.
+ */
+export const wrapExternal = (source: string, text: string) =>
+  `<external_data source="${source}">\n${text.replace(EXTERNAL_MARKER, "[marker removed]")}\n</external_data>`;
+/** What run steps and approvals keep: the text people see, without the model's envelope. */
+const shown = (text: string) =>
+  text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
+
 export type ToolCall = { toolUseId: string; name: string; input: Record<string, unknown> };
 export type Approval = typeof approvals.$inferSelect;
 
@@ -96,11 +108,15 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           ...output.outcome,
         }).catch(() => {});
       }
-      return output.content.length > MAX_RESULT_CHARS
-        ? { ...output, content: `${output.content.slice(0, MAX_RESULT_CHARS)}\n[truncated]` }
-        : output;
+      const capped =
+        output.content.length > MAX_RESULT_CHARS
+          ? { ...output, content: `${output.content.slice(0, MAX_RESULT_CHARS)}\n[truncated]` }
+          : output;
+      return tool.external ? { ...capped, content: wrapExternal(tool.name, capped.content) } : capped;
     } catch (error) {
-      return { content: `Tool failed: ${error instanceof Error ? error.message : String(error)}`, isError: true };
+      const message = error instanceof Error ? error.message : String(error);
+      // An MCP server's error text is its own words too.
+      return { content: `Tool failed: ${tool.external ? wrapExternal(tool.name, message) : message}`, isError: true };
     }
   }
 
@@ -146,7 +162,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           toolUseId: call.toolUseId,
           name: call.name,
           isError: output.isError === true,
-          content: output.content.slice(0, 4000),
+          content: shown(output.content),
           ...(output.data ? { data: output.data } : {}),
         });
         return { type: "result" as const, output };
@@ -272,14 +288,14 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       }
       await ctx.db
         .update(approvals)
-        .set({ result: { content: output.content.slice(0, 4000), isError: output.isError === true } })
+        .set({ result: { content: shown(output.content), isError: output.isError === true } })
         .where(sql`${approvals.id} = ${approval.id}`);
       await addRunStep(ctx.db, { id: ctx.runId, orgId: ctx.orgId }, "tool_result", {
         toolUseId: approval.toolUseId,
         name: approval.tool,
         approvalId: approval.id,
         isError: output.isError === true,
-        content: output.content.slice(0, 4000),
+        content: shown(output.content),
         ...(output.data ? { data: output.data } : {}),
       });
       return output;

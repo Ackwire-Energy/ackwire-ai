@@ -1,4 +1,4 @@
-import { ApiProvider } from "@agenteschat/client";
+import { ApiProvider, createSnapshot } from "@agenteschat/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { I18nextProvider } from "react-i18next";
@@ -8,6 +8,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { frameClock } from "@/agent/clock";
 import { api } from "@/lib/api";
+import { snapshotStore } from "@/lib/snapshot";
 import { ToastHost } from "@/ui/Toast";
 import { ThemeProvider } from "@/ui/theme";
 import { setupI18n } from "./i18n";
@@ -29,6 +30,20 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createQueryClient);
 
   useEffect(() => bindFocusToAppState(), []);
+  // The last lists and chats saved on this phone show at once; everything revalidates as usual. Saved again
+  // when the app goes to the background.
+  useEffect(() => {
+    const snapshot = createSnapshot(queryClient, snapshotStore);
+    const stop = snapshot.start();
+    void snapshot.restore();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "background") void snapshot.flush();
+    });
+    return () => {
+      stop();
+      sub.remove();
+    };
+  }, [queryClient]);
   useEffect(() => {
     frameClock.setPaused(AppState.currentState !== "active");
     const sub = AppState.addEventListener("change", (s) => frameClock.setPaused(s !== "active"));

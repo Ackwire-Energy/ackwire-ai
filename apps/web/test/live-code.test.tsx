@@ -72,7 +72,7 @@ describe("code the agent runs", () => {
     await act(async () => socket.open());
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
-    const run = { threadId: "m-1", runId: "r-code", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-code", agentId: ADA_ID };
     await ev({ type: "agent.run", ...run, status: "running" });
     await ev({ type: "agent.tool", ...run, tool: "run_code", code: { language: "python", source: "import csv" } });
     await ev({ type: "agent.tool.output", ...run, stream: "stdout", text: "lendo 48 linhas\n" });

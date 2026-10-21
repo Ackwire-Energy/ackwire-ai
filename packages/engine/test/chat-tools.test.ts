@@ -124,10 +124,20 @@ test("send_dm: the agent writes to a person in its DM with them, they're notifie
 
   // The DM between Thay and the agent, with the message from the agent, and a notification for her.
   const dm = (await f.db.select().from(schema.channels)).find((c) => c.kind === "dm");
-  const members = await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, dm?.id ?? ""));
+  const members = await f.db
+    .select()
+    .from(schema.channelMembers)
+    .where(eq(schema.channelMembers.channelId, dm?.id ?? ""));
   expect(members.map((m) => m.userId ?? m.agentId).sort()).toEqual([thay.id, f.agent.id].sort());
-  const [sent] = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm?.id ?? ""));
-  expect(sent).toMatchObject({ authorType: "agent", authorAgentId: f.agent.id, body: "Oi Thay! O Walter pediu para te avisar do e-mail." });
+  const [sent] = await f.db
+    .select()
+    .from(schema.messages)
+    .where(eq(schema.messages.channelId, dm?.id ?? ""));
+  expect(sent).toMatchObject({
+    authorType: "agent",
+    authorAgentId: f.agent.id,
+    body: "Oi Thay! O Walter pediu para te avisar do e-mail.",
+  });
   expect(sent?.meta.agentDm).toMatchObject({ requesterUserId: f.owner.id });
   const notes = await f.db
     .select()

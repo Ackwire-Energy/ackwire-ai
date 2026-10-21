@@ -11,6 +11,7 @@ import {
   useNotificationCount,
   useOverview,
   usePrefetchMessages,
+  usePrefetchRecent,
   useSkills,
 } from "@agenteschat/client";
 import { audienceChip } from "@agenteschat/client/lib/audience";
@@ -117,6 +118,8 @@ export function Sidebar() {
   const unreadWith = new Map((dms.data ?? []).map((d) => [d.with.id, d.unread]));
   // Hover or focus loads the conversation before the click (DMs: once we know their channel).
   const prefetch = usePrefetchMessages(orgId);
+  // …and the unread and latest ones as soon as the workspace opens.
+  usePrefetchRecent(orgId);
   const dmWith = new Map((dms.data ?? []).map((d) => [d.with.id, d.channelId]));
   const prefetchDm = (partnerId: string) => {
     const channelId = dmWith.get(partnerId);

@@ -1,5 +1,5 @@
 {
-  "id": "3096460c-0fb3-4e5a-a68e-0790b4ea364a",
+  "id": "320a0d96-021f-4a19-9401-47541b2e5242",
   "prevId": "97e606ff-89b3-44ce-bbd5-95afb4266dc6",
   "version": "7",
   "dialect": "postgresql",
@@ -1576,6 +1576,102 @@
           "columns": [
             "channel_id",
             "message_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.message_client_ids": {
+      "name": "message_client_ids",
+      "schema": "",
+      "columns": {
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message_id": {
+          "name": "message_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "message_client_ids_created_at_index": {
+          "name": "message_client_ids_created_at_index",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "message_client_ids_org_id_organizations_id_fk": {
+          "name": "message_client_ids_org_id_organizations_id_fk",
+          "tableFrom": "message_client_ids",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_client_ids_user_id_users_id_fk": {
+          "name": "message_client_ids_user_id_users_id_fk",
+          "tableFrom": "message_client_ids",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "message_client_ids_org_id_user_id_client_id_pk": {
+          "name": "message_client_ids_org_id_user_id_client_id_pk",
+          "columns": [
+            "org_id",
+            "user_id",
+            "client_id"
           ]
         }
       },
@@ -7790,43 +7886,6 @@
           "notNull": true,
           "default": "''"
         },
-        "branch": {
-          "name": "branch",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "base_branch": {
-          "name": "base_branch",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "base_sha": {
-          "name": "base_sha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "worktree_path": {
-          "name": "worktree_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "worktree_state": {
-          "name": "worktree_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "worktree_error": {
-          "name": "worktree_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "resume_tasks": {
           "name": "resume_tasks",
           "type": "boolean",
@@ -10357,30 +10416,6 @@
         "waiting_for": {
           "name": "waiting_for",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mode": {
-          "name": "mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "start_sha": {
-          "name": "start_sha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "end_sha": {
-          "name": "end_sha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "start_request": {
-          "name": "start_request",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

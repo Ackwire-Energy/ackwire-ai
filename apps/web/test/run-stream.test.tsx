@@ -88,7 +88,7 @@ describe("live row and Parar", () => {
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
     return { state, ev };
   };
-  const ids = { threadId: "m-1", runId: "r-live", agentId: ADA_ID };
+  const ids = { threadId: null, runId: "r-live", agentId: ADA_ID };
 
   test("tool calls stack in the block: open while running, folded into a summary when done", async () => {
     const { ev } = await open();
@@ -102,7 +102,10 @@ describe("live row and Parar", () => {
       code: { language: "python", source: "print(1)" },
     });
     await settle(2);
-    expect(document.querySelector(".live-work__say")?.textContent).toBe("Vou checar o ambiente.");
+    // The first thing it says opens the block, as a message would; the steps list holds the rest.
+    const opened = document.querySelector(".ac-msg--streaming") as HTMLElement;
+    expect(opened.querySelector(".ac-msg__text")?.textContent).toBe("Vou checar o ambiente.");
+    expect(document.querySelector(".live-work__say")).toBeNull();
     await ev({ type: "agent.delta", ...ids, seq: 1, text: "Rodando o teste." });
     await ev({
       type: "agent.tool",

@@ -45,19 +45,26 @@ export interface ModelInfo {
   cheap?: boolean;
   /** Suggested for new agents of that provider. */
   recommended?: boolean;
+  /** Context window in tokens (prompt + output); absent = `DEFAULT_CONTEXT_WINDOW`. */
+  contextWindow?: number;
 }
+
+/** Context window assumed for a model without one in the catalog: the smallest current one, so runs stay inside it. */
+export const DEFAULT_CONTEXT_WINDOW = 200_000;
 
 export const MODEL_CATALOG: Record<string, ModelInfo> = {
   "claude-opus-5-5": {
     provider: "anthropic",
     label: "Claude Opus 5.5",
     prices: { input: 4000, output: 20000, cacheRead: 200, cacheWrite: 5000 },
+    contextWindow: 1_000_000,
     serverSideFallback: true,
   },
   "claude-sonnet-5-5": {
     provider: "anthropic",
     label: "Claude Sonnet 5.5",
     prices: { input: 2000, output: 10000, cacheRead: 200, cacheWrite: 2500 },
+    contextWindow: 1_000_000,
     serverSideFallback: true,
     recommended: true,
   },
@@ -66,11 +73,13 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     label: "Claude Haiku 5.5",
     prices: { input: 100, output: 500, cacheRead: 10, cacheWrite: 125 },
     longContext: { aboveInputTokens: 100_000, prices: { input: 500, output: 2500, cacheRead: 50, cacheWrite: 625 } },
+    contextWindow: 1_000_000,
     serverSideFallback: false,
     cheap: true,
   },
   // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-14).
   // TODO: the page lists long-context prices but not the threshold; add `longContext` once known.
+  // TODO: `contextWindow` not checked yet; they use `DEFAULT_CONTEXT_WINDOW` until then.
   "gpt-6-sol": {
     provider: "openai",
     label: "GPT-6 Sol",
@@ -92,6 +101,9 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
 /** The cheap model of a provider (router fallback, summaries), from the catalog. */
 export const cheapModelOf = (provider: string) =>
   Object.entries(MODEL_CATALOG).find(([, m]) => m.provider === provider && m.cheap)?.[0] ?? null;
+
+/** The model's context window in tokens (`DEFAULT_CONTEXT_WINDOW` when the catalog doesn't say). */
+export const contextWindowOf = (model: string) => MODEL_CATALOG[model]?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
 
 export const isKnownModel = (model: string) => Object.hasOwn(MODEL_CATALOG, model);
 

@@ -118,10 +118,10 @@ export const en: Translations = {
       done: "Done",
     },
     hosts: {
-      ada: "Hi! I'm Ada, I'll set everything up with you.",
-      lia: "Hi! I'm Lia, I do research.",
+      ada: "Hi, I'm Ada, I'll set everything up with you.",
+      lia: "Hi, I'm Lia, I do research.",
       theo: "Nice to meet you, I'm Theo. I organize the team's tasks.",
-      atlas: "Hey! Atlas here, I look after the computers.",
+      atlas: "Hey, Atlas here, I look after the computers.",
     },
     progress: {
       left_one: "{{count}} step left",

@@ -141,7 +141,7 @@ describe("an agent that joined on its own (meta.joined)", () => {
 describe("the working line while an agent asks another", () => {
   test("'Ada está perguntando ao Atlas…' with both bodies and a clock → 'Atlas respondeu. Ada está escrevendo…' → the reply", async () => {
     const { socket } = await open();
-    const run = { threadId: "m-1", runId: "r-ask", agentId: ADA_ID };
+    const run = { threadId: null, runId: "r-ask", agentId: ADA_ID };
     await push(socket, { type: "agent.thinking", ...run });
     await settle();
     expect(bar()).toBe("Ada está trabalhando…");
@@ -175,12 +175,12 @@ describe("the working line while an agent asks another", () => {
 
   test("several agents: one line, stacked, 'Ada e Atlas estão trabalhando…'; it shrinks as each one finishes", async () => {
     const { socket } = await open();
-    await push(socket, { type: "agent.thinking", threadId: "m-1", runId: "r-a", agentId: ADA_ID });
-    await push(socket, { type: "agent.thinking", threadId: "m-1", runId: "r-b", agentId: ATLAS_ID });
+    await push(socket, { type: "agent.thinking", threadId: null, runId: "r-a", agentId: ADA_ID });
+    await push(socket, { type: "agent.thinking", threadId: null, runId: "r-b", agentId: ATLAS_ID });
     await settle();
     expect(bar()).toBe("Ada e Atlas estão trabalhando…");
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(2);
-    await push(socket, { type: "agent.idle", threadId: "m-1", runId: "r-b", agentId: ATLAS_ID });
+    await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
     await settle();
     expect(bar()).toBe("Ada está trabalhando…");
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);

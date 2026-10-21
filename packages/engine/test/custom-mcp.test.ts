@@ -23,6 +23,7 @@ import {
   setAgentScopes,
   suggestFor,
   ValidationError,
+  wrapExternal,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -257,7 +258,10 @@ describe("custom MCP servers", () => {
       "suporte_list_tickets",
     ]);
     const read = await gateway.invoke(ctx, { toolUseId: "t1", name: "suporte_list_tickets", input: {} });
-    expect(read).toMatchObject({ type: "result", output: { content: "#1 login broken" } });
+    expect(read).toMatchObject({
+      type: "result",
+      output: { content: wrapExternal("suporte_list_tickets", "#1 login broken") },
+    });
     const write = await gateway.invoke(ctx, { toolUseId: "t2", name: "suporte_close_ticket", input: { id: 1 } });
     expect(write.type).toBe("approval");
     if (write.type === "approval") expect(write.approval.title).toBe("Suporte: Fechar chamado");

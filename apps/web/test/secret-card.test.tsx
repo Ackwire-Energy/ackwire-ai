@@ -22,7 +22,7 @@ async function withRequest(requestedForUserId: string, publicKey: string) {
     id: "00000000-0000-4000-8000-0000000000e1",
     agentId: ADA_ID,
     channelId: ENG_ID,
-    threadId: "m-1",
+    threadId: null,
     messageId: "msg-s",
     requestedForUserId,
     name: "NPM_TOKEN",
@@ -38,7 +38,7 @@ async function withRequest(requestedForUserId: string, publicKey: string) {
   state.messages.push({
     id: "msg-s",
     channelId: ENG_ID,
-    threadId: "m-1",
+    threadId: null,
     author: { type: "agent", id: ADA_ID },
     body: "Pedido de segredo: NPM_TOKEN",
     mentionedAgentIds: [],
