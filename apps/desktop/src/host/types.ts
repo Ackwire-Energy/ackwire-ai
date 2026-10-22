@@ -82,6 +82,10 @@ export interface Host {
   setAppMenu(labels: Record<string, string>): Promise<void>;
   /** A menu bar choice the popover owns (`menu://action`): updates, quit, access requests, this Mac. */
   onMenuAction(cb: (action: MenuAction) => void): () => void;
+  /** The popover listens for the site's requests now (requests sent before that wait, main_window.rs). */
+  thisMacListening(): Promise<void>;
+  /** Preferências → "Mostrar no Dock" (dock.rs): off, the app lives in the menu bar while no window shows. */
+  setDock(show: boolean): Promise<void>;
 }
 
 export type MenuAction = "updates" | "quit" | "requests" | "thisMac";

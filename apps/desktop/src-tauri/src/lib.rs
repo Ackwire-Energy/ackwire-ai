@@ -4,11 +4,13 @@
 //! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
 
 mod cover;
+mod dock;
 mod main_window;
 mod menus;
 mod notch;
 mod runners;
 mod tray;
+mod window_state;
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -62,19 +64,21 @@ fn is_sign_in_url(url: &str) -> bool {
 }
 
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
-/// (with the open-window dot, clickable); with all of them closed it lives in the menu bar only.
+/// (with the open-window dot, clickable), even when the person took it out of the Dock.
 const APP_WINDOWS: &[&str] = &["welcome", "prefs", main_window::LABEL];
 
-/// Dock icon on while an app window is visible, off otherwise (macOS).
+/// The Dock icon: always, like Slack's (dock.rs), or, when the person turned that off, only while an app
+/// window is visible (macOS).
 pub(crate) fn sync_dock(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
         // By window, not web view: the main window holds two (the site and its cover).
-        let open = APP_WINDOWS.iter().any(|name| {
-            app.get_window(name)
-                .and_then(|w| w.is_visible().ok())
-                .unwrap_or(false)
-        });
+        let open = dock::shows(app)
+            || APP_WINDOWS.iter().any(|name| {
+                app.get_window(name)
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false)
+            });
         let policy = if open {
             tauri::ActivationPolicy::Regular
         } else {
@@ -90,7 +94,10 @@ pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
     if !WINDOWS.contains(&name) {
         return Err(format!("unknown window: {name}"));
     }
-    let window = app.get_webview_window(name).ok_or("window not found")?;
+    let window = match app.get_webview_window(name) {
+        Some(window) => window,
+        None => make_window(app, name)?,
+    };
     if name == "popover" {
         // Right under the menu bar icon.
         let _ = window.move_window(Position::TrayCenter);
@@ -103,6 +110,24 @@ pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
     window.set_focus().map_err(|e| e.to_string())?;
     let _ = app.emit("window://shown", name);
     Ok(())
+}
+
+/// Welcome and Preferences are made when they open and go when they close (`"create": false` in
+/// tauri.conf.json): each is a whole web view, kept alive for nothing otherwise.
+const MADE_ON_OPEN: &[&str] = &["welcome", "prefs"];
+
+fn make_window(app: &AppHandle, name: &str) -> Result<tauri::WebviewWindow, String> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == name)
+        .ok_or("window not found")?
+        .clone();
+    tauri::WebviewWindowBuilder::from_config(app, &config)
+        .and_then(|b| b.build())
+        .map_err(|e| e.to_string())
 }
 
 /// The launch argument start at login passes, so a login start stays in the menu bar.
@@ -142,7 +167,10 @@ fn begin_quit(app: AppHandle) {
     if runners.is_quitting() {
         return;
     }
-    for name in WINDOWS.iter().chain([&main_window::LABEL]) {
+    if let Some(window) = app.get_window(main_window::LABEL) {
+        window_state::remember(&window, false);
+    }
+    for name in WINDOWS.iter().chain([&main_window::LABEL, &notch::LABEL]) {
         if let Some(window) = app.get_window(name) {
             let _ = window.hide();
         }
@@ -218,8 +246,12 @@ fn hide_window(app: AppHandle, name: String) -> Result<(), String> {
     if !WINDOWS.contains(&name.as_str()) {
         return Err(format!("unknown window: {name}"));
     }
-    let window = app.get_webview_window(&name).ok_or("window not found")?;
-    window.hide().map_err(|e| e.to_string())?;
+    let Some(window) = app.get_webview_window(&name) else { return Ok(()) };
+    if MADE_ON_OPEN.contains(&name.as_str()) {
+        window.destroy().map_err(|e| e.to_string())?;
+    } else {
+        window.hide().map_err(|e| e.to_string())?;
+    }
     sync_dock(&app);
     Ok(())
 }
@@ -328,6 +360,9 @@ pub fn run() {
         .manage(main_window::Bridge::default())
         .manage(menus::Zoom::default())
         .manage(cover::Cover::default())
+        .manage(dock::Dock::default())
+        .manage(menus::MenuParts::default())
+        .manage(window_state::LastSaved::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
@@ -350,6 +385,8 @@ pub fn run() {
             notch_place,
             main_window::this_mac,
             main_window::this_mac_reply,
+            main_window::this_mac_listening,
+            dock::dock_set,
             menus::app_menu_set,
             menus::context_menu,
             cover::page_ready,
@@ -364,14 +401,41 @@ pub fn run() {
                     *at = Some(Instant::now());
                 }
             }
+            // Welcome and Preferences really close (made again when they open).
+            WindowEvent::CloseRequested { .. } if MADE_ON_OPEN.contains(&window.label()) => {}
+            WindowEvent::Destroyed if MADE_ON_OPEN.contains(&window.label()) => sync_dock(window.app_handle()),
             WindowEvent::CloseRequested { api, .. } => {
-                // Windows are made once and only hidden; quitting goes through "Sair".
+                // The other windows are made once and only hidden; quitting goes through "Sair".
                 api.prevent_close();
+                if window.label() == main_window::LABEL {
+                    window_state::remember(window, false);
+                    // ⌘W in full screen: out of full screen first, so no empty Space stays behind.
+                    if window.is_fullscreen().unwrap_or(false) {
+                        let _ = window.set_fullscreen(false);
+                        let window = window.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(700));
+                            let _ = window.hide();
+                            sync_dock(window.app_handle());
+                        });
+                        return;
+                    }
+                }
                 let _ = window.hide();
                 sync_dock(window.app_handle());
             }
+            WindowEvent::Moved(_) if window.label() == main_window::LABEL => window_state::remember(window, true),
+            WindowEvent::Resized(_) if window.label() == main_window::LABEL => {
+                window_state::remember(window, true);
+                // Full screen in or out: the page's title bar keeps or drops the room for the buttons.
+                main_window::fit_page(window.app_handle());
+            }
             WindowEvent::ThemeChanged(theme) if window.label() == main_window::LABEL => {
-                let _ = window.set_background_color(Some(main_window::backdrop(*theme)));
+                let color = main_window::backdrop(*theme);
+                let _ = window.set_background_color(Some(color));
+                if let Some(page) = window.app_handle().get_webview(main_window::LABEL) {
+                    let _ = page.set_background_color(Some(color));
+                }
             }
             _ => {}
         })
@@ -395,6 +459,8 @@ pub fn run() {
             } else if !at_login {
                 let _ = main_window::open(&handle, None);
             }
+            // In the Dock from the start, like Slack (the popover then applies the person's choice).
+            sync_dock(&handle);
             Ok(())
         });
     // After long in the background macOS may end a window's page to free memory, which leaves it blank:

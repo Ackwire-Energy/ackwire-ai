@@ -27,6 +27,8 @@ const COMMANDS: &[&str] = &[
     "page_ready",
     "cover_retry",
     "cover_hide",
+    "this_mac_listening",
+    "dock_set",
 ];
 
 fn main() {

@@ -1,5 +1,5 @@
 import { Button, EmptyState } from "@agenteschat/ui";
-import { createRootRouteWithContext, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createRootRouteWithContext, Link, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { RouterContext } from "@/app/router-context";
@@ -15,10 +15,25 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function Root() {
   // agentes for Mac: the workspace has its title bar (org.$orgId.tsx); every other page drags from the top.
   const inWorkspace = useRouterState({ select: (s) => s.location.pathname.startsWith("/org/") });
+  const router = useRouter();
   // In the app: once this first screen is on the glass, the app's cover over the window goes.
   useEffect(() => {
     if (inDesktopApp()) requestAnimationFrame(() => requestAnimationFrame(pageReady));
   }, []);
+  // The app opens a page of the site that is already open (the tray, a notification, ⌘-click) without
+  // loading it again: the route moves (main_window.rs). Downloads and the API go as a plain load.
+  useEffect(() => {
+    if (!inDesktopApp()) return;
+    const w = window as { __agentesNavigate?: (path: string) => void };
+    w.__agentesNavigate = (path) => {
+      if (!path.startsWith("/") || path.startsWith("//")) return;
+      if (path.startsWith("/api/")) window.location.assign(path);
+      else router.history.push(path);
+    };
+    return () => {
+      delete w.__agentesNavigate;
+    };
+  }, [router]);
   return (
     <>
       {inDesktopApp() && !inWorkspace && <DesktopDragStrip />}

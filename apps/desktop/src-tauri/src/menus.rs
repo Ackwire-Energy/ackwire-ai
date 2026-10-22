@@ -37,6 +37,26 @@ const ZOOM_STEPS: &[f64] = &[0.67, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75];
 #[derive(Default)]
 pub struct Zoom(Mutex<Option<usize>>);
 
+/// The popover's labels and the site's organizations: the menu is built again when either changes.
+#[derive(Default)]
+pub struct MenuParts {
+    labels: Mutex<HashMap<String, String>>,
+    orgs: Mutex<Vec<(String, String)>>,
+}
+
+/// The zoom kept from last time (window_state.rs): applied when the window is made.
+pub fn restore_zoom(app: &AppHandle, step: usize) -> f64 {
+    let step = step.min(ZOOM_STEPS.len() - 1);
+    *app.state::<Zoom>().0.lock().unwrap_or_else(|e| e.into_inner()) = Some(step);
+    ZOOM_STEPS[step]
+}
+
+pub fn current_zoom(app: &AppHandle) -> f64 {
+    let base = ZOOM_STEPS.iter().position(|z| *z == 1.0).unwrap_or(0);
+    let at = app.state::<Zoom>().0.lock().unwrap_or_else(|e| e.into_inner()).unwrap_or(base);
+    ZOOM_STEPS[at]
+}
+
 impl Zoom {
     /// One step in or out (`by` ±1), or back to 100% (`by` 0).
     fn step(&self, by: i32) -> f64 {
@@ -58,9 +78,12 @@ fn site_call(function: &str, args: &[&str]) -> String {
     format!("window.{function}?.({})", args.join(","))
 }
 
+/// A choice for the site. From the menu bar it also brings the window forward (⌘K from Preferences lands in
+/// the window, not in a hidden page).
 fn to_site(app: &AppHandle, js: String) {
     if let Some(page) = app.get_webview(main_window::LABEL) {
         let _ = page.eval(js);
+        let _ = main_window::open(app, None);
     } else {
         // Nothing open to act on: the window comes, the person asks again from it.
         let _ = main_window::open(app, None);
@@ -70,9 +93,13 @@ fn to_site(app: &AppHandle, js: String) {
 /// A menu bar or right-click choice (`on_menu_event` in lib.rs).
 pub fn on_event(app: &AppHandle, id: &str) {
     if let Some(rest) = id.strip_prefix("ctx:") {
-        if let Some((token, item)) = rest.split_once(':') {
-            to_site(app, site_call("__agentesContextMenu", &[token, item]));
+        if let (Some((token, item)), Some(page)) = (rest.split_once(':'), app.get_webview(main_window::LABEL)) {
+            let _ = page.eval(site_call("__agentesContextMenu", &[token, item]));
         }
+        return;
+    }
+    if let Some(org) = id.strip_prefix("org:") {
+        to_site(app, site_call("__agentesMenu", &["org", org]));
         return;
     }
     let Some(action) = id.strip_prefix("app:") else { return };
@@ -85,6 +112,11 @@ pub fn on_event(app: &AppHandle, id: &str) {
             let _ = app.emit_to("popover", "menu://action", action);
         }
         "reload" => to_site(app, "location.reload()".into()),
+        "print" => {
+            if let Some(page) = app.get_webview(main_window::LABEL) {
+                let _ = page.print();
+            }
+        }
         "zoomIn" | "zoomOut" | "zoomReset" => {
             let by = match action {
                 "zoomIn" => 1,
@@ -95,6 +127,9 @@ pub fn on_event(app: &AppHandle, id: &str) {
             if let Some(page) = app.get_webview(main_window::LABEL) {
                 let _ = page.set_zoom(scale);
             }
+            let step = ZOOM_STEPS.iter().position(|z| *z == scale);
+            crate::window_state::update(app, |saved| saved.zoom = step);
+            main_window::fit_page(app);
         }
         _ if SITE_ACTIONS.iter().any(|(a, _)| *a == action) => to_site(app, site_call("__agentesMenu", &[action])),
         _ => {}
@@ -103,7 +138,11 @@ pub fn on_event(app: &AppHandle, id: &str) {
 
 /// The menu bar, with the popover's labels (missing ones fall back to the key, never empty).
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
-fn build_app_menu(app: &AppHandle, labels: &HashMap<String, String>) -> tauri::Result<Menu<tauri::Wry>> {
+fn build_app_menu(
+    app: &AppHandle,
+    labels: &HashMap<String, String>,
+    orgs: &[(String, String)],
+) -> tauri::Result<Menu<tauri::Wry>> {
     let l = |key: &str| labels.get(key).map(String::as_str).unwrap_or(key).to_string();
     let site = |key: &str| -> tauri::Result<tauri::menu::MenuItem<tauri::Wry>> {
         let shortcut = SITE_ACTIONS.iter().find(|(a, _)| *a == key).and_then(|(_, s)| *s);
@@ -148,6 +187,8 @@ fn build_app_menu(app: &AppHandle, labels: &HashMap<String, String>) -> tauri::R
         .item(&sep()?)
         .item(&site("search")?)
         .item(&sep()?)
+        .item(&own("print", Some("CmdOrCtrl+P"))?)
+        .item(&sep()?)
         .close_window_with_text(l("closeWindow"))
         .build()?;
     let edit = SubmenuBuilder::new(app, l("edit"))
@@ -172,13 +213,24 @@ fn build_app_menu(app: &AppHandle, labels: &HashMap<String, String>) -> tauri::R
         .item(&sep()?)
         .fullscreen_with_text(l("fullscreen"))
         .build()?;
-    let go = SubmenuBuilder::new(app, l("go"))
+    let mut go = SubmenuBuilder::new(app, l("go"))
         .item(&site("goHome")?)
         .item(&site("goWaiting")?)
         .item(&site("goTasks")?)
         .item(&site("goWiki")?)
-        .item(&site("goDrive")?)
-        .build()?;
+        .item(&site("goDrive")?);
+    // The person's organizations, ⌘⌥1–9 for the first nine (Slack's ⌘1–9 for workspaces; ⌘1–5 are sections).
+    if !orgs.is_empty() {
+        go = go.item(&sep()?);
+        for (n, (id, name)) in orgs.iter().enumerate() {
+            let mut item = MenuItemBuilder::with_id(format!("org:{id}"), name);
+            if n < 9 {
+                item = item.accelerator(format!("CmdOrCtrl+Alt+{}", n + 1));
+            }
+            go = go.item(&item.build(app)?);
+        }
+    }
+    let go = go.build()?;
     let window = SubmenuBuilder::new(app, l("window"))
         .minimize_with_text(l("minimize"))
         .maximize_with_text(l("zoom"))
@@ -188,9 +240,14 @@ fn build_app_menu(app: &AppHandle, labels: &HashMap<String, String>) -> tauri::R
         .item(&sep()?)
         .bring_all_to_front_with_text(l("bringAllToFront"))
         .build()?;
+    // Empty on purpose: the Mac puts its search of every menu item there.
+    let help = SubmenuBuilder::new(app, l("help")).build()?;
     #[cfg(target_os = "macos")]
-    let _ = window.set_as_windows_menu_for_nsapp();
-    let items: [&Submenu<tauri::Wry>; 6] = [&app_menu, &file, &edit, &view, &go, &window];
+    {
+        let _ = window.set_as_windows_menu_for_nsapp();
+        let _ = help.set_as_help_menu_for_nsapp();
+    }
+    let items: [&Submenu<tauri::Wry>; 7] = [&app_menu, &file, &edit, &view, &go, &window, &help];
     Menu::with_items(app, &items.map(|s| s as &dyn tauri::menu::IsMenuItem<tauri::Wry>))
 }
 
@@ -205,15 +262,62 @@ pub fn app_menu_set(app: AppHandle, window: tauri::Window, labels: HashMap<Strin
     if labels.len() > 100 || labels.iter().any(|(k, v)| k.len() > 40 || v.chars().count() > MAX_LABEL) {
         return Err("bad labels".into());
     }
+    *app.state::<MenuParts>().labels.lock().unwrap_or_else(|e| e.into_inner()) = labels;
+    rebuild(&app)
+}
+
+/// The menu bar again, with the labels and organizations it has now.
+fn rebuild(app: &AppHandle) -> Result<(), String> {
     // Windows and Linux would show it inside every window, the popover too: the menu bar is the Mac's.
     #[cfg(target_os = "macos")]
     {
-        let menu = build_app_menu(&app, &labels).map_err(|e| e.to_string())?;
+        let parts = app.state::<MenuParts>();
+        let labels = parts.labels.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        if labels.is_empty() {
+            return Ok(()); // the popover hasn't sent them yet
+        }
+        let orgs = parts.orgs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let menu = build_app_menu(app, &labels, &orgs).map_err(|e| e.to_string())?;
         app.set_menu(menu).map_err(|e| e.to_string())?;
     }
     #[cfg(not(target_os = "macos"))]
-    let _ = (app, labels);
+    let _ = app;
     Ok(())
+}
+
+/// The site's organizations (`this_mac` `orgs`, already checked), for the Go menu.
+pub fn set_orgs(app: &AppHandle, orgs: &serde_json::Value) {
+    let list: Vec<(String, String)> = orgs
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|o| Some((o["id"].as_str()?.to_string(), o["name"].as_str()?.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+    {
+        let parts = app.state::<MenuParts>();
+        let mut orgs = parts.orgs.lock().unwrap_or_else(|e| e.into_inner());
+        if *orgs == list {
+            return;
+        }
+        *orgs = list;
+    }
+    let _ = rebuild(app);
+}
+
+/// A download finished (main_window.rs): a notification with its name, in the app's language.
+pub fn downloaded(app: &AppHandle, name: &str) {
+    use tauri_plugin_notification::NotificationExt;
+    let title = app
+        .state::<MenuParts>()
+        .labels
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get("downloaded")
+        .cloned()
+        .unwrap_or_else(|| "Download".into());
+    let _ = app.notification().builder().title(title).body(name).show();
 }
 
 /// One choice of the site's right-click menu.

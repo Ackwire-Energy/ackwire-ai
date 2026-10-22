@@ -1,3 +1,4 @@
+import { useNotificationCount } from "@agenteschat/client";
 import { MenuAt, MenuHeading, MenuItem, MenuReactions, MenuSeparator } from "@agenteschat/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
@@ -11,8 +12,10 @@ import {
   selectedTextAt,
   setMenuHost,
 } from "@/lib/context-menu";
+import { thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { openPalette } from "./CommandMenu";
+import { useOrg } from "./org-context";
 import { NEW_CHANNEL_EVENT, toggleSidebar } from "./Sidebar";
 
 /**
@@ -162,8 +165,10 @@ export function MenuBarActions({ orgId }: { orgId: string }) {
       goDrive: to(`${org}/drive`),
       orgSettings: to(`${org}/settings`),
     };
-    const w = window as { __agentesMenu?: (action: string) => void };
-    w.__agentesMenu = (action) => {
+    const w = window as { __agentesMenu?: (action: string, arg?: string) => void };
+    w.__agentesMenu = (action, arg) => {
+      // Go → an organization (⌘⌥1–9).
+      if (action === "org" && arg) return router.history.push(`/org/${encodeURIComponent(arg)}`);
       if (performance.now() - (keyed.get(action) ?? -Infinity) < ECHO_MS) return;
       actions[action]?.();
     };
@@ -173,5 +178,23 @@ export function MenuBarActions({ orgId }: { orgId: string }) {
       window.removeEventListener("keydown", onKey, true);
     };
   }, [router, orgId]);
+
+  // The Go menu lists the person's organizations.
+  const { me } = useOrg();
+  const orgList = me.organizations.map((o) => ({ id: o.id, name: o.name }));
+  const orgsKey = JSON.stringify(orgList);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the list is sent when its content changes
+  useEffect(() => {
+    void thisMac.orgs(orgList).catch(() => {});
+  }, [orgsKey]);
+
+  // The Dock's badge: what waits on the person in this organization (a dot for unread only).
+  const counts = useNotificationCount(orgId).data;
+  const waiting = counts?.waiting ?? 0;
+  const unread = counts?.unread ?? 0;
+  useEffect(() => {
+    void thisMac.badge(waiting, unread).catch(() => {});
+  }, [waiting, unread]);
+  useEffect(() => () => void thisMac.badge(0, 0).catch(() => {}), []);
   return null;
 }

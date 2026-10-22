@@ -66,5 +66,7 @@ export function createTauriHost(): Host {
     thisMacReply: (id, ok, data) => invoke<void>("this_mac_reply", { id, ok, data }),
     setAppMenu: (labels) => invoke<void>("app_menu_set", { labels }),
     onMenuAction: (cb) => subscribe<MenuAction>("menu://action", cb),
+    thisMacListening: () => invoke<void>("this_mac_listening"),
+    setDock: (show) => invoke<void>("dock_set", { show }),
   };
 }
