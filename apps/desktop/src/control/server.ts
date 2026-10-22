@@ -1,4 +1,5 @@
-import { CLOUD_SERVER, normalizeServer } from "@agenteschat/client/lib/server";
+import { CLOUD_SERVER, normalizeServer, serverHost } from "@agenteschat/client/lib/server";
+import type { TFunction } from "i18next";
 import type { Home } from "./store";
 
 /** Preference: the server the next sign-in goes to ("Seu servidor" in the welcome window). */
@@ -15,3 +16,7 @@ export function siteOf(homes: readonly Home[], chosen: string): string {
   }
   return chosen;
 }
+
+/** The label of the link to `site`: agentes.chat opens in the app's own window, another server in the browser. */
+export const openSiteLabel = (site: string, t: TFunction) =>
+  site === CLOUD_SERVER ? t("desktop.tray.openSite") : t("desktop.tray.openServer", { host: serverHost(site) });

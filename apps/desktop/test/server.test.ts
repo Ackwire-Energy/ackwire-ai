@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ControlStatus } from "@agenteschat/adapters/runner-control";
-import { serverFromPref, siteOf } from "../src/control/server";
+import { openSiteLabel, serverFromPref, siteOf } from "../src/control/server";
 import type { Home } from "../src/control/store";
+import { createDesktopI18n } from "../src/i18n";
 
 const home = (status: Partial<ControlStatus> | null): Home => ({
   homeId: "h1",
@@ -40,5 +41,11 @@ describe("the server the app signs in to", () => {
     expect(siteOf([home({ paired: false, server: "https://chat.example.com" })], chosen)).toBe(chosen);
     expect(siteOf([home(null)], chosen)).toBe(chosen);
     expect(siteOf([], chosen)).toBe(chosen);
+  });
+
+  test("the link to the site names another server by its host", () => {
+    const { t } = createDesktopI18n("pt-BR");
+    expect(openSiteLabel("https://agentes.chat", t)).toBe("Abrir agentes");
+    expect(openSiteLabel("https://box.tail1234.ts.net", t)).toBe("Abrir box.tail1234.ts.net");
   });
 });

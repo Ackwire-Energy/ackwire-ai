@@ -21,7 +21,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { ControlError } from "../control/client";
-import { SERVER_PREF, siteOf } from "../control/server";
+import { openSiteLabel, SERVER_PREF, siteOf } from "../control/server";
 import { type Home, orgName, pairedHomes, RECONNECT_PREF, reconnectTarget } from "../control/store";
 import { chosenServer, readPref, useOnShown, writePref } from "../hooks";
 import { BrandFace, CodeDigits, MacPortrait } from "../ui/bits";
@@ -608,7 +608,7 @@ export function Welcome() {
       <>
         <span className="dk-foot__note" />
         <Button icon="external" onClick={() => void host.openExternal(site)}>
-          {t("desktop.tray.openSite", { host: serverHost(site) })}
+          {openSiteLabel(site, t)}
         </Button>
         <Button variant="primary" onClick={() => void finish()}>
           {t("desktop.welcome.finish")}
