@@ -7,12 +7,14 @@ import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
+import { DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
+import { inDesktopApp } from "@/lib/desktop";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
 
@@ -62,6 +64,7 @@ function OrgLayout() {
       <RealtimeProvider orgId={membership.id}>
         <ArtifactViewerProvider>
           <NavDrawerProvider>
+            {inDesktopApp() && <DesktopTitleBar />}
             <div className="shell">
               <RefetchBar />
               <CommandMenu />

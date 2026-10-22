@@ -7,9 +7,22 @@ name: Desktop
 # `agentes_<version>_universal.dmg`, its `.sha256`, `…universal.app.tar.gz` and its `.sig`
 # (the server reads those names).
 # Nothing runs on a developer's machine: testing means installing this build.
-# macOS runners cost about 10x Linux minutes: this runs only by hand or on a release tag, never per PR.
+# macOS runners cost about 10x Linux minutes: this runs only by hand, never per PR.
+# Run by hand on main with `release` = fix/feature/major: bumps the version (patch/minor/major) in
+# tauri.conf.json, package.json, Cargo.toml and Cargo.lock, commits and tags `desktop-v<version>` on main,
+# then builds and publishes the release. `none` only builds the current version as an artifact.
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "fix = 0.0.x, feature = 0.x.0, major = x.0.0; none = build only, no release"
+        type: choice
+        options: [fix, feature, major, none]
+        default: fix
+      notes:
+        description: "Release notes (optional; default = commit subjects since the last release)"
+        type: string
+        required: false
 
 concurrency:
   group: desktop-${{ github.ref }}
@@ -29,6 +42,8 @@ jobs:
       BIN_DIR: apps/desktop/src-tauri/binaries
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -62,6 +77,55 @@ jobs:
           printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      # Before any build step, so a failed bump costs no macOS minutes. Pushes made with the workflow token
+      # don't start other workflows.
+      - name: Bump the version, commit and tag
+        if: ${{ inputs.release && inputs.release != 'none' }}
+        shell: bash
+        env:
+          RELEASE: ${{ inputs.release }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Releases are cut from main (this run is on $GITHUB_REF); pick release = none for a test build"
+            exit 1
+          fi
+          CURRENT=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
+          IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          case "$RELEASE" in
+            fix) PATCH=$((PATCH + 1)) ;;
+            feature) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+          esac
+          NEXT="$MAJOR.$MINOR.$PATCH"
+          TAG="desktop-v$NEXT"
+          if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+          PREV=$(git describe --tags --abbrev=0 --match 'desktop-v*' 2>/dev/null || true)
+          if [ -z "$NOTES" ]; then
+            NOTES=$(git log --no-merges --format='- %s' ${PREV:+"$PREV"..HEAD} | head -40)
+          fi
+          # Only the version line changes (jq would reformat the whole file).
+          for f in apps/desktop/src-tauri/tauri.conf.json apps/desktop/package.json; do
+            perl -0pi -e "s/\"version\": \"\Q$CURRENT\E\"/\"version\": \"$NEXT\"/" "$f"
+          done
+          perl -0pi -e "s/^version = \"\Q$CURRENT\E\"/version = \"$NEXT\"/m" apps/desktop/src-tauri/Cargo.toml
+          git diff --stat
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(desktop): $NEXT"
+          # main may move while this runs: rebase onto it and retry. Commit and tag go up
+          # together (--atomic), so a rejected push never leaves a tag outside main.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main
+            git tag -f -a "$TAG" -m "$NOTES"
+            if git push --atomic origin HEAD:main "refs/tags/$TAG"; then break; fi
+            if [ "$attempt" = 3 ]; then echo "::error::Couldn't push the version to main"; exit 1; fi
+          done
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+
       - name: Version
         id: version
         shell: bash
@@ -73,8 +137,12 @@ jobs:
             echo "::error::Versions differ: tauri.conf.json $VERSION, package.json $PKG, Cargo.toml $CARGO"
             exit 1
           fi
-          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]] && [ "${GITHUB_REF#refs/tags/desktop-v}" != "$VERSION" ]; then
-            echo "::error::Tag ${GITHUB_REF#refs/tags/} doesn't match the app version $VERSION"
+          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then
+            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+            RELEASE_TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          if [ -n "$RELEASE_TAG" ] && [ "${RELEASE_TAG#desktop-v}" != "$VERSION" ]; then
+            echo "::error::Tag $RELEASE_TAG doesn't match the app version $VERSION"
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -182,7 +250,7 @@ jobs:
           cp "$TGZ.sig" "out/agentes_${VERSION}_universal.app.tar.gz.sig"
 
       - name: Keep the build
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ env.RELEASE_TAG == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: agentes-${{ steps.version.outputs.version }}-universal
@@ -191,12 +259,12 @@ jobs:
 
       # Release notes = the annotated tag's message (`git tag -a desktop-v0.2.0 -m "- Pastas…"`).
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        if: ${{ env.RELEASE_TAG != '' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          TAG="$RELEASE_TAG"
           VERSION="${{ steps.version.outputs.version }}"
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
           git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP SIGNATURE-----/,$d' > notes.txt

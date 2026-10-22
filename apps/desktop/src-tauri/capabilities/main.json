@@ -1,0 +1,9 @@
+{
+  "identifier": "main",
+  "description": "The main window loads agentes.chat itself (D79): it may drag and zoom the window from its title bar, and ask this Mac what `this_mac` relays (status, connect, reconnect, a Preferences tab, the access requests). No other app command, nothing else of the Mac.",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://agentes.chat/*"]
+  },
+  "permissions": ["core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize", "allow-this-mac"]
+}
