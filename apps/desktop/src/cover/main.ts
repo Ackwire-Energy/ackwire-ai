@@ -51,6 +51,8 @@ if (agent) {
   agent.width = agent.height = Math.round(size * dpr);
   const ctx = agent.getContext("2d");
   const seed = Math.random() * 9;
+  // With reduced motion the agent is drawn still (the sky does the same, packages/ui sky engine).
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const frame = (now: number) => {
     if (ctx) {
       const s = agent.width;
@@ -64,7 +66,7 @@ if (agent) {
         pose: unreachable ? { ...pose, blink: false, expression: "closed" } : pose,
       });
     }
-    requestAnimationFrame(frame);
+    if (!still) requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 }

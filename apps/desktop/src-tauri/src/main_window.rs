@@ -112,6 +112,9 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         .center()
         // Two web views share the window (the site and the cover): each follows its size.
         .auto_resize()
+        // Files dragged from Finder (into a conversation, the Drive) and drags inside the page go to the site;
+        // Tauri's own drop handling would take every drag first and the page would get nothing.
+        .disable_drag_drop_handler()
         .background_color(backdrop(theme))
         // Hidden, the page keeps running slowly instead of being suspended (macOS 14+): coming back to the app
         // finds it as it was.

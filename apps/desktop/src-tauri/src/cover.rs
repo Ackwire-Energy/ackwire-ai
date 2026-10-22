@@ -50,16 +50,37 @@ fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, Shown> {
     app.state::<Cover>().inner().0.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Covers the site now (it is loading a whole page again), for at least `min`.
+/// Covers the site now (it is loading a whole page again), for at least `min`. Already covering (the
+/// splash, when the first load starts), it keeps whatever minimum is left.
 pub fn show(app: &AppHandle, min: Duration) {
     let Some(cover) = app.get_webview(LABEL) else { return };
-    {
+    let was_shown = {
         let mut shown = lock(app);
+        let now = Instant::now();
+        let left = shown
+            .since
+            .map(|(since, before)| before.saturating_sub(since.elapsed()))
+            .unwrap_or_default();
+        let was_shown = shown.since.is_some();
         shown.generation += 1;
-        shown.since = Some((Instant::now(), min));
+        shown.since = Some((now, min.max(left)));
+        was_shown
+    };
+    if !was_shown {
+        let _ = cover.eval("window.__coverShown?.()");
     }
-    let _ = cover.eval("window.__coverShown?.()");
     let _ = cover.show();
+    // Typing goes to what shows, not to the page loading behind it.
+    if window_is_key(app) {
+        let _ = cover.set_focus();
+    }
+}
+
+/// The main window is the one in front (focus moves only inside it, never brings it forward).
+fn window_is_key(app: &AppHandle) -> bool {
+    app.get_window(main_window::LABEL)
+        .and_then(|w| w.is_focused().ok())
+        .unwrap_or(false)
 }
 
 /// The site painted: the cover fades and steps aside (after its minimum, when it has one).
@@ -87,8 +108,10 @@ pub fn hide(app: &AppHandle) {
             shown.since = None;
         }
         let _ = cover.hide();
-        if let Some(site) = app.get_webview(main_window::LABEL) {
-            let _ = site.set_focus();
+        if window_is_key(&app) {
+            if let Some(site) = app.get_webview(main_window::LABEL) {
+                let _ = site.set_focus();
+            }
         }
     });
 }
@@ -110,7 +133,8 @@ pub fn cover_retry(app: AppHandle, webview: tauri::Webview) -> Result<(), String
         return Err("only the cover asks this".into());
     }
     let site = app.get_webview(main_window::LABEL).ok_or("no site")?;
-    site.reload().map_err(|e| e.to_string())
+    // A first load that never arrived leaves nothing to reload: go to the site again.
+    site.navigate(main_window::site()).map_err(|e| e.to_string())
 }
 
 /// The cover: the site is up but never said it painted (an older site): stop covering it.
