@@ -22,6 +22,8 @@ const COMMANDS: &[&str] = &[
     "notch_place",
     "this_mac",
     "this_mac_reply",
+    "app_menu_set",
+    "context_menu",
 ];
 
 fn main() {

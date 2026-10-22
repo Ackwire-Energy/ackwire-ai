@@ -40,4 +40,6 @@ export const STORAGE_KEYS = {
   sidebarSections: "agentes.sidebar.sections",
   /** Offline-computer notices the person closed (`machineId@offlineSince`), until that computer comes back. */
   outagesDismissed: "agentes.outages.dismissed",
+  /** The desktop app's right click: "ours" (default) or "system" (lib/context-menu.ts). */
+  menuLook: "agentes.desktop.menu",
 } as const;

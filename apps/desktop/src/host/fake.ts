@@ -138,6 +138,9 @@ export function createFakeHost(initial: WindowName, scenario: "first" | "default
     // No main window in the browser: nobody asks.
     onThisMac: () => () => {},
     thisMacReply: async () => {},
+    // No menu bar in the browser.
+    setAppMenu: async () => {},
+    onMenuAction: () => () => {},
     notify: async (title, body) => {
       console.info("[fake] notification:", title, "—", body);
     },

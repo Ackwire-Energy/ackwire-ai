@@ -2,6 +2,7 @@ import { Button, EmptyState } from "@agenteschat/ui";
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { RouterContext } from "@/app/router-context";
+import { ContextMenuHost } from "@/components/DesktopMenus";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
 import { inDesktopApp } from "@/lib/desktop";
 
@@ -16,6 +17,7 @@ function Root() {
   return (
     <>
       {inDesktopApp() && !inWorkspace && <DesktopDragStrip />}
+      {inDesktopApp() && <ContextMenuHost />}
       <Outlet />
     </>
   );
