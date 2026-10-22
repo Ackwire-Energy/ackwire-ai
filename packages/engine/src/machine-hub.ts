@@ -863,7 +863,12 @@ export function createMachineHub(deps: MachineHubDeps) {
         pause: null,
       };
       conn.helloTimer = setTimeout(() => {
-        if (!conn.machineId) refuse(conn, "invalid_token", "No hello in time.", MACHINE_CLOSE.timeout);
+        // Not a refusal: a runner that just woke up (the Mac slept) may be slow to say hello, and the token is
+        // fine. A `refused` frame would make it stop for good; a plain close makes it dial again.
+        if (conn.machineId) return;
+        try {
+          conn.socket.close(MACHINE_CLOSE.timeout, "no hello");
+        } catch {}
       }, helloTimeoutMs);
       return conn;
     },

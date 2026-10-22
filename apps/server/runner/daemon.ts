@@ -853,11 +853,21 @@ export class RunnerDaemon implements RequestObserver {
     return this.config;
   }
 
-  /** The app's "Reconnect": the socket is dropped and dialed again at once. */
+  /**
+   * The app's "Reconnect": the socket is dropped and dialed again at once. After a refusal (no session left)
+   * it tries again with the same token: a token that is really gone is refused the same way, anything else
+   * gets back online instead of staying off until the app restarts.
+   */
   reconnect(): { reconnecting: boolean } {
     this.requirePaired();
     const s = this.session;
-    if (!s) return { reconnecting: false };
+    if (!s) {
+      if (!this.refused || this.refused.reason === "outdated") return { reconnecting: false };
+      this.opts.log("reconnect asked by the app (after a refusal)");
+      this.refused = null;
+      void this.reconcile();
+      return { reconnecting: true };
+    }
     this.opts.log("reconnect asked by the app");
     s.connection.reconnect();
     return { reconnecting: true };
