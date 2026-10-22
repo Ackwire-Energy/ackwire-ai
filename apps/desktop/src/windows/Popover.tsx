@@ -18,9 +18,9 @@ import {
   siteLink,
 } from "../control/browser";
 import { NOTCH_PREF } from "../control/notch";
-import { answerThisMac, type PrefsTab } from "../control/this-mac";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
+import { answerThisMac, type PrefsTab } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
 import { SITE_URL } from "../control/version";
 import { agentOf, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";

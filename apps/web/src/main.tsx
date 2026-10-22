@@ -7,8 +7,8 @@ import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
 import { createI18n, savedLocale } from "./i18n";
-import { snapshotStore } from "./lib/snapshot-store";
 import { inDesktopApp } from "./lib/desktop";
+import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
