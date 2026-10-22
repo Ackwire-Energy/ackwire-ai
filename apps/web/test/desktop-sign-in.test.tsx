@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -14,7 +14,7 @@ import { renderApp, screen, settle } from "./render";
  * through the browser; the browser page hands the fresh sign-in back.
  */
 
-const app = window as { __agentesDesktop?: unknown };
+const app = domWindow() as unknown as { __agentesDesktop?: unknown };
 afterEach(() => {
   cleanup();
   delete app.__agentesDesktop;

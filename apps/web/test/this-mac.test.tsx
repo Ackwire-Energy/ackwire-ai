@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -14,7 +14,7 @@ import { renderApp, screen, settle } from "./render";
  * the app's Preferences for what is granted on the Mac itself.
  */
 
-const win = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
+const win = domWindow() as unknown as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
 afterEach(() => {
   cleanup();
   delete win.__agentesDesktop;
