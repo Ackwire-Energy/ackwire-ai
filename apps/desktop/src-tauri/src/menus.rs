@@ -59,8 +59,8 @@ fn site_call(function: &str, args: &[&str]) -> String {
 }
 
 fn to_site(app: &AppHandle, js: String) {
-    if let Some(window) = app.get_webview_window(main_window::LABEL) {
-        let _ = window.eval(js);
+    if let Some(page) = app.get_webview(main_window::LABEL) {
+        let _ = page.eval(js);
     } else {
         // Nothing open to act on: the window comes, the person asks again from it.
         let _ = main_window::open(app, None);
@@ -92,8 +92,8 @@ pub fn on_event(app: &AppHandle, id: &str) {
                 _ => 0,
             };
             let scale = app.state::<Zoom>().step(by);
-            if let Some(window) = app.get_webview_window(main_window::LABEL) {
-                let _ = window.set_zoom(scale);
+            if let Some(page) = app.get_webview(main_window::LABEL) {
+                let _ = page.set_zoom(scale);
             }
         }
         _ if SITE_ACTIONS.iter().any(|(a, _)| *a == action) => to_site(app, site_call("__agentesMenu", &[action])),
@@ -297,15 +297,16 @@ fn add_items<'a>(
 
 /// The site's right-click menu in the system's look: drawn at the pointer; the choice goes back to the page.
 #[tauri::command]
-pub fn context_menu(app: AppHandle, window: tauri::Window, token: u32, items: Vec<ContextItem>) -> Result<(), String> {
-    if window.label() != main_window::LABEL {
+pub fn context_menu(app: AppHandle, webview: tauri::Webview, token: u32, items: Vec<ContextItem>) -> Result<(), String> {
+    // The site itself, not the cover that shares its window.
+    if webview.label() != main_window::LABEL {
         return Err("only the main window asks this".into());
     }
     check(&items, 0, &mut 0)?;
     let menu = add_items(&app, token, &items, SubmenuBuilder::new(&app, ""))
         .and_then(|b| b.build())
         .map_err(|e| e.to_string())?;
-    window.popup_menu(&menu).map_err(|e| e.to_string())
+    webview.window().popup_menu(&menu).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

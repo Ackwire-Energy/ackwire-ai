@@ -366,6 +366,10 @@ export const desktopEn: DesktopTranslations = {
       folderDesc: "One folder per organization, with a folder for each agent.",
     },
   },
+  cover: {
+    offline: "No internet connection · trying again…",
+    down: "agentes.chat didn't answer · trying again…",
+  },
   menu: {
     about: "About agentes.chat",
     updates: "Check for updates…",

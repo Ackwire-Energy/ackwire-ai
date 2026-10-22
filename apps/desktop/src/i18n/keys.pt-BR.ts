@@ -370,6 +370,11 @@ export const desktopPtBR = {
       folderDesc: "Uma pasta por organização, com uma pasta para cada agente.",
     },
   },
+  /** The main window's cover (cover/main.ts) when the site can't be reached; it tries again by itself. */
+  cover: {
+    offline: "Sem conexão com a internet · tentando de novo…",
+    down: "O agentes.chat não respondeu · tentando de novo…",
+  },
   /** The Mac's menu bar (menus.rs): one label per item id. */
   menu: {
     about: "Sobre o agentes.chat",

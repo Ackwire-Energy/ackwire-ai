@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 use tauri::utils::config::BackgroundThrottlingPolicy;
-use tauri::webview::{DownloadEvent, NewWindowResponse};
+use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent};
 use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, Theme, Url, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
@@ -86,9 +86,10 @@ pub fn backdrop(theme: Theme) -> Color {
 pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let site = site();
     let url = url.filter(|u| same_site(u, &site));
-    if let Some(window) = app.get_webview_window(LABEL) {
+    // The window holds two web views (the site, and the app's cover over it), so it is found by its parts.
+    if let Some(page) = app.get_webview(LABEL) {
         if let Some(url) = url {
-            window.navigate(url).map_err(|e| e.to_string())?;
+            page.navigate(url).map_err(|e| e.to_string())?;
         }
         return front(app);
     }
@@ -96,6 +97,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let on_nav = app.clone();
     let on_new = app.clone();
     let on_download = app.clone();
+    let on_load = app.clone();
     let nav_site = site.clone();
     let version = app.package_info().version.to_string();
     // The popover is made at start, so it already knows the system's appearance.
@@ -134,6 +136,12 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
             open_outside(&on_new, &url);
             NewWindowResponse::Deny
         })
+        // A whole page loading again (⌘R, macOS ended it, a full navigation): the cover, never a blank window.
+        .on_page_load(move |_, payload| {
+            if payload.event() == PageLoadEvent::Started {
+                crate::cover::show(&on_load, Duration::ZERO);
+            }
+        })
         .on_download(move |_, event| match event {
             DownloadEvent::Requested { destination, .. } => match downloads_path(&on_download, destination) {
                 Some(path) => {
@@ -151,7 +159,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         // Centred in the site's 40px title bar (apps/web desktop.css): `y` places the top of the buttons' row,
         // not their middle (at 20 they sat ~3pt below the bar's icons).
         .traffic_light_position(tauri::LogicalPosition::new(16.0, 17.0));
-    builder.build().map_err(|e| e.to_string())?;
+    let built = builder.build().map_err(|e| e.to_string())?;
+    crate::cover::attach(app, &built.as_ref().window()).map_err(|e| e.to_string())?;
     front(app)
 }
 
@@ -172,7 +181,7 @@ fn downloads_path(app: &AppHandle, suggested: &Path) -> Option<PathBuf> {
 }
 
 fn front(app: &AppHandle) -> Result<(), String> {
-    let window = app.get_webview_window(LABEL).ok_or("window not found")?;
+    let window = app.get_window(LABEL).ok_or("window not found")?;
     let _ = window.unminimize();
     window.show().map_err(|e| e.to_string())?;
     crate::sync_dock(app);
@@ -222,8 +231,9 @@ fn checked(request: &Value) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub async fn this_mac(app: AppHandle, window: tauri::Window, request: Value) -> Result<Value, String> {
-    if window.label() != LABEL {
+pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -> Result<Value, String> {
+    // The site itself, not the cover that shares its window.
+    if webview.label() != LABEL {
         return Err("only the main window asks this".into());
     }
     let request = checked(&request)?;

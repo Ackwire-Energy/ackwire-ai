@@ -70,6 +70,16 @@ const invoke = <T>(request: Record<string, unknown>): Promise<T> => {
   return tauri.invoke("this_mac", { request }) as Promise<T>;
 };
 
+/**
+ * The site painted its first screen: the app's cover over the window goes (apps/desktop cover.rs). Older apps
+ * don't have it; nothing happens there.
+ */
+export function pageReady() {
+  const tauri = (window as { __TAURI_INTERNALS__?: { invoke?: Invoke } }).__TAURI_INTERNALS__;
+  if (!inDesktopApp() || typeof tauri?.invoke !== "function") return;
+  void tauri.invoke("page_ready", {}).catch(() => {});
+}
+
 export const thisMac = {
   status: () => invoke<ThisMacStatus>({ kind: "status" }),
   /** The runner's code for the site to confirm; null when this Mac is already in `orgId`. */

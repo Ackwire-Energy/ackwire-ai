@@ -3,6 +3,7 @@
 //! Rust stays thin: tray, windows, the runner children, single instance, start at login, notifications,
 //! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
 
+mod cover;
 mod main_window;
 mod menus;
 mod notch;
@@ -68,8 +69,9 @@ const APP_WINDOWS: &[&str] = &["welcome", "prefs", main_window::LABEL];
 pub(crate) fn sync_dock(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
+        // By window, not web view: the main window holds two (the site and its cover).
         let open = APP_WINDOWS.iter().any(|name| {
-            app.get_webview_window(name)
+            app.get_window(name)
                 .and_then(|w| w.is_visible().ok())
                 .unwrap_or(false)
         });
@@ -141,7 +143,7 @@ fn begin_quit(app: AppHandle) {
         return;
     }
     for name in WINDOWS.iter().chain([&main_window::LABEL]) {
-        if let Some(window) = app.get_webview_window(name) {
+        if let Some(window) = app.get_window(name) {
             let _ = window.hide();
         }
     }
@@ -325,6 +327,7 @@ pub fn run() {
         .manage(PopoverClock(Mutex::new(None)))
         .manage(main_window::Bridge::default())
         .manage(menus::Zoom::default())
+        .manage(cover::Cover::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
@@ -348,7 +351,10 @@ pub fn run() {
             main_window::this_mac,
             main_window::this_mac_reply,
             menus::app_menu_set,
-            menus::context_menu
+            menus::context_menu,
+            cover::page_ready,
+            cover::cover_retry,
+            cover::cover_hide
         ])
         .on_menu_event(|app, event| menus::on_event(app, event.id().as_ref()))
         .on_window_event(|window, event| match event {
@@ -395,6 +401,9 @@ pub fn run() {
     // it loads again (the site opens from the disk cache, so it is back at once).
     #[cfg(target_os = "macos")]
     let builder = builder.on_web_content_process_terminate(|webview| {
+        if webview.label() == main_window::LABEL {
+            cover::show(webview.app_handle(), std::time::Duration::ZERO);
+        }
         let _ = webview.reload();
     });
     let app = builder
