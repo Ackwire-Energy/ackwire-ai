@@ -46,7 +46,7 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
@@ -84,7 +84,31 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
 }
 
 /** Tablet widths: the sidebar is always an icon rail (NavDrawer.tsx has the other breakpoints). */
-const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";
+export const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";
+
+/**
+ * The sidebar shrunk to its icon rail at desktop widths (remembered), shared with the Mac app's title bar,
+ * which carries the toggle there (DesktopTitleBar.tsx). In memory too, for when storage is blocked.
+ */
+const SIDEBAR_EVENT = "agentes:sidebar";
+let sidebarCollapsed = storage.get(STORAGE_KEYS.sidebarCollapsed) === "1";
+const onSidebarChange = (cb: () => void) => {
+  window.addEventListener(SIDEBAR_EVENT, cb);
+  return () => window.removeEventListener(SIDEBAR_EVENT, cb);
+};
+const toggleSidebar = () => {
+  sidebarCollapsed = !sidebarCollapsed;
+  storage.set(STORAGE_KEYS.sidebarCollapsed, sidebarCollapsed ? "1" : "0");
+  window.dispatchEvent(new Event(SIDEBAR_EVENT));
+};
+export function useSidebarCollapsed(): [boolean, () => void] {
+  const collapsed = useSyncExternalStore(
+    onSidebarChange,
+    () => sidebarCollapsed,
+    () => false,
+  );
+  return [collapsed, toggleSidebar];
+}
 
 /** The workspace sidebar (telas/Sidebar.dc.html). */
 export function Sidebar() {
@@ -142,13 +166,7 @@ export function Sidebar() {
   // Desktop: the person can shrink the sidebar to an icon rail (remembered). Tablets always get the rail.
   const compact = useMediaQuery(COMPACT_QUERY);
   const tablet = useMediaQuery(TABLET_QUERY);
-  const [collapsed, setCollapsed] = useState(() => storage.get(STORAGE_KEYS.sidebarCollapsed) === "1");
-  const toggleCollapsed = () => {
-    setCollapsed((c) => {
-      storage.set(STORAGE_KEYS.sidebarCollapsed, c ? "0" : "1");
-      return !c;
-    });
-  };
+  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const rail = !compact && (tablet || collapsed);
 
   // The active item's soft pill slides between items (one indicator, measured). Only the middle

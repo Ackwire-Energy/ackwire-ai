@@ -79,7 +79,7 @@ export const desktopEn: DesktopTranslations = {
     pauseHint: "What is already running finishes normally.",
     resume: "Resume the agents",
     addOrg: "Add organization",
-    openSite: "Open agentes.chat",
+    openSite: "Open agentes",
     prefs: "Preferences…",
     quit: "Quit agentes",
     pausedFor1h: "Paused for 1 hour",

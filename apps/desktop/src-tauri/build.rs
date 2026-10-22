@@ -20,6 +20,8 @@ const COMMANDS: &[&str] = &[
     "notch_set",
     "notch_info",
     "notch_place",
+    "this_mac",
+    "this_mac_reply",
 ];
 
 fn main() {
