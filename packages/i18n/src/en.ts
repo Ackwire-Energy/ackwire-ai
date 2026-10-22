@@ -106,6 +106,18 @@ export const en: Translations = {
       openMail: "Open {{app}}",
       backToSignIn: "Back to sign in",
     },
+    desktop: {
+      browser: "Continue in your browser",
+      browserLead:
+        "We opened your browser so you can sign in with {{provider}}. When you're done, we'll come back here on our own.",
+      reopen: "Open the browser again",
+      otherWay: "Sign in another way",
+      opening: "Opening {{provider}}…",
+      done: "All set.",
+      doneLead: "You're signed in to the agentes app. You can close this tab.",
+      expired: "This request expired.",
+      expiredLead: "Go back to the app and choose {{provider}} again.",
+    },
     reset: {
       title: "Create a new password.",
       save: "Save password",
@@ -504,6 +516,12 @@ export const en: Translations = {
       mine: "This computer or a server",
       mineDesc:
         "Uses the Claude Code you already have, no key needed. The agentes app connects outward, no open ports.",
+      thisMac: "This Mac",
+      thisMacDesc: "Agents work here, only in the folders you allow. Connects in one click.",
+      thisMacConnecting: "Connecting this Mac…",
+      thisMacConnected: "{{name}} connected. The chosen agents will work on this Mac.",
+      thisMacFolders: "Choose folders",
+      otherComputer: "Connect another computer",
       connected: "{{name}} connected · {{os}}. The chosen agents will use this computer.",
     },
     team: {
@@ -543,6 +561,8 @@ export const en: Translations = {
     skip: "Skip this step",
   },
   shell: {
+    // The Mac app's own title bar (ADR 0036).
+    titleBar: { back: "Back", forward: "Forward" },
     more: "More",
     moreGroups: { schedule: "Schedule", decisions: "Decisions" },
     moreWhat: {
@@ -6343,6 +6363,29 @@ export const en: Translations = {
     nameHelp: "How people and agents see it.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Other system" },
     commandCopied: "Command copied. Paste it in the computer's Terminal.",
+    // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
+    thisMac: {
+      text: "This Mac can work with your agents. They only use the folders you allow, and you can pause anytime.",
+      connect: "Use this Mac",
+      connected: "This Mac is connected. Choose the folders agents may use.",
+      failed: "Couldn't connect this Mac. Try again.",
+      folders: "This Mac's folders",
+      grantHere: "It's this Mac: allow folders in the app's Preferences.",
+      openFolders: "Open Folders",
+      toolsHere: "It's this Mac: turn the browser on in the app's Preferences, under Tools.",
+      openTools: "Open Tools",
+      reconnect: "Reconnect",
+      reconnecting: "Reconnecting this Mac…",
+      seeRequest: "See in the app",
+      emptyText: "No computers yet. This Mac connects in one click.",
+      offline: "This Mac is offline right now.",
+      outageTitle: "This Mac lost its connection {{ago}}",
+      toolsOff: "Off on this Mac. Turn it on in the app's Preferences, under Tools.",
+      browserTitle: "Turn the browser on on this Mac",
+      browserText: "One click in the app's Preferences, under Tools. This page notices by itself.",
+      noReport: "This Mac hasn't reported what it allows yet. Update the app.",
+      update: "Update the app",
+    },
     download: {
       title: "Connect a computer",
       text: "Download the agentes app on your Mac. It lives in the menu bar: it shows what agents do there and pauses whenever you want.",

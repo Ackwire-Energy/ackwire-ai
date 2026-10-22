@@ -15,4 +15,8 @@ export interface AuthClient {
   /** The new password for the link's token; signs out every other session. */
   resetPassword(input: { token: string; newPassword: string }): Promise<AuthResult>;
   signOut(): Promise<void>;
+  /** In the browser, after a fresh sign-in: hands it to the Mac app's window waiting on `challenge` (ADR 0036). */
+  desktopHandoff(challenge: string): Promise<AuthResult>;
+  /** In the Mac app's window: true once the browser handed a sign-in over for this verifier (sets the cookie). */
+  desktopRedeem(verifier: string): Promise<boolean>;
 }

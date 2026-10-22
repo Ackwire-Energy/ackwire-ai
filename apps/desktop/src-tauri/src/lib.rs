@@ -1,8 +1,9 @@
 //! agentes for macOS (ADR 0036): a menu bar icon, a popover and two small windows around the
-//! runners it spawns, one per organization. Rust stays thin: tray, windows, the runner children,
-//! single instance, start at login, notifications, native dialogs and self-update. Everything else lives in the
-//! runner (TypeScript) and in the web view.
+//! runners it spawns, one per organization, plus the main window with the whole site (ADR 0036, `main_window`).
+//! Rust stays thin: tray, windows, the runner children, single instance, start at login, notifications,
+//! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
 
+mod main_window;
 mod notch;
 mod runners;
 mod tray;
@@ -22,7 +23,8 @@ use tauri_plugin_updater::UpdaterExt;
 
 use runners::{RunnerInfo, Runners};
 
-/// agentes.chat: always among the sites the app opens (in the person's browser, never inside the app).
+/// agentes.chat: the site the main window loads (`main_window`). Its pages open there; the pages of the other
+/// servers the app signs in to open in the person's browser.
 const SITE: &str = "https://agentes.chat";
 const WINDOWS: &[&str] = &["popover", "welcome", "prefs"];
 
@@ -75,7 +77,7 @@ fn is_sign_in_url(url: &str) -> bool {
 
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
 /// (with the open-window dot, clickable); with all of them closed it lives in the menu bar only.
-const APP_WINDOWS: &[&str] = &["welcome", "prefs"];
+const APP_WINDOWS: &[&str] = &["welcome", "prefs", main_window::LABEL];
 
 /// Dock icon on while an app window is visible, off otherwise (macOS).
 pub(crate) fn sync_dock(app: &AppHandle) {
@@ -116,6 +118,18 @@ pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The launch argument start at login passes, so a login start stays in the menu bar.
+const AUTOSTART_ARG: &str = "--autostart";
+
+/// "Open the app": the main window, or the welcome while this Mac isn't connected to any organization.
+fn open_app(app: &AppHandle) {
+    if app.state::<Runners>().any_paired() {
+        let _ = main_window::open(app, None);
+    } else {
+        let _ = present(app, "welcome");
+    }
+}
+
 pub(crate) fn toggle_popover(app: &AppHandle) {
     let Some(window) = app.get_webview_window("popover") else { return };
     if window.is_visible().unwrap_or(false) {
@@ -141,7 +155,7 @@ fn begin_quit(app: AppHandle) {
     if runners.is_quitting() {
         return;
     }
-    for name in WINDOWS {
+    for name in WINDOWS.iter().chain([&main_window::LABEL]) {
         if let Some(window) = app.get_webview_window(name) {
             let _ = window.hide();
         }
@@ -177,9 +191,12 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn open_external(app: AppHandle, url: String) -> Result<(), String> {
+    if is_site_url(&url, &[SITE.to_string()]) {
+        let page = url.parse().map_err(|_| "not a URL")?;
+        return main_window::open(&app, Some(page));
+    }
     let mut sites: Vec<String> =
         app.state::<Runners>().servers().iter().filter_map(|s| https_origin(s)).collect();
-    sites.push(SITE.to_string());
     let chosen = app.state::<ChosenServer>().0.lock().unwrap_or_else(|p| p.into_inner()).clone();
     sites.extend(chosen);
     if !is_site_url(&url, &sites) && !is_sign_in_url(&url) {
@@ -305,12 +322,12 @@ async fn notch_place(app: AppHandle, width: f64, height: f64) -> Result<Option<n
 
 pub fn run() {
     let app = tauri::Builder::default()
-        // First: a second launch only shows the popover of the running app.
+        // First: a second launch brings the running app's window back.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            let _ = present(app, "popover");
+            open_app(app);
         }))
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -319,6 +336,7 @@ pub fn run() {
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
         .manage(ChosenServer::default())
+        .manage(main_window::Bridge::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
@@ -339,7 +357,9 @@ pub fn run() {
             update_install,
             notch_set,
             notch_info,
-            notch_place
+            notch_place,
+            main_window::this_mac,
+            main_window::this_mac_reply
         ])
         .on_window_event(|window, event| match event {
             WindowEvent::Focused(false) if window.label() == "popover" => {
@@ -361,10 +381,19 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             tray::create(app.handle())?;
             let handle = app.handle().clone();
+            // Start at login written before the flag existed: write it again, now with the flag.
+            let launcher = handle.autolaunch();
+            if launcher.is_enabled().unwrap_or(false) {
+                let _ = launcher.enable();
+            }
             let runners = app.state::<Runners>();
             runners.start_all(&handle);
+            // Started at login: the menu bar only (the welcome while nothing is paired, as before).
+            let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
             if !runners.any_paired() {
                 let _ = present(&handle, "welcome");
+            } else if !at_login {
+                let _ = main_window::open(&handle, None);
             }
             Ok(())
         })
@@ -378,12 +407,9 @@ pub fn run() {
                 begin_quit(app.clone());
             }
         }
-        // A click on the Dock icon: bring the app's window back (sign-in first, if nothing is signed in).
+        // A click on the Dock icon: bring the app's window back.
         #[cfg(target_os = "macos")]
-        RunEvent::Reopen { .. } => {
-            let name = if app.state::<Runners>().any_paired() { "prefs" } else { "welcome" };
-            let _ = present(app, name);
-        }
+        RunEvent::Reopen { .. } => open_app(app),
         _ => {}
     });
 }

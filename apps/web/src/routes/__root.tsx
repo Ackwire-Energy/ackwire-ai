@@ -1,12 +1,25 @@
 import { Button, EmptyState } from "@agenteschat/ui";
-import { createRootRouteWithContext, Link, Outlet } from "@tanstack/react-router";
+import { createRootRouteWithContext, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { RouterContext } from "@/app/router-context";
+import { DesktopDragStrip } from "@/components/DesktopTitleBar";
+import { inDesktopApp } from "@/lib/desktop";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  component: Outlet,
+  component: Root,
   notFoundComponent: NotFound,
 });
+
+function Root() {
+  // agentes for Mac: the workspace has its title bar (org.$orgId.tsx); every other page drags from the top.
+  const inWorkspace = useRouterState({ select: (s) => s.location.pathname.startsWith("/org/") });
+  return (
+    <>
+      {inDesktopApp() && !inWorkspace && <DesktopDragStrip />}
+      <Outlet />
+    </>
+  );
+}
 
 function NotFound() {
   const { t } = useTranslation();
