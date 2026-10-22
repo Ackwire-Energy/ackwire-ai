@@ -68,6 +68,7 @@ import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
 import { CommandBlock, MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { ShowRequestsButton, useIsThisMac } from "@/components/ThisMac";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
@@ -1109,6 +1110,9 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const notice = taskNoticeOf(message.meta);
+  // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (ADR 0036).
+  const asked = (message.meta as { machineAccess?: { machineId?: unknown } } | null)?.machineAccess?.machineId;
+  const here = useIsThisMac(org.id, typeof asked === "string" ? asked : "");
   if (!notice) return null;
   // A folder request (ADR 0036 §8): the server sends `path` and `computer`; the agent is the note's author.
   const author =
@@ -1135,7 +1139,8 @@ export function TaskNoticeLine({ message }: { message: Message }) {
       {blocked.length > 0 && task?.missionId && (
         <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
       )}
-      {notice.code === "machine_access_requested" && p.command && (
+      {notice.code === "machine_access_requested" && here && <ShowRequestsButton />}
+      {notice.code === "machine_access_requested" && p.command && !here && (
         <span className="mi-evt__command">
           <span className="small muted">{t("missions.notice.access_command")}</span>
           <CommandBlock command={p.command} />

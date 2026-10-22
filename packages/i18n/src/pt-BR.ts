@@ -112,6 +112,18 @@ export const ptBR = {
       openMail: "Abrir o {{app}}",
       backToSignIn: "Voltar para entrar",
     },
+    desktop: {
+      browser: "Continue no navegador",
+      browserLead:
+        "Abrimos o navegador para você entrar com {{provider}}. Quando terminar, a gente volta para cá sozinho.",
+      reopen: "Abrir o navegador de novo",
+      otherWay: "Usar outro jeito de entrar",
+      opening: "Abrindo {{provider}}…",
+      done: "Tudo certo.",
+      doneLead: "Você entrou no app agentes. Pode fechar esta aba.",
+      expired: "Esse pedido expirou.",
+      expiredLead: "Volte ao app e escolha {{provider}} de novo.",
+    },
     reset: {
       title: "Crie uma senha nova.",
       save: "Salvar senha",
@@ -512,6 +524,12 @@ export const ptBR = {
       cloudReady: "Computador na nuvem ligado. Fica pronto quando o primeiro agente precisar.",
       mine: "Este computador ou um servidor",
       mineDesc: "Usa o Claude Code que você já tem, sem chave. O app agentes conecta para fora, sem abrir porta.",
+      thisMac: "Este Mac",
+      thisMacDesc: "Os agentes trabalham aqui, só nas pastas que você liberar. Conecta com um clique.",
+      thisMacConnecting: "Conectando este Mac…",
+      thisMacConnected: "{{name}} conectado. Os agentes escolhidos vão trabalhar neste Mac.",
+      thisMacFolders: "Escolher pastas",
+      otherComputer: "Conectar outro computador",
       connected: "{{name}} conectado · {{os}}. Os agentes escolhidos vão usar este computador.",
     },
     team: {
@@ -551,6 +569,8 @@ export const ptBR = {
     skip: "Pular esta etapa",
   },
   shell: {
+    // The Mac app's own title bar (ADR 0036).
+    titleBar: { back: "Voltar", forward: "Avançar" },
     more: "Mais",
     moreGroups: { schedule: "Agenda", decisions: "Decisões" },
     moreWhat: {
@@ -6348,6 +6368,29 @@ export const ptBR = {
     nameHelp: "Como ele aparece para as pessoas e os agentes.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Outro sistema" },
     commandCopied: "Comando copiado. Cole no Terminal do computador.",
+    // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
+    thisMac: {
+      text: "Este Mac pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
+      connect: "Usar este Mac",
+      connected: "Este Mac está conectado. Escolha as pastas que os agentes podem usar.",
+      failed: "Não deu para conectar este Mac. Tente de novo.",
+      folders: "Pastas deste Mac",
+      grantHere: "É este Mac: libere pastas nas Preferências do app.",
+      openFolders: "Abrir Pastas",
+      toolsHere: "É este Mac: ligue o navegador nas Preferências do app, em Ferramentas.",
+      openTools: "Abrir Ferramentas",
+      reconnect: "Reconectar",
+      reconnecting: "Reconectando este Mac…",
+      seeRequest: "Ver no app",
+      emptyText: "Nenhum computador ainda. Este Mac conecta com um clique.",
+      offline: "Este Mac está sem conexão agora.",
+      outageTitle: "Este Mac perdeu a conexão {{ago}}",
+      toolsOff: "Desligado neste Mac. Ligue nas Preferências do app, em Ferramentas.",
+      browserTitle: "Ligue o navegador neste Mac",
+      browserText: "Um clique nas Preferências do app, em Ferramentas. A página percebe sozinha.",
+      noReport: "Este Mac ainda não informou o que libera. Atualize o app.",
+      update: "Atualizar o app",
+    },
     download: {
       title: "Conectar um computador",
       text: "Baixe o app agentes no Mac. Ele fica na barra de menus: mostra o que os agentes fazem ali e pausa quando você quiser.",

@@ -1,0 +1,93 @@
+/*
+ * agentes for Mac (ADR 0036): the site in the app's window. `html[data-desktop]` is set
+ * by main.tsx when the app loaded it. The window has no title bar of its own: its three buttons float over
+ * the top-left corner (main_window.rs puts them in the middle of these 40px).
+ */
+:root {
+  --titlebar-h: 40px;
+  /* The window's close, minimize and zoom buttons. */
+  --titlebar-lights: 78px;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--titlebar-h);
+  padding: 0 12px 0 var(--titlebar-lights);
+  background: var(--side);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.titlebar__nav {
+  display: flex;
+  gap: 2px;
+}
+/* The sidebar's ⌘K field (.sidebar__jump), centred in the bar. */
+.titlebar__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 460px;
+  min-width: 0;
+  height: 28px;
+  margin: 0 auto;
+  /* Centred on the window, not on what's left after the buttons. */
+  transform: translateX(calc((var(--titlebar-lights) + 96px) / -2));
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-radius: var(--control-r-md);
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+  font: inherit;
+  font-size: var(--control-fs-md);
+  color: var(--faint);
+  cursor: pointer;
+}
+.titlebar__search > .ac-icon {
+  width: 15px;
+  height: 15px;
+}
+.titlebar__search-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.titlebar__search .ac-kbd {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+.titlebar__search:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--muted);
+}
+.titlebar__search:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.titlebar-strip {
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--titlebar-h);
+  z-index: 50;
+}
+
+/* The workspace sits under the bar; ⌘K and the sidebar toggle live in the bar, so the sidebar's row goes. */
+html[data-desktop] .shell {
+  height: calc(100vh - var(--titlebar-h));
+  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+  height: calc(100dvh - var(--titlebar-h));
+}
+html[data-desktop] .sidebar__jump-row {
+  display: none;
+}
+/* Sign-in: the logo clears the window's buttons. */
+html[data-desktop] .auth__logo {
+  top: calc(var(--titlebar-h) + 16px);
+}

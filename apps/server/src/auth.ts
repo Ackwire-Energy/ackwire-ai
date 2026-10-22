@@ -6,6 +6,7 @@ import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { desktopSignIn } from "./desktop-sign-in";
 import type { Logger } from "./logger";
 
 /**
@@ -20,6 +21,8 @@ import type { Logger } from "./logger";
  * app (ADR 0035) signs in through the Expo plugin: its scheme
  * `agenteschat://` is trusted, it keeps the cookie in the device's secure
  * store and sends it back in a `Cookie` header with `X-Agentes-Client: mobile`.
+ * The Mac app's window loads the site itself and signs in like the web; for
+ * Google and Apple it borrows the browser (`desktop-sign-in.ts`, ADR 0036).
  */
 export function createAuth(deps: { db: Database; config: Config; log: Logger; emailDelivers?: boolean }) {
   const { db, config, log } = deps;
@@ -54,7 +57,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
     trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
-    plugins: [expo()],
+    plugins: [expo(), desktopSignIn()],
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: {
@@ -140,6 +143,9 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 15 * 60, max: 10 },
         "/request-password-reset": { window: 15 * 60, max: 3 },
+        // The app's window asks every 2 s while the browser signs in.
+        "/desktop/redeem": { window: 60, max: 40 },
+        "/desktop/handoff": { window: 60, max: 10 },
       },
     },
     advanced: {
