@@ -107,17 +107,23 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES=$(git log --no-merges --format='- %s' ${PREV:+"$PREV"..HEAD} | head -40)
           fi
+          # Only the version line changes (jq would reformat the whole file).
           for f in apps/desktop/src-tauri/tauri.conf.json apps/desktop/package.json; do
-            jq --arg v "$NEXT" '.version = $v' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            perl -0pi -e "s/\"version\": \"\Q$CURRENT\E\"/\"version\": \"$NEXT\"/" "$f"
           done
           perl -0pi -e "s/^version = \"\Q$CURRENT\E\"/version = \"$NEXT\"/m" apps/desktop/src-tauri/Cargo.toml
-          perl -0pi -e "s/(name = \"agentes-desktop\"\nversion = )\"\Q$CURRENT\E\"/\$1\"$NEXT\"/" apps/desktop/src-tauri/Cargo.lock
           git diff --stat
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "chore(desktop): $NEXT"
-          git tag -a "$TAG" -m "$NOTES"
-          git push origin HEAD:main "refs/tags/$TAG"
+          # main may move while this runs: rebase onto it and retry. Commit and tag go up
+          # together (--atomic), so a rejected push never leaves a tag outside main.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main
+            git tag -f -a "$TAG" -m "$NOTES"
+            if git push --atomic origin HEAD:main "refs/tags/$TAG"; then break; fi
+            if [ "$attempt" = 3 ]; then echo "::error::Couldn't push the version to main"; exit 1; fi
+          done
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Version
