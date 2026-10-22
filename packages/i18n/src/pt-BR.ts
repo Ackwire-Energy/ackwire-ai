@@ -407,6 +407,7 @@ export const ptBR = {
     label: "Ações",
     react: "Reagir",
     reply: "Responder",
+    copy: "Copiar",
     copyText: "Copiar texto",
     textCopied: "Texto copiado.",
     copyLink: "Copiar link",

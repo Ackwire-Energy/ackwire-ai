@@ -8,6 +8,7 @@ import {
   type MenuEntry,
   type OpenMenu,
   openContextMenu,
+  selectedTextAt,
   setMenuHost,
 } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
@@ -34,16 +35,28 @@ export function ContextMenuHost() {
   useEffect(() => {
     const onContextMenu = (e: MouseEvent) => {
       if (e.defaultPrevented || keepsSystemMenu(e.target)) return;
+      const selected = selectedTextAt(e.target);
       const link = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
-      const entries: MenuEntry[] = link ? linkEntries(link) : pageEntries();
+      const entries: MenuEntry[] = selected ? selectionEntries(selected) : link ? linkEntries(link) : pageEntries();
       e.preventDefault();
       openContextMenu(e.clientX, e.clientY, entries);
     };
+    const selectionEntries = (text: string): MenuEntry[] => [
+      {
+        kind: "item",
+        id: "copy",
+        label: t("contextMenu.copy"),
+        icon: "copy",
+        run: () => void copyText(text, () => toast.show(t("contextMenu.textCopied"))),
+      },
+    ];
     const linkEntries = (link: HTMLAnchorElement): MenuEntry[] => {
       const url = new URL(link.href, window.location.href);
       const here = url.origin === window.location.origin;
+      // What the link says on screen ("Wiki", a page's title); a site elsewhere by its name. Never a path or id.
+      const name = here ? linkName(link) : url.host.replace(/^www\./, "");
       return [
-        { kind: "header", label: here ? url.pathname : url.host },
+        ...(name ? [{ kind: "header", label: name } satisfies MenuEntry] : []),
         here
           ? { kind: "item", id: "open", label: t("contextMenu.open"), icon: "arrowRight", run: () => link.click() }
           : {
@@ -109,6 +122,12 @@ export function ContextMenuHost() {
       })}
     </MenuAt>
   );
+}
+
+/** A link's name as people see it (its label or text), short; empty when it has none. */
+function linkName(link: HTMLAnchorElement): string {
+  const name = (link.getAttribute("aria-label") || link.textContent || link.title || "").replace(/\s+/g, " ").trim();
+  return name.length > 48 ? `${name.slice(0, 47)}…` : name;
 }
 
 /** The site's own keys for menu bar items: when both fire, the menu's echo is dropped. */

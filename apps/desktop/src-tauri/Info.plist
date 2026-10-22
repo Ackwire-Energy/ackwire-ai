@@ -5,5 +5,16 @@
   <!-- A menu bar app: no Dock icon and no app menu, even before the Rust side sets the activation policy. -->
   <key>LSUIElement</key>
   <true/>
+  <!-- The app is in Portuguese and English: the system's own menus (text fields, sharing, dialogs) follow
+       the Mac's language instead of staying in English. -->
+  <key>CFBundleDevelopmentRegion</key>
+  <string>pt-BR</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>pt-BR</string>
+    <string>en</string>
+  </array>
+  <key>CFBundleAllowMixedLocalizations</key>
+  <true/>
 </dict>
 </plist>

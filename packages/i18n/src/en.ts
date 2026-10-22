@@ -399,6 +399,7 @@ export const en: Translations = {
     label: "Actions",
     react: "React",
     reply: "Reply",
+    copy: "Copy",
     copyText: "Copy text",
     textCopied: "Text copied.",
     copyLink: "Copy link",

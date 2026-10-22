@@ -309,7 +309,7 @@ fn migrate_login_item(app: &AppHandle) {
 }
 
 pub fn run() {
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // First: a second launch brings the running app's window back.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             open_app(app);
@@ -390,7 +390,14 @@ pub fn run() {
                 let _ = main_window::open(&handle, None);
             }
             Ok(())
-        })
+        });
+    // After long in the background macOS may end a window's page to free memory, which leaves it blank:
+    // it loads again (the site opens from the disk cache, so it is back at once).
+    #[cfg(target_os = "macos")]
+    let builder = builder.on_web_content_process_terminate(|webview| {
+        let _ = webview.reload();
+    });
+    let app = builder
         .build(tauri::generate_context!())
         .expect("error while building agentes.chat");
 

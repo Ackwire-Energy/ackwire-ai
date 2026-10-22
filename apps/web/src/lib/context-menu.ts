@@ -71,14 +71,20 @@ export function toSystem(entries: MenuEntry[]): { items: SystemItem[]; runs: Map
   return { items, runs };
 }
 
-/** Where the system's menu keeps its place: typing (spelling, paste) and selected text (Look Up, Translate). */
+/** Where the system's menu keeps its place: typing (spelling, paste). */
 export function keepsSystemMenu(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false;
-  if (target.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return true;
-  const selection = window.getSelection();
-  return Boolean(
-    selection && !selection.isCollapsed && selection.toString().trim() && selection.containsNode(target, true),
+  return (
+    target instanceof Element &&
+    Boolean(target.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']"))
   );
+}
+
+/** The text selected where the right click landed (empty when the click was elsewhere). */
+export function selectedTextAt(target: EventTarget | null): string {
+  if (!(target instanceof Node)) return "";
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !selection.containsNode(target, true)) return "";
+  return selection.toString().trim();
 }
 
 export interface OpenMenu {
@@ -133,10 +139,10 @@ export const contextMenusOn = () => inDesktopApp() && show !== null;
  * `onContextMenu` for something with its own menu (a message, a channel): the innermost one wins, and
  * typing or selected text keep the system's menu.
  */
-export function contextMenuHandler(build: () => MenuEntry[]) {
+export function contextMenuHandler(build: (e: MouseEvent) => MenuEntry[]) {
   return (e: MouseEvent) => {
     if (e.defaultPrevented || !contextMenusOn() || keepsSystemMenu(e.target)) return;
-    const entries = build();
+    const entries = build(e);
     if (!entries.length) return;
     e.preventDefault();
     openContextMenu(e.clientX, e.clientY, entries);

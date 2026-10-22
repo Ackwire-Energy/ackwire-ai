@@ -225,6 +225,13 @@ jobs:
           codesign --verify --strict --verbose=2 "$APP/Contents/MacOS/agent-browser"
           "$APP/Contents/MacOS/agent-browser" --version
           test -s "$APP/Contents/Resources/licenses/agent-browser/LICENSE"
+          # Apple may take a moment to hand out the ticket after accepting the notarization, and the build's
+          # own stapling then gives up quietly (0.5.4): staple again for a few minutes before checking. The
+          # .dmg and the update keep the app as built; without a ticket, the Mac checks it online.
+          for attempt in 1 2 3 4 5 6; do
+            if xcrun stapler validate "$APP" > /dev/null 2>&1; then break; fi
+            xcrun stapler staple "$APP" || sleep 30
+          done
           xcrun stapler validate "$APP"
           spctl --assess --type execute --verbose=4 "$APP"
 
