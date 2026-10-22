@@ -110,6 +110,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         .inner_size(1240.0, 800.0)
         .min_inner_size(960.0, 600.0)
         .center()
+        // Two web views share the window (the site and the cover): each follows its size.
+        .auto_resize()
         .background_color(backdrop(theme))
         // Hidden, the page keeps running slowly instead of being suspended (macOS 14+): coming back to the app
         // finds it as it was.
