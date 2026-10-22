@@ -12,8 +12,10 @@ use std::sync::{mpsc, Mutex};
 use std::time::Duration;
 
 use serde_json::{json, Value};
+use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::webview::{DownloadEvent, NewWindowResponse};
-use tauri::{AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::window::Color;
+use tauri::{AppHandle, Emitter, Manager, Theme, Url, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 pub const LABEL: &str = "main";
@@ -71,6 +73,15 @@ fn open_outside(app: &AppHandle, url: &Url) {
     let _ = app.opener().open_url(url.as_str(), None::<&str>);
 }
 
+/// What the window shows before the site paints: the site's own background (packages/ui tokens.css `--side`),
+/// never the web view's white. Follows the system's light/dark (lib.rs updates it on `ThemeChanged`).
+pub fn backdrop(theme: Theme) -> Color {
+    match theme {
+        Theme::Dark => Color(10, 10, 9, 255),
+        _ => Color(248, 248, 246, 255),
+    }
+}
+
 /// Shows the window (made on first use), on `url` when given (a page of the site).
 pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let site = site();
@@ -87,11 +98,20 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let on_download = app.clone();
     let nav_site = site.clone();
     let version = app.package_info().version.to_string();
+    // The popover is made at start, so it already knows the system's appearance.
+    let theme = app
+        .get_webview_window("popover")
+        .and_then(|w| w.theme().ok())
+        .unwrap_or(Theme::Light);
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(url.unwrap_or_else(|| site.clone())))
         .title("agentes")
         .inner_size(1240.0, 800.0)
         .min_inner_size(960.0, 600.0)
         .center()
+        .background_color(backdrop(theme))
+        // Hidden, the page keeps running slowly instead of being suspended (macOS 14+): coming back to the app
+        // finds it as it was.
+        .background_throttling(BackgroundThrottlingPolicy::Throttle)
         // The site knows it is in the app (its own title bar, sign-in through the browser); nothing else.
         .initialization_script(format!("window.__agentesDesktop = Object.freeze({{ version: {version:?} }});"))
         .on_navigation(move |url| match route(url, &nav_site) {

@@ -345,6 +345,9 @@ pub fn run() {
                 let _ = window.hide();
                 sync_dock(window.app_handle());
             }
+            WindowEvent::ThemeChanged(theme) if window.label() == main_window::LABEL => {
+                let _ = window.set_background_color(Some(main_window::backdrop(*theme)));
+            }
             _ => {}
         })
         .setup(|app| {
