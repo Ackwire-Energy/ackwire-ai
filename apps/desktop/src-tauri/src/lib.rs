@@ -121,10 +121,18 @@ pub(crate) fn present(app: &AppHandle, name: &str) -> Result<(), String> {
 /// The launch argument start at login passes, so a login start stays in the menu bar.
 const AUTOSTART_ARG: &str = "--autostart";
 
-/// "Open the app": the main window, or the welcome while this Mac isn't connected to any organization.
+/// Whether an organization here signs in to agentes.chat, the only site the main window loads.
+fn paired_to_site(app: &AppHandle) -> bool {
+    app.state::<Runners>().paired_servers().iter().any(|s| https_origin(s).as_deref() == Some(SITE))
+}
+
+/// "Open the app": the main window while an organization here is on agentes.chat, Preferences while they all
+/// are on their own servers, the welcome while this Mac isn't connected to any organization.
 fn open_app(app: &AppHandle) {
-    if app.state::<Runners>().any_paired() {
+    if paired_to_site(app) {
         let _ = main_window::open(app, None);
+    } else if app.state::<Runners>().any_paired() {
+        let _ = present(app, "prefs");
     } else {
         let _ = present(app, "welcome");
     }
@@ -388,11 +396,12 @@ pub fn run() {
             }
             let runners = app.state::<Runners>();
             runners.start_all(&handle);
-            // Started at login: the menu bar only (the welcome while nothing is paired, as before).
+            // Started at login: the menu bar only (the welcome while nothing is paired, as before). Opened by
+            // hand: the main window, but only for an organization on agentes.chat, the one site it loads.
             let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
             if !runners.any_paired() {
                 let _ = present(&handle, "welcome");
-            } else if !at_login {
+            } else if !at_login && paired_to_site(&handle) {
                 let _ = main_window::open(&handle, None);
             }
             Ok(())
