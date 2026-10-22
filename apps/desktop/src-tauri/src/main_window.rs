@@ -104,7 +104,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         .and_then(|w| w.theme().ok())
         .unwrap_or(Theme::Light);
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(url.unwrap_or_else(|| site.clone())))
-        .title("agentes")
+        .title("agentes.chat")
         .inner_size(1240.0, 800.0)
         .min_inner_size(960.0, 600.0)
         .center()

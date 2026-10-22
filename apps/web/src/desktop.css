@@ -91,3 +91,23 @@ html[data-desktop] .sidebar__jump-row {
 html[data-desktop] .auth__logo {
   top: calc(var(--titlebar-h) + 16px);
 }
+
+/*
+ * An app, not a page (telas/MenusDesktop.html): the interface's own words don't select (messages, pages and
+ * fields still do), buttons keep the Mac's arrow (links keep the hand), nothing of the interface drags out
+ * as a picture of the page, and scrolling past the end doesn't bounce the whole window.
+ */
+html[data-desktop],
+html[data-desktop] body {
+  overscroll-behavior: none;
+}
+html[data-desktop] :is(.sidebar, .titlebar, nav, button, [role="button"], [role="tab"], [role="menuitem"], label) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+html[data-desktop] :is(button, [role="button"], [role="tab"], [role="menuitem"], summary) {
+  cursor: default;
+}
+html[data-desktop] :is(.sidebar img, .sidebar a, .titlebar, svg, button) {
+  -webkit-user-drag: none;
+}

@@ -135,6 +135,25 @@ export function Popover() {
     [host, store],
   );
 
+  // The Mac's menu bar in the app's language (menus.rs); the choices the popover owns come back here.
+  useEffect(() => {
+    void host.setAppMenu(t("desktop.menu", { returnObjects: true }) as Record<string, string>).catch(() => {});
+  }, [host, t]);
+  useEffect(
+    () =>
+      host.onMenuAction((action) => {
+        if (action === "updates" || action === "thisMac") {
+          if (action === "updates") writePref("prefsTab", "updates");
+          void host.showWindow("prefs").catch(() => {});
+        } else {
+          // Quitting asks first here, as ⌘Q in the popover does.
+          if (action === "quit") setConfirmQuit(true);
+          void host.showWindow("popover").catch(() => {});
+        }
+      }),
+    [host],
+  );
+
   const openSite = () => {
     void host.openExternal(SITE_URL).catch(() => {});
     void host.hideWindow("popover").catch(() => {});

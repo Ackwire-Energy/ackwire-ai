@@ -1126,6 +1126,31 @@ textarea.ac-input {
   /* A dropdown shows all its actions; it scrolls only when the screen is short. */
   max-height: min(520px, var(--radix-dropdown-menu-content-available-height, 520px));
 }
+/* The right click (MenuAt): at the pointer at once, like the system's menus. */
+.ac-menu.ac-menu--at[data-state="open"] {
+  animation: none;
+}
+.ac-menu__reactions {
+  display: flex;
+  gap: 2px;
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--line);
+}
+.ac-menu__reaction {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.ac-menu__reaction[data-highlighted] {
+  background: var(--surface-sunken);
+}
 .ac-menu__note {
   margin: 0;
   max-width: 260px;

@@ -4,6 +4,7 @@
 //! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
 
 mod main_window;
+mod menus;
 mod notch;
 mod runners;
 mod tray;
@@ -293,6 +294,20 @@ async fn notch_place(app: AppHandle, width: f64, height: f64) -> Result<Option<n
     notch::place(&app, width, height)
 }
 
+/// The app was "agentes" before it became "agentes.chat", and the login item is named after the app: the old
+/// one goes and, if it was on, the new one takes its place.
+fn migrate_login_item(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    if let Ok(home) = app.path().home_dir() {
+        let old = home.join("Library/LaunchAgents/agentes.plist");
+        if old.exists() && std::fs::remove_file(&old).is_ok() {
+            let _ = app.autolaunch().enable();
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 pub fn run() {
     let app = tauri::Builder::default()
         // First: a second launch brings the running app's window back.
@@ -309,6 +324,7 @@ pub fn run() {
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
         .manage(main_window::Bridge::default())
+        .manage(menus::Zoom::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
@@ -330,8 +346,11 @@ pub fn run() {
             notch_info,
             notch_place,
             main_window::this_mac,
-            main_window::this_mac_reply
+            main_window::this_mac_reply,
+            menus::app_menu_set,
+            menus::context_menu
         ])
+        .on_menu_event(|app, event| menus::on_event(app, event.id().as_ref()))
         .on_window_event(|window, event| match event {
             WindowEvent::Focused(false) if window.label() == "popover" => {
                 let _ = window.hide();
@@ -355,6 +374,7 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             tray::create(app.handle())?;
             let handle = app.handle().clone();
+            migrate_login_item(&handle);
             // Start at login written before the flag existed: write it again, now with the flag.
             let launcher = handle.autolaunch();
             if launcher.is_enabled().unwrap_or(false) {
@@ -372,7 +392,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building agentes");
+        .expect("error while building agentes.chat");
 
     app.run(|app, event| match event {
         RunEvent::ExitRequested { api, .. } => {

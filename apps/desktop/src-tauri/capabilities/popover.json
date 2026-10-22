@@ -16,6 +16,7 @@
     "allow-app-info",
     "allow-notch-set",
     "allow-notify",
-    "allow-this-mac-reply"
+    "allow-this-mac-reply",
+    "allow-app-menu-set"
   ]
 }

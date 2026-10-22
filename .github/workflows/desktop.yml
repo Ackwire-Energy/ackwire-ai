@@ -195,6 +195,12 @@ jobs:
           bun scripts/icons.ts
           bun run tauri icon app-icon.png
 
+      # The cached target may keep an older build's .app, .dmg and updater bundle (another name, another
+      # version): the steps below pick the first one they find, so only this build's may be there.
+      - name: Clear older bundles
+        shell: bash
+        run: rm -rf apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle
+
       - name: Build the app (universal, signed, notarized)
         uses: tauri-apps/tauri-action@v0
         env:

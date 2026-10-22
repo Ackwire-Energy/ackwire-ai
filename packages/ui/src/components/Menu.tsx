@@ -1,5 +1,5 @@
 import { DropdownMenu } from "radix-ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 
@@ -139,4 +139,83 @@ export function MenuHeading({ children }: { children: ReactNode }) {
 
 export function MenuSeparator() {
   return <DropdownMenu.Separator className="ac-menu__separator" />;
+}
+
+/**
+ * A menu at a point: the right click of the desktop app. The same items as `Menu`, open at once under the
+ * pointer (no grow-in), flipped at the window's edges, closed by Esc, a click outside, scrolling the page or
+ * leaving the window. Give it a new `key` for each opening so it is placed again.
+ */
+export function MenuAt({
+  at,
+  onClose,
+  label,
+  children,
+}: {
+  at: { x: number; y: number };
+  onClose: () => void;
+  label?: string;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    const close = () => onClose();
+    const onScroll = (e: Event) => {
+      // Scrolling a long menu itself keeps it open.
+      if (e.target instanceof Element && e.target.closest(".ac-menu--at")) return;
+      onClose();
+    };
+    window.addEventListener("blur", close);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("blur", close);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [onClose]);
+  return (
+    <DropdownMenu.Root open onOpenChange={(open) => !open && onClose()} modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <span
+          aria-hidden="true"
+          style={{ position: "fixed", left: at.x, top: at.y, width: 0, height: 0, pointerEvents: "none" }}
+        />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          className="ac-menu ac-menu--dropdown ac-menu--at"
+          align="start"
+          side="bottom"
+          sideOffset={2}
+          collisionPadding={8}
+          aria-label={label}
+          // The page keeps its focus (the composer, the selection), as with the system's menus.
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {children}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
+/** A row of quick reactions at the top of a menu (a message's right click). */
+export function MenuReactions({
+  emojis,
+  onPick,
+  label,
+}: {
+  emojis: readonly string[];
+  onPick: (emoji: string) => void;
+  label: string;
+}) {
+  return (
+    <DropdownMenu.Group className="ac-menu__reactions" aria-label={label}>
+      {emojis.map((emoji) => (
+        <DropdownMenu.Item key={emoji} className="ac-menu__reaction" onSelect={() => onPick(emoji)}>
+          {emoji}
+        </DropdownMenu.Item>
+      ))}
+    </DropdownMenu.Group>
+  );
 }

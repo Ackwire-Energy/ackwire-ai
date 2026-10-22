@@ -182,7 +182,7 @@ import { WaitingCard } from "@/components/MachineOutages";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
-import { MessageMoreMenu, PersonMessageActions, ReplyButton } from "@/components/MessageMore";
+import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
@@ -2851,6 +2851,7 @@ export const TimelineMessage = memo(function TimelineMessage({
     forumSuggestion ||
     issueWork;
   const feedback = m.author.type === "agent" && !card && !m.local && !live;
+  const menu = useMessageMenu(m, channelName ?? "", { feedback });
   // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
   const keptAll = seenLive?.work?.length ? seenLive.work : null;
   const keptWork =
@@ -2877,6 +2878,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       className={cx(local && `ac-msg--local ac-msg--${local}`, contextMark && "msg--context")}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
+      onContextMenu={live ? undefined : menu.onContextMenu}
       avatar={
         routine ? (
           <span
@@ -3167,6 +3169,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           {m.author.type === "person" && !m.local && (
             <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
           )}
+          {menu.dialog}
         </>
       )}
     </Message>
