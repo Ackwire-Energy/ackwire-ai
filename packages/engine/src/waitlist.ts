@@ -1,7 +1,9 @@
-import { and, type Database, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { EmailError, type EmailSender } from "@agenteschat/adapters";
+import { and, type Database, type Executor, eq, isNotNull, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { randomToken, sha256 } from "./crypto";
 import { queueEmail } from "./email";
 import { ValidationError } from "./errors";
+import { enqueue, PermanentJobError } from "./outbox";
 
 const { waitlistEntries } = schema;
 
@@ -98,9 +100,62 @@ export async function confirmWaitlist(db: Database, token: string, now = new Dat
   if (!entry) return false;
   if (entry.confirmedAt) return true;
   if (!entry.confirmSentAt || now.getTime() - entry.confirmSentAt.getTime() > WAITLIST_LINK_TTL_MS) return false;
-  await db
-    .update(waitlistEntries)
-    .set({ confirmedAt: now })
-    .where(and(eq(waitlistEntries.id, entry.id), isNull(waitlistEntries.confirmedAt)));
+  await db.transaction(async (tx) => {
+    const [confirmed] = await tx
+      .update(waitlistEntries)
+      .set({ confirmedAt: now })
+      .where(and(eq(waitlistEntries.id, entry.id), isNull(waitlistEntries.confirmedAt)))
+      .returning({ id: waitlistEntries.id });
+    if (confirmed) await enqueueWaitlistContact(tx, confirmed.id);
+  });
   return true;
+}
+
+/** Job `waitlist.contact`: a confirmed address goes to the email provider's contacts (once per entry). */
+function enqueueWaitlistContact(db: Executor, entryId: string) {
+  return enqueue(db, {
+    orgId: null,
+    kind: "waitlist.contact",
+    payload: { entryId },
+    dedupeKey: `waitlist.contact:${entryId}`,
+  });
+}
+
+/**
+ * Queues `waitlist.contact` for every confirmed entry (run at boot: catches
+ * up entries confirmed before contacts were synced; the dedupe key makes it
+ * a no-op for the rest). Returns how many entries were looked at.
+ */
+export async function enqueueWaitlistContacts(db: Database): Promise<number> {
+  const rows = await db
+    .select({ id: waitlistEntries.id })
+    .from(waitlistEntries)
+    .where(isNotNull(waitlistEntries.confirmedAt));
+  for (const row of rows) await enqueueWaitlistContact(db, row.id);
+  return rows.length;
+}
+
+/**
+ * Saves a confirmed entry as a contact in the email provider (MillionSend),
+ * with `waitlist`, `locale`, `source` and `waitlist_confirmed_at` properties
+ * so the list can be segmented there. A provider without contacts: nothing.
+ */
+export async function saveWaitlistContact(db: Database, email: EmailSender, entryId: string): Promise<void> {
+  if (!email.saveContact) return;
+  const [entry] = await db.select().from(waitlistEntries).where(eq(waitlistEntries.id, entryId));
+  if (!entry?.confirmedAt) return;
+  try {
+    await email.saveContact({
+      email: entry.email,
+      properties: {
+        waitlist: "confirmed",
+        locale: entry.locale,
+        source: entry.source,
+        waitlist_confirmed_at: entry.confirmedAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    if (error instanceof EmailError && !error.retryable) throw new PermanentJobError(error.message);
+    throw error;
+  }
 }

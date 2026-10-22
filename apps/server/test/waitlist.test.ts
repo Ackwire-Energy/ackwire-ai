@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
-import { joinWaitlist, WAITLIST_MAX_SENDS } from "@agenteschat/engine";
+import { enqueueWaitlistContacts, joinWaitlist, WAITLIST_MAX_SENDS } from "@agenteschat/engine";
 import { browser, createTestServer, ORIGIN, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -59,6 +59,31 @@ test("joining emails a confirmation link (through the outbox, in their language)
   await anon("/api/waitlist", { json: { email: "ana@acme.com" } });
   await t.drain();
   expect(t.email.sent.length).toBe(1);
+  // Confirmed: saved once as a MillionSend contact, with properties to segment by.
+  expect(t.email.contacts).toEqual([
+    {
+      email: "ana@acme.com",
+      properties: {
+        waitlist: "confirmed",
+        locale: "en",
+        source: "landing",
+        waitlist_confirmed_at: row?.confirmedAt?.toISOString() ?? "",
+      },
+    },
+  ]);
+  await enqueueWaitlistContacts(t.db);
+  await t.drain();
+  expect(t.email.contacts.length).toBe(1);
+});
+
+test("entries confirmed earlier are caught up as contacts; unconfirmed ones never are", async () => {
+  await t.db.insert(schema.waitlistEntries).values([
+    { email: "old@acme.com", confirmedAt: new Date("2026-10-01T12:00:00Z") },
+    { email: "pending@acme.com" },
+  ]);
+  expect(await enqueueWaitlistContacts(t.db)).toBe(1);
+  await t.drain();
+  expect(t.email.contacts.map((c) => [c.email, c.properties.locale])).toEqual([["old@acme.com", "pt-BR"]]);
 });
 
 test("no locale means pt-BR, and the email is in Portuguese", async () => {

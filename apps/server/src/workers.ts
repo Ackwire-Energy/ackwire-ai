@@ -7,6 +7,7 @@ import {
   createOutboxPump,
   enqueue,
   enqueueIdleReflections,
+  enqueueWaitlistContacts,
   expireApprovals,
   expireBrowserHandoffs,
   expireConsultations,
@@ -227,6 +228,11 @@ export function startWorkers(deps: WorkerDeps) {
       }
     });
   }
+
+  // Confirmed waiting list entries from before contacts were synced (no-op for the rest: dedupe key).
+  void enqueueWaitlistContacts(db).catch((error) =>
+    log.error("background job failed", { job: "waitlistContacts", error: String(error) }),
+  );
 
   const offWake = deps.pubsub.subscribe(WAKE_TOPIC, () => void ticks.get("outbox")?.());
   // A person canceled a run: the instance executing it aborts it.
