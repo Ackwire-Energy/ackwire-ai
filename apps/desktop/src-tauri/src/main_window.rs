@@ -74,7 +74,7 @@ fn open_outside(app: &AppHandle, url: &Url) {
 }
 
 /// What the window shows before the site paints: the site's own background (packages/ui tokens.css `--side`),
-/// never the web view's white. Follows the Mac's light/dark (lib.rs updates it on `ThemeChanged`).
+/// never the web view's white. Follows the system's light/dark (lib.rs updates it on `ThemeChanged`).
 pub fn backdrop(theme: Theme) -> Color {
     match theme {
         Theme::Dark => Color(10, 10, 9, 255),
@@ -98,7 +98,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let on_download = app.clone();
     let nav_site = site.clone();
     let version = app.package_info().version.to_string();
-    // The popover is made at start, so it already knows the Mac's appearance.
+    // The popover is made at start, so it already knows the system's appearance.
     let theme = app
         .get_webview_window("popover")
         .and_then(|w| w.theme().ok())
