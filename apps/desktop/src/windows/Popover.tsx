@@ -116,7 +116,7 @@ export function Popover() {
     return () => ro.disconnect();
   }, [host, confirmQuit]);
 
-  // The site in the main window asking this Mac (D79): the popover owns the runners, so it answers.
+  // The site in the main window asking this Mac (ADR 0036): the popover owns the runners, so it answers.
   useEffect(
     () =>
       host.onThisMac((id, request) => {

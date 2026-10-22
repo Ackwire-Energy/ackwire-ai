@@ -1110,7 +1110,7 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const notice = taskNoticeOf(message.meta);
-  // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (D79).
+  // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (ADR 0036).
   const asked = (message.meta as { machineAccess?: { machineId?: unknown } } | null)?.machineAccess?.machineId;
   const here = useIsThisMac(org.id, typeof asked === "string" ? asked : "");
   if (!notice) return null;

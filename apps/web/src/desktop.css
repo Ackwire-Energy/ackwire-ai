@@ -1,5 +1,5 @@
 /*
- * agentes for Mac (D79, telas/AppDesktop.html B): the site in the app's window. `html[data-desktop]` is set
+ * agentes for Mac (ADR 0036): the site in the app's window. `html[data-desktop]` is set
  * by main.tsx when the app loaded it. The window has no title bar of its own: its three buttons float over
  * the top-left corner (main_window.rs puts them in the middle of these 40px).
  */

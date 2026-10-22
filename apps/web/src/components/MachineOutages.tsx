@@ -100,7 +100,7 @@ function OutageNotice({
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
-  // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (D79).
+  // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (ADR 0036).
   const here = useIsThisMac(org.id, o.machineId);
   // "há 12 min" moves on by itself.
   const [now, setNow] = useState(() => Date.now());

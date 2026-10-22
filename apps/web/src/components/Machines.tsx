@@ -138,7 +138,7 @@ export function CommandBlock({ command }: { command: string }) {
 
 /**
  * "Baixar o app para Mac" from the latest build, small; nothing while there is none (the connect card says so).
- * In the app itself: "Usar este Mac" instead (D79).
+ * In the app itself: "Usar este Mac" instead (ADR 0036).
  */
 export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
   const { t } = useTranslation();
@@ -162,7 +162,7 @@ export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
  * the latest release (version, size, SHA-256), the first-run steps (the app
  * is signed and notarized), and the terminal installer for servers and Linux. The
  * computer shows a code and the person confirms it on `/conectar`. In the app
- * itself (D79): "Usar este Mac" in one click instead of the download, unless
+ * itself (ADR 0036): "Usar este Mac" in one click instead of the download, unless
  * `download` (connecting another computer from the app).
  */
 export function ConnectComputer({ orgId, download = false }: { orgId: string; download?: boolean }) {
@@ -607,7 +607,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
   const nameOf = (id: string) =>
     agents.data?.find((a) => a.id === id)?.name ?? m.agents.find((a) => a.id === id)?.name ?? "";
   const access = m.access;
-  // This very Mac with an app too old to report: update it from here (agentes for Mac, D79).
+  // This very Mac with an app too old to report: update it from here (agentes for Mac, ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   return (
     <Card aria-labelledby="sec-machine-folders">
@@ -747,7 +747,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
 function GrantCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  // In the app, on this very Mac: straight to Preferences → Pastas (D79).
+  // In the app, on this very Mac: straight to Preferences → Pastas (ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   const path = t("machines.access.pathPlaceholder");
   const agent = t("machines.access.agentPlaceholder");

@@ -1,5 +1,5 @@
 //! agentes for macOS (ADR 0036): a menu bar icon, a popover and two small windows around the
-//! runners it spawns, one per organization, plus the main window with the whole site (D79, `main_window`).
+//! runners it spawns, one per organization, plus the main window with the whole site (ADR 0036, `main_window`).
 //! Rust stays thin: tray, windows, the runner children, single instance, start at login, notifications,
 //! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
 

@@ -6,7 +6,7 @@ import { browser, createTestServer, signUp, type TestServer } from "./harness";
 
 /**
  * The Mac app's window signs in with Google or Apple through the browser
- * (D79): the browser hands its fresh sign-in over for a challenge, the window
+ * (ADR 0036): the browser hands its fresh sign-in over for a challenge, the window
  * redeems it with the verifier and gets a session of its own.
  */
 

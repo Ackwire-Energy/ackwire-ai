@@ -561,7 +561,7 @@ export const en: Translations = {
     skip: "Skip this step",
   },
   shell: {
-    // The Mac app's own title bar (D79).
+    // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
     more: "More",
     moreGroups: { schedule: "Schedule", decisions: "Decisions" },
@@ -6352,7 +6352,7 @@ export const en: Translations = {
     nameHelp: "How people and agents see it.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Other system" },
     commandCopied: "Command copied. Paste it in the computer's Terminal.",
-    // agentes for Mac (D79): this Mac, from the site inside the app.
+    // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
       text: "This Mac can work with your agents. They only use the folders you allow, and you can pause anytime.",
       connect: "Use this Mac",

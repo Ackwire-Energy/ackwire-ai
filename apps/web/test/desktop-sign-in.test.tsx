@@ -10,7 +10,7 @@ import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * agentes for Mac (D79): in the app's window, Google/GitHub/Apple sign in
+ * agentes for Mac (ADR 0036): in the app's window, Google/GitHub/Apple sign in
  * through the browser; the browser page hands the fresh sign-in back.
  */
 

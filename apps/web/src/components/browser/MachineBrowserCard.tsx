@@ -40,7 +40,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   const toast = useToast();
   const actions = useBrowserHandoffMutations(org.id);
   const [confirming, setConfirming] = useState<string | null>(null);
-  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (D79).
+  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   const [seeing, setSeeing] = useState<string | null>(null);
   const agentIds = m.agents.map((a) => a.id);

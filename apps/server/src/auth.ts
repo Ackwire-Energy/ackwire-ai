@@ -22,7 +22,7 @@ import type { Logger } from "./logger";
  * `agenteschat://` is trusted, it keeps the cookie in the device's secure
  * store and sends it back in a `Cookie` header with `X-Agentes-Client: mobile`.
  * The Mac app's window loads the site itself and signs in like the web; for
- * Google and Apple it borrows the browser (`desktop-sign-in.ts`, D79).
+ * Google and Apple it borrows the browser (`desktop-sign-in.ts`, ADR 0036).
  */
 export function createAuth(deps: { db: Database; config: Config; log: Logger; emailDelivers?: boolean }) {
   const { db, config, log } = deps;

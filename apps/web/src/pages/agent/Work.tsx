@@ -224,7 +224,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   );
 }
 
-/** In agentes for Mac, when the offline computer is this very Mac: "Reconectar" right there (D79). */
+/** In agentes for Mac, when the offline computer is this very Mac: "Reconectar" right there (ADR 0036). */
 function ThisMacReconnect({ machineId }: { machineId: string }) {
   const { org } = useOrg();
   const here = useIsThisMac(org.id, machineId);
@@ -237,7 +237,7 @@ function ThisMacReconnect({ machineId }: { machineId: string }) {
 
 /**
  * The three clicks on the computer that turn its browser on, drawn small; the page notices by itself.
- * In agentes for Mac on this very Mac: one button to Preferences → Ferramentas instead (D79).
+ * In agentes for Mac on this very Mac: one button to Preferences → Ferramentas instead (ADR 0036).
  */
 export function BrowserSteps({ computer, machineId }: { computer: string; machineId?: string }) {
   const { t } = useTranslation();
@@ -478,7 +478,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const offId = useId();
-  // A brain switched off in this very Mac's Ferramentas (agentes for Mac): one click to turn it on (D79).
+  // A brain switched off in this very Mac's Ferramentas (agentes for Mac): one click to turn it on (ADR 0036).
   const toolOffHere =
     useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
   const machines = view.machines;
@@ -1095,7 +1095,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const pickable = usePickable();
   const setTarget = useSetComputerTarget(org.id);
   const [choice, setChoice] = useState(work.machineId);
-  // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (D79).
+  // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (ADR 0036).
   const thisMac = useThisMac(org.id);
   const thisMacFree = inDesktopApp() && canDo(org.role, "post") && thisMac.isSuccess && !thisMac.data;
   const [busy, setBusy] = useState(false);

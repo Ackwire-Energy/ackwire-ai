@@ -9,7 +9,7 @@ import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * agentes for Mac (D79): the site in the app's window connects this Mac in one
+ * agentes for Mac (ADR 0036): the site in the app's window connects this Mac in one
  * click (the app hands over the runner's code, the site confirms it) and opens
  * the app's Preferences for what is granted on the Mac itself.
  */

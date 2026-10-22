@@ -7,7 +7,7 @@ import { inDesktopApp, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /**
- * This Mac, in agentes for Mac (D79, telas/AppDesktop.html "Este Mac"): the
+ * This Mac, in agentes for Mac (ADR 0036): the
  * site knows which organizations the Mac it runs on is connected to, connects
  * it in one click (no code to read: the app hands the runner's code to the
  * site, which confirms it with the person's session) and opens the app's

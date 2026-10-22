@@ -569,7 +569,7 @@ export const ptBR = {
     skip: "Pular esta etapa",
   },
   shell: {
-    // The Mac app's own title bar (D79).
+    // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Voltar", forward: "Avançar" },
     more: "Mais",
     moreGroups: { schedule: "Agenda", decisions: "Decisões" },
@@ -6368,7 +6368,7 @@ export const ptBR = {
     nameHelp: "Como ele aparece para as pessoas e os agentes.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Outro sistema" },
     commandCopied: "Comando copiado. Cole no Terminal do computador.",
-    // agentes for Mac (D79): this Mac, from the site inside the app.
+    // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
       text: "Este Mac pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
       connect: "Usar este Mac",

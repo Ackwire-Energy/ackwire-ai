@@ -1,6 +1,6 @@
 {
   "identifier": "main",
-  "description": "The main window loads agentes.chat itself (D79): it may drag and zoom the window from its title bar, and ask this Mac what `this_mac` relays (status, connect, reconnect, a Preferences tab, the access requests). No other app command, nothing else of the Mac.",
+  "description": "The main window loads agentes.chat itself (ADR 0036): it may drag and zoom the window from its title bar, and ask this Mac what `this_mac` relays (status, connect, reconnect, a Preferences tab, the access requests). No other app command, nothing else of the Mac.",
   "windows": ["main"],
   "remote": {
     "urls": ["https://agentes.chat/*"]

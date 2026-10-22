@@ -1164,7 +1164,7 @@ function ChoiceCard({
 /**
  * Where the agents work: the workspace's cloud computer, or this computer / a
  * server (the Mac app or the terminal; the computer shows a code to confirm, live until it connects).
- * In agentes for Mac (D79) the second choice is "Este Mac", and choosing it connects it.
+ * In agentes for Mac (ADR 0036) the second choice is "Este Mac", and choosing it connects it.
  */
 function ComputerStep({
   orgId,
