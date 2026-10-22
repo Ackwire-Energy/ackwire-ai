@@ -38,6 +38,7 @@ import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";
 import { assessThread } from "./thread-assess";
+import { saveWaitlistContact } from "./waitlist";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -422,6 +423,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "email.send": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await sendQueuedEmail(deps.email, job.payload);
+    },
+    "waitlist.contact": async (job) => {
+      if (!deps.email) throw new PermanentJobError("no email sender configured");
+      await saveWaitlistContact(deps.db, deps.email, String(job.payload.entryId));
     },
     // A background task on a connected computer ended: its conversation wakes (ADR 0029).
     "machine.task_done": async (job) => {
