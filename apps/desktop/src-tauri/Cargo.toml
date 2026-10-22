@@ -1,6 +1,6 @@
 [package]
 name = "agentes-desktop"
-version = "0.5.1"
+version = "0.5.2"
 description = "agentes: the menu bar app that lets agents use this computer (ADR 0036)"
 license = "AGPL-3.0-only"
 edition = "2021"

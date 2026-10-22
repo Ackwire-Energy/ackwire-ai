@@ -47,6 +47,8 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { OpenPrefsButton, ThisMacButton, useIsThisMac } from "@/components/ThisMac";
+import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 
@@ -134,11 +136,16 @@ export function CommandBlock({ command }: { command: string }) {
   );
 }
 
-/** "Baixar o app para Mac" from the latest build, small; nothing while there is none (the connect card says so). */
+/**
+ * "Baixar o app para Mac" from the latest build, small; nothing while there is none (the connect card says so).
+ * In the app itself: "Usar este Mac" instead (ADR 0036).
+ */
 export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const latest = useDesktopLatest(DESKTOP_TARGET.target, DESKTOP_TARGET.arch);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
+  if (inDesktopApp()) return <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} primary={primary} />;
   if (!latest.data) return null;
   return (
     <Button asChild size="sm" variant={primary ? "primary" : "default"}>
@@ -154,9 +161,11 @@ export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
  * How to connect a computer (ADR 0036 §2, §10): "Baixar o app para Mac" from
  * the latest release (version, size, SHA-256), the first-run steps (the app
  * is signed and notarized), and the terminal installer for servers and Linux. The
- * computer shows a code and the person confirms it on `/conectar`.
+ * computer shows a code and the person confirms it on `/conectar`. In the app
+ * itself (ADR 0036): "Usar este Mac" in one click instead of the download, unless
+ * `download` (connecting another computer from the app).
  */
-export function ConnectComputer() {
+export function ConnectComputer({ orgId, download = false }: { orgId: string; download?: boolean }) {
   const { t, i18n } = useTranslation();
   const copy = useCopy();
   const latest = useDesktopLatest(DESKTOP_TARGET.target, DESKTOP_TARGET.arch);
@@ -164,12 +173,18 @@ export function ConnectComputer() {
   const otherId = useId();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const release = latest.data ?? null;
+  const app = inDesktopApp() && !download;
   return (
     <div className="machine-connect">
       <p className="small muted" style={{ margin: 0 }}>
-        {t("machines.download.text")}
+        {app ? t("machines.thisMac.text") : t("machines.download.text")}
       </p>
-      {latest.isLoading ? (
+      {app ? (
+        <div className="row" style={{ gap: 12, alignItems: "center" }}>
+          <ComputerPortrait kind="mac" state="online" />
+          <ThisMacButton orgId={orgId} canPair primary />
+        </div>
+      ) : latest.isLoading ? (
         <LoadingLine width={220} />
       ) : release ? (
         <div className="machine-connect__release">
@@ -209,7 +224,7 @@ export function ConnectComputer() {
       ) : (
         <Alert tone="neutral">{t("machines.download.unavailable")}</Alert>
       )}
-      {release && (
+      {release && !app && (
         <div className="stack-4" style={{ gap: 6 }}>
           <span className="newag__label">{t("machines.download.firstTime")}</span>
           <ol className="machine-pair__steps small">
@@ -478,7 +493,9 @@ export function MachinesSection() {
             <ComputerPortrait kind="mac" state="offline" size={96} />
             <span className="computers-empty__text">
               <b>{t("computers.mine.emptyTitle")}</b>
-              <span className="small muted">{t("computers.mine.emptyText")}</span>
+              <span className="small muted">
+                {inDesktopApp() ? t("machines.thisMac.emptyText") : t("computers.mine.emptyText")}
+              </span>
             </span>
           </div>
         )}
@@ -495,7 +512,7 @@ export function MachinesSection() {
           <h2 id="sec-machines-connect" className="ac-card__title">
             {t("machines.download.title")}
           </h2>
-          <ConnectComputer />
+          <ConnectComputer orgId={org.id} />
         </Card>
       )}
       <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />
@@ -590,6 +607,8 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
   const nameOf = (id: string) =>
     agents.data?.find((a) => a.id === id)?.name ?? m.agents.find((a) => a.id === id)?.name ?? "";
   const access = m.access;
+  // This very Mac with an app too old to report: update it from here (agentes for Mac, ADR 0036).
+  const here = useIsThisMac(org.id, m.id);
   return (
     <Card aria-labelledby="sec-machine-folders">
       <div className="stack-4" style={{ gap: 2 }}>
@@ -598,7 +617,14 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
         </h2>
         <span className="small muted">{t("machines.access.foldersText")}</span>
       </div>
-      {!access ? (
+      {!access && m.canManage && here ? (
+        <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <p className="small muted" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+            {t("machines.thisMac.noReport")}
+          </p>
+          <OpenPrefsButton tab="updates">{t("machines.thisMac.update")}</OpenPrefsButton>
+        </div>
+      ) : !access ? (
         // The server only shows the folders to admins and whoever connected it.
         <p className="small muted" style={{ margin: 0 }}>
           {m.canManage ? t("machines.access.noReport") : t("machines.access.hidden")}
@@ -720,6 +746,9 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
 /** Never a grant button: granting happens on the machine (the app, or the command as a fallback). */
 function GrantCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  // In the app, on this very Mac: straight to Preferences → Pastas (ADR 0036).
+  const here = useIsThisMac(org.id, m.id);
   const path = t("machines.access.pathPlaceholder");
   const agent = t("machines.access.agentPlaceholder");
   const allowExample = `agentes-runner folders allow ${path} --agent ${agent}`;
@@ -728,7 +757,14 @@ function GrantCard({ machine: m }: { machine: Machine }) {
       <h2 id="sec-machine-grant" className="ac-card__title">
         {t("machines.access.grantTitle")}
       </h2>
-      {m.canManage ? (
+      {m.canManage && here ? (
+        <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <p className="small" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+            {t("machines.thisMac.grantHere")}
+          </p>
+          <OpenPrefsButton tab="folders">{t("machines.thisMac.openFolders")}</OpenPrefsButton>
+        </div>
+      ) : m.canManage ? (
         <>
           <p className="small" style={{ margin: 0 }}>
             {t("machines.access.grantText")}

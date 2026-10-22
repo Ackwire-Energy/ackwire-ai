@@ -33,6 +33,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
@@ -99,6 +100,8 @@ function OutageNotice({
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
+  // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (ADR 0036).
+  const here = useIsThisMac(org.id, o.machineId);
   // "há 12 min" moves on by itself.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -119,7 +122,11 @@ function OutageNotice({
     <div className="outage" role="status">
       <ComputerIcon kind={computerKind(o.platform)} size={20} className="outage__icon" />
       <span className="outage__text">
-        <b>{t("outage.title", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })}</b>
+        <b>
+          {here
+            ? t("machines.thisMac.outageTitle", { ago: offlineFor(t, o.offlineSince, now) })
+            : t("outage.title", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })}
+        </b>
         <span>{sub}</span>
       </span>
       <span className="outage__crew">
@@ -141,7 +148,8 @@ function OutageNotice({
             {t("outage.view")}
           </Link>
         </Button>
-        <Button variant="primary" size="sm" onClick={() => setOpen(true)}>
+        {here && <ReconnectThisMacButton orgId={org.id} primary />}
+        <Button variant={here ? "ghost" : "primary"} size="sm" onClick={() => setOpen(true)}>
           {t("outage.switch")}
         </Button>
         <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("outage.dismiss")} onClick={onDismiss} />

@@ -15,6 +15,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as DesktopSignInRouteImport } from './routes/desktop.sign-in'
+import { Route as DesktopSignedInRouteImport } from './routes/desktop.signed-in'
 import { Route as DevGalleryRouteImport } from './routes/dev.gallery'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as OrgOrgIdRouteImport } from './routes/org.$orgId'
@@ -74,6 +76,16 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesktopSignInRoute = DesktopSignInRouteImport.update({
+  id: '/desktop/sign-in',
+  path: '/desktop/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesktopSignedInRoute = DesktopSignedInRouteImport.update({
+  id: '/desktop/signed-in',
+  path: '/desktop/signed-in',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevGalleryRoute = DevGalleryRouteImport.update({
@@ -237,6 +249,8 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/desktop/sign-in': typeof DesktopSignInRoute
+  '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId': typeof OrgOrgIdRouteWithChildren
@@ -275,6 +289,8 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/desktop/sign-in': typeof DesktopSignInRoute
+  '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId/approvals': typeof OrgOrgIdApprovalsRoute
@@ -313,6 +329,8 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/desktop/sign-in': typeof DesktopSignInRoute
+  '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId': typeof OrgOrgIdRouteWithChildren
@@ -353,6 +371,8 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/reset-password'
     | '/signup'
+    | '/desktop/sign-in'
+    | '/desktop/signed-in'
     | '/dev/gallery'
     | '/invite/$token'
     | '/org/$orgId'
@@ -391,6 +411,8 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/reset-password'
     | '/signup'
+    | '/desktop/sign-in'
+    | '/desktop/signed-in'
     | '/dev/gallery'
     | '/invite/$token'
     | '/org/$orgId/approvals'
@@ -428,6 +450,8 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/reset-password'
     | '/signup'
+    | '/desktop/sign-in'
+    | '/desktop/signed-in'
     | '/dev/gallery'
     | '/invite/$token'
     | '/org/$orgId'
@@ -467,6 +491,8 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  DesktopSignInRoute: typeof DesktopSignInRoute
+  DesktopSignedInRoute: typeof DesktopSignedInRoute
   DevGalleryRoute: typeof DevGalleryRoute
   InviteTokenRoute: typeof InviteTokenRoute
   OrgOrgIdRoute: typeof OrgOrgIdRouteWithChildren
@@ -514,6 +540,20 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/desktop/sign-in': {
+      id: '/desktop/sign-in'
+      path: '/desktop/sign-in'
+      fullPath: '/desktop/sign-in'
+      preLoaderRoute: typeof DesktopSignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/desktop/signed-in': {
+      id: '/desktop/signed-in'
+      path: '/desktop/signed-in'
+      fullPath: '/desktop/signed-in'
+      preLoaderRoute: typeof DesktopSignedInRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/gallery': {
@@ -801,6 +841,8 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  DesktopSignInRoute: DesktopSignInRoute,
+  DesktopSignedInRoute: DesktopSignedInRoute,
   DevGalleryRoute: DevGalleryRoute,
   InviteTokenRoute: InviteTokenRoute,
   OrgOrgIdRoute: OrgOrgIdRouteWithChildren,

@@ -1,4 +1,5 @@
 import type { HelloLine } from "../control/client";
+import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 
 /** The app's windows (Tauri labels). */
@@ -76,4 +77,7 @@ export interface Host {
   notchPlace(width: number, height: number): Promise<NotchInfo | null>;
   /** The current window's size in points (the popover follows its content). */
   resize(width: number, height: number): Promise<void>;
+  /** The site in the main window asking this Mac (ADR 0036; the popover answers, `this_mac` in main_window.rs). */
+  onThisMac(cb: (id: number, request: ThisMacRequest) => void): () => void;
+  thisMacReply(id: number, ok: boolean, data: unknown): Promise<void>;
 }

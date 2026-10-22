@@ -203,7 +203,12 @@ export async function listCustomServers(db: Database, actorId: string, orgId: st
   return rows.map((r) => view(r, tools));
 }
 
-/** Stores a custom server's connection (its own row; several servers per org). */
+/**
+ * Stores a custom server's connection (its own row; several servers per org).
+ * Connecting the same address again is a reconnect: the active row gets the
+ * new credentials in place, so agents keep their grants and the tools keep
+ * their classification.
+ */
 export async function storeCustomConnection(
   deps: CustomDeps,
   input: {
@@ -219,8 +224,47 @@ export async function storeCustomConnection(
 ) {
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
-  const id = crypto.randomUUID();
+  const [existing] = await deps.db
+    .select()
+    .from(connectorConnections)
+    .where(
+      and(
+        eq(connectorConnections.orgId, input.orgId),
+        like(connectorConnections.connector, `${CUSTOM_PREFIX}%`),
+        eq(connectorConnections.serverUrl, input.serverUrl),
+        isNull(connectorConnections.revokedAt),
+      ),
+    )
+    .orderBy(asc(connectorConnections.createdAt))
+    .limit(1);
+  const id = existing?.id ?? crypto.randomUUID();
   const sealed = input.secret ? await sealSecret(wrapper, JSON.stringify(input.secret), aadFor(input.orgId, id)) : null;
+  if (existing) {
+    const [row] = await deps.db
+      .update(connectorConnections)
+      .set({
+        authType: input.authType,
+        secretCiphertext: sealed?.ciphertext ?? null,
+        wrappedDataKey: sealed?.wrappedDataKey ?? null,
+        kekId: sealed?.kekId ?? null,
+        tokenExpiresAt: input.tokenExpiresAt ?? null,
+        oauthClientId: input.oauthClientId ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(connectorConnections.id, existing.id))
+      .returning();
+    if (!row) throw new Error("connection update returned nothing");
+    caches.connections.delete(`${input.orgId}:active`);
+    caches.scopes.deletePrefix(`${input.orgId}:`);
+    await recordAudit(deps.db, {
+      orgId: input.orgId,
+      actor: { type: "person", id: input.actorId },
+      action: "connector.custom_reconnected",
+      target: { type: "connector_connection", id: row.id },
+      details: { serverUrl: input.serverUrl, authType: input.authType },
+    });
+    return row;
+  }
   const [row] = await deps.db
     .insert(connectorConnections)
     .values({
