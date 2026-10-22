@@ -148,8 +148,9 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let builder = builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true)
-        // Centred in the site's 40px title bar (apps/web desktop.css).
-        .traffic_light_position(tauri::LogicalPosition::new(16.0, 20.0));
+        // Centred in the site's 40px title bar (apps/web desktop.css): `y` places the top of the buttons' row,
+        // not their middle (at 20 they sat ~3pt below the bar's icons).
+        .traffic_light_position(tauri::LogicalPosition::new(16.0, 17.0));
     builder.build().map_err(|e| e.to_string())?;
     front(app)
 }
