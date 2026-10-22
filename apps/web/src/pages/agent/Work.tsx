@@ -59,6 +59,8 @@ import { CLOUD } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { cleanSite, SITE } from "@/components/browser/sites";
 import { useOrg } from "@/components/org-context";
+import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";
+import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { useAgentEdit } from "./context";
 import "@/components/browser/browser.css";
@@ -212,16 +214,52 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         {footer && <div className="agp-workcard__foot">{footer}</div>}
       </section>
       {machine && !machine.online && kind !== "model" && (
-        <SettingNote icon="pause">{t("agentPage.work.offline", { ...g, computer: machine.name })}</SettingNote>
+        <SettingNote icon="pause">
+          {t("agentPage.work.offline", { ...g, computer: machine.name })}
+          <ThisMacReconnect machineId={machine.machineId} />
+        </SettingNote>
       )}
-      {steps && <BrowserSteps computer={machine.name} />}
+      {steps && <BrowserSteps computer={machine.name} machineId={machine.machineId} />}
     </div>
   );
 }
 
-/** The three clicks on the computer that turn its browser on, drawn small; the page notices by itself. */
-export function BrowserSteps({ computer }: { computer: string }) {
+/** In agentes for Mac, when the offline computer is this very Mac: "Reconectar" right there (D79). */
+function ThisMacReconnect({ machineId }: { machineId: string }) {
+  const { org } = useOrg();
+  const here = useIsThisMac(org.id, machineId);
+  return here ? (
+    <span style={{ display: "block", marginTop: 8 }}>
+      <ReconnectThisMacButton orgId={org.id} />
+    </span>
+  ) : null;
+}
+
+/**
+ * The three clicks on the computer that turn its browser on, drawn small; the page notices by itself.
+ * In agentes for Mac on this very Mac: one button to Preferences → Ferramentas instead (D79).
+ */
+export function BrowserSteps({ computer, machineId }: { computer: string; machineId?: string }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const here = useIsThisMac(org.id, machineId ?? "");
+  if (here) {
+    return (
+      <section className="brw-steps" aria-label={t("machines.thisMac.browserTitle")}>
+        <div className="brw-steps__head">
+          <Icon name="computer" size={16} />
+          <b>{t("machines.thisMac.browserTitle")}</b>
+          <span className="brw-steps__wait">{t("agentPage.work.steps.waiting")}</span>
+        </div>
+        <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="small muted" style={{ flex: 1, minWidth: 200 }}>
+            {t("machines.thisMac.browserText")}
+          </span>
+          <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+        </div>
+      </section>
+    );
+  }
   const step = (n: number, shot: ReactNode, text: string) => (
     <div className="brw-step">
       <div className="brw-step__shot" aria-hidden="true">
@@ -440,6 +478,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const offId = useId();
+  // A brain switched off in this very Mac's Ferramentas (agentes for Mac): one click to turn it on (D79).
+  const toolOffHere =
+    useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
   const machines = view.machines;
   const homeOf = (k: BrainKind) => (k === "model" ? null : homeFor(k, work.machineId, machines));
   const home = homeOf(kind);
@@ -760,6 +801,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             };
           })}
         />
+        {toolOffHere && (
+          <SettingNote icon="settings">
+            {t("machines.thisMac.toolsOff")}
+            <span style={{ display: "block", marginTop: 8 }}>
+              <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+            </span>
+          </SettingNote>
+        )}
       </DialogBody>
       <Footer
         note={
@@ -1046,6 +1095,9 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const pickable = usePickable();
   const setTarget = useSetComputerTarget(org.id);
   const [choice, setChoice] = useState(work.machineId);
+  // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (D79).
+  const thisMac = useThisMac(org.id);
+  const thisMacFree = inDesktopApp() && canDo(org.role, "post") && thisMac.isSuccess && !thisMac.data;
   const [busy, setBusy] = useState(false);
   const view = work.brain.data;
   const brain = view?.brain ?? "model";
@@ -1145,14 +1197,18 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       </DialogBody>
       <Footer
         note={
-          <Link
-            to="/org/$orgId/settings/$section"
-            params={{ orgId: org.id, section: "computers" }}
-            className="small agp-wdlg__link"
-          >
-            <Icon name="plus" size={14} />
-            {t("agentPage.work.computer.connect")}
-          </Link>
+          thisMacFree ? (
+            <ThisMacButton orgId={org.id} canPair folders={false} onConnected={setChoice} />
+          ) : (
+            <Link
+              to="/org/$orgId/settings/$section"
+              params={{ orgId: org.id, section: "computers" }}
+              className="small agp-wdlg__link"
+            >
+              <Icon name="plus" size={14} />
+              {t("agentPage.work.computer.connect")}
+            </Link>
+          )
         }
         disabled={choice === work.machineId}
         busy={busy}
@@ -1330,8 +1386,14 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
             </SettingNote>
           )}
           {noComputer && <SettingNote icon="alert">{t("agentPage.work.browserDialog.noComputer")}</SettingNote>}
+          {noComputer && inDesktopApp() && (
+            <ThisMacButton orgId={org.id} canPair={canDo(org.role, "post")} folders={false} />
+          )}
           {on && (moveTo ? !ready(moveTo) : !work.browser.data?.available && work.browser.data?.machine) && (
-            <BrowserSteps computer={moveTo?.name ?? work.browser.data?.machine?.name ?? ""} />
+            <BrowserSteps
+              computer={moveTo?.name ?? work.browser.data?.machine?.name ?? ""}
+              machineId={moveTo?.id ?? work.browser.data?.machine?.id}
+            />
           )}
           {on && <SettingNote icon="lock">{t("browser.agent.signedIn", g)}</SettingNote>}
         </div>

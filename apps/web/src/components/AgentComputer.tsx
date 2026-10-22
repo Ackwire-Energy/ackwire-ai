@@ -61,6 +61,8 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingCards, LoadingLine } from "@/components/Loading";
 import { MachineChip } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { ReconnectThisMacButton, ThisMacButton, useIsThisMac } from "@/components/ThisMac";
+import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 const STATUS_ICON: Record<ComputerDisplay, IconName> = {
@@ -289,13 +291,27 @@ export const targetOf = (pc: AgentComputer | undefined): ComputerTarget => pc?.t
 /** "Na máquina Servidor do escritório · Online": a connected computer is turned on by its owner. */
 function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind: "machine" }> }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  // In agentes for Mac, offline on this very Mac: reconnect from here (D79).
+  const here = useIsThisMac(org.id, target.machineId);
   return (
     <span className="stack-4" style={{ gap: 4 }}>
       <span className="row" style={{ gap: 8, alignItems: "center" }}>
         <span className="computer-machine__name">{target.name}</span>
         <MachineChip online={target.online} />
       </span>
-      <span className="small muted">{target.online ? t("computer.machineHint") : t("computer.machineOffline")}</span>
+      <span className="small muted">
+        {target.online
+          ? t("computer.machineHint")
+          : here
+            ? t("machines.thisMac.offline")
+            : t("computer.machineOffline")}
+      </span>
+      {!target.online && here && (
+        <span>
+          <ReconnectThisMacButton orgId={org.id} />
+        </span>
+      )}
     </span>
   );
 }
@@ -327,6 +343,10 @@ function ComputerTargetSelect({
   );
   if (machines.isLoading) return <LoadingLine width={200} />;
   if (list.length === 0 && target.kind === "cloud" && value === CLOUD) {
+    // agentes for Mac: connect this Mac right here and pick it (D79).
+    if (inDesktopApp() && can(org.role, "post")) {
+      return <ThisMacButton orgId={org.id} canPair folders={false} onConnected={onChange} />;
+    }
     return (
       <Link
         to="/org/$orgId/settings/$section"

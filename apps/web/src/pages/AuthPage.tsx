@@ -1,4 +1,4 @@
-import { ApiError, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
+import { ApiError, type SignInOptions, type SignInProvider, useApi, useAuthConfig } from "@agenteschat/client";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,14 +11,21 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
 import { prepareBurst } from "@/components/Sky";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/SocialButtons";
+import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH } from "@/lib/desktop";
 
 /**
  * Sign in and sign up in one flow: the e-mail
  * first, then the one next step the server says it needs (the password, the
  * provider the account signs in with, or the name and a new password).
  * "Esqueci a senha" happens in place. The agent reacts to what you do.
+ * In the Mac app, Google/GitHub/Apple open in the browser and the window
+ * waits for the sign-in to come back ("browser", D79).
  */
-type Step = "email" | "password" | "social" | "name" | "newPassword" | "closed" | "forgot" | "sent";
+type Step = "email" | "password" | "social" | "name" | "newPassword" | "closed" | "forgot" | "sent" | "browser";
+
+/** How often the Mac app's window asks whether the browser finished, and for how long. */
+const REDEEM_EVERY_MS = 2000;
+const REDEEM_FOR_MS = 10 * 60_000;
 
 /** Help under a new password, live: what's missing, or "Senha ok." */
 export function passwordHelp(t: TFunction, password: string) {
@@ -80,6 +87,10 @@ export function AuthPage({
   const canReset = config.data?.passwordReset === true;
   const termsUrl = config.data?.termsUrl;
   const privacyUrl = config.data?.privacyUrl;
+  const desktop = inDesktopApp();
+  const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
+    null,
+  );
 
   const go = (next: Step) => {
     setError(null);
@@ -184,6 +195,39 @@ export function AuthPage({
     else if (step === "forgot") void sendReset();
   };
 
+  /** The Mac app: the provider in the browser; this window keeps the verifier and waits. */
+  const signInInBrowser = async (provider: SignInProvider) => {
+    const verifier = newVerifier();
+    const challenge = await challengeOf(verifier);
+    setBrowser({ provider, verifier, challenge });
+    go("browser");
+    window.location.assign(browserSignInUrl(provider, challenge));
+  };
+  const reopenBrowser = () => {
+    if (browser) window.location.assign(browserSignInUrl(browser.provider, browser.challenge));
+  };
+
+  // Asks every 2 s and whenever the window comes back to the front; a full load after, so everything starts signed in.
+  useEffect(() => {
+    if (step !== "browser" || !browser) return;
+    let stopped = false;
+    const check = async () => {
+      if (stopped || !(await auth.desktopRedeem(browser.verifier).catch(() => false)) || stopped) return;
+      stopped = true;
+      window.location.assign(`${SIGNED_IN_PATH}?${new URLSearchParams({ to: redirect ?? "/" })}`);
+    };
+    const timer = setInterval(() => void check(), REDEEM_EVERY_MS);
+    const giveUp = setTimeout(() => clearInterval(timer), REDEEM_FOR_MS);
+    const onFocus = () => void check();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      clearTimeout(giveUp);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [step, browser, auth, redirect]);
+
   const capsKey = (e: KeyboardEvent<HTMLInputElement>) => setCaps(e.getModifierState?.("CapsLock") ?? false);
   const toggleShow = () => {
     setShow((s) => !s);
@@ -216,6 +260,10 @@ export function AuthPage({
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
+    browser: [
+      t("auth.desktop.browser"),
+      t("auth.desktop.browserLead", { provider: browser ? t(`auth.provider.${browser.provider}`) : "" }),
+    ],
   };
   const [title, lead] = bubble[step];
 
@@ -285,7 +333,12 @@ export function AuthPage({
     <AuthShell>
       <form className="auth__form" onSubmit={submit} noValidate>
         <header className="auth__ask" ref={header} data-burst>
-          <AgentAvatar name="agentes.chat" size="lg" state={pending ? "writing" : undefined} expression={expression} />
+          <AgentAvatar
+            name="agentes.chat"
+            size="lg"
+            state={pending || step === "browser" ? "writing" : undefined}
+            expression={expression}
+          />
           <div className="auth__bubble" key={`${step}-${wrong}`} aria-live="polite">
             <h1 className="auth__title">{title}</h1>
             <p className="auth__lead">{lead}</p>
@@ -360,7 +413,11 @@ export function AuthPage({
           {step === "email" && allProviders.length > 0 && (
             <>
               <div className="auth__or">{t("common.or")}</div>
-              <SocialButtons callbackURL={redirect ?? "/"} providers={allProviders} />
+              <SocialButtons
+                callbackURL={redirect ?? "/"}
+                providers={allProviders}
+                onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
+              />
             </>
           )}
 
@@ -372,12 +429,27 @@ export function AuthPage({
 
           {step === "social" && (
             <>
-              <SocialButtons callbackURL={redirect ?? "/"} providers={linkedProviders} />
+              <SocialButtons
+                callbackURL={redirect ?? "/"}
+                providers={linkedProviders}
+                onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
+              />
               {canReset && (
                 <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
                   {t("auth.flow.createPassword")}
                 </button>
               )}
+            </>
+          )}
+
+          {step === "browser" && (
+            <>
+              <Button type="button" size="lg" block onClick={reopenBrowser}>
+                {t("auth.desktop.reopen")}
+              </Button>
+              <button type="button" className="auth__quiet" onClick={() => go("email")}>
+                {t("auth.desktop.otherWay")}
+              </button>
             </>
           )}
 

@@ -131,6 +131,9 @@ export function createFakeHost(initial: WindowName, scenario: "first" | "default
     setAutostart: async (on) => {
       autostart = on;
     },
+    // No main window in the browser: nobody asks.
+    onThisMac: () => () => {},
+    thisMacReply: async () => {},
     notify: async (title, body) => {
       console.info("[fake] notification:", title, "—", body);
     },

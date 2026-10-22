@@ -5,6 +5,7 @@
 @import "@agenteschat/ui/styles.css";
 @import "./layout.css";
 @import "./responsive.css";
+@import "./desktop.css";
 
 :root {
   --font-sans: "Onest Variable", Onest, "Segoe UI", system-ui, sans-serif;
