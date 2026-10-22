@@ -49,8 +49,19 @@ export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
   return ORDER.filter((p) => on[p] && (!only || only.includes(p)));
 }
 
-/** "Continuar com Google/GitHub/Apple": brand mark, the last one used marked. */
-export function SocialButtons({ callbackURL, providers }: { callbackURL: string; providers: SignInProvider[] }) {
+/**
+ * "Continuar com Google/GitHub/Apple": brand mark, the last one used marked.
+ * `onSocial` takes over the redirect (the Mac app signs in through the browser).
+ */
+export function SocialButtons({
+  callbackURL,
+  providers,
+  onSocial,
+}: {
+  callbackURL: string;
+  providers: SignInProvider[];
+  onSocial?: (provider: SignInProvider) => void;
+}) {
   const { t } = useTranslation();
   const auth = useAuth();
   const last = lastSignIn();
@@ -71,7 +82,8 @@ export function SocialButtons({ callbackURL, providers }: { callbackURL: string;
           className="auth-social__btn"
           onClick={() => {
             rememberSignIn(p);
-            void auth.signInSocial(p, callbackURL);
+            if (onSocial) onSocial(p);
+            else void auth.signInSocial(p, callbackURL);
           }}
         >
           {BRAND[p]}

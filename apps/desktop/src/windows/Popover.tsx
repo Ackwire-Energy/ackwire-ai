@@ -20,6 +20,7 @@ import {
 import { NOTCH_PREF } from "../control/notch";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
+import { answerThisMac, type PrefsTab } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
 import { SITE_URL } from "../control/version";
 import { agentOf, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
@@ -114,6 +115,25 @@ export function Popover() {
     ro.observe(el);
     return () => ro.disconnect();
   }, [host, confirmQuit]);
+
+  // The site in the main window asking this Mac (D79): the popover owns the runners, so it answers.
+  useEffect(
+    () =>
+      host.onThisMac((id, request) => {
+        const openPrefsOn = async (tab: PrefsTab) => {
+          writePref("prefsTab", tab);
+          await host.showWindow("prefs");
+        };
+        const showRequests = () => host.showWindow("popover");
+        answerThisMac({ store, openPrefs: openPrefsOn, showRequests }, request)
+          .then(
+            (data) => host.thisMacReply(id, true, data ?? null),
+            (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),
+          )
+          .catch(() => {});
+      }),
+    [host, store],
+  );
 
   const openSite = () => {
     void host.openExternal(SITE_URL).catch(() => {});

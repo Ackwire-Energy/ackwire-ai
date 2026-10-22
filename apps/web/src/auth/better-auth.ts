@@ -19,5 +19,11 @@ export function createBetterAuthClient(origin = window.location.origin): AuthCli
     signOut: async () => {
       await client.signOut();
     },
+    desktopHandoff: async (challenge) =>
+      toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { challenge } })).error),
+    desktopRedeem: async (verifier) => {
+      const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } });
+      return res.data?.signedIn === true;
+    },
   };
 }

@@ -1,7 +1,13 @@
 import type { AuthClient, AuthResult } from "@/auth/client";
 
 export function createFakeAuth(
-  options: { signIn?: AuthResult; signUp?: AuthResult; reset?: AuthResult; onSignIn?: () => void } = {},
+  options: {
+    signIn?: AuthResult;
+    signUp?: AuthResult;
+    reset?: AuthResult;
+    redeem?: boolean;
+    onSignIn?: () => void;
+  } = {},
 ) {
   const calls: { method: string; args: unknown[] }[] = [];
   const auth: AuthClient = {
@@ -29,6 +35,14 @@ export function createFakeAuth(
     },
     signOut: async () => {
       calls.push({ method: "signOut", args: [] });
+    },
+    desktopHandoff: async (challenge) => {
+      calls.push({ method: "desktopHandoff", args: [challenge] });
+      return { ok: true };
+    },
+    desktopRedeem: async (verifier) => {
+      calls.push({ method: "desktopRedeem", args: [verifier] });
+      return options.redeem ?? false;
     },
   };
   return { auth, calls };

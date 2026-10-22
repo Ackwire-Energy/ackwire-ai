@@ -15,6 +15,7 @@
     "allow-quit-app",
     "allow-app-info",
     "allow-notch-set",
-    "allow-notify"
+    "allow-notify",
+    "allow-this-mac-reply"
   ]
 }
