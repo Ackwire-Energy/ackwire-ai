@@ -144,6 +144,11 @@ impl Runners {
         self.lock().values().filter_map(|r| home_server(&r.dir)).collect()
     }
 
+    /// The server of each home signed in to an organization.
+    pub fn paired_servers(&self) -> Vec<String> {
+        self.lock().values().filter(|r| paired_home(&r.dir)).filter_map(|r| home_server(&r.dir)).collect()
+    }
+
     pub fn is_shut_down(&self) -> bool {
         self.shut_down.load(Ordering::SeqCst)
     }
