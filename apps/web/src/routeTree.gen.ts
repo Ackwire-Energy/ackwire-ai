@@ -14,6 +14,10 @@ import { Route as ConectarRouteImport } from './routes/conectar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as DesktopSignInRouteImport } from './routes/desktop.sign-in'
 import { Route as DesktopSignedInRouteImport } from './routes/desktop.signed-in'
@@ -71,6 +75,26 @@ const OnboardingRoute = OnboardingRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -248,6 +272,10 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/termos': typeof TermosRoute
   '/signup': typeof SignupRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
@@ -288,6 +316,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/termos': typeof TermosRoute
   '/signup': typeof SignupRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
@@ -328,6 +360,10 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/termos': typeof TermosRoute
   '/signup': typeof SignupRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
@@ -370,6 +406,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/reset-password'
+    | '/privacidade'
+    | '/privacy'
+    | '/terms'
+    | '/termos'
     | '/signup'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
@@ -410,6 +450,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/reset-password'
+    | '/privacidade'
+    | '/privacy'
+    | '/terms'
+    | '/termos'
     | '/signup'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
@@ -449,6 +493,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/reset-password'
+    | '/privacidade'
+    | '/privacy'
+    | '/terms'
+    | '/termos'
     | '/signup'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
@@ -490,6 +538,10 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
+  TermosRoute: typeof TermosRoute
   SignupRoute: typeof SignupRoute
   DesktopSignInRoute: typeof DesktopSignInRoute
   DesktopSignedInRoute: typeof DesktopSignedInRoute
@@ -533,6 +585,34 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -840,6 +920,10 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
+  TermosRoute: TermosRoute,
   SignupRoute: SignupRoute,
   DesktopSignInRoute: DesktopSignInRoute,
   DesktopSignedInRoute: DesktopSignedInRoute,

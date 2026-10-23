@@ -428,6 +428,11 @@ export const ptBR = {
     lookOurs: "agentes.chat",
     lookSystem: "Do sistema",
   },
+  legal: {
+    updated: "Atualizado em {{date}}",
+    contents: "Nesta página",
+    home: "Ir para o início",
+  },
   shell: {
     // The Mac app's own title bar (D79).
     titleBar: { back: "Voltar", forward: "Avançar" },
