@@ -55,13 +55,16 @@ describe("run policy table", () => {
     expect(toolKind(builtIn("post_message")).kind).toBe("elsewhere");
     expect(toolKind(builtIn("react")).kind).toBe("here");
     expect(toolKind(builtIn("hand_off")).kind).toBe("hand_off");
+    // A tool the table doesn't know: a sensitive one asks a person, any other is only for a person's run.
+    expect(toolKind({ ...builtIn("deploy_app"), sensitive: true }).kind).toBe("external");
+    expect(toolKind(builtIn("some_new_tool")).kind).toBe("unknown");
     expect(toolKind(app("github_get_issue", "github:issues.read")).kind).toBe("read");
     expect(toolKind(app("github_create_issue", "github:issues.write")).kind).toBe("external");
     expect(toolKind(app("mail_support_send", "mail:send")).kind).toBe("external");
     expect(toolKind(app("mail_support_read", "mail:read")).kind).toBe("read");
     expect(toolKind(app("git_clone", "github:git.read"))).toEqual({ kind: "internal", area: "code" });
     // A new built-in tool the table doesn't know is for people's runs only.
-    expect(toolKind(builtIn("brand_new_tool")).kind).toBe("elsewhere");
+    expect(toolKind(builtIn("brand_new_tool")).kind).toBe("unknown");
   });
 
   test("routine, read: reads and hand_off only; writes refused with a reason for the model", () => {

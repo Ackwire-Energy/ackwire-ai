@@ -72,7 +72,8 @@ export async function startOrJoinRun(
   // One active run per agent and conversation (forum turns are driven separately; background runs
   // hold no slot): the message goes to it, read at its next step, instead of a second run.
   if (trigger !== "forum" && !options.background) {
-    const [active] = await tx
+    // In the agents' DM several runs may be active, one per person behind them: join that person's.
+    const active = await tx
       .select({ id: agentRuns.id, triggerMessageId: agentRuns.triggerMessageId })
       .from(agentRuns)
       .where(
@@ -92,14 +93,12 @@ export async function startOrJoinRun(
         ),
       )
       .orderBy(sql`${agentRuns.createdAt} desc`)
-      .limit(1);
-    if (
-      active &&
-      active.triggerMessageId !== message.id &&
-      (await samePersonInAgentsDm(tx, message, active.id)) &&
-      (await queueOnRun(tx, active.id, message.id))
-    )
-      return { joined: active.id };
+      .limit(10);
+    for (const run of active) {
+      if (run.triggerMessageId === message.id || !(await samePersonInAgentsDm(tx, message, run.id))) continue;
+      if (await queueOnRun(tx, run.id, message.id)) return { joined: run.id };
+      break;
+    }
   }
   const [run] = await tx
     .insert(agentRuns)

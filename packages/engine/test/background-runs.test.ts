@@ -80,7 +80,7 @@ function workTools(over: { onLook?: (ctx: { runId: string; db: Fixture["db"] }) 
       {
         name: "look",
         description: "Look at the open pull requests",
-        scope: "",
+        scope: "context:read",
         inputSchema: { type: "object", properties: {} },
         execute: async (_input, ctx) => {
           await over.onLook?.(ctx);
@@ -99,7 +99,8 @@ function workTools(over: { onLook?: (ctx: { runId: string; db: Fixture["db"] }) 
       {
         name: "file_issue",
         description: "File an issue",
-        scope: "",
+        // A scope every agent has by default (an internal change people can undo).
+        scope: "drive:write",
         inputSchema: { type: "object", properties: {} },
         execute: async (_input, ctx) => {
           await recordAgentActions(ctx.db, ctx, [
@@ -401,7 +402,7 @@ describe("a routine's background run never posts by itself", () => {
         {
           name: "check_env",
           description: "Check the environment",
-          scope: "",
+          scope: "context:read",
           inputSchema: { type: "object", properties: {}, additionalProperties: false },
           execute: async () => {
             checks++;

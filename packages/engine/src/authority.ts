@@ -35,6 +35,8 @@ export type MessageRoot =
   | { kind: "agent_note" }
   | { kind: "agent" };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** How many links (message → its run → that run's trigger) a chain may have before it counts as nobody's. */
 export const MAX_AUTHORITY_CHAIN = 8;
 
@@ -134,6 +136,7 @@ export async function runAuthority(db: Executor, run: AuthorityRun): Promise<Run
 
 /** Who is behind a run, by its id (the tool context's `runId`); unattended when the run is gone. */
 export async function runAuthorityById(db: Executor, orgId: string, runId: string): Promise<RunAuthority> {
+  if (!UUID.test(runId)) return { kind: "unattended", personId: null, reason: "agent" };
   const [run] = await db
     .select({
       id: agentRuns.id,

@@ -76,7 +76,7 @@ describe("structural checks pause the routine with its reason and one notificati
     expect(routine).toMatchObject({ active: false, nextRunAt: null, pausedReason: "agent_archived" });
     const paused = await notificationsOf(f, "routine_paused");
     expect(paused).toHaveLength(1);
-    expect(paused[0]).toMatchObject({ userId: f.owner.id, latest: { statusTo: "agent_archived" } });
+    expect(paused[0]).toMatchObject({ userId: f.owner.id, latest: { reason: "agent_archived" } });
   });
 
   test("agent no longer in the channel; creator no longer able to post there", async () => {

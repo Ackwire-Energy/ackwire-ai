@@ -57,9 +57,12 @@ export const ROUTINE_CODE_TEXT: Record<string, string> = {
 export const routineCodeText = (code: string | null | undefined) => (code && ROUTINE_CODE_TEXT[code]) || code || "";
 
 /** The routine run's `routine.run` job is still queued or running (else nothing will ever start it). */
-export const routineJobAlive = (routineRunId: typeof routineRuns.id | SQL) =>
-  sql`exists (select 1 from ${outbox} o where o.dedupe_key = 'routine.run:' || ${routineRunId}
+export const routineJobAlive = (routineRunId: typeof routineRuns.id | SQL) => {
+  // Always the outer row's id: a bare "id" inside the subquery would be the job's own.
+  const id = routineRunId === routineRuns.id ? sql.raw(`"routine_runs"."id"`) : routineRunId;
+  return sql`exists (select 1 from ${outbox} o where o.dedupe_key = 'routine.run:' || ${id}::text
     and o.status in ('pending', 'processing'))`;
+};
 
 /** Whether this person can still post in that conversation: a member of the organization who may post, and of it. */
 export async function personCanPost(db: Executor, orgId: string, userId: string, channelId: string): Promise<boolean> {

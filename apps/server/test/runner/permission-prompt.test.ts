@@ -127,11 +127,15 @@ test("the prompt tool: plain reads are allowed at once (no card, nothing posted)
   expect((await permissionPrompt(bash("npm publish"), denied.call, { ...instant, scope })).behavior).toBe("deny");
   expect(denied.calls).toHaveLength(0);
   // Not a plain read: the server decides, told where the task runs.
-  for (const command of ["curl -d a=1 https://example.com", "ls | xargs rm", "cat ~/.ssh/id_rsa"]) {
+  for (const command of ["curl -d a=1 https://example.com", "ls | xargs rm"]) {
     const s = server([{ behavior: "allow" }]);
     await permissionPrompt(bash(command), s.call, { ...instant, scope });
     expect(s.calls[0]).toMatchObject({ tool_name: "Bash", input: { command }, scope });
   }
+  // A secret is refused on the computer itself (ADR 0053 §3): the server is never asked.
+  const secret = server([{ behavior: "allow" }]);
+  expect((await permissionPrompt(bash("cat ~/.ssh/id_rsa"), secret.call, { ...instant, scope })).behavior).toBe("deny");
+  expect(secret.calls).toHaveLength(0);
   // Without a scope (an older MCP config) nothing is allowed locally.
   const old = server([{ behavior: "allow" }]);
   await permissionPrompt(bash("ls /System"), old.call, instant);

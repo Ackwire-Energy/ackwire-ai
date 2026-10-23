@@ -268,10 +268,14 @@ describe("reminders from the chat", () => {
     await fireNow();
     const all = await f.db.select().from(schema.messages);
     expect(all.filter((m) => m.channelId === dm.id)).toHaveLength(before);
-    // Background work in #general (its trigger flat in the timeline); with nothing handed off, nothing posted.
+    // Background work in the routine's own room (ADR 0053 §4), reporting to #general; with nothing handed
+    // off, nothing reaches any conversation.
     const [work] = (await f.db.select().from(schema.agentRuns)).filter((r) => r.background);
-    expect(work).toMatchObject({ channelId: f.general.id, status: "done", replyMessageId: null });
-    expect(all.find((m) => m.id === work?.triggerMessageId)).toMatchObject({ threadId: null });
+    expect(work).toMatchObject({ status: "done", replyMessageId: null });
+    expect(work?.channelId).not.toBe(f.general.id);
+    const brief = all.find((m) => m.id === work?.triggerMessageId);
+    expect(brief?.meta.routineBrief).toMatchObject({ deliverTo: { channelId: f.general.id, threadId: null } });
+    expect(all.filter((m) => m.channelId === f.general.id && m.id === work?.triggerMessageId)).toEqual([]);
     expect(all.filter((m) => m.authorType === "agent" && m.channelId === f.general.id)).toEqual([]);
   });
 

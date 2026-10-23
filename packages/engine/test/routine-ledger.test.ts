@@ -55,7 +55,7 @@ test("fatigue: the first failure after a good run notifies once, the fifth in a 
   });
   const paused = await notificationsOf(f, "routine_paused");
   expect(paused).toHaveLength(1);
-  expect(paused[0]?.latest).toMatchObject({ statusTo: "failing" });
+  expect(paused[0]?.latest).toMatchObject({ reason: "failing" });
 
   // Resumed by a person: the reason and the streak are cleared, the pause notification is done.
   await setRoutineActive(routineDeps(f), f.owner.id, f.org.id, routine.id, true);

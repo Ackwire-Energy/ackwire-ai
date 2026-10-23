@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import type { MailSummary } from "@agenteschat/adapters";
 import { asc, eq, schema } from "@agenteschat/db";
 import {
+  addChannelMember,
   closeRoutineRun,
   createAgentRuns,
   createChannel,
@@ -11,7 +12,6 @@ import {
   fireRoutineEvent,
   ingestMail,
   insertMessage,
-  postPersonMessage,
   type RoutineDeps,
   stopRoutineRun,
   webhookEvent,
@@ -159,10 +159,13 @@ describe("issue.created", () => {
 
     // A person, directly and through the agent working for them.
     const mine = await createIssue(deps, { type: "person", userId: f.owner.id }, f.org.id, { title: "Bug A" });
-    await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev abre uma issue" });
-    const personRun = (await f.db.select().from(schema.agentRuns)).find(
-      (r) => !r.background && r.triggerMessageId !== note.id,
-    );
+    const ask = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "@dev abre uma issue",
+    });
+    const [personRun] = await createAgentRuns(f.db, ask, [f.agent.id], "mention");
     const theirs = await byAgent(personRun?.id);
     const runs = await runsOf(watcher.id);
     expect(runs).toHaveLength(1);
@@ -175,6 +178,8 @@ describe("issue.created", () => {
   test("only routines whose creator can see the issue fire", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    // Whoever creates a routine must be able to post where it reports.
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
     const event = { trigger: { type: "event" as const, event: "issue.created" as const } };
     const mine = await channelRoutine(f, event);
     const hers = await channelRoutine(f, event, bia.id);
@@ -220,10 +225,11 @@ describe("email", () => {
     expect(await ingestMail(x.deps, watch?.id ?? "", [mail("a1")])).toEqual({ added: 1, fired: true });
     const [first] = await runsOf(routine.id);
     await executeRoutineRun(deps, first?.id ?? "");
+    const [working] = await runsOf(routine.id);
     // While it works, a new email waits for it.
     expect(await ingestMail(x.deps, watch?.id ?? "", [mail("a2")])).toEqual({ added: 1, fired: false });
     // It fails: its email joins the waiting run, which starts now.
-    await closeRoutineRun({ db: f.db, pubsub: f.pubsub }, await agentRunRow(f, first?.agentRunId ?? null), {
+    await closeRoutineRun({ db: f.db, pubsub: f.pubsub }, await agentRunRow(f, working?.agentRunId ?? null), {
       status: "failed",
       code: "provider_error",
     });

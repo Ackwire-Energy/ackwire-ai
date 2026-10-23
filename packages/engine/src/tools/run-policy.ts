@@ -41,7 +41,9 @@ export type ToolKind =
   /** An internal change people can undo. */
   | { kind: "internal"; area: InternalArea }
   /** A write to a connected app (connector tools that aren't reads, mail). */
-  | { kind: "external" };
+  | { kind: "external" }
+  /** A tool this table doesn't know (no scope it reads): only for a person's run. */
+  | { kind: "unknown" };
 
 export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser";
 
@@ -130,8 +132,9 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (isReadScope(tool.scope)) return { kind: "read" };
   const area = INTERNAL_BY_SCOPE[tool.scope];
   if (area) return { kind: "internal", area };
-  // Anything else (a new built-in tool without a scope this table knows): only for a person's run.
-  return { kind: "elsewhere" };
+  // Anything else (a new tool without a scope this table knows): a sensitive one asks a person, like a
+  // connected app's write; any other is only for a person's run.
+  return tool.sensitive ? { kind: "external" } : { kind: "unknown" };
 }
 
 /** What unattended runs may change on their own: what carries a receipt and Undo, and files for their reply. */
@@ -152,6 +155,8 @@ export const REFUSALS = {
   unattendedInternal:
     "Nobody asked for this work (a routine's report or another agent started it): say in your reply what you'd do; a person asks you to go ahead.",
   handOffOnly: "Only background work (a routine's run) hands off: just reply.",
+  unknownTool:
+    "This tool is only for work a person asked for. Say what you'd do (in hand_off for a routine's work, in your reply otherwise); a person asks you to go ahead.",
 } as const;
 
 /** The table (see the file's comment): what `authority` may do with `tool`. */
@@ -179,6 +184,8 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
         return refuse(what.area === "browser" ? REFUSALS.routineBrowserReadOnly : REFUSALS.routineReadOnly);
       case "external":
         return authority.brief?.access === "act" ? APPROVE : refuse(REFUSALS.routineReadOnly);
+      case "unknown":
+        return refuse(REFUSALS.unknownTool);
     }
   }
   switch (what.kind) {
@@ -193,6 +200,8 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
       return UNATTENDED_INTERNAL.has(what.area) ? ALLOW : refuse(REFUSALS.unattendedInternal);
     case "external":
       return APPROVE;
+    case "unknown":
+      return refuse(REFUSALS.unknownTool);
   }
 }
 
