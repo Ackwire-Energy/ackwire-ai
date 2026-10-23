@@ -306,7 +306,7 @@ describe("routine views", () => {
     for (const [i, run] of ended.entries()) await routineRun(routine.id, i + 1, { ...run, finishedAt: new Date() });
     const view = await getRoutineView(f.db, f.owner.id, f.org.id, routine.id);
     expect(view.health).toEqual({ ok: 1, silent: 1, failed: 1, skipped: 2, missed: 1, total: 6 });
-    expect(view.recentRuns.map((r) => r.status)).toEqual(ended.map((r) => r.status));
+    expect(view.recentRuns.map((r): string => r.status)).toEqual(ended.map((r) => r.status));
   });
 
   test("emails held for the next email are no run: the routine isn't busy and no list shows them", async () => {
