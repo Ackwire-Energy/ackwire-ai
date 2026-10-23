@@ -1,4 +1,5 @@
 import { and, desc, type Executor, eq, inArray, ne, schema } from "@agenteschat/db";
+import { type RoutineBrief, routineBriefOf } from "./routine-brief";
 import type { AgentRun } from "./runs";
 
 const { messages, routineRuns } = schema;
@@ -26,6 +27,18 @@ export async function routineOfRun(
     routineRunId: typeof r.runId === "string" ? r.runId : null,
     name: typeof r.name === "string" ? r.name : "",
   };
+}
+
+/** The brief of a routine's background run (ADR 0053 §4), from its trigger; null for any other run. */
+export async function routineBriefOfRun(
+  db: Executor,
+  run: Pick<AgentRun, "orgId" | "triggerMessageId">,
+): Promise<RoutineBrief | null> {
+  const [m] = await db
+    .select({ meta: messages.meta })
+    .from(messages)
+    .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
+  return routineBriefOf(m?.meta);
 }
 
 /** A routine's last finished background run before this one: when, whether it reported, and its record. */

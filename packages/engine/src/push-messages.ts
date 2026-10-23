@@ -51,6 +51,10 @@ interface Strings {
   missionStoppedTitle: string;
   routineFailedTitle: string;
   routineFailedBody: string;
+  routinePausedTitle: string;
+  routinePausedBody: string;
+  routineStalledTitle: string;
+  routineStalledBody: (computer: string) => string;
   machineConnectedTitle: string;
   browserHandoffTitle: (actor: string) => string;
   browserHandoffBody: string;
@@ -73,6 +77,10 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "Uma missão parou",
     routineFailedTitle: "Uma rotina não terminou",
     routineFailedBody: "Toque para ver o que aconteceu.",
+    routinePausedTitle: "Uma rotina foi pausada",
+    routinePausedBody: "Toque para ver o motivo.",
+    routineStalledTitle: "Uma rotina está esperando o computador",
+    routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
     machineConnectedTitle: "Um computador novo entrou na organização",
     browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
     browserHandoffBody: "Toque para abrir a tela.",
@@ -93,6 +101,10 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "A mission stopped",
     routineFailedTitle: "A routine didn't finish",
     routineFailedBody: "Tap to see what happened.",
+    routinePausedTitle: "A routine was paused",
+    routinePausedBody: "Tap to see why.",
+    routineStalledTitle: "A routine is waiting for its computer",
+    routineStalledBody: (c) => `It runs when ${c} is back.`,
     machineConnectedTitle: "A new computer joined the organization",
     browserHandoffTitle: (a) => `${a} needs you in the browser`,
     browserHandoffBody: "Tap to open the screen.",
@@ -133,6 +145,12 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       return out(s.missionStoppedTitle, what || s.openBody);
     case "routine_failed":
       return out(s.routineFailedTitle, what || s.routineFailedBody);
+    case "routine_paused":
+      // Its name only: the app says why, in the person's words.
+      return out(s.routinePausedTitle, what || s.routinePausedBody);
+    case "routine_stalled":
+      // The computer's name (what the person calls it), else the routine's.
+      return out(s.routineStalledTitle, text ? s.routineStalledBody(text) : what || s.openBody);
     case "machine_connected":
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
       return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);

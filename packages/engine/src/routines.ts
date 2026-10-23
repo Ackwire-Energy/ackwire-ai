@@ -2,16 +2,17 @@ import type { MailAdapters, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, isNotNull, isNull, lte, rowsOf, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceError, audienceNotice, canTalkTo } from "./audience";
+import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
+import { brainOf } from "./brain-settings";
 import { requireChannelAccess } from "./channels";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { nextCronTime, zonedTime } from "./cron";
-import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { openDm } from "./dms";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
 import { createForumTopic } from "./forum";
+import { releaseRoutineEmails } from "./mail/inbound";
 import {
   checkWatchable,
   type MailFilter,
@@ -22,10 +23,16 @@ import {
   watchesOf,
 } from "./mail/watches";
 import { getOrgSettings } from "./management";
-import { getMessage, insertMessageWithRuns, type Message, messageView, replyExcerpt } from "./messages";
-import { notifyRoutineRun } from "./notification-producers";
-import { can, requirePermission } from "./organizations";
-import { enqueue } from "./outbox";
+import { getMessage, insertMessageWithRuns, messageView, replyExcerpt } from "./messages";
+import { resolveRoutinePaused } from "./notification-producers";
+import { can, getMembership, requirePermission } from "./organizations";
+import { PermanentJobError } from "./outbox";
+import { type RoutineBrief, routineAccessOf, routineReportOf } from "./routine-brief";
+import { enqueueRoutineJob, queueEventRun, startGatheredRun } from "./routine-events";
+import { claimRoutineRun, haltRoutineRuns, makeWayForRun, skipRoutineRun, unclaimRoutineRun } from "./routine-firing";
+import { afterRoutineRunEnded, endRoutineRun } from "./routine-ledger";
+import { startRoutineRun } from "./routine-room";
+import { pauseRoutine, personCanPost, type RoutinePausedReason } from "./routine-state";
 import {
   cronToRule,
   describeRule,
@@ -38,6 +45,8 @@ import {
 } from "./rrule";
 import { runErrorDetail } from "./runs";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
+
+export { startRoutineRun } from "./routine-room";
 
 const { routines, routineRuns, agentRuns, usageRecords, channelMembers, channels } = schema;
 
@@ -779,7 +788,7 @@ export async function updateRoutine(
   return view as RoutineView;
 }
 
-/** Deletes a routine: it never fires again; its run history stays. */
+/** Deletes a routine: it never fires again and its work in progress stops (§6.7); its run history stays. */
 export async function deleteRoutine(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
   const current = await loadRoutine(deps.db, orgId, id);
   await requireRoutineEditor(deps.db, actorId, orgId, current);
@@ -787,6 +796,7 @@ export async function deleteRoutine(deps: RoutineDeps, actorId: string, orgId: s
     .update(routines)
     .set({ active: false, nextRunAt: null, deletedAt: new Date(), updatedAt: new Date() })
     .where(eq(routines.id, current.id));
+  await haltRoutineRuns(deps, orgId, current.id, { code: "deleted", byUserId: actorId });
   // A mail routine's watch (and its Composio trigger) goes with it.
   await syncMailWatch(deps, current, null);
   await recordAudit(deps.db, {
@@ -843,7 +853,10 @@ export async function duplicateRoutine(
   return view as RoutineView;
 }
 
-/** Pause (no next run) or resume (next run computed from now: missed slots don't pile up). */
+/**
+ * Pause (no next run, and its work in progress stops: §6.7) or resume (next run computed from now:
+ * missed slots don't pile up; why it paused itself and its failure streak are cleared).
+ */
 export async function setRoutineActive(
   deps: RoutineDeps,
   actorId: string,
@@ -856,9 +869,11 @@ export async function setRoutineActive(
   const nextRunAt = active && current.triggerType === "schedule" ? nextRoutineTime(current, new Date()) : null;
   const [row] = await deps.db
     .update(routines)
-    .set({ active, nextRunAt, updatedAt: new Date() })
+    .set({ active, nextRunAt, updatedAt: new Date(), ...(active ? { pausedReason: null, failuresInRow: 0 } : {}) })
     .where(eq(routines.id, id))
     .returning();
+  if (!active) await haltRoutineRuns(deps, orgId, id, { code: "paused", byUserId: actorId });
+  else await resolveRoutinePaused(deps, orgId, id).catch(() => {});
   const watch = row ? (await watchesOf(deps.db, [row.id])).get(row.id) : undefined;
   if (row && watch) {
     if (active && !current.active) await resetMailWatchState(deps.db, row.id);
@@ -868,28 +883,26 @@ export async function setRoutineActive(
   return view as RoutineView;
 }
 
-/** Queues one run of a routine (`routine.run` job); null when that slot already ran. */
+/**
+ * Queues one slot or manual run of a routine (`routine.run` job); null when that slot already ran.
+ * Events go through `fireRoutineEvent` (deduplicated and coalesced).
+ */
 export async function queueRoutineRun(
   deps: { db: Database },
   routine: RoutineRow,
   at: Date,
-  trigger: "schedule" | "manual" | "event",
-  event?: Record<string, unknown>,
+  trigger: "schedule" | "manual",
 ) {
-  const [run] = await deps.db
-    .insert(routineRuns)
-    .values({ orgId: routine.orgId, routineId: routine.id, at, trigger, event: event ?? null })
-    .onConflictDoNothing()
-    .returning();
-  if (!run) return null;
-  await enqueue(deps.db, {
-    orgId: routine.orgId,
-    kind: "routine.run",
-    payload: { routineRunId: run.id },
-    dedupeKey: `routine.run:${run.id}`,
-    maxAttempts: 3,
+  return deps.db.transaction(async (tx) => {
+    const [run] = await tx
+      .insert(routineRuns)
+      .values({ orgId: routine.orgId, routineId: routine.id, at, trigger })
+      .onConflictDoNothing()
+      .returning();
+    if (!run) return null;
+    await enqueueRoutineJob(tx, run);
+    return run;
   });
-  return run;
 }
 
 /** "Rodar agora". */
@@ -952,25 +965,27 @@ export async function fireDueRoutines(deps: RoutineDeps, now = new Date()) {
         .onConflictDoNothing()
         .returning();
       if (!run) continue;
-      await enqueue(tx, {
-        orgId: r.orgId,
-        kind: "routine.run",
-        payload: { routineRunId: run.id },
-        dedupeKey: `routine.run:${run.id}`,
-        maxAttempts: 3,
-      });
+      await enqueueRoutineJob(tx, run);
       fired++;
     }
     return fired;
   });
 }
 
-/** An event happened (webhook, new issue): the routines listening to it run, with the event as context. */
+/**
+ * An event happened (webhook, new issue): the routines listening to it run, with the event as data
+ * (`routine_runs.event`; the context puts it in the outside-content envelope). `dedupeKey`: the
+ * event's identity, so the same event never fires a routine twice; `visibleTo`: only routines whose
+ * creator may see what it is about get it. Events arriving while a run is queued join it; while one
+ * works, they gather in one run that starts when it ends (`queueEventRun`). Returns how many
+ * routines got it.
+ */
 export async function fireRoutineEvent(
   deps: { db: Database },
   orgId: string,
   event: RoutineEvent,
   payload: { summary: string; [key: string]: unknown },
+  options: { dedupeKey?: string | null; visibleTo?: (userId: string) => Promise<boolean> } = {},
 ) {
   const rows = await deps.db
     .select()
@@ -979,191 +994,139 @@ export async function fireRoutineEvent(
       and(
         eq(routines.orgId, orgId),
         eq(routines.active, true),
+        isNull(routines.deletedAt),
         eq(routines.triggerType, "event"),
         eq(routines.event, event),
       ),
     );
   let fired = 0;
-  for (const r of rows) if (await queueRoutineRun(deps, r, new Date(), "event", { type: event, ...payload })) fired++;
+  for (const r of rows) {
+    if (options.visibleTo && !(r.createdByUserId && (await options.visibleTo(r.createdByUserId)))) continue;
+    const outcome = await queueEventRun(deps, r, {
+      event: { ...payload, type: event },
+      dedupeKey: options.dedupeKey ?? null,
+    });
+    if (outcome !== "duplicate") fired++;
+  }
   return fired;
 }
 
-/** A run of this routine is waiting for the agent's computer (its brain, ADR 0032 §5). */
-async function waitsForComputer(db: Database, routineId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ id: routineRuns.id })
-    .from(routineRuns)
-    .innerJoin(agentRuns, eq(agentRuns.id, routineRuns.agentRunId))
-    .where(
-      and(
-        eq(routineRuns.routineId, routineId),
-        eq(agentRuns.status, "waiting_input"),
-        isNotNull(agentRuns.waitingMachineId),
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
-}
-
-async function finishRun(db: Database, runId: string, status: "skipped" | "failed", summary: string) {
-  await db.update(routineRuns).set({ status, summary }).where(eq(routineRuns.id, runId));
-}
+/** Errors that will never pass on a retry: the run fails instead of the job retrying. */
+const isPermanent = (error: unknown) =>
+  error instanceof ForbiddenError ||
+  error instanceof NotFoundError ||
+  error instanceof ValidationError ||
+  error instanceof ConflictError ||
+  error instanceof PermanentJobError;
 
 /**
- * A routine fires as background work (`agent_runs.background`): its trigger
- * is written in the conversation it reports to on the creator's behalf (their
- * permissions start the run and they stay the requester), shown as the
- * routine's (`meta.routine`, compact), and its run starts on its own. The
- * trigger joins no run in progress and answers no open question; the run holds
- * no conversation slot, so people's messages there start or join a normal run
- * meanwhile. It speaks only through `hand_off`. Null when the agent can't run
- * there (not a member, or the creator can't talk to it).
- */
-export async function startRoutineRun(
-  deps: { db: Database; pubsub?: PubSub },
-  input: {
-    orgId: string;
-    creatorId: string;
-    agentId: string;
-    channelId: string;
-    threadId: string | null;
-    body: string;
-    routine: { id: string; name: string; runId: string };
-  },
-): Promise<{ message: Message; runId: string } | null> {
-  const { db } = deps;
-  const { membership } = await requireChannelAccess(db, input.creatorId, input.orgId, input.channelId);
-  if (!can(membership.role, "post")) throw new ForbiddenError();
-  const [eligible] = await eligibleChannelAgents(db, input.orgId, input.channelId, [input.agentId], {
-    requesterUserId: input.creatorId,
-  });
-  if (!eligible) return null;
-  const started = await db.transaction(async (tx) => {
-    const { message } = await insertMessageWithRuns(
-      tx,
-      {
-        orgId: input.orgId,
-        channelId: input.channelId,
-        threadId: input.threadId,
-        author: { type: "person", userId: input.creatorId },
-        body: input.body,
-        meta: {
-          routineId: input.routine.id,
-          routineRunId: input.routine.runId,
-          routine: input.routine,
-          background: true,
-        },
-      },
-      { startRuns: false, deliver: false },
-    );
-    const [agentRun] = await createAgentRuns(tx, message, [input.agentId], "mention", { background: true });
-    if (!agentRun) return null;
-    await tx
-      .update(routineRuns)
-      .set({ status: "started", agentRunId: agentRun.id, summary: "" })
-      .where(and(eq(routineRuns.id, input.routine.runId), eq(routineRuns.orgId, input.orgId)));
-    return { message, runId: agentRun.id };
-  });
-  if (started && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(started.message));
-  return started;
-}
-
-/**
- * Job `routine.run`: the routine's work runs in the background where its
- * result goes (the channel, the conversation it was asked in, or the
- * creator's DM with the agent), with the normal run path: budget, scopes,
- * approvals. What people hear is what it hands off (`startRoutineRun`).
+ * Job `routine.run` (ADR 0053 §6): claims the routine run (`queued` → `starting`), then fires it.
+ * A transient error gives the row back and rethrows, so the job retries; a permanent one fails the
+ * run (its ledger and failure streak as on any ending).
  */
 export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string) {
   const { db } = deps;
-  const [run] = await db.select().from(routineRuns).where(eq(routineRuns.id, routineRunId));
-  if (run?.status !== "queued") return;
+  const run = await claimRoutineRun(db, routineRunId);
+  if (!run) return;
+  try {
+    await fireClaimedRun(deps, run);
+  } catch (error) {
+    if (!isPermanent(error)) {
+      await unclaimRoutineRun(db, run.id).catch(() => {});
+      throw error;
+    }
+    const [row] = await db
+      .select({ agentRunId: routineRuns.agentRunId })
+      .from(routineRuns)
+      .where(eq(routineRuns.id, run.id));
+    // Its run started before the error: the run's own ending closes it.
+    if (row?.agentRunId) return;
+    const reason = error instanceof Error ? error.message : String(error);
+    await endRoutineRun(
+      deps,
+      { orgId: run.orgId, routineId: run.routineId, routineRunId: run.id },
+      { status: "failed", code: "error", detail: reason.slice(0, 300) },
+    );
+  }
+}
+
+/**
+ * Fires a claimed routine run, in order (§6): a deleted or paused routine skips the slot (a manual
+ * run is a person's ask, a one-off fires while active); structural checks pause the routine with
+ * their coded reason and one notification (creator gone or unable to post where it reports, agent
+ * archived, out of the agent's audience, agent not in the conversation); one run at a time
+ * (`makeWayForRun`); then the work: a forum topic, a reminder (no run), or the background run in the
+ * routine's room, which reports through `hand_off` to the conversation it reports to (`deliverTo`).
+ */
+async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
+  const { db } = deps;
+  const skip = async (code: string) => {
+    const skipped = await skipRoutineRun(db, run.id, code);
+    // The emails it carried wait for the next run (§6.8).
+    if (skipped && run.event?.type === "email.received") await releaseRoutineEmails(deps, run.id);
+    return skipped;
+  };
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
-  if (!routine || routine.deletedAt) return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.deleted"]);
-  if (!routine.active && run.trigger !== "manual")
-    return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.paused"]);
+  if (!routine || routine.deletedAt) return skip("deleted");
+  if (!routine.active && run.trigger !== "manual") return skip("paused");
+  const paused = async (reason: RoutinePausedReason) => {
+    await pauseRoutine(deps, routine, reason);
+    return skip(reason);
+  };
   const creator = routine.createdByUserId;
-  if (!creator) return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.creator_left"]);
+  const membership = creator ? await getMembership(db, creator, routine.orgId) : null;
+  if (!creator || !membership) return paused("creator_left");
   const agent = await getAgent(db, routine.orgId, routine.agentId);
-  if (!agent || agent.archivedAt) {
-    await finishRun(db, run.id, "failed", RUN_SUMMARY["routine_run.agent_archived"]);
-    await notifyRoutineRun(deps, {
-      orgId: routine.orgId,
-      routineId: routine.id,
-      agentId: routine.agentId,
-      ok: false,
-      runKey: run.id,
-      text: RUN_SUMMARY["routine_run.agent_archived"],
-    }).catch(() => {});
+  if (!agent || agent.archivedAt) return paused("agent_archived");
+  // Its creator can no longer talk to the agent (D31).
+  if (!canTalkTo(agent, creator)) return paused("audience");
+  const once = routine.triggerType === "once";
+  // It ran: a one-off is done (it stays listed, inactive).
+  const ran = () =>
+    db
+      .update(routines)
+      .set({ lastRunAt: new Date(), updatedAt: new Date(), ...(once ? { active: false, nextRunAt: null } : {}) })
+      .where(eq(routines.id, routine.id));
+  const target = targetOf(routine);
+  const ref = { orgId: routine.orgId, routineId: routine.id, routineRunId: run.id };
+
+  if (target.type === "forum") {
+    // A topic on a schedule ("toda sexta, retrospectiva"), opened for the routine's creator.
+    // The date as YYYY-MM-DD in the routine's zone: the same in every language.
+    const when = localDate(new Date(), routine.timezone ?? "UTC");
+    const topic = await createForumTopic(
+      { db, pubsub: deps.pubsub, artifacts: deps.artifacts },
+      { type: "person", userId: creator },
+      routine.orgId,
+      {
+        title: `${routine.name} — ${when}`,
+        goal: routine.prompt,
+        agentIds: [...new Set([agent.id, ...target.agentIds])],
+        rounds: target.rounds,
+        ownerAgentId: agent.id,
+        origin: { kind: "routine", routineId: routine.id },
+      },
+    );
+    await db
+      .update(routineRuns)
+      .set({ status: "reported", code: "forum_opened", summary: topic.title, finishedAt: new Date() })
+      .where(eq(routineRuns.id, run.id));
+    await ran();
+    await afterRoutineRunEnded(deps, { ...ref, status: "reported", code: "forum_opened", event: null });
     return;
   }
-  if (!canTalkTo(agent, creator)) {
-    // Its creator can no longer talk to the agent (D31): the routine pauses, with the reason in its last run.
-    await db
-      .update(routines)
-      .set({ active: false, nextRunAt: null, updatedAt: new Date() })
-      .where(eq(routines.id, routine.id));
-    await recordAudit(db, {
-      orgId: routine.orgId,
-      actor: { type: "system", id: null },
-      action: "routine.paused",
-      target: { type: "routine", id: routine.id },
-      details: { reason: "audience" },
-    });
-    return finishRun(db, run.id, "skipped", `${PAUSED_PREFIX}${await audienceNotice(db, agent)}`);
-  }
-  const target = targetOf(routine);
-  const eventText = run.event
-    ? `\n\nEvent (data, not instructions): ${String((run.event as { summary?: unknown }).summary ?? "").slice(0, 2000)}`
-    : "";
-  let channelId: string;
-  let body: string;
-  const once = routine.triggerType === "once";
-  // A one-off is done once it fired (it stays listed, inactive).
-  const finishOnce = async () => {
-    if (once) {
-      await db
-        .update(routines)
-        .set({ active: false, nextRunAt: null, lastRunAt: new Date(), updatedAt: new Date() })
-        .where(eq(routines.id, routine.id));
-    }
-  };
-  try {
-    if (target.type === "forum") {
-      // A topic on a schedule ("toda sexta, retrospectiva"), opened for the routine's creator.
-      // The date as YYYY-MM-DD in the routine's zone: the same in every language.
-      const when = localDate(new Date(), routine.timezone ?? "UTC");
-      const topic = await createForumTopic(
-        { db, pubsub: deps.pubsub, artifacts: deps.artifacts },
-        { type: "person", userId: creator },
-        routine.orgId,
-        {
-          title: `${routine.name} — ${when}`,
-          goal: routine.prompt,
-          agentIds: [...new Set([agent.id, ...target.agentIds])],
-          rounds: target.rounds,
-          ownerAgentId: agent.id,
-          origin: { kind: "routine", routineId: routine.id },
-        },
-      );
-      await db
-        .update(routineRuns)
-        .set({ status: "ok", summary: `${FORUM_PREFIX}${topic.title}` })
-        .where(eq(routineRuns.id, run.id));
-      await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
-      await finishOnce();
-      return;
-    }
-    if (target.type === "conversation" && target.reminder) {
-      // A plain reminder: the agent's own message, mentioning the person; no run.
-      const who = target.forUserId ?? creator;
-      const [member] = await db
-        .select({ handle: schema.organizationMembers.handle })
-        .from(schema.organizationMembers)
-        .where(and(eq(schema.organizationMembers.orgId, routine.orgId), eq(schema.organizationMembers.userId, who)));
-      const mention = member?.handle ? `@${member.handle} ` : "";
-      const { message } = await insertMessageWithRuns(
-        db,
+
+  if (target.type === "conversation" && target.reminder) {
+    // A plain reminder: the agent's own message, mentioning the person; no run.
+    const who = target.forUserId ?? creator;
+    const [member] = await db
+      .select({ handle: schema.organizationMembers.handle })
+      .from(schema.organizationMembers)
+      .where(and(eq(schema.organizationMembers.orgId, routine.orgId), eq(schema.organizationMembers.userId, who)));
+    const mention = member?.handle ? `@${member.handle} ` : "";
+    const message = await db.transaction(async (tx) => {
+      const written = await insertMessageWithRuns(
+        tx,
         {
           orgId: routine.orgId,
           channelId: target.channelId,
@@ -1182,64 +1145,145 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
         },
         { startRuns: false },
       );
-      await publishMessageCreated(deps.pubsub, messageView(message));
-      for (const userId of message.mentionedUserIds) {
-        await publishUserEvent(deps.pubsub, routine.orgId, userId, {
-          type: "mention",
-          channelId: target.channelId,
-          messageId: message.id,
-          threadId: message.threadId,
-          byAgentId: agent.id,
-        });
-      }
-      await db
+      await tx
         .update(routineRuns)
-        .set({ status: "ok", summary: RUN_SUMMARY["routine_run.reminder_sent"] })
+        .set({ status: "reported", code: "reminder_sent", messageId: written.message.id, finishedAt: new Date() })
         .where(eq(routineRuns.id, run.id));
-      await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
-      await finishOnce();
-      return;
-    }
-    // The agent's computer is away and the last run waits for it (it runs when the computer is back):
-    // no second run piling up behind it.
-    if (await waitsForComputer(db, routine.id)) {
-      return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.waiting_computer"]);
-    }
-    if (target.type === "channel" || target.type === "conversation") {
-      channelId = target.channelId;
-      body = `@${agent.handle} ${routine.prompt}${eventText}`;
-    } else {
-      channelId = (await openDm(db, creator, routine.orgId, { agentId: agent.id })).id;
-      body =
-        target.type === "artifact"
-          ? `${routine.prompt}${eventText}\n\nSave the result as a file in the Drive (create_artifact), then hand off where it is.`
-          : `${routine.prompt}${eventText}`;
-    }
-    const started = await startRoutineRun(deps, {
-      orgId: routine.orgId,
-      creatorId: creator,
-      agentId: agent.id,
-      channelId,
-      threadId: target.type === "conversation" ? target.threadId : null,
-      body,
-      routine: { id: routine.id, name: routine.name, runId: run.id },
+      return written.message;
     });
-    if (!started) return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.agent_not_in_channel"]);
-    await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
-    await finishOnce();
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    await finishOnce().catch(() => {});
-    await finishRun(db, run.id, "failed", reason.slice(0, 300));
-    await notifyRoutineRun(deps, {
-      orgId: routine.orgId,
-      routineId: routine.id,
-      agentId: agent.id,
-      ok: false,
-      runKey: run.id,
-      text: reason,
-    }).catch(() => {});
+    await publishMessageCreated(deps.pubsub, messageView(message));
+    for (const userId of message.mentionedUserIds) {
+      await publishUserEvent(deps.pubsub, routine.orgId, userId, {
+        type: "mention",
+        channelId: target.channelId,
+        messageId: message.id,
+        threadId: message.threadId,
+        byAgentId: agent.id,
+      });
+    }
+    await ran();
+    await afterRoutineRunEnded(deps, { ...ref, status: "reported", code: "reminder_sent", event: null });
+    return;
   }
+
+  // Where it reports: its channel or the conversation it was asked in, else the creator's DM with the agent.
+  let deliverTo: RoutineBrief["deliverTo"];
+  if (target.type === "channel" || target.type === "conversation") {
+    if (!(await personCanPost(db, routine.orgId, creator, target.channelId))) return paused("creator_no_access");
+    const [member] = await db
+      .select({ id: channelMembers.id })
+      .from(channelMembers)
+      .where(and(eq(channelMembers.channelId, target.channelId), eq(channelMembers.agentId, agent.id)));
+    if (!member) return paused("agent_not_in_channel");
+    deliverTo = { channelId: target.channelId, threadId: target.type === "conversation" ? target.threadId : null };
+  } else {
+    if (!can(membership.role, "post")) return paused("creator_no_access");
+    deliverTo = { channelId: (await openDm(db, creator, routine.orgId, { agentId: agent.id })).id, threadId: null };
+  }
+
+  const gate = await makeWayForRun(deps, routine, run);
+  if (gate === "gathered") {
+    // An event run waits for the one working (it may have just ended).
+    await startGatheredRun(deps, routine.id);
+    return;
+  }
+  if (gate) {
+    await skip(gate);
+    if (once) await ran();
+    return;
+  }
+  const brief: RoutineBrief = {
+    routineId: routine.id,
+    routineRunId: run.id,
+    name: routine.name,
+    creatorUserId: creator,
+    deliverTo,
+    access: routineAccessOf(routine.access),
+    report: routineReportOf(routine.report),
+    trigger: run.trigger,
+    dueAt: run.at.toISOString(),
+  };
+  const started = await startRoutineRun(deps, {
+    orgId: routine.orgId,
+    agentId: agent.id,
+    brief,
+    body: routine.prompt,
+    brain: brainOf(agent.brain),
+  });
+  // Stopped while it was being started: nothing ran.
+  if (!started) return;
+  await ran();
+}
+
+/**
+ * Stop in Rotinas (§6.7): the routine's run in progress is canceled quietly (nothing is posted) and
+ * its row ends `canceled` (`stopped`, with who stopped it). Its creator, the agent's owner or an
+ * admin. Returns how many runs it stopped.
+ */
+export async function stopRoutineRun(
+  deps: { db: Database; pubsub?: PubSub },
+  actorId: string,
+  orgId: string,
+  routineId: string,
+): Promise<{ stopped: number }> {
+  const routine = await loadRoutine(deps.db, orgId, routineId, { deleted: true });
+  await requireRoutineEditor(deps.db, actorId, orgId, routine);
+  const stopped = await haltRoutineRuns(deps, orgId, routine.id, { code: "stopped", byUserId: actorId });
+  if (stopped > 0) {
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "routine.stopped",
+      target: { type: "routine", id: routine.id },
+      details: { runs: stopped },
+    });
+  }
+  return { stopped };
+}
+
+/**
+ * Take over (§6.2): an admin or the agent's owner becomes the routine's creator (the one it reports
+ * for and who hears about it), after the same checks as creating it: they can talk to the agent and
+ * post where it reports. Why it paused itself is cleared; resuming stays a separate choice.
+ */
+export async function takeOverRoutine(
+  deps: RoutineDeps,
+  actorId: string,
+  orgId: string,
+  routineId: string,
+): Promise<RoutineView> {
+  const { db } = deps;
+  const current = await loadRoutine(db, orgId, routineId);
+  await requireRoutineManager(db, actorId, orgId, current.agentId);
+  const agent = await getAgent(db, orgId, current.agentId);
+  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
+  const target = targetOf(current);
+  if (
+    (target.type === "channel" || target.type === "conversation") &&
+    !(await personCanPost(db, orgId, actorId, target.channelId))
+  ) {
+    throw new ForbiddenError(
+      "Join the conversation this routine reports to before taking it over",
+      "routine.take_over_no_access",
+    );
+  }
+  const [row] = await db
+    .update(routines)
+    .set({ createdByUserId: actorId, pausedReason: null, updatedAt: new Date() })
+    .where(and(eq(routines.id, current.id), eq(routines.orgId, orgId)))
+    .returning();
+  if (!row) throw new NotFoundError("Routine not found");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "routine.taken_over",
+    target: { type: "routine", id: row.id },
+    details: { from: current.createdByUserId },
+  });
+  await resolveRoutinePaused(deps, orgId, row.id).catch(() => {});
+  const [view] = await views(db, [row]);
+  return view as RoutineView;
 }
 
 // ── Reminders from the chat (agents' `schedule_reminder`) ────────────────────

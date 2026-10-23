@@ -339,10 +339,12 @@ describe("reminders from the chat", () => {
       reminder: false,
     });
     await fireNow();
+    // The routine's brief, in its own room; it reports to the conversation it was asked in.
     const asked = (await f.db.select().from(schema.messages)).find(
-      (m) => typeof m.meta.routineId === "string" && m.authorType === "person",
+      (m) => m.meta.routineBrief !== undefined && m.authorType === "person",
     );
-    expect(asked).toMatchObject({ threadId: null, body: "@dev verifique o deploy e conte aqui" });
+    expect(asked).toMatchObject({ threadId: null, body: "verifique o deploy e conte aqui" });
+    expect(asked?.meta.routineBrief).toMatchObject({ deliverTo: { channelId: f.general.id, threadId: null } });
     const runs = (await f.db.select().from(schema.agentRuns)).filter((r) => r.triggerMessageId === asked?.id);
     expect(runs).toHaveLength(1);
   });

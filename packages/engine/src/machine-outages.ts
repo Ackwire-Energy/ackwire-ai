@@ -9,6 +9,7 @@ import { getMachine, type MachineRow, machineOnline, machinePause, setAgentCompu
 import { missionTurnFor } from "./missions-engine";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { missStaleRoutineRun } from "./routine-firing";
 
 const { machines, agents, agentRuns, routineRuns } = schema;
 
@@ -307,6 +308,8 @@ export async function moveAgentsFromMachine(
   const movedSet = new Set(moved);
   for (const r of waiting) {
     if (!movedSet.has(r.agentId)) continue;
+    // A routine's run whose slot is more than 12 hours old doesn't run late on the new computer: it is missed.
+    if (r.routineRunId && (await missStaleRoutineRun(deps, r.id, now))) continue;
     // Tools already ran in the cut-off turn: only the old computer may finish it.
     if (r.executed > 0) {
       stillWaiting++;
