@@ -205,23 +205,6 @@
   }
 }
 
-/* Calendar: the side panel goes under the grid when there's no room beside it. */
-@media (max-width: 900px) {
-  .cal-page[data-panel] .cal-page__body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(360px, 1fr) auto;
-    overflow-y: auto;
-  }
-  .cal-page[data-panel] .cal-side {
-    overflow: visible;
-  }
-}
-@media (max-width: 640px) {
-  .cal-page__header {
-    padding-top: 12px;
-  }
-}
-
 /* Centered card pages on a phone (invite, onboarding) */
 @media (max-width: 640px) {
   .center {
@@ -238,8 +221,7 @@
     min-height: var(--control-h-md);
   }
   /* Keyboard shortcuts mean nothing on a touch screen. */
-  .sidebar__jump .ac-kbd,
-  .cal-page__new .ac-kbd {
+  .sidebar__jump .ac-kbd {
     display: none;
   }
 }
@@ -248,7 +230,7 @@
     font-size: 16px;
   }
 }
-/* Onboarding: clear the notch and home bar (viewport-fit=cover); the e-mail chips field stays at 16px. */
+/* Onboarding: clear the notch (viewport-fit=cover); the home bar and the e-mail chips field: pages/onboarding.css. */
 .onb {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
@@ -256,14 +238,6 @@
 @media (max-width: 760px) {
   .onb__rail {
     padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
-  }
-  .onb__body {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
-  }
-}
-@media (max-width: 760px), (pointer: coarse) {
-  .onb__emails-input {
-    font-size: 16px;
   }
 }
 /* Phones: a long composer placeholder ends in "…" instead of wrapping into a half-hidden second line. */

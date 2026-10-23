@@ -1,5 +1,5 @@
 import type { Machine, Role } from "@agenteschat/client";
-import { keys, useConfirmDevice, useMachines, useModels, useSandboxSettings } from "@agenteschat/client";
+import { keys, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind } from "@agenteschat/client/lib/machines";
@@ -10,13 +10,7 @@ import {
   type OnboardingStepId,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
-import {
-  keyLooksValid,
-  PROVIDERS,
-  type ProviderId,
-  providerLabel,
-  suggestModel,
-} from "@agenteschat/client/lib/providers";
+import { AUTO, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@agenteschat/client/lib/providers";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
@@ -64,6 +58,7 @@ import {
 import { inDesktopApp, thisMac } from "@/lib/desktop";
 import { importVault } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
+import "./onboarding.css";
 
 export const PRESETS = ["theo", "ada", "lia", "atlas"] as const;
 export type Preset = (typeof PRESETS)[number];
@@ -148,7 +143,6 @@ export function OnboardingPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
-  const models = useModels();
   const guide = useGuideMood();
 
   const [index, setIndex] = useState(0);
@@ -343,7 +337,6 @@ export function OnboardingPage() {
   const saveAgents = useMutation({
     mutationFn: async () => {
       if (!created) return;
-      const provider = key === "platform" ? "anthropic" : key;
       // No key needed when the agents think on the connected computer; one pasted is still saved.
       if (key !== "platform" && !keySaved && apiKey.trim()) {
         const cred = await api.agents.addCredential(created.orgId, {
@@ -372,7 +365,8 @@ export function OnboardingPage() {
           handle: handleFrom(info.name),
           role: info.role,
           instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
-          model: suggestModel(list.models, provider, list.defaultModel),
+          // "Automático" (D83): each task gets its model and effort.
+          model: AUTO,
           // null = the workspace default key.
           credentialId: null,
           appearance: PRESET_LOOK[p],
@@ -381,7 +375,7 @@ export function OnboardingPage() {
         ids[p] = agent.id;
         setAgentIds({ ...ids });
       }
-      // Imported agents: their own name, role and instructions; our model unless theirs is in the catalog.
+      // Imported agents: their own name, role and instructions; their model when it's in the catalog, else Automático.
       const crewSoFar = [...importedCrew];
       const used = new Set([
         ...PRESETS.filter((p) => ids[p]).map((p) => handleFrom(presetInfo(p).name)),
@@ -398,7 +392,7 @@ export function OnboardingPage() {
           handle,
           role: a.role || undefined,
           instructions: a.instructions || undefined,
-          model: importedModel(a, modelIds, suggestModel(list.models, provider, list.defaultModel)),
+          model: importedModel(a, modelIds, AUTO),
           credentialId: null,
           appearance: a.appearance,
         });
@@ -1011,19 +1005,7 @@ export function OnboardingPage() {
                 </>
               )}
               <p className="onb__help">
-                {models.data &&
-                  t("onboarding.suggestedModel", {
-                    model:
-                      models.data.models.find(
-                        (m) =>
-                          m.id ===
-                          suggestModel(
-                            models.data.models,
-                            key === "platform" ? "anthropic" : key,
-                            models.data.defaultModel,
-                          ),
-                      )?.label ?? "",
-                  })}{" "}
+                {t("onboarding.suggestedAuto")}{" "}
                 <button
                   type="button"
                   className="onb__link"

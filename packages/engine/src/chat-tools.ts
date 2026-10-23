@@ -7,6 +7,8 @@ import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView } from "./messages";
 import { enqueue } from "./outbox";
+import { personBehindCall } from "./requester";
+import { isRoutineRoomKey } from "./routine-brief";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
@@ -23,33 +25,8 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
-/** The person whose message started this run (null when an agent or a routine did). */
-async function requesterOf(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ userId: schema.messages.authorUserId })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
-  return m?.userId ?? null;
-}
-
-/**
- * The person behind this run: who wrote the message that started it, or who made the routine that did
- * (null for an agent's or a webhook's message).
- */
-async function personBehind(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ userId: schema.messages.authorUserId, meta: schema.messages.meta })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
-  if (m?.userId) return m.userId;
-  const routineId = m?.meta.routineId;
-  if (typeof routineId !== "string") return null;
-  const [routine] = await ctx.db
-    .select({ by: schema.routines.createdByUserId })
-    .from(schema.routines)
-    .where(and(eq(schema.routines.orgId, ctx.orgId), eq(schema.routines.id, routineId)));
-  return routine?.by ?? null;
-}
+/** Posting where the run already is: a reply. (A routine's run never posts: the run policy refuses it.) */
+const SAME_CONVERSATION = "That is this conversation: just reply.";
 
 /** For matching what someone typed against names: lower case, no accents, no leading @. */
 const plain = (v: string) =>
@@ -120,12 +97,12 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       }),
       async execute(input, ctx) {
         try {
-          const requester = await requesterOf(ctx);
+          const requester = await personBehindCall(ctx);
           if (!requester) return { content: "Only a person's request can post in another channel.", isError: true };
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
           const { channels, channelMembers } = schema;
-          const [channel] = await ctx.db
-            .select({ id: channels.id, name: channels.name, visibility: channels.visibility })
+          const [found] = await ctx.db
+            .select({ id: channels.id, name: channels.name, visibility: channels.visibility, dmKey: channels.dmKey })
             .from(channels)
             .where(
               and(
@@ -135,6 +112,8 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
                 isNull(channels.archivedAt),
               ),
             );
+          // A routine's room is never a place to post in (nor named to anyone).
+          const channel = found && !isRoutineRoomKey(found.dmKey) ? found : undefined;
           const members = channel
             ? await ctx.db
                 .select({ userId: channelMembers.userId, agentId: channelMembers.agentId })
@@ -145,7 +124,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           if (!channel || !members.some((m) => m.userId === requester)) {
             return { content: `No channel #${name} that the person who asked is in.`, isError: true };
           }
-          if (channel.id === ctx.channelId) return { content: "That is this conversation: just reply.", isError: true };
+          if (channel.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
           if (channel.visibility !== "public" && !members.some((m) => m.agentId === ctx.agentId)) {
             return {
               content: `You are not in #${channel.name} (private). Ask someone to add you to it, then try again.`,
@@ -208,7 +187,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
     {
       name: SEND_DM_TOOL,
       description:
-        'Send a direct message to a person in the organization, e.g. "avisa a Thay na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language. Only when someone asked you (or in their routine). If several people match, ask which one. Then reply here saying you sent it.',
+        'Send a direct message to a person in the organization, e.g. "avisa a Thay na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.',
       scope: "",
       inputSchema: {
         type: "object",
@@ -225,9 +204,8 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       }),
       async execute(input, ctx) {
         try {
-          const requester = await personBehind(ctx);
-          if (!requester)
-            return { content: "Only a person's request (or their routine) can send a DM.", isError: true };
+          const requester = await personBehindCall(ctx);
+          if (!requester) return { content: "Only a person's request can send a DM.", isError: true };
           const text = str(input.text).trim();
           if (!text) return { content: "Give the text to send.", isError: true };
           const matches = await findMember(ctx, str(input.person));
@@ -250,7 +228,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             return { content: `You already sent ${MAX_DMS_PER_RUN} DMs in this turn.`, isError: true };
           }
           const dm = await openPersonAgentDm(ctx.db, ctx.orgId, to.userId, ctx.agentId);
-          if (dm.id === ctx.channelId) return { content: "That is this conversation: just reply.", isError: true };
+          if (dm.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
           const [run] = await ctx.db
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)

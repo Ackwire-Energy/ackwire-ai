@@ -1,5 +1,5 @@
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
-import { isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentAppearance } from "./appearance";
 import { caches } from "./cache";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
@@ -28,8 +28,9 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
-  if (input.model !== undefined && !isKnownModel(input.model)) {
-    throw new ValidationError(`model must be one of: ${Object.keys(MODEL_CATALOG).join(", ")}`);
+  // "auto" (D83): each run picks the model from the line of the agent's key (any provider).
+  if (input.model !== undefined && !isAutoModel(input.model) && !isKnownModel(input.model)) {
+    throw new ValidationError(`model must be ${AUTO_MODEL} or one of: ${Object.keys(MODEL_CATALOG).join(", ")}`);
   }
   if (input.monthlyBudgetNanoUsd != null && input.monthlyBudgetNanoUsd < 0) {
     throw new ValidationError("budget can't be negative");
@@ -58,6 +59,9 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
   }
 }
 
+/** What a person's new agent thinks with when nobody picks a model: "Automático" (D83). */
+export const NEW_AGENT_DEFAULTS = { model: AUTO_MODEL } as const;
+
 export async function createAgent(
   db: Database,
   actorId: string,
@@ -68,10 +72,18 @@ export async function createAgent(
   await requirePermission(db, actorId, orgId, "manage_agents");
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
   await validate(db, orgId, values);
+  // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
+  // starts with the model and effort picked per run (written here, so agents made before D83 keep theirs).
+  const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
   try {
     const [agent] = await db
       .insert(agents)
-      .values({ ...values, orgId, ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId })
+      .values({
+        ...values,
+        ...brainAuto,
+        orgId,
+        ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId,
+      })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
     // Every agent may read context, keep its own notes and use its computer; everything else is granted explicitly.

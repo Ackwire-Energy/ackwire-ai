@@ -3,6 +3,7 @@ import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { addChannelMember } from "./channels";
 import { getChannelCached } from "./context";
+import { personBehindCall } from "./requester";
 import { replyThreadOf } from "./runs";
 import { closeThread, getThread, updateThread } from "./threads";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -16,14 +17,8 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
-/** The person whose message started this run (null when an agent or a routine did). */
-async function requesterOf(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ type: schema.messages.authorType, userId: schema.messages.authorUserId })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
-  return m?.type === "person" ? (m.userId ?? null) : null;
-}
+/** The person behind this run (`authority.ts`): null for a routine's work and for unattended runs. */
+const requesterOf = (ctx: ToolContext): Promise<string | null> => personBehindCall(ctx);
 
 const noRequester: ToolOutput = {
   content: "Only a person's request can change this; nothing was changed.",

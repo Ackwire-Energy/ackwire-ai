@@ -4,7 +4,10 @@ import { documentPreview, KIND_ICON, patchCounts } from "@agenteschat/client/lib
 import { Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
-import { useArtifactViewer, useAuthorName } from "./ArtifactViewer";
+import { contextMenuHandler, copyText } from "@/lib/context-menu";
+import { useToast } from "@/lib/toast";
+import { useArtifactDownload } from "./ArtifactActions";
+import { artifactLink, useArtifactViewer, useAuthorName } from "./ArtifactViewer";
 import { FileCardPreview } from "./FileView";
 import { MermaidDiagram } from "./Mermaid";
 
@@ -17,6 +20,8 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   const { org } = useOrg();
   const viewer = useArtifactViewer();
   const authorName = useAuthorName();
+  const download = useArtifactDownload();
+  const toast = useToast();
   const query = useArtifact(org.id, ref.deleted ? null : ref.id, ref.version);
   const a = query.data;
   // Deleted (to the trash): a quiet placeholder, never a broken card.
@@ -37,16 +42,40 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   }
   if (!a) return <div className="artifact-card artifact-card--loading" aria-busy="true" />;
   const open = () => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined);
+  // The desktop app's right click: open, download, its link.
+  const onContextMenu = contextMenuHandler(() => [
+    { kind: "header", label: a.title },
+    { kind: "item", id: "open", label: t("contextMenu.open"), icon: "eye", run: open },
+    {
+      kind: "item",
+      id: "download",
+      label: t("contextMenu.download"),
+      icon: "download",
+      run: () => void download.save(a, undefined, a.shownVersion, a.content),
+    },
+    {
+      kind: "item",
+      id: "copy-link",
+      label: t("contextMenu.copyLink"),
+      icon: "link",
+      run: () =>
+        void copyText(artifactLink(window.location.origin, org.id, a.id, a.shownVersion), () =>
+          toast.show(t("contextMenu.linkCopied")),
+        ),
+    },
+  ]);
   // Files are tiles that sit side by side (images as their thumbnail).
   if (a.content.kind === "file") {
     return (
-      <div className="artifact-tile" data-kind="file">
+      // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
+      <div className="artifact-tile" data-kind="file" onContextMenu={onContextMenu}>
         <FileCardPreview content={a.content} artifactId={a.id} version={a.shownVersion} title={a.title} onOpen={open} />
       </div>
     );
   }
   return (
-    <div className="artifact-card" data-kind={a.kind}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
+    <div className="artifact-card" data-kind={a.kind} onContextMenu={onContextMenu}>
       <button
         type="button"
         className="artifact-card__open"

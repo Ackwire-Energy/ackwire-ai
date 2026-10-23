@@ -64,6 +64,11 @@ const KNOWN = {
   "run.not_continuable": "errors.run.notContinuable",
   "run.agent_busy": "errors.run.agentBusy",
   "run.continue_forbidden": "errors.run.continueForbidden",
+  "routine.too_frequent": "errors.routine.tooFrequent",
+  "routine.too_many": "errors.routine.tooMany",
+  "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
+  "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
+  "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
 } as const;
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */
@@ -74,6 +79,13 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 ]);
 
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
+
+/** A known server code in the person's language; null for anything else (the caller keeps its own words). */
+export function knownErrorText(t: TFunction, error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  const key = KNOWN[error.code as keyof typeof KNOWN];
+  return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
+}
 
 /** Translated text for a failed request. */
 export function errorText(t: TFunction, error: unknown): string {

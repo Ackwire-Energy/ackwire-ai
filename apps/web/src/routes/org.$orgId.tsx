@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
+import { MenuBarActions } from "@/components/DesktopMenus";
 import { DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
@@ -65,6 +66,7 @@ function OrgLayout() {
         <ArtifactViewerProvider>
           <NavDrawerProvider>
             {inDesktopApp() && <DesktopTitleBar />}
+            {inDesktopApp() && <MenuBarActions orgId={membership.id} />}
             <div className="shell">
               <RefetchBar />
               <CommandMenu />

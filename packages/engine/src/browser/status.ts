@@ -13,7 +13,14 @@ export type BrowserUnavailable =
   | "not_reported";
 
 export type AgentBrowserStatus =
-  | { available: true; machineId: string; machineName: string; online: boolean }
+  | {
+      available: true;
+      machineId: string;
+      machineName: string;
+      online: boolean;
+      /** The runner's protocol (17 and later: batched commands and images, ADR 0054). */
+      protocol: number;
+    }
   | {
       available: false;
       code: BrowserUnavailable;
@@ -57,7 +64,7 @@ export async function agentBrowserStatus(
   if (!info.available) {
     return { ...none("not_installed", machineId, status.name), detail: info.reason?.slice(0, 500) ?? null };
   }
-  return { available: true, machineId, machineName: status.name, online: status.online };
+  return { available: true, machineId, machineName: status.name, online: status.online, protocol: status.protocol };
 }
 
 /** One sentence for the agent (tool errors) about an unavailable browser. */

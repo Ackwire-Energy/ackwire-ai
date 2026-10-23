@@ -26,6 +26,8 @@ export const PUSH_KINDS: ReadonlySet<string> = new Set([
   "dm",
   "mission_stopped",
   "routine_failed",
+  "routine_paused",
+  "routine_stalled",
   "machine_connected",
   "browser_handoff",
 ]);
@@ -193,6 +195,7 @@ export async function deliverPush(deps: PushDeps, notificationId: string): Promi
       title: latest.title,
       text: latest.text,
       highRisk,
+      routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     }),
     data,
     priority: row.waiting ? "high" : "default",

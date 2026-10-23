@@ -7,6 +7,7 @@ import {
   createOutboxPump,
   enqueue,
   enqueueIdleReflections,
+  enqueueWaitlistContacts,
   expireApprovals,
   expireBrowserHandoffs,
   expireConsultations,
@@ -20,8 +21,10 @@ import {
   pruneMessageClientIds,
   purgeDeletedArtifacts,
   queueApprovalDigests,
+  reapRoutineRuns,
   reconcileComposioAccounts,
   recoverStaleRuns,
+  sweepEndedInboxes,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
 import type { Logger } from "./logger";
@@ -60,6 +63,8 @@ export const WORKER_INTERVALS_MS = {
   notifications: 30_000,
   /** Runs whose worker died (deploy, crash): also once at boot. */
   recovery: 60_000,
+  /** Ended runs still holding unread messages (safety net: they get a run of their own); routine runs left open. */
+  inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
   /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
@@ -121,6 +126,8 @@ export function startWorkers(deps: WorkerDeps) {
         outcome,
         error: String(error),
       }),
+    // How long each job waited to be claimed (ADR 0053 §10): a person's run should never queue behind routines.
+    onTiming: (name, ms, attrs) => log.debug(name, { ms, ...attrs }),
   });
   every("outbox", WORKER_INTERVALS_MS.outbox, async () => {
     while (!stopped && (await outboxPump.pump()) > 0) {}
@@ -164,6 +171,14 @@ export function startWorkers(deps: WorkerDeps) {
   every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
     const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
     if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
+  });
+
+  every("inboxes", WORKER_INTERVALS_MS.inboxes, async () => {
+    const swept = await sweepEndedInboxes({ db, pubsub: deps.pubsub });
+    if (swept > 0) log.warn("unread messages of ended runs handed on", { runs: swept });
+    // Routine runs left open by an ending that didn't close them, or whose job died (ADR 0053 §5).
+    const reaped = await reapRoutineRuns({ db, pubsub: deps.pubsub });
+    if (reaped > 0) log.warn("routine runs closed by the reaper", { runs: reaped });
   });
 
   const files = deps.artifacts;
@@ -227,6 +242,11 @@ export function startWorkers(deps: WorkerDeps) {
       }
     });
   }
+
+  // Confirmed waiting list entries from before contacts were synced (no-op for the rest: dedupe key).
+  void enqueueWaitlistContacts(db).catch((error) =>
+    log.error("background job failed", { job: "waitlistContacts", error: String(error) }),
+  );
 
   const offWake = deps.pubsub.subscribe(WAKE_TOPIC, () => void ticks.get("outbox")?.());
   // A person canceled a run: the instance executing it aborts it.

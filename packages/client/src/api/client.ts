@@ -691,6 +691,10 @@ export interface ApiClient {
     create(orgId: string, input: RoutineInput): Promise<Routine>;
     setActive(orgId: string, id: string, active: boolean): Promise<Routine>;
     runNow(orgId: string, id: string): Promise<Routine>;
+    /** Stops the run in progress quietly (it ends `canceled`, `stopped` by me). */
+    stop(orgId: string, id: string): Promise<Routine>;
+    /** An admin or the agent's owner becomes its creator (a routine paused because its creator left). */
+    takeOver(orgId: string, id: string): Promise<Routine>;
     runs(orgId: string, id: string): Promise<RoutineRun[]>;
     /** A phrase → rule, its description, cron and next 5 runs. */
     parseRule(orgId: string, phrase: string, timezone?: string): Promise<RuleInfo>;

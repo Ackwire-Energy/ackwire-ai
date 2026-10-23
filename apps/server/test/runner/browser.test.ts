@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   AGENT_BROWSER_VERSION,
@@ -18,6 +18,7 @@ import {
   BrowserManager,
   type BrowserManagerOptions,
   CHROME_ARGS,
+  captureMarks,
   chromeLabel,
   chromeLaunchArgs,
   chromeUserAgent,
@@ -26,6 +27,7 @@ import {
   findChrome,
   type InputState,
   isWebPage,
+  jpegSize,
   type OwnChrome,
   relayCommands,
   type StreamSocket,
@@ -408,6 +410,111 @@ test.if(posix)(
   },
 );
 
+test("jpegSize reads a JPEG's frame header; captureMarks keeps only well-formed marks", () => {
+  // SOI, an APP0 segment to skip, then SOF0 with 800 × 1280.
+  const jpeg = Uint8Array.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x20, 0x05, 0x00, 0x03, 0, 0, 0,
+    0, 0, 0,
+  ]);
+  expect(jpegSize(jpeg)).toEqual({ width: 1280, height: 800 });
+  expect(jpegSize(Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))).toBeNull();
+  expect(
+    captureMarks([
+      { ref: "@e2", number: 2, role: "link", box: { x: 1, y: 2, width: 3, height: 4 } },
+      { ref: "not-a-ref", box: {} },
+      "nope",
+    ]),
+  ).toEqual([{ ref: "e2", number: 2, role: "link", box: { x: 1, y: 2, width: 3, height: 4 } }]);
+});
+
+test.if(posix)(
+  "a batch runs back to back in the agent's session and stops at a failure it doesn't tolerate",
+  async () => {
+    const t = setup();
+    const res = await t.manager.batch(dev, await t.folder(), {
+      op: "browser.batch",
+      commands: [
+        { command: "open", args: ["https://shop.example.com"], timeoutSeconds: 30 },
+        // The fake knows neither: one tolerated, one not.
+        { command: "fill", args: ["@e1", "x"], timeoutSeconds: 30, tolerate: true },
+        { command: "snapshot", args: ["-c"], timeoutSeconds: 30 },
+        { command: "press", args: ["Enter"], timeoutSeconds: 30 },
+        { command: "click", args: ["@e1"], timeoutSeconds: 30 },
+      ],
+    });
+    expect(res.answers.map((a) => a.success)).toEqual([true, false, true, false]);
+    expect(res.answers[2]).toMatchObject({ data: { snapshot: '- button "Go" [ref=e1]' } });
+    // The command after the failure never ran.
+    expect(t.logged().some((c) => c.args.slice(-2).join(" ") === "click @e1")).toBe(false);
+  },
+);
+
+test.if(posix)("a command that throws mid-batch keeps the answers of what already ran", async () => {
+  const t = setup();
+  const res = await t.manager.batch(dev, await t.folder(), {
+    op: "browser.batch",
+    commands: [
+      { command: "open", args: ["https://shop.example.com"], timeoutSeconds: 30 },
+      // Checked when it runs: a bad ref throws there.
+      { command: "agentes:type_secret", args: ["not-a-ref", "X"], timeoutSeconds: 30 },
+      { command: "snapshot", args: [], timeoutSeconds: 30 },
+    ],
+  });
+  expect(res.answers.map((a) => a.success)).toEqual([true, false]);
+  expect(res.answers[1]?.error).toContain("agentes:type_secret takes a ref");
+});
+
+test.if(posix)("a capture of a page outside the agent's sites is refused (like every read)", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  expect(await errorCode(async () => t.manager.capture(dev, await t.folder(), ["other.example"]))).toBe("not_allowed");
+  expect(t.logged().some((c) => c.args.includes("--annotate"))).toBe(false);
+});
+
+test.if(posix)("a batch with one command that wouldn't pass is refused before anything runs", async () => {
+  const t = setup();
+  const folder = await t.folder();
+  const batch = (commands: { command: string; args: string[] }[], allowedDomains?: string[]) =>
+    errorCode(() =>
+      t.manager.batch(dev, folder, {
+        op: "browser.batch",
+        commands: commands.map((c) => ({ ...c, timeoutSeconds: 30 })),
+        ...(allowedDomains ? { allowedDomains } : {}),
+      }),
+    );
+  expect(
+    await batch(
+      [
+        { command: "open", args: ["https://shop.example.com"] },
+        { command: "open", args: ["https://evil.example"] },
+      ],
+      ["shop.example.com"],
+    ),
+  ).toBe("not_allowed");
+  expect(await batch([{ command: "open", args: ["https://x.com", "--profile", "Default"] }])).toBe("bad_request");
+  expect(await batch([{ command: "chat", args: ["hi"] }])).toBe("bad_request");
+  expect(await batch([])).toBe("bad_request");
+  expect(t.logged()).toHaveLength(0);
+});
+
+test.if(posix)("capture: the page as a JPEG with its numbered elements, and the file gone at once", async () => {
+  const t = setup();
+  expect(await errorCode(async () => t.manager.capture(dev, await t.folder()))).toBe("bad_request");
+  await t.act("open", ["https://shop.example.com"]);
+  const shot = await t.manager.capture(dev, await t.folder());
+  expect(shot).toMatchObject({
+    width: 1280,
+    height: 800,
+    viewport: { width: 1280, height: 800 },
+    url: "https://shop.example.com",
+    marks: [{ ref: "e1", number: 1, role: "button", name: "Go", box: { x: 10, y: 20, width: 100, height: 40 } }],
+  });
+  expect([...Buffer.from(shot.data, "base64").subarray(0, 2)]).toEqual([0xff, 0xd8]);
+  expect(readdirSync(path.join(await t.folder(), ".agentes", "captures"))).toEqual([]);
+  const call = t.logged().find((c) => c.args.includes("--annotate"));
+  expect(call?.args).toContain("jpeg");
+});
+
 test.if(posix)("the first screenshot works: its folder is made before", async () => {
   const t = setup();
   await t.act("open", ["https://shop.example.com"]);
@@ -645,7 +752,7 @@ test.if(posix)(
       type: "browser.frame",
       agentId: dev.id,
       seq: 0,
-      data: Buffer.from("png").toString("base64"),
+      data: expect.stringMatching(/^\/9j\//), // the JPEG the fake writes (FF D8 FF)
       metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/", title: "Loja" },
     });
     const shot = t.logged().find((c) => c.args.includes("screenshot"));

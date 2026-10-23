@@ -1,7 +1,9 @@
-import { and, type Database, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { EmailError, type EmailSender } from "@agenteschat/adapters";
+import { and, type Database, type Executor, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { randomToken, sha256 } from "./crypto";
 import { queueEmail } from "./email";
 import { ValidationError } from "./errors";
+import { enqueue, PermanentJobError } from "./outbox";
 
 const { waitlistEntries } = schema;
 
@@ -42,10 +44,15 @@ export async function joinWaitlist(
   const locale: WaitlistLocale = WAITLIST_LOCALES.includes(input.locale as WaitlistLocale)
     ? (input.locale as WaitlistLocale)
     : "pt-BR";
-  await db
-    .insert(waitlistEntries)
-    .values({ email, locale, source: input.source ?? "landing" })
-    .onConflictDoNothing();
+  await db.transaction(async (tx) => {
+    const [added] = await tx
+      .insert(waitlistEntries)
+      .values({ email, locale, source: input.source ?? "landing" })
+      .onConflictDoNothing()
+      .returning({ id: waitlistEntries.id });
+    // A new address is a contact right away, as pending until confirmed.
+    if (added) await enqueueWaitlistContact(tx, added.id, "pending");
+  });
 
   const token = randomToken();
   return db.transaction(async (tx) => {
@@ -98,9 +105,68 @@ export async function confirmWaitlist(db: Database, token: string, now = new Dat
   if (!entry) return false;
   if (entry.confirmedAt) return true;
   if (!entry.confirmSentAt || now.getTime() - entry.confirmSentAt.getTime() > WAITLIST_LINK_TTL_MS) return false;
-  await db
-    .update(waitlistEntries)
-    .set({ confirmedAt: now })
-    .where(and(eq(waitlistEntries.id, entry.id), isNull(waitlistEntries.confirmedAt)));
+  await db.transaction(async (tx) => {
+    const [confirmed] = await tx
+      .update(waitlistEntries)
+      .set({ confirmedAt: now })
+      .where(and(eq(waitlistEntries.id, entry.id), isNull(waitlistEntries.confirmedAt)))
+      .returning({ id: waitlistEntries.id });
+    if (confirmed) await enqueueWaitlistContact(tx, confirmed.id, "confirmed");
+  });
   return true;
+}
+
+/**
+ * Job `waitlist.contact`: the address goes to the email provider's contacts,
+ * once when it joins (pending) and once when it's confirmed.
+ */
+function enqueueWaitlistContact(db: Executor, entryId: string, status: "pending" | "confirmed") {
+  return enqueue(db, {
+    orgId: null,
+    kind: "waitlist.contact",
+    payload: { entryId },
+    dedupeKey: status === "confirmed" ? `waitlist.contact:${entryId}` : `waitlist.contact:${entryId}:pending`,
+  });
+}
+
+/**
+ * Queues `waitlist.contact` for every entry in its current status (run at
+ * boot: catches up entries from before contacts were synced; the dedupe key
+ * makes it a no-op for the rest). Returns how many entries were looked at.
+ */
+export async function enqueueWaitlistContacts(db: Database): Promise<number> {
+  const rows = await db
+    .select({ id: waitlistEntries.id, confirmedAt: waitlistEntries.confirmedAt })
+    .from(waitlistEntries);
+  for (const row of rows) await enqueueWaitlistContact(db, row.id, row.confirmedAt ? "confirmed" : "pending");
+  return rows.length;
+}
+
+/**
+ * Saves an entry as a contact in the email provider (MillionSend), with
+ * `waitlist` ("pending" or "confirmed"), `locale`, `source`,
+ * `waitlist_joined_at` and, once confirmed, `waitlist_confirmed_at`, so the
+ * list can be segmented there. The status is read now, not when the job was
+ * queued, so a late pending job never undoes a confirmation. A provider
+ * without contacts: nothing.
+ */
+export async function saveWaitlistContact(db: Database, email: EmailSender, entryId: string): Promise<void> {
+  if (!email.saveContact) return;
+  const [entry] = await db.select().from(waitlistEntries).where(eq(waitlistEntries.id, entryId));
+  if (!entry) return;
+  try {
+    await email.saveContact({
+      email: entry.email,
+      properties: {
+        waitlist: entry.confirmedAt ? "confirmed" : "pending",
+        locale: entry.locale,
+        source: entry.source,
+        waitlist_joined_at: entry.createdAt.toISOString(),
+        ...(entry.confirmedAt ? { waitlist_confirmed_at: entry.confirmedAt.toISOString() } : {}),
+      },
+    });
+  } catch (error) {
+    if (error instanceof EmailError && !error.retryable) throw new PermanentJobError(error.message);
+    throw error;
+  }
 }

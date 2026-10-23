@@ -8,6 +8,7 @@ import {
   useDecideApproval,
   usePostMessage,
 } from "@agenteschat/client";
+import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -458,6 +459,20 @@ export function ExactAction({ approval, max }: { approval: Approval; max?: numbe
   );
 }
 
+/** "Pedido pela rotina «X» enquanto ninguém acompanhava": asked while nobody was watching (ADR 0053 §8). */
+function ApprovalOrigin({ approval }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const origin = approvalOriginWords(approval);
+  if (!origin) return null;
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return (
+    <p className="ap-origin">
+      <Icon name="routines" size={14} />
+      <span>{tt(origin.key, origin.values)}</span>
+    </p>
+  );
+}
+
 function Traits({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const traits = approvalTraits(approval);
@@ -706,8 +721,9 @@ function RequestCard({
         </button>
       </h3>
       <div className="ap-card__body">
+        <ApprovalOrigin approval={a} />
+        {approvalWhy(a) && <p className="ap-why">{approvalWhy(a)}</p>}
         <ExactAction approval={a} max={4} />
-        {a.why && <p className="ap-why">{a.why}</p>}
         <Traits approval={a} />
         {running && <p className="ap-card__running">{t("approvals.running", { The: g.The, name })}</p>}
         {refusing && a.canDecide && <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />}
@@ -964,6 +980,22 @@ function ApprovalDetails({
 
       {p !== "waiting" && <Outcome approval={a} agent={agent} />}
 
+      <ApprovalOrigin approval={a} />
+      {approvalWhy(a) && (
+        <DetailsSection title={t("approvals.panel.why")}>
+          <p className="ap-bubble">{approvalWhy(a)}</p>
+          {a.issue && (
+            <Link
+              className="ap-link"
+              to="/org/$orgId/issues/$number"
+              params={{ orgId: org.id, number: String(a.issue.number) }}
+            >
+              #{a.issue.number} {a.issue.title}
+            </Link>
+          )}
+        </DetailsSection>
+      )}
+
       <DetailsSection title={t("approvals.panel.exact")}>
         <ExactAction approval={a} />
         {Object.keys(a.params ?? {}).length > scalars(a.params).length && (
@@ -978,21 +1010,6 @@ function ApprovalDetails({
           </a>
         )}
       </DetailsSection>
-
-      {a.why && (
-        <DetailsSection title={t("approvals.panel.why")}>
-          <p className="ap-bubble">{a.why}</p>
-          {a.issue && (
-            <Link
-              className="ap-link"
-              to="/org/$orgId/issues/$number"
-              params={{ orgId: org.id, number: String(a.issue.number) }}
-            >
-              #{a.issue.number} {a.issue.title}
-            </Link>
-          )}
-        </DetailsSection>
-      )}
 
       {(a.trail?.length ?? 0) > 1 && (
         <DetailsSection title={t("approvals.panel.trail")}>

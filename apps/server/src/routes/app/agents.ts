@@ -17,6 +17,7 @@ import {
   getTeam,
   listAgents,
   listCredentials,
+  NEW_AGENT_DEFAULTS,
   NotFoundError,
   publishMachineAgentsChanged,
   revokeCredential,
@@ -45,7 +46,7 @@ import {
   AgentAppearance,
   AgentAudience,
   AgentBrain,
-  BrainEffort,
+  BrainEffortSetting,
   BrainKind,
   Credential,
   Model,
@@ -82,7 +83,9 @@ const AgentFields = z.object({
   name: z.string().trim().min(1).max(80),
   role: z.string().max(200).optional(),
   instructions: z.string().max(50_000).optional(),
-  model: z.string().optional().openapi({ description: "Defaults to AGENT_DEFAULT_MODEL." }),
+  model: z.string().optional().openapi({
+    description: "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to `auto`.",
+  }),
   credentialId: z
     .uuid()
     .nullable()
@@ -106,7 +109,7 @@ const budget = (usd: number | null | undefined) =>
 
 /** Provider credentials, agents, usage and the model catalog. */
 export function agentRoutes(deps: AppDeps) {
-  const { db, config, adapters } = deps;
+  const { db, adapters } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
   app.use("/models", requireSession(deps.auth));
@@ -118,12 +121,22 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Models agents can use, with prices",
-      responses: { 200: json(z.object({ models: z.array(Model), defaultModel: z.string() })), 401: errors[401] },
+      responses: {
+        200: json(
+          z.object({
+            models: z.array(Model),
+            defaultModel: z
+              .string()
+              .openapi({ description: "What a new agent gets when no model is chosen: `auto` (D83)." }),
+          }),
+        ),
+        401: errors[401],
+      },
     }),
     (c) =>
       c.json(
         {
-          defaultModel: config.AGENT_DEFAULT_MODEL,
+          defaultModel: NEW_AGENT_DEFAULTS.model,
           models: Object.entries(MODEL_CATALOG).map(([id, m]) => ({
             id,
             label: m.label,
@@ -324,7 +337,8 @@ export function agentRoutes(deps: AppDeps) {
         c.get("user").id,
         orgId,
         { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
-        { model: config.AGENT_DEFAULT_MODEL },
+        // New agents start on "Automático" (D83).
+        NEW_AGENT_DEFAULTS,
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
@@ -442,7 +456,7 @@ export function agentRoutes(deps: AppDeps) {
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
-                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name. Null = the brain's default; omitted = keep (reset when the brain changes).",
+                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier, D83). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
             acceptPlanTerms: z.boolean().optional(),
@@ -450,9 +464,9 @@ export function agentRoutes(deps: AppDeps) {
               description:
                 "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the person who connected the computer may change it (`account.not_owner`).",
             }),
-            effort: BrainEffort.nullable()
+            effort: BrainEffortSetting.nullable()
               .optional()
-              .openapi({ description: "Null = the CLI's default; omitted = keep." }),
+              .openapi({ description: "`auto` = picked per run (D83); null = the CLI's default; omitted = keep." }),
           }),
         ),
       },

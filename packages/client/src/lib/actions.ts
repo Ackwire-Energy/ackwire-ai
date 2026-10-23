@@ -1,5 +1,12 @@
 import type { TFunction } from "i18next";
-import type { AgentAction } from "../api/types";
+import type { AgentAction, ApiRule } from "../api/types";
+
+/** A receipt's `params.rule` when it is a rule (`freq`, `timezone`); anything else is none. */
+function ruleOf(value: unknown): ApiRule | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const r = value as Partial<ApiRule>;
+  return typeof r.freq === "string" && typeof r.timezone === "string" ? (r as ApiRule) : null;
+}
 
 /**
  * Act with undo (ADR 0037 round 2): how a receipt under an agent's reply
@@ -63,6 +70,8 @@ export function actionTextValues(
   a: Pick<AgentAction, "kind" | "target" | "params">,
   t: TFunction,
   viewerUserId?: string,
+  /** Says a routine's rule in the person's language (the web's sentence); without it, no schedule. */
+  options: { schedule?: (rule: ApiRule) => string } = {},
 ): Record<string, string> {
   const p = a.params;
   const fields = Array.isArray(p.fields) ? p.fields : [];
@@ -101,8 +110,12 @@ export function actionTextValues(
     case "memory.updated":
     case "memory.forgotten":
       return { text: str(p.text) };
-    case "routine.created":
-      return { name: str(p.name) || title, schedule: str(p.schedule) };
+    case "routine.created": {
+      // When it runs, from its rule in the person's language; the server's `schedule` is English, never shown.
+      const rule = ruleOf(p.rule);
+      const schedule = rule && options.schedule ? options.schedule(rule) : "";
+      return schedule ? { name: str(p.name) || title, schedule } : { name: str(p.name) || title, context: "bare" };
+    }
     case "routine.updated": {
       const v: Record<string, string> = { name: str(p.name) || title, fields: fieldWords("routineFields") };
       if (fields.length === 1 && fields[0] === "active") v.context = p.active ? "resumed" : "paused";
