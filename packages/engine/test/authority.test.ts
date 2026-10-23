@@ -46,7 +46,7 @@ const runFor = async (messageId: string, options: { background?: boolean } = {})
   if (!run) throw new Error("no run");
   return run;
 };
-const brief = (): RoutineBrief => ({
+const brief = (over: Partial<RoutineBrief> = {}): RoutineBrief => ({
   routineId: crypto.randomUUID(),
   routineRunId: crypto.randomUUID(),
   name: "Vigiar e-mails",
@@ -56,6 +56,7 @@ const brief = (): RoutineBrief => ({
   report: "when_new",
   trigger: "schedule",
   dueAt: new Date().toISOString(),
+  ...over,
 });
 
 describe("who is behind a run", () => {
@@ -90,15 +91,43 @@ describe("who is behind a run", () => {
       notice: { kind: "routine_handoff", text: "Erro novo no checkout", from: "Routine «Sentry»", refs: {} },
     });
     const woken = await runFor(report.id);
-    expect(await runAuthority(f.db, woken)).toEqual({ kind: "unattended", personId: null, reason: "routine_report" });
+    // A report whose routine run can't be told works as one that only looks.
+    expect(await runAuthority(f.db, woken)).toEqual({
+      kind: "unattended",
+      personId: null,
+      reason: "routine_report",
+      routineAccess: "read",
+    });
     // Its reply mentioning someone else still roots in the report.
     const reply = await byAgent("@dev é do seu deploy?", woken.id);
-    expect(await messageRoot(f.db, f.org.id, reply.id)).toEqual({ kind: "routine_report" });
+    expect(await messageRoot(f.db, f.org.id, reply.id)).toEqual({ kind: "routine_report", backgroundRunId: null });
     // A person writing into it puts them behind it from then on.
     expect(await runAuthority(f.db, { ...woken, transcript: { steeredBy: f.owner.id } })).toEqual({
       kind: "person",
       personId: f.owner.id,
     });
+  });
+
+  test("the run a routine's report wakes works within that routine's access", async () => {
+    f = await setup();
+    for (const access of ["read", "act"] as const) {
+      const fired = await byPerson("Confira o checkout", { routineBrief: brief({ access }), background: true });
+      const routineRun = await runFor(fired.id, { background: true });
+      const report = await byAgent("Checkout quebrou", null, {
+        notice: {
+          kind: "routine_handoff",
+          text: "Checkout quebrou",
+          from: "Routine «Checkout»",
+          refs: { runId: routineRun.id },
+        },
+      });
+      expect(await runAuthority(f.db, await runFor(report.id))).toEqual({
+        kind: "unattended",
+        personId: null,
+        reason: "routine_report",
+        routineAccess: access,
+      });
+    }
   });
 
   test("an answer to a question continues the work of the run that asked, for its person", async () => {

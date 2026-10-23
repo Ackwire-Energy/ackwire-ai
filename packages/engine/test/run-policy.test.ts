@@ -119,6 +119,21 @@ describe("run policy table", () => {
     expect(decide(unattended, app("github_create_issue", "github:issues.write"))).toBe("approve");
   });
 
+  test("woken by the report of a routine that only reads: no change of its own, it proposes", () => {
+    const fromRead: RunAuthority = { ...unattended, routineAccess: "read" };
+    expect(toolPolicy(fromRead, builtIn("create_issue", "issues:write"))).toEqual({
+      action: "refuse",
+      reason: REFUSALS.reportReadOnly,
+    });
+    expect(decide(fromRead, builtIn("remember", "memory:write"))).toBe("refuse");
+    expect(decide(fromRead, builtIn("list_issues", "issues:read"))).toBe("allow");
+    expect(decide(fromRead, builtIn("react"))).toBe("allow");
+    // A connected app's write still becomes a person's decision.
+    expect(decide(fromRead, app("github_create_issue", "github:issues.write"))).toBe("approve");
+    // A routine that may act: the run its report wakes may too, with receipts.
+    expect(decide({ ...unattended, routineAccess: "act" }, builtIn("create_issue", "issues:write"))).toBe("allow");
+  });
+
   test("person: unchanged (only hand_off, which is background work's)", () => {
     for (const tool of [
       builtIn("post_message"),

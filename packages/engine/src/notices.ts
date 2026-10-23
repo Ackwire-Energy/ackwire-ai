@@ -50,9 +50,10 @@ function yourRoutine(n: Notice) {
 export function handoffGuidance(report: string | undefined) {
   return [
     "Tell the people here what it found, in your own voice, as one message: how big it is first (urgent or not, how many, new or the same as before), then the concrete findings (ids, numbers, names, links), even when you ask them to decide something, then what you would do about it. When a decision is theirs, end with that one question.",
+    "When what you'd do needs a person's approval (a rollback, a deploy, a merge, a change in a connected app), ask for it with that tool and your reason instead of asking in words: it becomes a card here, and nothing runs until a person approves.",
     "Don't redo the routine's lookups: it already looked. Check something only when the report leaves a gap that matters.",
     report === "always"
-      ? "This routine reports every time: keep the full report, every finding and number, in your own words; don't cut it to a summary, and say so in a line when nothing changed."
+      ? "This routine reports every time: on a quiet day say so in one line with the key numbers; when something changed, keep every finding and number in your own words (don't cut it to a vague summary)."
       : "If it turns out to be nothing they need, say nothing.",
   ].join(" ");
 }

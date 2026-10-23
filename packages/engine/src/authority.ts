@@ -1,5 +1,5 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
-import { type RoutineBrief, routineBriefOf } from "./routine-brief";
+import { type RoutineAccess, type RoutineBrief, routineBriefOf } from "./routine-brief";
 
 const { agentRuns, messages } = schema;
 
@@ -14,7 +14,9 @@ const { agentRuns, messages } = schema;
  *   from the routine's access level (`brief.access`).
  * - `unattended`: no person at the root: the conversation run a routine's report woke, a note from
  *   another agent, an agent's own message. It may read and talk where it is, never act for anyone.
- *   A person writing into such a run (`steeredBy`) puts that person behind it from then on.
+ *   One a routine's report woke works within that routine's access (`routineAccess`): the report of a
+ *   routine that only looks wakes a run that only looks and proposes. A person writing into such a
+ *   run (`steeredBy`) puts that person behind it from then on.
  *
  * Message metadata alone never proves a person: only authorship and server-set links (a message's run,
  * a notice's run) are followed.
@@ -22,7 +24,7 @@ const { agentRuns, messages } = schema;
 export type RunAuthority =
   | { kind: "person"; personId: string }
   | { kind: "routine"; personId: null; brief: RoutineBrief | null }
-  | { kind: "unattended"; personId: null; reason: UnattendedReason };
+  | { kind: "unattended"; personId: null; reason: UnattendedReason; routineAccess?: RoutineAccess };
 
 /** Why nobody is behind an unattended run (for its refusal reasons and its card's words). */
 export type UnattendedReason = "routine_report" | "agent_note" | "agent";
@@ -31,7 +33,8 @@ export type UnattendedReason = "routine_report" | "agent_note" | "agent";
 export type MessageRoot =
   | { kind: "person"; personId: string }
   | { kind: "routine" }
-  | { kind: "routine_report" }
+  /** `backgroundRunId`: the routine's run that handed it off (the notice's `refs.runId`). */
+  | { kind: "routine_report"; backgroundRunId: string | null }
   | { kind: "agent_note" }
   | { kind: "agent" };
 
@@ -74,7 +77,10 @@ export async function messageRoot(db: Executor, orgId: string, messageId: string
       return m.authorUserId ? { kind: "person", personId: m.authorUserId } : { kind: "agent" };
     }
     const notice = noticeOf(m.meta);
-    if (notice?.kind === "routine_handoff") return { kind: "routine_report" };
+    if (notice?.kind === "routine_handoff") {
+      const runId = notice.refs?.runId;
+      return { kind: "routine_report", backgroundRunId: typeof runId === "string" ? runId : null };
+    }
     if (notice?.kind === "agent_note") return { kind: "agent_note" };
     // The answer to a question this agent asked, or the result it waited for: it continues the work of
     // the run that asked (its `refs.runId`), for whoever is behind that run.
@@ -127,11 +133,22 @@ export async function runAuthority(db: Executor, run: AuthorityRun): Promise<Run
   if (root.kind === "person") return { kind: "person", personId: root.personId };
   const steeredBy = steeredByOf(run.transcript);
   if (steeredBy) return { kind: "person", personId: steeredBy };
-  return {
-    kind: "unattended",
-    personId: null,
-    reason: root.kind === "agent_note" ? "agent_note" : root.kind === "agent" ? "agent" : "routine_report",
-  };
+  if (root.kind === "routine_report") {
+    const routineAccess = await accessOfReport(db, run.orgId, root.backgroundRunId);
+    return { kind: "unattended", personId: null, reason: "routine_report", routineAccess };
+  }
+  return { kind: "unattended", personId: null, reason: root.kind === "agent_note" ? "agent_note" : "agent" };
+}
+
+/** The access a routine's run handed off with (its brief); `read` when it can't be told. */
+async function accessOfReport(db: Executor, orgId: string, backgroundRunId: string | null): Promise<RoutineAccess> {
+  if (!backgroundRunId || !UUID.test(backgroundRunId)) return "read";
+  const [row] = await db
+    .select({ meta: messages.meta })
+    .from(agentRuns)
+    .innerJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.triggerMessageId)))
+    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, backgroundRunId), eq(agentRuns.background, true)));
+  return routineBriefOf(row?.meta)?.access === "act" ? "act" : "read";
 }
 
 /** Who is behind a run, by its id (the tool context's `runId`); unattended when the run is gone. */

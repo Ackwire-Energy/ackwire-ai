@@ -17,7 +17,9 @@ import type { ToolDefinition } from "./types";
  * - `routine`, access `act`: also internal changes people can undo (issues, memory, wiki, Drive, its
  *   own branches and pull requests, its computer); every write to a connected app asks a person.
  * - `unattended`: reads, the reply where it is (`react`, `pass`, questions, cards), issues, memory and
- *   Drive files with receipts; writes to a connected app ask a person; nothing elsewhere.
+ *   Drive files with receipts; writes to a connected app ask a person; nothing elsewhere. Woken by the
+ *   report of a routine that only reads (`routineAccess: "read"`): no change of its own either, it
+ *   proposes (a person's go-ahead puts them behind it).
  *
  * Tool names are written here as plain strings (not imported) so the table loads before the tool
  * modules, which import the gateway.
@@ -154,6 +156,8 @@ export const REFUSALS = {
     "Nobody asked for this work (a routine's report or another agent started it): you can't post elsewhere, message people, manage routines or reminders, ask or tell other agents, or ask for secrets or permissions. Say it in your reply here; the people decide.",
   unattendedInternal:
     "Nobody asked for this work (a routine's report or another agent started it): say in your reply what you'd do; a person asks you to go ahead.",
+  reportReadOnly:
+    "The routine behind this report only looks and tells: change nothing yourself. Say in your reply what you'd do (the issue you'd open, with its title); a person asks you to go ahead.",
   handOffOnly: "Only background work (a routine's run) hands off: just reply.",
   unknownTool:
     "This tool is only for work a person asked for. Say what you'd do (in hand_off for a routine's work, in your reply otherwise); a person asks you to go ahead.",
@@ -197,6 +201,7 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
     case "elsewhere":
       return refuse(REFUSALS.unattendedElsewhere);
     case "internal":
+      if (authority.kind === "unattended" && authority.routineAccess === "read") return refuse(REFUSALS.reportReadOnly);
       return UNATTENDED_INTERNAL.has(what.area) ? ALLOW : refuse(REFUSALS.unattendedInternal);
     case "external":
       return APPROVE;
