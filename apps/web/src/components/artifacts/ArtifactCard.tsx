@@ -67,12 +67,14 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   // Files are tiles that sit side by side (images as their thumbnail).
   if (a.content.kind === "file") {
     return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
       <div className="artifact-tile" data-kind="file" onContextMenu={onContextMenu}>
         <FileCardPreview content={a.content} artifactId={a.id} version={a.shownVersion} title={a.title} onOpen={open} />
       </div>
     );
   }
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
     <div className="artifact-card" data-kind={a.kind} onContextMenu={onContextMenu}>
       <button
         type="button"

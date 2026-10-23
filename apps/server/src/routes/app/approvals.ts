@@ -4,6 +4,12 @@ import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSe
 
 const tags = ["Approvals"];
 
+/** Where an approval asked while nobody watched comes from (ADR 0053 §8): a routine, or unattended work. */
+export const ApprovalOrigin = z.union([
+  z.object({ kind: z.literal("routine"), routineId: z.string(), routineName: z.string() }),
+  z.object({ kind: z.literal("unattended") }),
+]);
+
 export const Approval = z
   .object({
     id: z.uuid(),
@@ -33,7 +39,13 @@ export const Approval = z
       .openapi({ description: "What the action returned once it ran (raw, short)." }),
     connector: z.string().nullable().openapi({ example: "github" }),
     connectorAccount: z.string().nullable().openapi({ example: "acme" }),
-    why: z.string().nullable().openapi({ description: "What the agent said right before asking." }),
+    why: z
+      .string()
+      .nullable()
+      .openapi({ description: "The agent's required reason: what it found and why this action." }),
+    origin: ApprovalOrigin.nullable().openapi({
+      description: "Asked while nobody was watching: by a routine, or by unattended work.",
+    }),
     issue: z.object({ id: z.uuid(), number: z.number().int(), title: z.string() }).nullable(),
     trail: z
       .array(z.object({ text: z.string(), at: z.string() }))

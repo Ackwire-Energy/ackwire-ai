@@ -1,8 +1,9 @@
 import { type Approval, useCatalog } from "@agenteschat/client";
+import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Chip, Fuse, Text } from "@/ui";
+import { Chip, Fuse, Icon, Text } from "@/ui";
 import { useColors, useNow } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
 import { approvalSaid, approvalTable, approvalTraits } from "./logic";
@@ -59,15 +60,40 @@ export function ApprovalDetails({ approval: a, max = 3 }: { approval: Approval; 
   );
 }
 
-/** "Theo disse antes: “…”" (its last words before asking), when it said something. */
-export function ApprovalSaid({ approval: a, name }: { approval: Approval; name: string }) {
+/**
+ * Why it asks, read before the action (ADR 0053 §8): "Pedido pela rotina «X» enquanto ninguém
+ * acompanhava" when nobody was watching, then "Theo disse: “…”" (its reason, else its last words).
+ * The request itself, or its notification (only its origin and why).
+ */
+export function ApprovalWhy({
+  approval: a,
+  name,
+}: {
+  approval: Pick<Approval, "origin" | "why" | "trail">;
+  name: string;
+}) {
   const { t } = useTranslation();
+  const c = useColors();
   const said = approvalSaid(a);
-  if (!said) return null;
+  const origin = approvalOriginWords(a);
+  if (!said && !origin) return null;
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
-    <Text variant="small" tone="muted" style={styles.said}>
-      {t("mobile.approval.why", { name, text: said })}
-    </Text>
+    <View style={styles.why}>
+      {origin ? (
+        <View style={styles.origin}>
+          <Icon name="clock" size={13} color={c.muted} />
+          <Text variant="footnote" tone="muted" style={styles.grow}>
+            {tt(origin.key, origin.values)}
+          </Text>
+        </View>
+      ) : null}
+      {said ? (
+        <Text variant="small" tone="ink2" style={styles.said}>
+          {t("mobile.approval.why", { name, text: said })}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -95,6 +121,8 @@ const styles = StyleSheet.create({
   factKey: { width: 92 },
   grow: { flex: 1, minWidth: 0 },
   said: { lineHeight: 20 },
+  why: { gap: 4 },
+  origin: { flexDirection: "row", alignItems: "center", gap: 6 },
   fuse: { flexDirection: "row", alignItems: "center", gap: 10 },
   expiry: { fontWeight: "500", fontVariant: ["tabular-nums"] },
 });

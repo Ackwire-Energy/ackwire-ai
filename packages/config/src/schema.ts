@@ -174,7 +174,8 @@ export const envVars = {
   },
   AGENT_DEFAULT_MODEL: {
     schema: modelId.default("claude-sonnet-5-5"),
-    description: "Model used by new agents unless one is chosen explicitly.",
+    description:
+      "Unused since D83: new agents start on Automático (`auto`, each run picks the model and effort), whatever this says. Still checked when set; to be removed.",
     section: "Agents",
   },
   ROUTER_ENABLED: {

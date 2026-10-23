@@ -53,10 +53,16 @@ describe("Entrar (e-mail primeiro)", () => {
     // auth-config of the fake: GitHub only.
     expect(screen().queryByRole("button", { name: /Continuar com Google/ })).toBeNull();
     expect(screen().getByRole("button", { name: /Continuar com GitHub/ })).toBeTruthy();
-    expect(screen().getByRole("button", { name: /^Continuar(?! com)/ }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Continuar(?! com)/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
     await type("E-mail", "marina@acme.com.br");
     await press(/^Continuar(?! com)/);
-    expect(state.calls.find((c) => c.method === "account.signInOptions")?.args).toEqual([{ email: "marina@acme.com.br" }]);
+    expect(state.calls.find((c) => c.method === "account.signInOptions")?.args).toEqual([
+      { email: "marina@acme.com.br" },
+    ]);
     expect(heading()).toBe("Bom te ver de novo.");
     expect(screen().getByText("marina@acme.com.br")).toBeTruthy();
 
@@ -105,7 +111,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(heading()).toBe("Te mando um link para criar outra senha.");
     await press(/^Enviar link/);
     expect(calls[0]?.method).toBe("requestPasswordReset");
-    expect((calls[0]?.args[0] as { email: string }).email).toBe("marina@gmail.com");
+    expect((calls[0]?.args[0] as { email: string } | undefined)?.email).toBe("marina@gmail.com");
     expect(heading()).toBe("Pronto. Mandei o link para marina@gmail.com.");
     expect(screen().getByRole("link", { name: "Abrir o Gmail" }).getAttribute("href")).toBe("https://mail.google.com");
   });
@@ -133,7 +139,11 @@ describe("Criar conta (e-mail novo)", () => {
     expect(heading()).toBe("Boa, Walter. Agora uma senha.");
     await type("Crie uma senha", "curta");
     expect(screen().getByText("Faltam 3 caracteres (mínimo de 8).")).toBeTruthy();
-    expect(screen().getByRole("button", { name: /Criar conta/ }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen()
+        .getByRole("button", { name: /Criar conta/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
     await type("Crie uma senha", "senha-longa");
     expect(screen().getByText("Senha ok.")).toBeTruthy();
     await press(/Criar conta/);
@@ -290,7 +300,8 @@ describe("Onboarding", () => {
     expect(screen().queryByRole("button", { name: /Usar créditos da plataforma/ })).toBeNull();
     const save = () => button(/Salvar e criar 1 agente/);
     expect(save().hasAttribute("disabled")).toBe(true);
-    expect(document.body.textContent).toContain("Começa com Claude Sonnet 5.5.");
+    // New agents start on "Automático" (D83).
+    expect(document.body.textContent).toContain("Começa no Automático: escolhe o modelo e o esforço para cada tarefa.");
     await type("Chave da API da Anthropic", "sk-errado");
     await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Anthropic")));
     expect(document.body.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
@@ -349,7 +360,7 @@ describe("Onboarding", () => {
       name: "Theo",
       handle: "theo",
       role: "PM",
-      model: "claude-sonnet-5-5",
+      model: "auto",
       credentialId: null,
       appearance: { color: "indigo", eyes: "round", accessory: "cap" },
     });
@@ -505,7 +516,8 @@ describe("Onboarding", () => {
       name: "Morgan",
       handle: "lead",
       role: "Sales lead",
-      model: "claude-sonnet-5-5",
+      // The source names no model of ours: Automático.
+      model: "auto",
       credentialId: null,
       appearance: { color: "violet" },
     });

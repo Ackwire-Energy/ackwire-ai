@@ -1,5 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { cx } from "../cx";
+import { Icon } from "../icons/Icon";
 import { Chip } from "./Chip";
 
 export type ApprovalStatus = "waiting" | "approved" | "refused";
@@ -10,6 +11,10 @@ export interface ApprovalCardProps extends Omit<HTMLAttributes<HTMLElement>, "ti
   who: ReactNode;
   /** Chip text: "Aguardando você", "Expira em 23 h", "Aprovado por você · agora". */
   statusLabel?: ReactNode;
+  /** Asked while nobody was watching ("Pedido pela rotina «X» enquanto ninguém acompanhava"): above the why. */
+  origin?: ReactNode;
+  /** Why the agent asks (what it found, why this action): read before the action itself. */
+  why?: ReactNode;
   /** The action in human words: "Fazer merge do PR #42 em main". Omitted on the compact decided card. */
   title?: ReactNode;
   /** Exact detail (tool, target, expiry). */
@@ -34,6 +39,8 @@ export function ApprovalCard({
   status,
   who,
   statusLabel,
+  origin,
+  why,
   title,
   detail,
   actions,
@@ -63,6 +70,13 @@ export function ApprovalCard({
           </Chip>
         )}
       </div>
+      {origin && (
+        <p className="ac-approval__origin">
+          <Icon name="routines" size={14} />
+          <span>{origin}</span>
+        </p>
+      )}
+      {why && <p className="ac-approval__why">{why}</p>}
       {title && <p className="ac-approval__title">{title}</p>}
       {detail && <p className="ac-approval__detail">{detail}</p>}
       {actions && <div className="ac-approval__actions">{actions}</div>}

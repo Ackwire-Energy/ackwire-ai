@@ -1,4 +1,3 @@
-import { and, eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_KINDS,
   type ArtifactActor,
@@ -15,6 +14,7 @@ import {
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
+import { personBehindCall } from "./requester";
 import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -95,15 +95,6 @@ const failed = (error: unknown): ToolOutput => ({
 });
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-
-/** The person whose message started this run (null when an agent did). */
-async function requesterOf(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ userId: schema.messages.authorUserId })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
-  return m?.userId ?? null;
-}
 
 /**
  * Drive tools through the Tool Gateway: `create_artifact`, `update_artifact`
@@ -234,7 +225,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
       async execute(input, ctx) {
         try {
           const since = str(input.since) ? new Date(str(input.since)) : undefined;
-          const requester = input.visibleToRequester === false ? null : await requesterOf(ctx);
+          const requester = input.visibleToRequester === false ? null : await personBehindCall(ctx);
           const list = await listArtifacts(deps.db, actorOf(ctx), ctx.orgId, {
             q: str(input.query) || undefined,
             kind: (input.kind as ArtifactKind | undefined) ?? undefined,
@@ -274,7 +265,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
         try {
           const actor = actorOf(ctx) as Extract<ArtifactActor, { type: "agent" }>;
           const result = await shareArtifact(deps, actor, ctx.orgId, str(input.artifact_id), {
-            requesterUserId: await requesterOf(ctx),
+            requesterUserId: await personBehindCall(ctx),
             note: str(input.note) || null,
           });
           const a = result.artifact;

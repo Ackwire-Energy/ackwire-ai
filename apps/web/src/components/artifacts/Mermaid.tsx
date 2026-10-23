@@ -13,7 +13,7 @@ const realRenderer: MermaidRenderer = async (id, source) => {
     securityLevel: "strict",
     theme: "neutral",
     flowchart: { htmlLabels: false },
-    fontFamily: "Onest Variable, Onest, sans-serif",
+    fontFamily: "Source Sans 3 Variable, Source Sans 3, sans-serif",
   });
   const { svg } = await mermaid.render(id, source);
   return svg;

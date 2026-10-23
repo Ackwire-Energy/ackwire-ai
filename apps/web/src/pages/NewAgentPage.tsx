@@ -18,7 +18,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
-import { modelChoices } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AffixInput,
@@ -78,7 +78,6 @@ import {
   type NewAgentStep,
   presetChannels,
   presetLevels,
-  presetModel,
   ROLE_GROUPS,
   ROLE_PRESETS,
   type RoleGroupId,
@@ -195,7 +194,8 @@ function NewAgentFlow() {
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
   const [owner, setOwner] = useState(me.user.id);
   const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
-  const [model, setModel] = useState<string | undefined>(undefined);
+  // "Automático" (D83) for every new agent: each task gets its model and effort; a fixed model is one click away.
+  const [model, setModel] = useState<string>(AUTO);
   const [key, setKey] = useState(DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).
   const [budget, setBudget] = useState("");
@@ -224,11 +224,7 @@ function NewAgentFlow() {
     [agents.data, members.data],
   );
 
-  // Defaults once the data arrives: the deployment's usable model, the skills on for new agents, the levels.
-  useEffect(() => {
-    if (model || !models.data || !credentials.data) return;
-    setModel(presetModel("sonnet", models.data.models, (m) => usable.has(m.id), models.data.defaultModel));
-  }, [model, models.data, credentials.data, usable]);
+  // Defaults once the data arrives: the skills on for new agents, the levels.
   useEffect(() => {
     if (library.data && skillIds === null)
       setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
@@ -257,7 +253,7 @@ function NewAgentFlow() {
     ownerUserId: ownerId,
     audience,
     budget,
-    modelOk: Boolean(model && usable.has(model)),
+    modelOk: isAuto(model) ? usable.size > 0 : usable.has(model),
   };
   const errors = tried.has(step) ? stepErrors(step, check) : [];
   const errorOf = (field: DraftError["field"]) => errors.find((e) => e.field === field);
@@ -281,6 +277,7 @@ function NewAgentFlow() {
   const defaultBudget = settings.data?.defaultAgentBudgetUsd;
   const budgetShown = amount ?? defaultBudget;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
+  const modelLabel = isAuto(model) ? t("brain.auto.label") : (modelInfo?.label ?? model);
   const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
   const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
   const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
@@ -411,7 +408,7 @@ function NewAgentFlow() {
     setChannelIds(new Set());
     setOwner(me.user.id);
     setAudience({ mode: "everyone", userIds: [] });
-    setModel(undefined);
+    setModel(AUTO);
     setKey(DEFAULT_KEY);
     setBudget("");
     scrollTop();
@@ -460,7 +457,7 @@ function NewAgentFlow() {
     setInstructions(t(`newAgent.roles.${id}.instructions`));
     setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
-    if (models.data) setModel(presetModel(preset.model, models.data.models, (m) => usable.has(m.id), model));
+    setModel(AUTO);
     setTried((prev) => {
       const nextTried = new Set(prev);
       nextTried.delete("role");
@@ -1075,7 +1072,7 @@ function NewAgentFlow() {
               "bolt",
               t("newAgent.modelAndCost"),
               <span>
-                {modelInfo?.label ?? model}{" "}
+                {modelLabel}{" "}
                 <span className="muted">
                   · {keyLabel}
                   {budgetShown !== undefined && ` · ${t("newAgent.upTo", { amount: usd(t, locale, budgetShown) })}`}
@@ -1132,7 +1129,7 @@ function NewAgentFlow() {
         ? t("newAgent.hints.tools", { count: granted.length + grantedMail.length })
         : t("newAgent.hints.noTools"),
     where: joined.length ? t("newAgent.hints.where", { count: joined.length }) : t("newAgent.noChannelsYet"),
-    model: modelInfo?.label ?? "",
+    model: modelLabel,
     review: t("newAgent.hints.review"),
   };
 
@@ -1263,7 +1260,7 @@ function NewAgentFlow() {
               </PreviewSection>
               <PreviewSection label={t("newAgent.modelAndCost")}>
                 <span className="newag__chips">
-                  {modelInfo && chip("bolt", modelInfo.label, "model")}
+                  {modelLabel && chip("bolt", modelLabel, "model")}
                   {budgetShown !== undefined &&
                     !budgetInvalid &&
                     chip("wallet", t("newAgent.upTo", { amount: usd(t, locale, budgetShown) }), "budget")}

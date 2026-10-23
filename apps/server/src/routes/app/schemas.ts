@@ -177,6 +177,7 @@ export const AgentAction = z
         "memory.forgotten",
         "routine.created",
         "routine.updated",
+        "routine.deleted",
         "channel.agent_added",
         "wiki.page_created",
         "wiki.page_edited",
@@ -198,8 +199,21 @@ export const AgentAction = z
       slug: z.string().optional().openapi({ description: "Wiki pages." }),
     }),
     params: z
-      .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]))
-      .openapi({ description: "Values for the sentence (number, title, fields, status, text, agentName…)." }),
+      .record(
+        z.string(),
+        z.union([
+          z.string(),
+          z.number(),
+          z.boolean(),
+          z.null(),
+          z.array(z.string()),
+          z.record(z.string(), z.unknown()),
+        ]),
+      )
+      .openapi({
+        description:
+          "Values for the sentence (number, title, fields, status, text, agentName…); a routine's `rule` is an object the app words.",
+      }),
     createdAt: z.string(),
     undoableUntil: z
       .string()
@@ -358,6 +372,11 @@ export const BrainEffort = z.enum(BRAIN_EFFORTS).openapi("BrainEffort", {
   description: "How hard a computer brain thinks (Claude Code `--effort`; Codex maps `xhigh` and `max` to `high`).",
 });
 
+/** The effort setting: a level, or `auto` (picked per run with the model tier, D83). */
+export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("BrainEffortSetting", {
+  description: "A `BrainEffort`, or `auto`: the judge picks low, medium or high for each run (D83).",
+});
+
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
 export const MachineAccount = z
@@ -396,7 +415,7 @@ export const AgentBrain = z
       .uuid()
       .nullable()
       .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
-    effort: BrainEffort.nullable().openapi({ description: "Null = the CLI's default." }),
+    effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run (D83); null = the CLI's default." }),
     accounts: z.array(MachineAccount).openapi({ description: "The accounts on the agent's computer, both kinds." }),
     accountsOwner: z
       .object({ id: z.string(), name: z.string() })

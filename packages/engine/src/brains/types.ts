@@ -45,7 +45,7 @@ export interface BrainTurn {
   session?: BrainSession;
   /** Computer brains: the account to run with (absent: the computer's own sign-in). */
   account?: BrainAccount;
-  /** Computer brains: how hard it thinks (absent: the CLI's default). */
+  /** How hard it thinks (absent: the CLI's or the API's default); the model brain only gets one from "Automático". */
   effort?: BrainEffort;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;
@@ -58,10 +58,36 @@ export interface ToolResult {
   pause?: { kind: "approval" | "input"; id: string };
 }
 
+/** A person's message handed to a computer brain's turn in progress (live steering). */
+export interface SteerMessage {
+  /** A fresh UUID per handoff: `steer_read` names it once the turn read it. */
+  uuid: string;
+  /** Rendered as the loop renders messages read between turns. */
+  text: string;
+  /** "Parar e mandar": read now (the running tool moved to the background); a brain that can't is `unsupported`. */
+  urgent?: boolean;
+}
+
+/**
+ * `accepted`: handed to the turn (read later: `steer_read`). `unsupported`:
+ * this turn can't take messages mid-turn (they wait for its end), or not an
+ * urgent one (the turn is stopped and started again instead). `no_turn`: the
+ * turn isn't there (just ended, or not started yet).
+ */
+export type SteerReply =
+  | { status: "accepted"; accepted: string[] }
+  | { status: "unsupported" | "no_turn"; reason?: string };
+
 export interface BrainIO {
   signal: AbortSignal;
   /** Model brain: the engine executes tool calls through the Tool Gateway. */
   executeTool(call: { id: string; name: string; input: unknown }): Promise<ToolResult>;
+  /**
+   * Computer brains that can take messages mid-turn (Claude Code on runner
+   * protocol 15) hand the engine a way to, once the turn is on its way, and
+   * `null` when it ends. Brains that can't never call it.
+   */
+  steerable?(steer: ((messages: SteerMessage[]) => Promise<SteerReply>) | null): void;
 }
 
 export type BrainEvent =
@@ -80,7 +106,9 @@ export type BrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean };
+  | { type: "error"; code: string; message: string; retryable?: boolean }
+  /** Messages handed mid-turn (`BrainIO.steerable`) that the turn read, by their `uuid`. */
+  | { type: "steer_read"; uuids: string[] };
 
 export interface Brain {
   kind: BrainKind;

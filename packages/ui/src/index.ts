@@ -157,9 +157,9 @@ export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export {
   Menu,
+  MenuAt,
   MenuCheckboxItem,
   MenuHeading,
-  MenuAt,
   MenuItem,
   MenuNote,
   MenuRadioGroup,

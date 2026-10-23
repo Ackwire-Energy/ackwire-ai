@@ -11,11 +11,13 @@ import {
   type RunnerAccess,
   type RunnerFrame,
   type RunnerTools,
+  STEER_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
 import { realFoldersFor } from "./access";
 import type { AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
+import type { CodexAppServers } from "./brain-codex-app";
 import type { BrowserManager } from "./browser";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
@@ -72,12 +74,15 @@ export interface HandlerContext {
   /**
    * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
    * scratch), how Codex starts our MCP server, and the live Codex runs the
-   * MCP bridge looks up by run id (`agentes-runner mcp --run <runId>`).
+   * MCP bridge looks up by run id (`agentes-runner mcp --run <runId>`), or
+   * by app-server process.
    */
   codex?: {
     runnerHome: string;
     mcp?: { socketPath: string; command: string[] };
     runs: Map<string, McpTaskInfo>;
+    /** Protocol 15: long-lived `codex app-server`s (turns take messages mid-turn); without it, `codex exec`. */
+    app?: CodexAppServers;
   };
   /** Protocol 9: whether the owner paused this computer (new work is refused with `paused`). */
   paused?: () => boolean;
@@ -284,6 +289,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   if (req.op === "access.request" || req.op === "access.reduce") return handleAccess(ctx, req);
   // Protocol 13: accounts belong to the machine, not to an agent.
   if (req.op === "account") return handleAccount(ctx, req);
+  // Protocol 15: messages for a turn already running (never new work: a paused computer still takes them).
+  if (req.op === "brain.steer") return doBrainSteer(ctx, req);
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
@@ -464,6 +471,38 @@ async function doBrainTurn(
   return { runId, final };
 }
 
+const STEER_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/**
+ * `brain.steer` (protocol 15): messages for the request's agent's turn of
+ * `runId` in progress (Claude Code reads them at its next tool boundary; a
+ * Codex turn on its app-server at its next model request, `turn/steer`).
+ * A Codex turn run by `codex exec` can't take any: `unsupported`.
+ */
+function doBrainSteer(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "brain.steer" }>,
+): MachineReplies["brain.steer"] | Promise<MachineReplies["brain.steer"]> {
+  if (!req.agent) throw new RunnerError("bad_request", "Steering belongs to an agent's turn");
+  const runId = requireString(req.runId, "runId");
+  const session = requireString(req.session, "session");
+  if (!Array.isArray(req.messages) || req.messages.length === 0 || req.messages.length > STEER_LIMITS.messages) {
+    throw new RunnerError("bad_request", `Between 1 and ${STEER_LIMITS.messages} messages`);
+  }
+  const messages = req.messages.map((m) => {
+    if (typeof m?.uuid !== "string" || !STEER_UUID.test(m.uuid)) throw new RunnerError("bad_request", "Invalid uuid");
+    if (typeof m.text !== "string" || !m.text.trim()) throw new RunnerError("bad_request", "Empty message");
+    return { uuid: m.uuid, text: m.text.slice(0, STEER_LIMITS.text), ...(m.urgent === true ? { urgent: true } : {}) };
+  });
+  if (ctx.codex?.runs.has(runId)) {
+    return ctx.codex.app
+      ? ctx.codex.app.steer(String(req.agent.id), { runId, session, messages })
+      : { status: "unsupported", reason: "Codex reads messages only between turns" };
+  }
+  if (!ctx.brains) return { status: "unsupported", reason: "This runner runs no brain turns" };
+  return ctx.brains.steer(String(req.agent.id), { runId, session, messages });
+}
+
 /**
  * A turn in an account that was refused (`not_logged_in`) or is gone
  * (`account_missing`): its CLI is asked again and the server hears the answer
@@ -478,9 +517,11 @@ function signedOut(ctx: HandlerContext, req: { account?: unknown }, final: { typ
 }
 
 /**
- * The Codex branch of `brain.turn`: `codex exec --json` per turn
- * (`brain-codex.ts`). While it runs, its MCP server (`mcp --run <runId>`,
- * the run's server token in its env) is relayed for the run.
+ * The Codex branch of `brain.turn`: on the session's `codex app-server`
+ * (`brain-codex-app.ts`; its bridge is the process's, relayed for this run),
+ * else `codex exec --json` per turn (`brain-codex.ts`), whose MCP server
+ * (`mcp --run <runId>`, the run's server token in its env) is relayed for the
+ * run. This run's entry also marks it a Codex run for `brain.steer`.
  */
 async function doCodexTurn(
   ctx: HandlerContext,
@@ -515,6 +556,7 @@ async function doCodexTurn(
         ...(codex.mcp ? { mcp: codex.mcp } : {}),
         ...(ctx.grants ? { grants: ctx.grants } : {}),
         ...(ctx.accounts ? { accounts: ctx.accounts } : {}),
+        ...(codex.app ? { app: codex.app } : {}),
       },
       req as unknown as CodexBrainTurnRequest,
       {
@@ -596,6 +638,9 @@ function describeOp(req: MachineRequest): string {
       return `task.output ${String(req.taskId ?? "")}`;
     case "brain.turn":
       return `brain.turn ${String(req.runId ?? "")} (${String(req.kind ?? "")}${req.model ? `, ${String(req.model)}` : ""})`;
+    case "brain.steer":
+      // Never the text: how many messages, for which run.
+      return `brain.steer ${String(req.runId ?? "")} (${Array.isArray(req.messages) ? req.messages.length : 0} messages)`;
     case "git.sync": {
       const repos = Array.isArray(req.repos) ? req.repos.map((r) => String(r?.repo ?? "")).join(", ") : "";
       return `git.sync ${repos || "(existing checkouts)"}`;

@@ -56,7 +56,16 @@ const agentScript = (req: { messages: { content: unknown }[]; system: unknown })
   if (last.includes("Decision: Ship to stores now?")) {
     return {
       chunks: ["Asking to merge."],
-      toolUses: [{ name: "request_approval", input: { action: "merge", target: "PR #3" } }],
+      toolUses: [
+        {
+          name: "request_approval",
+          input: {
+            action: "merge",
+            target: "PR #3",
+            why: "The decision came back and the checks passed: merging ships the work.",
+          },
+        },
+      ],
     };
   }
   if (last.includes("Recorded. End your turn")) return { chunks: ["Waiting for your call."] };

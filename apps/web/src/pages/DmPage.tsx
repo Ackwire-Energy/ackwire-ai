@@ -3,6 +3,7 @@ import { keys, useModels } from "@agenteschat/client";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import { Avatar, BrainIcon, Button } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -53,7 +54,11 @@ export function DmPage({ target }: { target: DmTarget }) {
   if (!dm.data || dir.loading) return <ChannelSkeleton />;
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
-  const model = agent ? (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model) : "";
+  const model = !agent
+    ? ""
+    : isAuto(agent.model)
+      ? t("brain.auto.label")
+      : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   // Who thinks: a computer brain ("Claude Code · Sonnet no mac") instead of the API model.
   const brainLine = agent ? agentBrainLine(t, agent, model) : null;
   const role = agent ? agent.role || `@${agent.handle}` : "";

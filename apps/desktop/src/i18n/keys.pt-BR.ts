@@ -246,7 +246,8 @@ export const desktopPtBR = {
       notifyBrowserTitle: "Avisar quando um agente precisar de você no navegador",
       notifyBrowserDesc: "O pedido já chega no celular e no site; isto avisa também no Mac.",
       dockTitle: "Mostrar no Dock",
-      dockDesc: "Com o número do que espera por você. Desligado, o app fica só na barra de menus quando não há janela aberta.",
+      dockDesc:
+        "Com o número do que espera por você. Desligado, o app fica só na barra de menus quando não há janela aberta.",
       notchTitle: "Mostrar os agentes no notch",
       notchDesc: "Em MacBooks com notch: quem está trabalhando aparece em volta da câmera.",
     },

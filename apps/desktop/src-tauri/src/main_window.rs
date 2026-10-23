@@ -375,7 +375,9 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
     let id = app.state::<Bridge>().next.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
     {
-        let mut waiting = app.state::<Bridge>().waiting.lock().map_err(|e| e.to_string())?;
+        // The state outlives the lock (a temporary `State` would be dropped while still borrowed).
+        let bridge = app.state::<Bridge>();
+        let mut waiting = bridge.waiting.lock().map_err(|e| e.to_string())?;
         if waiting.len() >= MAX_WAITING {
             return Err("this Mac is busy".into());
         }

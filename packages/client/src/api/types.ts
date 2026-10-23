@@ -305,6 +305,9 @@ export interface MessageReceipts {
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
 
+/** What became of a person's message that reached a waiting run (`agent.run.wait_message`). */
+export type WaitMessageOutcome = "resolved" | "woke" | "held";
+
 /** A run the server still considers active in a channel (`GET …/channels/{id}/active-runs`). */
 export interface ActiveRun {
   runId: string;
@@ -320,6 +323,8 @@ export interface ActiveRun {
   createdAt?: string;
   /** Messages sent to it while it works that it hasn't read yet (the others steered into it, it read). */
   pendingMessageIds?: string[];
+  /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
+  background?: boolean;
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -380,6 +385,8 @@ export type ChannelEvent =
       /** The message that started the run (anchors its live row). */
       triggerMessageId?: string | null;
       startedAt?: string | null;
+      /** A routine's background run: never the conversation's working indicator. */
+      background?: boolean;
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -392,7 +399,15 @@ export type ChannelEvent =
     }
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
-  | { type: "agent.thinking"; channelId: string; threadId: string; agentId: string; runId: string | null }
+  | {
+      type: "agent.thinking";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string | null;
+      /** A routine's background run: never the conversation's working indicator. */
+      background?: boolean;
+    }
   /** An agent asked another agent (`ask_agent`) and waits for it: "Dev está perguntando ao Infra…". */
   | {
       type: "agent.consulting";
@@ -424,6 +439,46 @@ export type ChannelEvent =
       runId: string;
       status: "done" | "failed" | "waiting_approval";
       error?: string;
+    }
+  // ── Chat delivery (packages/engine/src/events.ts) ───────────────────────────
+  /**
+   * Handed to a computer brain mid-turn (Claude Code reads it at its next tool boundary), not
+   * confirmed read yet: "Ada recebeu". `agent.run.read` follows once it is read.
+   */
+  | {
+      type: "agent.run.delivered";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageIds: string[];
+    }
+  /** Messages a run took but never read (it ended, failed, was stopped) went to a run of their own. */
+  | {
+      type: "agent.run.redispatched";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      newRunId: string;
+      messageIds: string[];
+    }
+  /** The run ended without posting (nobody called it by name and it had nothing to add): drop its row now. */
+  | { type: "agent.passed"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  /**
+   * A person's message reached a run that was waiting (browser help, another agent's answer, an approval).
+   * `resolved`: it ended the wait; `woke`: the run stopped waiting and reads it now; `held`: it waits for
+   * the decision on a card.
+   */
+  | {
+      type: "agent.run.wait_message";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageId: string;
+      waitKind: string;
+      outcome: WaitMessageOutcome;
     }
   /** A person is typing; drop it after `ttlMs`. */
   | { type: "user.typing"; channelId: string; threadId: string | null; userId: string; ttlMs: number }
@@ -551,12 +606,17 @@ export interface Approval {
   /** The connector it goes through ("github") and its account. */
   connector?: string | null;
   connectorAccount?: string | null;
-  /** What the agent said right before asking. */
+  /** Why it asks (ADR 0053 §8): what the agent found and why this action. Shown above the action. */
   why?: string | null;
+  /** Asked while nobody watched: by a routine (its name) or by an unattended run. Null: a person was there. */
+  origin?: ApprovalOrigin | null;
   issue?: { id: string; number: number; title: string } | null;
   /** One approval only: what the agent said at each turn before asking. */
   trail?: { text: string; at: string }[];
 }
+
+/** Who asked when nobody was watching (`approvals.origin`). */
+export type ApprovalOrigin = { kind: "routine"; routineId: string; routineName: string } | { kind: "unattended" };
 
 export interface ScopeInfo {
   id: string;
@@ -995,13 +1055,14 @@ export interface AgentActionTarget {
  * - `issue.assigned`: `number`, `title`, `assigneeType`, `assigneeId`, `assigneeName`, `assigneeIsSelf`
  * - `memory.saved`: `text` (and `previousText` when it replaced one); `memory.updated`: `text`, `previousText`;
  *   `memory.forgotten`: `text`
- * - `routine.created`: `name`, `schedule` (the server's words), `active`; `routine.updated`: `name`,
+ * - `routine.created`: `name`, `rule` (an `ApiRule`, said in the person's language), `schedule` (the server's
+ *   English words, never shown), `active`; `routine.updated`: `name`,
  *   `fields` (name, prompt, target, schedule, active), `active`, `schedule`
  * - `channel.agent_added`: `agentId`, `agentName`, `agentHandle`, `channel`
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
  */
-export type AgentActionParams = Record<string, string | number | boolean | null | string[]>;
+export type AgentActionParams = Record<string, string | number | boolean | null | string[] | ApiRule>;
 
 export interface AgentAction {
   id: string;
@@ -1510,37 +1571,104 @@ export type RoutineTarget =
   | RoutineTargetInput
   | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string };
 
+/** What a routine may do while nobody watches: look and tell (`read`), or also change things (`act`). */
+export type RoutineAccess = "read" | "act";
+/** When a routine speaks: on every run (`always`), or only when there is news (`when_new`). */
+export type RoutineReport = "always" | "when_new";
+
+/**
+ * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
+ * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
+ * or an answer), `failing` (its last runs failed: `failuresInRow`).
+ */
+export type RoutineState = "active" | "paused" | "running" | "waiting_computer" | "waiting_person" | "failing";
+
+/** Why the server paused a routine (the app says it, with its one-tap fix); null: a person paused it. */
+export type RoutinePausedReason =
+  | "creator_left"
+  | "creator_no_access"
+  | "agent_archived"
+  | "agent_not_in_channel"
+  | "audience"
+  | "failing";
+
 export interface Routine {
   id: string;
   name: string;
   agentId: string;
-  prompt: string;
+  /** What it does; null when the viewer may not see it (only its outcomes). */
+  prompt: string | null;
   target: RoutineTarget;
   trigger: RoutineTrigger;
   active: boolean;
   /** Null when paused or event-driven. */
   nextRunAt: string | null;
-  running: boolean;
+  createdAt: string;
+  access: RoutineAccess;
+  report: RoutineReport;
+  /** A coded reason (`RoutinePausedReason`); anything else is shown as a plain pause. */
+  pausedReason: string | null;
+  failuresInRow: number;
+  state: RoutineState;
+  /** Its run waits for this computer since `since` (state `waiting_computer`). */
+  waitingFor: { machineId: string; machineName: string; since: string } | null;
+  /** Who thinks for it, and on which computer (`machineName` null for the API). */
+  brain: { kind: BrainKind; machineName: string | null };
+  /**
+   * The last 7 days: `ok` counts runs that reported; `skipped` slots that didn't run (replaced ones too);
+   * `total` their sum, without the runs a person stopped.
+   */
+  health: { ok: number; silent: number; failed: number; skipped: number; missed: number; total: number };
+  /** The viewer sees its prompt, records and reports (else only outcomes, without text). */
+  canSeeDetails: boolean;
+  /** The viewer may change, pause, run, stop or delete it. */
+  canManage: boolean;
   lastRun: RoutineRun | null;
   /** The last runs, newest first (at most 14): the row's pixel strip and the horizon. */
-  recentRuns?: RoutineRun[];
+  recentRuns: RoutineRun[];
+  /** The last 7 days: tokens on a plan (Claude Code, Codex), cost on the API. */
+  usage: { runs: number; tokens: number; costNanoUsd: number; billedTo: "api" | "plan" | "mixed" };
   /** Event routines that can be triggered by a webhook: the URL to call. */
   webhookUrl?: string | null;
-  createdAt: string;
 }
+
+/**
+ * A routine run's state (`routine_runs`): working (`queued`, `running`, `waiting` for a person or the
+ * computer), then one end: `reported` (it told people), `silent` (nothing new), `failed`, `canceled`
+ * (a person stopped it), `superseded` (the next slot took its place), `missed` (too late to run) or
+ * `skipped` (the slot never started a run).
+ */
+export type RoutineRunStatus =
+  | "queued"
+  | "running"
+  | "waiting"
+  | "reported"
+  | "silent"
+  | "failed"
+  | "canceled"
+  | "superseded"
+  | "missed"
+  | "skipped";
 
 export interface RoutineRun {
   id: string;
   at: string;
-  /** `silent`: nothing new, the agent stayed quiet (NO_REPLY). */
-  status: "ok" | "silent" | "failed" | "skipped";
-  /** "Resumo postado no #geral", "Orçamento do mês esgotado" (the server's pt-BR words). */
+  status: RoutineRunStatus;
+  /** Why it ended this way (`stopped`, `previous_running`, `budget_exceeded`…): the app says it. */
+  code: string | null;
+  /** Values for the code's words (`stopped`: `by`, the person who stopped it). */
+  codeParams?: Record<string, string>;
+  /** The agent's own words for this run; '' when the viewer may not see text. */
   summary: string;
-  /** The same as a code ("routine_run.paused") and its values: shown in the UI language. */
-  summaryCode?: string | null;
-  summaryParams?: Record<string, string>;
   /** Recent runs only: cost as a share (0–1) of the priciest recent run; never money. */
   weight?: number;
+  /** The brain that ran it (`claude_code`, `codex`, `model`). */
+  brain: string | null;
+  /** The agent's message people saw ("Abrir na conversa"). */
+  link: { channelId: string; threadId: string | null; messageId: string } | null;
+  /** Waiting for this approval ("Esperando sua aprovação"). */
+  approvalId?: string | null;
+  finishedAt: string | null;
 }
 
 export interface RoutineInput {
@@ -1554,9 +1682,13 @@ export interface RoutineInput {
     | { type: "event"; event: RoutineEvent }
     | { type: "once"; at: string; timezone?: string }
     | Omit<RoutineEmailTrigger, "status">;
+  /** Default `read` ("Só olhar e contar"). */
+  access?: RoutineAccess;
+  /** Default `when_new` ("Só quando tiver novidade"). */
+  report?: RoutineReport;
 }
 
-/** `PATCH …/routines/{id}`: only what changed. */
+/** `PATCH …/routines/{id}`: only what changed (`active: true` also clears a pause reason and a failure streak). */
 export type RoutinePatch = Partial<Omit<RoutineInput, "name">> & { name?: string; active?: boolean };
 
 /** Natural language → cron, in the workspace time zone (the backend decides). */
@@ -2836,8 +2968,8 @@ export interface AgentBrain {
   canEdit: boolean;
   /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
   account: string | null;
-  /** How much it thinks before answering; null = the brain's default. */
-  effort: BrainEffort | null;
+  /** How much it thinks before answering; `auto` = picked per task (D83); null = the brain's default. */
+  effort: BrainEffortSetting | null;
   /** The accounts added on the agent's computer (both kinds); "Conta deste computador" isn't listed. */
   accounts: MachineAccount[];
   /** Whose subscriptions those are (the computer's owner); null without a computer. */
@@ -2850,6 +2982,8 @@ export interface AgentBrain {
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
 export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
+/** D83: a level, or "Automático" (each run picks low, medium or high with the model). */
+export type BrainEffortSetting = BrainEffort | "auto";
 
 export type MachineAccountKind = "claude_code" | "codex";
 
@@ -2874,7 +3008,7 @@ export interface AgentBrainInput {
   acceptPlanTerms?: boolean;
   /** Only the computer's owner; null = "Conta deste computador". */
   account?: string | null;
-  effort?: BrainEffort | null;
+  effort?: BrainEffortSetting | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */
@@ -3213,8 +3347,14 @@ export type NotificationKind =
   | "approval"
   | "mission_finished"
   | "mission_stopped"
+  /** ADR 0053: the agent told people what a routine found. Opens its message (`source.channelId`, `messageId`). */
   | "routine_finished"
+  /** A routine's failure streak began (one per streak; the next good run resolves it). Opens it in Rotinas. */
   | "routine_failed"
+  /** The server paused a routine (`latest.reason`: its coded `pausedReason`). Opens it in Rotinas. */
+  | "routine_paused"
+  /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */
+  | "routine_stalled"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
@@ -3250,7 +3390,7 @@ export interface NotificationSource {
 
 /** What the card shows (plain text; only @mentions are highlighted). */
 export interface NotificationLatest {
-  /** Snippet of the latest message, comment, question or summary (≤ 280 chars). */
+  /** Snippet of the latest message, comment, question or summary (≤ 280 chars); an approval's why. */
   text?: string;
   /** Issue title, the approval's action title, the topic's question. */
   title?: string;
@@ -3268,6 +3408,13 @@ export interface NotificationLatest {
   /** Forum turns. */
   round?: number;
   rounds?: number;
+  /**
+   * `routine_paused`: why (a `RoutinePausedReason`); `routine_failed`: its failed run's code (`routines.code.*`).
+   * Both said in the person's language.
+   */
+  reason?: string;
+  /** `approval`: asked while nobody watched, by a routine or an unattended run (ADR 0053 §8). */
+  origin?: ApprovalOrigin;
 }
 
 export interface AppNotification {
@@ -3349,6 +3496,8 @@ export interface WorkingRun {
   label: string | null;
   /** Messages sent to it while it works that it hasn't read yet. */
   pendingMessageIds?: string[];
+  /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
+  background?: boolean;
 }
 
 /** A one-off reminder in a conversation (`reminders.*`; also a routine in Rotinas). */

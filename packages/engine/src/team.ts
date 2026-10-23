@@ -3,9 +3,8 @@ import type { AgentAppearance } from "./appearance";
 import { canTalkTo } from "./audience";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
-import { requesterOf } from "./dispatch";
-import { getMessage } from "./messages";
 import { requirePermission } from "./organizations";
+import { personBehindCall } from "./requester";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
@@ -71,7 +70,7 @@ export function teamPrompt(team: Teammate[], selfId: string, requester: string |
     others.length > TEAM_IN_PROMPT
       ? `${others.length} other agents work in this organization.`
       : `Other agents in this organization: ${others.map((a) => `@${a.handle}${a.role ? ` (${a.role})` : ""}`).join(", ")}.`;
-  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it.`;
+  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it (its answer reaches you as a message; you carry on meanwhile), or let one know something with \`tell_agent\`.`;
 }
 
 const words = (s: string) =>
@@ -104,8 +103,7 @@ export function createFindAgentToolSource(): ToolSource {
     describe: (input) => ({ title: "Find agents", detail: String(input.query ?? "") }),
     async execute(input, ctx) {
       const { db } = ctx;
-      const trigger = await getMessage(db, ctx.orgId, ctx.triggerMessageId);
-      const person = trigger ? await requesterOf(db, trigger) : null;
+      const person = await personBehindCall(ctx);
       const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person));
       const query = words(String(input.query ?? ""));
       const scored = team

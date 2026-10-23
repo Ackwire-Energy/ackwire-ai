@@ -87,7 +87,12 @@ describe("agent access", () => {
     const merge = await gateway.invoke(ctx, {
       toolUseId: "t1",
       name: "github_merge_pull_request",
-      input: { owner: "acme", repo: "app", pullNumber: 1 },
+      input: {
+        owner: "acme",
+        repo: "app",
+        pullNumber: 1,
+        why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+      },
     });
     expect(merge.type).toBe("approval"); // `all` never removes approvals
 
@@ -101,7 +106,12 @@ describe("agent access", () => {
     const denied = await gateway.invoke(ctx, {
       toolUseId: "t2",
       name: "github_merge_pull_request",
-      input: { owner: "acme", repo: "app", pullNumber: 1 },
+      input: {
+        owner: "acme",
+        repo: "app",
+        pullNumber: 1,
+        why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+      },
     });
     expect(denied).toMatchObject({ type: "result", output: { isError: true } });
 

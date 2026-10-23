@@ -1,4 +1,4 @@
-import { and, type Database, desc, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
 import { audienceSql } from "./audience";
 import { summarizeGrants } from "./capabilities";
@@ -285,6 +285,16 @@ export async function resolveRouterModel(
  * (or its newest key), else the catalog's cheap model for that provider.
  */
 export async function cheapModelForOrg(db: Database, orgId: string, perProvider: Record<string, string>) {
+  const provider = await orgModelProvider(db, orgId);
+  return perProvider[provider] ?? cheapModelOf(provider) ?? perProvider.anthropic ?? "claude-haiku-5-5";
+}
+
+/**
+ * The provider of an organization's own model calls: its default key's, else
+ * its newest key's, else Anthropic (the platform key). Also the line an agent
+ * on "Automático" without a key of its own picks from (D83).
+ */
+export async function orgModelProvider(db: Executor, orgId: string): Promise<string> {
   const [settings] = await db
     .select({ provider: schema.providerCredentials.provider })
     .from(organizationSettings)
@@ -300,7 +310,7 @@ export async function cheapModelForOrg(db: Database, orgId: string, perProvider:
       .limit(1);
     provider = newest?.provider ?? "anthropic";
   }
-  return perProvider[provider] ?? cheapModelOf(provider) ?? perProvider.anthropic ?? "claude-haiku-5-5";
+  return provider;
 }
 
 export interface RouterDeps {
@@ -365,7 +375,7 @@ export async function routeMessage(
         singleAgentMinScore: undefined,
       }
     : deps.policy;
-  // The person behind it: the author, or for an agent's message whoever started its run.
+  // The person behind it (`authority.ts`): the author, or for an agent's message the person behind its run.
   const personId = byAgent ? await requesterOf(db, message) : message.authorUserId;
   const [already] = await db
     .select({ id: routingDecisions.id })

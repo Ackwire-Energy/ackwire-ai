@@ -189,6 +189,8 @@ export function MenuAt({
           sideOffset={2}
           collisionPadding={8}
           aria-label={label}
+          // Radix names the menu after its trigger, here a hidden point with no text: the label names it instead.
+          {...(label ? { "aria-labelledby": undefined } : {})}
           // The page keeps its focus (the composer, the selection), as with the system's menus.
           onCloseAutoFocus={(e) => e.preventDefault()}
         >

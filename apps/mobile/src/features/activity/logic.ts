@@ -1,4 +1,6 @@
 import type { AppNotification, NotificationActor, Routine } from "@agenteschat/client";
+import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
+import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import { daysAgo } from "../shared/logic";
 
 /**
@@ -68,11 +70,24 @@ export function whoOf(actors: NotificationActor[], nameOf: (a: NotificationActor
   return { first, second, more: Math.max(0, names.length - shown), total: Math.max(1, names.length) };
 }
 
-/** The line under the title: the snippet, the quote of a reaction, or the request's title. */
-export function subtitleOf(n: AppNotification): string {
+/** Says coded words (an i18n key and its values) in the person's language; `otherwise` for an unknown key. */
+export type SayWords = (w: Words, otherwise?: string) => string;
+
+/**
+ * The line under the title: the snippet, the quote of a reaction, or the request's title. Coded words are
+ * said in the person's language (`say`): why a routine paused or failed (its `latest.reason`, never the
+ * server's English), and who asked for an approval while nobody watched, leading its title.
+ */
+export function subtitleOf(n: AppNotification, say: SayWords): string {
   const l = n.latest;
   if (n.kind === "reaction") return l.quote ?? "";
-  if (n.kind === "approval" || n.kind === "issue_assigned" || n.kind === "forum_turn") return l.title ?? l.text ?? "";
+  const reason = routineNotificationWords(n);
+  if (reason) return say(reason, l.text ?? "");
+  if (n.kind === "approval") {
+    const origin = approvalOriginWords({ origin: l.origin });
+    return [origin ? say(origin) : "", l.title ?? l.text ?? ""].filter(Boolean).join(" · ");
+  }
+  if (n.kind === "issue_assigned" || n.kind === "forum_turn") return l.title ?? l.text ?? "";
   return l.text ?? l.title ?? "";
 }
 

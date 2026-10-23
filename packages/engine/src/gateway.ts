@@ -53,13 +53,19 @@ export const BUDGET_WARNING_RATIO = 0.8;
 export interface GatewayCall {
   orgId: string;
   agentId: string;
-  /** The agent row, when the caller already has it (saves a lookup). */
+  /**
+   * The agent row, when the caller already has it (saves a lookup). A run on
+   * "Automático" (D83) passes it with the model it chose: the call is priced,
+   * reserved and recorded at that model.
+   */
   agent?: Agent;
   runId?: string;
   system: SystemPrompt;
   messages: ModelMessage[];
   maxTokens: number;
   tools?: ToolSpec[];
+  /** How hard the model thinks (set by "Automático"); absent: the provider's default. */
+  effort?: ModelRequest["effort"];
   onDelta(text: string): void;
   signal?: AbortSignal;
 }
@@ -517,6 +523,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         messages: call.messages,
         maxTokens: call.maxTokens,
         tools: call.tools,
+        ...(call.effort ? { effort: call.effort } : {}),
         signal: call.signal,
       };
       // Conservative prompt estimate (3 chars/token) so the reservation is an upper bound in practice.

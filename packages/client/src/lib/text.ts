@@ -83,12 +83,15 @@ export function emailTypoFix(email: string): string | null {
 }
 
 /** Where to read the e-mail we just sent: the webmail of known domains ("Abrir o Gmail"). */
-export function webmailOf(email: string): { name: "Gmail" | "Outlook" | "iCloud Mail" | "Yahoo Mail"; url: string } | null {
+export function webmailOf(
+  email: string,
+): { name: "Gmail" | "Outlook" | "iCloud Mail" | "Yahoo Mail"; url: string } | null {
   const domain = email.trim().toLowerCase().split("@")[1] ?? "";
   if (domain === "gmail.com" || domain === "googlemail.com") return { name: "Gmail", url: "https://mail.google.com" };
   if (["outlook.com", "hotmail.com", "live.com", "msn.com"].includes(domain))
     return { name: "Outlook", url: "https://outlook.live.com/mail" };
-  if (["icloud.com", "me.com", "mac.com"].includes(domain)) return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };
+  if (["icloud.com", "me.com", "mac.com"].includes(domain))
+    return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };
   if (domain.startsWith("yahoo.")) return { name: "Yahoo Mail", url: "https://mail.yahoo.com" };
   return null;
 }

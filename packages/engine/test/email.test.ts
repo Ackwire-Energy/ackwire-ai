@@ -175,7 +175,15 @@ describe("outbox delivery", () => {
     const gh = fakeGithub();
     f = await setup({
       toolSources: [gh.source],
-      reply: () => ({ chunks: [], toolUses: [{ name: "github_merge_pr", input: { repo: "a/b", pr: 1 } }] }),
+      reply: () => ({
+        chunks: [],
+        toolUses: [
+          {
+            name: "github_merge_pr",
+            input: { repo: "a/b", pr: 1, why: "CI passed and the review is done: merging ships the fix today." },
+          },
+        ],
+      }),
     });
     await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
     await addMember(f.db, f.org.id, "admin", "bia");

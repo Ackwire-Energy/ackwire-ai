@@ -1,4 +1,4 @@
-import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
 
 const { outbox } = schema;
 
@@ -58,14 +58,68 @@ export interface ClaimOptions {
   batchSize?: number;
   leaseMs?: number;
   now?: Date;
+  /**
+   * At most this many background jobs in this claim (`backgroundJobSql`): the pump's free background
+   * slots. Undefined: no cap (batches, tests).
+   */
+  maxBackground?: number;
+  /** Measurements: `queue_wait_ms` for each claimed job (from when it was due to when a worker took it). */
+  onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
 }
 
-/** Claims due jobs: pending ones whose time has come, and processing ones whose lease expired. */
-export async function claimJobs(db: Database, options: ClaimOptions): Promise<OutboxJob[]> {
+/** A claimed job, and whether it is background work (it counts against the pump's background slots). */
+export type ClaimedJob = OutboxJob & { background: boolean };
+
+/**
+ * Background work (ADR 0053 §10): a routine firing (`routine.run`), or the execution of a routine's
+ * background run (`agent_run.execute` of a run with `agent_runs.background`). A person's message never
+ * waits behind it: it holds at most half of a worker's slots.
+ */
+const backgroundJobSql = sql`(${outbox.kind} = 'routine.run' or (${outbox.kind} = 'agent_run.execute' and exists (
+  select 1 from ${schema.agentRuns} r
+  where r.id = case when ${outbox.payload}->>'runId' ~ '^[0-9a-fA-F-]{36}$' then (${outbox.payload}->>'runId')::uuid end
+    and r.background)))`;
+
+/**
+ * Claims due jobs: pending ones whose time has come, and processing ones whose lease expired. Other
+ * work first, then background jobs up to `maxBackground` in the slots left.
+ */
+export async function claimJobs(db: Database, options: ClaimOptions): Promise<ClaimedJob[]> {
   const now = options.now ?? new Date();
+  const batch = options.batchSize ?? 20;
+  const foreground = await claimWhere(db, options, now, sql`not ${backgroundJobSql}`, batch);
+  const room = Math.min(batch - foreground.length, options.maxBackground ?? batch);
+  const background = room > 0 ? await claimWhere(db, options, now, backgroundJobSql, room) : [];
+  const claimed: ClaimedJob[] = [
+    ...foreground.map((job) => ({ ...job, background: false })),
+    ...background.map((job) => ({ ...job, background: true })),
+  ];
+
+  // A job whose lease expired after its final attempt is not retried again.
+  const runnable: ClaimedJob[] = [];
+  for (const job of claimed) {
+    if (job.attempts > job.maxAttempts) {
+      await db
+        .update(outbox)
+        .set({ status: "failed", lockedUntil: null, lastError: job.lastError ?? "lease expired on the final attempt" })
+        .where(eq(outbox.id, job.id));
+    } else {
+      runnable.push(job);
+      options.onTiming?.("queue_wait_ms", Math.max(0, now.getTime() - job.nextAttemptAt.getTime()), {
+        jobId: job.id,
+        kind: job.kind,
+        attempt: job.attempts,
+        background: job.background,
+      });
+    }
+  }
+  return runnable;
+}
+
+/** One statement (no transaction round trips): lock due rows matching `filter`, skipping locked ones; lease them. */
+function claimWhere(db: Database, options: ClaimOptions, now: Date, filter: SQL, limit: number) {
   const leaseUntil = new Date(now.getTime() + (options.leaseMs ?? DEFAULT_LEASE_MS));
-  // One statement (no transaction round trips): lock due rows, skipping locked ones, and lease them.
-  const claimed = await db
+  return db
     .update(outbox)
     .set({
       status: "processing",
@@ -75,25 +129,14 @@ export async function claimJobs(db: Database, options: ClaimOptions): Promise<Ou
     })
     .where(
       sql`${outbox.id} in (select ${outbox.id} from ${outbox}
-        where (${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${now.toISOString()}::timestamptz)
-           or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${now.toISOString()}::timestamptz)
+        where ((${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${now.toISOString()}::timestamptz)
+           or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${now.toISOString()}::timestamptz))
+          and ${filter}
         order by ${outbox.nextAttemptAt}
-        limit ${options.batchSize ?? 20}
+        limit ${limit}
         for update skip locked)`,
     )
     .returning();
-
-  // A job whose lease expired after its final attempt is not retried again.
-  const runnable: OutboxJob[] = [];
-  for (const job of claimed) {
-    if (job.attempts > job.maxAttempts) {
-      await db
-        .update(outbox)
-        .set({ status: "failed", lockedUntil: null, lastError: job.lastError ?? "lease expired on the final attempt" })
-        .where(eq(outbox.id, job.id));
-    } else runnable.push(job);
-  }
-  return runnable;
 }
 
 /** Extends a running job's lease, unless another worker took it over. Returns whether it still owns the job. */
@@ -214,26 +257,39 @@ export interface OutboxPump {
   idle(): Promise<void>;
 }
 
+/** The share of a worker's slots background jobs may hold at most (ADR 0053 §10), never less than one. */
+export const backgroundSlotsOf = (maxInFlight: number) => Math.max(1, Math.floor(maxInFlight / 2));
+
 /**
  * The worker's job pool: up to `maxInFlight` jobs at once, and a slot that
  * frees is refilled right away (`onSlotFree`). Unlike `processOutbox`, a
  * long job (a 5-minute agent run) never holds back the jobs claimed after it.
+ * Background jobs (routines) hold at most half of the slots
+ * (`backgroundSlotsOf`), so a person's message always finds one.
  */
 export function createOutboxPump(
   db: Database,
   handlers: JobHandlers,
-  options: Omit<ProcessOptions, "batchSize"> & { maxInFlight?: number; onSlotFree?: () => void },
+  options: Omit<ProcessOptions, "batchSize" | "maxBackground"> & { maxInFlight?: number; onSlotFree?: () => void },
 ): OutboxPump {
   const max = options.maxInFlight ?? 20;
+  const backgroundMax = backgroundSlotsOf(max);
   const running = new Set<Promise<void>>();
+  let backgroundRunning = 0;
   return {
     async pump() {
       const free = max - running.size;
       if (free <= 0) return 0;
-      const jobs = await claimJobs(db, { ...options, batchSize: free });
+      const jobs = await claimJobs(db, {
+        ...options,
+        batchSize: free,
+        maxBackground: Math.max(0, backgroundMax - backgroundRunning),
+      });
       for (const job of jobs) {
+        if (job.background) backgroundRunning++;
         const p: Promise<void> = runJob(db, handlers, job, options).finally(() => {
           running.delete(p);
+          if (job.background) backgroundRunning--;
           options.onSlotFree?.();
         });
         running.add(p);

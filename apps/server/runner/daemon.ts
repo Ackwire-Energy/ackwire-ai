@@ -46,6 +46,7 @@ import {
 import { AccountManager } from "./accounts";
 import { ActivityLog } from "./activity";
 import { BrainManager } from "./brain";
+import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import {
   configPath,
@@ -200,6 +201,7 @@ interface Session {
   workspaceReal: string;
   tasks: TaskManager;
   brains: BrainManager;
+  codexApp: CodexAppServers;
   mcp: McpBridge;
   browser: BrowserManager;
   connection: RunnerConnection;
@@ -453,10 +455,12 @@ export class RunnerDaemon implements RequestObserver {
         maxConcurrent: paired.maxConcurrentTasks ?? DEFAULT_LIMITS.maxConcurrentTasks,
         defaultMaxSeconds: paired.taskMaxSeconds ?? DEFAULT_LIMITS.taskMaxSeconds,
       });
-      this.session.brains.setLimits({
+      const brainLimits = {
         idleMs: (paired.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
         maxProcesses: paired.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
-      });
+      };
+      this.session.brains.setLimits(brainLimits);
+      this.session.codexApp.setLimits(brainLimits);
     }
     this.queueStatus();
     void this.reconcile();
@@ -581,6 +585,13 @@ export class RunnerDaemon implements RequestObserver {
       log,
     });
     const codexRuns = new Map<string, McpTaskInfo>();
+    // Codex turns on long-lived app-servers (live steering); `codex exec` where they can't run.
+    const codexApp = new CodexAppServers({
+      runs: codexRuns,
+      idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
+      maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
+      log,
+    });
     const mcp = new McpBridge({
       socketPath,
       task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? null,
@@ -611,7 +622,7 @@ export class RunnerDaemon implements RequestObserver {
       gitDir: path.join(home, "git"),
       tasks,
       brains,
-      codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns },
+      codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
       access: () => this.access(),
       accessOps: {
@@ -654,7 +665,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
     live = connection;
-    const session: Session = { config, workspaceReal, tasks, brains, mcp, browser, connection };
+    const session: Session = { config, workspaceReal, tasks, brains, codexApp, mcp, browser, connection };
     this.session = session;
     log(
       `agentes-runner ${RUNNER_VERSION}: connecting to ${config.server} (workspace ${workspaceReal}${this.access().tools.commands ? "" : ", commands off"})`,
@@ -666,6 +677,7 @@ export class RunnerDaemon implements RequestObserver {
     s.connection.stop();
     s.tasks.close();
     s.brains.close();
+    s.codexApp.close();
     await s.browser.close().catch(() => undefined);
     await s.mcp.close().catch(() => undefined);
   }

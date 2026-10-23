@@ -950,7 +950,7 @@ p {
 .list-head h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -1814,7 +1814,7 @@ p {
 .drive-head__title h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -2227,7 +2227,7 @@ p {
 .drive-pv__hero {
   padding: 6cqw 6cqw 3cqw;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 6.4cqw;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -2635,7 +2635,7 @@ button.drive-where:focus-visible {
 }
 .drive-dropzone__in b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(26px, 4vw, 36px);
   letter-spacing: -0.03em;
 }
@@ -3735,7 +3735,7 @@ button.drive-where:focus-visible {
 }
 .catalog .ac-dialog__title {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 30px;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -3981,7 +3981,7 @@ button.drive-where:focus-visible {
 .catalog-detail__name {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.025em;
@@ -4761,7 +4761,7 @@ button.drive-where:focus-visible {
 .tr-done__title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 30px;
   letter-spacing: -0.03em;
   line-height: 1.08;
@@ -5204,15 +5204,7 @@ button.drive-where:focus-visible {
   letter-spacing: var(--track-tight);
 }
 
-/* "Lembrete" next to the agent's name on a reminder message. */
-/* A routine's message: one line saying whom it called; its instructions open on demand. */
-.msg-routine {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  margin: 2px 0 0;
-}
+/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. */
 .msg-reminder {
   display: inline-flex;
   align-items: center;
@@ -7711,7 +7703,7 @@ a.machine-row__name:hover {
   margin: 0;
   font-family: var(--font-display);
   font-size: 26px;
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
@@ -8379,7 +8371,7 @@ textarea.onb__big.ac-input {
 .onb__title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 42px);
   line-height: 1.08;
   letter-spacing: -0.03em;
@@ -8645,7 +8637,7 @@ textarea.onb__big.ac-input {
 .onb__welcome-title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 30px;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -8672,7 +8664,7 @@ textarea.onb__big.ac-input {
 }
 .onb__stat {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 22px;
   overflow-wrap: anywhere;
 }
@@ -8756,7 +8748,7 @@ textarea.onb__big.ac-input {
 }
 .newag__rail-title b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 26px;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -9005,7 +8997,7 @@ textarea.onb__big.ac-input {
 }
 .newag__role-name b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 26px;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -9567,7 +9559,7 @@ textarea.onb__big.ac-input {
 }
 .newag__pv-name b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 26px;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -9661,7 +9653,7 @@ textarea.onb__big.ac-input {
   margin: 0;
   max-width: 12ch;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(34px, 4.4vw, 52px);
   line-height: 1.08;
   letter-spacing: -0.03em;
@@ -10121,7 +10113,7 @@ textarea.onb__big.ac-input {
   margin: 0;
   font-family: var(--font-display);
   font-size: 36px;
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   line-height: 1;
   letter-spacing: -0.03em;
   overflow-wrap: anywhere;
@@ -11060,7 +11052,7 @@ textarea.onb__big.ac-input {
 .agp-tile b {
   font-family: var(--font-display);
   font-size: 30px;
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
@@ -11229,7 +11221,7 @@ textarea.onb__big.ac-input {
 .agp-spent__top b {
   font-family: var(--font-display);
   font-size: 30px;
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   line-height: 1;
   letter-spacing: -0.02em;
 }

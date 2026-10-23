@@ -46,12 +46,17 @@ async function addInfra() {
   );
 }
 
-/** @dev asks @infra on "deploy"; @infra answers from its DM; @dev relays what it heard. */
+/**
+ * @dev asks @infra on "deploy" and carries on (it never waits); @infra answers from its DM; the
+ * answer comes back as a notice and @dev relays what it heard.
+ */
 const consultReply = (infraSays: (req: ModelRequest) => ReturnType<typeof answer>) => (req: ModelRequest) => {
   if (inAgentDm(req)) return infraSays(req);
   const last = lastText(req);
+  const heard = /your question to @infra\]: ([^"\\]+)/.exec(last);
+  if (heard) return { chunks: [`Relaying: ${heard[1]}`] };
   if (last.includes("tool_result"))
-    return { chunks: [`Relaying: ${/instructions\):\\n\\n([^"]+)/.exec(last)?.[1] ?? last}`] };
+    return { chunks: ["Asked @infra how staging is deployed; I'll tell you when it answers."] };
   if (last.includes("deploy"))
     return {
       chunks: [],
@@ -62,7 +67,7 @@ const consultReply = (infraSays: (req: ModelRequest) => ReturnType<typeof answer
 const answer = (text: string) => ({ chunks: [text] });
 
 describe("ask_agent", () => {
-  test("an agent asks another in their private DM, waits, and goes on with the answer", async () => {
+  test("an agent asks another in their private DM, carries on, and relays the answer when it comes", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("Staging deploys with deploy.sh")) });
     const infra = await addInfra();
     const events = f.listen(f.general.id);
@@ -93,21 +98,20 @@ describe("ask_agent", () => {
     expect(members.every((m) => m.userId === null)).toBe(true);
     expect((await listDms(f.db, f.owner.id, f.org.id)).map((d) => d.channelId)).not.toContain(c?.channelId);
 
-    // The asking run heard the answer and replied where it was asked (D67), with the "message from @infra" card.
+    // The asking run never paused: it told the person and ended. The answer came as a notice where it
+    // was asked (D67), and a run of the asker relayed it there.
     const all = await runs();
     expect(all.every((r) => r.status === "done")).toBe(true);
+    expect(all.some((r) => r.status === "waiting_input")).toBe(false);
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const told = timeline.findIndex((m) => m.body.startsWith("Asked @infra"));
+    const notice = timeline.findIndex(
+      (m) => (m.meta as { notice?: { kind?: string } }).notice?.kind === "consult_reply",
+    );
+    expect(told).toBeGreaterThanOrEqual(0);
+    expect(notice).toBeGreaterThan(told);
     const reply = timeline.at(-1);
-    expect(reply?.body).toContain("deploy.sh");
-    expect(reply?.meta.consulted).toEqual([
-      {
-        agentId: infra.id,
-        consultationId: c?.id,
-        status: "answered",
-        question: "How is staging deployed?",
-        answer: "Staging deploys with deploy.sh",
-      },
-    ]);
+    expect(reply?.body).toBe("Relaying: Staging deploys with deploy.sh");
     await Bun.sleep(5);
     expect(events).toContainEqual(
       expect.objectContaining({ type: "agent.consulting", agentId: f.agent.id, consultedAgentId: infra.id }),
@@ -125,7 +129,19 @@ describe("ask_agent", () => {
       reply: consultReply((req) =>
         lastText(req).includes("tool_result")
           ? answer("Merged.")
-          : { chunks: [], toolUses: [{ name: "github_merge_pr", input: { repo: "acme/app", pr: 7 } }] },
+          : {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "github_merge_pr",
+                  input: {
+                    repo: "acme/app",
+                    pr: 7,
+                    why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                  },
+                },
+              ],
+            },
       ),
     });
     const infra = await addInfra();
@@ -195,7 +211,7 @@ describe("ask_agent", () => {
     expect(results.some((t) => t.includes("That is you"))).toBe(true);
   });
 
-  test("no answer in time: the asking run goes on without it", async () => {
+  test("no answer in time: the asker hears it, as a notice", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
     const infra = await addInfra();
     // @infra never runs: its execute jobs are dropped.
@@ -212,8 +228,9 @@ describe("ask_agent", () => {
     };
     await post("@dev deploy staging");
     await drainOutbox(f.db, handlers);
+    // It never waits: the asking run ended after telling the person.
     const asker = (await runs()).find((r) => r.agentId === f.agent.id);
-    expect(asker?.status).toBe("waiting_input");
+    expect(asker?.status).toBe("done");
 
     expect(await expireConsultations({ db: f.db }, new Date(Date.now() + CONSULTATION_TTL_MS + 1000))).toBe(1);
     await drainOutbox(f.db, handlers);
@@ -223,7 +240,7 @@ describe("ask_agent", () => {
       status: "canceled",
       error: "consultation_expired",
     });
-    expect((await runs()).find((r) => r.id === asker?.id)?.status).toBe("done");
+    expect((await runs()).filter((r) => r.agentId === f.agent.id).every((r) => r.status === "done")).toBe(true);
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("didn't answer within 15 minutes");
   });
 
@@ -255,7 +272,7 @@ describe("ask_agent", () => {
     expect((await recoverStaleRuns({ db: f.db })).failed).toEqual([target.id]);
     await drainOutbox(f.db, handlers);
     expect((await consultations())[0]?.status).toBe("failed");
-    expect((await runs()).find((r) => r.agentId === f.agent.id)?.status).toBe("done");
-    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("couldn't answer");
+    expect((await runs()).filter((r) => r.agentId === f.agent.id).every((r) => r.status === "done")).toBe(true);
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("No answer: it couldn't");
   });
 });

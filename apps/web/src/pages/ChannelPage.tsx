@@ -85,10 +85,11 @@ import {
   parseMissionCommand,
   taskNoticeOf,
 } from "@agenteschat/client/lib/missions";
+import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
-import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
+import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
@@ -171,6 +172,7 @@ import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
+import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
@@ -1966,6 +1968,9 @@ const Timeline = memo(function Timeline({
   );
   /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
   const threadRow = (key: string, m: MessageType) => {
+    // What reached an agent's conversation (a routine's report nobody answered yet, another agent's
+    // answer): quiet lines, never a person's or the agent's own voice.
+    if (noticeOf(m.meta)) return <NoticeLine key={key} message={m} />;
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
     if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
     if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
@@ -2382,7 +2387,9 @@ function StoppedLine({
 
 /**
  * Under a message sent while an agent worked: "Theo lê na próxima pausa" → "Theo leu" (its face);
- * "Theo parou para ler" when the person asked it to stop and read now.
+ * "Theo parou para ler" when the person asked it to stop and read now (or it woke a wait); "Theo
+ * recebeu" once handed to Claude Code mid-turn; "lê depois da sua decisão no card" while an approval
+ * holds it; "encerrou o pedido de ajuda" when it ended the wait.
  */
 function SteerLine({ steer }: { steer: SteerState }) {
   const { t } = useTranslation();
@@ -2404,10 +2411,20 @@ function SteerLine({ steer }: { steer: SteerState }) {
             <Icon name="bolt" size={14} />
             {t("run.steer.now", { name })}
           </>
+        ) : steer.state === "delivered" ? (
+          <>
+            <Icon name="check" size={14} />
+            {t("run.steer.delivered", { name })}
+          </>
+        ) : steer.state === "held" ? (
+          <>
+            <Icon name="waiting" size={14} />
+            {t("run.steer.held", { name })}
+          </>
         ) : (
           <>
             <AgentAvatar agentId={steer.agentId} name={name} size="xs" state="idle" />
-            {t("run.steer.read", { name })}
+            {t(steer.state === "resolved" ? "run.steer.resolved" : "run.steer.read", { name })}
           </>
         )}
       </span>
@@ -2730,20 +2747,21 @@ export const TimelineMessage = memo(function TimelineMessage({
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
   const name = dir.authorName(m.author);
-  // Posted by a routine on its creator's behalf: shown as the routine, never as if the person typed it.
-  const routine = routineOfMessage(m.meta);
-  // An agent's answer to a routine (`meta.viaRoutine`): the routine's call is hidden, so a small tag says so.
-  const viaRoutine = viaRoutineOf(m.meta);
-  // Its text is the instructions it gives the agent: one line ("Chamou @Theo"), the instructions on demand.
-  const [routineOpen, setRoutineOpen] = useState(false);
-  const routineAgents = useMemo(() => {
-    if (!routine) return [];
-    const handles = new Set([...m.body.matchAll(/@([\w.-]+)/g)].map((x) => (x[1] ?? "").toLowerCase()));
-    return [...handles].flatMap((h) => {
-      const a = dir.agentByHandle.get(h);
-      return a ? [a] : [];
-    });
-  }, [routine, m.body, dir.agentByHandle]);
+  // What a routine found, told by its agent (`meta.routine`): a tag that opens the routine, and the report
+  // it answers on demand (that report's own line folds into this message).
+  const routine = routineReplyOf(m);
+  const [reportOpen, setReportOpen] = useState(false);
+  const report = routine?.noticeId
+    ? routineReportText(
+        [
+          ...(qc.getQueryData<MessageType[]>(keys.messages(org.id, m.channelId)) ?? []),
+          ...((m.threadId && qc.getQueryData<MessageType[]>(keys.thread(org.id, m.channelId, m.threadId))) || []),
+        ],
+        routine.noticeId,
+      )
+    : null;
+  // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
+  const talker = m.author.type === "agent" && isTalkerReply(m.meta);
   const wikiLink = useWikiLinkRenderer();
   // It went into a running task: "Theo lê na próxima pausa" → "Theo leu" / "Theo parou para ler".
   const steer = useSteerState(org.id, m.channelId, m.author.type === "person" && !m.local ? m.id : "");
@@ -2883,15 +2901,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       onFocus={feedback ? () => setActive(true) : undefined}
       onContextMenu={live ? undefined : menu.onContextMenu}
       avatar={
-        routine ? (
-          <span
-            className="ac-avatar ac-avatar--routine"
-            role="img"
-            aria-label={t("channel.routineAuthor", { name: routine.name })}
-          >
-            <Icon name="routines" size={18} />
-          </span>
-        ) : m.author.id ? (
+        m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
             {agent ? (
               // At work: thinking, then writing; a saved message: the agent at rest.
@@ -2913,12 +2923,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         )
       }
       author={
-        routine ? (
-          <span>
-            {t("channel.routineAuthor", { name: routine.name })}{" "}
-            <span className="muted small">{t("channel.routineBy", { name })}</span>
-          </span>
-        ) : m.author.id ? (
+        m.author.id ? (
           <>
             <ProfileTrigger
               actor={{ type: m.author.type, id: m.author.id }}
@@ -2933,11 +2938,18 @@ export const TimelineMessage = memo(function TimelineMessage({
                 {t("channel.reminder")}
               </span>
             )}
-            {viaRoutine && (
-              <Link to="/org/$orgId/routines" params={{ orgId: org.id }} className="msg-reminder msg-reminder--link">
-                <Icon name="routines" size={14} />
-                {t("channel.viaRoutine", { name: viaRoutine.name })}
-              </Link>
+            {routine && (
+              <RoutineTag
+                routine={routine}
+                report={report}
+                open={reportOpen}
+                onToggle={() => setReportOpen((o) => !o)}
+              />
+            )}
+            {talker && (
+              <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
+                {t("chat.notice.talker")}
+              </span>
             )}
           </>
         ) : (
@@ -3025,31 +3037,13 @@ export const TimelineMessage = memo(function TimelineMessage({
               stopped={stopped.canceled}
             />
           ) : null}
-          {routine && (
-            <p className="msg-routine small">
-              <span className="muted">
-                {routineAgents.length
-                  ? t("channel.routineCalled", { names: routineAgents.map((a) => `@${a.name}`).join(", ") })
-                  : t("channel.routineRan")}
-              </span>
-              <button
-                type="button"
-                className="ac-link"
-                aria-expanded={routineOpen}
-                onClick={() => setRoutineOpen((o) => !o)}
-                style={inlineButton}
-              >
-                {routineOpen ? t("channel.routineHide") : t("channel.routineShow")}
-              </button>
-            </p>
-          )}
+          {routine && report && reportOpen && <RoutineReport text={report} />}
           {quoted && <QuotedMessage reply={quoted} />}
           {m.author.id &&
             consulted.map((c) => (
               <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />
             ))}
-          {(!routine || routineOpen) &&
-            !missionCard &&
+          {!missionCard &&
             !forumSuggestion &&
             !issueWork &&
             !waitNotice &&

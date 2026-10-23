@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { modelChoices, suggestModel } from "@agenteschat/client/lib/providers";
+import { modelChoices } from "@agenteschat/client/lib/providers";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
@@ -230,7 +230,7 @@ describe("models by provider and the default key", () => {
   ];
   const cred = { id: "k", provider: "anthropic", label: "A", keyHint: "1", createdAt: "", revokedAt: null };
 
-  test("availability comes from the keys (or the server's flag); suggested model per provider", () => {
+  test("availability comes from the keys (or the server's flag)", () => {
     expect(modelChoices(models, [cred], false).map(([p, c]) => [p, c.map((x) => x.available)])).toEqual([
       ["anthropic", [true]],
       ["openai", [false]],
@@ -238,8 +238,6 @@ describe("models by provider and the default key", () => {
     expect(
       modelChoices([{ ...models[1], available: true } as (typeof models)[number]], [], false)[0]?.[1][0]?.available,
     ).toBe(true);
-    expect(suggestModel(models, "anthropic")).toBe("claude-sonnet-5-5");
-    expect(suggestModel(models, "openai")).toBe("gpt-5");
   });
 
   test("Criar agente: model cards by provider, OpenAI disabled without a key; key defaults to the workspace's", async () => {
@@ -248,7 +246,10 @@ describe("models by provider and the default key", () => {
     await proceed(4);
     const models = screen().getByRole("group", { name: "Modelo" });
     const cards = within(models).getAllByRole("button");
-    expect(cards.map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
+    // "Automático" first and chosen (D83), then the models by provider.
+    expect(cards[0]?.querySelector(".newag__model-head b")?.textContent).toBe("Automático");
+    expect(cards[0]?.getAttribute("aria-pressed")).toBe("true");
+    expect(cards.slice(1).map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
       "Anthropic",
       "Anthropic",
       "Anthropic",

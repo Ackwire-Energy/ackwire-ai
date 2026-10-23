@@ -41,7 +41,9 @@ pub fn set_badge(app: &AppHandle, waiting: u32, unread: u32) {
     let Some(window) = app.get_window(main_window::LABEL).or_else(|| app.get_window("popover")) else { return };
     let _ = window.set_badge_label(label(waiting, unread));
     let more = {
-        let mut last = app.state::<Dock>().last_waiting.lock().unwrap_or_else(|e| e.into_inner());
+        // The state outlives the lock (a temporary `State` would be dropped while still borrowed).
+        let dock = app.state::<Dock>();
+        let mut last = dock.last_waiting.lock().unwrap_or_else(|e| e.into_inner());
         let more = waiting > *last;
         *last = waiting;
         more

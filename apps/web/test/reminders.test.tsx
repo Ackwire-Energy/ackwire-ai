@@ -5,7 +5,7 @@ setupDom();
 
 import type { Routine } from "@agenteschat/client";
 import { activityText, toolActivity } from "@agenteschat/client/lib/activity";
-import { isRoutineCall, onceParts, reminderBody, routineOfMessage } from "@agenteschat/client/lib/routines";
+import { isRoutineCall, onceParts, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
 import { isDoneOnce } from "@/pages/RoutinesPage";
@@ -18,9 +18,20 @@ const DM_ID = "00000000-0000-4000-8000-0000000000d1";
 const base = {
   agentId: ADA_ID,
   prompt: "Ligar para o fornecedor",
-  running: false,
   createdAt: "2026-10-15T12:00:00.000Z",
-};
+  access: "read",
+  report: "when_new",
+  pausedReason: null,
+  failuresInRow: 0,
+  state: "active",
+  waitingFor: null,
+  brain: { kind: "model", machineName: null },
+  health: { ok: 0, silent: 0, failed: 0, skipped: 0, missed: 0, total: 0 },
+  canSeeDetails: true,
+  canManage: true,
+  recentRuns: [],
+  usage: { runs: 0, tokens: 0, costNanoUsd: 0, billedTo: "api" },
+} satisfies Partial<Routine>;
 const once = (at: string) => ({ type: "once" as const, at, timezone: "America/Sao_Paulo", description: "" });
 const routines: Routine[] = [
   {
@@ -51,7 +62,16 @@ const routines: Routine[] = [
     trigger: once("2026-10-14T12:00:00.000Z"),
     active: false,
     nextRunAt: null,
-    lastRun: { id: "x", at: "2026-10-14T12:00:00.000Z", status: "ok", summary: "Lembrete enviado" },
+    lastRun: {
+      id: "x",
+      at: "2026-10-14T12:00:00.000Z",
+      status: "reported",
+      code: null,
+      summary: "Lembrete enviado",
+      brain: null,
+      link: null,
+      finishedAt: "2026-10-14T12:00:00.000Z",
+    },
   },
 ];
 
@@ -132,12 +152,13 @@ describe("reminder messages and activity", () => {
     expect(row.textContent).not.toContain("Reminder:");
     expect(reminderBody("@ana Lembrete: pagar", { reminder: true })).toBe("@ana pagar");
     expect(reminderBody("Reminder: x", {})).toBe("Reminder: x");
-    expect(row.textContent).not.toContain("Rotina ·");
-    expect(routineOfMessage({ reminder: true, routine: { id: "r", name: "x" } })).toBeNull();
-    expect(routineOfMessage({ routine: { id: "r", name: "x" } })).toEqual({ id: "r", name: "x" });
+    expect(row.textContent).not.toContain("Rotina «");
+    const agent = { type: "agent" };
+    expect(routineReplyOf({ author: agent, meta: { reminder: true, routine: { id: "r", name: "x" } } })).toBeNull();
+    expect(routineReplyOf({ author: agent, meta: { routine: { id: "r", name: "x" } } })).toMatchObject({ id: "r" });
   });
 
-  test("a routine's top-level call message is hidden: only the agent's answer shows", async () => {
+  test("a routine's call written as its creator is hidden: only the agent's answer shows", async () => {
     const state = seedState();
     state.messages.push({
       id: "m-routine",
@@ -153,15 +174,10 @@ describe("reminder messages and activity", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
     const rows = screen().getAllByRole("article");
-    expect(rows.some((a) => a.textContent?.includes("Rotina · Eventos"))).toBe(false);
     expect(rows.some((a) => a.textContent?.includes("Verifique os eventos novos"))).toBe(false);
-    expect(
-      isRoutineCall({ threadId: null, author: { type: "person" }, meta: { routine: { id: "r", name: "x" } } }),
-    ).toBe(true);
-    // In a thread (a routine answering in a conversation) the call still shows, as one line.
-    expect(
-      isRoutineCall({ threadId: "m-1", author: { type: "person" }, meta: { routine: { id: "r", name: "x" } } }),
-    ).toBe(false);
+    expect(isRoutineCall({ author: { type: "person" }, meta: { routine: { id: "r", name: "x" } } })).toBe(true);
+    // An agent's message with `meta.routine` is what the routine found: it shows, tagged.
+    expect(isRoutineCall({ author: { type: "agent" }, meta: { routine: { id: "r", name: "x" } } })).toBe(false);
   });
 
   test("activity verbs for scheduling from the chat", () => {

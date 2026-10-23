@@ -7,7 +7,11 @@
   overflow: hidden;
   background: #0a3f9c;
   color: #fff;
-  font: 500 13.5px/1.5 "Onest", -apple-system, system-ui, sans-serif;
+  font:
+    500 13.5px / 1.5 "Onest",
+    -apple-system,
+    system-ui,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   -webkit-user-select: none;

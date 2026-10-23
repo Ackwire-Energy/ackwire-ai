@@ -219,6 +219,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
+      // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
+      if (message.meta.talker) return;
+      // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
+      if (message.meta.background) return;
       const routed = async (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],
@@ -263,6 +267,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.authorType !== "person") {
         // Between agents only (`ask_agent`, ADR 0034): the consultation runs are started by the tool.
         if (where && isAgentOnlyDm(where)) return;
+        // A notice is for its own agent (`deliverNotice` starts or joins its run): nobody else chimes in.
+        if (message.meta.notice) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {

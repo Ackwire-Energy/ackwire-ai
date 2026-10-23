@@ -8,7 +8,16 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
-import { isRoutineCall, routineOfMessage } from "@agenteschat/client/lib/routines";
+import {
+  answeredNotices,
+  isAnsweredNotice,
+  isEventLine,
+  isTalkerReply,
+  noticeAgentHandle,
+  noticeOf,
+  noticeRoutineName,
+} from "@agenteschat/client/lib/notices";
+import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -67,32 +76,93 @@ export function standsAlone(m: Message) {
       meta.issueTaken ||
       questionOf(meta) ||
       consultationsOf(meta).length > 0 ||
-      routineOfMessage(meta),
+      routineReplyOf(m) ||
+      isEventLine(meta),
   );
 }
 
 /**
- * Day dividers and messages, oldest first (the list draws them newest at the bottom). A routine's
- * message stands alone with its own header; its top-level call is left out, like the web's `buildTimeline`.
+ * Day dividers and messages, oldest first (the list draws them newest at the bottom). What a routine
+ * found, told by its agent, stands alone with its own header; the report it answers folds into it, and a
+ * routine's call written as its creator is left out, like the web's `buildTimeline`.
  */
 export function buildRows(messages: Message[], hidden: (m: Message) => boolean = () => false): ChatRow[] {
   const rows: ChatRow[] = [];
   let lastDay = "";
   let prev: Message | null = null;
+  const answered = answeredNotices(messages);
   for (const m of [...messages].sort(byTime)) {
-    // The message a routine posts to call its agent isn't shown (as on the web): only the agent's answer is.
-    if (hidden(m) || isRoutineCall(m)) continue;
+    if (hidden(m) || isRoutineCall(m) || isAnsweredNotice(m, answered)) continue;
     const day = dayKey(m.createdAt);
     if (day !== lastDay) {
       rows.push({ kind: "day", key: `day-${day}`, iso: m.createdAt });
       lastDay = day;
       prev = null;
     }
-    const grouped = !standsAlone(m) && !(prev && standsAlone(prev)) && groupsWith(prev, m);
+    // A fast reply while its task works keeps its header ("enquanto trabalha"), as on the web.
+    const grouped = !standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m);
     rows.push({ kind: "message", key: messageKey(m), message: m, grouped });
     prev = m;
   }
   return rows;
+}
+
+// ── Automatic lines ──────────────────────────────────────────────────────────
+
+/**
+ * One quiet line instead of a voice (the web's `ChatNotices`): what reached an agent's conversation
+ * (`meta.notice`: "Rotina «X» entregou um relatório" while nobody answered it yet, "@Infra respondeu",
+ * "Nota de @Dev", "Chegou o resultado que Ada esperava"); the text on demand. `key`/`values` are the
+ * shared i18n (`chat.notice.*`). A talker reply is never one: it shows as the agent's message
+ * (`noticeOf` leaves it out).
+ */
+export interface EventLineView {
+  kind: "notice";
+  icon: "clock" | "agent" | "chat" | "check" | "bell";
+  key: string;
+  values: Record<string, string>;
+  /** Shown on "Ver": the message's text, else the notice's. */
+  text: string;
+}
+
+const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
+  routine_handoff: "clock",
+  consult_reply: "agent",
+  agent_note: "chat",
+  wait_result: "check",
+};
+
+export function eventLineOf(
+  m: Pick<Message, "body" | "meta">,
+  names: { author: string; agentByHandle: (handle: string) => string | null },
+): EventLineView | null {
+  const notice = noticeOf(m.meta);
+  if (!notice) return null;
+  const handle = noticeAgentHandle(notice);
+  // `from` is written for the agent ("@infra"): the app says the agent's name.
+  const from = handle ? `@${names.agentByHandle(handle) ?? handle}` : notice.from;
+  const icon = NOTICE_ICON[notice.kind] ?? "bell";
+  const line = (key: string, values: Record<string, string> = {}): EventLineView => ({
+    kind: "notice",
+    icon,
+    key,
+    values,
+    text: m.body.trim() || notice.text,
+  });
+  switch (notice.kind) {
+    case "routine_handoff": {
+      const routine = noticeRoutineName(notice);
+      return routine ? line("chat.notice.routineHandoff", { routine }) : line("chat.notice.routineHandoffAnon");
+    }
+    case "consult_reply":
+      return from ? line("chat.notice.consultReply", { from }) : line("chat.notice.consultReplyAnon");
+    case "agent_note":
+      return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
+    case "wait_result":
+      return line("chat.notice.waitResult", { name: names.author });
+    default:
+      return line("chat.notice.other", { name: names.author });
+  }
 }
 
 // ── What a message carries ───────────────────────────────────────────────────
@@ -259,26 +329,6 @@ export function markedParts(text: string): { text: string; bold: boolean }[] {
     const after = at < 0 ? "" : part.slice(at + 1);
     if (name) out.push({ text: name, bold: true });
     if (after) out.push({ text: after, bold: false });
-  }
-  return out;
-}
-
-// ── Routines ─────────────────────────────────────────────────────────────────
-
-/**
- * The agents a routine's message calls (its @handles, known agents only, in
- * order, once each): "Chamou @Atlas com as instruções da rotina".
- */
-export function routineAgents<A extends { handle: string }>(body: string, agents: A[]): A[] {
-  const byHandle = new Map(agents.map((a) => [a.handle.toLowerCase(), a]));
-  const seen = new Set<string>();
-  const out: A[] = [];
-  for (const match of body.matchAll(/@([\w.-]+)/g)) {
-    const h = (match[1] ?? "").toLowerCase();
-    const a = byHandle.get(h);
-    if (!a || seen.has(h)) continue;
-    seen.add(h);
-    out.push(a);
   }
   return out;
 }

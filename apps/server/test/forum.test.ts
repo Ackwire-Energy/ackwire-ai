@@ -69,9 +69,9 @@ test("forum API: a plan for an issue with a seated person, pass, sub-issues, a n
     createdBy: { id: string };
   };
   const me = issue.createdBy.id;
-  const ops = (await (await api("/agents", { json: { name: "Ops", handle: "ops", credentialId } })).json()) as {
-    id: string;
-  };
+  const ops = (await (
+    await api("/agents", { json: { name: "Ops", handle: "ops", model: "claude-sonnet-5-5", credentialId } })
+  ).json()) as { id: string };
 
   const created = await api("/forum/topics", {
     json: {

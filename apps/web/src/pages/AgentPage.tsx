@@ -17,6 +17,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agenteschat/client/lib/repos";
 import {
   type AgentAppearance,
@@ -238,7 +239,8 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     ids.length
       ? ids.map((id) => `#${visible.list.find((c) => c.id === id)?.name ?? ""}`).join(", ")
       : t("agentPage.none");
-  const modelText = (id: string) => models.data?.models.find((m) => m.id === id)?.label ?? id;
+  const modelText = (id: string) =>
+    isAuto(id) ? t("brain.auto.label") : (models.data?.models.find((m) => m.id === id)?.label ?? id);
   const resourceById = new Map(resources.map((r) => [r.id, r]));
 
   const changes: Change[] = changedKeys(saved, edits).map(({ key, field, resource }) => {
