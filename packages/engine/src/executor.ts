@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import {
   type ContentBlock,
   type ModelMessage,
@@ -30,7 +30,7 @@ import {
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
 import { consultationCardThread, onConsultedRunFinished } from "./consultations";
-import { buildRunContext, getChannelCached, restatesReaction, taskNotice } from "./context";
+import { buildRunContext, getChannelCached, restatesReaction } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -42,6 +42,7 @@ import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { mirrorReplyToIssue } from "./issues";
+import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import type { MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
@@ -867,30 +868,10 @@ async function executeRunInner(
     const ids = await takeSteering();
     if (ids.length === 0) return null;
     for (const id of ids) readIds.add(id);
-    const rows = await db
-      .select({
-        id: schema.messages.id,
-        body: schema.messages.body,
-        meta: schema.messages.meta,
-        name: sql<string | null>`coalesce(${users.name}, ${schema.agents.name})`,
-        createdAt: schema.messages.createdAt,
-      })
-      .from(schema.messages)
-      .leftJoin(users, eq(users.id, schema.messages.authorUserId))
-      .leftJoin(schema.agents, eq(schema.agents.id, schema.messages.authorAgentId))
-      .where(
-        and(eq(schema.messages.orgId, run.orgId), inArray(schema.messages.id, ids), isNull(schema.messages.deletedAt)),
-      );
-    rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    // Rendered as live steering renders them mid-turn (`live-steer.ts`).
+    const rows = await renderSteered(db, run.orgId, ids);
     if (rows.length === 0) return null;
-    const text = rows
-      .map(
-        (m) =>
-          // A background task that ended while it worked: the notice with its result.
-          taskNotice({ body: m.body, meta: m.meta }, true) ??
-          `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`,
-      )
-      .join("\n\n");
+    const text = rows.map((m) => m.text).join("\n\n");
     const t = transcript as Transcript;
     appendUserText(t, text);
     await saveTranscript(db, t);
@@ -1248,6 +1229,21 @@ async function executeRunInner(
 
   const maxTurns = deps.maxToolTurns ?? 25;
   let firstTurn = true;
+  // Live steering (`live-steer.ts`): while a computer turn is in flight, a person's message goes to it
+  // (read at its next tool boundary) instead of waiting for the turn's end; any other time, it waits.
+  const live = listenLiveSteering({ db, pubsub: deps.pubsub }, run, replyThreadId, {
+    take: takeSteering,
+    onHanded: (ids) => {
+      for (const id of ids) readIds.add(id);
+    },
+    onReturned: (ids) => {
+      for (const id of ids) readIds.delete(id);
+    },
+    onRead: (read) => {
+      appendUserText(transcript as Transcript, read.map((m) => m.text).join("\n\n"));
+      later(() => addRunStep(db, run, "context", { steeredMessageIds: read.map((m) => m.id), live: true }));
+    },
+  });
   try {
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
@@ -1289,6 +1285,8 @@ async function executeRunInner(
         // side effects wait for the end of the turn (`takeBridgeEffects`).
         executeTool: (call) =>
           executeToolForRun(deps, { orgId: run.orgId, agentId: run.agentId, runId: run.id, machineId: "" }, call),
+        // A computer brain's turn that can take messages mid-turn (live steering).
+        steerable: (steer) => live.steerable(steer),
       };
       // A computer brain's turn: the transcript is saved (the bridge's pauses join it), and the turn's
       // tool token goes in `brain.turn.mcp.token` so the runner bridge maps its calls to this run.
@@ -1360,8 +1358,11 @@ async function executeRunInner(
               }
             },
             onExecuted: (call) => executedNow.push(call),
+            onSteerRead: (uuids) => live.read(uuids),
           },
-        );
+          // Before anything reads the inbox again (the next step, a failure's redispatch): what the turn
+          // was handed and never confirmed reading goes back there.
+        ).finally(() => live.endTurn());
         if (turnPlan.kind !== "model") {
           computerTurns++;
           nextPrompt = null;
@@ -1813,6 +1814,8 @@ async function executeRunInner(
     // A state change lost to a cancel (the final or suspend transition found `canceled`): end as canceled.
     if (await isCanceled().catch(() => false)) return stopCanceled("");
     throw error;
+  } finally {
+    live.close();
   }
 }
 
@@ -1953,6 +1956,8 @@ async function thinkOnce(
     onLimit?(resetsAt?: string): void;
     /** A call the brain already ran (through the bridge, or its own tools). */
     onExecuted?(call: { id: string; name: string }): void;
+    /** Messages handed to the turn mid-turn that it read (live steering). */
+    onSteerRead?(uuids: string[]): void;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
@@ -1981,6 +1986,7 @@ async function thinkOnce(
         event.resetsAt,
       );
     } else if (event.type === "error") throw new BrainFailure(event.code, event.message, event.retryable === true);
+    else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
     // `event.session`: computer brains keep a stable session per conversation (`brainSessionId`); nothing to store.
     else if (event.type === "done") text = event.text;
   }

@@ -72,9 +72,10 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     let live = false;
     let waited: WaitMessageOutcome | null = null;
     // Its model call stops and the loop reads the message at once (a running tool finishes first).
-    // A computer brain (Claude Code, Codex) can't drop its turn halfway: the task stops for real, and
-    // stopping it starts it again from this message (`restartAfterStopAndSend`). Who may not stop it
-    // just leaves the message for its next step.
+    // A computer brain (Claude Code, Codex) can't drop its turn halfway: Claude Code whose turn takes
+    // messages gets it live and urgent (read now, or at its next tool boundary: `live-steer.ts`); else
+    // the task stops for real, and stopping it starts it again from this message
+    // (`restartAfterStopAndSend`). Who may not stop it just leaves the message for its next step.
     if (now && active.status === "running") {
       const agent = await getAgentCached(deps.db, orgId, active.agentId);
       if (agent && agent.brain !== "model") {

@@ -7,6 +7,7 @@ import {
   brainTopic,
   type PubSub,
   parseBrainEvent,
+  STEER_PROTOCOL,
   type WireBrainEvent,
 } from "@agenteschat/adapters";
 import { type Database, schema } from "@agenteschat/db";
@@ -14,7 +15,7 @@ import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
-import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn } from "./types";
+import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
 /**
  * The Claude Code brain (ADR 0032): an agent thinks with Claude Code on its
@@ -35,6 +36,11 @@ import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn } from "./type
  *   ADR 0041, when it has one) end the turn at once
  *   with an `error` whose `retryable: true` tells the engine it may fall back
  *   to the model brain (ADR 0032 §5).
+ *
+ * - Live steering (runner protocol 15): once the turn is sent, the brain
+ *   hands the engine `steer` (`BrainIO.steerable`): a person's messages go to
+ *   the turn in progress (`brain.steer`), Claude Code reads them at its next
+ *   tool boundary, and `steer_read` events say which it read.
  *
  * Error codes (`retryable` = the turn may run on another brain):
  * `no_session`, `machine_offline`, `exec_disabled`, `runner_outdated`,
@@ -67,6 +73,41 @@ export interface ClaudeCodeBrainDeps {
   timeoutMs?: number;
   /** After the request's result, how long to wait for the stream's last events (default 1.5 s). */
   finalGraceMs?: number;
+  /** How long a `brain.steer` may take (default `STEER_CALL_MS`). */
+  steerTimeoutMs?: number;
+}
+
+/** A `brain.steer` answers at once (it only writes to the CLI's stdin): longer means the computer is in trouble. */
+export const STEER_CALL_MS = 2000;
+
+/** Hands messages to the turn of `runId` on its computer (`brain.steer`); a failed call is `no_turn` (they wait). */
+export async function steerOnMachine(
+  hub: Pick<MachineCaller, "call">,
+  input: { machineId: string; runId: string; session: string; agent: AgentScope; timeoutMs?: number },
+  messages: SteerMessage[],
+): Promise<SteerReply> {
+  try {
+    const reply = await hub.call<"brain.steer">(
+      input.machineId,
+      {
+        op: "brain.steer",
+        runId: input.runId,
+        session: input.session,
+        messages: messages.map((m) => ({ uuid: m.uuid, text: m.text, ...(m.urgent ? { urgent: true } : {}) })),
+        agent: input.agent,
+      },
+      { timeoutMs: input.timeoutMs ?? STEER_CALL_MS },
+    );
+    if (reply?.status === "accepted" && Array.isArray(reply.accepted)) {
+      const sent = new Set(messages.map((m) => m.uuid));
+      return { status: "accepted", accepted: reply.accepted.filter((u) => typeof u === "string" && sent.has(u)) };
+    }
+    if (reply?.status === "unsupported")
+      return { status: "unsupported", ...(reply.reason ? { reason: reply.reason } : {}) };
+    return { status: "no_turn", ...(reply && "reason" in reply && reply.reason ? { reason: reply.reason } : {}) };
+  } catch (error) {
+    return { status: "no_turn", reason: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /** The agent's id and handle, as the runner names its folder (and its name, for the machine's activity log). */
@@ -269,6 +310,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
         return;
       }
       const queue = new Queue();
+      let steering = false;
       const off = deps.pubsub.subscribe(brainTopic(turn.runId), (e) => {
         // Only the agent's own computer speaks for this run.
         if (e.machineId !== session.machineId) return;
@@ -317,6 +359,18 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
             },
             (error: unknown) => queue.push({ kind: "reply", final: claudeCodeCallError(error) }),
           );
+        // The turn is on its way: a person's messages can reach it mid-turn (an older runner reads them at the end).
+        if (io.steerable && (status?.protocol ?? 0) >= STEER_PROTOCOL) {
+          const target = {
+            machineId: session.machineId,
+            runId: turn.runId,
+            session: session.id,
+            agent,
+            ...(deps.steerTimeoutMs ? { timeoutMs: deps.steerTimeoutMs } : {}),
+          };
+          io.steerable((messages) => steerOnMachine(deps.hub, target, messages));
+          steering = true;
+        }
         let streamEnded = false;
         let replyFinal: BrainEvent | null = null;
         for (;;) {
@@ -335,6 +389,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           }
         }
       } finally {
+        if (steering) io.steerable?.(null);
         off();
       }
     },

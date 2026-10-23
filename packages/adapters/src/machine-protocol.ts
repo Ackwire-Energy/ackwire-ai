@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 14;
+export const MACHINE_PROTOCOL_VERSION = 15;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -116,6 +116,14 @@ export const ACCOUNTS_PROTOCOL = 13;
  * starts a mission on an older runner.
  */
 export const MISSION_WORKTREE_PROTOCOL = 14;
+/**
+ * From this protocol on (live steering): `brain.steer` hands messages to a
+ * Claude Code turn in progress (stream-json user lines on its stdin, read at
+ * its next tool boundary), and the turn reports which it read
+ * (`brain.event` `steer_read`). Older runners would drop the unknown op: the
+ * server never sends it to them (their turns read new messages at the end).
+ */
+export const STEER_PROTOCOL = 15;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -518,7 +526,34 @@ export type WireBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean };
+  | { type: "error"; code: string; message: string; retryable?: boolean }
+  /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
+  | { type: "steer_read"; uuids: string[] };
+
+/**
+ * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
+ * Each has its own `uuid` (a UUID the engine maps to its message); `urgent`
+ * ("Parar e mandar") asks the CLI to read it now (moving background-able work
+ * aside) where it can, else at its next tool boundary like the rest.
+ */
+export interface BrainSteerRequest {
+  runId: string;
+  /** The turn's session (as in its `brain.turn`): with the request's agent, it names the process. */
+  session: string;
+  messages: Array<{ uuid: string; text: string; urgent?: boolean }>;
+}
+
+/**
+ * `accepted`: written to the turn (their `uuid`s; read later, `steer_read`).
+ * `unsupported`: this turn can't take messages mid-turn (an older CLI, a
+ * one-shot process, Codex). `no_turn`: no turn of that run runs now.
+ */
+export type BrainSteerReply =
+  | { status: "accepted"; accepted: string[] }
+  | { status: "unsupported" | "no_turn"; reason?: string };
+
+/** Most messages and characters per message in one `brain.steer`. */
+export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
 
 /**
  * `brain.turn` (protocol 8, ADR 0032): one conversational turn of an agent
@@ -749,6 +784,8 @@ export type MachineRequest = (
   | { op: "task.output"; taskId: string; tail: number }
   /** Protocol 8: one brain turn (ADR 0032); streams `brain.event` frames while it runs. */
   | ({ op: "brain.turn" } & BrainTurnRequest)
+  /** Protocol 15: messages for a brain turn in progress (live steering). */
+  | ({ op: "brain.steer" } & BrainSteerRequest)
   /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
   | ({ op: "git.sync" } & GitSyncRequest)
   /** Protocol 14: the mission's worktree (ADR 0044). */
@@ -813,6 +850,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.cancel",
   "task.output",
   "brain.turn",
+  "brain.steer",
   "git.sync",
   "mission.worktree",
   "access.request",
@@ -867,6 +905,7 @@ export interface MachineReplies {
   "task.output": { lines: string[]; truncated: boolean };
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
+  "brain.steer": BrainSteerReply;
   "git.sync": { repos: GitSyncRepo[] };
   /** `remove` answers `{ removed }` (`false`: the folder was already gone). */
   "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };
@@ -1166,6 +1205,14 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
         ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
       };
+    case "steer_read": {
+      if (!Array.isArray(v.uuids)) return null;
+      const uuids = v.uuids
+        .filter(isString)
+        .slice(0, STEER_LIMITS.messages * 4)
+        .map((u) => u.slice(0, 64));
+      return uuids.length ? { type: "steer_read", uuids } : null;
+    }
     default:
       return null;
   }
