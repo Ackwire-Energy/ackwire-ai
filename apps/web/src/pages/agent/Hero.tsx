@@ -33,8 +33,8 @@ function useLiveRun(agentId: string) {
   return { status, channelId, connector };
 }
 
-/** Runs, budget (money for admins, % for everyone else) and lessons: one quiet line under "Como trabalha". */
-function Numbers() {
+/** Runs, budget (money for admins, % for everyone else) and lessons: quiet lines under "Como trabalha". */
+export function Numbers() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org } = useOrg();
@@ -104,7 +104,7 @@ export function AgentHero({
   const g = agentGrammar(t, agent.name);
   return (
     <header className="agp-hero">
-      {/* One card holds who the agent is: cover, face, name and how it works. */}
+      {/* Open sky: the cover edge to edge, the agent on its left edge, no card. */}
       <section className="agp-idcard" aria-label={name}>
         <div className="agp-cover" data-busy={busy || undefined}>
           <AgentCover color={draft.look.color as AgentColor} busy={busy} />
@@ -192,7 +192,7 @@ export function AgentHero({
             )}
           </div>
         </div>
-        {/* In the middle, over the cover's edge, cut out by a ring of the card. */}
+        {/* Over the cover's left edge, cut out by a ring of the page. */}
         <span className="agp-face">
           <AgentAvatar agentId={agent.id} appearance={draft.look} size="xl" name={name} />
         </span>
@@ -203,8 +203,11 @@ export function AgentHero({
             {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
           </span>
         </div>
-        {/* In the panel the numbers stay on the full page. */}
-        <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+        {/* Narrow (the panel beside its DM, small screens): how it works stays up here, on every tab. Wide, it
+            is the overview's side column (OverviewTab). In the panel the numbers stay on the full page. */}
+        <div className="agp-hero__work">
+          <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+        </div>
       </section>
     </header>
   );

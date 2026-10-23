@@ -78,7 +78,7 @@ import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
-import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, SidebarOrgSky } from "./Sky";
+import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
@@ -207,7 +207,6 @@ export function Sidebar() {
     const busy = runningAgents(st);
     return agentIds ? agentIds.split(",").filter((id) => busy.has(id)).length : 0;
   });
-  const orgRef = useRef<HTMLDivElement>(null);
   // Narrow screens: the sidebar is a drawer (id, open state, close on link / swipe).
   const drawer = useNavDrawer();
   // Desktop: the person can shrink the sidebar to an icon rail (remembered). Tablets always get the rail.
@@ -283,8 +282,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
       <div className="sidebar__top">
-        <div className="sidebar__org" ref={orgRef}>
-          <SidebarOrgSky calm={() => [orgRef.current?.querySelector(".sidebar__org-text") ?? null]} />
+        <div className="sidebar__org">
           <WorkspaceMenu
             summary={
               overview.data
@@ -503,7 +501,7 @@ export function Sidebar() {
       <div className="sidebar__foot">
         <SidebarHorizon working={working} total={dir.agents.length} />
         {can(org.role, "manage_agents") && (
-          <Button asChild block className="ac-btn--cut sidebar__create">
+          <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
               <Icon name="plus" />
               <span className="sidebar__item-label">{t("shell.createAgent")}</span>

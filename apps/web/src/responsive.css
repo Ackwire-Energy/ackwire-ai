@@ -248,10 +248,16 @@
     white-space: nowrap;
   }
 }
-/* Agent page: one column below the desktop; the numbers leave the sky (they render under it). */
+/* Agent page: one column below the desktop; how it works moves up under the name (on every tab). */
 @media (max-width: 1100px) {
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .agp-aside__work {
+    display: none;
+  }
+  .agp-hero__work {
+    display: block;
   }
 }
 @media (max-width: 900px) {
@@ -279,14 +285,20 @@
   }
 }
 @media (max-width: 760px) {
-  .agp-tabs .ac-tabs {
-    margin: 12px -16px 0;
+  /* The cover stays edge to edge: the page's own padding (above) is the gutter under it. */
+  .agp {
+    --agp-gutter: 16px;
+    padding: 0 0 28px;
   }
 }
 @media (max-width: 640px) {
   .agp-cover {
-    height: 104px;
-    border-radius: 20px;
+    height: 120px;
+  }
+  .agp-face {
+    width: 88px;
+    height: 88px;
+    margin-top: -44px;
   }
   .agp-name {
     font-size: 32px;
@@ -339,7 +351,7 @@
     padding: 0;
   }
   .agp-card.ac-card {
-    --card-pad: 16px;
+    padding-block: 20px;
   }
   .agp-savebar {
     bottom: 10px;
@@ -357,11 +369,18 @@
 /* The agent page in the panel beside its DM: the same narrow rules (above and in layout.css), by the
    panel's width instead of the screen's. */
 .agp--panel {
-  padding: 20px 16px 24px;
+  --agp-gutter: 20px;
+  padding: 0 0 24px;
 }
 @container agp-side (max-width: 1100px) {
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .agp-aside__work {
+    display: none;
+  }
+  .agp-hero__work {
+    display: block;
   }
 }
 @container agp-side (max-width: 900px) {
@@ -389,14 +408,18 @@
   }
 }
 @container agp-side (max-width: 760px) {
-  .agp-tabs .ac-tabs {
-    margin: 12px -16px 0;
+  .agp {
+    --agp-gutter: 16px;
   }
 }
 @container agp-side (max-width: 640px) {
   .agp-cover {
-    height: 104px;
-    border-radius: 20px;
+    height: 120px;
+  }
+  .agp-face {
+    width: 88px;
+    height: 88px;
+    margin-top: -44px;
   }
   .agp-name {
     font-size: 32px;
@@ -449,7 +472,7 @@
     padding: 0;
   }
   .agp-card.ac-card {
-    --card-pad: 16px;
+    padding-block: 20px;
   }
   .agp-savebar {
     bottom: 10px;

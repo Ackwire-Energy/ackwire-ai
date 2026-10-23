@@ -20,8 +20,10 @@ import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { BrowserNow } from "./BrowserNow";
 import { CardHead, useAgentEdit } from "./context";
+import { Numbers } from "./Hero";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
+import { WorkCard } from "./Work";
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */
 export function OverviewTab() {
@@ -29,7 +31,7 @@ export function OverviewTab() {
   const locale = i18n.language;
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const { agent, g, viewer, saved, goTo, can, resources, ownerFirst } = useAgentEdit();
+  const { agent, g, viewer, saved, goTo, can, resources, ownerFirst, openWork } = useAgentEdit();
   const detail = useAgentDetail(org.id, agent.id);
   const proposals = useProposals(org.id);
   const runs = useRuns(org.id, agent.id, viewer !== "member");
@@ -253,7 +255,14 @@ export function OverviewTab() {
           </Card>
         </div>
 
-        <div className="agp-col">
+        {/* The quiet side column: how it works and its numbers, then who and where. */}
+        <div className="agp-col agp-aside">
+          <section className="agp-aside__work" aria-labelledby="ov-work">
+            <h2 id="ov-work" className="agp-aside__h">
+              {t("agentPage.work.cell.label")}
+            </h2>
+            <WorkCard onOpen={openWork} footer={<Numbers />} />
+          </section>
           <Card as="section" className="agp-card" aria-labelledby="ov-who">
             <CardHead
               id="ov-who"

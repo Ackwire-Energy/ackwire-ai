@@ -176,22 +176,7 @@ p {
   flex-direction: column;
   overflow: hidden;
 }
-/*
- * Pages that aren't a conversation: the work area is a paper a shade
- * darker, so the cards on it stand out. Conversations stay white. A page laid out like a chat but not
- * one (the calendar) says so with `--desk`.
- */
-:root,
-[data-theme="light"] {
-  --desk: #f5f5f2;
-}
-[data-theme="dark"] {
-  --desk: #0b0b0a;
-}
-.shell__main:not(.shell__main--chat),
-.shell__main--desk {
-  --pane: var(--desk);
-}
+/* Every page sits on the same white as the conversations: no grayer desk. */
 /*
  * The work area beside the sidebar: an app-wide notice on top when there is one,
  * then the page, laid out as before (a row: the page's main column and anything beside it).
@@ -4032,7 +4017,8 @@ p {
   }
 }
 
-/* Sidebar 2026-10: soft pill for the active item (one indicator slides between items), neutral badges. */
+/* Sidebar: on the sky's paper, nothing raised in it. The active item is the page's
+   white with a hairline (one indicator slides between items); counts are plain numbers. */
 .sidebar {
   position: relative;
   background: var(--side);
@@ -4054,8 +4040,8 @@ p {
   left: 0;
   z-index: 0;
   border-radius: var(--control-r-md);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  background: var(--pane);
+  box-shadow: inset 0 0 0 1px var(--line);
   pointer-events: none;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -4092,17 +4078,14 @@ p {
   color: var(--faint);
 }
 .sidebar__unread {
-  background: var(--raised);
-  color: var(--ink);
-  box-shadow: var(--e1);
+  background: none;
+  color: var(--muted);
+  box-shadow: none;
   font-weight: 650;
 }
-/* The workspace header: a raised card with the org's name. */
+/* The workspace header: the org's name, no card (a soft fill on hover). */
 .sidebar__org {
-  padding: 6px;
-  border-radius: var(--radius-lg);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  border-radius: 12px;
 }
 .sidebar__org-name {
   font-size: 15.5px;
@@ -4119,8 +4102,8 @@ p {
   padding: 0 10px 0 var(--control-px-md);
   border: 0;
   border-radius: var(--control-r-md);
-  background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--field-line);
+  background: var(--pane);
+  box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: var(--control-fs-md);
   color: var(--faint);
@@ -5340,21 +5323,14 @@ button.live-call__head:hover {
   text-shadow: 0 1px 6px rgba(4, 32, 63, 0.6);
 }
 
-/* Sidebar: the workspace's little sky, working agents, the horizon */
+/* Sidebar: the workspace's header, working agents, the horizon */
 .sidebar__org {
   position: relative;
   overflow: hidden;
-  min-height: 56px;
-  /* The whole card is the menu button: no inset, so every pixel of it opens the menu. */
+  min-height: 48px;
+  /* The whole header is the menu button: no inset, so every pixel of it opens the menu. */
   padding: 0;
-  border-radius: 14px;
-  /* The sky is light tones faded from this surface, so the text keeps the theme's own ink. */
-  border: 1px solid var(--line);
-  background: var(--sunken);
   color: var(--ink);
-}
-.sidebar__org > :not(.ac-sky) {
-  position: relative;
 }
 .sidebar__org .sidebar__org-button,
 .sidebar__org .sidebar__org-button > .ac-icon,
@@ -5363,7 +5339,7 @@ button.live-call__head:hover {
 }
 .sidebar__org .sidebar__org-button {
   align-self: stretch;
-  padding: 8px 12px 8px 10px;
+  padding: 6px 10px 6px 8px;
   border-radius: inherit;
 }
 .sidebar__org .sidebar__org-meta {
@@ -5371,7 +5347,7 @@ button.live-call__head:hover {
 }
 .sidebar__org .sidebar__org-button:hover,
 .sidebar__org .ac-btn:hover {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: var(--plate);
 }
 .sidebar__item[data-busy="true"] {
   position: relative;
@@ -5412,14 +5388,18 @@ button.live-call__head:hover {
   overflow: hidden;
   pointer-events: none;
 }
-/* The whole card is the account button (no inner margin it doesn't answer to). Solid like the busy
-   chip: the moving sky behind would make a blur redo itself on every frame. */
+/* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {
   border-radius: 12px;
-  background: var(--glass-solid);
-  box-shadow:
-    0 0 0 1px var(--line),
-    0 8px 20px -12px rgba(0, 0, 0, 0.35);
+}
+.sidebar__me > .sidebar__user:hover {
+  background: var(--plate);
+}
+/* "Criar agente": a plain row (a ghost button), not a raised one. */
+.sidebar__create.ac-btn {
+  justify-content: flex-start;
+  color: var(--ink2);
+  font-weight: 500;
 }
 .sidebar[data-rail="true"] .sidebar__org {
   min-height: 0;
@@ -7237,8 +7217,11 @@ a.machine-row__name:hover {
  * editing and one save bar that sticks to the bottom while something is
  * unsaved. Cards stay neutral; only the cover and running states use color. */
 .agp {
+  /* Open sky: the page is the cover's width; what is under it keeps a gutter. */
+  --agp-gutter: 40px;
+  max-width: none;
   gap: 0;
-  padding-bottom: 24px;
+  padding: 0 0 24px;
 }
 .agp-hero {
   display: flex;
@@ -7246,12 +7229,10 @@ a.machine-row__name:hover {
 }
 .agp-cover {
   position: relative;
-  height: 128px;
-  border-radius: 24px;
+  height: 176px;
   overflow: hidden;
   isolation: isolate;
   background: var(--sunken);
-  box-shadow: var(--e1);
 }
 .agp-cover__sky {
   position: absolute;
@@ -7263,96 +7244,43 @@ a.machine-row__name:hover {
   width: 100%;
   height: 100%;
 }
-/* The agent in the middle, over the cover's edge, cut out by a ring of the page. */
+/* The agent on the cover's left edge, cut out by a ring of the page. */
 .agp-face {
   position: relative;
   z-index: 1;
   display: grid;
-  width: 96px;
-  height: 96px;
-  margin: -48px auto 0;
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 var(--agp-gutter);
   /* The avatar's own tile (radius 30%) is the face: the ring follows it. */
   border-radius: 30%;
-  box-shadow:
-    0 0 0 5px var(--bg),
-    var(--e1);
+  box-shadow: 0 0 0 6px var(--bg);
 }
 .agp-face .ac-avatar {
   width: 100%;
   height: 100%;
 }
-/*
- * The agent's page sits on a grayer desk (full page and the panel beside its DM),
- * and who the agent is (cover, face, name, how it works) lives in one white card, so it never blends
- * with the cards of the tabs.
- */
-:root,
-[data-theme="light"] {
-  --agp-desk: #efefec;
-}
-[data-theme="dark"] {
-  --agp-desk: #080807;
-}
-.shell__main:not(.shell__main--chat):has(> .agp),
-.thread-panel--wide {
-  --pane: var(--agp-desk);
-  --bg: var(--agp-desk);
-  --surface: var(--agp-desk);
-}
+/* Who the agent is (cover, face, name) is no card: it sits on the page's own white. */
 .agp-idcard {
   display: flex;
   flex-direction: column;
-  padding: 8px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
-  box-shadow: var(--card-shadow);
 }
-/* Concentric with the card. */
-.agp-idcard .agp-cover {
-  border-radius: calc(var(--radius-section) - 8px);
-  box-shadow: none;
-}
-.agp-idcard .agp-face {
-  box-shadow:
-    0 0 0 5px var(--surface-raised),
-    var(--e1);
-}
-.agp-idcard .agp-work {
-  padding-top: 14px;
-}
-/* The three cells are part of the card: a hairline above them, no card of their own. */
-.agp-idcard .agp-workcard {
-  padding: 6px 0 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-/* The tabs as a segmented control under the card, centered; it sticks to the top while the page scrolls. */
-.agp-tabs .ac-tabs--seg {
-  position: sticky;
-  top: 8px;
-  z-index: var(--z-sticky);
-  display: flex;
-  width: max-content;
-  margin: 16px auto 0;
-  box-shadow:
-    inset 0 0 0 1px var(--line),
-    inset 0 1px 2px rgba(0, 0, 0, 0.06),
-    0 6px 16px -10px rgba(0, 0, 0, 0.25);
+/* How it works lives in the overview's side column; up here only where that column is gone (responsive.css). */
+.agp-hero__work {
+  display: none;
+  padding: 18px var(--agp-gutter) 0;
 }
 .agp-ident {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 10px 4px 0;
-  text-align: center;
+  padding: 12px var(--agp-gutter) 0;
 }
 .agp-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: 40px;
   font-weight: var(--font-display-weight, 300);
   line-height: 1;
   letter-spacing: -0.03em;
@@ -7395,11 +7323,8 @@ a.machine-row__name:hover {
   padding-top: 16px;
 }
 .agp-workcard {
-  padding: 6px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
-  /* Raised off the page (white in light) so it reads as one card. */
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  padding: 4px 0;
+  border-block: 1px solid var(--line);
 }
 .agp-cells {
   display: grid;
@@ -7448,8 +7373,7 @@ a.machine-row__name:hover {
   width: 30px;
   height: 30px;
   border-radius: 10px 10px 10px 3px;
-  background: var(--sunken);
-  color: var(--ink2);
+  color: var(--muted);
 }
 .agp-cell__key .ac-brand--sm {
   border-radius: inherit;
@@ -7708,8 +7632,8 @@ a.machine-row__name:hover {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  margin: 14px -8px 0;
-  padding: 0 8px;
+  margin: 18px 0 0;
+  padding: 0 calc(var(--agp-gutter) - 12px);
   overflow-x: auto;
   scrollbar-width: none;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
@@ -7747,7 +7671,7 @@ a.machine-row__name:hover {
   color: var(--warn);
 }
 .agp-view {
-  padding-top: 22px;
+  padding: 8px var(--agp-gutter) 0;
   animation: agp-in 0.3s var(--out) both;
 }
 @keyframes agp-in {
@@ -7762,27 +7686,82 @@ a.machine-row__name:hover {
 }
 .agp-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 280px;
   align-items: start;
-  gap: 18px;
+  gap: 48px;
 }
 .agp-col {
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-width: 0;
 }
+/* No cards on the agent's page: sections on the white, a hairline between them. */
 .agp-card.ac-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  --card-pad: 18px;
+  padding: 26px 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
+.agp-card.ac-card + .agp-card.ac-card,
+.agp-attns + .agp-card.ac-card,
+.agp-aside__work + .agp-card.ac-card {
+  border-top: 1px solid var(--line);
+}
+.agp-card.ac-card > .ac-card__foot {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+/* Something changed in it: a bar on its left edge. */
 .agp-card[data-changed] {
-  box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--card-shadow);
+  padding-left: 14px;
+  box-shadow: inset 2px 0 0 var(--ink);
+}
+/* The side column: quiet, smaller headings. */
+.agp-aside__work {
+  padding: 26px 0;
+}
+.agp-aside__h {
+  margin: 0 0 6px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.agp-aside .agp-work {
+  padding-top: 0;
+}
+.agp-aside .agp-workcard {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.agp-aside .agp-cells {
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 -12px;
+}
+.agp-aside .agp-cell + .agp-cell::before {
+  display: none;
+}
+.agp-aside .agp-workcard__foot {
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+}
+.agp-aside .agp-numbers {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.agp-aside .agp-number {
+  font-size: 14px;
+  white-space: normal;
+  text-align: left;
 }
 .agp-changed {
   display: inline-flex;

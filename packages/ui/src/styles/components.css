@@ -3040,19 +3040,13 @@ a.ac-list__row:focus-visible {
   --person-b: #d9d9d4;
   --person-ink: #2a2a28;
   --b1-light: rgba(255, 255, 255, 0.18);
-  /* Cards: an object like the buttons, lit top edge, darker bottom
-     edge, contact + ambient shadow. Keys are the small tiles on a card (head icon); the well is pressed in. */
-  --card-face-top: #ffffff;
-  --card-shadow:
-    0 0 0 1px rgba(23, 23, 22, 0.08), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(23, 23, 22, 0.06),
-    0 1px 2px rgba(23, 23, 22, 0.06), 0 12px 28px -14px rgba(23, 23, 22, 0.18);
-  --card-shadow-hover:
-    0 0 0 1px rgba(23, 23, 22, 0.1), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(23, 23, 22, 0.07),
-    0 2px 4px rgba(23, 23, 22, 0.06), 0 18px 36px -16px rgba(23, 23, 22, 0.24);
-  --card-key-bottom: #f5f5f2;
-  --card-key:
-    0 0 0 1px rgba(23, 23, 22, 0.09), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(23, 23, 22, 0.08),
-    0 1px 2px rgba(23, 23, 22, 0.08);
+  /* Cards: flat on the white page, a hairline and the cut corner, no shadow.
+     Keys (the head icon) are a bare icon, no frame; the well is pressed in. */
+  --card-face-top: var(--surface-raised);
+  --card-shadow: 0 0 0 1px rgba(23, 23, 22, 0.1);
+  --card-shadow-hover: 0 0 0 1px rgba(23, 23, 22, 0.18);
+  --card-key-bottom: var(--surface-raised);
+  --card-key: none;
   --card-well: #f6f6f3;
   --card-well-shadow: inset 0 1px 2px rgba(23, 23, 22, 0.07), inset 0 0 0 1px rgba(23, 23, 22, 0.05), 0 1px 0 #ffffff;
 }
@@ -3061,17 +3055,11 @@ a.ac-list__row:focus-visible {
   --person-b: #2a2a28;
   --person-ink: #efefec;
   --b1-light: rgba(255, 255, 255, 0.12);
-  --card-face-top: #232322;
-  --card-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 1px 2px rgba(0, 0, 0, 0.5), 0 14px 30px -12px rgba(0, 0, 0, 0.75);
-  --card-shadow-hover:
-    0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 2px 4px rgba(0, 0, 0, 0.5), 0 20px 40px -14px rgba(0, 0, 0, 0.85);
-  --card-key-bottom: #1f1f1e;
-  --card-key:
-    0 0 0 1px rgba(255, 255, 255, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    0 1px 2px rgba(0, 0, 0, 0.5);
+  --card-face-top: var(--surface-raised);
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --card-shadow-hover: 0 0 0 1px rgba(255, 255, 255, 0.18);
+  --card-key-bottom: var(--surface-raised);
+  --card-key: none;
   --card-well: #121211;
   --card-well-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -3542,9 +3530,8 @@ a.ac-list__row:focus-visible {
 }
 
 /*
- * Cards: neutral, an object like the buttons (lit top edge, darker
- * bottom edge, contact + ambient shadow), so it stands out on the white work area. Every card has the cut
- * corner: straight bottom-left, the rest rounded. Interactive ones lift.
+ * Cards: neutral, a hairline on the white page, no shadow. Every card keeps the cut corner: straight bottom-left, the rest rounded.
+ * Interactive ones darken their line and lift a little.
  */
 .ac-card {
   border: 0;
@@ -3568,19 +3555,16 @@ a.ac-list__row:focus-visible {
 .ac-card__head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 .ac-card__key {
   display: grid;
   flex: none;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px 10px 10px 3px;
-  background: linear-gradient(180deg, var(--surface-raised), var(--card-key-bottom));
-  box-shadow: var(--card-key);
-  color: var(--ink2);
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
 }
 .ac-card__heading {
   display: flex;
@@ -3617,11 +3601,10 @@ a.ac-list__row:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 calc(8px - var(--card-pad, 20px)) calc(8px - var(--card-pad, 20px));
-  padding: 9px 10px;
-  border-radius: 12px 12px 12px 3px;
-  background: var(--card-well);
-  box-shadow: var(--card-well-shadow);
+  /* A quiet line under a hairline, edge to edge of the card (no gray well). */
+  margin: 0 calc(0px - var(--card-pad, 20px)) calc(0px - var(--card-pad, 20px));
+  padding: 12px var(--card-pad, 20px);
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12.5px;
   line-height: 17px;

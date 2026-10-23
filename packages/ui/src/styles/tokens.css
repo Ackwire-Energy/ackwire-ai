@@ -8,7 +8,8 @@
   --raised-2: #ffffff;
   --sunken: #f3f3f0;
   /* The app shell: the sidebar's paper and the work area beside it. */
-  --side: #f8f8f6;
+  /* The sidebar is on the sky's paper, the faintest cool tint. */
+  --side: #f6f9fd;
   --pane: #ffffff;
   /* The open book of the memory mark. */
   --book-page: #fffdf6;
@@ -53,7 +54,7 @@
   --raised: #1c1c1b;
   --raised-2: #242423;
   --sunken: #0a0a09;
-  --side: #0a0a09;
+  --side: #0d1015;
   --pane: #0f0f0e;
   --book-page: #ebe6d8;
   --book-line: #a59e8c;

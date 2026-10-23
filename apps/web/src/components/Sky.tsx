@@ -319,31 +319,6 @@ export function prepareBurst(from: HTMLElement): () => void {
 
 /* ---------- Sidebar ---------- */
 
-/** The workspace header's little sky: light tones, a touch deeper at the right (calm behind its name). */
-export function SidebarOrgSky({ calm }: { calm: () => (Element | null)[] }) {
-  return (
-    <PixelSky
-      className="sidebar__org-sky"
-      options={{
-        pixel: 3,
-        surface: "--sunken",
-        // Soft tones run from the surface (0) toward the color: low values stay light.
-        palette: (bg) => softTones("sky", bg),
-        body: spriteTone("sky"),
-        // No pixel agents here: the strip is too small, they would pass behind the logo.
-        sprites: 0,
-        near: 0,
-        calm,
-        calmV: 0,
-        calmPad: 10,
-        light: 0,
-        base: (u, v) => 0.36 * u * u * u * (0.6 + 0.4 * v),
-        blobs: (tt) => [[0.9 + 0.04 * S(tt * 0.3), 0.75, 0.07, 0.08]],
-      }}
-    />
-  );
-}
-
 /** Behind a working agent's row: a light sweep in its color, stronger on the right. */
 export function AgentTrail({ color }: { color: AgentColor }) {
   return (
