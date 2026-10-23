@@ -8,6 +8,14 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
+import {
+  backgroundRoutineOf,
+  isEventLine,
+  isTalkerReply,
+  noticeAgentHandle,
+  noticeOf,
+  noticeRoutineName,
+} from "@agenteschat/client/lib/notices";
 import { isRoutineCall, routineOfMessage } from "@agenteschat/client/lib/routines";
 import { previewOf } from "../shared/logic";
 
@@ -67,7 +75,8 @@ export function standsAlone(m: Message) {
       meta.issueTaken ||
       questionOf(meta) ||
       consultationsOf(meta).length > 0 ||
-      routineOfMessage(meta),
+      routineOfMessage(meta) ||
+      isEventLine(meta),
   );
 }
 
@@ -88,11 +97,80 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
       lastDay = day;
       prev = null;
     }
-    const grouped = !standsAlone(m) && !(prev && standsAlone(prev)) && groupsWith(prev, m);
+    // A fast reply while its task works keeps its header ("enquanto trabalha"), as on the web.
+    const grouped = !standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m);
     rows.push({ kind: "message", key: messageKey(m), message: m, grouped });
     prev = m;
   }
   return rows;
+}
+
+// ── Automatic lines ──────────────────────────────────────────────────────────
+
+/**
+ * One quiet line instead of a voice (the web's `ChatNotices`): what reached an agent's conversation
+ * (`meta.notice`: "Rotina «X» entregou um relatório", "@Infra respondeu", "Nota de @Dev", "Chegou o
+ * resultado que Ada esperava") or a routine that ran in the background ("Rotina «X» rodou"); the text
+ * on demand. `key`/`values` are the shared i18n (`chat.notice.*`). A talker reply is never one: it
+ * shows as the agent's message (`noticeOf` leaves it out).
+ */
+export interface EventLineView {
+  kind: "notice" | "routine";
+  icon: "clock" | "agent" | "chat" | "check" | "bell";
+  key: string;
+  values: Record<string, string>;
+  /** Shown on "Ver": the message's text, else the notice's. */
+  text: string;
+}
+
+const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
+  routine_handoff: "clock",
+  consult_reply: "agent",
+  agent_note: "chat",
+  wait_result: "check",
+};
+
+export function eventLineOf(
+  m: Pick<Message, "body" | "meta">,
+  names: { author: string; agentByHandle: (handle: string) => string | null },
+): EventLineView | null {
+  const notice = noticeOf(m.meta);
+  if (notice) {
+    const handle = noticeAgentHandle(notice);
+    // `from` is written for the agent ("@infra"): the app says the agent's name.
+    const from = handle ? `@${names.agentByHandle(handle) ?? handle}` : notice.from;
+    const icon = NOTICE_ICON[notice.kind] ?? "bell";
+    const line = (key: string, values: Record<string, string> = {}): EventLineView => ({
+      kind: "notice",
+      icon,
+      key,
+      values,
+      text: m.body.trim() || notice.text,
+    });
+    switch (notice.kind) {
+      case "routine_handoff": {
+        const routine = noticeRoutineName(m.meta, notice);
+        return routine ? line("chat.notice.routineHandoff", { routine }) : line("chat.notice.routineHandoffAnon");
+      }
+      case "consult_reply":
+        return from ? line("chat.notice.consultReply", { from }) : line("chat.notice.consultReplyAnon");
+      case "agent_note":
+        return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
+      case "wait_result":
+        return line("chat.notice.waitResult", { name: names.author });
+      default:
+        return line("chat.notice.other", { name: names.author });
+    }
+  }
+  const routine = backgroundRoutineOf(m.meta);
+  if (!routine) return null;
+  return {
+    kind: "routine",
+    icon: "clock",
+    key: "chat.notice.routineRan",
+    values: { routine: routine.name },
+    text: m.body.trim(),
+  };
 }
 
 // ── What a message carries ───────────────────────────────────────────────────

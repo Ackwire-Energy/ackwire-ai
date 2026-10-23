@@ -5,6 +5,7 @@ import {
   artifactsOf,
   buildRows,
   consultationsOf,
+  eventLineOf,
   hidesBody,
   markedParts,
   markName,
@@ -555,5 +556,104 @@ describe("an agent's turn as one block", () => {
     const next = withContinued({ canceled: { byUserId: "u1", text: "Oi" }, other: 1 }, "r2");
     expect(next).toEqual({ canceled: { byUserId: "u1", text: "Oi", continuedRunId: "r2" }, other: 1 });
     expect(stoppedOf(next)?.continuedRunId).toBe("r2");
+  });
+});
+
+describe("automatic lines (notices, a routine's background start) and fast replies", () => {
+  const handles: Record<string, string> = { infra: "Infra", dev: "Dev" };
+  const names = { author: "Ada", agentByHandle: (handle: string) => handles[handle] ?? null };
+  const agentMsg = (id: string, meta: Record<string, unknown>, over: Partial<Message> = {}) =>
+    message({ id, author: { type: "agent", id: "ada" }, body: "", meta, ...over });
+
+  test("a routine's report: «name» from the message's routine, the refs or `from`; the text on demand", () => {
+    const own = eventLineOf(
+      agentMsg("n1", {
+        routine: { id: "rt1", name: "Sentry diário" },
+        notice: { kind: "routine_handoff", text: "3 erros novos" },
+      }),
+      names,
+    );
+    expect(own).toEqual({
+      kind: "notice",
+      icon: "clock",
+      key: "chat.notice.routineHandoff",
+      values: { routine: "Sentry diário" },
+      text: "3 erros novos",
+    });
+    const fromOnly = eventLineOf(
+      agentMsg("n2", { notice: { kind: "routine_handoff", text: "x", from: "Rotina «Bom dia»" } }),
+      names,
+    );
+    expect(fromOnly?.values).toEqual({ routine: "Bom dia" });
+    const anon = eventLineOf(agentMsg("n3", { notice: { kind: "routine_handoff", text: "x" } }), names);
+    expect(anon?.key).toBe("chat.notice.routineHandoffAnon");
+  });
+
+  test("another agent's answer and note say its name, not the agent-facing handle", () => {
+    const reply = eventLineOf(agentMsg("n1", { notice: { kind: "consult_reply", text: "ok", from: "@infra" } }), names);
+    expect(reply).toMatchObject({ icon: "agent", key: "chat.notice.consultReply", values: { from: "@Infra" } });
+    const unknown = eventLineOf(
+      agentMsg("n2", { notice: { kind: "agent_note", text: "ok", refs: { agentHandle: "@zed" } } }),
+      names,
+    );
+    expect(unknown).toMatchObject({ icon: "chat", key: "chat.notice.agentNote", values: { from: "@zed" } });
+    const anon = eventLineOf(agentMsg("n3", { notice: { kind: "consult_reply", text: "ok" } }), names);
+    expect(anon?.key).toBe("chat.notice.consultReplyAnon");
+  });
+
+  test("a wait's result names the agent that waited; the message's own text wins over the notice's", () => {
+    const line = eventLineOf(
+      agentMsg("n1", { notice: { kind: "wait_result", text: "notice text" } }, { body: "  o deploy terminou  " }),
+      names,
+    );
+    expect(line).toMatchObject({
+      icon: "check",
+      key: "chat.notice.waitResult",
+      values: { name: "Ada" },
+      text: "o deploy terminou",
+    });
+    expect(eventLineOf(agentMsg("n2", { notice: { kind: "new_kind", text: "x" } }), names)).toMatchObject({
+      icon: "bell",
+      key: "chat.notice.other",
+    });
+  });
+
+  test("a talker reply is the agent's message, never a line (it carries both meta.talker and a notice)", () => {
+    const talker = agentMsg("t1", {
+      talker: { runId: "r1", inReplyTo: "m1" },
+      notice: { kind: "talker_reply", text: "Já vejo isso" },
+    });
+    expect(eventLineOf(talker, names)).toBeNull();
+    expect(standsAlone(talker)).toBe(false);
+  });
+
+  test("a routine's background start is one line «X» rodou, its instructions on demand, never the person", () => {
+    const start = message({
+      id: "bg",
+      body: "@ada veja os erros",
+      meta: { background: true, routineId: "rt1", routine: { id: "rt1", name: "Sentry diário" } },
+    });
+    expect(eventLineOf(start, names)).toEqual({
+      kind: "routine",
+      icon: "clock",
+      key: "chat.notice.routineRan",
+      values: { routine: "Sentry diário" },
+      text: "@ada veja os erros",
+    });
+    // Not hidden like a routine's plain call: it shows, as its line.
+    expect(buildRows([start]).filter((r) => r.kind === "message")).toHaveLength(1);
+    expect(eventLineOf(message({ id: "plain" }), names)).toBeNull();
+  });
+
+  test("lines never group; a fast reply keeps its header (enquanto trabalha)", () => {
+    const ada = { type: "agent" as const, id: "ada" };
+    const rows = buildRows([
+      message({ id: "a", author: ada, createdAt: at(10) }),
+      message({ id: "n", author: ada, meta: { notice: { kind: "agent_note", text: "x" } }, createdAt: at(9) }),
+      message({ id: "b", author: ada, createdAt: at(8) }),
+      message({ id: "t", author: ada, meta: { talker: { runId: "r1" } }, createdAt: at(7) }),
+      message({ id: "c", author: ada, createdAt: at(6) }),
+    ]).flatMap((r) => (r.kind === "message" ? [r.grouped] : []));
+    expect(rows).toEqual([false, false, false, false, true]);
   });
 });

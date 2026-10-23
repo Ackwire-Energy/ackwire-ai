@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentAccess, WorkingRun } from "@agenteschat/client";
 import { activitySections, dayGroupOf, emojisOf, subtitleOf, whoOf } from "../../src/features/activity/logic";
-import { agoOf, busyAgents, canUse, spendOf, teamLines, workingNow } from "../../src/features/agents/logic";
+import {
+  agoOf,
+  busyAgents,
+  busyChannels,
+  canUse,
+  spendOf,
+  teamLines,
+  workingNow,
+} from "../../src/features/agents/logic";
 import { filterResults, fold, isEmpty, matches, searchCounts, searchResults } from "../../src/features/search/logic";
 import { agent, mission, notification } from "./fixtures";
 
@@ -109,6 +117,18 @@ describe("who is working", () => {
     );
     expect(work.map((w) => w.key)).toEqual(["m:m1", "r:r1", "r:r5"]);
     expect([...busyAgents(work)]).toEqual(["dev", "nina", "theo"]);
+  });
+
+  test("a routine's background run is never working (no row, the DM doesn't say trabalhando)", () => {
+    const work = workingNow(
+      [
+        run("bg", "nina", "running", null, ago(1), { channelId: "d1", channelKind: "dm", background: true }),
+        run("r1", "dev", "running", "t1"),
+      ],
+      [],
+    );
+    expect(work.map((w) => w.key)).toEqual(["r:r1"]);
+    expect([...busyChannels(work)]).toEqual(["c1"]);
   });
 
   test("a run says what it works on, else where it is", () => {
