@@ -215,7 +215,17 @@ describe("MCP tools through the Tool Gateway", () => {
         if (last.includes("checks passing"))
           return {
             chunks: ["Checks passing."],
-            toolUses: [{ name: "github_merge_pull_request", input: { owner: "acme", repo: "app", pullNumber: 42 } }],
+            toolUses: [
+              {
+                name: "github_merge_pull_request",
+                input: {
+                  owner: "acme",
+                  repo: "app",
+                  pullNumber: 42,
+                  why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                },
+              },
+            ],
           };
         return {
           chunks: [],

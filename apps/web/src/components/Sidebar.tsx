@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/client";
 import { audienceChip } from "@agenteschat/client/lib/audience";
 import { formatPercent } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
@@ -53,12 +54,22 @@ import { useAuth } from "@/auth/context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
+import {
+  contextMenuHandler,
+  copyText,
+  type MenuEntry,
+  type MenuLook,
+  menuLook,
+  onMenuLookChange,
+  setMenuLook,
+} from "@/lib/context-menu";
+import { inDesktopApp } from "@/lib/desktop";
 import { markOpen } from "@/lib/perf";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
-import type { SettingsSection } from "@/pages/SettingsPage";
-import { useStreams } from "@/realtime/context";
+import type { SettingsSection } from "@/pages/settings-sections";
+import { useLiveStore, useStreams } from "@/realtime/context";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
@@ -67,6 +78,7 @@ import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, SidebarOrgSky } from "./Sky";
+import { isStoppable, useStopRun } from "./StopRun";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
 function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boolean; label: string }) {
@@ -96,7 +108,7 @@ const onSidebarChange = (cb: () => void) => {
   window.addEventListener(SIDEBAR_EVENT, cb);
   return () => window.removeEventListener(SIDEBAR_EVENT, cb);
 };
-const toggleSidebar = () => {
+export const toggleSidebar = () => {
   sidebarCollapsed = !sidebarCollapsed;
   storage.set(STORAGE_KEYS.sidebarCollapsed, sidebarCollapsed ? "1" : "0");
   window.dispatchEvent(new Event(SIDEBAR_EVENT));
@@ -110,6 +122,9 @@ export function useSidebarCollapsed(): [boolean, () => void] {
   return [collapsed, toggleSidebar];
 }
 
+/** File → Novo canal in the desktop app's menu bar (DesktopMenus.tsx): the sidebar opens its dialog. */
+export const NEW_CHANNEL_EVENT = "agentes:new-channel";
+
 /** The workspace sidebar (telas/Sidebar.dc.html). */
 export function Sidebar() {
   const { t } = useTranslation();
@@ -119,6 +134,27 @@ export function Sidebar() {
   const channels = useChannels(orgId);
   const overview = useOverview(orgId);
   const [creatingChannel, setCreatingChannel] = useState(false);
+  useEffect(() => {
+    const open = () => setCreatingChannel(true);
+    window.addEventListener(NEW_CHANNEL_EVENT, open);
+    return () => window.removeEventListener(NEW_CHANNEL_EVENT, open);
+  }, []);
+  const toast = useToast();
+  // The desktop app's right click on a channel (lib/context-menu.ts).
+  const channelMenu = (c: { id: string; name: string }) =>
+    contextMenuHandler(() => [
+      { kind: "header", label: `#${c.name}` },
+      {
+        kind: "item",
+        id: "copy-link",
+        label: t("contextMenu.copyLink"),
+        icon: "link",
+        run: () =>
+          void copyText(`${window.location.origin}/org/${orgId}/c/${c.id}`, () =>
+            toast.show(t("contextMenu.linkCopied")),
+          ),
+      },
+    ]);
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
   // The bell: unread notifications (live through `notification.counts`); the badge bumps when one arrives.
   const unreadNotifications = useNotificationCount(orgId).data?.unread ?? 0;
@@ -374,6 +410,7 @@ export function Sidebar() {
                 onMouseEnter={() => prefetch(c.id)}
                 onFocus={() => prefetch(c.id)}
                 onClick={() => markOpen(c.id)}
+                onContextMenu={channelMenu(c)}
               >
                 <Icon name="channel" className="sidebar__channel-icon" />
                 <span className="sidebar__item-label">{c.name}</span>
@@ -623,8 +660,54 @@ function AgentRow({
   const busy = state !== "idle" && !waitingFor;
   const color = colorOf(a);
   const chip = audienceChip(t, a);
+  const navigate = useNavigate();
+  const live = useLiveStore();
+  const runs = useStopRun();
+  const toast = useToast();
+  // The desktop app's right click on an agent: talk, its page, its link, and stop while it works.
+  const onContextMenu = contextMenuHandler(() => {
+    const working = Object.values(live.get().streams.runs).filter(
+      (r) => r.agentId === a.id && isStoppable(r) && runs.canStop(r),
+    );
+    return [
+      { kind: "header", label: a.name },
+      {
+        kind: "item",
+        id: "agent-page",
+        label: t("contextMenu.agentPage"),
+        icon: "agent",
+        run: () => void navigate({ to: "/org/$orgId/agents/$agentId", params: { orgId: org.id, agentId: a.id } }),
+      },
+      {
+        kind: "item",
+        id: "copy-link",
+        label: t("contextMenu.copyLink"),
+        icon: "link",
+        run: () =>
+          void copyText(`${window.location.origin}/org/${org.id}/dm/agent/${a.id}`, () =>
+            toast.show(t("contextMenu.linkCopied")),
+          ),
+      },
+      ...(working.length
+        ? ([
+            { kind: "separator" },
+            {
+              kind: "item",
+              id: "stop",
+              label: t("run.stopAgent", agentGrammar(t, a.name)),
+              icon: "stop",
+              danger: true,
+              run: () => {
+                for (const r of working) runs.stop(r);
+              },
+            },
+          ] satisfies MenuEntry[])
+        : []),
+    ];
+  });
   return (
     <Link
+      onContextMenu={onContextMenu}
       to="/org/$orgId/dm/agent/$agentId"
       params={{ orgId: org.id, agentId: a.id }}
       className="sidebar__item"
@@ -683,6 +766,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const theme = useTheme();
+  const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -773,6 +857,20 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
               options={locales.map((l) => ({ value: l.code, label: l.label }))}
             />
           </MenuOverlayRow>
+          {inDesktopApp() && (
+            <MenuOverlayRow icon="pointer" label={t("contextMenu.look")}>
+              <Segmented
+                size="sm"
+                label={t("contextMenu.look")}
+                value={look}
+                onValueChange={(v) => setMenuLook(v as MenuLook)}
+                options={[
+                  { value: "ours", label: t("contextMenu.lookOurs") },
+                  { value: "system", label: t("contextMenu.lookSystem") },
+                ]}
+              />
+            </MenuOverlayRow>
+          )}
           {budgetUsed !== null &&
             (can(org.role, "view_usage") ? (
               <MenuOverlayItem

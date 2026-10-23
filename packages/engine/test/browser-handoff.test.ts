@@ -276,6 +276,30 @@ describe("browser_ask_person", () => {
     expect(other?.content).toContain("has been asked to take it");
   });
 
+  test("a person's message woke the asking run and it ended: the next run's browser call waits on the open help", async () => {
+    await start();
+    const ask = await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    // No judge: the message only wakes the run; it answers and ends, the help stays open.
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "which account?",
+      threadId: ask.id,
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    expect((await handoffs())[0]?.status).toBe("pending");
+
+    await post("@dev probe");
+    await drainOutbox(f.db, f.handlers);
+    const next = (await runs()).find((r) => r.id !== h?.runId);
+    expect(next?.status).toBe("waiting_input");
+    expect((await handoffs())[0]?.runId).toBe(next?.id);
+    await finishHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "", { result: "done" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs()).find((r) => r.id === next?.id)?.status).toBe("done");
+  });
+
   test("a resume that fails doesn't strand the others, and the next sweep resumes it", async () => {
     await start();
     await post("@dev sign in please");

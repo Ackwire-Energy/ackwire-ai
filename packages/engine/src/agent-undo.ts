@@ -157,6 +157,8 @@ const ROUTINE_FIELDS = [
   "event",
   "rule",
   "active",
+  "access",
+  "report",
 ] as const;
 
 /** The fields a routine change can touch (what undo restores). */
@@ -321,6 +323,19 @@ const handlers: Record<string, Handler> = {
     } else {
       if (!row.deletedAt) throw changedSince();
       await setRoutine(deps.db, row, { active: obj(a.after).active !== false }, false);
+    }
+    return undefined;
+  },
+
+  async "routine.deleted"(deps, a, _userId, direction) {
+    const row = await routineRow(deps.db, a.orgId, a.targetId);
+    if (!row) throw new NotFoundError("The routine is gone", "action.target_gone");
+    if (direction === "undo") {
+      if (!row.deletedAt) throw changedSince();
+      await setRoutine(deps.db, row, { active: obj(a.before).active !== false }, false);
+    } else {
+      if (row.deletedAt) throw changedSince();
+      await setRoutine(deps.db, row, {}, true);
     }
     return undefined;
   },

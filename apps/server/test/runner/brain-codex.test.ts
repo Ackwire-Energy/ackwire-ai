@@ -7,6 +7,7 @@ import {
   CodexThreads,
   codexBridgeOverrides,
   codexEffort,
+  codexProfileOf,
   codexThreadKey,
   codexThreadsFile,
   codexTurnArgs,
@@ -61,7 +62,7 @@ test("command line: first turn with instructions, resume by id without them, opt
     instructions: 'Be "brief".\nUse tools.',
     mcp: { command: ["/usr/bin/bun", "/r/runner.js"] },
   });
-  expect(first.slice(0, 9)).toEqual([
+  expect(first.slice(0, 7)).toEqual([
     "exec",
     "--json",
     "--skip-git-repo-check",
@@ -69,9 +70,9 @@ test("command line: first turn with instructions, resume by id without them, opt
     "/w/my app",
     "--sandbox",
     "workspace-write",
-    "-c",
-    "sandbox_workspace_write.network_access=true",
   ]);
+  // ADR 0053 §3: never the network (exec can't ask, so the sandbox is the limit).
+  expect(first.join(" ")).not.toContain("network_access");
   expect(first).toContain(`developer_instructions=${JSON.stringify('Be "brief".\nUse tools.')}`);
   expect(first.slice(-5)).toEqual(["-m", "gpt-5.5", "-o", "/r/last.txt", "-"]);
   expect(first).not.toContain("resume");
@@ -80,6 +81,20 @@ test("command line: first turn with instructions, resume by id without them, opt
   const resumed = codexTurnArgs({ cwd: "/w/app", lastFile: "/l.txt", runId: RUN, instructions: "x", thread: THREAD });
   expect(resumed.slice(-5)).toEqual(["-o", "/l.txt", "resume", THREAD, "-"]);
   expect(resumed.some((a) => a.startsWith("developer_instructions="))).toBe(false);
+
+  // A plan turn: a read-only sandbox (its writable roots don't apply).
+  const plan = codexTurnArgs({
+    cwd: "/w/app",
+    lastFile: "/l.txt",
+    runId: RUN,
+    profile: "plan",
+    writableRoots: ["/w/shared"],
+  });
+  expect(plan.slice(5, 7)).toEqual(["--sandbox", "read-only"]);
+  expect(plan.join(" ")).not.toContain("writable_roots");
+  expect(plan.join(" ")).not.toContain("network_access");
+  expect(codexProfileOf({ permissions: { mode: "plan" } })).toBe("plan");
+  expect(codexProfileOf({})).toBe("work");
 });
 
 test("MCP bridge overrides: stdio by run with the token through env_vars, or HTTP with a bearer from the env", () => {

@@ -48,6 +48,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
+import "./drive.css";
 
 /** Authors shown on a channel's group header. */
 const STACK_MAX = 5;

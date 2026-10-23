@@ -229,7 +229,7 @@ describe("reminders from the chat", () => {
     expect(await listRoutines(f.db, f.owner.id, f.org.id)).toHaveLength(1);
   });
 
-  test("a routine asked in a DM moves to #general (update_routine): it answers there, flat, and nothing comes to the DM", async () => {
+  test("a routine asked in a DM moves to #general (update_routine): it runs there, flat, and nothing comes to the DM", async () => {
     let routineId = "";
     await world((req) => {
       const last = JSON.stringify(req.messages.at(-1)?.content);
@@ -260,7 +260,7 @@ describe("reminders from the chat", () => {
     await say("manda no general, não no privado");
     const updated = (await results()).find((r) => r.name === "update_routine");
     expect(updated).toMatchObject({ isError: false });
-    expect(updated?.content).toContain("answers in #general");
+    expect(updated?.content).toContain("reports in #general");
     const [moved] = await listRoutines(f.db, f.owner.id, f.org.id);
     expect(moved?.target).toEqual({ type: "channel", channelId: f.general.id });
 
@@ -268,8 +268,15 @@ describe("reminders from the chat", () => {
     await fireNow();
     const all = await f.db.select().from(schema.messages);
     expect(all.filter((m) => m.channelId === dm.id)).toHaveLength(before);
-    const answer = all.find((m) => m.channelId === f.general.id && m.authorType === "agent");
-    expect(answer).toMatchObject({ body: "Nenhum erro novo.", threadId: null });
+    // Background work in the routine's own room (ADR 0053 §4), reporting to #general; with nothing handed
+    // off, nothing reaches any conversation.
+    const [work] = (await f.db.select().from(schema.agentRuns)).filter((r) => r.background);
+    expect(work).toMatchObject({ status: "done", replyMessageId: null });
+    expect(work?.channelId).not.toBe(f.general.id);
+    const brief = all.find((m) => m.id === work?.triggerMessageId);
+    expect(brief?.meta.routineBrief).toMatchObject({ deliverTo: { channelId: f.general.id, threadId: null } });
+    expect(all.filter((m) => m.channelId === f.general.id && m.id === work?.triggerMessageId)).toEqual([]);
+    expect(all.filter((m) => m.authorType === "agent" && m.channelId === f.general.id)).toEqual([]);
   });
 
   test("create_routine with a channel posts there; a channel the person isn't in is not found", async () => {
@@ -301,7 +308,7 @@ describe("reminders from the chat", () => {
       await drainOutbox(f.db, f.handlers);
     }
     const created = (await results()).filter((r) => r.name === "create_routine");
-    expect(created[0]?.content).toContain("answers in #general");
+    expect(created[0]?.content).toContain("reports in #general");
     expect(created[1]).toMatchObject({ isError: true });
     expect(created[1]?.content).toContain("No channel #secreto");
     const routines = await listRoutines(f.db, f.owner.id, f.org.id);
@@ -336,10 +343,12 @@ describe("reminders from the chat", () => {
       reminder: false,
     });
     await fireNow();
+    // The routine's brief, in its own room; it reports to the conversation it was asked in.
     const asked = (await f.db.select().from(schema.messages)).find(
-      (m) => typeof m.meta.routineId === "string" && m.authorType === "person",
+      (m) => m.meta.routineBrief !== undefined && m.authorType === "person",
     );
-    expect(asked).toMatchObject({ threadId: null, body: "@dev verifique o deploy e conte aqui" });
+    expect(asked).toMatchObject({ threadId: null, body: "verifique o deploy e conte aqui" });
+    expect(asked?.meta.routineBrief).toMatchObject({ deliverTo: { channelId: f.general.id, threadId: null } });
     const runs = (await f.db.select().from(schema.agentRuns)).filter((r) => r.triggerMessageId === asked?.id);
     expect(runs).toHaveLength(1);
   });

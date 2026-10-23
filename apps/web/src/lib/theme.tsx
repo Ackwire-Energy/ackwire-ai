@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { STORAGE_KEYS, storage } from "./storage";
 
 export type ThemePreference = "light" | "dark" | "system";
@@ -42,7 +42,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     else storage.set(STORAGE_KEYS.theme, value);
   }, []);
 
-  return <ThemeContext.Provider value={{ preference, resolved, setPreference }}>{children}</ThemeContext.Provider>;
+  const value = useMemo(() => ({ preference, resolved, setPreference }), [preference, resolved, setPreference]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

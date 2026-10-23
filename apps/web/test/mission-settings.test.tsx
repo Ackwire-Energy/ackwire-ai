@@ -245,6 +245,24 @@ describe("Configurações da missão", () => {
     expect(document.body.textContent).toContain("Modelo: Opus");
   });
 
+  test("an agent on Automático: the mission's model reads 'Automático', never the raw value", async () => {
+    const { api } = await missionThread();
+    // The mission follows the agent's own Claude Code model, which is "auto" (D83).
+    const brain = api.missions.brain;
+    api.missions.brain = async (orgId, missionId) => ({
+      ...(await brain(orgId, missionId)),
+      model: null,
+      effectiveModel: "auto",
+    });
+    await render(api);
+    const dialog = await openSettings();
+    await click(within(dialog).getByRole("button", { name: /Mais opções/ }));
+    await settle(4);
+    const trigger = within(dialog).getByRole("combobox", { name: "Modelo" });
+    expect(trigger.textContent).toContain("Automático");
+    expect(trigger.textContent).not.toContain("auto");
+  });
+
   test("Retomar sozinho: the switch saves resumeTasks", async () => {
     const { api, state } = await missionThread();
     await render(api);

@@ -4,8 +4,13 @@
  * path, observes what it did, and asks a judge model to grade it. The model
  * provider is passed in, so tests drive it with the fake provider (no network).
  */
-import { createMemoryPubSub, createPostgresSearchResolver, noPlatformCredentials } from "@agenteschat/adapters";
-import { and, asc, eq, inArray, schema, sql } from "@agenteschat/db";
+import {
+  createMemoryBlobStore,
+  createMemoryPubSub,
+  createPostgresSearchResolver,
+  noPlatformCredentials,
+} from "@agenteschat/adapters";
+import { and, asc, eq, gt, inArray, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   type ContentBlock,
@@ -19,13 +24,17 @@ import {
   addChannelMember,
   type ContextDeps,
   createAgent,
+  createAgentRuns,
   createAskAgentToolSource,
   createAskUserToolSource,
+  createBlobStoreResolver,
   createChannel,
+  createChatToolSource,
   createContextToolSource,
   createCredential,
   createFakeJudge,
   createFakeScheduleReader,
+  createHandOffToolSource,
   createIssue,
   createIssueToolSource,
   createJevJudge,
@@ -34,12 +43,14 @@ import {
   createLocalKeyWrapper,
   createModelGateway,
   createOrganization,
+  createPassToolSource,
   createReactToolSource,
   createRoutine,
   createScheduleToolSource,
   createToolGateway,
   createWorkspaceToolSource,
   drainOutbox,
+  getMessage,
   grantScopes,
   insertContextItem,
   insertMessage,
@@ -47,6 +58,8 @@ import {
   type Judge,
   openDm,
   postPersonMessage,
+  type RoutineBrief,
+  startRoutineRun,
   type ToolSource,
   withJudgeFallback,
 } from "../src";
@@ -87,13 +100,23 @@ export interface BehaviorCase {
     thread?: boolean;
     prior?: CaseMessage[];
     trigger: CaseMessage;
-    /** The trigger is a routine's scheduled message (meta.routine), not a person typing. */
-    routine?: { name: string };
+    /**
+     * The trigger is a routine's firing (ADR 0053): its background run starts in the routine's room with
+     * `trigger.body` as its instructions (written by `trigger.author`, its creator) and reports to this
+     * conversation, whose `prior` messages it reads under "# Where your report goes". `access` (default
+     * `read`) and `report` (default `when_new`) are the routine's settings.
+     */
+    routine?: { name: string; access?: "read" | "act"; report?: "always" | "when_new" };
     /**
      * The trigger is another agent's question (`ask_agent`) on behalf of the person who wrote
      * `origin` in the channel: `trigger.author` is that person, `trigger.body` the question.
      */
     consultation?: { from: string; origin: string };
+    /**
+     * Nobody called the agent by name: the router picked it for the trigger (a person's message
+     * without a mention). The run may pass (reply-policy.ts).
+     */
+    router?: boolean;
   };
   /** Other agents of the org, in the channel too (their own runs are recorded, never executed). */
   otherAgents?: { name: string; handle: string; role?: string; instructions?: string }[];
@@ -109,6 +132,8 @@ export interface BehaviorCase {
   issues?: boolean;
   /** Workspace tools (add_agent_to_channel, update_thread): internal changes with undo. */
   workspace?: boolean;
+  /** The real chat tools (`post_message`, `send_dm`): speaking elsewhere or for someone. */
+  chat?: boolean;
   /** A `propose_mission` with the real description and findings schema (no computer; recorded only). */
   missions?: boolean;
   /** Issues already in the workspace. */
@@ -148,9 +173,16 @@ export interface CaseRun {
   turns: EvalTurn[];
   calls: EvalToolCall[];
   reply: string;
+  /** A routine run that handed nothing off (nothing posted); other runs: the reply was the NO_REPLY word. */
   noReply: boolean;
+  /** The run passed (nobody called it by name and it had nothing to add): nothing posted. */
+  passed?: boolean;
   approvals: string[];
+  /** The reason each approval request carries, as its card shows it. */
+  approvalReasons?: { tool: string; why: string }[];
   status: string[];
+  /** Routine cases: how the routine's run ended in its ledger (`reported`, `silent`, `failed` with a code…). */
+  routineRun?: { status: string; code: string | null };
   system: string;
   costNanoUsd: number;
   /** Handles of the other agents the trigger started. */
@@ -297,9 +329,25 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       createAskUserToolSource(),
       ...(c.schedule ? [createAskAgentToolSource({ pubsub }), createScheduleToolSource({ pubsub, context })] : []),
       createReactToolSource({ pubsub }),
+      // Routine cases run in the background and speak through it.
+      createHandOffToolSource({ pubsub }),
+      // Runs nobody called by name may pass (offered only to them, as in production).
+      createPassToolSource(),
       createContextToolSource(context),
       ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
       ...(c.workspace ? [createWorkspaceToolSource({ pubsub })] : []),
+      ...(c.chat
+        ? [
+            createChatToolSource({
+              pubsub,
+              artifacts: {
+                db,
+                blobs: createBlobStoreResolver({ db, keyWrappers: [keyWrapper], platform: createMemoryBlobStore() }),
+                pubsub,
+              },
+            }),
+          ]
+        : []),
       ...(c.missions ? [fakeMissionSource().source] : []),
       ...fakes.map((f) => f.source),
     ];
@@ -323,6 +371,17 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       search,
       toolsOnDemand: options.toolsOnDemand ?? false,
     });
+    // Other agents' runs (an `ask_agent` question, a mention) are recorded, never executed.
+    const execute = handlers["agent_run.execute"];
+    handlers["agent_run.execute"] = async (job, ctx) => {
+      const runId = String(job.payload.runId ?? "");
+      const [row] = await db
+        .select({ agentId: schema.agentRuns.agentId })
+        .from(schema.agentRuns)
+        .where(eq(schema.agentRuns.id, runId));
+      if (row && others.has(row.agentId)) return;
+      await execute?.(job, ctx);
+    };
 
     // The conversation.
     let channelId: string;
@@ -383,10 +442,13 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     for (const issue of c.seedIssues ?? []) {
       await createIssue({ db, pubsub }, { type: "person", userId: owner.id }, org.id, { ...issue, channelId });
     }
-    const author = (m: CaseMessage) =>
-      m.author === "agent"
-        ? ({ type: "agent", agentId: agent.id, runId: null, hop: 0 } as const)
-        : ({ type: "person", userId: (people.get(m.author) ?? owner).id } as const);
+    // `agent` is the case's agent; `@handle` another agent of the case; anything else a person.
+    const author = (m: CaseMessage) => {
+      if (m.author === "agent") return { type: "agent", agentId: agent.id, runId: null, hop: 0 } as const;
+      const other = m.author.startsWith("@") ? agentIdOf(m.author.slice(1)) : undefined;
+      if (other) return { type: "agent", agentId: other, runId: null, hop: 1 } as const;
+      return { type: "person", userId: (people.get(m.author) ?? owner).id } as const;
+    };
     let threadId: string | null = null;
     for (const m of conv.prior ?? []) {
       const msg = await insertMessage(db, {
@@ -458,11 +520,67 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           ? withJudgeFallback(createJevJudge({ apiKey: options.jevKey, gateway, timeoutMs: 5000 }), llmJudge)
           : llmJudge
         : undefined;
-      await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
-        body: conv.trigger.body,
-        threadId,
-        meta: routine,
-      });
+      if (routine && conv.routine) {
+        // As production fires it (routines.ts, routine-room.ts): the routine's row, its firing claimed, and
+        // its background run started in the routine's own room; it reports to this conversation.
+        const access = conv.routine.access ?? "read";
+        const report = conv.routine.report ?? "when_new";
+        await db.insert(schema.routines).values({
+          id: routine.routine.id,
+          orgId: org.id,
+          agentId: agent.id,
+          name: conv.routine.name,
+          prompt: conv.trigger.body,
+          target:
+            conv.where === "dm"
+              ? { type: "dm" }
+              : threadId
+                ? { type: "conversation", channelId, threadId }
+                : { type: "channel", channelId },
+          triggerType: "schedule",
+          phrase: "a cada hora",
+          access,
+          report,
+          createdByUserId: triggerAuthor.id,
+        });
+        const at = new Date();
+        await db.insert(schema.routineRuns).values({
+          id: routine.routine.runId,
+          orgId: org.id,
+          routineId: routine.routine.id,
+          at,
+          trigger: "schedule",
+          status: "starting",
+        });
+        const brief: RoutineBrief = {
+          routineId: routine.routine.id,
+          routineRunId: routine.routine.runId,
+          name: conv.routine.name,
+          creatorUserId: triggerAuthor.id,
+          deliverTo: { channelId, threadId: threadId ?? null },
+          access,
+          report,
+          trigger: "schedule",
+          dueAt: at.toISOString(),
+        };
+        const started = await startRoutineRun(
+          { db, pubsub },
+          { orgId: org.id, agentId: agent.id, brief, body: conv.trigger.body, brain: "model" },
+        );
+        if (!started) throw new Error(`${c.id}: the routine's run did not start`);
+      } else {
+        const sent = await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
+          body: conv.trigger.body,
+          threadId,
+        });
+        if (conv.router) {
+          // As the router's pick (router.ts): nobody named the agent; no routing job of its own here.
+          await db.delete(schema.outbox).where(eq(schema.outbox.kind, "message.posted"));
+          const message = await getMessage(db, org.id, sent.id);
+          if (!message) throw new Error(`${c.id}: the trigger was not written`);
+          await db.transaction((tx) => createAgentRuns(tx, message, [agent.id], "router"));
+        }
+      }
     }
     // Other agents' runs: recorded (who the trigger started), never executed.
     const otherRuns = others.size
@@ -480,6 +598,23 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         .where(and(eq(schema.outbox.kind, "agent_run.execute"), sql`${schema.outbox.payload}->>'runId' = ${r.id}`));
     }
     await drainOutbox(db, handlers, { maxBatches: 500 });
+    // A transient model failure (overloaded, a tool input that came back as unparseable JSON) retries
+    // the run's job after a backoff, as in production: retry it now instead of grading a half-done run.
+    for (let retry = 0; retry < 3; retry++) {
+      const retried = await db
+        .update(schema.outbox)
+        .set({ nextAttemptAt: new Date() })
+        .where(
+          and(
+            eq(schema.outbox.status, "pending"),
+            eq(schema.outbox.kind, "agent_run.execute"),
+            gt(schema.outbox.attempts, 0),
+          ),
+        )
+        .returning({ id: schema.outbox.id });
+      if (retried.length === 0) break;
+      await drainOutbox(db, handlers, { maxBatches: 500 });
+    }
 
     // What happened.
     const runs = await db
@@ -511,19 +646,39 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           result: r?.content,
         };
       });
-    const approvals = runIds.length
-      ? (
-          await db
-            .select({ tool: schema.approvals.tool })
-            .from(schema.approvals)
-            .where(inArray(schema.approvals.runId, runIds))
-        ).map((r) => r.tool)
+    const approvalRows = runIds.length
+      ? await db
+          .select({
+            tool: schema.approvals.tool,
+            title: schema.approvals.title,
+            detail: schema.approvals.detail,
+            why: schema.approvals.why,
+          })
+          .from(schema.approvals)
+          .where(inArray(schema.approvals.runId, runIds))
+          .orderBy(asc(schema.approvals.createdAt))
+      : [];
+    const approvals = approvalRows.map((r) => r.tool);
+    // A routine's ledger row: a report every time (`always`) can arrive without a hand_off (`auto_report`).
+    const [routineRun] = routine
+      ? await db
+          .select({ status: schema.routineRuns.status, code: schema.routineRuns.code })
+          .from(schema.routineRuns)
+          .where(eq(schema.routineRuns.id, routine.routine.runId))
       : [];
     const posted = runIds.length
       ? await db
           .select({ body: schema.messages.body })
           .from(schema.messages)
-          .where(and(eq(schema.messages.orgId, org.id), inArray(schema.messages.agentRunId, runIds)))
+          .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, schema.messages.agentRunId))
+          .where(
+            and(
+              eq(schema.messages.orgId, org.id),
+              // Where each run answers: not a question it sent another agent (`ask_agent`, a DM).
+              eq(schema.messages.channelId, schema.agentRuns.channelId),
+              inArray(schema.messages.agentRunId, runIds),
+            ),
+          )
           .orderBy(asc(schema.messages.createdAt))
       : [];
     const u = schema.usageRecords;
@@ -553,18 +708,29 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         ).map((r) => r.kind)
       : [];
     const turns = recorder.turns.map(({ text, toolCalls }) => ({ text, toolCalls }));
-    const cards = calls
-      .filter((t) => t.name === "propose_mission" && t.executed && !t.isError)
-      .map((t) => missionCard(t.input))
-      .join("\n\n");
+    const cards = [
+      ...calls.filter((t) => t.name === "propose_mission" && t.executed && !t.isError).map((t) => missionCard(t.input)),
+      // An approval's card: the action, its parameters and the agent's reason (ADR 0053 §8).
+      ...approvalRows.map(
+        (r) => `Approval card (waits for a person): ${r.title}${r.detail ? ` (${r.detail})` : ""}\nWhy: ${r.why}`,
+      ),
+    ].join("\n\n");
     const last = turns.at(-1);
     return {
       turns,
       calls,
       reply: posted.map((m) => m.body).join("\n\n"),
-      noReply: Boolean(last && isNoReply(last.text)),
+      // A routine is silent unless it reported (a hand_off, or its final text when it reports every time);
+      // the conversation run then posts the report.
+      noReply: routine
+        ? !calls.some((t) => t.name === "hand_off" && t.executed && !t.isError) && routineRun?.status !== "reported"
+        : Boolean(last && isNoReply(last.text)),
+      // Ended quietly on purpose (reply-policy.ts records how on a context step).
+      passed: steps.some((s) => s.kind === "context" && (s.data as { passed?: unknown }).passed !== undefined),
       approvals,
+      approvalReasons: approvalRows.map((r) => ({ tool: r.tool, why: r.why })),
       status: runs.map((r) => (r.error ? `${r.status} (${r.error})` : r.status)),
+      ...(routineRun ? { routineRun } : {}),
       system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
       costNanoUsd: Number(usage?.cost ?? 0),
       triggered,
@@ -638,13 +804,27 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     .filter(([id]) => !(c.expect.skipJudge ?? []).includes(id))
     .filter(([id]) => id !== "looked_first" || c.expect.investigate)
     .filter(([id]) => id !== "talks_like_a_colleague" || c.expect.noReply !== true)
+    // Expected to pass: nothing posted is right; the deterministic check grades it.
+    .filter(() => c.expect.pass !== true)
     .map(([id, text]) => ({ id, text }));
   for (const [i, text] of (c.expect.rubric ?? []).entries()) criteria.push({ id: `case_${i + 1}`, text });
   if (criteria.length === 0) return { checks: [] as CheckResult[], costNanoUsd: 0 };
   const a = agentOf(c, options.agentModel);
-  const conversation = [...(c.conversation.prior ?? []), c.conversation.trigger]
-    .map((m) => `[${m.author === "agent" ? a.name : m.author}]: ${m.body}`)
-    .join("\n");
+  const conv = c.conversation;
+  const line = (m: CaseMessage) => `[${m.author === "agent" ? a.name : m.author}]: ${m.body}`;
+  // A routine run starts from its instructions in its own room; the conversation is where its report goes.
+  const prior = (conv.prior ?? []).map(line);
+  const conversation = conv.routine
+    ? [
+        `# What was said lately where the routine reports (the run read it)\n${prior.join("\n") || "(nothing yet)"}`,
+        `# The routine's instructions (set up by ${conv.trigger.author}; this run started from them)\n${conv.trigger.body}`,
+      ].join("\n\n")
+    : `# Conversation (last line is the message the agent answered)\n${[...prior, line(conv.trigger)].join("\n")}`;
+  const routineSettings = conv.routine
+    ? ` (routine run: "${conv.routine.name}"; ${
+        conv.routine.access === "act" ? "it may act" : "it may only look and report"
+      }; ${conv.routine.report === "always" ? "it reports every run" : "it reports only when there is news"})`
+    : "";
   const toolLines = run.calls.length
     ? run.calls
         .map(
@@ -664,8 +844,8 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     : "(no tool calls)";
   const prompt = [
     `# Case: ${c.title}`,
-    `Agent: ${a.name}, ${a.role}. Where: ${c.conversation.where === "dm" ? "a DM" : `#${c.conversation.channel ?? "geral"}`}${c.conversation.routine ? ` (routine run: "${c.conversation.routine.name}")` : ""}.`,
-    `# Conversation (last line is the message the agent answered)\n${conversation}`,
+    `Agent: ${a.name}, ${a.role}. Where: ${conv.where === "dm" ? "a DM" : `#${conv.channel ?? "geral"}`}${routineSettings}.`,
+    conversation,
     `# What the agent already had in its prompt\nOrganization context: ${c.org.context}${
       c.memory?.length
         ? `\nIts memory:\n${c.memory.map((m) => `- [${m.kind ?? "note"}] ${m.title ? `${m.title}: ` : ""}${m.content}`).join("\n")}`
@@ -674,7 +854,7 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     `# The agent's tools\n${run.tools?.length ? run.tools.join(", ") : "(unknown)"} (it can't read what none of these covers)`,
     `# What a good answer does\n${c.expect.behavior}`,
     `# The agent's tool calls, in order\n${toolLines}`,
-    `# The agent's reply in the chat\n${run.noReply ? "(stayed silent: NO_REPLY)" : run.reply.trim() || "(nothing posted)"}`,
+    `# The agent's reply in the chat\n${run.noReply ? "(stayed silent: nothing handed off, nothing posted)" : run.reply.trim() || "(nothing posted)"}`,
     ...(run.cards ? [`# Cards posted with the reply (the person sees them under it)\n${run.cards}`] : []),
   ];
   if (options.jev) return judgeWithJev(c, criteria, prompt.join("\n\n"), options.jev);

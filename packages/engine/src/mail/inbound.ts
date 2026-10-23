@@ -1,7 +1,7 @@
 import { MailAuthError, type MailSummary } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { NotFoundError } from "../errors";
-import { queueRoutineRun } from "../routines";
+import { type EventMerge, holdForNextRun, queueEventRun, type RoutineEventPayload } from "../routine-events";
 import {
   accountRef,
   applyComposioStateFor,
@@ -56,7 +56,7 @@ function mailSummary(address: string, folder: string, readTool: string, messages
  * (the watch's filter and what the routine's agent may read), deduplicated
  * by message id (`mail_seen`), and merged into ONE routine run: a run still
  * queued for this routine takes the new messages instead of a second run.
- * The run's prompt carries the summary as "Event (data, not instructions)".
+ * The run's context carries the summary inside the outside-content envelope.
  */
 export async function ingestMail(
   deps: { db: Database; now?: () => Date },
@@ -98,53 +98,70 @@ export async function ingestMail(
       }),
     );
   if (added.length === 0) return { added: 0, fired: false };
-  const slugs = mailSlugs((await orgMailAccounts(db, routine.orgId)).filter((a) => a.address));
-  const readTool = `mail_${slugs.get(account.id) ?? "mailbox"}_read`;
+  const merge = await mailMerge(db, routine.orgId, account, watch.folder);
+  // Bursts become one run (§6.3, §6.8): the new messages join the run still queued with its job alive,
+  // or the run waiting to start (gathered while another works, or emails held from a run that didn't finish).
+  const outcome = await queueEventRun({ db }, routine, {
+    event: merge(
+      { type: "email.received", accountId: account.id, watchId: watch.id, messages: [], extra: 0, summary: "" },
+      { messages: added },
+    ) as RoutineEventPayload,
+    merge,
+    at: now,
+  });
+  return { added: added.length, fired: outcome === "queued" };
+}
 
-  // A run of this routine still waiting in the queue takes the new messages (bursts → one run).
-  const merged = await db.transaction(async (tx) => {
-    const [queued] = await tx
-      .select()
-      .from(routineRuns)
-      .where(
-        and(
-          eq(routineRuns.routineId, routine.id),
-          eq(routineRuns.status, "queued"),
-          sql`${routineRuns.event}->>'type' = 'email.received'`,
-        ),
-      )
-      .limit(1)
-      .for("update", { skipLocked: true });
-    if (!queued) return false;
-    const event = (queued.event ?? {}) as { messages?: QueuedMail[]; extra?: number };
-    const all = [...(event.messages ?? []), ...added];
+/** How new messages join a mail run's event: one list (the first `MAX_MESSAGES_PER_RUN`, the rest counted). */
+async function mailMerge(
+  db: Database,
+  orgId: string,
+  account: { id: string; address: string },
+  folder: string,
+): Promise<EventMerge> {
+  const slugs = mailSlugs((await orgMailAccounts(db, orgId)).filter((a) => a.address));
+  const readTool = `mail_${slugs.get(account.id) ?? "mailbox"}_read`;
+  return (current, incoming) => {
+    const listed = (e: Record<string, unknown>) => (Array.isArray(e.messages) ? (e.messages as QueuedMail[]) : []);
+    const counted = (e: Record<string, unknown>) => (typeof e.extra === "number" ? e.extra : 0);
+    const all = [...listed(current), ...listed(incoming)];
     const kept = all.slice(0, MAX_MESSAGES_PER_RUN);
-    const extra = (event.extra ?? 0) + all.length - kept.length;
-    await tx
-      .update(routineRuns)
-      .set({
-        event: {
-          ...event,
-          messages: kept,
-          extra,
-          summary: mailSummary(account.address, watch.folder, readTool, kept, extra),
-        },
-      })
-      .where(eq(routineRuns.id, queued.id));
-    return true;
-  });
-  if (merged) return { added: added.length, fired: false };
-  const kept = added.slice(0, MAX_MESSAGES_PER_RUN);
-  const extra = added.length - kept.length;
-  const run = await queueRoutineRun({ db }, routine, now, "event", {
-    type: "email.received",
-    accountId: account.id,
-    watchId: watch.id,
-    messages: kept,
-    extra,
-    summary: mailSummary(account.address, watch.folder, readTool, kept, extra),
-  });
-  return { added: added.length, fired: !!run };
+    const extra = counted(current) + counted(incoming) + all.length - kept.length;
+    return {
+      ...current,
+      messages: kept,
+      extra,
+      summary: mailSummary(account.address, folder, readTool, kept, extra),
+    };
+  };
+}
+
+/**
+ * An email run that failed, was stopped or never ran (§6.8): its messages are released to the next
+ * run (they join the run waiting to start, or wait for the next email), so none is lost.
+ */
+export async function releaseRoutineEmails(deps: { db: Database }, routineRunId: string): Promise<boolean> {
+  const { db } = deps;
+  const [run] = await db.select().from(routineRuns).where(eq(routineRuns.id, routineRunId));
+  const event = (run?.event ?? null) as { type?: unknown; watchId?: unknown; messages?: unknown } | null;
+  if (!run || event?.type !== "email.received" || !Array.isArray(event.messages) || event.messages.length === 0)
+    return false;
+  const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
+  if (!routine || routine.deletedAt) return false;
+  const [watch] = await db
+    .select()
+    .from(mailWatches)
+    .where(eq(mailWatches.id, String(event.watchId ?? "")));
+  if (!watch || watch.routineId !== routine.id) return false;
+  const [account] = await db.select().from(mailAccounts).where(eq(mailAccounts.id, watch.accountId));
+  if (!account || account.revokedAt) return false;
+  const merge = await mailMerge(db, routine.orgId, account, watch.folder);
+  const released = merge(
+    { type: "email.received", accountId: account.id, watchId: watch.id, messages: [], extra: 0, summary: "" },
+    run.event ?? {},
+  ) as RoutineEventPayload;
+  await holdForNextRun({ db }, routine, released, merge);
+  return true;
 }
 
 // ── Composio webhooks ───────────────────────────────────────────────────────

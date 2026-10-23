@@ -262,7 +262,11 @@ describe("custom MCP servers", () => {
       type: "result",
       output: { content: wrapExternal("suporte_list_tickets", "#1 login broken") },
     });
-    const write = await gateway.invoke(ctx, { toolUseId: "t2", name: "suporte_close_ticket", input: { id: 1 } });
+    const write = await gateway.invoke(ctx, {
+      toolUseId: "t2",
+      name: "suporte_close_ticket",
+      input: { id: 1, why: "The checks passed and the change was reviewed: this action finishes what was asked." },
+    });
     expect(write.type).toBe("approval");
     if (write.type === "approval") expect(write.approval.title).toBe("Suporte: Fechar chamado");
     expect(mcp.state.calls).toEqual(["list_tickets"]);

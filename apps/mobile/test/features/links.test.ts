@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chatHref, hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
+import { agentDmOf, chatHref, hrefForPush, hrefFromUrl, notificationHref } from "../../src/features/links/logic";
 import { notification } from "./fixtures";
 
 describe("deep links", () => {
@@ -54,11 +54,37 @@ describe("inbox items", () => {
     ).toBe("/chat/c1?thread=t1");
     expect(notificationHref(notification({ id: "n", kind: "dm", source: { dmId: "d1" } }))).toBe("/chat/d1");
   });
-  test("issues, the forum and routines have no screen in the app", () => {
+  test("issues and the forum have no screen in the app", () => {
     expect(
       notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", channelId: "c1" } })),
     ).toBeNull();
     expect(notificationHref(notification({ id: "n", kind: "forum_turn", source: { topicId: "f1" } }))).toBeNull();
-    expect(notificationHref(notification({ id: "n", kind: "routine_failed", source: { routineId: "r1" } }))).toBeNull();
+  });
+
+  test("routines: what one found opens the agent's message; its trouble opens the agent's DM", () => {
+    const atlas = [{ type: "agent" as const, id: "atlas" }];
+    const finished = notification({
+      id: "n",
+      kind: "routine_finished",
+      actors: atlas,
+      source: { routineId: "r1", channelId: "c1", messageId: "m1" },
+    });
+    expect(notificationHref(finished)).toBe("/chat/c1");
+    expect(notificationHref({ ...finished, source: { ...finished.source, threadId: "t1" } })).toBe(
+      "/chat/c1?thread=t1",
+    );
+    const dms = [
+      { channelId: "d-ada", with: { type: "agent" as const, id: "ada", name: "Ada", handle: "ada" } },
+      { channelId: "d-atlas", with: { type: "agent" as const, id: "atlas", name: "Atlas", handle: "atlas" } },
+    ];
+    for (const kind of ["routine_failed", "routine_paused", "routine_stalled"] as const) {
+      const n = notification({ id: "n", kind, actors: atlas, source: { routineId: "r1", channelId: "c1" } });
+      expect(notificationHref(n, agentDmOf(dms))).toBe("/chat/d-atlas");
+      // No DM with it yet: the agent, whose page opens the conversation.
+      expect(notificationHref(n)).toBe("/agent/atlas");
+    }
+    expect(agentDmOf(undefined)("atlas")).toBeNull();
+    // Without an agent behind it, there is nowhere to go.
+    expect(notificationHref(notification({ id: "n", kind: "routine_paused", source: { routineId: "r1" } }))).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 import { Logo } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { AuthHorizon } from "@/components/Sky";
+import "./auth.css";
 
 /**
  * Sign in, sign up and new password (telas/EntrarCadastro.html, C): one calm

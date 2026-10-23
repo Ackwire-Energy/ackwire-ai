@@ -8,12 +8,12 @@ import { taskRequester } from "./machine-tasks";
 import { getMessage } from "./messages";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
 import { completeMission } from "./mission-delivery";
+import { MISSION_LIMITS } from "./mission-limits";
 import {
   askDecision,
   checkMissionToolRate,
   getMissionRow,
   homeThreadOf,
-  MISSION_LIMITS,
   type MissionDeps,
   type MissionExecutor,
   type MissionRow,
