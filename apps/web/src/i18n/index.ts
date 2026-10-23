@@ -37,9 +37,23 @@ export function savedLocale(languages?: readonly string[]): LocaleCode {
   return browserLocale(languages) ?? DEFAULT_LOCALE;
 }
 
+/** Each language is its own download: the app loads only the one in use. */
+const bundles: Record<LocaleCode, () => Promise<object>> = {
+  "pt-BR": () => import("@agenteschat/i18n/pt-BR").then((m) => m.ptBR),
+  en: () => import("@agenteschat/i18n/en").then((m) => m.en),
+};
+
 export function setLocale(code: LocaleCode, instance: I18n = i18n) {
-  void instance.changeLanguage(code);
-  if (typeof document !== "undefined") document.documentElement.lang = code;
+  const apply = () => {
+    void instance.changeLanguage(code);
+    if (typeof document !== "undefined") document.documentElement.lang = code;
+  };
+  if (instance.hasResourceBundle(code, "translation")) apply();
+  else
+    void bundles[code]().then((strings) => {
+      instance.addResourceBundle(code, "translation", strings);
+      apply();
+    });
   try {
     localStorage.setItem(STORAGE_KEY, code);
   } catch {
@@ -47,7 +61,22 @@ export function setLocale(code: LocaleCode, instance: I18n = i18n) {
   }
 }
 
-/** Creates and initializes an i18next instance (one for the app, fresh ones in tests). */
+/** The app's instance, with only `lng` downloaded (another language loads when the person picks it). */
+export async function loadI18n(lng: LocaleCode): Promise<I18n> {
+  const strings = await bundles[lng]();
+  const instance = i18n.createInstance();
+  void instance.use(initReactI18next).init({
+    resources: { [lng]: { translation: strings } },
+    lng,
+    fallbackLng: DEFAULT_LOCALE,
+    interpolation: { escapeValue: false },
+    initAsync: false,
+    returnNull: false,
+  });
+  return instance;
+}
+
+/** An instance with every language loaded at once (tests). */
 export function createI18n(lng: LocaleCode = DEFAULT_LOCALE): I18n {
   const instance = i18n.createInstance();
   void instance.use(initReactI18next).init({

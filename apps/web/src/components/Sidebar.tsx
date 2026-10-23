@@ -68,7 +68,7 @@ import { markOpen } from "@/lib/perf";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
-import type { SettingsSection } from "@/pages/SettingsPage";
+import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
