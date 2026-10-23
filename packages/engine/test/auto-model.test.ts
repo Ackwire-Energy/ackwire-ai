@@ -54,8 +54,9 @@ describe("chooseAutoModel (D83)", () => {
     const call = judge.calls[0];
     expect(call).toMatchObject({ kind: "auto_model", orgId: "o", agentId: "a", runId: "r" });
     expect(Object.keys(call?.questions ?? {})).toEqual(["tier", "effort"]);
-    expect(Object.keys(call?.questions.tier?.criteria ?? {})).toEqual(["small", "medium", "large"]);
-    expect(Object.keys(call?.questions.effort?.criteria ?? {})).toEqual(["low", "medium", "high"]);
+    const { tier, effort } = call?.questions ?? {};
+    expect(Object.keys((tier as { criteria: Record<string, string> }).criteria)).toEqual(["small", "medium", "large"]);
+    expect(Object.keys((effort as { criteria: Record<string, string> }).criteria)).toEqual(["low", "medium", "high"]);
     expect(call?.state).toMatchObject({
       message: input.message,
       recent: "person: a cobrança está falhando",
