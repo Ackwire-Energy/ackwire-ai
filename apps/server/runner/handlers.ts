@@ -17,6 +17,7 @@ import { realFoldersFor } from "./access";
 import type { AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
+import type { CodexAppServers } from "./brain-codex-app";
 import type { BrowserManager } from "./browser";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
@@ -73,12 +74,15 @@ export interface HandlerContext {
   /**
    * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
    * scratch), how Codex starts our MCP server, and the live Codex runs the
-   * MCP bridge looks up by run id (`agentes-runner mcp --run <runId>`).
+   * MCP bridge looks up by run id (`agentes-runner mcp --run <runId>`), or
+   * by app-server process.
    */
   codex?: {
     runnerHome: string;
     mcp?: { socketPath: string; command: string[] };
     runs: Map<string, McpTaskInfo>;
+    /** Protocol 15: long-lived `codex app-server`s (turns take messages mid-turn); without it, `codex exec`. */
+    app?: CodexAppServers;
   };
   /** Protocol 9: whether the owner paused this computer (new work is refused with `paused`). */
   paused?: () => boolean;
@@ -471,13 +475,14 @@ const STEER_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}
 
 /**
  * `brain.steer` (protocol 15): messages for the request's agent's turn of
- * `runId` in progress (Claude Code reads them at its next tool boundary).
- * Codex turns (`codex exec`) can't take any: `unsupported`.
+ * `runId` in progress (Claude Code reads them at its next tool boundary; a
+ * Codex turn on its app-server at its next model request, `turn/steer`).
+ * A Codex turn run by `codex exec` can't take any: `unsupported`.
  */
 function doBrainSteer(
   ctx: HandlerContext,
   req: Extract<MachineRequest, { op: "brain.steer" }>,
-): MachineReplies["brain.steer"] {
+): MachineReplies["brain.steer"] | Promise<MachineReplies["brain.steer"]> {
   if (!req.agent) throw new RunnerError("bad_request", "Steering belongs to an agent's turn");
   const runId = requireString(req.runId, "runId");
   const session = requireString(req.session, "session");
@@ -489,7 +494,11 @@ function doBrainSteer(
     if (typeof m.text !== "string" || !m.text.trim()) throw new RunnerError("bad_request", "Empty message");
     return { uuid: m.uuid, text: m.text.slice(0, STEER_LIMITS.text), ...(m.urgent === true ? { urgent: true } : {}) };
   });
-  if (ctx.codex?.runs.has(runId)) return { status: "unsupported", reason: "Codex reads messages only between turns" };
+  if (ctx.codex?.runs.has(runId)) {
+    return ctx.codex.app
+      ? ctx.codex.app.steer(String(req.agent.id), { runId, session, messages })
+      : { status: "unsupported", reason: "Codex reads messages only between turns" };
+  }
   if (!ctx.brains) return { status: "unsupported", reason: "This runner runs no brain turns" };
   return ctx.brains.steer(String(req.agent.id), { runId, session, messages });
 }
@@ -508,9 +517,11 @@ function signedOut(ctx: HandlerContext, req: { account?: unknown }, final: { typ
 }
 
 /**
- * The Codex branch of `brain.turn`: `codex exec --json` per turn
- * (`brain-codex.ts`). While it runs, its MCP server (`mcp --run <runId>`,
- * the run's server token in its env) is relayed for the run.
+ * The Codex branch of `brain.turn`: on the session's `codex app-server`
+ * (`brain-codex-app.ts`; its bridge is the process's, relayed for this run),
+ * else `codex exec --json` per turn (`brain-codex.ts`), whose MCP server
+ * (`mcp --run <runId>`, the run's server token in its env) is relayed for the
+ * run. This run's entry also marks it a Codex run for `brain.steer`.
  */
 async function doCodexTurn(
   ctx: HandlerContext,
@@ -545,6 +556,7 @@ async function doCodexTurn(
         ...(codex.mcp ? { mcp: codex.mcp } : {}),
         ...(ctx.grants ? { grants: ctx.grants } : {}),
         ...(ctx.accounts ? { accounts: ctx.accounts } : {}),
+        ...(codex.app ? { app: codex.app } : {}),
       },
       req as unknown as CodexBrainTurnRequest,
       {

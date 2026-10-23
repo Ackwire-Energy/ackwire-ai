@@ -11,8 +11,9 @@ const { agentRuns, messages, users, agents } = schema;
 
 /**
  * Live steering: a person's message reaches a computer brain's turn in
- * progress (Claude Code reads it at its next tool boundary) instead of
- * waiting for the whole CLI turn to end.
+ * progress (Claude Code reads it at its next tool boundary, Codex on its
+ * app-server at its next model request) instead of waiting for the whole CLI
+ * turn to end.
  *
  * - `deliverLive` (any instance) asks the instance executing the run, over
  *   pub/sub (`steerTopic`), and waits a moment for its answer.
@@ -26,7 +27,8 @@ const { agentRuns, messages, users, agents } = schema;
  *   confirmed go back to the inbox, so the loop reads them with the next turn:
  *   never lost, never read twice.
  * - No such turn (the model brain, a turn between steps, an older runner or
- *   CLI, Codex): the messages stay in the inbox and `deliverLive` is false.
+ *   CLI, Codex run as `codex exec`): the messages stay in the inbox and
+ *   `deliverLive` is false.
  */
 
 /** Cross-instance: the instance executing the run hands it a message now (if its turn can take one). */
