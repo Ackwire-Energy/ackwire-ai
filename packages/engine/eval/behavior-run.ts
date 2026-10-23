@@ -19,6 +19,7 @@ import {
   addChannelMember,
   type ContextDeps,
   createAgent,
+  createAgentRuns,
   createAskAgentToolSource,
   createAskUserToolSource,
   createChannel,
@@ -35,12 +36,14 @@ import {
   createLocalKeyWrapper,
   createModelGateway,
   createOrganization,
+  createPassToolSource,
   createReactToolSource,
   createRoutine,
   createScheduleToolSource,
   createToolGateway,
   createWorkspaceToolSource,
   drainOutbox,
+  getMessage,
   grantScopes,
   insertContextItem,
   insertMessage,
@@ -96,6 +99,11 @@ export interface BehaviorCase {
      * `origin` in the channel: `trigger.author` is that person, `trigger.body` the question.
      */
     consultation?: { from: string; origin: string };
+    /**
+     * Nobody called the agent by name: the router picked it for the trigger (a person's message
+     * without a mention). The run may pass (reply-policy.ts).
+     */
+    router?: boolean;
   };
   /** Other agents of the org, in the channel too (their own runs are recorded, never executed). */
   otherAgents?: { name: string; handle: string; role?: string; instructions?: string }[];
@@ -152,6 +160,8 @@ export interface CaseRun {
   reply: string;
   /** A routine run that handed nothing off (nothing posted); other runs: the reply was the NO_REPLY word. */
   noReply: boolean;
+  /** The run passed (nobody called it by name and it had nothing to add): nothing posted. */
+  passed?: boolean;
   approvals: string[];
   status: string[];
   system: string;
@@ -302,6 +312,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       createReactToolSource({ pubsub }),
       // Routine cases run in the background and speak through it.
       createHandOffToolSource({ pubsub }),
+      // Runs nobody called by name may pass (offered only to them, as in production).
+      createPassToolSource(),
       createContextToolSource(context),
       ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
       ...(c.workspace ? [createWorkspaceToolSource({ pubsub })] : []),
@@ -388,10 +400,13 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     for (const issue of c.seedIssues ?? []) {
       await createIssue({ db, pubsub }, { type: "person", userId: owner.id }, org.id, { ...issue, channelId });
     }
-    const author = (m: CaseMessage) =>
-      m.author === "agent"
-        ? ({ type: "agent", agentId: agent.id, runId: null, hop: 0 } as const)
-        : ({ type: "person", userId: (people.get(m.author) ?? owner).id } as const);
+    // `agent` is the case's agent; `@handle` another agent of the case; anything else a person.
+    const author = (m: CaseMessage) => {
+      if (m.author === "agent") return { type: "agent", agentId: agent.id, runId: null, hop: 0 } as const;
+      const other = m.author.startsWith("@") ? agentIdOf(m.author.slice(1)) : undefined;
+      if (other) return { type: "agent", agentId: other, runId: null, hop: 1 } as const;
+      return { type: "person", userId: (people.get(m.author) ?? owner).id } as const;
+    };
     let threadId: string | null = null;
     for (const m of conv.prior ?? []) {
       const msg = await insertMessage(db, {
@@ -478,10 +493,17 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           },
         );
       } else {
-        await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
+        const sent = await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
           body: conv.trigger.body,
           threadId,
         });
+        if (conv.router) {
+          // As the router's pick (router.ts): nobody named the agent; no routing job of its own here.
+          await db.delete(schema.outbox).where(eq(schema.outbox.kind, "message.posted"));
+          const message = await getMessage(db, org.id, sent.id);
+          if (!message) throw new Error(`${c.id}: the trigger was not written`);
+          await db.transaction((tx) => createAgentRuns(tx, message, [agent.id], "router"));
+        }
       }
     }
     // Other agents' runs: recorded (who the trigger started), never executed.
@@ -586,6 +608,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       noReply: routine
         ? !calls.some((t) => t.name === "hand_off" && t.executed && !t.isError)
         : Boolean(last && isNoReply(last.text)),
+      // Ended quietly on purpose (reply-policy.ts records how on a context step).
+      passed: steps.some((s) => s.kind === "context" && (s.data as { passed?: unknown }).passed !== undefined),
       approvals,
       status: runs.map((r) => (r.error ? `${r.status} (${r.error})` : r.status)),
       system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
@@ -661,6 +685,8 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     .filter(([id]) => !(c.expect.skipJudge ?? []).includes(id))
     .filter(([id]) => id !== "looked_first" || c.expect.investigate)
     .filter(([id]) => id !== "talks_like_a_colleague" || c.expect.noReply !== true)
+    // Expected to pass: nothing posted is right; the deterministic check grades it.
+    .filter(() => c.expect.pass !== true)
     .map(([id, text]) => ({ id, text }));
   for (const [i, text] of (c.expect.rubric ?? []).entries()) criteria.push({ id: `case_${i + 1}`, text });
   if (criteria.length === 0) return { checks: [] as CheckResult[], costNanoUsd: 0 };

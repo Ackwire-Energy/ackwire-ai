@@ -28,6 +28,7 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "add_agent_to_channel",
     "update_thread",
     "hand_off",
+    "pass",
   ]);
   const ids = new Set<string>();
   for (const c of all) {
@@ -202,4 +203,31 @@ test("a mission proposal carries what the agent read; one without findings is re
   const checks = deterministicChecks(c.expect, run);
   expect(checks.find((k) => k.id === "mission_investigated")).toMatchObject({ pass: true });
   expect(checks.find((k) => k.id === "cites_evidence")?.pass).toBe(true);
+});
+
+test("a router case: nobody named the agent, it may pass; passing posts nothing and grades as a pass", async () => {
+  const c = byId("router-pass-already-answered");
+  const provider = script([{ chunks: [], toolUses: [{ name: "pass", input: { reason: "@dev already answered" } }] }]);
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
+  expect(run.error).toBeUndefined();
+  expect(run.tools).toContain("pass");
+  // Another agent's earlier answer (`@dev` in the case) is history the agent reads.
+  expect(JSON.stringify(run.turns[0]?.text ?? "")).not.toContain("NO_REPLY");
+  expect(run.passed).toBe(true);
+  expect(run.reply).toBe("");
+  const checks = deterministicChecks(c.expect, run);
+  expect(checks.find((k) => k.id === "passes_when_nothing_to_add")?.pass).toBe(true);
+  expect(checks.find((k) => k.id === "no_silence_word")?.pass).toBe(true);
+});
+
+test("called by name in a DM: no pass tool; the silence word is never posted", async () => {
+  const c = byId("dm-thanks-never-silent");
+  // It tries the silence word: nudged once, then it answers.
+  const provider = script([{ chunks: ["NO_REPLY"] }, { chunks: ["Por nada!"] }]);
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
+  expect(run.tools).not.toContain("pass");
+  expect(run.reply).toBe("Por nada!");
+  const checks = deterministicChecks(c.expect, run);
+  expect(checks.find((k) => k.id === "answers_when_called")?.pass).toBe(true);
+  expect(checks.find((k) => k.id === "no_silence_word")?.pass).toBe(true);
 });

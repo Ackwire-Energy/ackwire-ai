@@ -223,6 +223,11 @@ export interface Expectations {
   evidence?: string[];
   /** Routine runs: true = must stay silent (no `hand_off`); false = must hand off a report that gets posted. */
   noReply?: boolean;
+  /**
+   * Runs nobody called by name (`router`): true = it must pass (nothing posted); false = it must
+   * answer. Called by name (mention, DM): false = it never passes and answers.
+   */
+  pass?: boolean;
   /** "never": no `ask_user`; "required": must ask (ask_user or a question in the reply). */
   ask?: "never" | "required";
   /** Tools that must not be called at all (e.g. `ask_agent`: no relaying the person's request). */
@@ -242,6 +247,8 @@ export interface RunObservation {
   reply: string;
   /** The routine run handed nothing off (silence). */
   noReply: boolean;
+  /** The run ended quietly on purpose (`pass`, or nothing to say when it may): nothing posted. */
+  passed?: boolean;
   /** Tools whose calls became approval requests. */
   approvals: string[];
   /** Handles of the other agents of the case that the trigger started. */
@@ -335,6 +342,20 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
       detail: run.noReply ? "handed nothing off" : text.trim() ? "posted a report" : "posted nothing",
     });
   }
+  if (expect.pass !== undefined) {
+    const passed = run.passed === true && !text.trim();
+    out.push({
+      id: expect.pass ? "passes_when_nothing_to_add" : "answers_when_called",
+      pass: expect.pass ? passed : !passed && (text.trim().length > 0 || run.calls.some((c) => c.name === "react")),
+      detail: passed ? "passed (nothing posted)" : text.trim() ? "answered" : "posted nothing",
+    });
+  }
+  // Never, on any run: the silence word in what people read.
+  out.push({
+    id: "no_silence_word",
+    pass: !/\bNO[_\s-]?REPLY\b/i.test(text),
+    detail: /\bNO[_\s-]?REPLY\b/i.test(text) ? "posted the silence word" : "ok",
+  });
   if (expect.mustNotCall?.length) {
     const called = [...new Set(run.calls.filter((c) => expect.mustNotCall?.includes(c.name)).map((c) => c.name))];
     out.push({
