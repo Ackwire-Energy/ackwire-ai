@@ -35,7 +35,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::from_bytes(IDLE)?)
         .icon_as_template(true)
-        .tooltip("agentes")
+        .tooltip("agentes.chat")
         .on_tray_icon_event(|tray, event| {
             // The positioner needs every tray event to know where the icon is.
             tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);

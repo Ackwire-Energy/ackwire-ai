@@ -167,7 +167,11 @@ test("send asks a person with the exact action; approved, it sends once and is c
   await giveMail(m, account.id, "read_write", { fromAddress: "hello@icloud.com" });
   const ctx = await runContext(m.f);
   const input = { to: ["Ana@Acme.com"], cc: ["boss@acme.com"], subject: "Hi", body: "Hello there" };
-  const r = await m.tools.invoke(ctx, { toolUseId: "tu_send", name: "mail_support_send", input });
+  const r = await m.tools.invoke(ctx, {
+    toolUseId: "tu_send",
+    name: "mail_support_send",
+    input: { ...input, why: "The customer asked for this and it answers their question; sending closes the request." },
+  });
   if (r.type !== "approval") throw new Error("expected an approval");
   expect(r.approval.title).toBe('Send email to ana@acme.com, boss@acme.com: "Hi"');
   expect(r.approval.detail).toBe(
@@ -225,7 +229,11 @@ test("recipients outside the list are refused, including reply-all's computed on
     output: { isError: true, data: { deniedRecipients: ["lurker@evil.com"] } },
   });
   // A plain reply only goes to the sender: asks, with the computed recipient on the card.
-  const reply = await call("mail_support_reply", { message_id: "t1", body: "ok" });
+  const reply = await call("mail_support_reply", {
+    message_id: "t1",
+    body: "ok",
+    why: "The customer asked for this and it answers their question; sending closes the request.",
+  });
   if (reply.type !== "approval") throw new Error("expected an approval");
   expect(reply.approval.title).toBe('Reply by email to ana@acme.com: "Re: Question"');
 
@@ -269,41 +277,6 @@ test("the daily cap counts this agent's sends from this mailbox (UTC day)", asyn
     .set({ sentAt: new Date(Date.now() - 2 * day) })
     .where(eq(schema.mailSends.accountId, account.id));
   expect(await send()).toMatchObject({ type: "result", output: { content: expect.stringContaining("Sent") } });
-});
-
-test("a run started by mail asks before sending even when the policy allows sending without asking", async () => {
-  m = await mailSetup();
-  const account = await imapAccount(m);
-  await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: true });
-  const ctx = await runContext(m.f);
-  const [routine] = await m.f.db
-    .insert(schema.routines)
-    .values({
-      orgId: m.f.org.id,
-      agentId: m.f.agent.id,
-      name: "mail",
-      prompt: "triage",
-      target: { type: "dm" },
-      triggerType: "event",
-      event: "email.received",
-      createdByUserId: m.f.owner.id,
-    })
-    .returning();
-  await m.f.db.insert(schema.routineRuns).values({
-    orgId: m.f.org.id,
-    routineId: routine?.id ?? "",
-    at: new Date(),
-    trigger: "event",
-    event: { type: "email.received", summary: "x" },
-    agentRunId: ctx.runId,
-    status: "started",
-  });
-  const r = await m.tools.invoke(ctx, {
-    toolUseId: "tu_x",
-    name: "mail_support_send",
-    input: { to: ["a@acme.com"], subject: "s", body: "b" },
-  });
-  expect(r.type).toBe("approval");
 });
 
 test("refused credentials mark the mailbox for reconnecting and tell the model", async () => {

@@ -2,30 +2,38 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   MACHINE_PROTOCOL_VERSION,
+  type MachineRequest,
   parseExecutors,
   parseRunnerFrame,
   parseServerFrame,
   type RunnerFrame,
+  STEER_PROTOCOL,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
 import {
   BRAIN_BUILTIN_TOOLS,
   BrainManager,
   type BrainManagerOptions,
+  brainProfileLaunch,
   ClaudeStreamParser,
   carryClaudeSession,
   claudeBrainArgs,
+  claudeCapabilities,
   fallbackModelFor,
+  STEER_CAPABILITY,
+  STEER_NOW_CAPABILITY,
+  steerSupport,
   userMessageLine,
 } from "../../runner/brain";
 import { claudeAuth } from "../../runner/executors";
 import { handleRequest } from "../../runner/handlers";
 import { type IpcReply, McpBridge, McpToolCache } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
-import { removeDirs, tempDir, waitFor } from "./helpers";
+import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 const managers: BrainManager[] = [];
@@ -248,6 +256,34 @@ test("command line: stream-json both ways, opus falls back to sonnet, strict MCP
     parent_tool_use_id: null,
     session_id: "",
   });
+});
+
+test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no edits or web, our prompt", () => {
+  const base = {
+    session: SESSION(1),
+    resume: false,
+    systemFile: "/b/system.txt",
+    mcpConfigFile: "/b/mcp.json",
+    settingsFile: "/b/settings.json",
+  };
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(BRAIN_PROFILES_PROTOCOL);
+  // The owner's own MCP servers never reach a plan turn.
+  const plan = claudeBrainArgs({ ...base, ...brainProfileLaunch("plan", true) });
+  const at = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
+  expect(plan).toContain("--strict-mcp-config");
+  expect(at(plan, "--setting-sources")).toBe("");
+  expect(at(plan, "--permission-mode")).toBe("default");
+  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep");
+  expect(at(plan, "--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
+  const work = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", false) });
+  expect(at(work, "--permission-mode")).toBe("acceptEdits");
+  expect(at(work, "--setting-sources")).toBe("project");
+  expect(at(work, "--tools")).toBe(BRAIN_BUILTIN_TOOLS.join(","));
+  expect(work).toContain("--permission-prompt-tool");
+  // With the owner's servers (work): their settings and every tool, as D60 had it.
+  const personal = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", true) });
+  expect(personal).not.toContain("--strict-mcp-config");
+  expect(personal).not.toContain("--setting-sources");
 });
 
 // ── The manager with a fake Claude Code ──────────────────────────────────────
@@ -484,7 +520,66 @@ test.if(posix)("keepAlive false: one-shot, the process ends with the turn", asyn
   const r = await turn(1, "once", { keepAlive: false });
   expect(r.final).toMatchObject({ type: "done", text: "echo 1: once" });
   expect(m.size).toBe(0);
+  // A background turn on a session that has a live process: it goes too, after the turn.
+  await turn(2, "kept");
+  expect(m.size).toBe(1);
+  const bg = await turn(3, "background", { keepAlive: false });
+  expect(bg.final).toMatchObject({ type: "done", text: "echo 2: background" });
+  expect(m.size).toBe(0);
 });
+
+test.if(posix)(
+  "a plan turn launches Claude Code read-only: our tools only, no settings files; edits, web and secrets denied",
+  async () => {
+    const { spawns, turn } = setup();
+    // Even when the agent opted into the owner's MCP servers.
+    const r = await turn(1, "look", { permissions: { mode: "plan" }, personalMcp: true });
+    expect(r.final).toMatchObject({ type: "done" });
+    const args = spawns()[0]?.args ?? [];
+    const at = (flag: string) => args[args.indexOf(flag) + 1];
+    expect(args).toContain("--strict-mcp-config");
+    expect(at("--setting-sources")).toBe("");
+    expect(at("--permission-mode")).toBe("default");
+    expect(at("--tools")).toBe("Bash,Read,Glob,Grep");
+    expect(at("--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
+    const settings = JSON.parse(readFileSync(at("--settings") as string, "utf8")) as {
+      permissions: { allow: string[]; deny: string[] };
+    };
+    const denied = [
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch",
+      "Read(~/.ssh/**)",
+      "Bash(node -e*)",
+      "Bash(gh pr merge *)",
+    ];
+    for (const rule of denied) expect(settings.permissions.deny).toContain(rule);
+    // Shell reads aren't allow rules: our prompt tool decides them (and refuses secrets).
+    expect(settings.permissions.allow.some((r) => r.startsWith("Bash("))).toBe(false);
+    // Its MCP process answers the prompts itself, reads only.
+    const config = JSON.parse(readFileSync(at("--mcp-config") as string, "utf8")) as {
+      mcpServers: { agentes: { env: Record<string, string> } };
+    };
+    expect(config.mcpServers.agentes.env.AGENTES_MCP_PROFILE).toBe("plan");
+    // A work turn: edits accepted, the same denials, no profile for its prompts.
+    const work = setup();
+    await work.turn(1, "do");
+    const wargs = work.spawns()[0]?.args ?? [];
+    expect(wargs[wargs.indexOf("--permission-mode") + 1]).toBe("acceptEdits");
+    const wsettings = JSON.parse(readFileSync(wargs[wargs.indexOf("--settings") + 1] as string, "utf8")) as {
+      permissions: { allow: string[]; deny: string[] };
+    };
+    expect(wsettings.permissions.deny).toContain("Bash(python3 -c*)");
+    expect(wsettings.permissions.deny).toContain("Bash(gh auth token*)");
+    expect(wsettings.permissions.deny).not.toContain("Edit");
+    expect(wsettings.permissions.allow).not.toContain("Bash(cat *)");
+    const wconfig = JSON.parse(readFileSync(wargs[wargs.indexOf("--mcp-config") + 1] as string, "utf8")) as {
+      mcpServers: { agentes: { env: Record<string, string> } };
+    };
+    expect(wconfig.mcpServers.agentes.env.AGENTES_MCP_PROFILE).toBeUndefined();
+  },
+);
 
 test.if(posix)("plan limit and login failures end the turn with retryable errors", async () => {
   const { turn } = setup();
@@ -657,4 +752,419 @@ test.if(posix)("an account that isn't on the computer is account_missing, never 
   const bare = setup();
   expect((await bare.turn(2, "hi", { account: ACCOUNT })).final).toMatchObject({ code: "account_missing" });
   expect((await bare.turn(3, "hi", { account: "../../x" })).final).toMatchObject({ code: "bad_request" });
+});
+
+// ── Live steering (protocol 15) ──────────────────────────────────────────────
+
+const U = (n: number) => `0193cccc-0000-7000-8000-${String(n).padStart(12, "0")}`;
+
+/** What 2.1.220 says it can do (lifecycle, no "now"); 2.1.309 adds `interrupt_send_now_v1`. */
+const CAPS_NEXT = ["interrupt_receipt_v1", "interrupt_cancel_queued_v1", "msg_lifecycle_v1"];
+const CAPS_NOW = [...CAPS_NEXT, "interrupt_send_now_v1", "queued_notifications"];
+
+/** Runs `fn` with the fake CLI saying this version and these capabilities (none: an old CLI). */
+async function withCli<T>(
+  cli: { version?: string; caps?: string[]; noResultUuids?: boolean },
+  fn: () => Promise<T>,
+): Promise<T> {
+  const env = {
+    FAKE_CLAUDE_VERSION: cli.version,
+    FAKE_CLAUDE_CAPS: cli.caps?.join(","),
+    FAKE_CLAUDE_NO_RESULT_UUIDS: cli.noResultUuids ? "1" : undefined,
+  };
+  for (const [k, v] of Object.entries(env)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const k of Object.keys(env)) delete process.env[k];
+  }
+}
+const NOW_CLI = { version: "2.1.309", caps: CAPS_NOW };
+
+/** Steers once the turn is there (its CLI started): `no_turn` until then. */
+async function steerWhenReady(
+  m: BrainManager,
+  run: string,
+  messages: { uuid: string; text: string; urgent?: boolean }[],
+) {
+  let reply = m.steer(AGENT.id, { runId: run, session: SESSION(1), messages });
+  const start = Date.now();
+  while (reply.status === "no_turn" && Date.now() - start < 3000) {
+    await new Promise((r) => setTimeout(r, 5));
+    reply = m.steer(AGENT.id, { runId: run, session: SESSION(1), messages });
+  }
+  return reply;
+}
+
+test("protocol 15: brain.steer parses; steer_read events travel, empty ones are dropped", () => {
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(STEER_PROTOCOL);
+  expect(
+    parseServerFrame(
+      line({ type: "request", id: "r1", op: "brain.steer", runId: RUN(1), session: SESSION(1), messages: [] }),
+    ),
+  ).toMatchObject({ op: "brain.steer" });
+  expect(
+    parseRunnerFrame(line({ type: "brain.event", runId: RUN(1), event: { type: "steer_read", uuids: [U(1), 3] } })),
+  ).toEqual({ type: "brain.event", runId: RUN(1), event: { type: "steer_read", uuids: [U(1)] } });
+  expect(
+    parseRunnerFrame(line({ type: "brain.event", runId: RUN(1), event: { type: "steer_read", uuids: [] } })),
+  ).toBeNull();
+});
+
+test("steering: capabilities (not versions), the stdin line, and what the parser reads back", () => {
+  // 2.1.175 says none; 2.1.220 the lifecycle; 2.1.309 also "now". A version alone is never enough.
+  expect(steerSupport(undefined)).toEqual({ next: false, now: false });
+  expect(steerSupport([])).toEqual({ next: false, now: false });
+  expect(steerSupport(CAPS_NEXT)).toEqual({ next: true, now: false });
+  expect(steerSupport(CAPS_NOW)).toEqual({ next: true, now: true });
+  expect(steerSupport([STEER_NOW_CAPABILITY])).toEqual({ next: false, now: false });
+  expect(steerSupport([STEER_CAPABILITY])).toEqual({ next: true, now: false });
+  expect(claudeCapabilities({ capabilities: ["msg_lifecycle_v1", 3, null] })).toEqual(["msg_lifecycle_v1"]);
+  expect(claudeCapabilities({})).toEqual([]);
+  expect(JSON.parse(userMessageLine("hi"))).not.toHaveProperty("uuid");
+  expect(JSON.parse(userMessageLine("hi", { uuid: U(1), priority: "now", origin: { kind: "human" } }))).toMatchObject({
+    type: "user",
+    message: { role: "user", content: "hi" },
+    uuid: U(1),
+    priority: "now",
+    origin: { kind: "human" },
+  });
+  const p = new ClaudeStreamParser();
+  p.beginTurn();
+  // A turn's first reply names what started it; the result lists everything it read (or the single field).
+  expect(
+    p.push(line({ type: "assistant", message: { content: [] }, parent_tool_use_id: null, user_message_uuid: U(1) }))
+      .events,
+  ).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+  const r = p.push(
+    line({
+      type: "result",
+      subtype: "success",
+      result: "ok",
+      user_message_uuids: [U(1), U(2)],
+      queued_turn_count: 1,
+      usage: {},
+    }),
+  );
+  expect(r.events[0]).toEqual({ type: "steer_read", uuids: [U(1), U(2)] });
+  expect(r.queued).toBe(1);
+  expect(r.final).toMatchObject({ type: "done", text: "ok" });
+  // msg_lifecycle_v1: `started` is the read (as 2.1.309 prints it); queued and completed say nothing.
+  const life = (state: string) =>
+    p.push(line({ type: "command_lifecycle", command_uuid: U(3), state, uuid: "x", session_id: SESSION(1) })).events;
+  expect(life("queued")).toEqual([]);
+  expect(life("started")).toEqual([{ type: "steer_read", uuids: [U(3)] }]);
+  expect(life("completed")).toEqual([]);
+  // Tasks: started in the foreground, moved to the background, over (both ways it's said).
+  const sys = (o: Record<string, unknown>) => p.push(line({ type: "system", session_id: SESSION(1), ...o }));
+  expect(sys({ subtype: "task_started", task_id: "b1", is_backgrounded: false, task_type: "local_bash" }).task).toEqual(
+    { id: "b1", started: true, backgrounded: false },
+  );
+  expect(sys({ subtype: "task_updated", task_id: "b1", patch: { is_backgrounded: true } }).task).toEqual({
+    id: "b1",
+    backgrounded: true,
+  });
+  expect(sys({ subtype: "task_updated", task_id: "b1", patch: { status: "completed", end_time: 1 } }).task).toEqual({
+    id: "b1",
+    ended: true,
+  });
+  expect(sys({ subtype: "task_notification", task_id: "b1", status: "completed" }).task).toEqual({
+    id: "b1",
+    ended: true,
+  });
+  expect(sys({ subtype: "task_summary", detail: "x" }).task).toBeUndefined();
+  expect(sys({ subtype: "init", capabilities: CAPS_NOW }).turnStart).toBe(true);
+  // Any tool result is a tool boundary (queued messages and task notices are read there).
+  expect(
+    p.push(
+      line({
+        type: "user",
+        parent_tool_use_id: null,
+        message: { content: [{ type: "tool_result", tool_use_id: "zz", content: "ok" }] },
+      }),
+    ).boundary,
+  ).toBe(true);
+});
+
+test.if(posix)(
+  "a message steered mid-turn is read at the next tool boundary: accepted, steer_read, one answer",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, turn } = setup();
+      const pending = turn(1, "STEER work");
+      const reply = await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "also the docs" }]);
+      expect(reply).toEqual({ status: "accepted", accepted: [U(1)] });
+      const { final, events } = await pending;
+      // At the next tool boundary, from a person.
+      expect(final).toMatchObject({ type: "done", text: "echo 1: STEER work +next/human: also the docs" });
+      // Read once: the lifecycle's `started` and the result's list are the same read.
+      expect(events.filter((e) => e.type === "steer_read")).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+      expect(events.findIndex((e) => e.type === "steer_read")).toBeLessThan(events.findIndex((e) => e.type === "done"));
+      // The process stays for the next turn; nothing is left over.
+      expect(m.size).toBe(1);
+      expect((await turn(2, "next")).final).toMatchObject({ text: "echo 2: next" });
+      // The turn is over: nothing to steer.
+      expect(m.steer(AGENT.id, { runId: RUN(1), session: SESSION(1), messages: [{ uuid: U(2), text: "x" }] })).toEqual({
+        status: "no_turn",
+      });
+    });
+  },
+);
+
+test.if(posix)("the read is the lifecycle's `started`, before the result (which may list nothing)", async () => {
+  // 2.1.220: the lifecycle, but no `user_message_uuids` in its results.
+  await withCli({ version: "2.1.220", caps: CAPS_NEXT, noResultUuids: true }, async () => {
+    const { m, turn } = setup();
+    const seen: string[] = [];
+    const pending = turn(1, "STEER work");
+    expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "also this" }])).status).toBe("accepted");
+    const { final, events } = await pending;
+    seen.push(...events.map((e) => e.type));
+    expect(final).toMatchObject({ text: "echo 1: STEER work +next/human: also this" });
+    expect(events.filter((e) => e.type === "steer_read")).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+    // Said before the turn's usage (the result's first event) and its answer.
+    expect(seen.indexOf("steer_read")).toBeLessThan(seen.indexOf("usage"));
+    expect(m.size).toBe(1);
+  });
+});
+
+test.if(posix)("urgent: `now` where the CLI can move work aside; unsupported where it can't", async () => {
+  await withCli({ version: "2.1.220", caps: CAPS_NEXT }, async () => {
+    const { m, turn } = setup();
+    const pending = turn(1, "STEER work");
+    const reply = await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "stop that", urgent: true }]);
+    // The engine stops the turn and starts it again from the message instead.
+    expect(reply).toMatchObject({ status: "unsupported" });
+    expect((reply as { reason: string }).reason).toContain("2.1.220");
+    // Nothing was written: the turn ends on its own (the fake waits for a line a moment).
+    expect((await pending).final).toMatchObject({ text: "echo 1: STEER work" });
+  });
+  await withCli(NOW_CLI, async () => {
+    const { m, turn } = setup();
+    const pending = turn(1, "STEER work");
+    expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "stop that", urgent: true }])).status).toBe(
+      "accepted",
+    );
+    expect((await pending).final).toMatchObject({ text: "echo 1: STEER work +now/human: stop that" });
+  });
+});
+
+test.if(posix)(
+  "work an urgent message moved to the background: the request waits for the CLI's own turn, answers join",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup();
+      const pending = turn(1, "STEERBG work");
+      expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "check this", urgent: true }])).status).toBe(
+        "accepted",
+      );
+      const { final, events } = await pending;
+      expect(final).toMatchObject({
+        type: "done",
+        text: "echo 1: STEERBG work +now/human: check this\n\nbackground finished",
+      });
+      expect(events.filter((e) => e.type === "steer_read")).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+      expect(events.filter((e) => e.type === "done")).toHaveLength(1);
+      // Both turns' usage, one answer: the follow-up never reaches the next request.
+      expect(events.filter((e) => e.type === "usage")).toHaveLength(2);
+      expect(m.size).toBe(1);
+      const next = await turn(2, "after");
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      expect(next.events.filter((e) => e.type === "done")).toHaveLength(1);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+/** Nothing of a turn the CLI ran by itself reached this request. */
+const noLeak = (r: { final: WireBrainEvent; events: WireBrainEvent[] }) => {
+  const text = r.events.map((e) => (e.type === "text_delta" ? e.text : "")).join("");
+  expect(text).not.toContain("stray");
+  expect(text).not.toContain("background finished");
+  expect(r.final.type === "done" ? r.final.text : "").not.toMatch(/stray|background finished/);
+  expect(r.events.filter((e) => e.type === "done")).toHaveLength(1);
+};
+
+test.if(posix)(
+  "moved work that outlives the wait: the request ends, the process drains; the next request waits for that turn and reuses it",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup({ steerBackgroundWaitMs: 200 });
+      const pending = turn(1, "STEERBGSLOW work");
+      expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "x", urgent: true }])).status).toBe("accepted");
+      const first = await pending;
+      expect(first.final).toMatchObject({ type: "done", text: "echo 1: STEERBGSLOW work +now/human: x" });
+      // Not killed: the agent's background work goes on.
+      const proc = m.process(AGENT.id, SESSION(1));
+      expect(proc?.ownTurnDue).toBe(true);
+      expect(proc?.exited).toBe(false);
+      const next = await turn(2, "after");
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      noLeak(next);
+      expect(proc?.ownTurns).toBe(1);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)(
+  "moved work that never ends (a server): nothing is killed, the next request goes on after a short wait",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup({ steerBackgroundWaitMs: 200, strayWaitMs: 300, dueWaitMs: 200 });
+      const pending = turn(1, "STEERBGHANG work");
+      expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "x", urgent: true }])).status).toBe("accepted");
+      expect((await pending).final).toMatchObject({ type: "done", text: "echo 1: STEERBGHANG work +now/human: x" });
+      const proc = m.process(AGENT.id, SESSION(1));
+      expect(proc?.ownTurnDue).toBe(true);
+      const started = Date.now();
+      const next = await turn(2, "again");
+      // A short wait for a turn that never comes, then on, on the same process: the agent's server goes on.
+      expect(Date.now() - started).toBeLessThan(2000);
+      expect(proc?.ownTurnDue).toBe(false);
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: again" });
+      noLeak(next);
+      expect(proc?.exited).toBe(false);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)(
+  "a turn the CLI ran by itself and finished (the agent's own background task ended): the process is reused, not killed",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup();
+      // The agent's own background task doesn't hold the answer.
+      expect((await turn(1, "BGSELF serve")).final).toMatchObject({ type: "done", text: "echo 1: BGSELF serve" });
+      const proc = m.process(AGENT.id, SESSION(1));
+      await waitFor(() => proc?.ownTurns === 1);
+      expect(proc?.strayTurn).toBe(false);
+      const next = await turn(2, "after");
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      noLeak(next);
+      expect(proc?.exited).toBe(false);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)(
+  "a turn of its own still running when a request comes: waited for, then the process is reused",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup();
+      expect((await turn(1, "BGSELF serve")).final).toMatchObject({ type: "done", text: "echo 1: BGSELF serve" });
+      const proc = m.process(AGENT.id, SESSION(1));
+      await waitFor(() => proc?.strayTurn === true);
+      const next = await turn(2, "after");
+      expect(proc?.ownTurns).toBe(1);
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      noLeak(next);
+      expect(proc?.exited).toBe(false);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)("a turn of its own stuck past the wait: the process is killed and the session resumes", async () => {
+  await withCli(NOW_CLI, async () => {
+    const { m, spawns, turn } = setup({ strayWaitMs: 300 });
+    expect((await turn(1, "BGSELFSTUCK serve")).final).toMatchObject({ type: "done" });
+    const proc = m.process(AGENT.id, SESSION(1));
+    await waitFor(() => proc?.strayTurn === true);
+    const next = await turn(2, "after");
+    expect(next.final).toMatchObject({ type: "done", text: "echo 1: after" });
+    noLeak(next);
+    await waitFor(() => proc?.exited === true);
+    expect(spawns()).toHaveLength(2);
+    expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+  });
+});
+
+test.if(posix)("a message the CLI never confirms: the turn ends, the process goes (nothing runs unheard)", async () => {
+  await withCli(NOW_CLI, async () => {
+    const { m, spawns, turn } = setup({ steerFollowUpMs: 200 });
+    const pending = turn(1, "STEERDROP work");
+    expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "lost" }])).status).toBe("accepted");
+    const { final, events } = await pending;
+    expect(final).toMatchObject({ type: "done", text: "echo 1: STEERDROP work" });
+    // Queued, never started: not read (the engine puts it back in the run's inbox).
+    expect(events.some((e) => e.type === "steer_read")).toBe(false);
+    expect(m.size).toBe(0);
+    // The next turn starts it again, resumed.
+    expect((await turn(2, "again")).final).toMatchObject({ type: "done" });
+    expect(spawns()).toHaveLength(2);
+    expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+  });
+});
+
+test.if(posix)(
+  "a message the turn ended before reading starts the CLI's next turn: the request waits for it, answers join",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup();
+      const pending = turn(1, "STEERLATE work");
+      expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "one more thing" }])).status).toBe("accepted");
+      const { final, events } = await pending;
+      expect(final).toMatchObject({ type: "done", text: "echo 1: STEERLATE work\n\necho 2: one more thing" });
+      expect(events.filter((e) => e.type === "steer_read")).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+      expect(events.filter((e) => e.type === "done")).toHaveLength(1);
+      expect(m.size).toBe(1);
+      expect((await turn(2, "after")).final).toMatchObject({ text: "echo 3: after" });
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)("an old CLI, a one-shot turn, another agent or session: unsupported or no_turn", async () => {
+  // A version new enough by number, but no capabilities said: not steerable.
+  await withCli({ version: "2.1.300" }, async () => {
+    const { m, turn } = setup();
+    const pending = turn(1, "SLOW old");
+    const reply = await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "hey" }]);
+    expect(reply).toMatchObject({ status: "unsupported" });
+    expect((reply as { reason: string }).reason).toContain("2.1.300");
+    await pending;
+  });
+  await withCli({}, async () => {
+    const { m, turn } = setup();
+    const pending = turn(1, "SLOW unknown");
+    expect(await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "hey" }])).toMatchObject({ status: "unsupported" });
+    await pending;
+  });
+  await withCli(NOW_CLI, async () => {
+    const { m, turn } = setup();
+    const once = turn(1, "SLOW once", { keepAlive: false });
+    expect(await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "hey" }])).toMatchObject({ status: "unsupported" });
+    await once;
+    const live = turn(2, "SLOW live");
+    await waitFor(() => m.size === 1);
+    const msgs = [{ uuid: U(2), text: "hey" }];
+    expect(m.steer("someone-else", { runId: RUN(2), session: SESSION(1), messages: msgs })).toEqual({
+      status: "no_turn",
+    });
+    expect(m.steer(AGENT.id, { runId: RUN(2), session: SESSION(2), messages: msgs })).toEqual({ status: "no_turn" });
+    await live;
+  });
+});
+
+test.if(posix)("handler: brain.steer checks its messages and reaches the agent's turn", async () => {
+  const { m, ws } = setup();
+  const ctx = { workspaceReal: ws, exec: true, token: "agm_x", brains: m };
+  const scope = { signal: new AbortController().signal, output: () => {} };
+  const req = (messages: unknown) =>
+    ({ op: "brain.steer", runId: RUN(1), session: SESSION(1), messages, agent: AGENT }) as MachineRequest;
+  expect(await errorCode(() => handleRequest(ctx, req([{ uuid: "nope", text: "x" }]), scope))).toBe("bad_request");
+  expect(await errorCode(() => handleRequest(ctx, req([]), scope))).toBe("bad_request");
+  expect(await errorCode(() => handleRequest(ctx, req([{ uuid: U(1), text: " " }]), scope))).toBe("bad_request");
+  expect(await handleRequest(ctx, req([{ uuid: U(1), text: "hi" }]), scope)).toEqual({ status: "no_turn" });
+  // A Codex turn (`codex exec`) never takes messages mid-turn.
+  const runs = new Map([[RUN(1), {} as never]]);
+  expect(
+    await handleRequest({ ...ctx, codex: { runnerHome: ws, runs } }, req([{ uuid: U(1), text: "hi" }]), scope),
+  ).toMatchObject({ status: "unsupported" });
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
-import { joinWaitlist, WAITLIST_MAX_SENDS } from "@agenteschat/engine";
+import { enqueueWaitlistContacts, joinWaitlist, WAITLIST_MAX_SENDS } from "@agenteschat/engine";
 import { browser, createTestServer, ORIGIN, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -59,6 +59,58 @@ test("joining emails a confirmation link (through the outbox, in their language)
   await anon("/api/waitlist", { json: { email: "ana@acme.com" } });
   await t.drain();
   expect(t.email.sent.length).toBe(1);
+  // A MillionSend contact on joining (pending), updated on confirming; joining again adds nothing.
+  const joined = row?.createdAt.toISOString() ?? "";
+  expect(t.email.contacts).toEqual([
+    {
+      email: "ana@acme.com",
+      properties: { waitlist: "pending", locale: "en", source: "landing", waitlist_joined_at: joined },
+    },
+    {
+      email: "ana@acme.com",
+      properties: {
+        waitlist: "confirmed",
+        locale: "en",
+        source: "landing",
+        waitlist_joined_at: joined,
+        waitlist_confirmed_at: row?.confirmedAt?.toISOString() ?? "",
+      },
+    },
+  ]);
+  await enqueueWaitlistContacts(t.db);
+  await t.drain();
+  expect(t.email.contacts.length).toBe(2);
+});
+
+test("a pending job that runs after the confirmation still saves the contact as confirmed", async () => {
+  const anon = browser(t);
+  await anon("/api/waitlist", { json: { email: "ana@acme.com" } });
+  // Confirmed before the outbox ran the join's jobs.
+  const [entry] = await t.db.select().from(schema.waitlistEntries);
+  await t.db.update(schema.waitlistEntries).set({ confirmedAt: new Date() });
+  await t.drain();
+  expect(entry?.confirmedAt).toBeNull();
+  expect(t.email.contacts.map((c) => c.properties.waitlist)).toEqual(["confirmed"]);
+});
+
+test("entries from before the sync are caught up as contacts, each in its status", async () => {
+  await t.db.insert(schema.waitlistEntries).values([
+    { email: "old@acme.com", confirmedAt: new Date("2026-10-01T12:00:00Z") },
+    { email: "pending@acme.com", locale: "en" },
+  ]);
+  expect(await enqueueWaitlistContacts(t.db)).toBe(2);
+  await t.drain();
+  expect(
+    t.email.contacts
+      .map((c) => [c.email, c.properties.waitlist, c.properties.locale])
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+  ).toEqual([
+    ["old@acme.com", "confirmed", "pt-BR"],
+    ["pending@acme.com", "pending", "en"],
+  ]);
+  expect(await enqueueWaitlistContacts(t.db)).toBe(2);
+  await t.drain();
+  expect(t.email.contacts.length).toBe(2);
 });
 
 test("no locale means pt-BR, and the email is in Portuguese", async () => {

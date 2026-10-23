@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
+import { contextMenuHandler, copyText, type MenuEntry, QUICK_REACTIONS, selectedTextAt } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { ReactButton, reactionOf, useMessageReactions } from "./Reactions";
 import { SaveToWikiDialog } from "./SaveToWiki";
@@ -92,4 +93,85 @@ export function PersonMessageActions({
       <MessageMoreMenu message={message} channelName={channelName} />
     </div>
   );
+}
+
+/**
+ * A message's right click in the desktop app (lib/context-menu.ts): quick reactions, then what its "…" has
+ * (Responder, Copiar link, Salvar na wiki) and Copiar texto. With text selected in it, the selection's own menu
+ * (Copiar, Responder; Salvar na wiki saves the selection). `dialog` goes with the message.
+ */
+export function useMessageMenu(message: Message, channelName: string, options: { feedback?: boolean } = {}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const actions = useChannelActions();
+  const reactions = useMessageReactions(message.id, message.reactions, { feedback: options.feedback });
+  // What Salvar na wiki saves: the selection when it was asked, else the whole message.
+  const [saving, setSaving] = useState<string | null>(null);
+  const onContextMenu = contextMenuHandler((e): MenuEntry[] => {
+    if (message.local) return [];
+    const copy = (text: string, id: string, label: string): MenuEntry => ({
+      kind: "item",
+      id,
+      label,
+      icon: "copy",
+      run: () => void copyText(text, () => toast.show(t("contextMenu.textCopied"))),
+    });
+    const reply: MenuEntry[] = actions?.reply
+      ? [
+          {
+            kind: "item",
+            id: "reply",
+            label: t("contextMenu.reply"),
+            icon: "reply",
+            run: () => actions.reply?.(message),
+          },
+        ]
+      : [];
+    const copyLink: MenuEntry = {
+      kind: "item",
+      id: "copy-link",
+      label: t("contextMenu.copyLink"),
+      icon: "link",
+      run: () =>
+        void copyText(messageLink(window.location.origin, org.id, message), () =>
+          toast.show(t("contextMenu.linkCopied")),
+        ),
+    };
+    const wiki = (text: string): MenuEntry => ({
+      kind: "item",
+      id: "wiki",
+      label: t("contextMenu.saveToWiki"),
+      icon: "book",
+      run: () => setSaving(text),
+    });
+    const selected = selectedTextAt(e.target);
+    if (selected) {
+      return [copy(selected, "copy", t("contextMenu.copy")), ...reply, { kind: "separator" }, copyLink, wiki(selected)];
+    }
+    return [
+      {
+        kind: "reactions",
+        label: t("contextMenu.react"),
+        emojis: QUICK_REACTIONS,
+        pick: (emoji) => reactions.toggle(reactionOf(emoji)),
+      },
+      ...reply,
+      copy(message.body, "copy-text", t("contextMenu.copyText")),
+      copyLink,
+      { kind: "separator" },
+      wiki(message.body),
+    ];
+  });
+  const dialog =
+    saving === null ? null : (
+      <SaveToWikiDialog
+        open
+        onClose={() => setSaving(null)}
+        text={saving}
+        source={{ kind: "message", channelId: message.channelId, messageId: message.id }}
+        from={t("wiki.fromMessage", { channel: channelName })}
+      />
+    );
+  return { onContextMenu, dialog };
 }

@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { publishChannelEvent } from "./events";
+import { personBehindCall } from "./requester";
 import type { ToolContext } from "./tools/types";
 
 const { agentActions, messages } = schema;
@@ -29,6 +30,7 @@ export type AgentActionKind =
   | "memory.forgotten"
   | "routine.created"
   | "routine.updated"
+  | "routine.deleted"
   | "channel.agent_added"
   | "wiki.page_created"
   | "wiki.page_edited"
@@ -44,6 +46,7 @@ export const UNDOABLE_TOOLS = new Set([
   "forget",
   "create_routine",
   "update_routine",
+  "delete_routine",
   "add_agent_to_channel",
   "create_wiki_page",
   "update_wiki_page",
@@ -65,8 +68,11 @@ export interface AgentActionTarget {
   slug?: string;
 }
 
+/** A value of a receipt's sentence: plain values, or a small object the app renders (a schedule's rule). */
+export type AgentActionParam = string | number | boolean | null | string[] | { [key: string]: unknown };
+
 /** Values for the receipt's sentence (`agentActions.{kind}` in the app's i18n). */
-export type AgentActionParams = Record<string, string | number | boolean | null | string[]>;
+export type AgentActionParams = Record<string, AgentActionParam>;
 
 /** One receipt, as the app shows it under the agent's message. */
 export interface AgentActionView {
@@ -117,16 +123,6 @@ export const actionView = (r: Row): AgentActionView => {
   };
 };
 
-/** The person behind the run: the trigger message's author when a person wrote it. */
-async function requesterOf(db: Executor, orgId: string, triggerMessageId: string): Promise<string | null> {
-  if (!triggerMessageId) return null;
-  const [m] = await db
-    .select({ type: messages.authorType, userId: messages.authorUserId })
-    .from(messages)
-    .where(and(eq(messages.orgId, orgId), eq(messages.id, triggerMessageId)));
-  return m?.type === "person" ? (m.userId ?? null) : null;
-}
-
 /** Writes receipts for a run's change (call it in the change's transaction). Returns their ids. */
 export async function recordAgentActions(
   db: Executor,
@@ -135,7 +131,8 @@ export async function recordAgentActions(
   now = new Date(),
 ): Promise<string[]> {
   if (records.length === 0 || !ctx.runId) return [];
-  const requestedByUserId = await requesterOf(db, ctx.orgId, ctx.triggerMessageId);
+  // Who asked for the change (`authority.ts`); nobody for a routine's or an unattended run.
+  const requestedByUserId = await personBehindCall({ ...ctx, db });
   const rows = await db
     .insert(agentActions)
     .values(
@@ -260,6 +257,8 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
       return `created the routine${title}`;
     case "routine.updated":
       return `changed the routine${title}`;
+    case "routine.deleted":
+      return `deleted the routine${title}`;
     case "channel.agent_added":
       return `added ${typeof p.agentName === "string" ? p.agentName : "an agent"} to #${t.title ?? "?"}`;
     case "wiki.page_created":

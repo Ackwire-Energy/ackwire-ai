@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-10-20. Revised 2026-10-20: Android first, self-host first (an optional compose profile), Cloud next (KVM hosts only), iOS on Macs (see "Revision")
-- Planning: D64; D80 (open source with a docker-compose self-host)
+- Planning: D64; D85 (open source with a docker-compose self-host)
 - Extends: ADR 0025 (connected computers), ADR 0031 §5 and §13 (computer use: simulator, explorations become tests), ADR 0040 (agent browser: tools, handoff, live view)
 - Out of scope for now: real phones over USB, protected mode (ADR 0030), Cloud iOS for anything but developing and testing the customer's own app (§12)
 
@@ -10,7 +10,7 @@
 
 The first version (the same day) put iOS first on a rented Mac, Android after it, and left the Android live view open. Two things changed the order:
 
-- The code opened with a docker-compose self-host (D80), so the machines self-hosters already run come first. Those are Linux servers: Android runs there with KVM, and iOS can't run there at all (it needs Apple hardware).
+- The code opened with a docker-compose self-host (D85), so the machines self-hosters already run come first. Those are Linux servers: Android runs there with KVM, and iOS can't run there at all (it needs Apple hardware).
 - Android also runs on bare-metal Macs (HVF) and Windows (WHPX), and CI can test it (GitHub's Linux runners have KVM). iOS depends on Xcode's private frameworks: Xcode 27 broke Orca's iOS simulator from 2026-07-29 to 2026-10-01 (Orca #11388 to #17587), and Orca's issue about Device Hub dropping input is still open (#23997).
 
 Kept: two layers (§1), the iOS driver choice (§2), one screen shared with the browser (§4), the tools (§5), one device per agent locked lazily (§6). Changed: Android is the first driver, with a readiness guard (§3); the live view is decided (§7); testing (§8); the order. New: the self-host recipe (§9), Cloud (§10), Mac hosts (§11), iOS hosting (§12).

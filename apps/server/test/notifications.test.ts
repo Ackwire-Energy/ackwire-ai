@@ -51,7 +51,15 @@ test("an approval waits in the inbox of whoever may decide, and leaves it once d
     reply: (req) => {
       const last = JSON.stringify(req.messages.at(-1)?.content);
       if (last.includes("merged")) return { chunks: ["Merge done."] };
-      return { chunks: [], toolUses: [{ name: "github_merge_pr", input: { pr: 42 } }] };
+      return {
+        chunks: [],
+        toolUses: [
+          {
+            name: "github_merge_pr",
+            input: { pr: 42, why: "CI passed and the review is done: merging ships the fix today." },
+          },
+        ],
+      };
     },
   });
   const { api, orgId, channelId, agentId } = await signedIn();
@@ -80,7 +88,16 @@ test("an agent's question waits for the person who asked; answering resolves it"
       if (last.includes("tool_result")) return { chunks: ["ok"] };
       return {
         chunks: [],
-        toolUses: [{ name: "ask_user", input: { question: "Qual ambiente?", choices: ["staging", "production"] } }],
+        toolUses: [
+          {
+            name: "ask_user",
+            input: {
+              why: "I need a person's answer before I go on: this decides what I change next.",
+              question: "Qual ambiente?",
+              choices: ["staging", "production"],
+            },
+          },
+        ],
       };
     },
   });

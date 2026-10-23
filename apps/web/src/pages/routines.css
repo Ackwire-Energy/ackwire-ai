@@ -29,7 +29,7 @@
 .routines-head h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -548,6 +548,43 @@
 .routine-runs__node--running {
   background: var(--agent);
   color: #fff;
+}
+/* "Esperando sua aprovação" opens the request; "Abrir na conversa", the agent's message. */
+.routine-runs__link {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.routine-runs__open {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.routine-runs__open:hover,
+.routine-runs__link:hover {
+  color: var(--ink);
+}
+
+/* A quiet note with its icon: a routine that wakes someone's computer often. */
+.routine-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink2);
+}
+.routine-note > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--muted);
+}
+/* The form's plain questions: the answer's short explanation under the choice. */
+.routine-kind p {
+  margin: 0;
 }
 
 /* ── "Nova rotina": templates ───────────────────────────────────────────── */

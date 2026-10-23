@@ -5,6 +5,8 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
 import { can, getMembership } from "./organizations";
+import { closeRoutineRun } from "./routine-ledger";
+import { releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 
@@ -164,13 +166,15 @@ export const canceledBy = (error: string | null | undefined) =>
  * - Running: the worker aborts the model stream (usage so far is recorded),
  *   stops before the next tool, kills running code, and posts what the agent
  *   wrote so far with "Stopped by …".
- * The UI hears `run.canceled` at once. Audited.
+ * The UI hears `run.canceled` at once. Audited. Messages sent to it that it hasn't read get a run
+ * of their own (`releaseInbox`), except `stopMessageId`: the message that asked it to stop.
  */
 export async function cancelRun(
   deps: { db: Database; pubsub?: PubSub },
   userId: string,
   orgId: string,
   runId: string,
+  options: { stopMessageId?: string } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
   const { db } = deps;
   const membership = await getMembership(db, userId, orgId);
@@ -192,7 +196,7 @@ export async function cancelRun(
   if (!allowed)
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
-  return stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId });
+  return stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId }, options);
 }
 
 /**
@@ -200,6 +204,8 @@ export async function cancelRun(
  * secret requests close, its queued jobs are dropped, the worker running it
  * aborts, and the app hears it stopped. `actor`: the person who stopped it,
  * or the system (a consultation nobody waits for anymore, ADR 0034).
+ * Its unread messages are handed on: by the worker executing it once it has
+ * posted the stop (it may restart from a "Parar e mandar"), else here.
  */
 export async function stopRun(
   deps: { db: Database; pubsub?: PubSub },
@@ -207,6 +213,7 @@ export async function stopRun(
   start: typeof agentRuns.$inferSelect,
   channelKind: string | null,
   actor: { type: "person"; id: string } | { type: "system"; reason: string },
+  options: { stopMessageId?: string } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
   const { db } = deps;
   const error = actor.type === "person" ? `canceled_by:${actor.id}` : actor.reason;
@@ -220,6 +227,13 @@ export async function stopRun(
     const done = await db.transaction(async (tx) => {
       const moved = await transitionRun(tx, run.id, status, "canceled", { error });
       if (!moved) return null;
+      // The "stop" itself needs no answer: it never gets a run of its own.
+      if (options.stopMessageId) {
+        await tx
+          .update(agentRuns)
+          .set({ pendingMessageIds: sql`array_remove(${agentRuns.pendingMessageIds}, ${options.stopMessageId}::uuid)` })
+          .where(eq(agentRuns.id, run.id));
+      }
       const now = new Date();
       await tx
         .update(approvals)
@@ -265,6 +279,12 @@ export async function stopRun(
   // The worker running it (here or on another instance) aborts and posts what was written.
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
+  // A routine's background run is stopped quietly (ADR 0053 §6.7): nothing in a conversation, its ledger
+  // ends `canceled` with who stopped it. Any other stop of it (a pause, a delete, the next slot) is closed
+  // by whoever stopped it, with its own reason.
+  if (run.background && actor.type === "person") {
+    await closeRoutineRun(deps, run, { status: "canceled", code: "stopped", byUserId: actor.id }).catch(() => null);
+  }
   // The app drops "pensando…" right away.
   const where = {
     channelId: run.channelId,
@@ -272,10 +292,14 @@ export async function stopRun(
     agentId: run.agentId,
     runId: run.id,
   };
-  if (actor.type === "person")
+  const bg = run.background ? { background: true as const } : {};
+  if (actor.type === "person" && !run.background)
     await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
-  await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, status: "canceled" });
-  if (previous !== "running") {
+  await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
+  if (previous !== "running" && run.background) {
+    await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
+    await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });
+  } else if (previous !== "running") {
     // Nobody is executing it: finish it for the app here.
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status: "canceled" });
@@ -291,6 +315,11 @@ export async function stopRun(
     if (channelKind === "forum") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, orgId, run.channelId, run.id).catch(() => {});
     }
+    // Nobody executes it: what was sent to it and not read gets a run of its own now.
+    await releaseInbox(db, deps.pubsub, run, {
+      reason: "canceled",
+      ...(options.stopMessageId ? { exclude: [options.stopMessageId] } : {}),
+    }).catch(() => null);
   }
   return { id: run.id, status: run.status, previousStatus: previous };
 }

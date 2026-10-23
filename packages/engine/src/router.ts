@@ -1,4 +1,4 @@
-import { and, type Database, desc, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
 import { audienceSql } from "./audience";
 import { summarizeGrants } from "./capabilities";
@@ -285,6 +285,16 @@ export async function resolveRouterModel(
  * (or its newest key), else the catalog's cheap model for that provider.
  */
 export async function cheapModelForOrg(db: Database, orgId: string, perProvider: Record<string, string>) {
+  const provider = await orgModelProvider(db, orgId);
+  return perProvider[provider] ?? cheapModelOf(provider) ?? perProvider.anthropic ?? "claude-haiku-5-5";
+}
+
+/**
+ * The provider of an organization's own model calls: its default key's, else
+ * its newest key's, else Anthropic (the platform key). Also the line an agent
+ * on "Automático" without a key of its own picks from (D83).
+ */
+export async function orgModelProvider(db: Executor, orgId: string): Promise<string> {
   const [settings] = await db
     .select({ provider: schema.providerCredentials.provider })
     .from(organizationSettings)
@@ -300,7 +310,7 @@ export async function cheapModelForOrg(db: Database, orgId: string, perProvider:
       .limit(1);
     provider = newest?.provider ?? "anthropic";
   }
-  return perProvider[provider] ?? cheapModelOf(provider) ?? perProvider.anthropic ?? "claude-haiku-5-5";
+  return provider;
 }
 
 export interface RouterDeps {
@@ -365,7 +375,7 @@ export async function routeMessage(
         singleAgentMinScore: undefined,
       }
     : deps.policy;
-  // The person behind it: the author, or for an agent's message whoever started its run.
+  // The person behind it (`authority.ts`): the author, or for an agent's message the person behind its run.
   const personId = byAgent ? await requesterOf(db, message) : message.authorUserId;
   const [already] = await db
     .select({ id: routingDecisions.id })
@@ -441,24 +451,25 @@ export async function routeMessage(
     .from(channels)
     .where(and(eq(channels.id, message.channelId), eq(channels.orgId, message.orgId)));
   if (!channel) return { runs: [], skipped: "message_missing" };
-  const history = await db
-    .select({
-      id: messages.id,
-      body: messages.body,
-      userName: users.name,
-      agentHandle: agents.handle,
-      authorAgentId: messages.authorAgentId,
-      authorUserId: messages.authorUserId,
-      mentionedAgentIds: messages.mentionedAgentIds,
-      createdAt: messages.createdAt,
-    })
-    .from(messages)
-    .leftJoin(users, eq(users.id, messages.authorUserId))
-    .leftJoin(agents, eq(agents.id, messages.authorAgentId))
-    .where(
+  const historyOf = (where: ReturnType<typeof and>) =>
+    db
+      .select({
+        id: messages.id,
+        body: messages.body,
+        userName: users.name,
+        agentHandle: agents.handle,
+        authorAgentId: messages.authorAgentId,
+        authorUserId: messages.authorUserId,
+        mentionedAgentIds: messages.mentionedAgentIds,
+        createdAt: messages.createdAt,
+      })
+      .from(messages)
+      .leftJoin(users, eq(users.id, messages.authorUserId))
+      .leftJoin(agents, eq(agents.id, messages.authorAgentId))
+      .where(and(eq(messages.orgId, message.orgId), eq(messages.channelId, message.channelId), where));
+  const [history, [root]] = await Promise.all([
+    historyOf(
       and(
-        eq(messages.orgId, message.orgId),
-        eq(messages.channelId, message.channelId),
         isNull(messages.deletedAt),
         // A top-level message: the channel as people see it, replies under earlier messages included.
         message.threadId ? eq(messages.threadId, message.threadId) : undefined,
@@ -467,11 +478,16 @@ export async function routeMessage(
         lte(messages.createdAt, message.createdAt),
       ),
     )
-    .orderBy(desc(messages.createdAt))
-    .limit(6);
+      .orderBy(desc(messages.createdAt))
+      .limit(6),
+    // A reply in a thread: the message it is under is what the thread is about, however long ago.
+    message.threadId ? historyOf(and(eq(messages.id, message.threadId), isNull(messages.deletedAt))) : [],
+  ]);
   if (byAgent) {
     // Bringing someone in: agents that already spoke here aren't new voices.
-    const spoke = new Set(history.flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])));
+    const spoke = new Set(
+      [...history, ...(root ? [root] : [])].flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])),
+    );
     candidates = candidates.filter((c) => !spoke.has(c.agentId));
     if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
   }
@@ -521,7 +537,17 @@ export async function routeMessage(
     candidateIds.has(replyTo.author.id)
       ? replyTo.author.id
       : null;
-  if (quotedAgentId) continuityAgentId = quotedAgentId;
+  // A reply under an agent's message (in its thread) is for that agent the same way, while no other agent
+  // has spoken there ("nos nao subimos isso" under Theo's routine report an hour later, 2026-10-23).
+  const rootAgentId =
+    !byAgent &&
+    root?.authorAgentId &&
+    candidateIds.has(root.authorAgentId) &&
+    !history.some((m) => m.authorAgentId && m.authorAgentId !== root.authorAgentId)
+      ? root.authorAgentId
+      : null;
+  const repliedAgentId = quotedAgentId ?? rootAgentId;
+  if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
 
   let result: RoutingResult;
@@ -534,7 +560,7 @@ export async function routeMessage(
         author: author?.name ?? "someone",
         body: `${quotedLine(message.meta)}${message.body}`,
       },
-      thread: history.reverse().map((m) => ({
+      thread: [...(root ? [root] : []), ...history.reverse()].map((m) => ({
         author: m.agentHandle ? `@${m.agentHandle}` : (m.userName ?? "someone"),
         body: m.body,
       })),
@@ -563,15 +589,15 @@ export async function routeMessage(
 
   // The router's own pick; when it picks several agents, the message speaks to several.
   const picked = selectAgents(candidates, result, policy, { continuityAgentId });
-  // A short follow-up without a mention ("and now?"), or a quote reply to an agent, goes only to the agent
-  // the person was talking to, unless the router heard it as for several agents, or (not quoting) clearly
+  // A short follow-up without a mention ("and now?"), or a reply to an agent (quote or thread), goes only to the agent
+  // the person was talking to, unless the router heard it as for several agents, or (not replying) clearly
   // for another one ("tem sim ada, tenta dnv" right after Theo spoke: a name beats who spoke last).
   // A short message the router heard as for nobody stays with people ("boa noite walter" right after
   // Ada spoke, 2026-10-19: Ada reacted to a greeting meant for a person).
   const scoreOf = (agentId: string | null) =>
     Math.max(0, ...result.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
   const clearlyAnother =
-    quotedAgentId === null &&
+    repliedAgentId === null &&
     picked.some(
       (id) =>
         id !== continuityAgentId &&
@@ -580,7 +606,7 @@ export async function routeMessage(
     );
   const followUp =
     continuityAgentId !== null &&
-    (quotedAgentId !== null || (isShortFollowUp(message.body) && picked.length > 0)) &&
+    (repliedAgentId !== null || (isShortFollowUp(message.body) && picked.length > 0)) &&
     picked.length < 2 &&
     !clearlyAnother;
   // Another agent already answered this in the thread: don't pile on with a second answer. Not when the

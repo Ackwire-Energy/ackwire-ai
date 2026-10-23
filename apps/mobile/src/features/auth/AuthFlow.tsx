@@ -38,8 +38,8 @@ const BACK: Record<Step, Step | null> = {
   sent: "password",
 };
 
-const TERMS_URL = "https://agentes.chat/termos";
-const PRIVACY_URL = "https://agentes.chat/privacidade";
+const TERMS_URL = "https://agentes.chat/terms";
+const PRIVACY_URL = "https://agentes.chat/privacy";
 
 export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; email?: string }) {
   const { t } = useTranslation();

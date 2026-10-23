@@ -5,12 +5,12 @@ import { abortLocalRun, RUN_CANCEL_TOPIC } from "./cancel";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { RunIdentity } from "./executor";
 import { insertMessage, messageView } from "./messages";
+import { MISSION_LIMITS } from "./mission-limits";
 import { enqueueRunJob } from "./mission-runs";
 import { missionCwd, worktreeBlocksWork } from "./mission-worktree";
 import {
   agentAnswers,
   getMissionRow,
-  MISSION_LIMITS,
   MISSION_STUCK,
   type MissionDeps,
   type MissionRow,

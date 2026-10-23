@@ -174,7 +174,8 @@ export const envVars = {
   },
   AGENT_DEFAULT_MODEL: {
     schema: modelId.default("claude-sonnet-5-5"),
-    description: "Model used by new agents unless one is chosen explicitly.",
+    description:
+      "Unused since D83: new agents start on Automático (`auto`, each run picks the model and effort), whatever this says. Still checked when set; to be removed.",
     section: "Agents",
   },
   ROUTER_ENABLED: {
@@ -205,6 +206,15 @@ export const envVars = {
   JEV_TIMEOUT_MS: {
     schema: z.coerce.number().int().min(200).max(30_000).default(2000),
     description: "Timeout for a Jev router call; after it the LLM router decides.",
+    section: "Agents",
+  },
+  JEV_VISION_MODEL: {
+    schema: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9._-]{0,63}$/)
+      .default("jev-preview"),
+    description:
+      "Jev model for judgments over images (the agent browser finding a target on a screenshot). Needs a release that takes images.",
     section: "Agents",
   },
   OPENAI_CHEAP_MODEL: {

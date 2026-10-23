@@ -75,6 +75,8 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       status: RunStatus;
+      /** Background work (a routine's run): not the conversation's "working" indicator. */
+      background?: true;
       error?: string;
       /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
       errorCode?: string;
@@ -85,8 +87,16 @@ export type ChannelEvent =
    * show "thinking" right away. `runId` is null when announced at post time,
    * before the run exists.
    */
-  | { type: "agent.thinking"; channelId: string; threadId: string | null; agentId: string; runId: string | null }
-  /** An agent asked another agent (`ask_agent`, ADR 0034) and waits for it: "Dev is asking Infra…". */
+  | {
+      type: "agent.thinking";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string | null;
+      /** Background work (a routine's run): not the conversation's "working" indicator. */
+      background?: true;
+    }
+  /** An agent asked another agent (`ask_agent`, ADR 0034); the answer comes later as a notice: "Dev asked Infra…". */
   | {
       type: "agent.consulting";
       channelId: string;
@@ -138,12 +148,20 @@ export type ChannelEvent =
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */
-  | { type: "agent.idle"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  | {
+      type: "agent.idle";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      background?: true;
+    }
   | {
       type: "run.finished";
       channelId: string;
       threadId: string | null;
       agentId: string;
+      background?: true;
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       error?: string;
@@ -175,6 +193,49 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       messageIds: string[];
+    }
+  /**
+   * Handed to a computer brain mid-turn (Claude Code reads it at its next tool boundary), not
+   * confirmed read yet: "Ada recebeu". `agent.run.read` follows once the turn reports it read.
+   */
+  | {
+      type: "agent.run.delivered";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageIds: string[];
+    }
+  /**
+   * Messages a run took but never read (it ended, failed, was stopped or interrupted by a deploy)
+   * went to a run of their own: nothing sent to an agent is dropped.
+   */
+  | {
+      type: "agent.run.redispatched";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      newRunId: string;
+      messageIds: string[];
+    }
+  /** The run ended without posting: nobody called it by name and it had nothing to add (`pass`). */
+  | { type: "agent.passed"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  /**
+   * A person's message reached a run that was waiting (help in the browser, another agent's answer,
+   * an approval): `outcome` says what became of it. `resolved`: it ended the wait (e.g. "pronto,
+   * loguei" closed the browser help as done). `woke`: the run stopped waiting and reads it now (the
+   * wait stays open; its result comes later as a notice). `held`: it waits for the decision on a card.
+   */
+  | {
+      type: "agent.run.wait_message";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageId: string;
+      waitKind: string;
+      outcome: "resolved" | "woke" | "held";
     }
   /**
    * A person pressed "Continuar" under a stopped reply (`messageId`): `newRunId` picks up where

@@ -470,6 +470,16 @@ describe("machines and targets", () => {
 });
 
 describe("hub", () => {
+  test("no hello in time: the socket closes without a refusal, so the runner dials again", async () => {
+    f = await setup({ machines: true });
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-h", helloTimeoutMs: 20 });
+    hubs.push(hub);
+    const slow = fakeRunner(hub);
+    await Bun.sleep(60);
+    expect(slow.sent).toEqual([]);
+    expect(slow.closed()).toMatchObject({ code: 4408 });
+  });
+
   test("hello → welcome and online; bad token and outdated runners are refused", async () => {
     f = await setup({ machines: true });
     const hub = f.machineHub as MachineHub;

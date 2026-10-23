@@ -43,7 +43,7 @@ export interface WorkItem {
 /**
  * Active missions first (they are long work), then runs in progress (`GET
  * …/active-runs`, everyone's view of the conversations they are in), newest
- * first, one per agent and conversation.
+ * first, one per agent and conversation. A routine's background runs are left out.
  */
 export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] | undefined): WorkItem[] {
   const out: WorkItem[] = [];
@@ -68,7 +68,8 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
   const newest = (r: WorkingRun) => r.startedAt ?? r.createdAt;
   for (const r of [...(runs ?? [])].sort((a, b) => newest(b).localeCompare(newest(a)))) {
     const at = spot(r.agentId, r.channelId, r.threadId);
-    if (!ACTIVE.has(r.status) || seen.has(at)) continue;
+    // A routine's background run holds no conversation: never "trabalhando" (its report comes as a notice).
+    if (r.background || !ACTIVE.has(r.status) || seen.has(at)) continue;
     seen.add(at);
     out.push({
       key: `r:${r.runId}`,

@@ -54,6 +54,41 @@ describe("MillionSend sender", () => {
     }
   });
 
+  test("saveContact creates the contact; one that exists (409) gets its properties merged by email", async () => {
+    const calls: { url: string; method?: string; body: unknown }[] = [];
+    const sender = createMillionSendSender({
+      apiKey: "k",
+      from: "f@x.y",
+      fetch: (async (url: string, init: RequestInit) => {
+        calls.push({ url, method: init.method, body: JSON.parse(String(init.body)) });
+        return init.method === "POST"
+          ? Response.json({ statusCode: 409, name: "conflict", message: "exists" }, { status: 409 })
+          : Response.json({ object: "contact", id: "c1" });
+      }) as unknown as typeof fetch,
+    });
+    await sender.saveContact?.({ email: "ana+x@example.com", properties: { waitlist: "confirmed" } });
+    expect(calls).toEqual([
+      {
+        url: "https://api.millionsend.com/contacts",
+        method: "POST",
+        body: { email: "ana+x@example.com", properties: { waitlist: "confirmed" } },
+      },
+      {
+        url: "https://api.millionsend.com/contacts/ana%2Bx%40example.com",
+        method: "PATCH",
+        body: { properties: { waitlist: "confirmed" } },
+      },
+    ]);
+    const refused = await createMillionSendSender({
+      apiKey: "k",
+      from: "f@x.y",
+      fetch: (async () => Response.json({ message: "plan limit" }, { status: 403 })) as unknown as typeof fetch,
+    })
+      .saveContact?.({ email: "a@b.co", properties: {} })
+      .catch((e: unknown) => e);
+    expect((refused as EmailError).retryable).toBe(false);
+  });
+
   test("dev fallback logs instead of sending; the fake records", async () => {
     const lines: unknown[] = [];
     const log = createLogEmailSender((line, data) => lines.push([line, data]));

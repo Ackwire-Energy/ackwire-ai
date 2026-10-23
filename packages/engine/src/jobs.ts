@@ -38,6 +38,7 @@ import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";
 import { assessThread } from "./thread-assess";
+import { saveWaitlistContact } from "./waitlist";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -218,6 +219,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
+      // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
+      if (message.meta.talker) return;
+      // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
+      if (message.meta.background) return;
       const routed = async (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],
@@ -262,6 +267,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.authorType !== "person") {
         // Between agents only (`ask_agent`, ADR 0034): the consultation runs are started by the tool.
         if (where && isAgentOnlyDm(where)) return;
+        // A notice is for its own agent (`deliverNotice` starts or joins its run): nobody else chimes in.
+        if (message.meta.notice) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {
@@ -422,6 +429,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "email.send": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await sendQueuedEmail(deps.email, job.payload);
+    },
+    "waitlist.contact": async (job) => {
+      if (!deps.email) throw new PermanentJobError("no email sender configured");
+      await saveWaitlistContact(deps.db, deps.email, String(job.payload.entryId));
     },
     // A background task on a connected computer ended: its conversation wakes (ADR 0029).
     "machine.task_done": async (job) => {

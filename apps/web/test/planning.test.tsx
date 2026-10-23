@@ -275,7 +275,7 @@ describe("Rotinas", () => {
     expect(screen().getByRole("region", { name: "Próximas horas" })).toBeTruthy();
   });
 
-  test("pause with the switch, run now and see runs in the details", async () => {
+  test("pause with the switch, run now, stop, and see runs in the details", async () => {
     await go("routines");
     const weekly = () => screen().getByRole("article", { name: "Resumo da semana" });
     await click(within(weekly()).getByRole("switch", { name: "Ativa: Resumo da semana" }));
@@ -290,14 +290,20 @@ describe("Rotinas", () => {
     expect(run.getAttribute("title")).toBe("Rodar agora");
     await click(run);
     await settle(4);
-    expect(within(weekly()).getByRole("button", { name: "Rodando…" }).hasAttribute("disabled")).toBe(true);
-    // The title opens the details: what it does, when, where, and the run history.
+    // Running: "Parar" takes the place of "Rodar agora", and stops it quietly.
+    expect(weekly().getAttribute("data-state")).toBe("running");
+    await click(within(weekly()).getByRole("button", { name: "Parar Resumo da semana" }));
+    await settle(4);
+    expect(screen().getByText("Execução parada.")).toBeTruthy();
+    expect(weekly().getAttribute("data-state")).toBe("active");
+    // The title opens the details: what it does, when, where, and the run history in plain words.
     await click(within(weekly()).getByRole("button", { name: "Resumo da semana" }));
     await settle(4);
     const details = screen().getByRole("dialog", { name: "Resumo da semana" });
     expect(details.textContent).toContain("Resuma o que");
-    expect(details.textContent).toContain("Orçamento do mês esgotado");
-    expect(details.textContent).toContain("não rodou");
+    expect(details.textContent).toContain("Parada por");
+    expect(details.textContent).toContain("O orçamento do mês acabou");
+    expect(details.textContent).toContain("Contou o que achou");
     expect(details.textContent).toContain("Resumo postado no canal");
     await click(within(details).getByRole("button", { name: "Fechar detalhes" }));
     expect(screen().queryByRole("dialog", { name: "Resumo da semana" })).toBeNull();

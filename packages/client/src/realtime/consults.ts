@@ -42,13 +42,32 @@ const drop = (state: ConsultsState, runId: string) => {
 const dropIfBack = (state: ConsultsState, runId: string) =>
   state[runId] && state[runId].status !== "asking" ? drop(state, runId) : state;
 
+/**
+ * The answer came back as a notice that woke another run of the asker (the asking run had ended):
+ * that run writing (or posting) is the asker writing, so the "respondeu" line of the agent there goes.
+ */
+const dropBackOf = (state: ConsultsState, agentId: unknown, channelId: unknown) => {
+  if (typeof agentId !== "string" || typeof channelId !== "string") return state;
+  const gone = Object.values(state).filter(
+    (c) => c.status !== "asking" && c.agentId === agentId && c.channelId === channelId,
+  );
+  return gone.reduce((s, c) => drop(s, c.runId), state);
+};
+
 export function applyConsultEvent(
   state: ConsultsState,
   event: ChannelEvent | { type: string },
   now = Date.now(),
 ): ConsultsState {
   // Some run events (`agent.tool`, `run.canceled`) live outside `ChannelEvent`: read them loosely.
-  const e = event as unknown as { type: string; runId?: unknown; status?: unknown; tool?: unknown };
+  const e = event as unknown as {
+    type: string;
+    runId?: unknown;
+    status?: unknown;
+    tool?: unknown;
+    agentId?: unknown;
+    channelId?: unknown;
+  };
   switch (e.type) {
     case "agent.consulting": {
       const ev = event as Extract<ChannelEvent, { type: "agent.consulting" }>;
@@ -84,16 +103,21 @@ export function applyConsultEvent(
       };
     }
     case "message.created": {
-      const runId = (event as Extract<ChannelEvent, { type: "message.created" }>).message?.agentRunId;
-      return runId ? drop(state, runId) : state;
+      const message = (event as Extract<ChannelEvent, { type: "message.created" }>).message;
+      const runId = message?.agentRunId;
+      if (!runId) return state;
+      const next = drop(state, runId);
+      return message.author.type === "agent" ? dropBackOf(next, message.author.id, message.channelId) : next;
     }
     // Its words are arriving: the reply's own row takes over.
     case "agent.delta":
     case "agent.typing":
-      return typeof e.runId === "string" ? dropIfBack(state, e.runId) : state;
+      return typeof e.runId === "string" ? dropBackOf(dropIfBack(state, e.runId), e.agentId, e.channelId) : state;
     case "agent.tool":
       // Another tool after the answer: the line says that tool now.
-      return typeof e.runId === "string" && e.tool && e.tool !== "ask_agent" ? dropIfBack(state, e.runId) : state;
+      return typeof e.runId === "string" && e.tool && e.tool !== "ask_agent"
+        ? dropBackOf(dropIfBack(state, e.runId), e.agentId, e.channelId)
+        : state;
     case "run.canceled":
       return typeof e.runId === "string" ? drop(state, e.runId) : state;
     case "agent.run":
