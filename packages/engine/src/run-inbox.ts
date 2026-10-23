@@ -71,12 +71,23 @@ export async function releaseInbox(
     .from(messages)
     .where(and(eq(messages.orgId, run.orgId), inArray(messages.id, ids), isNull(messages.deletedAt)))
     .orderBy(asc(messages.createdAt));
-  // The trigger: the last person's message (else another agent's call). The agent's own fast reply
-  // (talker) and notices are context only: they never start a run by themselves.
-  const callers = rows.filter((m) => !m.meta.talker && !m.meta.notice);
-  const last = callers.filter((m) => m.authorType === "person").at(-1) ?? callers.at(-1);
+  // The trigger: the last person's message, else the last notice (a routine's report, another agent's
+  // answer: events the agent must act on), else another agent's call. The agent's own fast reply
+  // (talker) is context only: it never starts a run by itself.
+  const callers = rows.filter((m) => !m.meta.talker);
+  const last =
+    callers.filter((m) => m.authorType === "person").at(-1) ??
+    callers.filter((m) => m.meta.notice).at(-1) ??
+    callers.at(-1);
   if (!last) return null;
-  const started = await db.transaction((tx) => startOrJoinRun(tx, last, run.agentId, run.trigger));
+  const started = await db.transaction(async (tx) => {
+    const out = await startOrJoinRun(tx, last, run.agentId, run.trigger);
+    // Joined a run that already read its context: the rest go to it too (a new run reads them in the conversation).
+    if (out && "joined" in out) {
+      for (const m of rows) if (m.id !== last.id) await queueOnRun(tx, out.joined, m.id);
+    }
+    return out;
+  });
   if (!started) return null;
   const newRunId = "created" in started ? started.created.id : started.joined;
   const messageIds = rows.map((m) => m.id);
