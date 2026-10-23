@@ -3,9 +3,8 @@ import type { AgentAppearance } from "./appearance";
 import { canTalkTo } from "./audience";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
-import { requesterOf } from "./dispatch";
-import { getMessage } from "./messages";
 import { requirePermission } from "./organizations";
+import { personBehindCall } from "./requester";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
@@ -104,8 +103,7 @@ export function createFindAgentToolSource(): ToolSource {
     describe: (input) => ({ title: "Find agents", detail: String(input.query ?? "") }),
     async execute(input, ctx) {
       const { db } = ctx;
-      const trigger = await getMessage(db, ctx.orgId, ctx.triggerMessageId);
-      const person = trigger ? await requesterOf(db, trigger) : null;
+      const person = await personBehindCall(ctx);
       const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person));
       const query = words(String(input.query ?? ""));
       const scored = team

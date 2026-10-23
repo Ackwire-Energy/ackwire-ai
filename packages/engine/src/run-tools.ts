@@ -9,6 +9,7 @@ import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
 import { notifyQuestion } from "./notification-producers";
 import {
+  ASK_USER_TOOL,
   type AgentQuestionRow,
   publishQuestion,
   QUESTION_TTL_MS,
@@ -20,7 +21,8 @@ import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
 import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
-import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
+import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
+import { withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
@@ -74,10 +76,18 @@ export const bodyCode = (code: string, params: Record<string, string> = {}) => (
   bodyParams: params,
 });
 
+/**
+ * A tool as a brain receives it (the model loop and the bridge alike). A tool that asks a person (an
+ * approval, `ask_user`) takes the required `why` its card shows: the gateway's list already adds it,
+ * and this keeps it so for any list that reaches a brain.
+ */
 export const brainToolOf = (t: ToolDefinition): BrainTool => ({
   name: t.name,
   description: t.description,
-  inputSchema: t.inputSchema,
+  inputSchema:
+    isSensitive(t) || (t.name === ASK_USER_TOOL && t.scope === "" && !t.connectionId)
+      ? withWhy(t.inputSchema)
+      : t.inputSchema,
 });
 
 // ── Side effects of tools ────────────────────────────────────────────────────
@@ -403,6 +413,8 @@ const loadedGroupsOf = (transcript: unknown): string[] | null => {
  * The tools of a bridge identity, as `BrainTool[]`: a run's (the Tool Gateway
  * list with its scopes, mission tools when in a mission thread) or a mission
  * task's (its own gateway). `machineId` marks the context as a bridge call.
+ * The run's policy applies as for the model loop (`run-policy.ts`): a tool the
+ * run may not use isn't listed, and every call is checked again.
  */
 export async function bridgeToolsFor(deps: RunToolsDeps, id: BridgeIdentity): Promise<BrainTool[]> {
   if (!deps.tools) return [];

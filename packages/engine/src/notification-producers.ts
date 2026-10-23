@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
 import { approvalCardThreads } from "./approvals";
+import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
 import {
   type NotificationActor,
@@ -62,32 +63,27 @@ async function inChannel(deps: NotificationDeps, channelId: string, userIds: str
   return rows.flatMap((r) => (r.userId ? [r.userId] : []));
 }
 
-/** The person behind a run: the author of its trigger, following agent hand-offs (at most 6 hops). */
+/**
+ * Who hears about a run's requests (questions, browser handoffs): the person accountable for it
+ * (`accountablePerson`: the person behind it, else the routine's creator), or null (the caller falls
+ * back to the agent's owner).
+ */
 async function requesterOfRun(
   deps: Pick<NotificationDeps, "db">,
   orgId: string,
   runId: string | null,
 ): Promise<string | null> {
-  let current = runId;
-  for (let hop = 0; current && hop < 6; hop++) {
-    const [run] = await deps.db
-      .select({ trigger: agentRuns.triggerMessageId })
-      .from(agentRuns)
-      .where(and(eq(agentRuns.id, current), eq(agentRuns.orgId, orgId)));
-    if (!run) return null;
-    const [m] = await deps.db
-      .select({ userId: messages.authorUserId, runId: messages.agentRunId })
-      .from(messages)
-      .where(and(eq(messages.orgId, orgId), eq(messages.id, run.trigger)));
-    if (!m) return null;
-    if (m.userId) return m.userId;
-    current = m.runId;
-  }
-  return null;
+  return runId ? accountablePerson(await runAuthorityById(deps.db, orgId, runId)) : null;
 }
 
 /** The person behind a run (who asked for the work, through agents that asked each other), or null. */
-export const humanBehindRun = requesterOfRun;
+export async function humanBehindRun(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  runId: string | null,
+): Promise<string | null> {
+  return runId ? (await runAuthorityById(deps.db, orgId, runId)).personId : null;
+}
 
 async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
   const [a] = await deps.db.select({ owner: agents.ownerUserId }).from(agents).where(eq(agents.id, agentId));

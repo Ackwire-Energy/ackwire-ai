@@ -1,13 +1,14 @@
 import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { audienceSql } from "./audience";
-import { dmAgents } from "./dms";
+import { personOfMessage, runAuthorityById } from "./authority";
+import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
 import type { AgentRun } from "./runs";
 
-const { agents, channelMembers, agentRuns } = schema;
+const { agents, channelMembers, channels, agentRuns } = schema;
 
 export type RunTrigger = AgentRun["trigger"];
 
@@ -92,7 +93,12 @@ export async function startOrJoinRun(
       )
       .orderBy(sql`${agentRuns.createdAt} desc`)
       .limit(1);
-    if (active && active.triggerMessageId !== message.id && (await queueOnRun(tx, active.id, message.id)))
+    if (
+      active &&
+      active.triggerMessageId !== message.id &&
+      (await samePersonInAgentsDm(tx, message, active.id)) &&
+      (await queueOnRun(tx, active.id, message.id))
+    )
       return { joined: active.id };
   }
   const [run] = await tx
@@ -118,6 +124,27 @@ export async function startOrJoinRun(
     maxAttempts: 4,
   });
   return { created: run };
+}
+
+/**
+ * In the agents' DM a run works for one person (ADR 0053 §9): a question or note joins the run active
+ * there only when the same person is behind both (or nobody is behind either); otherwise it starts a
+ * run of its own, so one person's exchange never reaches a run working for another. Any other
+ * conversation: true.
+ */
+async function samePersonInAgentsDm(
+  tx: Executor,
+  message: Pick<Message, "id" | "orgId" | "channelId">,
+  runId: string,
+): Promise<boolean> {
+  const [channel] = await tx
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
+  if (!channel || !isAgentOnlyDm(channel)) return true;
+  const person = await personOfMessage(tx, message.orgId, message.id);
+  const behindRun = await runAuthorityById(tx, message.orgId, runId);
+  return person === behindRun.personId;
 }
 
 /** Active agents among `agentIds` that are members of the channel (re-checked at dispatch time). */
@@ -148,24 +175,11 @@ export async function eligibleChannelAgents(
 }
 
 /**
- * The person behind a message: its author, or for an agent's message the
- * person whose message started that agent's run (up to a few hops). Null when
- * a routine, webhook or other system started the chain.
+ * The person behind a message (`authority.ts`): its author, or for an agent's message the person
+ * behind the run that wrote it. Null when nobody is (a routine, a webhook, an agent on its own).
  */
-export async function requesterOf(db: Executor, message: Pick<Message, "orgId" | "authorUserId" | "agentRunId">) {
-  let current: Pick<Message, "authorUserId" | "agentRunId"> | null = message;
-  for (let hop = 0; current && hop < 6; hop++) {
-    if (current.authorUserId) return current.authorUserId;
-    if (!current.agentRunId) return null;
-    const [run] = await db
-      .select({ trigger: agentRuns.triggerMessageId })
-      .from(agentRuns)
-      .where(and(eq(agentRuns.id, current.agentRunId), eq(agentRuns.orgId, message.orgId)));
-    if (!run) return null;
-    current = await getMessage(db, message.orgId, run.trigger);
-  }
-  return null;
-}
+export const requesterOf = (db: Executor, message: Pick<Message, "orgId" | "id">) =>
+  personOfMessage(db, message.orgId, message.id);
 
 /**
  * Handles `message.posted` for messages with mentions: starts one run per

@@ -365,7 +365,7 @@ export async function routeMessage(
         singleAgentMinScore: undefined,
       }
     : deps.policy;
-  // The person behind it: the author, or for an agent's message whoever started its run.
+  // The person behind it (`authority.ts`): the author, or for an agent's message the person behind its run.
   const personId = byAgent ? await requesterOf(db, message) : message.authorUserId;
   const [already] = await db
     .select({ id: routingDecisions.id })
