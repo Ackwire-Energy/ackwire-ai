@@ -27,6 +27,7 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "propose_mission",
     "add_agent_to_channel",
     "update_thread",
+    "hand_off",
   ]);
   const ids = new Set<string>();
   for (const c of all) {
@@ -107,14 +108,15 @@ test("a sensitive call becomes an approval request and never runs", async () => 
   expect(checks.find((k) => k.id === "requested_approval")?.pass).toBe(true);
 });
 
-test("a routine run: the trigger is the routine's, earlier messages are history, NO_REPLY posts nothing", async () => {
+test("a routine run: background work on the routine's trigger, earlier messages are history, no hand_off posts nothing", async () => {
   const provider = script([
     { chunks: [], toolUses: [{ name: "sentry_search_issues", input: { query: "is:unresolved firstSeen:-1h" } }] },
-    { chunks: ["NO_REPLY"] },
+    { chunks: ["Nada novo: só o LUMEN-API-3A1, estável."] },
   ]);
   const c = byId("ops-sentry-routine-nothing-new");
   const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
   expect(run.system).toContain("This is a routine run");
+  expect(run.tools).toContain("hand_off");
   // Only the trigger started a run: the earlier routine message and the agent's old reply are history.
   expect(run.status).toEqual(["done"]);
   const history = JSON.stringify(provider.calls[0]?.request.messages);

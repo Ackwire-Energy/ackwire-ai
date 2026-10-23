@@ -214,7 +214,7 @@ export interface Expectations {
   approval?: string[];
   /** The reply must cite at least one of these (file, line, number, link from the fake results). */
   evidence?: string[];
-  /** Routine runs: true = must be exactly NO_REPLY; false = must report something. */
+  /** Routine runs: true = must stay silent (no `hand_off`); false = must hand off a report that gets posted. */
   noReply?: boolean;
   /** "never": no `ask_user`; "required": must ask (ask_user or a question in the reply). */
   ask?: "never" | "required";
@@ -233,7 +233,7 @@ export interface RunObservation {
   calls: EvalToolCall[];
   /** Everything the agent posted to the chat in this run, joined. */
   reply: string;
-  /** The run's last answer is the routine's silence. */
+  /** The routine run handed nothing off (silence). */
   noReply: boolean;
   /** Tools whose calls became approval requests. */
   approvals: string[];
@@ -325,7 +325,7 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
     out.push({
       id: expect.noReply ? "no_reply_when_nothing_new" : "reports_when_something_new",
       pass: expect.noReply ? run.noReply : !run.noReply && text.trim().length > 0,
-      detail: run.noReply ? "answered NO_REPLY" : text.trim() ? "posted a report" : "posted nothing",
+      detail: run.noReply ? "handed nothing off" : text.trim() ? "posted a report" : "posted nothing",
     });
   }
   if (expect.mustNotCall?.length) {

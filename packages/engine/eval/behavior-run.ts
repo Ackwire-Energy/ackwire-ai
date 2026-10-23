@@ -26,6 +26,7 @@ import {
   createCredential,
   createFakeJudge,
   createFakeScheduleReader,
+  createHandOffToolSource,
   createIssue,
   createIssueToolSource,
   createJevJudge,
@@ -47,6 +48,7 @@ import {
   type Judge,
   openDm,
   postPersonMessage,
+  startRoutineRun,
   type ToolSource,
   withJudgeFallback,
 } from "../src";
@@ -148,6 +150,7 @@ export interface CaseRun {
   turns: EvalTurn[];
   calls: EvalToolCall[];
   reply: string;
+  /** A routine run that handed nothing off (nothing posted); other runs: the reply was the NO_REPLY word. */
   noReply: boolean;
   approvals: string[];
   status: string[];
@@ -297,6 +300,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       createAskUserToolSource(),
       ...(c.schedule ? [createAskAgentToolSource({ pubsub }), createScheduleToolSource({ pubsub, context })] : []),
       createReactToolSource({ pubsub }),
+      // Routine cases run in the background and speak through it.
+      createHandOffToolSource({ pubsub }),
       createContextToolSource(context),
       ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
       ...(c.workspace ? [createWorkspaceToolSource({ pubsub })] : []),
@@ -458,11 +463,26 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           ? withJudgeFallback(createJevJudge({ apiKey: options.jevKey, gateway, timeoutMs: 5000 }), llmJudge)
           : llmJudge
         : undefined;
-      await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
-        body: conv.trigger.body,
-        threadId,
-        meta: routine,
-      });
+      if (routine) {
+        // As production fires it (routines.ts): background work on the person's behalf.
+        await startRoutineRun(
+          { db, pubsub },
+          {
+            orgId: org.id,
+            creatorId: triggerAuthor.id,
+            agentId: agent.id,
+            channelId,
+            threadId,
+            body: conv.trigger.body,
+            routine: routine.routine,
+          },
+        );
+      } else {
+        await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
+          body: conv.trigger.body,
+          threadId,
+        });
+      }
     }
     // Other agents' runs: recorded (who the trigger started), never executed.
     const otherRuns = others.size
@@ -562,7 +582,10 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       turns,
       calls,
       reply: posted.map((m) => m.body).join("\n\n"),
-      noReply: Boolean(last && isNoReply(last.text)),
+      // A routine is silent unless it handed something off; the conversation run then posts the report.
+      noReply: routine
+        ? !calls.some((t) => t.name === "hand_off" && t.executed && !t.isError)
+        : Boolean(last && isNoReply(last.text)),
       approvals,
       status: runs.map((r) => (r.error ? `${r.status} (${r.error})` : r.status)),
       system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
@@ -674,7 +697,7 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     `# The agent's tools\n${run.tools?.length ? run.tools.join(", ") : "(unknown)"} (it can't read what none of these covers)`,
     `# What a good answer does\n${c.expect.behavior}`,
     `# The agent's tool calls, in order\n${toolLines}`,
-    `# The agent's reply in the chat\n${run.noReply ? "(stayed silent: NO_REPLY)" : run.reply.trim() || "(nothing posted)"}`,
+    `# The agent's reply in the chat\n${run.noReply ? "(stayed silent: nothing handed off, nothing posted)" : run.reply.trim() || "(nothing posted)"}`,
     ...(run.cards ? [`# Cards posted with the reply (the person sees them under it)\n${run.cards}`] : []),
   ];
   if (options.jev) return judgeWithJev(c, criteria, prompt.join("\n\n"), options.jev);

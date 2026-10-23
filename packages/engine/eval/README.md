@@ -33,7 +33,7 @@ Output: PASS/FAIL per case with each check (printed as each case ends), totals p
 | --- | --- |
 | `agent` | `preset` (`dev`, `ops`, `qa`, `pm`: name, role and instructions from the pt-BR presets), or `name`/`role`/`instructions`; `model` |
 | `org` | `name`, `context` |
-| `conversation` | `where` (`channel` or `dm`), `channel`, `topic`, `thread` (prior messages after the first and the trigger go in its thread), `prior` (history: `author` is a person's name or `"agent"`; they start no runs), `trigger`, `routine: { name }` (the trigger is a routine's scheduled message), `consultation: { from, origin }` (the trigger is another agent's `ask_agent` question on behalf of the person who wrote `origin`) |
+| `conversation` | `where` (`channel` or `dm`), `channel`, `topic`, `thread` (prior messages after the first and the trigger go in its thread), `prior` (history: `author` is a person's name or `"agent"`; they start no runs), `trigger`, `routine: { name }` (the trigger is a routine's scheduled message: a background run that speaks only through `hand_off`), `consultation: { from, origin }` (the trigger is another agent's `ask_agent` question on behalf of the person who wrote `origin`) |
 | `otherAgents` | other agents in the org and the channel (`name`, `handle`, `role`, `instructions`); runs the trigger starts for them are recorded, never executed |
 | `routines` | routines already there (`agent`: a handle or `"self"`, `name`, `prompt`, `schedule`) |
 | `schedule` | the scheduling tools (`list_routines`, `update_routine`…) and `ask_agent` |
@@ -44,6 +44,6 @@ Output: PASS/FAIL per case with each check (printed as each case ends), totals p
 | `missions` | a `propose_mission` with the real description and findings schema (no computer: the proposal is only recorded) |
 | `memory` | the agent's memory items (found with `search_context`) |
 | `fixtures` | per tool name, canned results: the first entry whose `when` words all appear in the call's input (no `when` = default) |
-| `expect` | deterministic: `investigate`, `mustCall` (`"a\|b"` = any), `mustNotExecute`, `approval`, `evidence` (any of), `noReply`, `ask` (`never`/`required`), `mustNotCall`, `notTriggered` (other agents' handles the trigger must not start), `receipts` (act with undo: receipt kinds the reply must carry, e.g. `issue.created`), `missionFindings` (`propose_mission` with read/data findings and at most one decision); judge: `behavior` (what a good answer does), `rubric` (extra criteria), `skipJudge` |
+| `expect` | deterministic: `investigate`, `mustCall` (`"a\|b"` = any), `mustNotExecute`, `approval`, `evidence` (any of), `noReply` (routine cases: true = no `hand_off`, false = a report handed off and posted), `ask` (`never`/`required`), `mustNotCall`, `notTriggered` (other agents' handles the trigger must not start), `receipts` (act with undo: receipt kinds the reply must carry, e.g. `issue.created`), `missionFindings` (`propose_mission` with read/data findings and at most one decision); judge: `behavior` (what a good answer does), `rubric` (extra criteria), `skipJudge` |
 
 Checkers are unit-tested in `test/behavior-checks.test.ts`; `test/behavior-eval.test.ts` runs the harness with the fake provider (no network).

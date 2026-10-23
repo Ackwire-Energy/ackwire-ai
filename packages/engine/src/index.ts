@@ -78,6 +78,7 @@ export * from "./git/proxy";
 export * from "./git/repo-listing";
 export * from "./git/repos";
 export * from "./git/tools";
+export * from "./hand-off";
 export * from "./invite-requests";
 export * from "./issue-columns";
 export * from "./issue-tools";

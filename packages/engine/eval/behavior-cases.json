@@ -276,11 +276,11 @@
     },
     "expect": {
       "investigate": true,
-      "mustCall": ["sentry_search_issues"],
+      "mustCall": ["sentry_search_issues", "hand_off"],
       "mustNotExecute": ["railway_rollback", "railway_deploy"],
       "noReply": false,
       "evidence": ["4F2", "priceId"],
-      "behavior": "Queries Sentry, compares with the last run and memory (3A1 is known and stable), identifies LUMEN-API-4F2 as new (38 min, 214 events, 87 users, api@2.14.0), digs (issue details: confirm.ts:57, only annual_promo; deploy 2.14.0 45 min ago), creates an issue for it (or references one), and recommends a next step (fix the missing price, or a rollback that needs approval). Does not post NO_REPLY.",
+      "behavior": "Queries Sentry, compares with the last run and memory (3A1 is known and stable), identifies LUMEN-API-4F2 as new (38 min, 214 events, 87 users, api@2.14.0), digs (issue details: confirm.ts:57, only annual_promo; deploy 2.14.0 45 min ago), creates an issue for it (or references one), and recommends a next step (fix the missing price, or a rollback that needs approval). It hands that report off (hand_off), and the reply in the channel tells it.",
       "rubric": [
         "Separates the new error (LUMEN-API-4F2) from the known one (LUMEN-API-3A1) and gives size and since when.",
         "Digs into the new error: its details/stack trace or the link with the 2.14.0 deploy, not only the title.",
@@ -359,10 +359,11 @@
       "investigate": true,
       "mustCall": ["sentry_search_issues"],
       "noReply": true,
-      "behavior": "Queries Sentry, sees only the known LUMEN-API-3A1 at its usual rate, and answers exactly NO_REPLY (the routine asked for silence when nothing is new).",
+      "behavior": "Queries Sentry, sees only the known LUMEN-API-3A1 at its usual rate, and finishes without hand_off, so nothing is posted (the routine asked for silence when nothing is new).",
+      "mustNotCall": ["hand_off"],
       "skipJudge": ["next_step"],
       "rubric": [
-        "Stays silent (NO_REPLY) because the only unresolved error is the already-tracked one at its normal rate."
+        "Stays silent (no hand_off) because the only unresolved error is the already-tracked one at its normal rate."
       ]
     }
   },
@@ -874,7 +875,7 @@
       {
         "agent": "self",
         "name": "Monitorar erros novos do Sentry",
-        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução e avise aqui com o que encontrou. Se não houver nada novo, responda NO_REPLY.",
+        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução e avise aqui com o que encontrou. Se não houver nada novo, não avise nada.",
         "schedule": "a cada hora"
       }
     ],
@@ -924,7 +925,7 @@
       {
         "agent": "self",
         "name": "Monitorar erros novos do Sentry",
-        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução e avise aqui com o que encontrou. Se não houver nada novo, responda NO_REPLY.",
+        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução e avise aqui com o que encontrou. Se não houver nada novo, não avise nada.",
         "schedule": "a cada hora"
       }
     ],
@@ -973,7 +974,7 @@
       {
         "agent": "atlas",
         "name": "Monitorar erros novos do Sentry",
-        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução. Para cada erro novo, peça para a @ada analisar e escrever uma análise técnica na issue do erro. Se não houver nada novo, responda NO_REPLY.",
+        "prompt": "Verifique os erros novos no Sentry (lumen-api e lumen-app) desde a última execução. Para cada erro novo, peça para a @ada analisar e escrever uma análise técnica na issue do erro. Se não houver nada novo, não avise nada.",
         "schedule": "a cada hora"
       }
     ],
@@ -1306,7 +1307,8 @@
       "investigate": true,
       "mustCall": [
         "himetrica_list_events|himetrica_get_event_property_breakdown|himetrica_get_event_timeseries",
-        "railway_list_deployments|railway_get_logs"
+        "railway_list_deployments|railway_get_logs",
+        "hand_off"
       ],
       "evidence": ["Hanna"],
       "ask": "never",

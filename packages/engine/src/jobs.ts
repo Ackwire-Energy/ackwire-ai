@@ -219,6 +219,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
+      // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
+      if (message.meta.background) return;
       const routed = async (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],

@@ -34,14 +34,16 @@ export async function createAgentRuns(
    * A person's new message in the channel (the router picked the agent): it also joins the agent's
    * run that answers in the channel itself (D62), so two people calling one agent get one answer.
    * Routines, agents' messages and consultations keep one run per message.
+   * `background`: a routine's work (`agent_runs.background`): a run of its own that never joins the
+   * conversation's run, and that nothing joins (it holds no conversation slot).
    */
-  options: { joinChannelRun?: boolean } = {},
+  options: { joinChannelRun?: boolean; background?: boolean } = {},
 ): Promise<AgentRun[]> {
   const created: AgentRun[] = [];
   for (const agentId of agentIds) {
     // One active run per agent and conversation (forum turns are driven separately):
-    // the message goes to it, read at its next step, instead of a second run.
-    if (trigger !== "forum") {
+    // the message goes to it, read at its next step, instead of a second run. Background work isn't one.
+    if (trigger !== "forum" && !options.background) {
       const [active] = await tx
         .select({
           id: agentRuns.id,
@@ -55,6 +57,7 @@ export async function createAgentRuns(
             eq(agentRuns.agentId, agentId),
             eq(agentRuns.channelId, message.channelId),
             inArray(agentRuns.status, ["queued", "running", "waiting_approval", "waiting_input"]),
+            eq(agentRuns.background, false),
             sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
               select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm')
               or ${
@@ -86,6 +89,7 @@ export async function createAgentRuns(
         triggerMessageId: message.id,
         trigger,
         hop: message.hop + 1,
+        ...(options.background ? { background: true } : {}),
       })
       .onConflictDoNothing()
       .returning();

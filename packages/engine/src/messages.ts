@@ -357,7 +357,11 @@ const parseJson = <T>(v: T | string | null, fallback: T): T =>
 export async function insertMessageWithRuns(
   tx: Executor,
   input: NewMessage,
-  options: { startRuns: boolean },
+  /**
+   * `deliver: false`: a person's message written on their behalf (a routine's trigger) answers no open
+   * question and joins no run in progress; only the runs its caller starts read it.
+   */
+  options: { startRuns: boolean; deliver?: boolean },
 ): Promise<{
   message: Message;
   runs: { id: string; agentId: string }[];
@@ -387,6 +391,7 @@ export async function insertMessageWithRuns(
   const hop = input.author.type === "agent" ? input.author.hop : 0;
   const threadId = input.threadId ?? null;
   const startRuns = options.startRuns && person;
+  const deliver = person && options.deliver !== false;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
   const referenced = `{${(person ? referencedOf(input.meta ?? {}) : []).filter((v) => UUID.test(v)).join(",")}}`;
   // Idempotent send: a person's `clientId` is claimed with the message; a resend finds it taken.
@@ -439,7 +444,7 @@ export async function insertMessageWithRuns(
         -- A person's reply where an agent asked something (same channel and thread) answers it.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
           answered_at = now()
-        where ${person}::boolean and q.status = 'open' and not exists (select 1 from archived)
+        where ${deliver}::boolean and q.status = 'open' and not exists (select 1 from archived)
           and exists (select 1 from fresh) and q.id = (
             select oq.id from ${agentQuestions} oq
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
@@ -483,8 +488,10 @@ export async function insertMessageWithRuns(
         -- an approval or an answer would hold the new request): two people calling Ada get one Ada.
         select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
         join ${agents} ra on ra.id = r.agent_id
-        where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
+        where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+          -- Background work (a routine's run) holds no conversation: people's messages never join it.
+          and not r.background
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])

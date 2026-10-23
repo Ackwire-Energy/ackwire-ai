@@ -27,6 +27,11 @@ export interface ToolContext {
    * behind `find_tools` / `use_tool`. Undefined or null: every tool is listed as is.
    */
   loadedGroups?: readonly string[] | null;
+  /**
+   * A background run (`agent_runs.background`, a routine's): nobody in the conversation is waiting, so
+   * tools that speak there (`ask_user`, `react`) are refused and `hand_off` is offered instead.
+   */
+  background?: boolean;
 }
 
 export interface ToolOutput {
