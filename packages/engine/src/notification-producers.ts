@@ -610,7 +610,8 @@ export async function notifyRoutinePaused(
 
 /**
  * A routine's run waits for the agent's computer (§6.4): its creator and the agent's owner hear it
- * once per outage (`outageKey`: the computer's last sign of life). Resolved by the next good run.
+ * once per outage (`outageKey`: the routine's last run that really ran; the next one that does starts a
+ * new outage). Resolved by the next good run.
  */
 export async function notifyRoutineStalled(
   deps: NotificationDeps,
