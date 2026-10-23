@@ -8481,8 +8481,9 @@ a.machine-row__name:hover {
 .agp-secrets h3 {
   margin: 0;
 }
-.agp-danger.ac-card {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+/* The danger zone is a section like the others (no box on the agent's page): its icon says it. */
+.agp-danger.ac-card .ac-card__key {
+  color: var(--danger);
 }
 .agp-dz {
   display: flex;
