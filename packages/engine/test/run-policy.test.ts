@@ -141,7 +141,7 @@ describe("run policy table", () => {
       expect(decide(who, builtIn("permission_prompt"))).toBe("allow");
     expect(toolKind(builtIn("get_context")).kind).toBe("read");
     const missionWork: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
-    for (const name of ["start_task", "upload_artifact"]) {
+    for (const name of ["start_task", "upload_artifact", "update_plan", "complete_mission", "request_approval"]) {
       expect(decide(person, builtIn(name))).toBe("allow");
       expect(decide(missionWork, builtIn(name))).toBe("allow");
       expect(decide(routine("act"), builtIn(name))).toBe("refuse");

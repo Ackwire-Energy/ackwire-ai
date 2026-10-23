@@ -164,7 +164,18 @@ describe("receipts when no new run starts", () => {
         const last = JSON.stringify(req.messages.at(-1)?.content);
         if (last.includes("tool_result")) return { chunks: ["Ok"] };
         if (last.includes("deploy it"))
-          return { chunks: [], toolUses: [{ name: "ask_user", input: { why: "I need a person's answer before I go on: this decides what I change next.", question: "Which environment?" } }] };
+          return {
+            chunks: [],
+            toolUses: [
+              {
+                name: "ask_user",
+                input: {
+                  why: "I need a person's answer before I go on: this decides what I change next.",
+                  question: "Which environment?",
+                },
+              },
+            ],
+          };
         return { chunks: ["Done."] };
       },
     });

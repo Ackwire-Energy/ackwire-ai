@@ -341,6 +341,7 @@ export async function updateMyProfile(
       .update(organizationMembers)
       .set(set)
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    caches.zones.delete(`${orgId}:${userId}`);
   }
   const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
   if (!me) throw new ForbiddenError("You are not a member of this organization");

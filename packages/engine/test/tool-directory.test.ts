@@ -13,6 +13,8 @@ import {
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
+const WHY = "The person asked for this and the checks passed: this action finishes what was requested.";
+
 let f: Fixture;
 afterEach(async () => {
   const current = f;
@@ -176,7 +178,7 @@ test("through the directory the real tool runs with its own scope, schema, steps
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: TIKTOK, scope: "tiktok:write" }]);
   const asked = await call("tiktok_use_tool", {
     tool: "tiktok_ad_create",
-    arguments: { advertiser_id: "a1", name: "Black Friday" },
+    arguments: { advertiser_id: "a1", name: "Black Friday", why: WHY },
   });
   expect(asked).toMatchObject({ type: "approval", approval: { tool: "tiktok_ad_create", connectionId: TIKTOK } });
   expect(executed).toEqual(["tiktok_campaign_get"]);

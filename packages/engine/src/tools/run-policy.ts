@@ -108,8 +108,21 @@ const READS = new Set([
   "get_context",
 ]);
 
-/** A mission's machine tools for its main session, by name (`mission-mcp.ts`). */
-const MISSION = new Set(["start_task", "upload_artifact"]);
+/**
+ * A mission's tools for its main session, by name: its machine tools (`mission-mcp.ts`) and its plan,
+ * reports and delivery (`mission-tools.ts`, which also checks the run acts for the mission).
+ */
+const MISSION = new Set([
+  "start_task",
+  "upload_artifact",
+  "update_plan",
+  "record_findings",
+  "report",
+  "ask_decision",
+  "request_review",
+  "complete_mission",
+  "request_approval",
+]);
 
 /** Internal changes outside their scope's own area, by name. */
 const INTERNAL_BY_NAME: Readonly<Record<string, InternalArea>> = {

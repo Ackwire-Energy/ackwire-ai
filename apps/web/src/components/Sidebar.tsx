@@ -54,9 +54,6 @@ import { useAuth } from "@/auth/context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
-import { markOpen } from "@/lib/perf";
-import { STORAGE_KEYS, storage } from "@/lib/storage";
-import { type ThemePreference, useTheme } from "@/lib/theme";
 import {
   contextMenuHandler,
   copyText,
@@ -67,6 +64,9 @@ import {
   setMenuLook,
 } from "@/lib/context-menu";
 import { inDesktopApp } from "@/lib/desktop";
+import { markOpen } from "@/lib/perf";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/SettingsPage";
 import { useLiveStore, useStreams } from "@/realtime/context";

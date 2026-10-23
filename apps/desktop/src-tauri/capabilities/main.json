@@ -6,5 +6,11 @@
   "remote": {
     "urls": ["https://agentes.chat/*"]
   },
-  "permissions": ["core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize", "allow-this-mac", "allow-context-menu", "allow-page-ready"]
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
+    "allow-this-mac",
+    "allow-context-menu",
+    "allow-page-ready"
+  ]
 }

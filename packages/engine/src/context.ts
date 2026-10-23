@@ -991,6 +991,10 @@ async function forSamePerson(db: Database, run: AgentRun, history: Message[], tr
 
 /** The person's IANA zone in this organization, else the organization's ("UTC" without either). */
 async function zoneOf(db: Database, orgId: string, userId: string | null) {
+  return (await caches.zones.getOrLoad(`${orgId}:${userId ?? ""}`, () => loadZone(db, orgId, userId))) as string;
+}
+
+async function loadZone(db: Database, orgId: string, userId: string | null) {
   const { organizationMembers, organizationSettings } = schema;
   const [row] = await db
     .select({ mine: organizationMembers.timezone, org: organizationSettings.timezone })

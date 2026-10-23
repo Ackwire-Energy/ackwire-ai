@@ -28,6 +28,8 @@ import {
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
+const WHY = "The person asked for this and the checks passed: this action finishes what was requested.";
+
 let f: Fixture;
 afterEach(async () => {
   const current = f;
@@ -251,7 +253,7 @@ describe("limits and cost", () => {
     const outcome = await f.tools?.invoke(await runCtx(), {
       toolUseId: crypto.randomUUID(),
       name: "run_code",
-      input: { language: "bash", code: "echo oi" },
+      input: { language: "bash", code: "echo oi", why: WHY },
     });
     expect(outcome?.type).toBe("approval");
   });

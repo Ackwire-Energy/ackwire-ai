@@ -242,7 +242,8 @@ export const desktopEn: DesktopTranslations = {
       notifyBrowserTitle: "Let me know when an agent needs me in its browser",
       notifyBrowserDesc: "The request already reaches your phone and the site; this also tells you on the Mac.",
       dockTitle: "Show in the Dock",
-      dockDesc: "With the count of what waits for you. Off, the app stays in the menu bar only while no window is open.",
+      dockDesc:
+        "With the count of what waits for you. Off, the app stays in the menu bar only while no window is open.",
       notchTitle: "Show the agents in the notch",
       notchDesc: "On MacBooks with a notch: who is working shows around the camera.",
     },

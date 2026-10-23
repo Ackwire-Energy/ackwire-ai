@@ -111,7 +111,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(heading()).toBe("Te mando um link para criar outra senha.");
     await press(/^Enviar link/);
     expect(calls[0]?.method).toBe("requestPasswordReset");
-    expect((calls[0]?.args[0] as { email: string }).email).toBe("marina@gmail.com");
+    expect((calls[0]?.args[0] as { email: string } | undefined)?.email).toBe("marina@gmail.com");
     expect(heading()).toBe("Pronto. Mandei o link para marina@gmail.com.");
     expect(screen().getByRole("link", { name: "Abrir o Gmail" }).getAttribute("href")).toBe("https://mail.google.com");
   });
