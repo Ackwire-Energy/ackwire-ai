@@ -120,19 +120,25 @@ export async function releaseInbox(
 
 /** How long an ended run's unread messages are left to the path that ended it before the sweeper takes them. */
 export const INBOX_SWEEP_GRACE_MS = 30_000;
+/**
+ * A run that ended longer ago than this is stale: its unread messages are only emptied, never answered
+ * now (inboxes left from before delivery existed woke agents on requests days old).
+ */
+export const INBOX_SWEEP_MAX_AGE_MS = 60 * 60_000;
 
 /**
  * Safety net: ended runs (done, failed, canceled) still holding unread messages, finished more
  * than `graceMs` ago (whatever ended them didn't hand them on: a crash between the end and the
- * release, or a path that ends runs without it), are released. Idempotent: a released inbox is
- * empty. Returns how many runs were swept.
+ * release, or a path that ends runs without it), are released; ones that ended more than
+ * `maxAgeMs` ago are only emptied. Idempotent: a released inbox is empty. Returns how many runs were swept.
  */
 export async function sweepEndedInboxes(
   deps: { db: Database; pubsub?: PubSub },
-  options: { now?: Date; graceMs?: number; limit?: number } = {},
+  options: { now?: Date; graceMs?: number; maxAgeMs?: number; limit?: number } = {},
 ): Promise<number> {
   const now = options.now ?? new Date();
   const cutoff = new Date(now.getTime() - (options.graceMs ?? INBOX_SWEEP_GRACE_MS));
+  const stale = now.getTime() - (options.maxAgeMs ?? INBOX_SWEEP_MAX_AGE_MS);
   const ended = await deps.db
     .select()
     .from(agentRuns)
@@ -147,12 +153,13 @@ export async function sweepEndedInboxes(
     .limit(options.limit ?? 100);
   let swept = 0;
   for (const run of ended) {
-    // An archived agent answers nobody: its inbox is just emptied.
+    // An archived agent answers nobody, and nobody waits for an answer this late: the inbox is just emptied.
     const [agent] = await deps.db
       .select({ archivedAt: schema.agents.archivedAt })
       .from(schema.agents)
       .where(eq(schema.agents.id, run.agentId));
-    if (!agent || agent.archivedAt) await takeInbox(deps.db, run.id);
+    const endedAt = (run.finishedAt ?? run.updatedAt).getTime();
+    if (!agent || agent.archivedAt || endedAt < stale) await takeInbox(deps.db, run.id);
     else await releaseInbox(deps.db, deps.pubsub, run, { reason: "swept" });
     swept++;
   }

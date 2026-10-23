@@ -22,6 +22,8 @@ export const en: Translations = {
     retry: "Try again",
     unknownError: "Something went wrong. Try again.",
     signedOut: "Your session ended. Sign in again to continue.",
+    newVersion: "A new version of agentes.chat is out.",
+    reload: "Reload",
     copy: "Copy",
     copied: "Copied",
     you: "you",

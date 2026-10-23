@@ -203,6 +203,21 @@ describe("ending a run hands its unread messages on", () => {
     expect(await sweepEndedInboxes(deps(), { now: new Date(Date.now() + 60_000) })).toBe(0);
   });
 
+  test("the sweeper only empties the inbox of a run that ended long ago", async () => {
+    f = await setup();
+    const ask = await post("@dev prepare the report");
+    const more = await post("include September", { threadId: ask.id });
+    const [first] = await runs();
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done", finishedAt: new Date(Date.now() - 3 * 24 * 60 * 60_000), pendingMessageIds: [more.id] })
+      .where(eq(schema.agentRuns.id, first?.id ?? ""));
+    expect(await sweepEndedInboxes(deps())).toBe(1);
+    const all = await runs();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.pendingMessageIds).toEqual([]);
+  });
+
   test("the agent's own fast reply is context only: the person's message is the trigger, alone it starts nothing", async () => {
     f = await setup();
     const ask = await post("@dev prepara o relatório");

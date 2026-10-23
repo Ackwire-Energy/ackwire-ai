@@ -72,6 +72,7 @@ import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { checkAppVersion } from "@/lib/app-version";
 import { useToast } from "@/lib/toast";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
@@ -391,6 +392,8 @@ export function RealtimeProvider({
     const conn = new RealtimeConnection({ url: realtimeUrl(window.location, orgId), createSocket });
     // Catch up over HTTP after a reconnect: events sent while offline are gone.
     const offReconnect = conn.onReconnect(() => {
+      // A reconnect is often a deploy: is this tab still on the app the server serves?
+      void checkAppVersion();
       // Reactions heard live may be stale now: the refetched message lists carry them again.
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.

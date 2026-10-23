@@ -28,6 +28,8 @@ export const ptBR = {
     retry: "Tentar de novo",
     unknownError: "Algo deu errado. Tente de novo.",
     signedOut: "Sua sessão terminou. Entre de novo para continuar.",
+    newVersion: "Tem uma versão nova do agentes.chat.",
+    reload: "Recarregar",
     copy: "Copiar",
     copied: "Copiado",
     you: "você",

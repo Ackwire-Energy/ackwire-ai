@@ -7,6 +7,14 @@ import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
 import { createI18n, savedLocale } from "./i18n";
+import {
+  checkAppVersion,
+  createVersionWatch,
+  fetchIndexHtml,
+  loadedEntry,
+  startVersionWatch,
+  VERSION_CHECK_MS,
+} from "./lib/app-version";
 import { snapshotStore } from "./lib/snapshot-store";
 import { inDesktopApp } from "./lib/desktop";
 import { createToastStore } from "./lib/toast";
@@ -58,6 +66,29 @@ declare module "@tanstack/react-router" {
     router: typeof router;
   }
 }
+
+// A deploy while this tab is open: say so, and the next page change loads the new app.
+const versionWatch = startVersionWatch(
+  createVersionWatch({
+    loaded: loadedEntry(),
+    fetchHtml: fetchIndexHtml,
+    onStale: () =>
+      toasts.show(i18n.t("common.newVersion"), "info", {
+        label: i18n.t("common.reload"),
+        run: () => window.location.reload(),
+      }),
+  }),
+);
+router.subscribe("onBeforeNavigate", ({ toLocation, fromLocation }) => {
+  if (versionWatch.stale && fromLocation && toLocation.href !== fromLocation.href) {
+    window.location.assign(toLocation.href);
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void checkAppVersion();
+});
+window.addEventListener("online", () => void checkAppVersion());
+setInterval(() => void checkAppVersion(), VERSION_CHECK_MS);
 
 // The connector OAuth callback reports failures as `/?connector_error=…`.
 const connectorError = new URLSearchParams(window.location.search).get("connector_error");
