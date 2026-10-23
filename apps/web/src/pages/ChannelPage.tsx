@@ -318,6 +318,11 @@ const FOCUS_MAX_PAGES = 10;
 const HIGHLIGHT_MS = 2400;
 /** A scroll within this long after a wheel/touch/key/pointer counts as the person's. */
 const GESTURE_MS = 1500;
+/**
+ * Scrolled up but idle this long (no wheel/touch/key/pointer on the list), or away from the window:
+ * a new message brings the list to it instead of waiting behind the pill.
+ */
+const IDLE_CATCH_UP_MS = 20_000;
 /** Older messages per scroll-up page. */
 const OLDER_PAGE = 50;
 /** Per channel, for this session: older pages already loaded, channels with no more, and scroll positions. */
@@ -943,6 +948,16 @@ function ChannelView({
     ];
   };
   const openedAt = useRef(Date.now());
+  // A new message came while the person was scrolled up and idle: go to it once the divider is drawn.
+  const catchUp = useRef(false);
+  /** Scrolled up but not reading: no gesture on the list for a while, or the window elsewhere; never mid-selection. */
+  const idleAway = () => {
+    const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
+    if (selection && !selection.isCollapsed && scroller.current?.contains(selection.anchorNode)) return false;
+    if (document.hidden || (typeof document.hasFocus === "function" && !document.hasFocus())) return true;
+    // A conversation reopened scrolled up gets the same grace as a fresh scroll.
+    return Date.now() - Math.max(lastGesture.current, openedAt.current) > IDLE_CATCH_UP_MS;
+  };
   /**
    * At the bottom: follow it, unless the newest row is an agent's answer taller than the list. That
    * one lands once with its first line at the top (and a brief highlight); then nothing pulls the list.
@@ -1047,7 +1062,15 @@ function ChannelView({
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
     else if (!holdingRef.current) {
       const first = newRow ? firstNewKey(timeline, before) : null;
-      if (first) markUnseen(first);
+      if (first) {
+        const drawn = unseenFromRef.current !== null;
+        markUnseen(first);
+        // Nobody reading up there: go to what is new (as the pill would), once its divider is drawn.
+        if (settled && idleAway()) {
+          if (drawn) openUnseen();
+          else catchUp.current = true;
+        }
+      }
       if (newBlock) setUnseenRun(true);
     }
   }, [lastKey, slotsKey]);
@@ -1450,6 +1473,12 @@ function ChannelView({
     }
     toBottom(true);
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once the divider a catch-up asked for is drawn
+  useEffect(() => {
+    if (!catchUp.current || unseenFrom === null) return;
+    catchUp.current = false;
+    openUnseen();
+  }, [unseenFrom]);
   const emptySuggestions = useMemo(() => {
     if (chrome?.suggestions) return chrome.suggestions;
     const first = channelAgents[0];
