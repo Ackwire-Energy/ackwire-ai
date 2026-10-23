@@ -184,6 +184,54 @@ test("createOutboxPump: a slow job doesn't hold back jobs claimed after it, and 
   expect((await rows()).every((r) => r.status === "done")).toBe(true);
 });
 
+test("createOutboxPump: routines hold at most half of the slots, so other work always finds one", async () => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => {
+    release = r;
+  });
+  const started: string[] = [];
+  const waits: { kind: unknown; background: unknown }[] = [];
+  const pump = createOutboxPump(
+    db,
+    {
+      "routine.run": () => {
+        started.push("routine");
+        return held;
+      },
+      "message.posted": async () => void started.push("message"),
+    },
+    {
+      workerId: "w",
+      maxInFlight: 4,
+      onTiming: (name, _ms, attrs) => {
+        if (name === "queue_wait_ms") waits.push({ kind: attrs.kind, background: attrs.background });
+      },
+    },
+  );
+  for (let i = 0; i < 5; i++) await enqueue(db, job("routine.run"));
+  expect(await pump.pump()).toBe(2);
+  // Two free slots left, but no more routines while two run.
+  expect(await pump.pump()).toBe(0);
+  await enqueue(db, job("message.posted"));
+  expect(await pump.pump()).toBe(1);
+  while (pump.inFlight() > 2) await Bun.sleep(1);
+  expect(started.filter((s) => s === "routine")).toHaveLength(2);
+  expect(started).toContain("message");
+  expect(waits).toEqual([
+    { kind: "routine.run", background: true },
+    { kind: "routine.run", background: true },
+    { kind: "message.posted", background: false },
+  ]);
+  release();
+  await pump.idle();
+  // The slots free up: the next routines go.
+  expect(await pump.pump()).toBe(2);
+  await pump.idle();
+  expect(await pump.pump()).toBe(1);
+  await pump.idle();
+  expect((await rows()).every((r) => r.status === "done")).toBe(true);
+});
+
 test("drainOutbox follows chains of jobs", async () => {
   await enqueue(db, job("first"));
   const done: string[] = [];

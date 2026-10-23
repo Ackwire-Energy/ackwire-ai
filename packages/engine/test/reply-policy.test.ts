@@ -43,6 +43,16 @@ describe("replyPolicyFor", () => {
     expect(WHY_YOU_WERE_CALLED).toContain("without re-checking an answer already given");
   });
 
+  test("a run a note, a late result or its own fast reply woke may pass; a report or an answer may not", () => {
+    const notice = (kind: string) => ({ authorType: "agent" as const, meta: { notice: { kind, text: "x" } } });
+    for (const kind of ["agent_note", "wait_result", "talker_reply"])
+      expect(replyPolicyFor(run({ trigger: "mention" }), notice(kind))).toEqual({ mayPass: true, background: false });
+    for (const kind of ["routine_handoff", "consult_reply"])
+      expect(replyPolicyFor(run({ trigger: "mention" }), notice(kind)).mayPass).toBe(false);
+    // A person wrote into it meanwhile: it owes them an answer.
+    expect(replyPolicyFor(run({ trigger: "mention" }), notice("agent_note"), { answerOwed: true }).mayPass).toBe(false);
+  });
+
   test("background runs never post their answer", () => {
     expect(replyPolicyFor(run({ trigger: "mention", background: true }), person())).toEqual({
       mayPass: false,

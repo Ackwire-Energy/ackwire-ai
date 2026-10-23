@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import {
   type ContentBlock,
   type ModelMessage,
@@ -12,9 +12,17 @@ import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
+import { runAuthority } from "./authority";
 import { recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
-import { type BrainPlan, notePlanLimit, resolveBrain, UNAVAILABLE_CODES } from "./brains/select";
+import {
+  type BrainPlan,
+  mayFallBack,
+  notePlanLimit,
+  recordRunBrain,
+  resolveBrain,
+  UNAVAILABLE_CODES,
+} from "./brains/select";
 import type { Brain, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
 import {
   canceledBy,
@@ -28,7 +36,7 @@ import {
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
-import { consultationCardThread, onConsultedRunFinished } from "./consultations";
+import { onConsultedRunFinished } from "./consultations";
 import { buildRunContext, getChannelCached, restatesReaction } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
@@ -45,19 +53,9 @@ import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import type { MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
-import { notifyMissionApproval } from "./mission-tools";
-import { notifyQuestion, notifyRoutineRun, routineReplyText } from "./notification-producers";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
-import {
-  type AgentQuestionRow,
-  ASK_USER_TOOL,
-  publishQuestion,
-  QUESTION_TTL_MS,
-  questionResult,
-  questionView,
-  syncQuestionMessage,
-} from "./questions";
+import { ASK_USER_TOOL, questionResult } from "./questions";
 import {
   ANSWER_NUDGE,
   endsWithSentinel,
@@ -69,7 +67,8 @@ import {
   stripSentinel,
   visibleText,
 } from "./reply-policy";
-import { closeRoutineRun } from "./routine-ledger";
+import { routineBriefOf } from "./routine-brief";
+import { closeRoutineRun, type RoutineRunEnd } from "./routine-ledger";
 import { type ReleaseReason, releaseInbox, takeInbox } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
@@ -82,7 +81,10 @@ import {
   invokeToolForRun,
   invokeWithChip,
   mergeToolEffects,
+  postPauseCards,
+  publishPauseCards,
   type RunToolScope,
+  runMessageMeta,
   storedTranscript,
   takeBridgeEffects,
   waitOf,
@@ -96,7 +98,7 @@ import {
   runErrorDetail,
   transitionRun,
 } from "./runs";
-import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
+import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { FIND_AGENT_TOOL } from "./team";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
@@ -106,7 +108,7 @@ import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, approvals, agentQuestions, messages, secretRequests, users } = schema;
+const { agentActions, agentRuns, approvals, agentQuestions, messages, routineRuns, secretRequests, users } = schema;
 /** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
 const ASKED_GRACE_MS = 250;
 
@@ -200,10 +202,18 @@ export interface Transcript {
   passed?: { reason: string };
   /** It was told once to answer after a reply that was only the silence word (or nothing). */
   nudged?: boolean;
-  /** A card it asked for with nothing said went back once for the findings (`unexplainedPause`). */
-  explainNudged?: boolean;
-  /** A person decided or answered what it waited on (an approval, a question): it can't pass anymore. */
+  /**
+   * A person decided or answered what it waited on (an approval, a question), or wrote to it while it
+   * worked (ADR 0053 §10): it owes them an answer and can't pass anymore.
+   */
   answerOwed?: boolean;
+  /**
+   * A person wrote into this run while it worked and nobody was behind it (an unattended run): they are
+   * behind it from then on (`authority.ts`, `steeredByOf`).
+   */
+  steeredBy?: string;
+  /** A background run near its tool-call cap was told once to wrap up (`WRAP_UP_NOTE`). */
+  wrapUpNoted?: boolean;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -290,28 +300,22 @@ export function interruptedTurnPrompt(
     .join("\n\n");
 }
 
-/** What a turn's calls get back when it asked for a card with nothing said (`unexplainedPause`). */
-export const EXPLAIN_FIRST =
-  "Not run, and nothing was posted: you looked things up but said nothing, and a card alone tells the person nothing. Reply now with text: what you found (the numbers, ids, files) and what you recommend and why. Only if you still need their approval or answer, call the tool again after that text, in the same reply. None of this turn's calls ran.";
+/** How many model calls before the cap a background run is told to wrap up (ADR 0053 §10). */
+export const WRAP_UP_TURNS = 2;
+
+/** What a background run near its tool-call cap reads once: hand off what it has instead of failing. */
+export const WRAP_UP_NOTE =
+  "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work. If the people need to know what you found, call hand_off now with what you have; then end with your record (a short summary of what you checked). Your tools stay available for these last calls.";
 
 /**
- * A turn that pauses the run for a person (an approval, `ask_user`) after the run looked things up,
- * with no text: the card would show alone, without the findings or the why (eval 2026-10-23: a bare
- * "Approval request: railway_rollback" after five reads). A direct request on the first turn is fine.
+ * The coded reason of a failed run for its routine's ledger (`closeRoutineRun`): the run error's code
+ * without its `run.` prefix (`budget_exceeded`, `provider_error`…), with its detail when it has one.
  */
-export function unexplainedPause(
-  calls: { name: string }[],
-  tools: Pick<ToolDefinition, "name" | "scope" | "sensitive">[],
-  turnText: string,
-  lookedBefore: boolean,
-): boolean {
-  if (!lookedBefore || stripSentinel(turnText).trim()) return false;
-  const byName = new Map(tools.map((t) => [t.name, t]));
-  return calls.some((c) => {
-    if (c.name === ASK_USER_TOOL) return true;
-    const tool = byName.get(c.name);
-    return tool !== undefined && isSensitive(tool);
-  });
+export function runFailureCode(reason: string): { code: string; detail?: string } {
+  const detail = runErrorDetail(reason);
+  const code = (detail?.errorCode ?? "run.failed").replace(/^run\./, "");
+  const text = detail?.errorParams?.detail;
+  return text ? { code, detail: text } : { code };
 }
 
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
@@ -458,8 +462,6 @@ async function executeRunInner(
     agentId: run.agentId,
     runId: run.id,
   });
-  /** Set once the trigger is read: the routine that started this run (its creator hears how it ended). */
-  let routineOfRun: { id: string; name: string } | null = null;
   /** Who thinks for this run (set before the first turn). */
   let brainPlan: BrainPlan | null = null;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
@@ -499,26 +501,18 @@ async function executeRunInner(
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
-    // A routine's run ended: its creator hears it (D46). A background run that ended well was heard
-    // already if it handed something off (`hand_off`); without that it found nothing: no notification.
-    if (routineOfRun && (status === "failed" || (status === "done" && !run.background))) {
-      const routine = routineOfRun;
-      const notifyDeps = { db, pubsub: deps.pubsub };
-      await routineReplyText(notifyDeps, run.orgId, run.id)
-        .then((text) =>
-          status === "done" && !text
-            ? undefined
-            : notifyRoutineRun(notifyDeps, {
-                orgId: run.orgId,
-                routineId: routine.id,
-                agentId: run.agentId,
-                ok: status === "done",
-                runKey: run.id,
-                text: status === "done" ? text : (error ?? text),
-              }),
-        )
-        .catch(() => {});
-    }
+    // A routine's run is heard through its ledger (`closeRoutineRun`, on every ending), never from here.
+  };
+
+  /**
+   * A routine's background run ended (ADR 0053 §5): its ledger closes here, on every path. A no-op for
+   * any other run. A failure to close is kept on the trail (the reaper closes it later).
+   */
+  const closeRoutine = async (end: RoutineRunEnd) => {
+    if (!run.background) return;
+    await closeRoutineRun({ db, pubsub: deps.pubsub }, run, end).catch((error) =>
+      addRunStep(db, run, "error", { reason: "routine_close", message: String(error) }).catch(() => {}),
+    );
   };
 
   const event = (status: RunStatus, error?: string): ChannelEvent => ({
@@ -543,10 +537,12 @@ async function executeRunInner(
    * nothing sent to the agent is swallowed by an ending.
    */
   const redispatchPending = (reason: ReleaseReason) => releaseInbox(db, deps.pubsub, run, { reason }).catch(() => null);
-  const fail = async (reason: string) => {
+  /** `ledger`: the routine run's coded reason when the run error's own code isn't the right one. */
+  const fail = async (reason: string, ledger?: { code: string; detail?: string }) => {
     await deferred;
     await addRunStep(db, run, "error", { reason });
-    await transitionRun(db, run.id, "running", "failed", { error: reason });
+    const failed = await transitionRun(db, run.id, "running", "failed", { error: reason });
+    if (failed) await closeRoutine({ status: "failed", ...(ledger ?? runFailureCode(reason)) });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
     // An archived agent answers nobody; any other failure leaves the waiting messages a run of their own.
@@ -611,38 +607,34 @@ async function executeRunInner(
   // Started by a routine: its answer carries the routine (the app shows a small tag on the
   // agent's message, since the routine's own call isn't shown), and it may end in silence.
   const triggerMessage = trigger ?? topTrigger ?? (await getMessage(db, run.orgId, run.triggerMessageId));
-  const routineCall = triggerMessage?.meta.routine as { id?: unknown; name?: unknown } | undefined;
-  // Brought in by the router after another agent spoke (D49): nobody called it, its replies say so (`meta.joined`).
-  const joined = run.trigger === "router" && triggerMessage?.authorType === "agent";
-  const viaRoutine =
-    routineCall && typeof routineCall.id === "string" && typeof routineCall.name === "string"
-      ? { id: routineCall.id, name: routineCall.name }
-      : null;
-  routineOfRun = viaRoutine;
+  // The routine that called it (`viaRoutine`) and whether the router brought it in after another agent
+  // spoke (`joined`, D49): every message it posts says so, cards included (`runMessageMeta`).
+  const runMeta = runMessageMeta(run, triggerMessage);
+  const viaRoutine = (runMeta.viaRoutine as { id: string; name: string } | undefined) ?? null;
+  // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
+  const report = routineReportTagOf(triggerMessage);
   // Who must answer (reply-policy.ts): a run nobody called by name may pass; a background run never posts.
   const policy = replyPolicyFor(run, triggerMessage, {
     followUp: await routedAsFollowUp(db, run).catch(() => false),
     answerOwed: Boolean((run.transcript as unknown as Transcript | null)?.answerOwed),
   });
+  /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
   const post = async (
     tx: Executor,
     threadId: string | null,
     body: string,
     meta?: Record<string, unknown>,
     createdAt?: Date,
+    note = false,
   ) => {
-    const m = await postAgentMessage(
-      tx,
-      run,
-      threadId,
-      body,
-      {
-        ...meta,
-        ...(viaRoutine ? { viaRoutine } : {}),
-        ...(joined ? { joined: true } : {}),
-      },
-      createdAt,
-    );
+    const tagged = report && !note ? { routine: report } : {};
+    const m = await postAgentMessage(tx, run, threadId, body, { ...meta, ...runMeta, ...tagged }, createdAt);
+    if (report && !note) {
+      await tx
+        .update(routineRuns)
+        .set({ messageId: m.id })
+        .where(and(eq(routineRuns.id, report.runId), eq(routineRuns.orgId, run.orgId), isNull(routineRuns.messageId)));
+    }
     // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
     if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
     return m;
@@ -839,12 +831,29 @@ async function executeRunInner(
   /**
    * The run was canceled (the row is already `canceled`): post what the agent
    * wrote so far, nothing lost, with "Stopped by …", and tell the channel.
+   * A background run posts nothing (ADR 0053 §5): its ledger says who stopped it.
    */
   const stopCanceled = async (partial: string) => {
     await deferred;
     const t = transcript as Transcript;
     const [row] = await db.select({ error: agentRuns.error }).from(agentRuns).where(eq(agentRuns.id, run.id));
     const by = canceledBy(row?.error);
+    if (run.background) {
+      if (partial.trim() && t.messages.at(-1)?.role !== "assistant")
+        t.messages.push({ role: "assistant", content: [{ type: "text", text: partial.trim() }] });
+      t.postedUpTo = t.messages.length;
+      await addRunStep(db, run, "error", { reason: "canceled", byUserId: by });
+      await db
+        .update(agentRuns)
+        .set({ transcript: storedTranscript(t), updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+      // Stopped by a person: "stopped" with who. Any other stop (a pause, a delete, the next slot) is
+      // closed by whoever stopped it, with its own reason.
+      if (by) await closeRoutine({ status: "canceled", code: "stopped", byUserId: by });
+      await publishChannelEvent(deps.pubsub, event("canceled"));
+      await finished("canceled");
+      return;
+    }
     const [person] = by ? await db.select({ name: users.name }).from(users).where(eq(users.id, by)) : [];
     const said = [
       ...t.messages
@@ -891,6 +900,21 @@ async function executeRunInner(
   /** Messages this run already read (a "stop and send" for one of them has nothing to interrupt). */
   const readIds = new Set<string>();
   /**
+   * A person's message read during the run (between steps or live): the run owes them an answer and
+   * can't pass anymore, and an unattended run acts for that person from then on (`steeredBy`, ADR 0053
+   * §1). True when one of `ids` was a person's.
+   */
+  const oweAnswer = async (t: Transcript, ids: string[]): Promise<boolean> => {
+    const person = await lastPersonAmong(db, run.orgId, ids);
+    if (!person) return false;
+    t.answerOwed = true;
+    if (!run.background && !t.steeredBy) {
+      const authority = await runAuthority(db, { ...run, transcript: t as unknown as Record<string, unknown> });
+      if (authority.kind === "unattended") t.steeredBy = person;
+    }
+    return true;
+  };
+  /**
    * Appends them to the conversation as "New message from …" (a step records it), so the model
    * reads them next, and tells the channel they were read ("Ada leu"). Returns the text.
    */
@@ -904,6 +928,7 @@ async function executeRunInner(
     const text = rows.map((m) => m.text).join("\n\n");
     const t = transcript as Transcript;
     appendUserText(t, text);
+    await oweAnswer(t, rows.map((m) => m.id));
     await saveTranscript(db, t);
     later(() => addRunStep(db, run, "context", { steeredMessageIds: rows.map((m) => m.id) }));
     await publishChannelEvent(deps.pubsub, {
@@ -956,6 +981,24 @@ async function executeRunInner(
     // A routine's or any background run's work never continues a conversation's session, nor the other way.
     fresh: Boolean(viaRoutine) || run.background,
   });
+  // A conversation run that fell back to the model brain keeps it when it resumes (an approval, an answer):
+  // its transcript is the model's, and the computer would start the task again from the trigger.
+  if (brainPlan.kind !== "model" && run.brain === "model" && transcript.fallback) {
+    brainPlan = { kind: "model", ...(brainPlan.missionId ? { missionId: brainPlan.missionId } : {}) };
+  }
+  // The run's effective brain (ADR 0053 §10): shared code reads it, never the agent's stored brain.
+  if (run.brain !== brainPlan.kind) {
+    await recordRunBrain(db, run.id, brainPlan.kind);
+    run = { ...run, brain: brainPlan.kind };
+    // A routine's ledger keeps the brain that ran it.
+    const routineRunId = run.background ? routineRunIdOf(triggerMessage?.meta) : null;
+    if (routineRunId) {
+      await db
+        .update(routineRuns)
+        .set({ brain: brainPlan.kind })
+        .where(and(eq(routineRuns.id, routineRunId), eq(routineRuns.orgId, run.orgId)));
+    }
+  }
   let plan: BrainPlan = brainPlan;
   let brain = createBrain(deps, agent, run, plan.kind, turnToken, () => transcript as Transcript);
   let triggerText = trigger?.body ?? topTrigger?.body ?? "";
@@ -979,9 +1022,39 @@ async function executeRunInner(
     }
   }
 
+  /** Ends the run with a plain closing line that carries what it changed (its receipts). */
+  const endWithReceipts = async () => {
+    await deferred;
+    const t = transcript as Transcript;
+    const reply = await db.transaction(async (tx) => {
+      const m = await post(
+        tx,
+        replyThreadId,
+        DONE_TEXT,
+        withFallback(t, withCode(takeMemoryUpdates(t), bodyCode("done"))),
+      );
+      t.postedUpTo = t.messages.length;
+      t.postedCount++;
+      await addRunStep(tx, run, "message", { messageId: m.id, receipts: true });
+      const done = await transitionRun(tx, run.id, "running", "done", {
+        replyMessageId: m.id,
+        error: null,
+        transcript: storedTranscript(t),
+      });
+      if (!done) throw new PermanentJobError("run changed state while executing");
+      return m;
+    });
+    const [view] = await withWikiLinks(db, run.orgId, [messageView(reply)]);
+    if (view) await publishMessageCreated(deps.pubsub, view);
+    await publishChannelEvent(deps.pubsub, event("done"));
+    await finished("done");
+    await redispatchPending("done");
+  };
+
   /**
    * Ends the run without a message (reply-policy.ts): nobody called it by name and it passed, or wrote
    * only the silence word, or nothing. A message that came in meanwhile is read first instead (false).
+   * A run that changed something posts its receipts instead (`endWithReceipts`).
    */
   const endQuietly = async (how: "pass" | "sentinel" | "empty", reason: string): Promise<boolean> => {
     const [still] = await db
@@ -992,6 +1065,13 @@ async function executeRunInner(
     if ((still?.pending.length ?? 0) > 0) {
       delete t.passed;
       return false;
+    }
+    // It changed something (receipts with Undo, ADR 0037): people see what it did, so it posts them
+    // instead of passing.
+    if (await hasUnpostedReceipts(db, run)) {
+      delete t.passed;
+      await endWithReceipts();
+      return true;
     }
     await deferred;
     t.postedUpTo = t.messages.length;
@@ -1036,43 +1116,53 @@ async function executeRunInner(
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
     // brain would redo them), so the run waits for it.
     const onlyThisComputer = (t.interruptedTurn?.executed.length ?? 0) > 0;
+    // A background run never stands in on the model brain (`mayFallBack`): it waits for its computer.
     if (
       !onlyThisComputer &&
-      agent.brainFallback !== false &&
+      mayFallBack(agent, run) &&
       (await deps.gateway.hasModelCredential(agent).catch(() => false))
     ) {
       t.fallback = { from, code: u.code, message: u.message };
       plan = { kind: "model", ...(plan.missionId ? { missionId: plan.missionId } : {}) };
       brain = createBrain(deps, agent, run, "model", turnToken, () => transcript as Transcript);
       await saveTranscript(db, t);
+      await recordRunBrain(db, run.id, "model");
+      run = { ...run, brain: "model" };
       await addRunStep(db, run, "context", { brainFallback: { from, code: u.code, message: u.message } });
       return "fallback";
     }
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
     if (!machineId || !UNAVAILABLE_CODES.has(u.code)) return "no";
-    // Nothing can stand in (no model credential): the agent says so once, and the run waits for the computer.
+    // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
     const name = from === "codex" ? "Codex" : "Claude Code";
     // One note per outage and place: another run of this agent already waits for the same computer and
     // said so here (an hourly routine, a second message): this one waits quietly with it.
-    // A routine's run waits quietly: it runs when the computer is back, the next ones are skipped meanwhile
-    // (`waitsForComputer`), and the outage card lists it; a note per run of a computer that naps and wakes is noise.
-    const quiet = routineOfRun !== null;
+    // A routine's run waits quietly: it runs when the computer is back (the next slot supersedes it), and
+    // Rotinas and one notification per outage say so; a note per run of a computer that naps is noise.
+    const quiet = run.background || viaRoutine !== null;
     const said = quiet || t.brainNotice === u.code || (await noticeAlreadyPosted(db, run, machineId, replyThreadId));
     const say = !said;
     const note = say
       ? await db.transaction(async (tx) => {
-          const m = await post(tx, replyThreadId, `${u.message} I'll answer when it's back.`, {
-            ...bodyCode("brain_unavailable", { brain: name }),
-            // `machineId` and `agentId`: the app shows the note as a live "waiting" card tied to the computer's outage.
-            brainUnavailable: {
-              brain: from,
-              code: u.code,
-              machineId,
-              agentId: agent.id,
-              ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}),
+          const m = await post(
+            tx,
+            replyThreadId,
+            `${u.message} I'll answer when it's back.`,
+            {
+              ...bodyCode("brain_unavailable", { brain: name }),
+              // `machineId` and `agentId`: the app shows the note as a live "waiting" card tied to the computer's outage.
+              brainUnavailable: {
+                brain: from,
+                code: u.code,
+                machineId,
+                agentId: agent.id,
+                ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}),
+              },
             },
-          });
+            undefined,
+            true,
+          );
           t.postedCount++;
           return m;
         })
@@ -1151,6 +1241,8 @@ async function executeRunInner(
       text = stripSentinel(textBefore(asked.askedAt + ASKED_GRACE_MS));
       at = new Date(asked.cardAt.getTime() - 1);
     }
+    // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
+    if (run.background) text = "";
     const message = text ? await post(db, replyThreadId, text, withFallback(t, takeMemoryUpdates(t)), at) : null;
     if (message) t.postedCount++;
     t.postedUpTo = t.messages.length;
@@ -1188,6 +1280,14 @@ async function executeRunInner(
       message: failure.message,
       executed,
     });
+    // A background run posts nothing (ADR 0053 §5): it fails with the brain's code, its ledger says so.
+    if (run.background) {
+      if (said && t.messages.at(-1)?.role !== "assistant")
+        t.messages.push({ role: "assistant", content: [{ type: "text", text: said }] });
+      t.postedUpTo = t.messages.length;
+      await saveTranscript(db, t);
+      return fail(`brain_interrupted: ${failure.message}`, { code: failure.code, detail: failure.message });
+    }
     const reply = await db.transaction(async (tx) => {
       const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
@@ -1254,7 +1354,12 @@ async function executeRunInner(
   if (plan.unavailable) {
     const handled = await brainUnavailable(plan.unavailable);
     if (handled === "waited") return;
-    if (handled === "no") return fail(`brain_unavailable: ${plan.unavailable.message}`);
+    if (handled === "no") {
+      return fail(`brain_unavailable: ${plan.unavailable.message}`, {
+        code: plan.unavailable.code,
+        detail: plan.unavailable.message,
+      });
+    }
   }
 
   const maxTurns = deps.maxToolTurns ?? 25;
@@ -1269,19 +1374,39 @@ async function executeRunInner(
     onReturned: (ids) => {
       for (const id of ids) readIds.delete(id);
     },
-    onRead: (read) => {
-      appendUserText(transcript as Transcript, read.map((m) => m.text).join("\n\n"));
+    onRead: async (read) => {
+      const t = transcript as Transcript;
+      appendUserText(t, read.map((m) => m.text).join("\n\n"));
       later(() => addRunStep(db, run, "context", { steeredMessageIds: read.map((m) => m.id), live: true }));
+      // Read mid-turn: owed now (a `pass` later in this turn is refused), written without the rest of
+      // the transcript (the bridge may be writing it).
+      if (await oweAnswer(t, read.map((m) => m.id)).catch(() => false)) {
+        await markAnswerOwed(db, run.id, t).catch(() => {});
+      }
     },
   });
   try {
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
+      // At the cap the inbox stays as it is: a message never gets marked read and then lost (the failure
+      // hands it to a run of its own).
+      if (run.turns >= maxTurns) return fail("too_many_tool_calls");
       const steered = await deliverSteering();
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
       }
-      if (run.turns >= maxTurns) return fail("too_many_tool_calls");
+      // A routine's run near the cap hands off what it has instead of failing (ADR 0053 §10).
+      if (
+        run.background &&
+        plan.kind === "model" &&
+        !transcript.wrapUpNoted &&
+        run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
+      ) {
+        transcript.wrapUpNoted = true;
+        appendUserText(transcript, WRAP_UP_NOTE);
+        await saveTranscript(db, transcript);
+        later(() => addRunStep(db, run, "context", { wrapUp: true }));
+      }
       const turnTools = firstTurn ? tools : await listRunTools(deps, ctx);
       firstTurn = false;
       const toolScope: RunToolScope | null = deps.tools ? { deps, tools: deps.tools, ctx, where, turnTools } : null;
@@ -1526,33 +1651,6 @@ async function executeRunInner(
       }
 
       const toolUses = result.toolCalls;
-      // Asked for a card with nothing said after looking: once, the calls go back for the findings first.
-      const lookedBefore = transcript.messages.some(
-        (m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c) => c.type === "tool_result"),
-      );
-      const nudge =
-        result.stopReason === "tool_use" &&
-        turnPlan.kind === "model" &&
-        !run.background &&
-        !transcript.explainNudged &&
-        unexplainedPause(toolUses, turnTools, turnText, lookedBefore);
-      if (nudge) {
-        transcript.explainNudged = true;
-        transcript.messages.push({
-          role: "user",
-          content: toolUses.map((use) => ({
-            type: "tool_result" as const,
-            toolUseId: use.id,
-            content: "Not run.",
-            isError: true,
-          })),
-        });
-        // Said as the conversation's next line, not only as the tools' error: models follow it there.
-        appendUserText(transcript, EXPLAIN_FIRST);
-        await saveTranscript(db, transcript);
-        later(() => addRunStep(db, run, "context", { explainNudged: toolUses.map((u) => u.name) }));
-        continue;
-      }
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];
@@ -1626,97 +1724,18 @@ async function executeRunInner(
         transcript.pending = { calls };
         const t = transcript;
         const posted = await db.transaction(async (tx) => {
-          const out: Message[] = [];
           // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
-          const said = stripSentinel(turnText);
-          if (said) out.push(await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))));
+          // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
+          const said = run.background ? "" : stripSentinel(turnText);
+          const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
+          // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
+          const pause = await postPauseCards(tx, run, {
+            approvals: waiting,
+            questions: asks,
+            secretRequestIds: secretAsks,
+          });
           t.postedUpTo = t.messages.length;
-          t.postedCount += out.length + waiting.length + asks.length + secretAsks.length;
-          const cards: Approval[] = [];
-          const questions: AgentQuestionRow[] = [];
-          const secrets: SecretRequestRow[] = [];
-          for (const requestId of secretAsks) {
-            const [request] = await tx
-              .update(secretRequests)
-              .set({ threadId: replyThreadId })
-              .where(eq(secretRequests.id, requestId))
-              .returning();
-            if (!request) continue;
-            const message = await post(tx, replyThreadId, `Secret request: ${request.name}`, {
-              ...bodyCode("secret_request", { name: request.name }),
-              secretRequestId: request.id,
-              secretRequest: secretRequestView(request),
-            });
-            out.push(message);
-            const [linked] = await tx
-              .update(secretRequests)
-              .set({ messageId: message.id })
-              .where(eq(secretRequests.id, request.id))
-              .returning();
-            if (linked) {
-              await syncSecretMessage(tx, linked);
-              message.meta = { ...message.meta, secretRequest: secretRequestView(linked) };
-              secrets.push(linked);
-            }
-          }
-          for (const ask of asks) {
-            const id = ask.id;
-            const [inserted] = await tx
-              .insert(agentQuestions)
-              .values({
-                id,
-                orgId: run.orgId,
-                runId: run.id,
-                agentId: run.agentId,
-                channelId: run.channelId,
-                threadId: replyThreadId,
-                toolUseId: ask.toolUseId,
-                text: ask.text,
-                choices: ask.choices,
-                expiresAt: new Date(Date.now() + QUESTION_TTL_MS),
-              })
-              .onConflictDoNothing()
-              .returning();
-            if (!inserted) continue;
-            const message = await post(tx, replyThreadId, ask.text, {
-              questionId: id,
-              question: questionView(inserted),
-            });
-            out.push(message);
-            const [linked] = await tx
-              .update(agentQuestions)
-              .set({ messageId: message.id })
-              .where(eq(agentQuestions.id, id))
-              .returning();
-            if (linked) {
-              await syncQuestionMessage(tx, linked);
-              message.meta = { ...message.meta, question: questionView(linked) };
-              questions.push(linked);
-            }
-          }
-          for (const approval of waiting) {
-            const cardMeta = { ...bodyCode("approval_request", { title: approval.title }), approvalId: approval.id };
-            const cardText = `Approval request: ${approval.title}`;
-            // A consulted agent's request goes to the conversation of whoever asked (ADR 0034).
-            const card =
-              approval.channelId === run.channelId
-                ? await post(tx, replyThreadId, cardText, cardMeta)
-                : await insertMessage(tx, {
-                    orgId: run.orgId,
-                    channelId: approval.channelId,
-                    threadId: await consultationCardThread(tx, run.orgId, run.id, approval.threadRootId),
-                    author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-                    body: cardText,
-                    meta: cardMeta,
-                  });
-            out.push(card);
-            const [linked] = await tx
-              .update(approvals)
-              .set({ messageId: card.id })
-              .where(eq(approvals.id, approval.id))
-              .returning();
-            if (linked) cards.push(linked);
-          }
+          t.postedCount += (lead ? 1 : 0) + pause.messages.length;
           await saveTranscript(tx, t);
           const suspended = await transitionRun(
             tx,
@@ -1725,21 +1744,14 @@ async function executeRunInner(
             asks.length > 0 || secretAsks.length > 0 || waits.length > 0 ? "waiting_input" : "waiting_approval",
           );
           if (!suspended) throw new PermanentJobError("run changed state while executing");
-          return { messages: out, cards, questions, secrets };
+          return { lead, pause };
         });
         prof.mark("persist");
-        for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView)))
-          await publishMessageCreated(deps.pubsub, m);
-        for (const card of posted.cards) {
-          await publishApproval(deps, card, "approval.created");
-          // A mission's approval (agent mode): its owner hears it waits.
-          if (card.missionId) await notifyMissionApproval({ db, pubsub: deps.pubsub }, card).catch(() => undefined);
+        if (posted.lead) {
+          const [view] = await withWikiLinks(db, run.orgId, [messageView(posted.lead)]);
+          if (view) await publishMessageCreated(deps.pubsub, view);
         }
-        for (const q of posted.questions) {
-          await publishQuestion(deps.pubsub, q, "question.asked");
-          await notifyQuestion({ db, pubsub: deps.pubsub }, q).catch(() => {});
-        }
-        for (const r of posted.secrets) await publishSecret(deps.pubsub, r, "secret.requested");
+        await publishPauseCards(deps, run, posted.pause);
         const waitingFor =
           asks.length > 0 || secretAsks.length > 0 || waits.length > 0 ? "waiting_input" : "waiting_approval";
         await publishChannelEvent(deps.pubsub, event(waitingFor));
@@ -1778,13 +1790,15 @@ async function executeRunInner(
         (Boolean(transcript.reacted) && restatesReaction(said)) ||
         (Boolean(transcript.reported) && !transcript.artifacts?.length && !transcript.memoryUpdates?.length);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
-      const text = silent
+      const written = silent
         ? ""
         : said ||
           (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
           saved ||
           closingSummary(transcript, anythingPosted) ||
           (result.executedCount > 0 && !anythingPosted ? DONE_TEXT : "");
+      // It changed something since its last message and wrote nothing more: its receipts still go out.
+      const text = written || (!silent && anythingPosted && (await hasUnpostedReceipts(db, run)) ? DONE_TEXT : "");
       // A line the server wrote (not the model): its code, so the app shows it in the person's language.
       const code =
         said || text === ""
@@ -2406,4 +2420,76 @@ async function noticeAlreadyPosted(
       ),
     );
   return rows.some((r) => r.channelId === run.channelId && (r.threadId ?? null) === threadId);
+}
+
+/** What a message posted by a run a routine's report woke carries (`meta.routine`, ADR 0053 §7). */
+export interface RoutineReportTag {
+  id: string;
+  name: string;
+  /** The routine run that reported (`routine_runs.id`). */
+  runId: string;
+  /** The `routine_handoff` notice it answers (the app folds it into the message). */
+  noticeId: string;
+}
+
+/** The routine whose report this trigger is (a `routine_handoff` notice with its refs), or null. */
+export function routineReportTagOf(trigger: Pick<Message, "id" | "meta"> | null | undefined): RoutineReportTag | null {
+  if (!trigger) return null;
+  const notice = trigger.meta.notice as { kind?: unknown; refs?: Record<string, unknown> } | undefined;
+  if (notice?.kind !== "routine_handoff") return null;
+  const refs = notice.refs ?? {};
+  if (typeof refs.routineId !== "string" || typeof refs.routineRunId !== "string") return null;
+  return {
+    id: refs.routineId,
+    name: typeof refs.routineName === "string" ? refs.routineName : "",
+    runId: refs.routineRunId,
+    noticeId: trigger.id,
+  };
+}
+
+/** The routine run a background run's trigger belongs to: its brief's, else the legacy `meta.routine.runId`. */
+function routineRunIdOf(meta: Record<string, unknown> | null | undefined): string | null {
+  const legacy = (meta?.routine as { runId?: unknown } | undefined)?.runId;
+  return routineBriefOf(meta)?.routineRunId ?? (typeof legacy === "string" ? legacy : null);
+}
+
+/** The person who wrote the latest of these messages, if any of them is a person's. */
+async function lastPersonAmong(db: Executor, orgId: string, ids: string[]): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const [row] = await db
+    .select({ userId: messages.authorUserId })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(messages.id, ids),
+        eq(messages.authorType, "person"),
+        isNull(messages.deletedAt),
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  return row?.userId ?? null;
+}
+
+/**
+ * Writes that the run owes an answer (and who wrote into it) onto its row and nothing else: mid-turn a
+ * computer brain's bridge writes the same transcript (its pending calls, its side effects).
+ */
+async function markAnswerOwed(db: Executor, runId: string, t: Pick<Transcript, "steeredBy">) {
+  const patch = JSON.stringify({ answerOwed: true, ...(t.steeredBy ? { steeredBy: t.steeredBy } : {}) });
+  await db
+    .update(agentRuns)
+    .set({ transcript: sql`coalesce(${agentRuns.transcript}, '{}'::jsonb) || ${patch}::jsonb` })
+    .where(eq(agentRuns.id, runId));
+}
+
+/** Whether the run changed something people haven't seen yet: receipts not on any message (ADR 0037). */
+async function hasUnpostedReceipts(db: Executor, run: Pick<AgentRun, "id" | "orgId">): Promise<boolean> {
+  const [row] = await db
+    .select({ id: agentActions.id })
+    .from(agentActions)
+    .where(and(eq(agentActions.orgId, run.orgId), eq(agentActions.runId, run.id), isNull(agentActions.messageId)))
+    .limit(1);
+  return Boolean(row);
 }

@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { runBrainOf } from "./brains/select";
 import { canceledBy, runRequester } from "./cancel";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -165,8 +166,9 @@ export async function restartAfterStopAndSend(
   const by = canceledBy(stopped?.error);
   if (!stopped || !by || stopped.pendingMessageIds.length === 0) return null;
   // A model brain reads a "Parar e mandar" mid-task (its call is cut); only a computer brain is restarted.
+  // The brain the stopped run thought with (a fallback ran on the model brain), the agent's before its first turn.
   const [agent] = await db.select({ brain: agents.brain }).from(agents).where(eq(agents.id, stopped.agentId));
-  if (!agent || agent.brain === "model") return null;
+  if (!agent || runBrainOf(stopped, agent) === "model") return null;
   const [said] = await db
     .select()
     .from(messages)

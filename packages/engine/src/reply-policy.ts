@@ -35,13 +35,20 @@ export interface ReplyPolicy {
 }
 
 /**
+ * Notices that only inform the agent (ADR 0053 §10): another agent's note, the late result of a wait it
+ * stopped waiting on, its own fast reply. The run one of them wakes may stay quiet.
+ */
+const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_result", "talker_reply"]);
+
+/**
  * How a run must answer. Only runs nobody called by name may pass: the router
  * brought them in (a person's message without a mention, or an agent's reply
- * it chimes in on, `meta.joined`). Never a mention, a DM, another agent's
- * `ask_agent` consultation (a DM between agents), a forum turn, a routine's
- * call, a quote reply to this agent, a router follow-up to the agent the person
- * was talking to, nor a run a person already answered (an approval, a question:
- * `answerOwed`).
+ * it chimes in on, `meta.joined`), or a notice that only informs woke them
+ * (`INFORMING_NOTICES`). Never a mention, a DM, another agent's `ask_agent`
+ * consultation (a DM between agents), a forum turn, a routine's call or
+ * report, a quote reply to this agent, a router follow-up to the agent the
+ * person was talking to, nor a run a person answered or wrote into
+ * (`answerOwed`).
  */
 export function replyPolicyFor(
   run: Pick<AgentRun, "agentId" | "trigger" | "background">,
@@ -49,7 +56,10 @@ export function replyPolicyFor(
   options: { followUp?: boolean; answerOwed?: boolean } = {},
 ): ReplyPolicy {
   if (run.background) return { mayPass: false, background: true };
-  if (run.trigger !== "router" || options.followUp || options.answerOwed) return { mayPass: false, background: false };
+  if (options.answerOwed) return { mayPass: false, background: false };
+  const notice = (trigger?.meta?.notice as { kind?: unknown } | undefined)?.kind;
+  if (typeof notice === "string" && INFORMING_NOTICES.has(notice)) return { mayPass: true, background: false };
+  if (run.trigger !== "router" || options.followUp) return { mayPass: false, background: false };
   const meta = trigger?.meta ?? {};
   if (meta.routine) return { mayPass: false, background: false };
   const replyTo = meta.replyTo as { author?: { type?: unknown; id?: unknown } } | undefined;
