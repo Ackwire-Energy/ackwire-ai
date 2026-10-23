@@ -200,6 +200,8 @@ export interface Transcript {
   passed?: { reason: string };
   /** It was told once to answer after a reply that was only the silence word (or nothing). */
   nudged?: boolean;
+  /** A card it asked for with nothing said went back once for the findings (`unexplainedPause`). */
+  explainNudged?: boolean;
   /** A person decided or answered what it waited on (an approval, a question): it can't pass anymore. */
   answerOwed?: boolean;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
@@ -286,6 +288,30 @@ export function interruptedTurnPrompt(
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+/** What a turn's calls get back when it asked for a card with nothing said (`unexplainedPause`). */
+export const EXPLAIN_FIRST =
+  "Not run, and nothing was posted: you looked things up but said nothing, and a card alone tells the person nothing. Reply now with text: what you found (the numbers, ids, files) and what you recommend and why. Only if you still need their approval or answer, call the tool again after that text, in the same reply. None of this turn's calls ran.";
+
+/**
+ * A turn that pauses the run for a person (an approval, `ask_user`) after the run looked things up,
+ * with no text: the card would show alone, without the findings or the why (eval 2026-10-23: a bare
+ * "Approval request: railway_rollback" after five reads). A direct request on the first turn is fine.
+ */
+export function unexplainedPause(
+  calls: { name: string }[],
+  tools: Pick<ToolDefinition, "name" | "scope" | "sensitive">[],
+  turnText: string,
+  lookedBefore: boolean,
+): boolean {
+  if (!lookedBefore || stripSentinel(turnText).trim()) return false;
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  return calls.some((c) => {
+    if (c.name === ASK_USER_TOOL) return true;
+    const tool = byName.get(c.name);
+    return tool !== undefined && isSensitive(tool);
+  });
 }
 
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
@@ -1500,6 +1526,33 @@ async function executeRunInner(
       }
 
       const toolUses = result.toolCalls;
+      // Asked for a card with nothing said after looking: once, the calls go back for the findings first.
+      const lookedBefore = transcript.messages.some(
+        (m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c) => c.type === "tool_result"),
+      );
+      if (
+        result.stopReason === "tool_use" &&
+        turnPlan.kind === "model" &&
+        !run.background &&
+        !transcript.explainNudged &&
+        unexplainedPause(toolUses, turnTools, turnText, lookedBefore)
+      ) {
+        transcript.explainNudged = true;
+        transcript.messages.push({
+          role: "user",
+          content: toolUses.map((use) => ({
+            type: "tool_result" as const,
+            toolUseId: use.id,
+            content: "Not run.",
+            isError: true,
+          })),
+        });
+        // Said as the conversation's next line, not only as the tools' error: models follow it there.
+        appendUserText(transcript, EXPLAIN_FIRST);
+        await saveTranscript(db, transcript);
+        later(() => addRunStep(db, run, "context", { explainNudged: toolUses.map((u) => u.name) }));
+        continue;
+      }
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];

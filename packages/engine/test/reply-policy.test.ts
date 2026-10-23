@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { endsWithSentinel, isSentinelOnly, replyPolicyFor, stripSentinel, visibleText } from "../src/reply-policy";
+import {
+  endsWithSentinel,
+  isSentinelOnly,
+  replyPolicyFor,
+  stripSentinel,
+  visibleText,
+  WHY_YOU_WERE_CALLED,
+} from "../src/reply-policy";
 
 const run = (over: Partial<{ trigger: "mention" | "router" | "dm" | "forum"; background: boolean }> = {}) => ({
   agentId: "a1",
@@ -25,6 +32,15 @@ describe("replyPolicyFor", () => {
     expect(replyPolicyFor(run(), person(), { followUp: true }).mayPass).toBe(false);
     expect(replyPolicyFor(run(), person({ routine: { id: "r", name: "x" } })).mayPass).toBe(false);
     expect(replyPolicyFor(run(), person(), { answerOwed: true }).mayPass).toBe(false);
+  });
+
+  test("a run brought in passes on a thanks without looking anything up first", () => {
+    // Eval 2026-10-23 (router-pass-already-answered): on "perfeito, obrigada!" after another agent
+    // answered, the run re-checked the deploy instead of passing.
+    expect(WHY_YOU_WERE_CALLED).toContain("call pass");
+    expect(WHY_YOU_WERE_CALLED).toContain("A thanks, an ok");
+    expect(WHY_YOU_WERE_CALLED).toContain("without looking anything up");
+    expect(WHY_YOU_WERE_CALLED).toContain("without re-checking an answer already given");
   });
 
   test("background runs never post their answer", () => {

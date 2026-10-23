@@ -25,7 +25,7 @@ export const ANSWER_NUDGE = "You were addressed directly; answer the person.";
 
 /** The prompt block of runs that may pass. */
 export const WHY_YOU_WERE_CALLED =
-  "# Why you were called\nNobody called you by name; you were brought in because you might have something to add. If you don't, or another agent already answered, call pass: staying quiet in a room is normal.";
+  "# Why you were called\nNobody called you by name; you were brought in because you might have something to add. If you don't, or another agent already answered, call pass: staying quiet in a room is normal. A thanks, an ok or people talking among themselves asks nothing of you: pass at once, without looking anything up and without re-checking an answer already given. Speak only when the message asks something in your area that nobody has answered yet.";
 
 export interface ReplyPolicy {
   /** Nobody called it by name: it may end without a message (`pass`, an empty or sentinel-only answer). */
