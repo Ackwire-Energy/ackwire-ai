@@ -31,6 +31,7 @@
  */
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import type { EventEmitter } from "node:events";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -84,7 +85,7 @@ const stop = () => {
 };
 const hard = setTimeout(stop, HARD_STOP_MS);
 
-createInterface({ input: child.stdout }).on("line", (line) => {
+(createInterface({ input: child.stdout }) as unknown as EventEmitter).on("line", (line: string) => {
   if (quiet) clearTimeout(quiet);
   quiet = null;
   let e: Record<string, unknown>;
@@ -148,7 +149,7 @@ setTimeout(() => {
   );
 }, injectAt);
 
-child.on("exit", (code) => {
+(child as unknown as EventEmitter).on("exit", (code: number | null) => {
   log("EXIT", code);
   clearTimeout(hard);
   if (quiet) clearTimeout(quiet);

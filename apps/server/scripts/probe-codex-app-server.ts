@@ -44,6 +44,7 @@
  * `codex app-server generate-ts` of the version named in brain-codex-app.ts.
  */
 import { spawn } from "node:child_process";
+import type { EventEmitter } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -72,7 +73,7 @@ child.stderr.on("data", (c: Buffer) => process.stderr.write(`[stderr] ${c.toStri
 
 let next = 1;
 const waiting = new Map<number, (msg: Record<string, unknown>) => void>();
-createInterface({ input: child.stdout }).on("line", (line) => {
+(createInterface({ input: child.stdout }) as unknown as EventEmitter).on("line", (line: string) => {
   let msg: Record<string, unknown>;
   try {
     msg = JSON.parse(line) as Record<string, unknown>;
