@@ -23,6 +23,7 @@ import {
   queueApprovalDigests,
   reconcileComposioAccounts,
   recoverStaleRuns,
+  sweepEndedInboxes,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
 import type { Logger } from "./logger";
@@ -61,6 +62,8 @@ export const WORKER_INTERVALS_MS = {
   notifications: 30_000,
   /** Runs whose worker died (deploy, crash): also once at boot. */
   recovery: 60_000,
+  /** Ended runs still holding unread messages (safety net: they get a run of their own). */
+  inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
   /** How often watched IMAP folders are looked at (each is checked every `MAIL_POLL_SECONDS`). */
@@ -165,6 +168,11 @@ export function startWorkers(deps: WorkerDeps) {
   every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
     const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
     if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
+  });
+
+  every("inboxes", WORKER_INTERVALS_MS.inboxes, async () => {
+    const swept = await sweepEndedInboxes({ db, pubsub: deps.pubsub });
+    if (swept > 0) log.warn("unread messages of ended runs handed on", { runs: swept });
   });
 
   const files = deps.artifacts;

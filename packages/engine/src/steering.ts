@@ -145,7 +145,8 @@ async function judgeStop(
     messageId: input.message.id,
     stop: true,
   });
-  await cancelRun(deps, input.userId, input.orgId, run.id);
+  // The "stop" itself is not handed on to a new run when the task's unread messages are.
+  await cancelRun(deps, input.userId, input.orgId, run.id, { stopMessageId: input.message.id });
 }
 
 /** Checks still running after the post returned (stop judge, fast replies). */

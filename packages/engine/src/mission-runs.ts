@@ -1,5 +1,6 @@
 import { and, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { enqueue } from "./outbox";
+import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 
 const { agentRuns } = schema;
 
@@ -18,7 +19,7 @@ export async function enqueueRunJob(
 ): Promise<{ run: typeof agentRuns.$inferSelect | null; steered: string | null }> {
   const threadRootId = message.threadId ?? message.id;
   const [active] = await tx
-    .select({ id: agentRuns.id, pending: agentRuns.pendingMessageIds })
+    .select({ id: agentRuns.id })
     .from(agentRuns)
     .where(
       and(
@@ -26,20 +27,14 @@ export async function enqueueRunJob(
         eq(agentRuns.agentId, agentId),
         eq(agentRuns.channelId, message.channelId),
         eq(agentRuns.threadRootId, threadRootId),
-        inArray(agentRuns.status, ["queued", "running", "waiting_approval", "waiting_input"]),
+        inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
+        eq(agentRuns.background, false),
       ),
     )
     .orderBy(sql`${agentRuns.createdAt} desc`)
     .limit(1);
-  if (active) {
-    if (!active.pending.includes(message.id)) {
-      await tx
-        .update(agentRuns)
-        .set({ pendingMessageIds: sql`array_append(${agentRuns.pendingMessageIds}, ${message.id}::uuid)` })
-        .where(eq(agentRuns.id, active.id));
-    }
-    return { run: null, steered: active.id };
-  }
+  // Queued only while that run is still active; one that just ended: the notice starts a run.
+  if (active && (await queueOnRun(tx, active.id, message.id))) return { run: null, steered: active.id };
   const [run] = await tx
     .insert(agentRuns)
     .values({

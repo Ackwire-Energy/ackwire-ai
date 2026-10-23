@@ -41,7 +41,6 @@ import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { fitContextWindow } from "./context-budget";
-import { createAgentRuns } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
@@ -65,6 +64,7 @@ import {
   questionView,
   syncQuestionMessage,
 } from "./questions";
+import { type ReleaseReason, releaseInbox, takeInbox } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
   absorbBrowserCall,
@@ -494,29 +494,12 @@ async function executeRunInner(
     deferred = deferred.then(write).catch(() => {});
   };
   /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
-  const takeSteering = async () =>
-    db.transaction(async (tx) => {
-      const [row] = await tx
-        .select({ pending: agentRuns.pendingMessageIds })
-        .from(agentRuns)
-        .where(eq(agentRuns.id, run.id))
-        .for("update");
-      const ids = row?.pending ?? [];
-      if (ids.length === 0) return [];
-      await tx.update(agentRuns).set({ pendingMessageIds: [] }).where(eq(agentRuns.id, run.id));
-      return ids;
-    });
+  const takeSteering = () => takeInbox(db, run.id);
   /**
-   * Messages taken by this run that it never read get their own run (the
-   * last one; it reads the thread), so a failure never swallows them.
+   * The run ended: messages it took but never read get a run of their own (`releaseInbox`), so
+   * nothing sent to the agent is swallowed by an ending.
    */
-  const redispatchPending = async () => {
-    const pending = await takeSteering().catch(() => [] as string[]);
-    const last = pending.at(-1);
-    if (!last || run.trigger === "forum") return;
-    const message = await getMessage(db, run.orgId, last);
-    if (message && !message.deletedAt) await createAgentRuns(db, message, [run.agentId], run.trigger);
-  };
+  const redispatchPending = (reason: ReleaseReason) => releaseInbox(db, deps.pubsub, run, { reason }).catch(() => null);
   const fail = async (reason: string) => {
     await deferred;
     await addRunStep(db, run, "error", { reason });
@@ -524,7 +507,7 @@ async function executeRunInner(
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
     // An archived agent answers nobody; any other failure leaves the waiting messages a run of their own.
-    if (reason !== "agent_archived") await redispatchPending();
+    if (reason !== "agent_archived") await redispatchPending("failed");
   };
 
   const ctx: ToolContext = {
@@ -843,11 +826,14 @@ async function executeRunInner(
     if (view) await publishMessageCreated(deps.pubsub, view);
     await publishChannelEvent(deps.pubsub, event("canceled"));
     await finished("canceled");
-    // Stopped by a "Parar e mandar" (a computer brain): it starts again from that message.
+    // Stopped by a "Parar e mandar" (a computer brain): it starts again from that message (and takes
+    // the rest of its unread messages along).
     if (by) {
       const { restartAfterStopAndSend } = await import("./continue-run");
-      await restartAfterStopAndSend(deps, run.id, { id: message.id, threadId: message.threadId }, t);
+      await restartAfterStopAndSend(deps, run.id, { id: message.id, threadId: message.threadId }, t).catch(() => null);
     }
+    // Anything else sent to it and not read gets a run of its own (the "stop" itself was dropped by `stopRun`).
+    await redispatchPending("canceled");
   };
 
   /** Messages this run already read (a "stop and send" for one of them has nothing to interrupt). */
@@ -1133,7 +1119,7 @@ async function executeRunInner(
     if (view) await publishMessageCreated(deps.pubsub, view);
     await publishChannelEvent(deps.pubsub, event("done"));
     await finished("done");
-    await redispatchPending();
+    await redispatchPending("done");
   };
 
   /**
@@ -1713,7 +1699,7 @@ async function executeRunInner(
       await finished("done");
       prof.mark("events");
       // A message that slipped in between the last check and `done` gets its own run (never lost).
-      await redispatchPending();
+      await redispatchPending("done");
       return;
     }
   } catch (error) {
