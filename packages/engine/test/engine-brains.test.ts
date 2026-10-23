@@ -781,7 +781,7 @@ test("the mission engine: one run per agent and notice; a resume answers the cal
     isError: false,
   });
   const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
-  expect(jobs.some((j) => j.dedupeKey === `agent_run.execute:${run?.id}:wait:decision-1`)).toBe(true);
+  expect(jobs.some((j) => j.dedupeKey?.startsWith(`agent_run.execute:${run?.id}:wait:decision-1:`))).toBe(true);
   // Answered once: a second answer finds nothing waiting.
   expect(
     await engine.resumeRun({ run: identity, pause: { kind: "input", id: "decision-1" }, result: { content: "y" } }),

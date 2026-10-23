@@ -71,7 +71,7 @@ export function teamPrompt(team: Teammate[], selfId: string, requester: string |
     others.length > TEAM_IN_PROMPT
       ? `${others.length} other agents work in this organization.`
       : `Other agents in this organization: ${others.map((a) => `@${a.handle}${a.role ? ` (${a.role})` : ""}`).join(", ")}.`;
-  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it.`;
+  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it (its answer reaches you as a message; you carry on meanwhile), or let one know something with \`tell_agent\`.`;
 }
 
 const words = (s: string) =>

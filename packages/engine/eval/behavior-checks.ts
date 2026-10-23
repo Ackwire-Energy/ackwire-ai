@@ -27,7 +27,14 @@ export interface CheckResult {
 }
 
 /** Tools that only talk to people or the chat: calling them is not "looking". */
-export const NON_READ_TOOLS = new Set(["ask_user", "react", "ask_agent", "post_message", "share_artifact"]);
+export const NON_READ_TOOLS = new Set([
+  "ask_user",
+  "react",
+  "ask_agent",
+  "tell_agent",
+  "post_message",
+  "share_artifact",
+]);
 
 /** Names of tools that write or act (best effort, by verb); everything else that isn't chat counts as reading. */
 const WRITE_VERB =
