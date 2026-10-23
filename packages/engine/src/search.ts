@@ -4,6 +4,7 @@ import { caches } from "./cache";
 import type { ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { isRoutineRoomKey } from "./routine-brief";
 
 const { messages, channelMembers, channels, contextItems } = schema;
 
@@ -169,18 +170,28 @@ async function loadAgentChannels(db: Database, orgId: string, agentId: string) {
  * Channels an agent's explicit search (`search_context`, `expand`) may read:
  * its public channels plus the run's own channel. Other private channels and
  * DMs it belongs to stay out, so a question in one place can't pull private
- * conversations from another.
+ * conversations from another. A routine's room (ADR 0053 §4) is read only by
+ * that routine's own runs: never by another routine's run or a conversation's.
  */
 export async function agentSearchChannels(db: Database, orgId: string, agentId: string, currentChannelId: string) {
   const rows = (await caches.scopes.getOrLoad(`${orgId}:${agentId}:visible-kind`, async () =>
     db
-      .select({ id: channelMembers.channelId, visibility: channels.visibility, kind: channels.kind })
+      .select({
+        id: channelMembers.channelId,
+        visibility: channels.visibility,
+        kind: channels.kind,
+        dmKey: channels.dmKey,
+      })
       .from(channelMembers)
       .innerJoin(channels, eq(channels.id, channelMembers.channelId))
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt))),
-  )) as { id: string; visibility: string; kind: string }[];
+  )) as { id: string; visibility: string; kind: string; dmKey: string | null }[];
   return rows
-    .filter((r) => r.id === currentChannelId || (r.visibility === "public" && r.kind === "channel"))
+    .filter(
+      (r) =>
+        r.id === currentChannelId ||
+        (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
+    )
     .map((r) => r.id);
 }
 

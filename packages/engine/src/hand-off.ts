@@ -1,24 +1,123 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, eq, gte, schema, sql } from "@agenteschat/db";
-import { routineOfRun } from "./background";
+import { and, type Executor, eq, gte, inArray, schema, sql } from "@agenteschat/db";
+import { routineBriefOfRun } from "./background";
 import { deliverNotice, publishDelivery } from "./delivery";
-import { notifyRoutineRun } from "./notification-producers";
-import { replyThreadOf } from "./runs";
+import type { Message } from "./messages";
+import type { RoutineBrief } from "./routine-brief";
+import { personCanPost } from "./routine-state";
+import type { AgentRun } from "./runs";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
 export const HAND_OFF_TOOL = "hand_off";
 /** A report, not a transcript: long enough for findings, why and what next. */
 export const MAX_HAND_OFF = 8000;
 
-const { agentRuns, messages, routineRuns } = schema;
+const { agentRuns, messages, routines, routineRuns } = schema;
+
+/** Why a routine's report can't be delivered now (the routine run ends `skipped` with it). */
+export type HandOffBlock = "deleted" | "paused" | "creator_no_access" | "handoff_blocked";
 
 /**
- * The built-in `hand_off`, offered only to background runs (a routine's,
- * `ctx.background`): the one way such a run speaks. The report becomes a
- * `routine_handoff` notice in the routine's conversation, for the same agent:
- * it joins the agent's run there or starts one, and that run tells the people
- * in the agent's voice, with the conversation's context. Delivered at once,
- * once per run (a second call is refused). Its creator hears it reported.
+ * Whether a routine may still speak where it reports (ADR 0053 §4): it exists and is active (a
+ * one-off or a manual run counts as live), and its creator can still post there. Read at delivery,
+ * since the routine may have changed while its run worked. Null when it may.
+ */
+export async function routineDeliveryBlock(tx: Executor, brief: RoutineBrief): Promise<HandOffBlock | null> {
+  const [routine] = await tx
+    .select({
+      orgId: routines.orgId,
+      active: routines.active,
+      deletedAt: routines.deletedAt,
+      triggerType: routines.triggerType,
+      creator: routines.createdByUserId,
+    })
+    .from(routines)
+    .where(eq(routines.id, brief.routineId));
+  if (!routine || routine.deletedAt) return "deleted";
+  if (!routine.active && brief.trigger !== "manual" && routine.triggerType !== "once") return "paused";
+  // Its creator now (an admin or the agent's owner may have taken it over since it fired).
+  if (!routine.creator) return "creator_no_access";
+  if (!(await personCanPost(tx, routine.orgId, routine.creator, brief.deliverTo.channelId))) return "creator_no_access";
+  return null;
+}
+
+/**
+ * A routine's report reaches the conversation it reports to (`brief.deliverTo`), never its room: a
+ * `routine_handoff` notice for the same agent, which joins the agent's run there or starts one (an
+ * unattended run that tells the people in the agent's voice). The routine run is `reported`, with
+ * the report as its record and `code` (`auto_report` when its final text was delivered for it).
+ * In the caller's transaction; publish with `publishDelivery` after the commit.
+ */
+export async function deliverRoutineReport(
+  tx: Executor,
+  input: {
+    run: Pick<AgentRun, "id" | "orgId" | "agentId">;
+    brief: RoutineBrief;
+    text: string;
+    code?: string | null;
+  },
+): Promise<{ message: Message; runs: AgentRun[] }> {
+  const { run, brief } = input;
+  const delivered = await deliverNotice(tx, {
+    orgId: run.orgId,
+    agentId: run.agentId,
+    channelId: brief.deliverTo.channelId,
+    threadId: brief.deliverTo.threadId,
+    // Nobody is behind it (authority.ts): the run it wakes answers at hop 1.
+    hop: 0,
+    notice: {
+      kind: "routine_handoff",
+      text: input.text,
+      from: brief.name ? `Routine «${brief.name}»` : "Routine",
+      refs: {
+        runId: run.id,
+        routineId: brief.routineId,
+        routineRunId: brief.routineRunId,
+        routineName: brief.name,
+        report: brief.report,
+      },
+    },
+  });
+  await tx
+    .update(routineRuns)
+    .set({ status: "reported", summary: input.text.slice(0, 4000), code: input.code ?? null })
+    .where(
+      and(
+        eq(routineRuns.id, brief.routineRunId),
+        eq(routineRuns.orgId, run.orgId),
+        inArray(routineRuns.status, ["queued", "starting", "started"]),
+      ),
+    );
+  return delivered;
+}
+
+/** Ends the routine run `skipped` with why its report couldn't be delivered (while still open). */
+async function blockRoutineRun(tx: Executor, brief: RoutineBrief, orgId: string, code: HandOffBlock) {
+  await tx
+    .update(routineRuns)
+    .set({ status: "skipped", code, finishedAt: new Date() })
+    .where(
+      and(
+        eq(routineRuns.id, brief.routineRunId),
+        eq(routineRuns.orgId, orgId),
+        inArray(routineRuns.status, ["queued", "starting", "started"]),
+      ),
+    );
+}
+
+const BLOCKED: Record<HandOffBlock, string> = {
+  deleted: "the routine was deleted",
+  paused: "the routine was paused",
+  creator_no_access: "the routine's creator can no longer post where it reports",
+  handoff_blocked: "this run has no routine to report to",
+};
+
+/**
+ * The built-in `hand_off`, offered only to background runs (a routine's, `ctx.background`): the
+ * one way such a run speaks. The report becomes a `routine_handoff` notice in the conversation the
+ * routine reports to (`deliverRoutineReport`), at once and once per run (a second call is refused),
+ * after checking the routine may still speak there (`routineDeliveryBlock`); when it can't, the
+ * routine run is skipped with the reason and the model is told to finish.
  */
 export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
   const tool: ToolDefinition = {
@@ -44,13 +143,15 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
           .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)))
           .for("update");
         if (!run?.background) return { refused: "Only background work (a routine's run) hands off: just reply." };
+        const brief = await routineBriefOfRun(tx, run);
+        if (!brief) return { refused: `Nothing was delivered: ${BLOCKED.handoff_blocked}. Finish now.` };
         const [already] = await tx
           .select({ id: messages.id })
           .from(messages)
           .where(
             and(
               eq(messages.orgId, run.orgId),
-              eq(messages.channelId, run.channelId),
+              eq(messages.channelId, brief.deliverTo.channelId),
               gte(messages.createdAt, run.createdAt),
               sql`${messages.meta} @> ${JSON.stringify({ notice: { kind: "routine_handoff", refs: { runId: run.id } } })}::jsonb`,
             ),
@@ -62,47 +163,15 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
               "You already handed off this run's report; it was delivered and can't be changed. Finish now: nothing else is posted.",
           };
         }
-        const routine = await routineOfRun(tx, run);
-        const refs: Record<string, string> = { runId: run.id };
-        if (routine) refs.routineId = routine.routineId;
-        if (routine?.routineRunId) refs.routineRunId = routine.routineRunId;
-        const delivered = await deliverNotice(tx, {
-          orgId: run.orgId,
-          agentId: run.agentId,
-          channelId: run.channelId,
-          threadId: replyThreadOf(run),
-          // The routine speaks for its creator, like its trigger: the conversation run answers at hop 1.
-          hop: 0,
-          notice: {
-            kind: "routine_handoff",
-            text,
-            from: routine?.name ? `Routine «${routine.name}»` : "Background work",
-            refs,
-          },
-        });
-        if (routine?.routineRunId) {
-          await tx
-            .update(routineRuns)
-            .set({ status: "reported", summary: text.slice(0, 4000) })
-            .where(and(eq(routineRuns.id, routine.routineRunId), eq(routineRuns.orgId, run.orgId)));
+        const block = await routineDeliveryBlock(tx, brief);
+        if (block) {
+          await blockRoutineRun(tx, brief, run.orgId, block);
+          return { refused: `Nothing was delivered: ${BLOCKED[block]}. Finish now: nothing else is posted.` };
         }
-        return { delivered, routine, run };
+        return { delivered: await deliverRoutineReport(tx, { run, brief, text }) };
       });
       if ("refused" in handed) return { content: handed.refused ?? "", isError: true };
       await publishDelivery(deps.pubsub, handed.delivered);
-      if (handed.routine) {
-        await notifyRoutineRun(
-          { db: ctx.db, pubsub: deps.pubsub },
-          {
-            orgId: ctx.orgId,
-            routineId: handed.routine.routineId,
-            agentId: ctx.agentId,
-            ok: true,
-            runKey: ctx.runId,
-            text,
-          },
-        ).catch(() => {});
-      }
       return {
         content:
           "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked; nothing else is posted.",

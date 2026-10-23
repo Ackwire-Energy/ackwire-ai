@@ -87,6 +87,8 @@ test("webhooks: signature checked; a GitHub PR opened fires the routine listenin
   expect(ok.status).toBe(202);
   expect(await ok.json()).toMatchObject({ event: "github.pr_opened", fired: 1 });
   await t.drain();
-  const trigger = (await t.db.select().from(schema.messages)).find((m) => typeof m.meta.routineId === "string");
-  expect(trigger?.body).toContain("PR #7 opened in acme/app: Fix login");
+  // The event stays in the routine run (the context gives it to the model as outside data).
+  const run = (await t.db.select().from(schema.routineRuns)).find((r) => r.event?.type === "github.pr_opened");
+  expect(run?.event).toMatchObject({ summary: "PR #7 opened in acme/app: Fix login" });
+  expect((await t.db.select().from(schema.messages)).some((m) => m.meta.routineBrief !== undefined)).toBe(true);
 });

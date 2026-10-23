@@ -547,50 +547,133 @@ export async function notifyMissionEnded(
   });
 }
 
-// ── Routines ──────────────────────────────────────────────────────────────────
+// ── Routines (ADR 0053) ─────────────────────────────────────────────────────────
 
-/** A routine's run ended (its agent's answer, or a failure): the routine's creator. */
-export async function notifyRoutineRun(
+/** A routine's name, creator and agent, and the agent's owner: who hears about it. */
+async function routineAudience(deps: Pick<NotificationDeps, "db">, orgId: string, routineId: string) {
+  const [r] = await deps.db
+    .select({ name: routines.name, creator: routines.createdByUserId, agentId: routines.agentId })
+    .from(routines)
+    .where(and(eq(routines.id, routineId), eq(routines.orgId, orgId)));
+  if (!r) return null;
+  return { ...r, owner: await agentOwner(deps, r.agentId) };
+}
+
+/**
+ * A routine's run failed after a good one (§6.6): its creator (else the agent's owner) hears it
+ * once per failure streak (`streakKey`: the streak's first failed run). Resolved by the next good run.
+ */
+export async function notifyRoutineFailed(
+  deps: NotificationDeps,
+  input: { orgId: string; routineId: string; streakKey: string; text?: string | null },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator ?? r.owner],
+    kind: "routine_failed",
+    groupKey: `routine_failed:${input.routineId}:${input.streakKey}`,
+    actor: agent(r.agentId),
+    source: { routineId: input.routineId, label: r.name },
+    latest: { title: r.name, ...(input.text ? { text: notificationSnippet(input.text) } : {}) },
+  });
+}
+
+/**
+ * A routine paused itself (§6.2, §6.6): its creator and the agent's owner hear it once per pause
+ * (`key`), with the coded reason (`latest.statusTo`, the app translates it) and its English fallback.
+ */
+export async function notifyRoutinePaused(
   deps: NotificationDeps,
   input: {
     orgId: string;
     routineId: string;
+    name: string;
     agentId: string;
-    ok: boolean;
-    /** Agent run or routine run id: one notification per run. */
-    runKey: string;
-    text?: string | null;
+    creatorUserId: string | null;
+    reason: string;
+    text: string;
+    key: string;
   },
 ) {
-  const [routine] = await deps.db
-    .select({ name: routines.name, creator: routines.createdByUserId })
-    .from(routines)
-    .where(and(eq(routines.id, input.routineId), eq(routines.orgId, input.orgId)));
-  if (!routine?.creator) return;
-  const kind = input.ok ? "routine_finished" : "routine_failed";
   await notify(deps, {
     orgId: input.orgId,
-    userIds: [routine.creator],
-    kind,
-    groupKey: `${kind}:${input.runKey}`,
+    userIds: [input.creatorUserId, await agentOwner(deps, input.agentId)],
+    kind: "routine_paused",
+    groupKey: `routine_paused:${input.routineId}:${input.key}`,
     actor: agent(input.agentId),
-    source: { routineId: input.routineId, label: routine.name },
-    latest: { title: routine.name, ...(input.text ? { text: notificationSnippet(input.text) } : {}) },
+    source: { routineId: input.routineId, label: input.name },
+    latest: { title: input.name, statusTo: input.reason, text: input.text },
   });
 }
 
-/** The routine's answer: the reply message of an agent run, for the card. */
-export async function routineReplyText(deps: NotificationDeps, orgId: string, runId: string) {
-  const [run] = await deps.db
-    .select({ reply: agentRuns.replyMessageId, error: agentRuns.error })
-    .from(agentRuns)
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
-  if (!run?.reply) return run?.error ?? null;
-  const [m] = await deps.db
-    .select({ body: messages.body })
-    .from(messages)
-    .where(and(eq(messages.orgId, orgId), eq(messages.id, run.reply)));
-  return m?.body ?? null;
+/**
+ * A routine's run waits for the agent's computer (§6.4): its creator and the agent's owner hear it
+ * once per outage (`outageKey`: the computer's last sign of life). Resolved by the next good run.
+ */
+export async function notifyRoutineStalled(
+  deps: NotificationDeps,
+  input: { orgId: string; routineId: string; machineId: string; machineName: string; outageKey: string },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator, r.owner],
+    kind: "routine_stalled",
+    groupKey: `routine_stalled:${input.routineId}:${input.machineId}:${input.outageKey}`,
+    actor: agent(r.agentId),
+    source: { routineId: input.routineId, machineId: input.machineId, label: r.name },
+    latest: { title: r.name, ...(input.machineName ? { text: notificationSnippet(input.machineName) } : {}) },
+  });
+}
+
+/**
+ * The agent told people what a routine found (the message its report woke, §7): its creator hears
+ * it, opening that message, unless they are a member of that conversation (they see it there).
+ */
+export async function notifyRoutineFinished(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    routineId: string;
+    routineRunId: string;
+    messageId: string;
+    channelId: string;
+    threadId: string | null;
+    text?: string | null;
+  },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r?.creator) return;
+  if ((await inChannel(deps, input.channelId, [r.creator])).length > 0) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator],
+    kind: "routine_finished",
+    groupKey: `routine_finished:${input.routineRunId}`,
+    actor: agent(r.agentId),
+    source: {
+      routineId: input.routineId,
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      messageId: input.messageId,
+      label: r.name,
+    },
+    latest: { title: r.name, ...(input.text ? { text: notificationSnippet(input.text) } : {}) },
+  });
+}
+
+/** A routine ran well again: its failure streak and computer outage notifications are done. */
+export async function resolveRoutineTrouble(deps: NotificationDeps, orgId: string, routineId: string) {
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_failed:${routineId}:` });
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_stalled:${routineId}:` });
+}
+
+/** A person resumed or took over a routine: its pause notifications are done. */
+export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string, routineId: string) {
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
 }
 
 // ── Connected computers ───────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { deliverNotice, publishDelivery } from "./delivery";
 import type { Message } from "./messages";
 import type { Notice } from "./notices";
 import { enqueue } from "./outbox";
+import { missStaleRoutineRun } from "./routine-firing";
 import { type AgentRun, replyThreadOf } from "./runs";
 
 const { agentRuns, messages } = schema;
@@ -197,20 +198,30 @@ function forPeople(notice: Notice) {
  * computer brain (no model credential to fall back on) are queued again.
  * Found by `agent_runs.waiting_machine_id` (indexed, set only while a run
  * waits for its computer); one job per wait (`waitingForBrain.waitId`), so
- * reconnects while the job is still queued don't add more.
+ * reconnects while the job is still queued don't add more. A routine's run
+ * whose slot is more than 12 hours old doesn't run late: it is missed
+ * (`missStaleRoutineRun`, ADR 0053 §6.4). Returns the runs queued again.
  */
-export async function resumeRunsWaitingForMachine(db: Executor, machineId: string): Promise<string[]> {
+export async function resumeRunsWaitingForMachine(
+  db: Database,
+  machineId: string,
+  options: { pubsub?: PubSub; now?: Date } = {},
+): Promise<string[]> {
   const rows = await db
     .select({
       id: agentRuns.id,
       orgId: agentRuns.orgId,
+      background: agentRuns.background,
       waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
       updatedAt: agentRuns.updatedAt,
     })
     .from(agentRuns)
     .where(and(eq(agentRuns.waitingMachineId, machineId), eq(agentRuns.status, "waiting_input")))
     .limit(200);
+  const resumed: string[] = [];
   for (const r of rows) {
+    if (r.background && (await missStaleRoutineRun({ db, pubsub: options.pubsub }, r.id, options.now))) continue;
+    resumed.push(r.id);
     await enqueue(db, {
       orgId: r.orgId,
       kind: "agent_run.execute",
@@ -220,5 +231,5 @@ export async function resumeRunsWaitingForMachine(db: Executor, machineId: strin
       maxAttempts: 4,
     });
   }
-  return rows.map((r) => r.id);
+  return resumed;
 }

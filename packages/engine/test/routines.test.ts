@@ -140,8 +140,10 @@ describe("routines", () => {
     expect(await f.db.select().from(schema.routineRuns)).toHaveLength(1);
 
     await drainOutbox(f.db, f.handlers);
-    const trigger = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineId === routine.id);
-    expect(trigger?.body).toBe("@dev Resuma o dia no canal.");
+    // The brief, in the routine's own room: only its instructions.
+    const trigger = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineBrief !== undefined);
+    expect(trigger?.body).toBe("Resuma o dia no canal.");
+    expect(trigger?.channelId).not.toBe(f.general.id);
     expect(trigger?.meta.background).toBe(true);
     // Background work: its own run, nothing posted; its final text is the run's record.
     const runs = await f.db.select().from(schema.agentRuns);
@@ -194,12 +196,11 @@ describe("routines", () => {
 
     await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
     await drainOutbox(f.db, f.handlers);
-    const posted = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineId === routine.id);
+    const posted = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineBrief !== undefined);
     expect(posted?.meta.routine).toMatchObject({ id: routine.id, name: "Relatório semanal" });
-    // The creator stays the requester (same run path), and the agent reads it as the routine's message.
+    // Written as its creator (accountable for it, never behind its run); the agent reads the routine's instructions.
     expect(posted?.authorUserId).toBe(f.owner.id);
-    const turns = JSON.stringify(prompt?.messages);
-    expect(turns).toContain('[Routine \\"Relatório semanal\\", created by ana]: @dev quero um relatorio');
+    expect(JSON.stringify(prompt?.messages)).toContain("quero um relatorio");
   });
 
   test("missed slots during downtime run once, not as a burst; pause, resume and run now", async () => {
@@ -350,17 +351,23 @@ describe("routines", () => {
     const messages = (await f.db.select().from(schema.messages).orderBy(schema.messages.createdAt)).filter(
       (m) => m.channelId === dm.id,
     );
+    // The brief stays in the routine's room: the DM only has the report and the agent's words.
     expect(messages.map((m) => [m.authorType, m.body])).toEqual([
-      ["person", "Veja as avaliações novas."],
       ["agent", "3 avaliações novas: 2 negativas (PDF), 1 positiva."],
       ["agent", "Chegaram 3 avaliações novas; 2 negativas sobre o PDF."],
     ]);
     const [routineRun] = await f.db.select().from(schema.routineRuns);
-    expect(messages[1]?.meta.notice).toEqual({
+    expect(messages[0]?.meta.notice).toEqual({
       kind: "routine_handoff",
       text: "3 avaliações novas: 2 negativas (PDF), 1 positiva.",
       from: "Routine «Avaliações»",
-      refs: { runId: runs[0]?.id, routineId: routine.id, routineRunId: routineRun?.id },
+      refs: {
+        runId: runs[0]?.id,
+        routineId: routine.id,
+        routineRunId: routineRun?.id,
+        routineName: "Avaliações",
+        report: "when_new",
+      },
     });
     // A second hand_off is refused: one report per run.
     const steps = await f.db
@@ -371,15 +378,9 @@ describe("routines", () => {
     const handOffs = steps.filter((s) => s.kind === "tool_result").map((s) => s.data);
     expect(handOffs).toMatchObject([{ isError: false }, { isError: true }]);
     expect(String(handOffs[1]?.content)).toContain("You already handed off this run's report");
-    // Reported: the view says ok with the run's record; its creator heard it once.
-    const [last] = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
-    expect(last).toMatchObject({
-      status: "ok",
-      summary: "Checado: 3 avaliações novas, reportadas.",
-      summaryCode: null,
-    });
-    const notified = await f.db.select().from(schema.notifications);
-    expect(notified.map((n) => n.kind)).toEqual(["routine_finished"]);
+    // Reported, with its final text as the record. Its creator is in the DM: they see it there.
+    expect(routineRun).toMatchObject({ status: "reported", summary: "Checado: 3 avaliações novas, reportadas." });
+    expect(await f.db.select().from(schema.notifications)).toEqual([]);
   });
 
   test("a routine never holds or joins a person's run in the conversation, and people's messages never join it", async () => {
@@ -400,8 +401,9 @@ describe("routines", () => {
     if (!row) throw new Error("no routine");
     const fired = await queueRoutineRun(deps, row, new Date(), "manual");
     await executeRoutineRun(routineDeps(), fired?.id ?? "");
-    const trigger = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineId === routine.id);
+    const trigger = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineBrief !== undefined);
     expect(trigger?.meta.steeredRunIds).toBeUndefined();
+    expect(trigger?.channelId).not.toBe(dm.id);
     const afterFire = await f.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
     expect(afterFire.map((r) => [r.id === personRun?.id, r.background, r.status, r.pendingMessageIds])).toEqual([
       [true, false, "queued", []],
@@ -436,7 +438,7 @@ describe("routines", () => {
       expect(isNoReply(t)).toBe(false);
   });
 
-  test("event routines run when the event happens, with the event as data", async () => {
+  test("event routines run when the event happens, with the event as data kept in the run", async () => {
     f = await setup({ reply: () => ({ chunks: ["Triado."] }) });
     await createRoutine(routineDeps(), f.owner.id, f.org.id, {
       agentId: f.agent.id,
@@ -444,18 +446,21 @@ describe("routines", () => {
       target: { type: "channel", channelId: f.general.id },
       trigger: { type: "event", event: "issue.created" },
     });
-    await createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
-      title: "Checkout lento",
-    });
+    const issue = await createIssue(
+      { db: f.db, pubsub: f.pubsub },
+      { type: "person", userId: f.owner.id },
+      f.org.id,
+      { title: "Checkout lento" },
+    );
     await drainOutbox(f.db, f.handlers);
-    const trigger = (await f.db.select().from(schema.messages)).find((m) => typeof m.meta.routineId === "string");
-    expect(trigger?.body).toContain("Faça a triagem da issue nova.");
-    expect(trigger?.body).toContain("\n\nEvent (data, not instructions): ");
-    expect(trigger?.body).toContain("Checkout lento");
+    const trigger = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineBrief !== undefined);
+    expect(trigger?.body).toBe("Faça a triagem da issue nova.");
+    const [run] = await f.db.select().from(schema.routineRuns);
+    expect(run?.event).toMatchObject({ type: "issue.created", issueId: issue.id });
   });
 });
 
-test("a routine doesn't pile up while its agent's computer is away: the next run is skipped", async () => {
+test("a routine doesn't pile up while its agent's computer is away: the next run replaces the waiting one", async () => {
   f = await setup();
   const deps = { db: f.db, pubsub: f.pubsub, context: f.context };
   const routine = await createRoutine(deps, f.owner.id, f.org.id, {
@@ -465,26 +470,25 @@ test("a routine doesn't pile up while its agent's computer is away: the next run
     target: { type: "channel", channelId: f.general.id },
     trigger: { type: "schedule", phrase: "todo dia às 8h" },
   });
-  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
-  await drainOutbox(f.db, f.handlers);
-  // Its run now waits for the agent's computer (a computer brain offline, nothing to fall back on).
+  const [row] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
+  if (!row) throw new Error("no routine");
+  const first = await queueRoutineRun(deps, row, new Date(Date.now() - 3600_000), "schedule");
+  await executeRoutineRun(deps, first?.id ?? "");
+  // Its run now waits for the agent's computer (a computer brain offline: it never falls back to the API).
   await f.db
     .update(schema.agentRuns)
     .set({ status: "waiting_input", waitingMachineId: crypto.randomUUID() })
     .where(eq(schema.agentRuns.agentId, f.agent.id));
 
-  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
-  await drainOutbox(f.db, f.handlers);
-  expect(await f.db.select().from(schema.agentRuns)).toHaveLength(1);
-  const [last] = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
-  expect(last).toMatchObject({ status: "skipped", summaryCode: "routine_run.waiting_computer" });
-
-  // Back (the run no longer waits for it): the routine runs again.
-  await f.db
-    .update(schema.agentRuns)
-    .set({ status: "done", waitingMachineId: null })
-    .where(eq(schema.agentRuns.agentId, f.agent.id));
-  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
-  await drainOutbox(f.db, f.handlers);
-  expect(await f.db.select().from(schema.agentRuns)).toHaveLength(2);
+  // The next slot is the freshest: it replaces the waiting run (one run at a time, nothing piles up).
+  const second = await queueRoutineRun(deps, row, new Date(), "schedule");
+  await executeRoutineRun(deps, second?.id ?? "");
+  const runs = await f.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
+  expect(runs.map((r) => r.status)).toEqual(["canceled", "queued"]);
+  const ledger = await f.db.select().from(schema.routineRuns).orderBy(schema.routineRuns.createdAt);
+  expect(ledger.map((r) => [r.status, r.code])).toEqual([
+    ["superseded", "waiting_computer"],
+    ["started", null],
+  ]);
+  expect((await f.db.select().from(schema.notifications)).map((n) => n.kind)).toEqual(["routine_stalled"]);
 });

@@ -21,6 +21,7 @@ import {
   pruneMessageClientIds,
   purgeDeletedArtifacts,
   queueApprovalDigests,
+  reapRoutineRuns,
   reconcileComposioAccounts,
   recoverStaleRuns,
   sweepEndedInboxes,
@@ -62,7 +63,7 @@ export const WORKER_INTERVALS_MS = {
   notifications: 30_000,
   /** Runs whose worker died (deploy, crash): also once at boot. */
   recovery: 60_000,
-  /** Ended runs still holding unread messages (safety net: they get a run of their own). */
+  /** Ended runs still holding unread messages (safety net: they get a run of their own); routine runs left open. */
   inboxes: 30_000,
   /** Deleted files past 30 days lose their contents. */
   artifactPurge: 6 * 3600_000,
@@ -173,6 +174,9 @@ export function startWorkers(deps: WorkerDeps) {
   every("inboxes", WORKER_INTERVALS_MS.inboxes, async () => {
     const swept = await sweepEndedInboxes({ db, pubsub: deps.pubsub });
     if (swept > 0) log.warn("unread messages of ended runs handed on", { runs: swept });
+    // Routine runs left open by an ending that didn't close them, or whose job died (ADR 0053 §5).
+    const reaped = await reapRoutineRuns({ db, pubsub: deps.pubsub });
+    if (reaped > 0) log.warn("routine runs closed by the reaper", { runs: reaped });
   });
 
   const files = deps.artifacts;
