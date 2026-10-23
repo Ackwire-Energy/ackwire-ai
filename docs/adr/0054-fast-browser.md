@@ -64,12 +64,13 @@ The agent names what it acts on, as a number (`e12`) or in words ("the Sign in b
 
 1. **A ref**, as given. The browser checks it; a stale one fails and says so.
 2. **Exactly one element with that name** and a fitting role, preferring a control over text with the same name (the heading "Sign in" next to the button). No judge.
-3. **The target memory:** what the same words found on the same page of the same site before, kept per agent (an LRU in the process, by host and generalized path, `/orders/:id`). It is found again by role and name.
+3. **The target memory:** what the same words found on the same page of the same site before, kept per agent (an LRU in the process, by host and generalized path, `/orders/:id`). It is found again by role, name **and place**: the Delete of the row for invoice 42 is found again only in that row, wherever the row moved, and when nothing or several things match the judge decides again.
 4. **The judge** picks among the page's fitting elements: only fields for a fill, boxes for a tick. Each element is described with where it sits (`button "Delete" — in row "Invoice 42 · R$ 42,00"`). A table row has no name of its own in `agent-browser`'s snapshot (the invoice number is a sibling cell), so a row is named by its other cells. One request carries a Choice over refs (plus "none") and a Noul for whether it's there at all. Rules:
    - The pick is taken at p ≥ 0.55, at least 0.2 ahead of the next.
-   - An element whose wrong pick costs (pay, delete, send, confirm…) needs 0.85.
+   - An element whose wrong pick costs (pay, delete, send, confirm…) needs 0.85. So does a plain "Yes" or "OK" inside a dialog that asks for one ("Delete project Acme?").
    - Two elements that read the same are never picked, however sure the judge is.
    - Below that, the three closest go back to the agent, which picks by number.
+   - Only a calibrated judge picks: the request is marked `calibrated`, so without Jev (or when it fails) the cheap model, whose probabilities are all 1, is never asked. The closest by their words go back instead.
 5. **An image of the page** (`browser.capture`, protocol 17), when the text has nothing that fits: an icon without a name, a canvas. The judge boxes the target and confirms it's there (≥ 0.6). A box over most of the image is refused. The point lands on a marked element's ref when there is one, so the action stays as exact as a ref; otherwise it is a click at the point. Passwords are only typed into elements found on the page, never at a point.
 
 ### 3. Every action answers with what changed
@@ -100,7 +101,7 @@ The plan stops at the first step that fails, can't find its target, or doesn't s
 - where it stopped and why, with the closest elements when a target wasn't clear;
 - the page at the end.
 
-A person taking over the browser stops the plan before its next step, and the run waits on them as before. The single tools (`browser_click`, `browser_fill`…) are one-step plans: the same finding, settling and answer.
+A person taking over the browser stops the plan before its next step, and the run waits on them as before. A take over that began and ended within one step stops it too, and the page isn't counted as read: the agent reads it before acting again. The single tools (`browser_click`, `browser_fill`…) are one-step plans: the same finding, settling and answer.
 
 `wait` takes `until` in words ("the export finished"). It is polled about every 0.7 s, and the judge looks again only when the page changed (a fingerprint of the snapshot).
 
@@ -111,7 +112,7 @@ When a click fails because something covers its target, the plan looks once. The
 ### 6. One round trip per action (protocol 17)
 
 - **`browser.batch`:** several `browser.act` commands back to back in the agent's session, with nothing else in between. Each command goes through the same checks: known command, no flag the runner sets, paths in the agent's folder, URLs on the allowed sites, the allowlist checked after each action. A command that wouldn't pass refuses the whole batch before anything runs. A failure stops it unless the command tolerates failing (the settle and load waits).
-- **`browser.capture`:** `screenshot --annotate` as a JPEG (quality 70), read and deleted at once. It returns the image's size, the page's size in CSS pixels and the numbered elements with their boxes.
+- **`browser.capture`:** `screenshot --annotate` as a JPEG (quality 70), read and deleted at once, only of a page on the agent's allowed sites (like every read). A file a timed-out capture left is removed by the next one. It returns the image's size, the page's size in CSS pixels and the numbered elements with their boxes.
 
 Older runners get the same commands one `browser.act` at a time, and no images. Everything else works.
 
@@ -128,6 +129,7 @@ Text questions keep `jev-latest`, with the cheap model as fallback.
 
 ### 8. Safety
 
+- **Page text stays in the untrusted block:** the report names elements by role and number (`button (e7)`); their names, the closest candidates and what `find` returned go with the page, inside `page_content`.
 - **The judge only points:** at something already on the page, or says whether something is true there. It never grants anything, and an approval is still the agent's to ask for (`ask_user`). Element names it reads are page text; the costly-pick threshold and the dismiss rule keep a hostile name from turning into a payment or a consent.
 - **Secrets:** `type_secret` is typed by the runner from what `request_secret` delivered, only on the site the person answered for, and only into a password or one-time-code field found on the page.
 - **Routines:** the policy table (ADR 0053) applies to `browser_do` as to every browser tool: `browser:use` is an internal area, refused to "only look" routines.

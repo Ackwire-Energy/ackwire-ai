@@ -94,6 +94,8 @@ const RETRY_FAILURE_MS = 10 * 60_000;
 const STREAM_OPEN_MS = 5000;
 /** A session that answered this long before its idle timeout is checked again before a read. */
 const ALIVE_MARGIN_MS = 60_000;
+/** A capture's file older than this is a leftover (its command timed out): removed by the next capture. */
+const CAPTURE_LEFTOVER_MS = 60_000;
 
 /** What the server may ask for: everything else (vault, plugins, chat, dashboard, sessions, installs) is refused. */
 const COMMANDS = new Set([
@@ -937,7 +939,7 @@ export class BrowserManager {
   /** `browser.act`: one command in the agent's session, after the checks. */
   async act(agent: AgentScope, folder: string, req: ActRequest, signal?: AbortSignal): Promise<BrowserAnswer> {
     const allowed = allowedDomainsOf(req.allowedDomains);
-    const prepared = this.prepare(req.command, req.args, req.timeoutSeconds, folder, allowed);
+    const prepared = this.checkCommand(req.command, req.args, req.timeoutSeconds, folder, allowed);
     const session = await this.session(agent, folder);
     return this.enqueue(session, () => this.perform(agent, session, prepared, allowed, req.link, signal));
   }
@@ -956,7 +958,7 @@ export class BrowserManager {
     }
     const allowed = allowedDomainsOf(req.allowedDomains);
     const prepared = list.map((c) => ({
-      ...this.prepare(c?.command, c?.args, c?.timeoutSeconds, folder, allowed),
+      ...this.checkCommand(c?.command, c?.args, c?.timeoutSeconds, folder, allowed),
       tolerate: c?.tolerate === true,
     }));
     const session = await this.session(agent, folder);
@@ -964,7 +966,20 @@ export class BrowserManager {
       const answers: BrowserAnswer[] = [];
       for (const p of prepared) {
         if (signal?.aborted) break;
-        const answer = await this.perform(agent, session, p, allowed, req.link, signal);
+        let answer: BrowserAnswer;
+        try {
+          answer = await this.perform(agent, session, p, allowed, req.link, signal);
+        } catch (err) {
+          // Nothing ran yet: refused as a whole (its error code reaches the server).
+          if (answers.length === 0) throw err;
+          // Something already ran: its answers are kept; this command failed and the batch stops.
+          answers.push({
+            success: false,
+            data: null,
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
+          });
+          break;
+        }
         answers.push(answer);
         if (!answer.success && !p.tolerate) break;
       }
@@ -975,16 +990,37 @@ export class BrowserManager {
   /**
    * `browser.capture` (protocol 17): the page as a JPEG with its elements
    * numbered and boxed (`screenshot --annotate`), for a judge that sees
-   * images. The file is read and removed at once; nothing stays.
+   * images. Only a page on the agent's allowed sites is captured. The file is
+   * read and removed at once; one a timed-out capture left is removed later.
    */
-  async capture(agent: AgentScope, folder: string, signal?: AbortSignal): Promise<MachineReplies["browser.capture"]> {
+  async capture(
+    agent: AgentScope,
+    folder: string,
+    allowedDomains?: unknown,
+    signal?: AbortSignal,
+  ): Promise<MachineReplies["browser.capture"]> {
+    const allowed = allowedDomainsOf(allowedDomains);
     const session = await this.session(agent, folder);
     return this.enqueue(session, async () => {
       if (!(await this.browserOpen(session, signal))) {
         throw new RunnerError("bad_request", "The browser isn't open: open a page first");
       }
+      // Like every read: a page that moved off the allowed sites by itself isn't looked at.
+      if (allowed.length > 0) {
+        const left = await this.leftAllowedSites(session, allowed, signal);
+        if (left) throw new RunnerError("not_allowed", left);
+      }
       const dir = path.join(session.folder, ".agentes", "captures");
       await mkdir(dir, { recursive: true });
+      // A screenshot whose command timed out may still be written after its capture ended: cleared here.
+      for (const name of readdirSync(dir)) {
+        const old = path.join(dir, name);
+        try {
+          if (this.now() - statSync(old).mtimeMs > CAPTURE_LEFTOVER_MS) await rm(old, { force: true });
+        } catch {
+          // gone already
+        }
+      }
       const file = path.join(dir, `${randomUUID()}.jpg`);
       try {
         const shot = await this.run(
@@ -1021,7 +1057,7 @@ export class BrowserManager {
   }
 
   /** One command checked before it runs: known, no flag the runner sets, paths in the folder, URLs allowed. */
-  private prepare(
+  private checkCommand(
     rawCommand: unknown,
     rawArgs: unknown,
     timeoutSeconds: unknown,

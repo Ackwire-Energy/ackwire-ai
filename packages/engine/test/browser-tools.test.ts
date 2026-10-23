@@ -19,6 +19,7 @@ import {
   setAgentBrowserDomains,
   wrapPage,
 } from "../src";
+import { actionCommands } from "../src/browser/surface";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { runContext } from "./mail-fixtures";
@@ -168,7 +169,7 @@ test("each tool is one agent-browser command in the agent's session, with its si
     args: ["@e1"],
     allowedDomains: ["shop.example.com", "*.stripe.com"],
   });
-  expect(clicked.content).toContain('Clicked button "Save" (e1).');
+  expect(clicked.content).toContain("Clicked button (e1).");
   sent = b.since();
   await b.call("browser_fill", { target: "[ref=e2]", text: "ana@example.com" });
   expect(sent()[0]).toMatchObject({ command: "fill", args: ["@e2", "ana@example.com"] });
@@ -249,7 +250,7 @@ test("a target in words is found by the judge on the page as it is, then remembe
       .slice(0, 2),
   ).toEqual(["snapshot", "click"]);
   expect(sent()[1]).toMatchObject({ args: ["@e7"] });
-  expect(out.content).toContain('Clicked button "Sign in" (e7).');
+  expect(out.content).toContain("Clicked button (e7).");
   // The same words on the same page again: no judge.
   const asked = judge.calls.length;
   await b.call("browser_click", { target: "the button that signs me in" });
@@ -294,7 +295,7 @@ test("browser_do runs a sign-in across pages, checks what it expects and stops w
   expect(out.isError).toBeUndefined();
   // The click on Orders happened; only what it should show didn't: the agent is told not to click again.
   expect(out.content).toContain(
-    'Stopped after step 4 of 5 (click "Orders"): Clicked link "Orders" (e20), but the page doesn\'t show "the list of orders shows". It was done: don\'t do it again',
+    'Stopped after step 4 of 5 (click "Orders"): Clicked link (e20), but the page doesn\'t show "the list of orders shows". It was done: don\'t do it again',
   );
   expect(out.content).toContain("Done before it: 3 steps.");
   expect(out.content).toContain("Now at https://app.acme.example/home");
@@ -307,6 +308,55 @@ test("browser_do runs a sign-in across pages, checks what it expects and stops w
   ]);
   // The step after the stop never ran.
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "click")).toHaveLength(2);
+});
+
+test("a person who takes the browser and gives it back within a step stops the plan, and reading comes first", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  let taken = false;
+  b.s.respond = async (r) => {
+    const a = r as Act;
+    // During the first click a person takes the browser and gives it back.
+    if (a.op === "browser.act" && a.command === "click" && !taken) {
+      taken = true;
+      await f.db.insert(schema.browserHandoffs).values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        machineId: b.machineId,
+        kind: "takeover",
+        status: "done",
+        controllerUserId: f.owner.id,
+        expiresAt: new Date(),
+        resolvedAt: new Date(Date.now() + 1000),
+      });
+    }
+    return page('- button "Save" [ref=e1]\n- button "Next" [ref=e2]');
+  };
+  const out = await b.call("browser_do", {
+    steps: [
+      { do: "click", target: "e1" },
+      { do: "click", target: "e2" },
+    ],
+  });
+  expect(out.content).toContain("a person had the browser meanwhile");
+  expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "click")).toHaveLength(1);
+  // The page wasn't marked as read: the next action is held until the agent reads it.
+  expect((await b.call("browser_click", { target: "e2" })).content).toContain("Read the page again first");
+});
+
+test("a hidden file field is reached by a CSS selector", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const sent = b.since();
+  await b.call("browser_upload", { target: "input[type=file]", path: "reports/q3.pdf" });
+  expect(sent()).toMatchObject([{ command: "upload", args: ["input[type=file]", "reports/q3.pdf"] }]);
+});
+
+test("a box found only on the image isn't ticked by a click there (a click would only flip it)", () => {
+  expect(() => actionCommands({ kind: "check", at: { x: 10, y: 20 } }, () => null)).toThrow("ticked by its element");
+  expect(actionCommands({ kind: "check", at: { ref: "e3" } }, () => null)).toMatchObject([
+    { command: "check", args: ["@e3"] },
+  ]);
 });
 
 test("a read with `find` returns only the lines that answer it", async () => {

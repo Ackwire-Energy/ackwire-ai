@@ -158,6 +158,8 @@ const STALE = /stale|unknown ref|ref\b.*\b(not found|no longer|invalid)|no eleme
 /** Longest a `wait` step waits. */
 export const MAX_WAIT_MS = 120_000;
 const POLL_MS = 700;
+/** A wait gives up after this many failed looks or judgments in a row. */
+const WAIT_FAILURES = 3;
 /**
  * An `expect` that isn't true yet gets up to this long to become true: a form
  * that navigates 300 ms after its submit, a message that shows when the
@@ -182,8 +184,11 @@ class Stop extends Error {
 class ActFailed extends Error {}
 
 const elementOf = (e: ScreenElement | null | undefined) => (e ? { ref: e.ref, role: e.role, name: e.name } : null);
-const quoted = (e: Pick<ScreenElement, "role" | "name" | "ref">) =>
-  `${e.role}${e.name ? ` "${e.name.slice(0, 80)}"` : ""} (${e.ref})`;
+/**
+ * An element as the report names it: its role and number only. Names are page text, and page text
+ * reaches the agent only inside the untrusted block (the screen part of the report, which has them).
+ */
+const quoted = (e: Pick<ScreenElement, "role" | "ref">) => `${e.role} (${e.ref})`;
 
 /** Runs `steps` in order on `deps.surface` (see the file's comment). */
 export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<PlanReport> {
@@ -279,29 +284,36 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
     }
     const deadline = now() + ms;
     let checked: string | null = null;
+    let failures = 0;
     for (;;) {
       if (deps.signal?.aborted) throw new Stop("stopped");
-      const current = await look();
-      if (text && current.lines.some((l) => l.includes(text))) {
-        report.note = `"${text}" showed`;
-        return;
-      }
-      // The judge only looks again when the screen changed.
-      const digest = screenDigest(current);
-      if (until && digest !== checked) {
-        checked = digest;
-        const r = await checkCondition({
-          judge: deps.judge,
-          orgId: deps.orgId,
-          agentId: deps.agentId,
-          runId: deps.runId,
-          condition: until,
-          observation: current,
-        });
-        if (r.met === true) {
-          report.note = `"${until}" is true`;
+      try {
+        const current = await look();
+        if (text && current.lines.some((l) => l.includes(text))) {
+          report.note = `"${text}" showed`;
           return;
         }
+        // The judge only looks again when the screen changed.
+        const digest = screenDigest(current);
+        if (until && digest !== checked) {
+          const r = await checkCondition({
+            judge: deps.judge,
+            orgId: deps.orgId,
+            agentId: deps.agentId,
+            runId: deps.runId,
+            condition: until,
+            observation: current,
+          });
+          checked = digest;
+          if (r.met === true) {
+            report.note = `"${until}" is true`;
+            return;
+          }
+        }
+        failures = 0;
+      } catch (error) {
+        // A look or a judgment that failed once (a page loading, a slow answer) isn't the end of the wait.
+        if (++failures >= WAIT_FAILURES) throw error;
       }
       if (now() + POLL_MS > deadline) throw new Stop(`waited ${Math.round(ms / 1000)} s and it didn't happen`);
       await deps.surface.perform({ kind: "pause", ms: POLL_MS }, { settle: false });
@@ -323,18 +335,26 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
         report.via = "ref";
         return { at: { ref: given }, element: screen?.elements.find((e) => e.ref === given) ?? null };
       }
-      const current = fresh || !screen ? await look() : screen;
-      const r = await resolveTarget({
-        judge: deps.judge,
-        orgId: deps.orgId,
-        agentId: deps.agentId,
-        runId: deps.runId,
-        target: words,
-        use,
-        observation: current,
-        cache: deps.cache,
-        scope: deps.scope,
-      });
+      const resolveOn = (observation: ScreenObservation) =>
+        resolveTarget({
+          judge: deps.judge,
+          orgId: deps.orgId,
+          agentId: deps.agentId,
+          runId: deps.runId,
+          target: words,
+          use,
+          observation,
+          cache: deps.cache,
+          scope: deps.scope,
+        });
+      // A look kept from before may predate the target (seconds old): when it isn't there, look once more.
+      const kept = fresh ? null : screen;
+      let current = kept ?? (await look());
+      let r = await resolveOn(current);
+      if (!r.found && kept) {
+        current = await look();
+        r = await resolveOn(current);
+      }
       if (r.found) {
         report.via = r.via;
         return { at: { ref: r.ref }, element: r.element };

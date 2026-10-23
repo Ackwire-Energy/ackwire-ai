@@ -125,8 +125,9 @@ export function actionCommands(
       return isPoint(action.at) ? [c("mouse", "move", px(action.at.x), px(action.at.y))] : [c("hover", ref(action.at))];
     case "check":
     case "uncheck":
-      // On a point a click toggles it; with a ref the browser sets it as asked.
-      return isPoint(action.at) ? clickAt(action.at) : [c(action.kind, ref(action.at))];
+      // A click on a point only toggles the box, whatever it is now: only its element can be set as asked.
+      if (isPoint(action.at)) throw new Error("a box is ticked by its element, not by a point on the page");
+      return [c(action.kind, ref(action.at))];
     case "fill":
       return isPoint(action.at)
         ? [

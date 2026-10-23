@@ -447,6 +447,28 @@ test.if(posix)(
   },
 );
 
+test.if(posix)("a command that throws mid-batch keeps the answers of what already ran", async () => {
+  const t = setup();
+  const res = await t.manager.batch(dev, await t.folder(), {
+    op: "browser.batch",
+    commands: [
+      { command: "open", args: ["https://shop.example.com"], timeoutSeconds: 30 },
+      // Checked when it runs: a bad ref throws there.
+      { command: "agentes:type_secret", args: ["not-a-ref", "X"], timeoutSeconds: 30 },
+      { command: "snapshot", args: [], timeoutSeconds: 30 },
+    ],
+  });
+  expect(res.answers.map((a) => a.success)).toEqual([true, false]);
+  expect(res.answers[1]?.error).toContain("agentes:type_secret takes a ref");
+});
+
+test.if(posix)("a capture of a page outside the agent's sites is refused (like every read)", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  expect(await errorCode(async () => t.manager.capture(dev, await t.folder(), ["other.example"]))).toBe("not_allowed");
+  expect(t.logged().some((c) => c.args.includes("--annotate"))).toBe(false);
+});
+
 test.if(posix)("a batch with one command that wouldn't pass is refused before anything runs", async () => {
   const t = setup();
   const folder = await t.folder();

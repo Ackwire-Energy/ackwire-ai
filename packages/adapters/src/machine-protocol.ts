@@ -879,7 +879,7 @@ export type MachineRequest = (
       link?: string;
     }
   /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
-  | { op: "browser.capture" }
+  | { op: "browser.capture"; allowedDomains?: string[] }
 ) & { agent?: AgentScope };
 
 /** One command of a `browser.batch` (protocol 17). */

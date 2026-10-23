@@ -407,7 +407,7 @@ async function handleBrowser(
       return browser.batch(req.agent, ctx.workspaceReal, req, scope.signal);
     case "browser.capture":
       requireTool(ctx, "browser");
-      return browser.capture(req.agent, ctx.workspaceReal, scope.signal);
+      return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
     case "browser.stream.start":
       requireTool(ctx, "browser");
       return browser.streamStart(req.agent, req.mode);

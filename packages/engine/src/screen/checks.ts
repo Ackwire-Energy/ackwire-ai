@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Judge, JudgeQuestion } from "../judge";
+import type { Judge, JudgeAnswer, JudgeQuestion } from "../judge";
 import {
   describeElement,
   type ScreenChanges,
@@ -137,19 +137,17 @@ export async function findInPage(
     questions,
   });
   const exists = answers.answers?.noul ?? 0;
-  const hits = new Set<number>();
+  // Each line the judge points at, with its probability: the most likely are kept, then shown in page order.
+  const hits = new Map<number, number>();
   for (let w = 0; w < windows; w++) {
     const probs = answers[`where_${w}`]?.probabilities ?? {};
     for (const [key, p] of Object.entries(probs)) {
       const m = /^L(\d+)$/.exec(key);
-      if (m && p >= 0.2) hits.add(Number(m[1]) - 1);
+      if (m && p >= 0.2) hits.set(Number(m[1]) - 1, p);
     }
-    const choice = answers[`where_${w}`]?.choice;
-    const m = choice ? /^L(\d+)$/.exec(choice) : null;
-    if (m && (probs[choice as string] ?? 0) >= 0.5) hits.add(Number(m[1]) - 1);
   }
   const keep = new Set<number>();
-  for (const i of [...hits].sort((a, b) => a - b).slice(0, 8)) {
+  for (const [i] of [...hits].sort((a, b) => b[1] - a[1]).slice(0, 8)) {
     for (let k = Math.max(0, i - AROUND); k <= Math.min(lines.length - 1, i + AROUND); k++) keep.add(k);
   }
   const out: string[] = [];
@@ -180,21 +178,29 @@ export async function findDismiss(
   const criteria: Record<string, string> = {};
   for (const e of pool) criteria[e.ref] = describeElement(e);
   criteria.none = "None of these just closes it.";
-  const answers = await input.judge.ask({
-    orgId: input.orgId,
-    agentId: input.agentId,
-    runId: input.runId,
-    kind: "screen_dismiss",
-    state: { covering: input.covering.slice(0, 300), screen: { address: input.observation.url } },
-    questions: {
-      close: {
-        type: "choice",
-        instructions:
-          "`covering` (a banner or dialog) is in the way of the page. Which control only closes it, agreeing to no more than needed: Close, ×, Not now, Reject optional cookies, Continue without accepting? Never one that buys, subscribes, signs up, accepts terms or grants permissions.",
-        criteria,
+  let answers: Record<string, JudgeAnswer>;
+  try {
+    answers = await input.judge.ask({
+      orgId: input.orgId,
+      agentId: input.agentId,
+      runId: input.runId,
+      kind: "screen_dismiss",
+      // Clicked on its probability alone: only a calibrated judge answers (the cheap model would say 1).
+      calibrated: true,
+      state: { covering: input.covering.slice(0, 300), screen: { address: input.observation.url } },
+      questions: {
+        close: {
+          type: "choice",
+          instructions:
+            "`covering` (a banner or dialog) is in the way of the page. Which control only closes it, agreeing to no more than needed: Close, ×, Not now, Reject optional cookies, Continue without accepting? Never one that buys, subscribes, signs up, accepts terms or grants permissions.",
+          criteria,
+        },
       },
-    },
-  });
+    });
+  } catch {
+    // Nothing is closed: the click's own error goes back to the agent.
+    return null;
+  }
   const choice = answers.close?.choice;
   const p = choice ? (answers.close?.probabilities?.[choice] ?? 0) : 0;
   if (!choice || choice === "none" || p < DISMISS_AT) return null;

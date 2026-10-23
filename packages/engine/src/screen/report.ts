@@ -109,9 +109,14 @@ export function describeScreen(
 export function formatPlanReport(r: PlanReport): FormattedReport {
   const done = r.steps.filter((s) => s.status === "done");
   const out: string[] = [];
-  const closest = r.stopped?.candidates?.length
-    ? `Closest on the page: ${r.stopped.candidates.map((c) => `${describeElement(c, 120)} [${c.ref}]`).join("; ")}.`
-    : null;
+  // The closest elements are page text: listed with the page (untrusted), only pointed at here.
+  const candidates = r.stopped?.candidates ?? [];
+  const closest =
+    candidates.length > 0 ? "The closest elements on the page are listed below: name one by its number." : null;
+  const closestList =
+    candidates.length > 0
+      ? `Closest on the page:\n${candidates.map((c) => `- ${describeElement(c, 160)} [${c.ref}]`).join("\n")}`
+      : null;
   // The step that stopped the plan ran, and only its check failed: say it was done, so it isn't done twice.
   const stoppedStep = r.stopped ? (r.steps[r.stopped.index] as StepReport) : null;
   const ranButUnconfirmed = stoppedStep?.ran
@@ -149,10 +154,13 @@ export function formatPlanReport(r: PlanReport): FormattedReport {
       if (f.answered === "no" || !f.text) return `Nothing on the page answers "${f.question}".`;
       return `Where the page answers "${f.question}"${f.answered === "partly" ? " (maybe only in part)" : ""}:\n${f.text}`;
     });
-  const screen = describeScreen(r.after, r.changes);
+  // A page just opened shows what can be acted on there, even when it is the page the agent saw before.
+  const opened = done.at(-1)?.step.do === "open";
+  const screen = describeScreen(r.after, r.changes, { overview: opened });
+  const parts = [closestList, ...found, screen].filter((p): p is string => Boolean(p));
   return {
     summary: out.join("\n"),
-    screen: found.length > 0 ? [...found, screen].filter(Boolean).join("\n\n") : screen,
+    screen: parts.length > 0 ? parts.join("\n\n") : null,
     failed: Boolean(r.stopped),
   };
 }

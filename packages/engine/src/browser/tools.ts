@@ -33,7 +33,7 @@ import { toolDetail } from "../tool-detail";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
-import { markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
+import { handedBackSince, markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
 import { type AgentBrowserStatus, agentBrowserStatus, browserUnavailableText } from "./status";
 import {
   type BrowserLink,
@@ -276,6 +276,9 @@ const FRESH_MS = 8000;
 /** A look this recent is still what the agent knows of the page (changes are counted from it). */
 const KNOWN_MS = 10 * 60_000;
 
+/** A CSS selector rather than words (`#avatar`, `.dropzone input`, `input[type=file]`). */
+const CSS_SELECTOR = /^[\w-]*(?:[#.][\w-]+|\[[^\]]+\])/;
+
 const targetProp = {
   type: "string",
   description:
@@ -487,7 +490,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         try {
           const shot = await caller.call<"browser.capture">(
             status.machineId,
-            { op: "browser.capture", agent: scope },
+            { op: "browser.capture", agent: scope, ...(domains ? { allowedDomains: domains } : {}) },
             { signal: ctx.signal, timeoutMs: 45_000 },
           );
           return judgeImage(shot);
@@ -534,6 +537,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     }
     const key = seenKey(ctx);
     let paused: ToolOutput | null = null;
+    // A take over that begins and ends within one step leaves no open handoff to see: it is checked too.
+    const started = new Date();
+    let handedBack = false;
     const report = await runPlan(
       {
         judge,
@@ -551,9 +557,15 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         // A person taking the browser stops the plan at the next step; the run waits on them.
         hold: async () => {
           const wait = await waitIfPersonInControl(ctx.db, ctx, deps.pubsub);
-          if (!wait) return null;
-          paused = wait;
-          return "a person took over the browser";
+          if (wait) {
+            paused = wait;
+            return "a person took over the browser";
+          }
+          if (await handedBackSince(ctx.db, ctx, started)) {
+            handedBack = true;
+            return "a person had the browser meanwhile and changed the page: read it (browser_read) before acting again";
+          }
+          return null;
         },
         last: seenWithin(key, FRESH_MS),
         before: seenWithin(key, KNOWN_MS),
@@ -562,8 +574,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       },
       steps,
     );
-    // The agent has seen the page (the report shows it), or opened one of its own.
-    if (report.after || report.steps.some((s) => s.status === "done" && s.step.do === "open")) {
+    // The agent has seen the page (the report shows it), or opened one of its own; not when a person
+    // changed it meanwhile (the read-first guard stays for the next call).
+    if (!handedBack && (report.after || report.steps.some((s) => s.status === "done" && s.step.do === "open"))) {
       await markPageRead(ctx.db, ctx);
     }
     const f = formatPlanReport(report);
@@ -587,15 +600,20 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     return { content, ...(f.failed && nothingDone ? { isError: true } : {}), data };
   }
 
-  /** A target in words or as a number → the element's ref, on the page as it is now. */
-  async function refFor(
+  /**
+   * A target in words, as a number or as a CSS selector → what the command takes (`@e7` or the
+   * selector), on the page as it is now. File inputs are often hidden, so not in the page's text:
+   * a selector reaches them.
+   */
+  async function selectorFor(
     ctx: ToolContext,
     target: string,
     link: BrowserLink,
     use: "upload",
   ): Promise<string | { error: string }> {
     const given = screenRef(target);
-    if (given) return given;
+    if (given) return `@${given}`;
+    if (CSS_SELECTOR.test(target.trim())) return target.trim();
     const key = seenKey(ctx);
     let page = seenWithin(key, FRESH_MS);
     if (!page) {
@@ -616,8 +634,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       cache: targets,
       scope: key,
     }).catch((error: unknown) => ({ found: false as const, reason: "absent" as const, candidates: [], error }));
-    if (found.found) return found.ref;
-    return { error: `Couldn't find "${target}" on the page. Read it (browser_read) and give the element's number.` };
+    if (found.found) return `@${found.ref}`;
+    return {
+      error: `Couldn't find "${target}" on the page. Read it (browser_read) and give the element's number, or a CSS selector for a hidden file field (\`input[type=file]\`).`,
+    };
   }
 
   const tool = (
@@ -905,7 +925,14 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       "browser_upload",
       `${BROWSER_TOOL_INFO.browser_upload.description} The path is relative to your folder on the computer.`,
       targetSchema(
-        { path: { type: "string", description: "A file in your folder (`reports/q3.pdf`).", maxLength: 1000 } },
+        {
+          target: {
+            ...targetProp,
+            description:
+              "The file field: its number from the page (`e7`), words (`the Attach file button`), or a CSS selector for a hidden one (`input[type=file]`).",
+          },
+          path: { type: "string", description: "A file in your folder (`reports/q3.pdf`).", maxLength: 1000 },
+        },
         ["path"],
       ),
       async (input, ctx) => {
@@ -913,9 +940,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         if (!path) return { content: "Give a path inside your own folder (relative, without `..`).", isError: true };
         const linked = await linkFor(ctx);
         if (!linked.ok) return { content: linked.text, isError: true };
-        const ref = await refFor(ctx, str(input.target), linked.link, "upload");
-        if (typeof ref !== "string") return { content: ref.error, isError: true };
-        const r = await linked.link.act({ command: "upload", args: [`@${ref}`, path], timeoutSeconds: OPEN_SECONDS });
+        const field = await selectorFor(ctx, str(input.target), linked.link, "upload");
+        if (typeof field !== "string") return { content: field.error, isError: true };
+        const r = await linked.link.act({ command: "upload", args: [field, path], timeoutSeconds: OPEN_SECONDS });
         if (!r.ok) return { content: r.text, isError: true };
         const url = urlOf(r.data);
         return {

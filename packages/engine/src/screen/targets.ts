@@ -70,8 +70,8 @@ export type TargetResult = TargetFound | TargetMissing;
 export interface TargetMemory {
   role: string;
   name: string;
-  /** Which of the elements with that role and name (0 = first). */
-  nth: number;
+  /** Where it sat (its named containers): it is found again only there ("Delete" in the row for invoice 42). */
+  context: string[];
 }
 
 /** In-process memory of targets per agent and site (LRU). */
@@ -103,7 +103,7 @@ const normalize = (s: string) =>
   s
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/["'`“”‘’]/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -167,15 +167,16 @@ function exactMatch(words: string, use: TargetUse, o: ScreenObservation): Screen
   return null;
 }
 
+/** The one element with the remembered role, name and place; none or several: the judge decides again. */
 function fromMemory(memory: TargetMemory, o: ScreenObservation): ScreenElement | null {
-  const same = o.elements.filter((e) => e.role === memory.role && e.name === memory.name);
-  return same[memory.nth] ?? (same.length === 1 ? (same[0] as ScreenElement) : null);
+  const place = memory.context.join(" › ");
+  const same = o.elements.filter(
+    (e) => e.role === memory.role && e.name === memory.name && e.context.join(" › ") === place,
+  );
+  return same.length === 1 ? (same[0] as ScreenElement) : null;
 }
 
-function memoryOf(e: ScreenElement, o: ScreenObservation): TargetMemory {
-  const same = o.elements.filter((x) => x.role === e.role && x.name === e.name);
-  return { role: e.role, name: e.name, nth: Math.max(0, same.indexOf(e)) };
-}
+const memoryOf = (e: ScreenElement): TargetMemory => ({ role: e.role, name: e.name, context: e.context });
 
 /** Most options one Choice offers (Jev takes 255, one is "none"). */
 const MAX_OPTIONS = 200;
@@ -189,6 +190,9 @@ const PICK_MARGIN = 0.2;
 export const COSTLY_PICK_AT = 0.85;
 const COSTLY =
   /\b(delete|remove|erase|destroy|pay|purchase|buy|place order|checkout|send|transfer|confirm|unsubscribe|close account|cancel (my )?(account|subscription|plan)|excluir|apagar|remover|pagar|comprar|finalizar|enviar|transferir|confirmar|encerrar|cancelar (a )?(conta|assinatura|plano))\b/i;
+/** A plain "Yes" or "OK" does what its dialog asks ("Delete project Acme?"): costly when the dialog is. */
+const isCostly = (e: ScreenElement) =>
+  COSTLY.test(e.name) || e.context.some((c) => /^(?:alert)?dialog "/.test(c) && COSTLY.test(c));
 /** Below this, nothing on the screen is it. */
 const ABSENT_BELOW = 0.3;
 
@@ -248,21 +252,50 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
       },
     },
   };
-  const answers = await input.judge.ask({
-    orgId: input.orgId,
-    agentId: input.agentId,
-    runId: input.runId,
-    kind: "screen_target",
-    state: {
-      target: words,
-      action: input.use,
-      screen: { address: o.url, elements: candidates.map((e) => `${e.ref}: ${describeElement(e)}`).join("\n") },
-    },
-    questions,
-  });
+  let answers: Record<string, JudgeAnswer>;
+  try {
+    answers = await input.judge.ask({
+      orgId: input.orgId,
+      agentId: input.agentId,
+      runId: input.runId,
+      kind: "screen_target",
+      // The pick is taken on its probabilities (the margin, 0.85 for costly ones): only a calibrated
+      // judge answers. The cheap model would say 1 to anything.
+      calibrated: true,
+      state: {
+        target: words,
+        action: input.use,
+        screen: { address: o.url, elements: candidates.map((e) => `${e.ref}: ${describeElement(e)}`).join("\n") },
+      },
+      questions,
+    });
+  } catch {
+    // No calibrated judge (or it failed): the closest by their words go back, and the agent picks by number.
+    return { found: false, reason: "unsure", candidates: closestByWords(words, candidates) };
+  }
   return decide(answers, candidates, (picked) => {
-    input.cache?.set(key, memoryOf(picked, o));
+    input.cache?.set(key, memoryOf(picked));
   });
+}
+
+/**
+ * The three elements that share the most words with the target: its name counts most, then its
+ * role, then where it sits; a control comes before text with the same words.
+ */
+function closestByWords(words: string, candidates: ScreenElement[]): ScreenElement[] {
+  const terms = normalize(words)
+    .split(" ")
+    .filter((t) => t.length > 1);
+  const hits = (text: string) => terms.filter((t) => normalize(text).includes(t)).length;
+  return candidates
+    .map((e) => ({
+      e,
+      score: 2 * hits(e.name) + hits(e.role) + 0.5 * hits(e.context.join(" ")) + (CONTROLS.has(e.role) ? 0.5 : 0),
+    }))
+    .filter((s) => s.score > 0.5)
+    .sort((a, b) => b.score - a.score || a.e.index - b.e.index)
+    .slice(0, 3)
+    .map((s) => s.e);
 }
 
 function decide(
@@ -290,7 +323,7 @@ function decide(
   if (picked && twins.length > 0) {
     return { found: false, reason: "unsure", candidates: [picked, ...twins].slice(0, 3) };
   }
-  const need = picked && COSTLY.test(picked.name) ? COSTLY_PICK_AT : PICK_AT;
+  const need = picked && isCostly(picked) ? COSTLY_PICK_AT : PICK_AT;
   if (picked && p >= need && p - next >= PICK_MARGIN && present >= ABSENT_BELOW) {
     remember(picked);
     return { found: true, ref: picked.ref, element: picked, via: "judge", confidence: p };
