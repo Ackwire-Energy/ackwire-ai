@@ -252,6 +252,7 @@ const TRAIL_TOOL: Record<ScreenVerb, BrowserToolName> = {
   scroll: "browser_scroll",
   wait: "browser_wait",
   back: "browser_back",
+  read: "browser_read",
 };
 
 function trailOf(report: PlanReport) {
@@ -260,7 +261,11 @@ function trailOf(report: PlanReport) {
     .map((s) => {
       const tool = TRAIL_TOOL[s.step.do];
       const detail = tool === "browser_open" ? toolDetail(tool, { url: s.step.url ?? s.step.target }) : undefined;
-      return { tool, ...(detail ? { detail } : {}), ...(s.status === "failed" ? { failed: true as const } : {}) };
+      return {
+        tool,
+        ...(detail ? { detail } : {}),
+        ...(s.status === "failed" && !s.ran ? { failed: true as const } : {}),
+      };
     });
 }
 
@@ -291,6 +296,7 @@ const VERBS: readonly ScreenVerb[] = [
   "hover",
   "wait",
   "back",
+  "read",
 ];
 
 /** One step of `browser_do`. */
@@ -320,6 +326,12 @@ const STEP_SCHEMA: JsonSchema = {
       maxLength: 500,
     },
     seconds: { type: "integer", minimum: 1, maximum: MAX_WAIT_SECONDS, description: "`wait`: at most this long." },
+    find: {
+      type: "string",
+      description:
+        "`read`: what to get from the page (`the order total`, `the status message`): only the lines that answer it.",
+      maxLength: 500,
+    },
     expect: {
       type: "string",
       description:
@@ -337,7 +349,7 @@ function stepOf(v: unknown): ScreenStep | null {
   const s = v as Record<string, unknown>;
   if (typeof s.do !== "string" || !(VERBS as readonly string[]).includes(s.do)) return null;
   const out: ScreenStep = { do: s.do as ScreenVerb };
-  for (const k of ["target", "url", "text", "value", "key", "secret", "until", "expect"] as const) {
+  for (const k of ["target", "url", "text", "value", "key", "secret", "until", "find", "expect"] as const) {
     if (typeof s[k] === "string") out[k] = s[k] as string;
   }
   if (s.direction === "up" || s.direction === "down" || s.direction === "left" || s.direction === "right") {
@@ -691,7 +703,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
   const definitions: ToolDefinition[] = [
     tool(
       "browser_do",
-      `${BROWSER_TOOL_INFO.browser_do.description} The fastest way to use the browser: write the whole sequence you'd do by hand (open, fill the fields, click, wait) as \`steps\`, naming each target in words when you haven't seen its number; they run one after another on the page as it is at each step, even across pages. Give \`expect\` on steps whose result matters (\`signed in\`, \`the order is confirmed\`): it's checked, and the plan stops at the first step that fails or doesn't show what you expected, telling you why and what's on the page then. ${changes}`,
+      `${BROWSER_TOOL_INFO.browser_do.description} The fastest way to use the browser: write the whole task as \`steps\` in one call, from the \`open\` to the last click and wait, the way you'd do it by hand. You don't need to have seen a page to plan on it: name each target in words (\`the Email field\`, \`Export\`) and it is found on the page as it is at that step, even pages the plan reaches on its way. Give \`expect\` on steps whose result matters (\`signed in\`, \`the order is confirmed\`): it's checked, and the plan stops at the first step that fails or doesn't show what you expected, telling you why and what's on the page then, so you can go on from there. To report what the page says at the end, finish with a \`read\` step and \`find\` (\`the status message\`). ${changes}`,
       {
         type: "object",
         properties: { steps: { type: "array", minItems: 1, maxItems: MAX_PLAN_STEPS, items: STEP_SCHEMA } },
@@ -714,7 +726,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
     step(
       "browser_open",
-      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. It answers with what you can act on there, so you can act right away.`,
+      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. It answers with what you can act on there. To open a page and do something on it, use one browser_do that starts with \`open\` instead.`,
       {
         type: "object",
         properties: { url: { type: "string", description: "Full address (https://…).", maxLength: 2048 } },
@@ -793,7 +805,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       async (input, ctx) => {
         const question = str(input.find).trim();
         const whole = input.interactive_only !== true && !str(input.selector);
-        const args = ["-c", ...(input.interactive_only === true ? ["-i"] : [])];
+        // The whole tree: the compact one (`-c`) can drop a page's text. Only the controls: compact is fine.
+        const args = input.interactive_only === true ? ["-i", "-c"] : [];
         if (str(input.selector)) args.push("-s", str(input.selector));
         const linked = await linkFor(ctx);
         if (!linked.ok) return { content: linked.text, isError: true };

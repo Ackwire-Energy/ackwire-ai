@@ -68,7 +68,7 @@ function fakeHub(state: { machineId: string; orgId: string }) {
   return { hub, calls, s };
 }
 
-async function browserSetup(options: { judge?: Judge; vision?: boolean } = {}) {
+async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: () => number } = {}) {
   const holder: { hub?: MachineCaller } = {};
   f = await setup({
     toolSources: [
@@ -81,6 +81,7 @@ async function browserSetup(options: { judge?: Judge; vision?: boolean } = {}) {
         },
         ...(options.judge ? { judge: options.judge } : {}),
         ...(options.vision ? { vision: true } : {}),
+        ...(options.now ? { now: options.now } : {}),
       }),
     ],
   });
@@ -153,7 +154,7 @@ test("each tool is one agent-browser command in the agent's session, with its si
   expect(b.calls.at(-1)).toMatchObject({
     op: "browser.act",
     command: "snapshot",
-    args: ["-c"],
+    args: [],
     agent: { id: f.agent.id, handle: "dev", name: "Dev" },
     allowedDomains: ["shop.example.com", "*.stripe.com"],
   });
@@ -265,7 +266,13 @@ test("browser_do runs a sign-in across pages, checks what it expects and stops w
     // The dashboard shows; no list of orders ever does.
     return String(state.condition).includes("dashboard") && text.includes("Dashboard") ? 0.9 : 0.05;
   });
-  const b = await browserSetup({ judge });
+  // A clock that runs fast: the expectation that never holds gives up at once instead of after 3 s.
+  let t = Date.now();
+  const now = () => {
+    t += 400;
+    return t;
+  };
+  const b = await browserSetup({ judge, now });
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
   let at = "login";
   b.s.respond = (r) => {
@@ -285,7 +292,10 @@ test("browser_do runs a sign-in across pages, checks what it expects and stops w
     ],
   });
   expect(out.isError).toBeUndefined();
-  expect(out.content).toContain('Stopped at step 4 of 5 (click "Orders"): expected "the list of orders shows"');
+  // The click on Orders happened; only what it should show didn't: the agent is told not to click again.
+  expect(out.content).toContain(
+    'Stopped after step 4 of 5 (click "Orders"): Clicked link "Orders" (e20), but the page doesn\'t show "the list of orders shows". It was done: don\'t do it again',
+  );
   expect(out.content).toContain("Done before it: 3 steps.");
   expect(out.content).toContain("Now at https://app.acme.example/home");
   // Each step goes to the chat's trail as the tool it stands for; the open names its page (no query string).
@@ -293,7 +303,7 @@ test("browser_do runs a sign-in across pages, checks what it expects and stops w
     { tool: "browser_open", detail: "app.acme.example/login" },
     { tool: "browser_fill" },
     { tool: "browser_click" },
-    { tool: "browser_click", failed: true },
+    { tool: "browser_click" },
   ]);
   // The step after the stop never ran.
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "click")).toHaveLength(2);

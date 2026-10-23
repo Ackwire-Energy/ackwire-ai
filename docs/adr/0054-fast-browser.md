@@ -65,9 +65,10 @@ The agent names what it acts on, as a number (`e12`) or in words ("the Sign in b
 1. **A ref**, as given. The browser checks it; a stale one fails and says so.
 2. **Exactly one element with that name** and a fitting role, preferring a control over text with the same name (the heading "Sign in" next to the button). No judge.
 3. **The target memory:** what the same words found on the same page of the same site before, kept per agent (an LRU in the process, by host and generalized path, `/orders/:id`). It is found again by role and name.
-4. **The judge** picks among the page's fitting elements: only fields for a fill, boxes for a tick. Each element is described with where it sits (`button "Delete" — in row "Invoice 42"`). One request carries a Choice over refs (plus "none") and a Noul for whether it's there at all. Rules:
+4. **The judge** picks among the page's fitting elements: only fields for a fill, boxes for a tick. Each element is described with where it sits (`button "Delete" — in row "Invoice 42 · R$ 42,00"`). A table row has no name of its own in `agent-browser`'s snapshot (the invoice number is a sibling cell), so a row is named by its other cells. One request carries a Choice over refs (plus "none") and a Noul for whether it's there at all. Rules:
    - The pick is taken at p ≥ 0.55, at least 0.2 ahead of the next.
    - An element whose wrong pick costs (pay, delete, send, confirm…) needs 0.85.
+   - Two elements that read the same are never picked, however sure the judge is.
    - Below that, the three closest go back to the agent, which picks by number.
 5. **An image of the page** (`browser.capture`, protocol 17), when the text has nothing that fits: an icon without a name, a canvas. The judge boxes the target and confirms it's there (≥ 0.6). A box over most of the image is refused. The point lands on a marked element's ref when there is one, so the action stays as exact as a ref; otherwise it is a click at the point. Passwords are only typed into elements found on the page, never at a point.
 
@@ -75,11 +76,11 @@ The agent names what it acts on, as a number (`e12`) or in words ("the Sign in b
 
 After an action the runner waits until the page has settled:
 
-- the DOM has been quiet for 150 ms (at most 2 s, `eval` of a `MutationObserver`);
+- the DOM has been quiet for 120 ms since the wait began (at most 2 s). One `MutationObserver` per document remembers when the DOM last changed. After a click or a key, nothing may change at first (a submit the server answers later): the wait then gives the page up to 400 ms for its first change. A choice or a tick changes a property, not the DOM, so it doesn't wait for one;
 - the document has loaded (`wait --load domcontentloaded`, at most 8 s, tolerated);
-- the DOM is quiet again, for a navigation that started late.
+- the DOM is quiet again, counted from its last change: on a page that didn't navigate this returns at once, and on a new document it starts fresh.
 
-Then it looks once (`snapshot -c`). The tool answers with:
+Then it looks once, at the whole tree (`snapshot`, not `-c`: on a page of plain paragraphs the compact tree drops the text; measured, 3 lines of 290 on a long cart page, the total among the lost ones). The tool answers with:
 
 - **on the same page:** the lines added and removed, counted from what the agent last saw (up to 3,500 characters);
 - **on a new page:** what can be acted on, meaning lines with a ref plus headings, dialogs and alerts (up to 6,000 characters);
@@ -89,9 +90,11 @@ Page text stays inside the untrusted `page_content` block. `browser_open` answer
 
 ### 4. Plans: `browser_do`
 
-`browser_do({ steps })` takes up to 15 steps: open, click, fill, select, check, uncheck, press, type_secret, scroll, hover, wait, back. Each step's target is found on the page as it is at that moment, so a plan crosses pages whose elements the agent never saw. A step may carry `expect` ("signed in", "the cart has 2 items"); the judge checks it on the settled page (≥ 0.6 true, < 0.35 false, unsure counts as not shown).
+`browser_do({ steps })` takes up to 15 steps: open, click, fill, select, check, uncheck, press, type_secret, scroll, hover, wait, back, read. Each step's target is found on the page as it is at that moment, so a plan crosses pages whose elements the agent never saw. `read` with `find` ("the status message") brings what the page says at that point into the answer, so a plan can end by reporting.
 
-The plan stops at the first step that fails, can't find its target, or doesn't show what it expected. It answers with:
+A step may carry `expect` ("signed in", "the cart has 2 items"); the judge checks it on the settled page (≥ 0.6 true, < 0.35 false, unsure counts as not shown). An `expect` that isn't true yet gets up to 2 s to become true (a form that navigates after its submit), looked at again every 300 ms and judged only when the page changed; it gives up sooner when the page stays the same for 1 s.
+
+The plan stops at the first step that fails, can't find its target, or doesn't show what it expected. A step whose action went through but whose `expect` didn't hold says so ("Clicked Export, but the page doesn't show … It was done: don't do it again"), so the agent never repeats an action it can't confirm. It answers with:
 
 - what ran;
 - where it stopped and why, with the closest elements when a target wasn't clear;
@@ -131,16 +134,51 @@ Text questions keep `jev-latest`, with the cheap model as fallback.
 
 ### 9. Cost and what is recorded
 
-- **Usage and cost:** every judge call is recorded with `org_id` and `agent_id` like the other judgments (kind `router`, provider `typesafe`). A target costs about one tenth of a cent. A plan's report carries each step's time (`data.timing`).
+- **Usage and cost:** every judge call is recorded with `org_id` and `agent_id` like the other judgments (kind `router`, provider `typesafe`). A target is 1,500–2,500 input tokens, about a hundredth of a cent. A plan's report carries each step's time (`data.timing`).
+- **Jev's price was recorded 1,000× too low** (`JEV_NANO_USD_PER_INPUT_TOKEN` was 0.042; the catalog's unit is USD per million × 1,000, so $0.042 per million is 42). Fixed here, for every Jev judgment.
 - **The chat's trail:** each step goes on the trail as the tool it stands for (`meta.browser.steps`), so the card of where the agent browsed is unchanged.
 
-### Expected effect (an estimate, not a measurement)
+### Measured (2026-10-23, `bun run eval:browser` and `eval:browser:micro`)
 
-| | Today | With this |
+The setup: real Claude, real Chrome for Testing through `agent-browser` 0.39.1 and real Jev, on local Acme pages, with a simulated 100 ms server↔runner trip.
+
+- **Old:** the tools and guidance from before this ADR, verbatim.
+- **New:** these.
+- **Done** means the page shows the result **and** the answer says so.
+
+**A/B, last round (every fix below in)**
+
+| | Old | New |
 |---|---|---|
-| Sign-in (open, email, password, click) | 6 model turns, 2 full reads in context | 1 turn (`browser_do` with `expect`) |
-| Time, at 3–8 s per turn | 18–48 s | 1 turn + 4 steps × (0.2–0.6 s runner + 0–0.35 s judge) ≈ 5–12 s |
-| Each action on protocol 17 | 1 round trip, then a read turn | 1 round trip, the change in the answer |
+| Sign-in + export, Sonnet 5.5 (2 runs) | done 2/2 · 15.1–16.6 s · 7–8 turns · 22–25k input tokens | done 2/2 · **11.3–11.7 s · 2 turns · 7.3k** |
+| Settings behind an icon on a 150-row dashboard, Sonnet 5.5 | done **0/2** · 27.9–28.2 s · 8–11 turns · 130–185k | done 2/2 · **13.6–13.7 s · 3 turns · 11.8k** |
+| The same, Opus 5.5 | done 1/2 · 17.8–36.4 s · 7–11 turns · 102–207k | done 2/2 · **17.1–18.3 s · 3 turns · 12.2k** |
+
+**All rounds, scored the same way:** the old tools got **9 of 22** tasks done, the new ones **22 of 22**.
+
+- **Why the old one failed:** in each miss it told the person it "couldn't confirm" the result. It reads the page before the site's answer has rendered.
+- **Turns:** with a `read` step the model plans the whole sign-in-and-export (open, fill, fill, click, click, wait, read) in one `browser_do`.
+- **Time:** time per turn varies a lot from run to run, depending on the API. The steady gains are fewer turns and much less context: 72–94% fewer input tokens, and so cheaper too.
+
+**Parts (microbenchmark)**
+
+- **Jev, a target in words:** 0.2 s at the median (worst 0.6 s), 9 of 9 right on the test pages, 0 ms from the site memory the second time. It got 2 table targets wrong until rows were named by their cells.
+- **Jev's Box on a screenshot:** found the icon without a name in 0.22–0.25 s, at 0.98.
+- **Checks:** right both ways in 0.2 s.
+- **`find`:** on a 290-line cart page (14.7k characters) it answered with 203 characters in 0.28 s.
+- **One action on the runner** (click, settle, look): 187 ms. It was 428 ms before the settle kept its observer across waits.
+- **The sign-in plan of 6 steps** (with the cookie banner, the `expect` and the export wait, 2.5 s of it the page's own): 7.0 s on protocol 17 against 10.3 s on protocol 12.
+
+**What the measurements changed in this ADR**
+
+- The look is the whole tree, not `-c`.
+- Table rows are named by their cells, and elements that read the same are never picked.
+- The settle has one observer per document and waits up to 400 ms for a first change after a click or a key.
+- An `expect` that isn't true yet gets up to 2 s, and stops when the page stays the same for 1 s.
+- A step whose action ran but whose `expect` failed says it was done, so it isn't done twice. A run repeated an export because of this before the fix.
+- The Box looks for controls that may be only an icon.
+- There is a `read` step with `find`: the model asked for one at the end of a plan.
+- Jev's recorded price is fixed.
 
 ## Order
 

@@ -1,5 +1,5 @@
 import type { Judge } from "../judge";
-import { checkCondition, findDismiss } from "./checks";
+import { checkCondition, findDismiss, findInPage } from "./checks";
 import {
   diffObservations,
   type ScreenChanges,
@@ -33,7 +33,8 @@ export type ScreenVerb =
   | "scroll"
   | "hover"
   | "wait"
-  | "back";
+  | "back"
+  | "read";
 
 /** One step as the agent writes it. */
 export interface ScreenStep {
@@ -50,6 +51,8 @@ export interface ScreenStep {
   /** `wait`: until this is true on the screen (words), this text shows, or for this long. */
   until?: string;
   seconds?: number;
+  /** `read`: what to get from the screen ("the order total"): only the lines that answer it. */
+  find?: string;
   /** After the step, this should be true on the screen; the plan stops when it isn't. */
   expect?: string;
 }
@@ -99,6 +102,8 @@ export interface PlanDeps {
   before?: ScreenObservation | null;
   /** The judge may look at images (Jev's vision): the fallback for targets the text lacks. */
   vision?: boolean;
+  /** How long an `expect` that isn't true yet may take to become true (default `EXPECT_GRACE_MS`). */
+  expectGraceMs?: number;
   now?: () => number;
 }
 
@@ -117,6 +122,10 @@ export interface StepReport {
   dismissed?: string;
   /** The step's `expect`, as checked. */
   expected?: { met: boolean | null; p: number };
+  /** Its action went through (a failed step with this only failed its `expect`: it must not be done again). */
+  ran?: boolean;
+  /** `read` with `find`: the lines that answer it (page text, untrusted), or why there are none. */
+  found?: { question: string; text: string; answered: "yes" | "partly" | "no" };
   ms: number;
 }
 
@@ -149,6 +158,15 @@ const STALE = /stale|unknown ref|ref\b.*\b(not found|no longer|invalid)|no eleme
 /** Longest a `wait` step waits. */
 export const MAX_WAIT_MS = 120_000;
 const POLL_MS = 700;
+/**
+ * An `expect` that isn't true yet gets up to this long to become true: a form
+ * that navigates 300 ms after its submit, a message that shows when the
+ * server answers. Looked at again every 300 ms, the judge only when the page
+ * changed; it stops sooner when the page stays the same for `EXPECT_QUIET_MS`.
+ */
+export const EXPECT_GRACE_MS = 2000;
+const EXPECT_QUIET_MS = 1000;
+const EXPECT_POLL_MS = 300;
 
 /** The plan stops here, for this reason (said to the agent). */
 class Stop extends Error {
@@ -222,9 +240,32 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
       case "wait":
         await waitStep(step, report);
         return;
+      case "read":
+        await readStep(step, report);
+        return;
       default:
         await targeted(step, report);
     }
+  }
+
+  /** A look at the screen as a step: with `find`, only the lines that answer it go into the report. */
+  async function readStep(step: ScreenStep, report: StepReport) {
+    const current = await look();
+    const question = step.find?.trim() || step.target?.trim();
+    if (!question) {
+      report.note = "the page";
+      return;
+    }
+    const found = await findInPage({
+      judge: deps.judge,
+      orgId: deps.orgId,
+      agentId: deps.agentId,
+      runId: deps.runId,
+      question,
+      observation: current,
+    });
+    report.note = `"${question}"`;
+    report.found = { question, text: found.text, answered: found.answered };
   }
 
   async function waitStep(step: ScreenStep, report: StepReport) {
@@ -394,23 +435,42 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
       if (held) throw new Stop(held);
       const prior: ScreenObservation | null = screen;
       await runStep(step, report);
+      // The action went through; what follows only checks it.
+      report.ran = true;
       if (step.expect?.trim()) {
-        const after = screen ?? (await look());
-        const check = await checkCondition({
-          judge: deps.judge,
-          orgId: deps.orgId,
-          agentId: deps.agentId,
-          runId: deps.runId,
-          condition: step.expect,
-          observation: after,
-          changes: diffObservations(prior, after),
-        });
+        const condition = step.expect.trim();
+        const judgeOn = (o: ScreenObservation) =>
+          checkCondition({
+            judge: deps.judge,
+            orgId: deps.orgId,
+            agentId: deps.agentId,
+            runId: deps.runId,
+            condition,
+            observation: o,
+            changes: diffObservations(prior, o),
+          });
+        let after = screen ?? (await look());
+        let check = await judgeOn(after);
+        // Not true yet: the page may still be on its way (a submit that navigates later, a server's answer).
+        const until = now() + (deps.expectGraceMs ?? EXPECT_GRACE_MS);
+        let judged = screenDigest(after);
+        let changedAt = now();
+        while (check.met !== true && now() < until && now() - changedAt < EXPECT_QUIET_MS) {
+          if (deps.signal?.aborted) throw new Stop("stopped");
+          await deps.surface.perform({ kind: "pause", ms: EXPECT_POLL_MS }, { settle: false });
+          after = await look();
+          const digest = screenDigest(after);
+          if (digest === judged) continue;
+          judged = digest;
+          changedAt = now();
+          check = await judgeOn(after);
+        }
         report.expected = check;
         if (check.met !== true) {
           throw new Stop(
             check.met === false
-              ? `expected "${step.expect.trim()}", but the page doesn't show it`
-              : `couldn't confirm "${step.expect.trim()}" on the page`,
+              ? `the page doesn't show "${condition}"`
+              : `couldn't confirm "${condition}" on the page`,
           );
         }
       }
@@ -418,7 +478,8 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
     } catch (error) {
       report.status = "failed";
       const reason = error instanceof Error ? error.message : String(error);
-      report.note = report.note ? `${report.note}: ${reason}` : reason;
+      // A step that ran keeps saying what it did: only its check failed.
+      if (!report.ran) report.note = report.note ? `${report.note}: ${reason}` : reason;
       stopped = {
         index,
         reason,

@@ -33,24 +33,56 @@ export const COMMAND_SECONDS = 30;
 export const OPEN_SECONDS = 60;
 
 /**
- * Settling: resolves once the page's DOM has been quiet for 150 ms (at most
- * 2 s), so a look after a click sees what the click did, not the page halfway
- * through. A navigation cuts it short (its document goes away), which the
- * load wait after it covers.
+ * Settling, so a look after a click sees what the click did, not the page
+ * halfway through: resolves once the DOM has been quiet for 120 ms (at most
+ * 2 s). One observer per document remembers when the DOM last changed. Right
+ * after an action the quiet is counted from the start of the wait (a
+ * response that renders 100 ms later is still seen); the second wait, after
+ * the load wait, counts from the last change, so on a page that didn't
+ * navigate it returns at once. A navigation cuts the first wait short (its
+ * document goes away), and the second one starts fresh on the new document.
+ * `lateMs`: after a click nothing may change at first (a submit the server
+ * answers later): the wait gives the page that long for its first change.
  */
-const SETTLE_JS =
-  "new Promise((resolve) => { let quiet; let cap; const done = () => { observer.disconnect(); clearTimeout(quiet); clearTimeout(cap); resolve(true); }; const observer = new MutationObserver(() => { clearTimeout(quiet); quiet = setTimeout(done, 150); }); observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true }); quiet = setTimeout(done, 150); cap = setTimeout(done, 2000); })";
-const SETTLE_B64 = Buffer.from(SETTLE_JS, "utf8").toString("base64");
+const settleScript = (fromStart: boolean, lateMs = 0) =>
+  `(() => { const key = Symbol.for("agentes.settle"); let s = window[key]; const fresh = !s; if (!s) { s = { last: performance.now() }; new MutationObserver(() => { s.last = performance.now(); }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true }); window[key] = s; } const start = performance.now(); const from = ${fromStart} || fresh; return new Promise((resolve) => { const tick = () => { const now = performance.now(); const quiet = now - (from ? Math.max(s.last, start) : s.last); const changed = s.last > start; const ready = quiet >= 120 && (changed || now - start >= ${lateMs}); if (ready || now - start >= 2000) resolve(true); else setTimeout(tick, Math.max(16, 120 - quiet)); }; tick(); }); })()`;
+const b64 = (js: string) => Buffer.from(js, "utf8").toString("base64");
 
-const settle: BrowserBatchCommand = { command: "eval", args: ["-b", SETTLE_B64], timeoutSeconds: 5, tolerate: true };
+const settle: BrowserBatchCommand = {
+  command: "eval",
+  args: ["-b", b64(settleScript(true))],
+  timeoutSeconds: 5,
+  tolerate: true,
+};
+/** After a click, a key or a choice: up to 400 ms for the page's first change. */
+const settleLate: BrowserBatchCommand = {
+  command: "eval",
+  args: ["-b", b64(settleScript(true, 400))],
+  timeoutSeconds: 5,
+  tolerate: true,
+};
+/**
+ * A click or a key (Enter sends a form) may get its answer later. A choice or a tick changes a
+ * property, not the DOM: waiting for a first change there would always run to the end.
+ */
+const LATE = new Set<ScreenAction["kind"]>(["click", "press"]);
 const loaded: BrowserBatchCommand = {
   command: "wait",
   args: ["--load", "domcontentloaded", "--timeout", "8000"],
   timeoutSeconds: 10,
   tolerate: true,
 };
-/** The look after an action: the whole page, compact (text and the elements' refs). */
-export const LOOK: BrowserBatchCommand = { command: "snapshot", args: ["-c"], timeoutSeconds: COMMAND_SECONDS };
+const settledAgain: BrowserBatchCommand = {
+  command: "eval",
+  args: ["-b", b64(settleScript(false))],
+  timeoutSeconds: 5,
+  tolerate: true,
+};
+/**
+ * The look after an action: the whole page, its text and the elements' refs. Not `-c`: on a page of
+ * plain paragraphs the compact tree drops the text (measured: 3 lines of 290 on a long cart page).
+ */
+export const LOOK: BrowserBatchCommand = { command: "snapshot", args: [], timeoutSeconds: COMMAND_SECONDS };
 
 const ref = (at: { ref: string }) => `@${at.ref.replace(/^@/, "")}`;
 const isPoint = (at: ActTarget): at is { x: number; y: number } => "x" in at;
@@ -153,7 +185,8 @@ export function browserSurface(options: BrowserSurfaceOptions): ScreenSurface {
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
-      const all = wait ? [...commands, settle, loaded, settle, LOOK] : commands;
+      const first = LATE.has(action.kind) ? settleLate : settle;
+      const all = wait ? [...commands, first, loaded, settledAgain, LOOK] : commands;
       const replies = await link.batch(all);
       // The action's own commands must all have gone through.
       for (let i = 0; i < commands.length; i++) {

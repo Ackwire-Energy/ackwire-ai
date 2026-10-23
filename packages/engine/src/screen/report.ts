@@ -21,6 +21,7 @@ const DONE: Record<ScreenVerb, string> = {
   hover: "Hovered",
   wait: "Waited",
   back: "Went back",
+  read: "Read",
 };
 
 /** One step in a few words ("click "the Sign in button""). */
@@ -36,6 +37,8 @@ export function stepLabel(step: ScreenStep): string {
       return step.until ? `wait until "${step.until}"` : step.text ? `wait for "${step.text}"` : "wait";
     case "back":
       return "back";
+    case "read":
+      return step.find || step.target ? `read "${step.find ?? step.target}"` : "read the page";
     default:
       return `${step.do.replace("_", " ")} "${step.target ?? ""}"`;
   }
@@ -109,16 +112,26 @@ export function formatPlanReport(r: PlanReport): FormattedReport {
   const closest = r.stopped?.candidates?.length
     ? `Closest on the page: ${r.stopped.candidates.map((c) => `${describeElement(c, 120)} [${c.ref}]`).join("; ")}.`
     : null;
+  // The step that stopped the plan ran, and only its check failed: say it was done, so it isn't done twice.
+  const stoppedStep = r.stopped ? (r.steps[r.stopped.index] as StepReport) : null;
+  const ranButUnconfirmed = stoppedStep?.ran
+    ? `${stepLine({ ...stoppedStep, expected: undefined }).replace(/\.$/, "")}, but ${r.stopped?.reason}. It was done: don't do it again; look at what the page shows.`
+    : null;
   if (r.steps.length === 1) {
     const only = r.steps[0] as StepReport;
-    if (r.stopped) out.push(`Couldn't ${stepLabel(only.step)}: ${r.stopped.reason}`);
+    if (ranButUnconfirmed) out.push(ranButUnconfirmed);
+    else if (r.stopped) out.push(`Couldn't ${stepLabel(only.step)}: ${r.stopped.reason}`);
     else out.push(stepLine(only));
     if (closest) out.push(closest);
   } else {
     if (r.stopped) {
       const n = r.stopped.index + 1;
-      const at = stepLabel((r.steps[r.stopped.index] as StepReport).step);
-      out.push(`Stopped at step ${n} of ${r.steps.length} (${at}): ${r.stopped.reason}`);
+      const at = stepLabel((stoppedStep as StepReport).step);
+      out.push(
+        ranButUnconfirmed
+          ? `Stopped after step ${n} of ${r.steps.length} (${at}): ${ranButUnconfirmed}`
+          : `Stopped at step ${n} of ${r.steps.length} (${at}): ${r.stopped.reason}`,
+      );
       if (closest) out.push(closest);
       out.push(
         done.length > 0 ? `Done before it: ${done.length} step${done.length > 1 ? "s" : ""}.` : "Nothing was done.",
@@ -128,9 +141,18 @@ export function formatPlanReport(r: PlanReport): FormattedReport {
       out.push(`${i + 1}. ${stepLine(s)}`);
     });
   }
+  // What `read` steps found goes with the page (it is page text), before what changed on it.
+  const found = r.steps
+    .filter((s) => s.status === "done" && s.found)
+    .map((s) => {
+      const f = s.found as NonNullable<StepReport["found"]>;
+      if (f.answered === "no" || !f.text) return `Nothing on the page answers "${f.question}".`;
+      return `Where the page answers "${f.question}"${f.answered === "partly" ? " (maybe only in part)" : ""}:\n${f.text}`;
+    });
+  const screen = describeScreen(r.after, r.changes);
   return {
     summary: out.join("\n"),
-    screen: describeScreen(r.after, r.changes),
+    screen: found.length > 0 ? [...found, screen].filter(Boolean).join("\n\n") : screen,
     failed: Boolean(r.stopped),
   };
 }

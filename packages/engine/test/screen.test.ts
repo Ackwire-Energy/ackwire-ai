@@ -77,6 +77,26 @@ describe("observing a screen", () => {
     expect(screenDigest(before)).not.toBe(screenDigest(after));
   });
 
+  test("a table row without a name is named by its other cells (as agent-browser writes tables)", () => {
+    const table = observeSnapshot({
+      text: `- table "Invoices"
+  - row
+    - cell "Invoice 41" [ref=e7]
+    - cell "Edit Delete" [ref=e9]
+      - button "Delete" [ref=e20]
+  - row
+    - cell "Invoice 42" [ref=e10]
+    - cell "R$ 42,00" [ref=e11]
+    - cell "Edit Delete" [ref=e12]
+      - button "Delete" [ref=e22]`,
+    });
+    const del = table.elements.find((e) => e.ref === "e22");
+    expect(del?.context).toEqual(['row "Invoice 42 · R$ 42,00"', 'table "Invoices"']);
+    expect(describeElement(del as NonNullable<typeof del>)).toBe(
+      'button "Delete" — in row "Invoice 42 · R$ 42,00" › table "Invoices"',
+    );
+  });
+
   test("the overview keeps what can be acted on, headings and alerts; paragraphs out", () => {
     const { text, omitted } = screenOverview(login());
     expect(text).toContain('- button "Sign in" [ref=e5]');
@@ -148,6 +168,23 @@ describe("targets in words", () => {
       found: false,
       reason: "absent",
     });
+  });
+
+  test("two elements that read the same are never picked by the judge, however sure it is", async () => {
+    const page = observeSnapshot({ text: '- list\n  - button "Remove" [ref=e1]\n  - button "Remove" [ref=e2]' });
+    const sure = createFakeJudge((kind, id) =>
+      kind !== "screen_target" ? undefined : id === "present" ? 0.95 : { choice: "e2", probabilities: { e2: 0.97 } },
+    );
+    const r = await resolveTarget({
+      judge: sure,
+      ...ids,
+      observation: page,
+      scope: "a",
+      target: "the second one",
+      use: "click",
+    });
+    expect(r).toMatchObject({ found: false, reason: "unsure" });
+    expect(r.found ? [] : r.candidates.map((c) => c.ref)).toEqual(["e2", "e1"]);
   });
 
   test("a costly element (delete, pay, send) needs a surer pick; else the agent picks by number", async () => {
@@ -330,16 +367,58 @@ describe("plans", () => {
   test("stops at an expectation the page doesn't show, and the rest never runs", async () => {
     const judge = createFakeJudge((kind) => (kind === "screen_check" ? 0.05 : undefined));
     const surface = fakeSurface(PAGES, "login");
-    const report = await runPlan({ judge, ...ids, surface, scope: "a" }, [
+    let t = 0;
+    const now = () => {
+      t += 500;
+      return t;
+    };
+    const report = await runPlan({ judge, ...ids, surface, scope: "a", now }, [
       { do: "click", target: "Sign in", expect: "an error says the password is wrong" },
       { do: "click", target: "Export" },
     ]);
     expect(report.stopped).toMatchObject({ index: 0 });
     expect(report.steps.map((s) => s.status)).toEqual(["failed", "skipped"]);
-    expect(surface.actions).toHaveLength(1);
+    // The click, then short pauses while it waited for the page to show it; no second click.
+    expect(surface.actions.filter((a) => a.kind !== "pause").map((a) => a.kind)).toEqual(["click"]);
+    // The page never changed while it waited: the judge was asked once.
+    expect(judge.calls.filter((c) => c.kind === "screen_check")).toHaveLength(1);
     expect(formatPlanReport(report).summary).toStartWith(
-      'Stopped at step 1 of 2 (click "Sign in"): expected "an error says the password is wrong", but the page doesn\'t show it',
+      'Stopped after step 1 of 2 (click "Sign in"): Clicked button "Sign in" (e5), but the page doesn\'t show "an error says the password is wrong". It was done',
     );
+  });
+
+  test("an expectation that becomes true a moment later (a submit that navigates late) still passes", async () => {
+    const judge = createFakeJudge((kind, _id, state) =>
+      kind === "screen_check" && String((state.screen as { text: string }).text).includes("Dashboard") ? 0.9 : 0.05,
+    );
+    const surface = fakeSurface(PAGES, "login");
+    let clicked = false;
+    let looksAfter = 0;
+    const observe = surface.observe.bind(surface);
+    surface.observe = async () => {
+      // The first look after the click still sees the login page; the next one, the dashboard.
+      if (clicked && ++looksAfter === 2) surface.go("home");
+      return observe();
+    };
+    const original = surface.perform.bind(surface);
+    surface.perform = async (action, options) => {
+      const out = await original(action, options);
+      if (action.kind !== "click") return out;
+      // The click itself leaves the page where it was: the navigation comes later.
+      clicked = true;
+      surface.go("login");
+      return { ok: true, observation: null };
+    };
+    let t = 0;
+    const now = () => {
+      t += 100;
+      return t;
+    };
+    const report = await runPlan({ judge, ...ids, surface, scope: "a", now }, [
+      { do: "click", target: "Sign in", expect: "the dashboard shows" },
+    ]);
+    expect(report.stopped).toBeUndefined();
+    expect(report.steps[0]?.expected).toMatchObject({ met: true });
   });
 
   test("a banner in the way is closed once, then the step goes through", async () => {
@@ -393,6 +472,29 @@ describe("plans", () => {
     expect(ticks).toBe(3);
     // First look, then only the change: two judgments for four looks.
     expect(checks).toBe(2);
+  });
+
+  test("a read step at the end brings what the page says, with the page text kept apart", async () => {
+    const judge = createFakeJudge((kind, id, _state, q) => {
+      if (kind !== "screen_find") return undefined;
+      if (id === "answers") return 0.9;
+      const keys = Object.keys((q as { criteria: Record<string, string> }).criteria);
+      const line = keys.find((k) => (q as { criteria: Record<string, string> }).criteria[k]?.includes("Export"));
+      return line ? { choice: line, probabilities: { [line]: 0.9 } } : "none";
+    });
+    const surface = fakeSurface(PAGES, "home");
+    const report = await runPlan({ judge, ...ids, surface, scope: "a" }, [
+      { do: "click", target: "Export" },
+      { do: "read", find: "the export button" },
+    ]);
+    expect(report.stopped).toBeUndefined();
+    expect(report.steps[1]?.found).toMatchObject({ question: "the export button", answered: "yes" });
+    const text = formatPlanReport(report);
+    expect(text.summary).toContain('2. Read "the export button".');
+    // What it found is page text: it goes with the screen (the caller wraps it as untrusted), not the summary.
+    expect(text.screen).toContain('Where the page answers "the export button":');
+    expect(text.screen).toContain('- button "Export" [ref=e21]');
+    expect(text.summary).not.toContain("[ref=e21]");
   });
 
   test("a person taking over stops the plan before the next step", async () => {

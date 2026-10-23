@@ -83,12 +83,24 @@ const PLACES = new Set([
   "iframe",
 ]);
 
+/** A table row has no name of its own in the snapshot: its cells say which row it is. */
+const ROWS = new Set(["row"]);
+const CELLS = new Set(["cell", "gridcell", "rowheader", "columnheader"]);
+
 const unquote = (s: string) => s.replace(/\\(.)/g, "$1");
 
 /** `e7`, `@e7` or `[ref=e7]` → `e7`; anything else → null. */
 export function screenRef(target: string): string | null {
   const m = /^\s*(?:\[?ref=)?@?(e\d+)\]?\s*$/.exec(target);
   return m ? (m[1] as string) : null;
+}
+
+interface Node {
+  role: string;
+  name: string | null;
+  ref: string | null;
+  line: string;
+  parent: number;
 }
 
 /**
@@ -109,33 +121,60 @@ export function observeSnapshot(input: {
     input.refs && typeof input.refs === "object"
       ? (input.refs as Record<string, { role?: unknown; name?: unknown }>)
       : {};
-  const elements: ScreenElement[] = [];
-  // Open containers, by depth: each line's named parents.
-  const stack: { depth: number; place: string | null }[] = [];
+  // The tree: each line's node and its parent (by indentation).
+  const nodes: Node[] = [];
+  const children: number[][] = [];
+  const open: { depth: number; index: number }[] = [];
   lines.forEach((line, index) => {
     const depth = (line.length - line.trimStart().length) / 2;
     const body = line.trim();
-    while (stack.length > 0 && (stack[stack.length - 1] as { depth: number }).depth >= depth) stack.pop();
-    const role = ROLE.exec(body)?.[1] ?? "";
+    while (open.length > 0 && (open[open.length - 1] as { depth: number }).depth >= depth) open.pop();
+    const parent = open.length > 0 ? (open[open.length - 1] as { index: number }).index : -1;
     const quoted = NAME.exec(body)?.[1];
-    const ref = REF.exec(body)?.[1];
-    if (ref) {
-      const meta = known[ref];
-      elements.push({
-        ref,
-        role: typeof meta?.role === "string" && meta.role ? meta.role : role,
-        name: typeof meta?.name === "string" ? meta.name : quoted !== undefined ? unquote(quoted) : "",
-        line: body,
-        context: stack
-          .map((s) => s.place)
-          .filter((p): p is string => p !== null)
-          .reverse()
-          .slice(0, 3),
-        index,
-      });
+    nodes.push({
+      role: ROLE.exec(body)?.[1] ?? "",
+      name: quoted !== undefined ? unquote(quoted) : null,
+      ref: REF.exec(body)?.[1] ?? null,
+      line: body,
+      parent,
+    });
+    children.push([]);
+    if (parent >= 0) (children[parent] as number[]).push(index);
+    open.push({ depth, index });
+  });
+  /** How a container reads as a place: its name, or for a row the other cells' text ("Invoice 42 · R$ 42,00"). */
+  const placeOf = (i: number, via: number): string | null => {
+    const n = nodes[i] as Node;
+    if (!PLACES.has(n.role)) return null;
+    if (n.name) return `${n.role} "${n.name.slice(0, 80)}"`;
+    if (!ROWS.has(n.role)) return null;
+    const cells = (children[i] as number[])
+      .filter((c) => c !== via && CELLS.has((nodes[c] as Node).role) && (nodes[c] as Node).name)
+      .map((c) => (nodes[c] as Node).name as string);
+    return cells.length > 0 ? `${n.role} "${cells.join(" · ").slice(0, 80)}"` : null;
+  };
+  const elements: ScreenElement[] = [];
+  nodes.forEach((n, index) => {
+    if (!n.ref) return;
+    // Its named containers, nearest first.
+    const context: string[] = [];
+    let child = index;
+    let p = n.parent;
+    while (p >= 0 && context.length < 3) {
+      const place = placeOf(p, child);
+      if (place) context.push(place);
+      child = p;
+      p = (nodes[p] as Node).parent;
     }
-    const place = PLACES.has(role) && quoted ? `${role} "${unquote(quoted).slice(0, 80)}"` : null;
-    stack.push({ depth, place });
+    const meta = known[n.ref];
+    elements.push({
+      ref: n.ref,
+      role: typeof meta?.role === "string" && meta.role ? meta.role : n.role,
+      name: typeof meta?.name === "string" ? meta.name : (n.name ?? ""),
+      line: n.line,
+      context,
+      index,
+    });
   });
   // Refs the map knows that no line carries (rare): still targets.
   const seen = new Set(elements.map((e) => e.ref));

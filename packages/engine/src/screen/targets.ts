@@ -285,6 +285,11 @@ function decide(
     ranked.find((r) => r.e.ref !== choice)?.p ?? 0,
     choice === "none" ? 0 : (probabilities.none ?? 0),
   );
+  // Elements that read the same can't be told apart, whatever the judge says: the agent picks by number.
+  const twins = picked ? candidates.filter((e) => e !== picked && describeElement(e) === describeElement(picked)) : [];
+  if (picked && twins.length > 0) {
+    return { found: false, reason: "unsure", candidates: [picked, ...twins].slice(0, 3) };
+  }
   const need = picked && COSTLY.test(picked.name) ? COSTLY_PICK_AT : PICK_AT;
   if (picked && p >= need && p - next >= PICK_MARGIN && present >= ABSENT_BELOW) {
     remember(picked);
@@ -330,11 +335,11 @@ export async function locateOnImage(input: {
         where: {
           type: "box",
           instructions:
-            "In `screenshot` (a web page), box the one element `target` describes: just that control, tightly.",
+            "In `screenshot` (a web page), box the one control that does what `target` describes, tightly. It may be only an icon: a gear for settings, a trash can for delete, a pencil for edit, a magnifier for search, × for close.",
         },
         present: {
           type: "noul",
-          instructions: "Does `screenshot` show the element `target` describes?",
+          instructions: "Does `screenshot` show a control that does what `target` describes (maybe only as an icon)?",
           criteria: {
             true: "It is visible on the screenshot.",
             false: "It isn't on the screenshot (hidden, scrolled away or not on this page).",
