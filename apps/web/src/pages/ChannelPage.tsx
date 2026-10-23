@@ -1478,7 +1478,10 @@ function ChannelView({
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const actions: ChannelActions = {
+  // The rows read these through context: the value stays the same object across renders (a keystroke
+  // in the composer must not redraw every message); each call reaches this render's handlers.
+  const latestActions = useRef<Required<ChannelActions>>(null as never);
+  latestActions.current = {
     insertMention: (handle) => {
       setDraft((d) => `${d.trim() ? `${d.trim()} ` : ""}@${handle} `);
       composer.current?.focus();
@@ -1501,12 +1504,10 @@ function ChannelView({
           setProfileId(null);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
-    openThread: thread
-      ? undefined
-      : (id) => {
-          setProfileId(null);
-          setPanel({ id, reply: false });
-        },
+    openThread: (id) => {
+      setProfileId(null);
+      setPanel({ id, reply: false });
+    },
     requestCorrection: (message, text) => {
       const handle = message.author.type === "agent" ? dir.agentById.get(message.author.id ?? "")?.handle : undefined;
       toBottom(true);
@@ -1522,6 +1523,24 @@ function ChannelView({
       composer.current?.focus();
     },
   };
+  const inThread = Boolean(thread);
+  const actions = useMemo<ChannelActions>(() => {
+    const now = () => latestActions.current;
+    return {
+      insertMention: (handle) => now().insertMention(handle),
+      retry: (local) => now().retry(local),
+      resend: (body) => now().resend(body),
+      focusComposer: () => now().focusComposer(),
+      followBottom: () => now().followBottom(),
+      channelAgents,
+      reply: (message) => now().reply(message),
+      // A thread view has no panel: its links go to the thread's page.
+      openThread: inThread ? undefined : (id) => now().openThread(id),
+      requestCorrection: (message, text) => now().requestCorrection(message, text),
+      jumpTo: (messageId) => now().jumpTo(messageId),
+      replyToMission: (missionId, label) => now().replyToMission(missionId, label),
+    };
+  }, [channelAgents, inThread]);
 
   // A DM with an agent: the agent's chip sits in the composer's toolbar row.
   const agentDm = Boolean(chrome?.dmAgentId) && !thread;

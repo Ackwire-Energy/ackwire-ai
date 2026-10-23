@@ -1,5 +1,5 @@
 import { Icon } from "@agenteschat/ui";
-import { createContext, type ReactNode, useCallback, useContext, useSyncExternalStore } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 
 /**
  * Minimal toasts in the design language (neutral surface, overlay shadow,
@@ -84,8 +84,10 @@ export function ToastProvider({
       store.show(text, tone, action, detail),
     [store],
   );
+  // Stable: a toast appearing must not re-render everything that can show one.
+  const value = useMemo(() => ({ show }), [show]);
   return (
-    <ToastContext.Provider value={{ show }}>
+    <ToastContext.Provider value={value}>
       {children}
       <div className="ac-toasts" aria-live="polite">
         {toasts.map((toast) => (

@@ -486,7 +486,9 @@ export function RealtimeProvider({
     return () => clearInterval(timer);
   }, [streams, qc, orgId]);
 
-  return <RealtimeContext.Provider value={{ connection, streams }}>{children}</RealtimeContext.Provider>;
+  // Stable across the layout's re-renders (every navigation): only a new socket changes it.
+  const value = useMemo(() => ({ connection, streams }), [connection, streams]);
+  return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 }
 
 function useRealtime() {
