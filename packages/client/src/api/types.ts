@@ -3404,6 +3404,8 @@ export interface WorkingRun {
   label: string | null;
   /** Messages sent to it while it works that it hasn't read yet. */
   pendingMessageIds?: string[];
+  /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
+  background?: boolean;
 }
 
 /** A one-off reminder in a conversation (`reminders.*`; also a routine in Rotinas). */

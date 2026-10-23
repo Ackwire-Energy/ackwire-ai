@@ -13,6 +13,7 @@ import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
+import { isTalkerReply } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
@@ -105,6 +106,8 @@ export const MessageRow = memo(function MessageRow({
   const viaRoutine = isAgent ? viaRoutineOf(meta) : null;
   // A plain reminder: the agent's own message with a "Lembrete" label (the server's prefix dropped).
   const reminder = isReminderMessage(meta);
+  // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
+  const talker = isAgent && isTalkerReply(meta);
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
   const body =
     hidesBody(m) || (routine && !routineOpen)
@@ -249,7 +252,18 @@ export const MessageRow = memo(function MessageRow({
             </Text>
             {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
             {viaRoutine ? <Tag icon="clock" label={t("channel.viaRoutine", { name: viaRoutine.name })} /> : null}
-            {!reminder && !viaRoutine && agent?.role ? (
+            {talker ? (
+              <Text
+                variant="caption"
+                tone="faint"
+                numberOfLines={1}
+                style={styles.shrink}
+                accessibilityHint={t("chat.notice.talkerTip")}
+              >
+                {t("chat.notice.talker")}
+              </Text>
+            ) : null}
+            {!reminder && !viaRoutine && !talker && agent?.role ? (
               <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
                 {agent.role}
               </Text>
@@ -333,8 +347,10 @@ function Sending({ offline, end }: { offline: boolean; end: boolean }) {
 
 /**
  * Under my message sent while an agent works (Mensagens.html, C): "{nome} lê na próxima pausa" (the ink
- * orbit) until it reads it, "{nome} parou para ler" when I asked it to stop and read, then "{nome} leu"
- * with its small face.
+ * orbit) until it reads it, "{nome} parou para ler" when I asked it to stop and read (or it woke a wait),
+ * "{nome} recebeu" (a check) once handed to its computer mid-turn, "{nome} lê depois da sua decisão no
+ * card" (paused) while an approval holds it, then "{nome} leu" or "{nome} encerrou o pedido de ajuda"
+ * with its small face (the shared store, `useSteerState`, as on the web).
  */
 function SteerLine({ message: m }: { message: Message }) {
   const { t } = useTranslation();
@@ -356,6 +372,10 @@ function SteerLine({ message: m }: { message: Message }) {
         <AgentFace agentId={steer.agentId} size={16} live={false} framed={false} />
       ) : steer.state === "now" ? (
         <Icon name="bolt" size={12} color={c.muted} />
+      ) : steer.state === "delivered" ? (
+        <Icon name="check" size={12} color={c.muted} />
+      ) : steer.state === "held" ? (
+        <Icon name="pause" size={12} color={c.muted} />
       ) : (
         <InkOrbit size={10} color={c.muted} />
       )}
