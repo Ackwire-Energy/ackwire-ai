@@ -4022,6 +4022,11 @@ p {
 .sidebar {
   position: relative;
   background: var(--side);
+  /* The chosen item and the ⌘K field: the page's white in light; a lighter step of the paper in dark. */
+  --side-active: var(--pane);
+}
+[data-theme="dark"] .sidebar {
+  --side-active: color-mix(in srgb, var(--ink) 7%, var(--side));
 }
 /* Light: the paper and the white work area meet on a hairline (dark keeps the step in tone; the drawer has its shadow). */
 @media (min-width: 761px) {
@@ -4040,7 +4045,7 @@ p {
   left: 0;
   z-index: 0;
   border-radius: var(--control-r-md);
-  background: var(--pane);
+  background: var(--side-active);
   box-shadow: inset 0 0 0 1px var(--line);
   pointer-events: none;
 }
@@ -4102,7 +4107,7 @@ p {
   padding: 0 10px 0 var(--control-px-md);
   border: 0;
   border-radius: var(--control-r-md);
-  background: var(--pane);
+  background: var(--side-active);
   box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: var(--control-fs-md);

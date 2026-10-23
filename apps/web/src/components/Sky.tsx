@@ -326,7 +326,7 @@ export function AgentTrail({ color }: { color: AgentColor }) {
       <PixelSky
         options={{
           pixel: 3,
-          surface: "--sunken",
+          surface: "--side",
           palette: (bg) => softTones(color, bg),
           light: 0,
           base: (u, _v, tt) => {
@@ -347,7 +347,7 @@ export function AgentGlow({ color }: { color: AgentColor }) {
       <PixelSky
         options={{
           pixel: 2,
-          surface: "--sunken",
+          surface: "--side",
           palette: (bg) => softTones(color, bg),
           light: 0,
           base: (u, v, tt) => {
@@ -371,7 +371,7 @@ export function SidebarHorizon({ working, total }: { working: number; total: num
   if (prefersReducedMotion()) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
-    surface: "--sunken",
+    surface: "--side",
     palette: (bg) => softTones("sky", bg),
     body: spriteTone("sky"),
     near: 0,
@@ -436,7 +436,7 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
   if (prefersReducedMotion()) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
-    surface: "--sunken",
+    surface: "--side",
     palette: (bg) => softTones("sky", bg),
     body: spriteTone("sky"),
     near: 0,
