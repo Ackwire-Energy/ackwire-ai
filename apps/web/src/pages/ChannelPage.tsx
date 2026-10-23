@@ -1,3 +1,7 @@
+// Not compiled by React Compiler: views here read the live store and refs while rendering (the rows'
+// memoization is written by hand).
+"use no memo";
+
 import type {
   Agent,
   AgentQuestion,
