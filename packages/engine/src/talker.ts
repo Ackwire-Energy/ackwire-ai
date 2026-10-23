@@ -91,6 +91,8 @@ export function talkerPolicy(input: {
   if (run.background) return "background";
   if (looksLikeStop(input.message.body)) return "stop";
   if (input.waited?.outcome === "resolved") return "resolved";
+  // The message woke the run from its wait: the task itself reads it and answers now.
+  if (input.waited?.outcome === "woke") return "reads_soon";
   const waiting = run.status === "waiting_input" || run.status === "waiting_approval" || input.waited !== null;
   const busy =
     run.status === "running" &&
