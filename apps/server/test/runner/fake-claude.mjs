@@ -3,7 +3,8 @@
 // Each start appends its argv and $CLAUDE_CONFIG_DIR to $FAKE_CLAUDE_LOG (one JSON line).
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
-// of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate.
+// of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate;
+// "STEER…" and "BGSELF" below (live steering, background tasks).
 import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -24,14 +25,27 @@ if (flag("--resume") && process.env.FAKE_CLAUDE_NO_SESSION) {
   process.exit(1);
 }
 const out = (o) => process.stdout.write(`${JSON.stringify({ ...o, session_id: session })}\n`);
-// $FAKE_CLAUDE_VERSION: the version its init line says (none: an old CLI that can't be steered).
+// $FAKE_CLAUDE_VERSION: the version its init line says (logs only).
 const version = process.env.FAKE_CLAUDE_VERSION;
-out({
-  type: "system",
-  subtype: "init",
-  model: flag("--model") ?? "claude-sonnet",
-  ...(version ? { claude_code_version: version } : {}),
-});
+// $FAKE_CLAUDE_CAPS: its init `capabilities`, comma-separated (unset: none, an old CLI that can't be steered).
+// With msg_lifecycle_v1 each line with a `uuid` says `command_lifecycle` queued → started (read) → completed.
+const caps = process.env.FAKE_CLAUDE_CAPS ? process.env.FAKE_CLAUDE_CAPS.split(",") : null;
+const lifecycle = caps?.includes("msg_lifecycle_v1") === true;
+// $FAKE_CLAUDE_NO_RESULT_UUIDS: results never list what they read (only the lifecycle says it).
+const resultUuids = !process.env.FAKE_CLAUDE_NO_RESULT_UUIDS;
+const lifecycleOf = (uuid, state) => {
+  if (lifecycle && uuid) out({ type: "command_lifecycle", command_uuid: uuid, state });
+};
+// Claude Code says `init` as each turn starts.
+const init = () =>
+  out({
+    type: "system",
+    subtype: "init",
+    model: flag("--model") ?? "claude-sonnet",
+    ...(version ? { claude_code_version: version } : {}),
+    ...(caps ? { capabilities: caps } : {}),
+  });
+init();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let turns = 0;
 // Lines wait here: a turn may read the ones sent while it runs ("STEER"), the rest start the next turns.
@@ -41,6 +55,9 @@ let closed = false;
 const rl = createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   queue.push(line);
+  try {
+    lifecycleOf(JSON.parse(line).uuid, "queued");
+  } catch {}
   wake?.();
 });
 rl.on("close", () => {
@@ -70,31 +87,70 @@ async function answer(line) {
   const msg = JSON.parse(line);
   const prompt = String(msg.message?.content ?? "");
   const read = msg.uuid ? [msg.uuid] : [];
+  lifecycleOf(msg.uuid, "started");
+  if (turns > 0) init();
   let steered = "";
+  let moved = false;
   turns++;
   // "STEER": a tool runs, then the messages sent meanwhile are read at its boundary (same turn).
   // "STEERLATE": the turn ends before reading them (they start the next turn).
   // "STEERDROP": they vanish unread and nothing waits (a CLI that lost them).
+  // "STEERBG": the tool runs as task bg1; a "now" message moves it to the background and is read at once;
+  // after the result the task ends and the CLI runs a turn of its own ("background finished").
+  // "STEERBGHANG": the moved task never ends.
   if (prompt.includes("STEER")) {
-    if (queue.length === 0) await waitForLine(3000);
-    if (prompt.includes("STEERDROP")) queue.length = 0;
-    else if (!prompt.includes("STEERLATE")) {
+    const bg = prompt.includes("STEERBG");
+    if (bg) {
       out({
         type: "assistant",
         message: { content: [{ type: "tool_use", id: "s1", name: "Bash", input: { command: "make" } }] },
         parent_tool_use_id: null,
       });
+      out({ type: "system", subtype: "task_started", task_id: "bg1", tool_use_id: "s1", is_backgrounded: false });
+    }
+    if (queue.length === 0) await waitForLine(3000);
+    if (prompt.includes("STEERDROP")) queue.length = 0;
+    else if (!prompt.includes("STEERLATE")) {
+      moved = bg && queue.some((l) => JSON.parse(l).priority === "now");
+      if (!bg) {
+        out({
+          type: "assistant",
+          message: { content: [{ type: "tool_use", id: "s1", name: "Bash", input: { command: "make" } }] },
+          parent_tool_use_id: null,
+        });
+      }
+      if (moved) out({ type: "system", subtype: "task_updated", task_id: "bg1", patch: { is_backgrounded: true } });
       out({
         type: "user",
-        message: { content: [{ type: "tool_result", tool_use_id: "s1", content: "built" }] },
+        message: {
+          content: [{ type: "tool_result", tool_use_id: "s1", content: moved ? "moved to the background" : "built" }],
+        },
         parent_tool_use_id: null,
       });
       while (queue.length) {
         const m = JSON.parse(queue.shift());
         if (m.uuid) read.push(m.uuid);
+        lifecycleOf(m.uuid, "started");
         steered += ` +${m.priority ?? "-"}/${m.origin?.kind ?? "-"}: ${m.message?.content ?? ""}`;
       }
+      // Read before the turn ends (the lifecycle says so first).
+      await sleep(50);
     }
+  }
+  // "BGSELF": the model starts a task in the background itself; it ends after the turn, and the CLI
+  // runs a turn of its own then, nobody asking ("stray").
+  if (prompt.includes("BGSELF")) {
+    out({
+      type: "assistant",
+      message: { content: [{ type: "tool_use", id: "b1", name: "Bash", input: { command: "serve" } }] },
+      parent_tool_use_id: null,
+    });
+    out({ type: "system", subtype: "task_started", task_id: "self1", tool_use_id: "b1", is_backgrounded: true });
+    out({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "b1", content: "running in the background" }] },
+      parent_tool_use_id: null,
+    });
   }
   const marker = log ? path.join(path.dirname(log), "crashed") : "";
   if (prompt.includes("CRASH") && marker && !existsSync(marker)) {
@@ -166,7 +222,39 @@ async function answer(line) {
     result: `echo ${turns}: ${prompt}${steered}`,
     usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 },
     modelUsage: { [flag("--model") ?? "claude-sonnet"]: { inputTokens: 10, outputTokens: 7 } },
-    ...(read.length ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),
+    ...(read.length && resultUuids ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),
+    ...(version ? { queued_turn_count: queue.length } : {}),
+  });
+  for (const uuid of read) lifecycleOf(uuid, "completed");
+  // "STEERBGHANG": the moved task never ends (a server): no notice, no turn of its own, ever.
+  if (moved && prompt.includes("STEERBGHANG")) {
+    // nothing
+  }
+  // "STEERBGSLOW": the moved task ends 800 ms after the result.
+  else if (moved) await turnOfItsOwn("bg1", "background finished", 0, prompt.includes("STEERBGSLOW") ? 800 : 100);
+  // Its own turn takes 300 ms ("BGSELFSTUCK": never ends).
+  if (prompt.includes("BGSELF")) await turnOfItsOwn("self1", "stray", prompt.includes("BGSELFSTUCK") ? 60_000 : 300);
+}
+
+/** A background task ends `after` ms on: its notice starts a turn nobody sent (it answers `text`, `ms` later). */
+async function turnOfItsOwn(taskId, text, ms = 0, after = 100) {
+  await sleep(after);
+  out({ type: "system", subtype: "task_updated", task_id: taskId, patch: { status: "completed" } });
+  out({ type: "system", subtype: "task_notification", task_id: taskId, status: "completed" });
+  init();
+  out({
+    type: "stream_event",
+    event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+    parent_tool_use_id: null,
+  });
+  out({ type: "assistant", message: { content: [{ type: "text", text }] }, parent_tool_use_id: null });
+  await sleep(ms);
+  out({
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    result: text,
+    usage: { input_tokens: 3, output_tokens: 2 },
     ...(version ? { queued_turn_count: queue.length } : {}),
   });
 }

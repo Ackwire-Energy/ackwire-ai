@@ -536,8 +536,11 @@ export type WireBrainEvent =
 /**
  * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
  * Each has its own `uuid` (a UUID the engine maps to its message); `urgent`
- * ("Parar e mandar") asks the CLI to read it now (moving background-able work
- * aside) where it can, else at its next tool boundary like the rest.
+ * ("Parar e mandar") asks the CLI to read it now, moving the running tool to
+ * the background. Support is what Claude Code's `system/init` says it can do
+ * (`msg_lifecycle_v1` for any message, `interrupt_send_now_v1` for urgent
+ * ones); a turn that can't take an urgent one answers `unsupported` (the
+ * engine stops and restarts the turn instead).
  */
 export interface BrainSteerRequest {
   runId: string;
@@ -549,7 +552,7 @@ export interface BrainSteerRequest {
 /**
  * `accepted`: written to the turn (their `uuid`s; read later, `steer_read`).
  * `unsupported`: this turn can't take messages mid-turn (an older CLI, a
- * one-shot process, Codex run as `codex exec`). `no_turn`: no turn of that
+ * one-shot process, Codex run as `codex exec`), or not urgent ones (no `now` on that CLI). `no_turn`: no turn of that
  * run runs now.
  */
 export type BrainSteerReply =
