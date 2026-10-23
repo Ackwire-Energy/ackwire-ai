@@ -1,0 +1,1062 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import type { EventEmitter } from "node:events";
+import path from "node:path";
+import { createInterface } from "node:readline";
+import { type BrainSteerReply, type BrainSteerRequest, isBrainEffort } from "@agenteschat/adapters/machine-protocol";
+import {
+  type CodexAppRunner,
+  type CodexBrainEvent,
+  type CodexTurnInput,
+  type CodexTurnOptions,
+  codexBridgeOverrides,
+  codexCommandCall,
+  codexEffort,
+  codexFileChangeCall,
+  codexProblem,
+  codexThreadKey,
+} from "./brain-codex";
+import { killTree } from "./exec";
+import { resolveCommand } from "./executors";
+import { CODEX_MCP_ENV, codexWritableRoots, type McpTaskInfo, newMcpToken } from "./mcp";
+import { isInside } from "./paths";
+
+/**
+ * Codex brain turns on `codex app-server` (protocol 15, live steering): the
+ * JSON-RPC (one JSON object per line on stdio, no `jsonrpc` field) that
+ * Codex's IDE extension speaks, so a person's message reaches a turn in
+ * progress, as Claude Code's do (`brain.ts`).
+ *
+ * - One app-server per (agent, session) stays alive between turns (closed
+ *   after `idleMs` idle, at most `maxProcesses`; the least recently used idle
+ *   one goes for a new one; all busy: that turn runs with `codex exec`).
+ *   Started with the same `-c` overrides as exec (network on in the
+ *   workspace-write sandbox, the agent's writable roots, our MCP bridge) and
+ *   the same env (the agent's secrets, `CODEX_HOME` = the turn's account).
+ *   A change of folder, roots, account or secrets starts it again.
+ * - `initialize` + `initialized`, then the session's Codex thread:
+ *   `thread/resume` of the stored id (the threads file exec keeps too), else
+ *   `thread/start` with the instructions (`developerInstructions`), always
+ *   `cwd`, `sandbox: "workspace-write"`, `approvalPolicy: "never"` (what exec
+ *   forces) and the model. Each turn is `turn/start` with the prompt, the
+ *   model and `effort`.
+ * - Notifications → the same events exec gives: `item/agentMessage/delta`
+ *   streamed as text deltas (batched), a completed `commandExecution` /
+ *   `fileChange` as an executed `tool_call`, `thread/tokenUsage/updated`
+ *   (the thread's totals: the turn's usage is the difference) as `usage`,
+ *   `turn/completed` as `done` (the last agent message) or the error.
+ * - Our MCP bridge is the process's, not a run's: `mcp --run <process id>`
+ *   with a local token; the turn's run and its server token are swapped in
+ *   per turn (between turns its calls are refused quietly, as Claude's).
+ * - Steering: `turn/steer` with `expectedTurnId` (the turn running now) and
+ *   our message `uuid` as `clientUserMessageId`; Codex adds the input at its
+ *   next model request and emits it as a `userMessage` item whose `clientId`
+ *   is that uuid: `steer_read`. "No active turn" or another turn id: `no_turn`
+ *   (the engine keeps the message for the next turn). An urgent one ("Parar e
+ *   mandar") is `turn/interrupt` (the turn ends `interrupted`, what it did so
+ *   far stays in the thread) and a new `turn/start` with the messages, in the
+ *   same `brain.turn`: the protocol has no "read it now" for steered input,
+ *   and interrupting stops a long command at once, as stop-and-send means.
+ * - `codex exec` instead (its turns answer steering with `unsupported`): an
+ *   HTTP bridge (its token is per run), a Codex older than
+ *   `CODEX_APP_MIN_VERSION`, all processes busy, an app-server that fails to
+ *   start or to `initialize` (remembered for that binary and version), or one
+ *   that dies mid-turn (that turn runs again with exec, resuming the thread).
+ *
+ * The protocol shapes below are the minimum this file reads, copied from
+ * `codex app-server generate-ts` of codex-cli 0.163.0 (`ClientRequest`,
+ * `ServerNotification`, `v2/*`); `apps/server/scripts/probe-codex-app-server.ts`
+ * checks them against a real CLI.
+ */
+
+/** The first Codex whose app-server has `turn/steer` and the shapes below (the same as `CODEX_MIN_VERSION` today). */
+export const CODEX_APP_MIN_VERSION = "0.163.0";
+export const CODEX_APP_IDLE_MS = 10 * 60_000;
+export const CODEX_APP_MAX_PROCESSES = 3;
+/** Text deltas are sent at most this often (batched), as Claude Code's. */
+export const CODEX_APP_DELTA_MS = 50;
+const START_TIMEOUT_MS = 20_000;
+const RPC_TIMEOUT_MS = 60_000;
+/** `turn/steer` and `turn/interrupt` answer at once. */
+const STEER_RPC_MS = 5_000;
+const CLOSE_GRACE_MS = 3_000;
+const STDERR_KEEP = 4000;
+
+// ── Protocol (codex-cli 0.163.0, `codex app-server generate-ts`) ─────────────
+
+/** `v2/UserInput`, the text variant. */
+type UserInput = { type: "text"; text: string; text_elements: never[] };
+/** `v2/TurnError`. */
+interface TurnError {
+  message: string;
+  /** `v2/CodexErrorInfo`: "usageLimitExceeded", "unauthorized", … or an object. */
+  codexErrorInfo: unknown;
+  additionalDetails: string | null;
+}
+/** `v2/Turn` (the fields read). */
+interface Turn {
+  id: string;
+  status: "completed" | "interrupted" | "failed" | "inProgress";
+  error: TurnError | null;
+}
+/** `v2/TokenUsageBreakdown`. */
+interface TokenUsageBreakdown {
+  totalTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+}
+/** `v2/ThreadTokenUsage`: `total` is the thread's, `last` the last model request's. */
+interface ThreadTokenUsage {
+  total: TokenUsageBreakdown;
+  last: TokenUsageBreakdown;
+}
+/** `ThreadStartResponse` / `ThreadResumeResponse` / `TurnStartResponse` (the fields read). */
+type ThreadResponse = { thread: { id: string } };
+type TurnStartResponse = { turn: Turn };
+
+const text = (t: string): UserInput => ({ type: "text", text: t, text_elements: [] });
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const str = (v: unknown) => (typeof v === "string" ? v : "");
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+/** `codex-cli 0.163.0` ≥ `min` (an unreadable version never is). */
+export function codexAtLeast(version: string | undefined, min = CODEX_APP_MIN_VERSION): boolean {
+  const parse = (s: string | undefined) =>
+    /(\d+)\.(\d+)\.(\d+)/
+      .exec(s ?? "")
+      ?.slice(1)
+      .map(Number) ?? null;
+  const have = parse(version);
+  const want = parse(min) as number[];
+  if (!have) return false;
+  for (let i = 0; i < 3; i++) if ((have[i] ?? 0) !== (want[i] ?? 0)) return (have[i] ?? 0) > (want[i] ?? 0);
+  return true;
+}
+
+/** The `codex app-server` arguments: exec's `-c` overrides (a process serves one folder and one set of roots). */
+export function codexAppServerArgs(input: {
+  /** The process id: our MCP bridge is `mcp --run <id>` (`McpTaskInfo` in the bridge's registry). */
+  processId: string;
+  mcp?: { command?: string[] };
+  writableRoots?: string[];
+}): string[] {
+  return [
+    "app-server",
+    "-c",
+    "sandbox_workspace_write.network_access=true",
+    ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
+    ...(input.mcp ? codexBridgeOverrides({ runId: input.processId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
+  ];
+}
+
+// ── JSON-RPC client ──────────────────────────────────────────────────────────
+
+/** A JSON-RPC error from the app-server (`code` -1: it exited or didn't answer). */
+export class CodexRpcError extends Error {
+  constructor(
+    readonly code: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** Server requests the runner answers (nothing should ask with `approvalPolicy: "never"`; a refusal never hangs a turn). */
+function serverRequestAnswer(method: string): { result: unknown } | { error: { code: number; message: string } } {
+  switch (method) {
+    case "item/commandExecution/requestApproval":
+    case "item/fileChange/requestApproval":
+      return { result: { decision: "decline" } };
+    case "execCommandApproval":
+    case "applyPatchApproval":
+      return { result: { decision: { denied: { rejection: "Not allowed on this computer." } } } };
+    default:
+      return { error: { code: -32601, message: `The agentes runner doesn't answer ${method}` } };
+  }
+}
+
+/** A running `codex app-server` on stdio. */
+export class CodexAppClient {
+  readonly child: ChildProcess;
+  exited = false;
+  stderr = "";
+  private nextId = 1;
+  private readonly pending = new Map<
+    number,
+    { resolve(v: unknown): void; reject(e: Error): void; timer: ReturnType<typeof setTimeout> }
+  >();
+  private readonly listeners = new Set<(method: string, params: Record<string, unknown>) => void>();
+  private readonly exitHandlers = new Set<() => void>();
+
+  constructor(file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }) {
+    this.child = spawn(file, args, {
+      cwd: opts.cwd,
+      env: opts.env,
+      stdio: ["pipe", "pipe", "pipe"],
+      // Its own process group: closing it takes the commands it runs along (`killTree`).
+      detached: process.platform !== "win32",
+      windowsHide: true,
+    });
+    const events = this.child as unknown as EventEmitter;
+    events.on("error", (err: Error) => {
+      this.stderr = `${this.stderr}${err.message}\n`.slice(-STDERR_KEEP);
+      this.markExit();
+    });
+    events.on("exit", () => this.markExit());
+    this.child.stdin?.on("error", () => {});
+    this.child.stderr?.setEncoding("utf8");
+    this.child.stderr?.on("data", (chunk: string) => {
+      this.stderr = (this.stderr + chunk).slice(-STDERR_KEEP);
+    });
+    if (this.child.stdout) {
+      const rl = createInterface({ input: this.child.stdout, crlfDelay: Number.POSITIVE_INFINITY });
+      (rl as unknown as EventEmitter).on("line", (line: string) => this.line(line));
+    }
+  }
+
+  private line(raw: string) {
+    let msg: unknown;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!isObj(msg)) return;
+    const method = typeof msg.method === "string" ? msg.method : null;
+    const id = typeof msg.id === "number" || typeof msg.id === "string" ? msg.id : null;
+    if (method && id !== null) {
+      this.send({ id, ...serverRequestAnswer(method) });
+      return;
+    }
+    if (method) {
+      const params = isObj(msg.params) ? msg.params : {};
+      for (const l of [...this.listeners]) l(method, params);
+      return;
+    }
+    if (typeof id !== "number") return;
+    const p = this.pending.get(id);
+    if (!p) return;
+    this.pending.delete(id);
+    clearTimeout(p.timer);
+    if (isObj(msg.error)) p.reject(new CodexRpcError(num(msg.error.code), str(msg.error.message) || "error"));
+    else p.resolve(msg.result);
+  }
+
+  private send(msg: unknown) {
+    if (this.exited) return;
+    try {
+      this.child.stdin?.write(`${JSON.stringify(msg)}\n`);
+    } catch {
+      // gone: the exit handler settles
+    }
+  }
+
+  private markExit() {
+    if (this.exited) return;
+    this.exited = true;
+    for (const [id, p] of this.pending) {
+      clearTimeout(p.timer);
+      p.reject(new CodexRpcError(-1, "Codex app-server exited"));
+      this.pending.delete(id);
+    }
+    // Lines still buffered in readline arrive first.
+    setImmediate(() => {
+      for (const h of [...this.exitHandlers]) h();
+    });
+  }
+
+  request<T>(method: string, params: unknown, timeoutMs = RPC_TIMEOUT_MS): Promise<T> {
+    if (this.exited) return Promise.reject(new CodexRpcError(-1, "Codex app-server exited"));
+    const id = this.nextId++;
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new CodexRpcError(-1, `Codex app-server didn't answer ${method}`));
+      }, timeoutMs);
+      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
+      this.send({ id, method, params });
+    });
+  }
+
+  notify(method: string, params?: unknown) {
+    this.send(params === undefined ? { method } : { method, params });
+  }
+
+  onNotification(handler: (method: string, params: Record<string, unknown>) => void): () => void {
+    this.listeners.add(handler);
+    return () => this.listeners.delete(handler);
+  }
+
+  onExit(handler: () => void): () => void {
+    if (this.exited) {
+      setImmediate(handler);
+      return () => {};
+    }
+    this.exitHandlers.add(handler);
+    return () => this.exitHandlers.delete(handler);
+  }
+
+  /** Ends its input (the app-server exits) and kills the group if it lingers. */
+  close(graceMs = CLOSE_GRACE_MS) {
+    if (this.exited) return;
+    try {
+      this.child.stdin?.end();
+    } catch {}
+    const t = setTimeout(() => {
+      if (this.exited) return;
+      killTree(this.child, "SIGTERM");
+      const k = setTimeout(() => {
+        if (!this.exited) killTree(this.child, "SIGKILL");
+      }, CLOSE_GRACE_MS);
+      k.unref?.();
+    }, graceMs);
+    t.unref?.();
+  }
+}
+
+// ── Notifications → brain events ─────────────────────────────────────────────
+
+const usageDiff = (a: TokenUsageBreakdown, b: TokenUsageBreakdown): TokenUsageBreakdown => ({
+  totalTokens: Math.max(0, num(a.totalTokens) - num(b.totalTokens)),
+  inputTokens: Math.max(0, num(a.inputTokens) - num(b.inputTokens)),
+  cachedInputTokens: Math.max(0, num(a.cachedInputTokens) - num(b.cachedInputTokens)),
+  cacheWriteInputTokens: Math.max(0, num(a.cacheWriteInputTokens) - num(b.cacheWriteInputTokens)),
+  outputTokens: Math.max(0, num(a.outputTokens) - num(b.outputTokens)),
+  reasoningOutputTokens: Math.max(0, num(a.reasoningOutputTokens) - num(b.reasoningOutputTokens)),
+});
+
+/**
+ * App-server notifications of one `brain.turn` (one or more Codex turns, with
+ * "Parar e mandar") → the events `codex exec` gives for a turn.
+ */
+export class CodexAppMapper {
+  /** The last agent message of the Codex turn running now. */
+  private answer?: string;
+  /** Agent messages streamed so far (by item id): a message that came whole is sent whole. */
+  private readonly streamed = new Set<string>();
+  private lastDeltaItem: string | null = null;
+  private anyText = false;
+  /** The thread's totals before this `brain.turn`, and now. */
+  private base?: TokenUsageBreakdown;
+  private total?: TokenUsageBreakdown;
+  /** An `error` notification Codex won't retry (the turn's own error says more). */
+  lastError?: string;
+
+  constructor(private readonly opts: { cwd: string; model?: string; redact?: (text: string) => string }) {}
+
+  private clean(t: string) {
+    return this.opts.redact ? this.opts.redact(t) : t;
+  }
+
+  private rel(p: string) {
+    if (!p || !this.opts.cwd) return p;
+    const abs = path.resolve(this.opts.cwd, p);
+    return isInside(this.opts.cwd, abs) ? path.relative(this.opts.cwd, abs).split(path.sep).join("/") : p;
+  }
+
+  /** Text for the live view; messages after the first are set apart by a blank line. Redacted by the caller. */
+  private textOf(itemId: string, delta: string): string {
+    const sep = this.lastDeltaItem !== itemId && this.anyText ? "\n\n" : "";
+    this.lastDeltaItem = itemId;
+    this.anyText = true;
+    return sep + delta;
+  }
+
+  /** `item/agentMessage/delta`. */
+  delta(params: Record<string, unknown>): string {
+    const itemId = str(params.itemId);
+    const delta = str(params.delta);
+    if (!delta) return "";
+    this.streamed.add(itemId);
+    return this.textOf(itemId, delta);
+  }
+
+  /** `item/completed`: executed tool calls, the answer, and the text of a message that wasn't streamed. */
+  completed(item: Record<string, unknown>): { events: CodexBrainEvent[]; text?: string } {
+    const id = str(item.id) || `codex-${randomUUID()}`;
+    switch (item.type) {
+      case "agentMessage": {
+        const t = str(item.text);
+        if (!t.trim()) return { events: [] };
+        this.answer = this.clean(t);
+        return this.streamed.has(id) ? { events: [] } : { events: [], text: this.textOf(id, t) };
+      }
+      case "commandExecution":
+        return {
+          events: [
+            codexCommandCall(
+              {
+                id,
+                command: str(item.command),
+                output: str(item.aggregatedOutput),
+                exitCode: typeof item.exitCode === "number" ? item.exitCode : null,
+                status: str(item.status),
+              },
+              (t) => this.clean(t),
+            ),
+          ],
+        };
+      case "fileChange": {
+        const changes = (Array.isArray(item.changes) ? item.changes : []).flatMap((c: unknown) =>
+          isObj(c) && str(c.path)
+            ? [{ path: this.rel(str(c.path)), kind: (isObj(c.kind) && str(c.kind.type)) || "update" }]
+            : [],
+        );
+        const status = str(item.status);
+        return { events: [codexFileChangeCall({ id, changes, failed: status === "failed" || status === "declined" })] };
+      }
+      default:
+        // Our bridge's calls (`mcpToolCall`) aren't repeated (the engine ran them); the rest isn't a tool call.
+        return { events: [] };
+    }
+  }
+
+  /** `thread/tokenUsage/updated`. */
+  usage(tokenUsage: unknown) {
+    if (!isObj(tokenUsage) || !isObj(tokenUsage.total)) return;
+    const u = tokenUsage as unknown as Partial<ThreadTokenUsage> & { total: TokenUsageBreakdown };
+    // The first one of this `brain.turn`: the thread's totals before its first model request.
+    if (!this.base) this.base = isObj(u.last) ? usageDiff(u.total, u.last) : u.total;
+    // Totals, not sums: Codex says the same usage again (rate-limit updates) without counting twice.
+    this.total = u.total;
+  }
+
+  /** A Codex turn ended and another starts in the same `brain.turn` ("Parar e mandar"): its answer, if it had one. */
+  nextTurn(): string | undefined {
+    const a = this.answer;
+    this.answer = undefined;
+    return a;
+  }
+
+  /** `turn/completed`: `usage` + `done` (held answers first), or how it failed. */
+  end(turn: Turn, sessionId: string, held: string[]): CodexBrainEvent[] {
+    if (turn.status === "completed") {
+      const u = this.base && this.total ? usageDiff(this.total, this.base) : undefined;
+      const answer = [...held, this.answer ?? ""].filter(Boolean).join("\n\n");
+      return [
+        {
+          type: "usage",
+          input: u?.inputTokens ?? 0,
+          output: u?.outputTokens ?? 0,
+          source: "plan",
+          ...(this.opts.model ? { model: this.opts.model } : {}),
+          // Codex counts cached input inside `inputTokens`.
+          ...(u && u.cachedInputTokens > 0 ? { cacheRead: u.cachedInputTokens } : {}),
+          ...(u && u.cacheWriteInputTokens > 0 ? { cacheWrite: u.cacheWriteInputTokens } : {}),
+        },
+        { type: "done", text: answer, session: { id: sessionId } },
+      ];
+    }
+    const info = turn.error?.codexErrorInfo;
+    const message = this.clean(
+      str(turn.error?.message) ||
+        this.lastError ||
+        (turn.status === "interrupted" ? "Codex stopped the turn" : "The turn failed"),
+    );
+    if (info === "usageLimitExceeded") return [{ type: "limit" }, { type: "error", code: "plan_limit", message }];
+    if (info === "unauthorized") return [{ type: "error", code: "not_logged_in", message, retryable: true }];
+    return codexProblem(message, turn.status === "failed");
+  }
+}
+
+// ── The processes ────────────────────────────────────────────────────────────
+
+/** A message for the turn in progress (`brain.steer`). */
+type SteerMessage = BrainSteerRequest["messages"][number];
+
+interface AppLive {
+  key: string;
+  /** Also the MCP bridge's id (`mcp --run <id>`). */
+  id: string;
+  agentId: string;
+  sessionId: string;
+  threadKey: string;
+  client: CodexAppClient;
+  sig: string;
+  threadId: string | null;
+  busy: boolean;
+  lastUsed: number;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+  /** The bridge entry between turns (no run: its calls are refused quietly). */
+  bridge: McpTaskInfo | null;
+  /** The turn in progress: messages for it mid-turn. */
+  turn: { runId: string; steer(messages: SteerMessage[]): Promise<BrainSteerReply> } | null;
+}
+
+interface AppOutcome {
+  died?: boolean;
+  canceled?: boolean;
+  /** Steered messages the turn never said it read. */
+  unread?: string[];
+}
+
+export interface CodexAppServersOptions {
+  /** The MCP bridge's registry (the daemon's Codex runs): each process's server is `mcp --run <process id>`. */
+  runs: Map<string, McpTaskInfo>;
+  idleMs?: number;
+  maxProcesses?: number;
+  /** Tests: the delta batching and how long `initialize` may take. */
+  deltaMs?: number;
+  startTimeoutMs?: number;
+  log?: (line: string) => void;
+}
+
+const canceledEvent: CodexBrainEvent = { type: "error", code: "canceled", message: "The turn was canceled." };
+
+export class CodexAppServers implements CodexAppRunner {
+  private readonly live = new Map<string, AppLive>();
+  private readonly chains = new Map<string, Promise<unknown>>();
+  /** Runs on a process now (steering finds them), and runs `codex exec` runs instead. */
+  private readonly running = new Map<string, AppLive>();
+  private readonly execRuns = new Set<string>();
+  /** `<bin>@<version>` whose app-server didn't start: exec for it from then on. */
+  private readonly broken = new Set<string>();
+  private closed = false;
+  private readonly log: (line: string) => void;
+
+  constructor(private readonly opts: CodexAppServersOptions) {
+    this.log = opts.log ?? (() => {});
+  }
+
+  setLimits(limits: { idleMs?: number; maxProcesses?: number }) {
+    if (limits.idleMs !== undefined) this.opts.idleMs = limits.idleMs;
+    if (limits.maxProcesses !== undefined) this.opts.maxProcesses = limits.maxProcesses;
+  }
+
+  /** App-servers alive now. */
+  get size() {
+    return [...this.live.values()].filter((l) => !l.client.exited).length;
+  }
+
+  /** The process of an agent's session (tests). */
+  process(agentId: string, sessionId: string, account?: string): CodexAppClient | undefined {
+    return this.live.get(`${agentId}:${codexThreadKey(sessionId, account)}`)?.client;
+  }
+
+  /**
+   * Protocol 15: messages for the Codex turn of `runId`. On an app-server:
+   * `turn/steer` (or the urgent restart); run by `codex exec`: `unsupported`;
+   * starting or ended: `no_turn` (they wait for the next turn).
+   */
+  async steer(agentId: string, req: BrainSteerRequest): Promise<BrainSteerReply> {
+    const live = this.running.get(req.runId);
+    if (live) {
+      if (live.agentId !== agentId || live.sessionId !== req.session || live.client.exited)
+        return { status: "no_turn" };
+      if (!live.turn || live.turn.runId !== req.runId) return { status: "no_turn", reason: "Codex is starting" };
+      return live.turn.steer(req.messages);
+    }
+    if (this.execRuns.has(req.runId)) {
+      return { status: "unsupported", reason: "This Codex turn runs with codex exec: it reads messages between turns" };
+    }
+    // Starting (spawn, handshake, thread), or ended: the messages wait for the next turn.
+    return { status: "no_turn" };
+  }
+
+  async turn(
+    input: CodexTurnInput & { version: string },
+    opts: CodexTurnOptions,
+    exec: () => Promise<void>,
+  ): Promise<void> {
+    const viaExec = async () => {
+      this.execRuns.add(input.runId);
+      try {
+        await exec();
+      } finally {
+        this.execRuns.delete(input.runId);
+      }
+    };
+    if (this.closed || input.mcp.url || !input.agentId || !codexAtLeast(input.version)) return viaExec();
+    if (this.broken.has(`${opts.bin ?? "codex"}@${input.version}`)) return viaExec();
+    const threadKey = codexThreadKey(input.sessionId, input.account?.id);
+    const key = `${input.agentId}:${threadKey}`;
+    const prev = this.chains.get(key) ?? Promise.resolve();
+    const run = prev.catch(() => undefined).then(() => this.runTurn(key, threadKey, input, opts));
+    this.chains.set(key, run);
+    let handled = false;
+    try {
+      handled = await run;
+    } catch (err) {
+      this.log(`codex app-server turn failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      if (this.chains.get(key) === run) this.chains.delete(key);
+    }
+    if (!handled) await viaExec();
+  }
+
+  private signature(input: CodexTurnInput, opts: CodexTurnOptions) {
+    return JSON.stringify({
+      cwd: input.cwd,
+      roots: input.writableRoots ?? [],
+      account: input.account?.home ?? null,
+      bin: opts.bin ?? "codex",
+      mcp: opts.mcpCommand ?? null,
+      socket: opts.socketPath ?? null,
+      env: opts.env ?? {},
+    });
+  }
+
+  private async runTurn(
+    key: string,
+    threadKey: string,
+    input: CodexTurnInput & { version: string },
+    opts: CodexTurnOptions,
+  ): Promise<boolean> {
+    if (opts.signal.aborted) {
+      opts.emit(canceledEvent);
+      return true;
+    }
+    const sig = this.signature(input, opts);
+    let live = this.live.get(key);
+    if (live && (live.client.exited || live.sig !== sig)) {
+      this.drop(live);
+      live = undefined;
+    }
+    if (!live) {
+      const max = this.opts.maxProcesses ?? CODEX_APP_MAX_PROCESSES;
+      if (this.size >= max) this.evictIdle();
+      // All busy: this turn runs with exec.
+      if (this.size >= max) return false;
+      const started = await this.start(key, threadKey, sig, input, opts);
+      if (!started) return false;
+      live = started;
+    }
+    const out = await this.onLive(live, input, opts);
+    if (out.died) {
+      this.log(`codex app-server for ${input.sessionId.slice(0, 8)} died mid-turn; running it with exec`);
+      this.drop(live);
+      return false;
+    }
+    // Canceled, or a steered message it never read (Codex might still act on it unheard): the process goes.
+    if (out.canceled || out.unread?.length) this.drop(live);
+    return true;
+  }
+
+  private async start(
+    key: string,
+    threadKey: string,
+    sig: string,
+    input: CodexTurnInput & { version: string },
+    opts: CodexTurnOptions,
+  ): Promise<AppLive | null> {
+    const id = randomUUID();
+    const token = newMcpToken();
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(opts.env ?? {}),
+      [CODEX_MCP_ENV[0]]: token,
+      ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
+      ...(opts.runnerHome ? { [CODEX_MCP_ENV[2]]: opts.runnerHome } : {}),
+      // ADR 0041: the account's folder is this process's Codex home.
+      ...(input.account ? { CODEX_HOME: input.account.home } : {}),
+    };
+    const args = codexAppServerArgs({
+      processId: id,
+      mcp: { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
+      ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
+    });
+    const brokenKey = `${opts.bin ?? "codex"}@${input.version}`;
+    let client: CodexAppClient;
+    try {
+      client = new CodexAppClient(resolveCommand(opts.bin ?? "codex", env.PATH), args, { cwd: input.cwd, env });
+    } catch (err) {
+      this.log(`codex app-server didn't start: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+    try {
+      await client.request(
+        "initialize",
+        {
+          clientInfo: { name: "agentes_runner", title: "agentes.chat runner", version: "1" },
+          capabilities: {
+            experimentalApi: false,
+            requestAttestation: false,
+            // Never read here (each is one line per chunk of output).
+            optOutNotificationMethods: [
+              "item/commandExecution/outputDelta",
+              "item/fileChange/outputDelta",
+              "item/reasoning/textDelta",
+              "item/reasoning/summaryTextDelta",
+              "item/reasoning/summaryPartAdded",
+              "item/plan/delta",
+              "turn/diff/updated",
+            ],
+          },
+        },
+        this.opts.startTimeoutMs ?? START_TIMEOUT_MS,
+      );
+      client.notify("initialized");
+    } catch (err) {
+      const tail = client.stderr.trim().split("\n").slice(-2).join(" ");
+      this.log(
+        `codex app-server handshake failed (${err instanceof Error ? err.message : String(err)}${tail ? `: ${tail}` : ""}); using codex exec`,
+      );
+      this.broken.add(brokenKey);
+      client.close(0);
+      return null;
+    }
+    const bridge: McpTaskInfo = {
+      token,
+      missionId: "",
+      running: false,
+      idle: true,
+      cwd: input.cwd,
+      folder: input.folder ?? input.cwd,
+    };
+    this.opts.runs.set(id, bridge);
+    const live: AppLive = {
+      key,
+      id,
+      agentId: input.agentId ?? "",
+      sessionId: input.sessionId,
+      threadKey,
+      client,
+      sig,
+      threadId: null,
+      busy: false,
+      lastUsed: Date.now(),
+      idleTimer: null,
+      bridge,
+      turn: null,
+    };
+    this.live.set(key, live);
+    // Gone while idle: forgotten; the next turn starts it again (resumed).
+    client.onExit(() => {
+      if (!live.busy) this.drop(live);
+    });
+    this.log(`codex app-server for ${input.sessionId.slice(0, 8)} started`);
+    return live;
+  }
+
+  private async onLive(live: AppLive, input: CodexTurnInput, opts: CodexTurnOptions): Promise<AppOutcome> {
+    live.busy = true;
+    if (live.idleTimer) clearTimeout(live.idleTimer);
+    live.idleTimer = null;
+    // The bridge relays for this run now, with its server token.
+    if (live.bridge) {
+      this.opts.runs.set(live.id, {
+        token: live.bridge.token,
+        missionId: "",
+        running: true,
+        cwd: live.bridge.cwd ?? input.cwd,
+        folder: live.bridge.folder ?? input.cwd,
+        runId: input.runId,
+        serverToken: input.mcp.token,
+        ...(opts.redact ? { redact: opts.redact } : {}),
+      });
+    }
+    this.running.set(input.runId, live);
+    try {
+      if (!live.threadId) {
+        const opened = await this.openThread(live, input, opts);
+        if (opened !== true) return opened;
+      }
+      return await this.runOnThread(live, input, opts);
+    } finally {
+      if (this.running.get(input.runId) === live) this.running.delete(input.runId);
+      live.busy = false;
+      live.turn = null;
+      live.lastUsed = Date.now();
+      if (live.bridge && this.opts.runs.has(live.id)) this.opts.runs.set(live.id, live.bridge);
+      if (this.live.get(live.key) === live) this.armIdle(live);
+    }
+  }
+
+  /** The session's thread on this process: resumed by its stored id, else a new one with the instructions. */
+  private async openThread(live: AppLive, input: CodexTurnInput, opts: CodexTurnOptions): Promise<true | AppOutcome> {
+    const client = live.client;
+    const common = {
+      cwd: input.cwd,
+      sandbox: "workspace-write",
+      approvalPolicy: "never",
+      ...(input.model ? { model: input.model } : {}),
+    };
+    const stored = opts.threads.get(live.threadKey);
+    if (stored) {
+      try {
+        const r = await client.request<ThreadResponse>("thread/resume", {
+          threadId: stored,
+          ...common,
+          excludeTurns: true,
+        });
+        live.threadId = str(r?.thread?.id) || stored;
+        return true;
+      } catch (err) {
+        if (client.exited) return { died: true };
+        // Lost (another Codex home, a cleaned folder): a new thread, with the instructions again, as exec does.
+        this.log(
+          `codex thread ${stored.slice(0, 8)} not resumed (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+    }
+    const instructions = input.system.trim();
+    try {
+      const r = await client.request<ThreadResponse>("thread/start", {
+        ...common,
+        ...(instructions ? { developerInstructions: instructions } : {}),
+      });
+      const id = str(r?.thread?.id);
+      if (!id) throw new CodexRpcError(0, "Codex started a thread without an id");
+      live.threadId = id;
+      opts.threads.set(live.threadKey, id);
+      return true;
+    } catch (err) {
+      if (client.exited) return { died: true };
+      const message = err instanceof Error ? err.message : String(err);
+      for (const e of codexProblem(opts.redact ? opts.redact(message) : message, false)) opts.emit(e);
+      return {};
+    }
+  }
+
+  /** One `brain.turn` on the thread: `turn/start`, its events, steering; ends with one `done` or `error`. */
+  private runOnThread(live: AppLive, input: CodexTurnInput, opts: CodexTurnOptions): Promise<AppOutcome> {
+    const client = live.client;
+    const threadId = live.threadId as string;
+    const redact = opts.redact ?? ((s: string) => s);
+    const deltaMs = this.opts.deltaMs ?? CODEX_APP_DELTA_MS;
+    const mapper = new CodexAppMapper({
+      cwd: input.cwd,
+      ...(input.model ? { model: input.model } : {}),
+      ...(opts.redact ? { redact: opts.redact } : {}),
+    });
+    const overrides = {
+      ...(input.model ? { model: input.model } : {}),
+      ...(isBrainEffort(input.effort) ? { effort: codexEffort(input.effort) } : {}),
+    };
+    return new Promise<AppOutcome>((resolve) => {
+      let settled = false;
+      let canceled = false;
+      /** The Codex turn running now (null while one starts). */
+      let turnId: string | null = null;
+      /** Steered inputs not read yet: our `clientUserMessageId` → the message uuids it carries. */
+      const unread = new Map<string, string[]>();
+      /** `turn/steer` requests not answered yet (by `clientUserMessageId`). */
+      const asking = new Set<string>();
+      /** "Parar e mandar": the turn is being interrupted; these start the next one. */
+      let restart: SteerMessage[] | null = null;
+      /** Answers of Codex turns that ended before the last one (an urgent message arrived as one completed). */
+      const held: string[] = [];
+      let buf = "";
+      let timer: ReturnType<typeof setTimeout> | null = null;
+
+      const flush = () => {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        if (!buf) return;
+        const t = redact(buf);
+        buf = "";
+        opts.emit({ type: "text_delta", text: t });
+      };
+      const addText = (t: string) => {
+        if (!t) return;
+        buf += t;
+        if (!timer) timer = setTimeout(flush, deltaMs);
+      };
+      const emit = (e: CodexBrainEvent) => {
+        flush();
+        opts.emit(e);
+      };
+      const finish = (events: CodexBrainEvent[], out: AppOutcome = {}) => {
+        if (settled) return;
+        flush();
+        settled = true;
+        for (const e of events) opts.emit(e);
+        live.turn = null;
+        offNote();
+        offExit();
+        opts.signal.removeEventListener("abort", onAbort);
+        // A steer still unanswered when the turn ended was refused (Codex accepts one only while its turn runs).
+        const left = [...unread.entries()].filter(([id]) => !asking.has(id)).flatMap(([, uuids]) => uuids);
+        resolve(left.length ? { ...out, unread: left } : out);
+      };
+      const interrupt = (id: string) =>
+        client.request("turn/interrupt", { threadId, turnId: id }, STEER_RPC_MS).catch(() => undefined);
+      const startTurn = (clientId: string, texts: string[]) => {
+        turnId = null;
+        client
+          .request<TurnStartResponse>("turn/start", {
+            threadId,
+            clientUserMessageId: clientId,
+            input: texts.map(text),
+            ...overrides,
+          })
+          .then((r) => {
+            if (!turnId) turnId = str(r?.turn?.id) || null;
+            if (canceled && turnId) void interrupt(turnId);
+          })
+          .catch((err: unknown) => {
+            // Gone: the exit handler settles it.
+            if (client.exited) return;
+            const message = err instanceof Error ? err.message : String(err);
+            finish(codexProblem(redact(message), false));
+          });
+      };
+
+      live.turn = {
+        runId: input.runId,
+        steer: async (messages) => {
+          if (settled || canceled) return { status: "no_turn" };
+          const uuids = messages.map((m) => m.uuid);
+          // Interrupting already: these join the messages the next turn starts with.
+          if (restart) {
+            restart.push(...messages);
+            return { status: "accepted", accepted: uuids };
+          }
+          const current = turnId;
+          if (!current) return { status: "no_turn", reason: "Codex is starting the turn" };
+          if (messages.some((m) => m.urgent)) {
+            const batch = [...messages];
+            restart = batch;
+            try {
+              await client.request("turn/interrupt", { threadId, turnId: current }, STEER_RPC_MS);
+              return { status: "accepted", accepted: uuids };
+            } catch (err) {
+              // The turn completed meanwhile and the next one already started with them: delivered all the same.
+              if (restart !== batch) return { status: "accepted", accepted: uuids };
+              restart = null;
+              return { status: "no_turn", reason: err instanceof Error ? err.message : String(err) };
+            }
+          }
+          const accepted: string[] = [];
+          for (const m of messages) {
+            // Known before the request: Codex may say it read it before it answers.
+            unread.set(m.uuid, [m.uuid]);
+            asking.add(m.uuid);
+            try {
+              await client.request(
+                "turn/steer",
+                { threadId, expectedTurnId: current, clientUserMessageId: m.uuid, input: [text(m.text)] },
+                STEER_RPC_MS,
+              );
+              accepted.push(m.uuid);
+            } catch (err) {
+              unread.delete(m.uuid);
+              // "no active turn to steer", "expected active turn id …", a turn that can't be steered (review, compact).
+              if (accepted.length) break;
+              return { status: "no_turn", reason: err instanceof Error ? err.message : String(err) };
+            } finally {
+              asking.delete(m.uuid);
+            }
+          }
+          return { status: "accepted", accepted };
+        },
+      };
+
+      const completed = (turn: Turn) => {
+        if (turnId && turn.id !== turnId) return;
+        flush();
+        if (restart && turn.status !== "failed") {
+          // The next Codex turn starts with the urgent messages (and any that came while it stopped).
+          const answer = mapper.nextTurn();
+          if (turn.status === "completed" && answer) held.push(answer);
+          const batch = restart;
+          restart = null;
+          const clientId = (batch[0] as SteerMessage).uuid;
+          unread.set(
+            clientId,
+            batch.map((m) => m.uuid),
+          );
+          startTurn(
+            clientId,
+            batch.map((m) => m.text),
+          );
+          return;
+        }
+        finish(mapper.end(turn, input.sessionId, held));
+      };
+
+      const offNote = client.onNotification((method, params) => {
+        if (settled) return;
+        if (typeof params.threadId === "string" && params.threadId !== threadId) return;
+        switch (method) {
+          case "turn/started": {
+            const id = isObj(params.turn) ? str(params.turn.id) : "";
+            if (!turnId && id) turnId = id;
+            return;
+          }
+          case "item/agentMessage/delta":
+            addText(mapper.delta(params));
+            return;
+          case "item/started":
+          case "item/completed": {
+            const item = isObj(params.item) ? params.item : {};
+            if (item.type === "userMessage") {
+              const ours = unread.get(str(item.clientId));
+              if (ours) {
+                unread.delete(str(item.clientId));
+                emit({ type: "steer_read", uuids: ours });
+              }
+              return;
+            }
+            if (method !== "item/completed") return;
+            const out = mapper.completed(item);
+            if (out.text) addText(out.text);
+            for (const e of out.events) emit(e);
+            return;
+          }
+          case "thread/tokenUsage/updated":
+            mapper.usage(params.tokenUsage);
+            return;
+          case "error": {
+            const error = isObj(params.error) ? params.error : {};
+            if (params.willRetry !== true && str(error.message)) mapper.lastError = str(error.message);
+            return;
+          }
+          case "turn/completed":
+            if (isObj(params.turn)) completed(params.turn as unknown as Turn);
+            return;
+          default:
+            return;
+        }
+      });
+      const offExit = client.onExit(() => finish([], { died: true }));
+      function onAbort() {
+        canceled = true;
+        if (turnId) void interrupt(turnId);
+        finish([canceledEvent], { canceled: true });
+      }
+      if (opts.signal.aborted) return onAbort();
+      opts.signal.addEventListener("abort", onAbort, { once: true });
+      startTurn(input.runId, [input.prompt]);
+    });
+  }
+
+  private armIdle(live: AppLive) {
+    if (live.idleTimer) clearTimeout(live.idleTimer);
+    live.idleTimer = setTimeout(() => {
+      if (!live.busy) {
+        this.log(`codex app-server for ${live.sessionId.slice(0, 8)} idle; closing`);
+        this.drop(live);
+      }
+    }, this.opts.idleMs ?? CODEX_APP_IDLE_MS);
+    live.idleTimer.unref?.();
+  }
+
+  /** Closes the least recently used idle process, if any. */
+  private evictIdle() {
+    let lru: AppLive | undefined;
+    for (const l of this.live.values()) {
+      if (l.busy) continue;
+      if (!lru || l.lastUsed < lru.lastUsed) lru = l;
+    }
+    if (lru) this.drop(lru);
+  }
+
+  private drop(live: AppLive) {
+    if (live.idleTimer) clearTimeout(live.idleTimer);
+    live.idleTimer = null;
+    if (this.live.get(live.key) === live) this.live.delete(live.key);
+    this.opts.runs.delete(live.id);
+    live.bridge = null;
+    live.client.close();
+  }
+
+  /** The runner is exiting: every process is closed. */
+  close() {
+    this.closed = true;
+    for (const l of [...this.live.values()]) this.drop(l);
+  }
+}

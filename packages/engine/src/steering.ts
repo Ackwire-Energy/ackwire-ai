@@ -71,8 +71,9 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     });
     let live = false;
     // Its model call stops and the loop reads the message at once (a running tool finishes first).
-    // A computer brain (Claude Code, Codex) can't drop its turn halfway: Claude Code whose turn takes
-    // messages gets it live and urgent (read now, or at its next tool boundary: `live-steer.ts`); else
+    // A computer brain (Claude Code, Codex) can't drop its turn halfway: one whose turn takes messages
+    // gets it live and urgent (Claude Code reads it now or at its next tool boundary; Codex's app-server
+    // stops the turn and starts the next one with it: `live-steer.ts`); else
     // the task stops for real, and stopping it starts it again from this message
     // (`restartAfterStopAndSend`). Who may not stop it just leaves the message for its next step.
     if (now && active.status === "running") {

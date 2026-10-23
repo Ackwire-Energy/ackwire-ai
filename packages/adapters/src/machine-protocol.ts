@@ -122,6 +122,9 @@ export const MISSION_WORKTREE_PROTOCOL = 14;
  * its next tool boundary), and the turn reports which it read
  * (`brain.event` `steer_read`). Older runners would drop the unknown op: the
  * server never sends it to them (their turns read new messages at the end).
+ * A Codex turn on the runner's `codex app-server` takes them too (`turn/steer`,
+ * read at its next model request); one run by `codex exec` answers
+ * `unsupported` (no new protocol number: the reply already says what it can).
  */
 export const STEER_PROTOCOL = 15;
 
@@ -546,7 +549,8 @@ export interface BrainSteerRequest {
 /**
  * `accepted`: written to the turn (their `uuid`s; read later, `steer_read`).
  * `unsupported`: this turn can't take messages mid-turn (an older CLI, a
- * one-shot process, Codex). `no_turn`: no turn of that run runs now.
+ * one-shot process, Codex run as `codex exec`). `no_turn`: no turn of that
+ * run runs now.
  */
 export type BrainSteerReply =
   | { status: "accepted"; accepted: string[] }

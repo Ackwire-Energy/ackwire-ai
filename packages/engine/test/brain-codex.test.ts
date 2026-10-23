@@ -180,3 +180,62 @@ test("accounts (ADR 0041): account and effort go to a runner that knows them; a 
   expect((refused[0] as { message: string }).message).toContain('"Pessoal"');
   expect(out.sent).toHaveLength(0);
 });
+
+test("live steering (protocol 15): the turn on its way takes messages through brain.steer; steer_read passes; null at the end", async () => {
+  const steered: unknown[] = [];
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  const l: ComputerBrainLink = {
+    ...link({ protocol: 15 }),
+    async turn(_machineId, _request, { onEvent }) {
+      onEvent({ type: "text_delta", text: "Working" });
+      await gate;
+      onEvent({ type: "steer_read", uuids: ["u1"] });
+      onEvent({ type: "done", text: "Got it", session: { id: "x" } });
+    },
+    async steer(machineId, target, messages) {
+      steered.push({ machineId, target, messages });
+      return { status: "accepted", accepted: messages.map((m) => m.uuid) };
+    },
+  };
+  const brain = new CodexBrain({
+    link: l,
+    mcp: async () => ({ token: "tok" }),
+    agent: async () => ({ id: "agent", handle: "dev" }),
+  });
+  const handed: Array<((m: { uuid: string; text: string }[]) => Promise<unknown>) | null> = [];
+  const events: BrainEvent[] = [];
+  const running = (async () => {
+    for await (const e of brain.run(turn(), { ...io(), steerable: (s) => handed.push(s) })) {
+      events.push(e);
+      if (e.type === "text_delta") {
+        expect(await handed[0]?.([{ uuid: "u1", text: "also bye" }])).toEqual({ status: "accepted", accepted: ["u1"] });
+        release();
+      }
+    }
+  })();
+  await running;
+  expect(steered).toEqual([
+    {
+      machineId: "m1",
+      target: { runId: turn().runId, session: SESSION, agent: { id: "agent", handle: "dev" } },
+      messages: [{ uuid: "u1", text: "also bye" }],
+    },
+  ]);
+  expect(events.map((e) => e.type)).toEqual(["text_delta", "steer_read", "done"]);
+  expect(handed.at(-1)).toBeNull();
+  expect(handed).toHaveLength(2);
+
+  // An older runner (protocol 14) is never asked.
+  const old: Array<unknown> = [];
+  await collect(
+    new CodexBrain({
+      link: { ...l, ...link({ protocol: 14, events: [{ type: "done", text: "ok" }] }) },
+      mcp: async () => ({ token: "t" }),
+      agent: async () => ({ id: "agent", handle: "dev" }),
+    }).run(turn(), { ...io(), steerable: (s) => old.push(s) }),
+  );
+  expect(old).toEqual([]);
+});

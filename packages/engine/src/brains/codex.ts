@@ -5,17 +5,19 @@ import {
   brainTopic,
   type PubSub,
   parseBrainEvent,
+  STEER_PROTOCOL,
 } from "@agenteschat/adapters";
 import type { MachineCaller } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
-import { accountFields, accountUnavailable } from "./claude-code";
+import { accountFields, accountUnavailable, steerOnMachine } from "./claude-code";
 import { computerPrompt } from "./prompt";
-import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
+import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
 /**
- * The Codex brain (ADR 0032, ADR 0029 "Codex"): one agent turn runs as
- * `codex exec --json` on the agent's connected computer, through the runner's
+ * The Codex brain (ADR 0032, ADR 0029 "Codex"): one agent turn runs on the
+ * agent's connected computer (a long-lived `codex app-server`, or
+ * `codex exec --json` where that can't run), through the runner's
  * `brain.turn` op. The runner owns the Codex side (command line, our session
  * → Codex thread id, JSONL → `BrainEvent`, the MCP bridge config); this brain
  * checks the computer can run it, builds the request (context on the first
@@ -26,6 +28,11 @@ import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
  * the run's identity), so `io.executeTool` is never used here; Codex's own
  * commands and file edits arrive as `tool_call` with `executed` (transcript
  * only). Usage is the person's plan (`source: "plan"`, cost zero).
+ *
+ * Live steering (runner protocol 15): once the turn is sent, the brain hands
+ * the engine `steer` (`BrainIO.steerable`, `brain.steer`); an app-server turn
+ * takes the messages (`turn/steer`) and says which it read (`steer_read`); an
+ * exec turn answers `unsupported` and they wait for its end, as before.
  */
 
 /** `brain.turn` as the server sends it to the runner (the shared wire type, `machine-protocol.ts`). */
@@ -51,6 +58,16 @@ export interface ComputerBrainLink {
     request: BrainTurnRequest & { agent?: AgentScope },
     options: { signal: AbortSignal; onEvent: (event: BrainEvent) => void },
   ): Promise<void>;
+  /**
+   * Protocol 15: messages for the turn of `runId` in progress (`brain.steer`).
+   * A runner whose Codex turn can't take them (`codex exec`) answers
+   * `unsupported`; without it, Codex turns read new messages at their end.
+   */
+  steer?(
+    machineId: string,
+    target: { runId: string; session: string; agent: AgentScope },
+    messages: SteerMessage[],
+  ): Promise<SteerReply>;
 }
 
 export interface CodexBrainDeps {
@@ -202,16 +219,28 @@ export class CodexBrain implements Brain {
       })
       .finally(() => events.end());
 
-    for await (const event of events.read()) {
-      if (ended) continue;
-      if (event.type === "text_delta") text += event.text;
-      if (event.type === "done") {
-        ended = true;
-        yield { type: "done", text: event.text, session: { id: session.id } };
-        continue;
+    // The turn is on its way: on a runner that runs Codex as an app-server, a person's messages reach it mid-turn.
+    const steer = this.deps.link.steer?.bind(this.deps.link);
+    let steering = false;
+    if (io.steerable && steer && agent && (status.protocol ?? 0) >= STEER_PROTOCOL) {
+      const target = { runId: turn.runId, session: session.id, agent };
+      io.steerable((messages) => steer(session.machineId, target, messages));
+      steering = true;
+    }
+    try {
+      for await (const event of events.read()) {
+        if (ended) continue;
+        if (event.type === "text_delta") text += event.text;
+        if (event.type === "done") {
+          ended = true;
+          yield { type: "done", text: event.text, session: { id: session.id } };
+          continue;
+        }
+        if (event.type === "error") ended = true;
+        yield event;
       }
-      if (event.type === "error") ended = true;
-      yield event;
+    } finally {
+      if (steering) io.steerable?.(null);
     }
     await sent;
     if (ended) return;
@@ -247,6 +276,7 @@ export function hubBrainLink(deps: {
 }): ComputerBrainLink {
   return {
     status: (machineId) => deps.hub.status(machineId).catch(() => null),
+    steer: (machineId, target, messages) => steerOnMachine(deps.hub, { machineId, ...target }, messages),
     async turn(machineId, request, options) {
       let streamEnded = false;
       let finalSeen = false;

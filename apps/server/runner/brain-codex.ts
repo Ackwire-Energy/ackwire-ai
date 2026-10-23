@@ -21,6 +21,9 @@ import { agentSecrets } from "./secrets";
 /**
  * The Codex branch of `brain.turn` (ADR 0032, ADR 0029 "Codex"): one agent
  * turn as `codex exec --json`, its JSONL turned into brain events.
+ * Protocol 15: where the runner has them, turns run on a long-lived
+ * `codex app-server` instead (`brain-codex-app.ts`: the same events, plus
+ * messages mid-turn); this file stays the fallback and shares its mapping.
  *
  * - First turn of a session: `codex exec --json --skip-git-repo-check -C <cwd>
  *   --sandbox workspace-write -c sandbox_workspace_write.network_access=true
@@ -77,7 +80,9 @@ export type CodexBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean };
+  | { type: "error"; code: string; message: string; retryable?: boolean }
+  /** Protocol 15 (app-server only): messages handed with `brain.steer` that the turn read. */
+  | { type: "steer_read"; uuids: string[] };
 
 /** `brain.turn` with `kind: "codex"` (contract: "Runner"). */
 export interface CodexBrainTurnRequest {
@@ -238,7 +243,7 @@ export function codexTurnArgs(input: {
 }
 
 /** `/bin/zsh -lc "npm test"` → `npm test` (Codex wraps every command in the login shell). */
-function unwrapShell(command: string) {
+export function unwrapShell(command: string) {
   const m = /^\S*(?:sh|bash|zsh)\s+-l?c\s+(["'])([\s\S]*)\1$/.exec(command.trim());
   return (m ? (m[2] ?? "") : command).replace(/\s+/g, " ").trim();
 }
@@ -247,6 +252,65 @@ const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit/i;
 /** Codex can't authenticate (signed out, a revoked or expired sign-in). */
 const CODEX_AUTH =
   /not logged in|codex login|401 unauthorized|refresh token (?:was )?(?:expired|revoked|already used)|access token could not be refreshed/i;
+
+/** A command Codex ran (exec's `command_execution`, app-server's `commandExecution`), as an executed `tool_call`. */
+export function codexCommandCall(
+  item: { id: string; command: string; output: string; exitCode: number | null; status: string },
+  clean: (text: string) => string,
+): CodexBrainEvent {
+  const command = clean(unwrapShell(item.command));
+  const declined = item.status === "declined";
+  const output = clean(item.output);
+  const content = declined
+    ? "Not allowed by Codex's sandbox."
+    : output.length > CODEX_TOOL_OUTPUT_MAX
+      ? `${output.slice(0, CODEX_TOOL_OUTPUT_MAX)}\n…`
+      : output;
+  return {
+    type: "tool_call",
+    id: item.id,
+    name: "shell",
+    input: { command },
+    executed: {
+      content,
+      ...(declined || item.status === "failed" || (item.exitCode !== null && item.exitCode !== 0)
+        ? { isError: true }
+        : {}),
+    },
+  };
+}
+
+/** Files Codex changed (exec's `file_change`, app-server's `fileChange`), as an executed `tool_call`. */
+export function codexFileChangeCall(item: {
+  id: string;
+  changes: Array<{ path: string; kind: string }>;
+  failed: boolean;
+}): CodexBrainEvent {
+  return {
+    type: "tool_call",
+    id: item.id,
+    name: "file_change",
+    input: { changes: item.changes },
+    executed: {
+      content: item.failed
+        ? "The change failed."
+        : `Changed ${item.changes.map((c) => `${c.path} (${c.kind})`).join(", ") || "nothing"}`,
+      ...(item.failed ? { isError: true } : {}),
+    },
+  };
+}
+
+/**
+ * How a Codex turn that went wrong ends: a usage limit is `limit` then
+ * `plan_limit`, a failed sign-in `not_logged_in` (the server marks the
+ * account signed out, ADR 0041), anything else `codex_failed` (retryable
+ * unless the turn itself failed).
+ */
+export function codexProblem(problem: string, turnFailed: boolean): CodexBrainEvent[] {
+  if (USAGE_LIMIT.test(problem)) return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem }];
+  if (CODEX_AUTH.test(problem)) return [{ type: "error", code: "not_logged_in", message: problem, retryable: true }];
+  return [{ type: "error", code: "codex_failed", message: problem, ...(turnFailed ? {} : { retryable: true }) }];
+}
 
 /**
  * `codex exec --json` lines → brain events, plus what the turn's end needs
@@ -323,48 +387,24 @@ export class CodexEventMapper {
             if (t.trim()) this.answer = this.clean(t);
             return [];
           }
-          case "command_execution": {
-            const command = this.clean(unwrapShell(str(item.command)));
-            const code = typeof item.exit_code === "number" ? item.exit_code : null;
-            const declined = item.status === "declined";
-            const output = this.clean(str(item.aggregated_output));
-            const content = declined
-              ? "Not allowed by Codex's sandbox."
-              : output.length > CODEX_TOOL_OUTPUT_MAX
-                ? `${output.slice(0, CODEX_TOOL_OUTPUT_MAX)}\n…`
-                : output;
+          case "command_execution":
             return [
-              {
-                type: "tool_call",
-                id,
-                name: "shell",
-                input: { command },
-                executed: {
-                  content,
-                  ...(declined || item.status === "failed" || (code !== null && code !== 0) ? { isError: true } : {}),
+              codexCommandCall(
+                {
+                  id,
+                  command: str(item.command),
+                  output: str(item.aggregated_output),
+                  exitCode: typeof item.exit_code === "number" ? item.exit_code : null,
+                  status: str(item.status),
                 },
-              },
+                (t) => this.clean(t),
+              ),
             ];
-          }
           case "file_change": {
             const changes = (Array.isArray(item.changes) ? (item.changes as Record<string, unknown>[]) : []).flatMap(
               (c) => (str(c?.path) ? [{ path: this.rel(str(c.path)), kind: str(c.kind) || "update" }] : []),
             );
-            const failed = item.status === "failed";
-            return [
-              {
-                type: "tool_call",
-                id,
-                name: "file_change",
-                input: { changes },
-                executed: {
-                  content: failed
-                    ? "The change failed."
-                    : `Changed ${changes.map((c) => `${c.path} (${c.kind})`).join(", ") || "nothing"}`,
-                  ...(failed ? { isError: true } : {}),
-                },
-              },
-            ];
+            return [codexFileChangeCall({ id, changes, failed: item.status === "failed" })];
           }
           default:
             return [];
@@ -385,16 +425,7 @@ export class CodexEventMapper {
           (input.exitCode === 0
             ? "Codex ended without finishing the turn"
             : `Codex exited with code ${input.exitCode ?? "?"}${input.stderr ? `: ${this.clean(input.stderr)}` : ""}`)));
-    if (problem) {
-      if (USAGE_LIMIT.test(problem)) {
-        return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem }];
-      }
-      // The server marks an account signed out on this code (ADR 0041).
-      if (CODEX_AUTH.test(problem)) {
-        return [{ type: "error", code: "not_logged_in", message: problem, retryable: true }];
-      }
-      return [{ type: "error", code: "codex_failed", message: problem, ...(this.failed ? {} : { retryable: true }) }];
-    }
+    if (problem) return codexProblem(problem, this.failed !== undefined);
     const text = this.answer ?? this.clean(input.lastFile?.trim() ?? "");
     return [
       ...(text ? [{ type: "text_delta" as const, text }] : []),
@@ -422,28 +453,43 @@ export interface CodexTurnOptions {
   /** Tests: the codex executable. */
   bin?: string;
   platform?: NodeJS.Platform;
+  /**
+   * Protocol 15: the long-lived `codex app-server` processes
+   * (`brain-codex-app.ts`): the turn runs there when it can (it takes
+   * messages mid-turn); when it can't, `codex exec` runs it as before.
+   */
+  app?: CodexAppRunner;
+}
+
+/** What one Codex turn needs (either mode). */
+export interface CodexTurnInput {
+  runId: string;
+  sessionId: string;
+  cwd: string;
+  model?: string;
+  system: string;
+  prompt: string;
+  mcp: { token: string; url?: string };
+  /** Protocol 10: folders allowed for the agent besides its own. */
+  writableRoots?: string[];
+  /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
+  account?: { id: string; home: string };
+  effort?: BrainEffort;
+  /** App-server mode: the agent (one process per agent and session) and its folder (the MCP bridge's). */
+  agentId?: string;
+  folder?: string;
+}
+
+/** The app-server mode as `runCodexTurn` sees it (`CodexAppServers`). */
+export interface CodexAppRunner {
+  /** Runs the turn on an app-server, or with `exec` (`codex exec`) when it can't there. */
+  turn(input: CodexTurnInput & { version: string }, opts: CodexTurnOptions, exec: () => Promise<void>): Promise<void>;
 }
 
 const detected = cachedExecutors();
 
 /** Runs one Codex turn and emits its events; ends with exactly one `done` or `error`. Never throws. */
-export async function runCodexTurn(
-  input: {
-    runId: string;
-    sessionId: string;
-    cwd: string;
-    model?: string;
-    system: string;
-    prompt: string;
-    mcp: { token: string; url?: string };
-    /** Protocol 10: folders allowed for the agent besides its own. */
-    writableRoots?: string[];
-    /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
-    account?: { id: string; home: string };
-    effort?: BrainEffort;
-  },
-  opts: CodexTurnOptions,
-): Promise<void> {
+export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions): Promise<void> {
   const fail = (code: string, message: string, retryable?: boolean) =>
     opts.emit({ type: "error", code, message, ...(retryable ? { retryable } : {}) });
   if ((opts.platform ?? process.platform) === "win32") {
@@ -454,7 +500,15 @@ export async function runCodexTurn(
   if (!codexVersionOk(version)) {
     return fail("codex_too_old", `Codex here is ${version}; agents need ${CODEX_MIN_VERSION} or newer.`);
   }
+  // A long-lived app-server takes messages mid-turn; exec runs the turns it can't (an older CLI, a failed handshake…).
+  if (opts.app) return opts.app.turn({ ...input, version }, opts, () => runCodexExec(input, opts));
+  return runCodexExec(input, opts);
+}
 
+/** One turn as `codex exec --json` (the version already checked). */
+async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Promise<void> {
+  const fail = (code: string, message: string, retryable?: boolean) =>
+    opts.emit({ type: "error", code, message, ...(retryable ? { retryable } : {}) });
   const threadKey = codexThreadKey(input.sessionId, input.account?.id);
   const thread = opts.threads.get(threadKey);
   mkdirSync(opts.workDir, { recursive: true });
@@ -582,6 +636,8 @@ export interface CodexBrainContext {
   grants?: string[];
   /** Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`. */
   accounts?: { accountDir(kind: AccountKind, id: string): string | null };
+  /** Protocol 15: the app-server processes (live steering); without it every turn is `codex exec`. */
+  app?: CodexAppRunner;
 }
 
 const threadStores = new Map<string, CodexThreads>();
@@ -648,6 +704,8 @@ export async function handleCodexBrainTurn(
       ...(writableRoots.length ? { writableRoots } : {}),
       ...(account ? { account } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
+      agentId: String(req.agent.id),
+      folder,
     },
     {
       threads,
@@ -659,6 +717,7 @@ export async function handleCodexBrainTurn(
       ...(secrets ? { env: secrets.env, redact: secrets.redact } : {}),
       ...(ctx.codexVersion ? { codexVersion: ctx.codexVersion } : {}),
       ...(ctx.bin ? { bin: ctx.bin } : {}),
+      ...(ctx.app ? { app: ctx.app } : {}),
     },
   );
 }
