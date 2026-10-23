@@ -234,17 +234,17 @@ describe("targets in words", () => {
     expect(r).toMatchObject({ found: false, reason: "unsure" });
   });
 
-  test("the site memory finds a target again only in the same place (never the Delete of another row)", async () => {
-    const rows = (first: string, second: string) =>
+  test("the site memory finds a target again only in the same place, and never a costly one", async () => {
+    const rows = (first: string, second: string, action = "Edit") =>
       observeSnapshot({
-        text: `- table "Invoices"\n  - row\n    - cell "${first}" [ref=e1]\n    - cell "Delete" [ref=e2]\n      - button "Delete" [ref=e3]\n  - row\n    - cell "${second}" [ref=e4]\n    - cell "Delete" [ref=e5]\n      - button "Delete" [ref=e6]`,
+        text: `- table "Invoices"\n  - row\n    - cell "${first}" [ref=e1]\n    - cell "${action}" [ref=e2]\n      - button "${action}" [ref=e3]\n  - row\n    - cell "${second}" [ref=e4]\n    - cell "${action}" [ref=e5]\n      - button "${action}" [ref=e6]`,
         url: "https://app.acme.example/invoices",
       });
     const judge = createFakeJudge((kind, id) =>
       kind !== "screen_target" ? undefined : id === "present" ? 0.95 : { choice: "e6", probabilities: { e6: 0.95 } },
     );
     const cache = createTargetCache();
-    const base = { judge, ...ids, scope: "a", cache, target: "delete invoice 42", use: "click" as const };
+    const base = { judge, ...ids, scope: "a", cache, target: "edit invoice 42", use: "click" as const };
     expect(await resolveTarget({ ...base, observation: rows("Invoice 41", "Invoice 42") })).toMatchObject({
       ref: "e6",
       via: "judge",
@@ -254,7 +254,7 @@ describe("targets in words", () => {
       ref: "e6",
       via: "cache",
     });
-    // Invoice 42 moved to the first row: the memory finds its Delete there, with no judge.
+    // Invoice 42 moved to the first row: the memory finds its Edit there, with no judge.
     const asked = judge.calls.length;
     expect(await resolveTarget({ ...base, observation: rows("Invoice 42", "Invoice 43") })).toMatchObject({
       ref: "e3",
@@ -264,6 +264,11 @@ describe("targets in words", () => {
     // Invoice 42 is gone: the remembered place isn't on the page, so the judge decides again.
     await resolveTarget({ ...base, observation: rows("Invoice 43", "Invoice 44") });
     expect(judge.calls).toHaveLength(asked + 1);
+    // A Delete is never taken from memory (its place is kept only in part): the judge decides each time.
+    const remove = { ...base, target: "delete invoice 42", observation: rows("Invoice 41", "Invoice 42", "Delete") };
+    expect(await resolveTarget(remove)).toMatchObject({ ref: "e6", via: "judge" });
+    expect(await resolveTarget(remove)).toMatchObject({ ref: "e6", via: "judge" });
+    expect(judge.calls).toHaveLength(asked + 3);
   });
 
   test("without a calibrated judge, the closest by their words come back instead of a pick", async () => {
@@ -283,8 +288,15 @@ describe("targets in words", () => {
       target: "the sign in control",
       use: "click",
     });
-    expect(r).toMatchObject({ found: false, reason: "unsure" });
+    expect(r).toMatchObject({ found: false, reason: "unjudged" });
     expect(r.found ? [] : r.candidates.map((c) => c.ref)).toContain("e5");
+    // The agent is told what works without one: a number or the exact name.
+    const plan = await runPlan({ judge: llm, ...ids, surface: fakeSurface(PAGES, "login"), scope: "a" }, [
+      { do: "click", target: "the sign in control" },
+    ]);
+    expect(formatPlanReport(plan).summary).toStartWith(
+      'Couldn\'t click "the sign in control": couldn\'t match "the sign in control" to an element by its words here: give its number or its exact name',
+    );
     // And nothing is dismissed on its word.
     const banner = observeSnapshot({ text: '- dialog "Cookies"\n  - button "Reject optional" [ref=e2]' });
     expect(await findDismiss({ judge: llm, ...ids, observation: banner, covering: "covered" })).toBeNull();
@@ -490,6 +502,44 @@ describe("plans", () => {
     ]);
     expect(report.stopped).toBeUndefined();
     expect(report.steps[0]?.expected).toMatchObject({ met: true });
+  });
+
+  test("an expectation outlives a look that fails once while the page navigates", async () => {
+    const judge = createFakeJudge((kind, _id, state) =>
+      kind === "screen_check" && String((state.screen as { text: string }).text).includes("Dashboard") ? 0.9 : 0.05,
+    );
+    const surface = fakeSurface(PAGES, "login");
+    let clicked = false;
+    let looksAfter = 0;
+    const observe = surface.observe.bind(surface);
+    surface.observe = async () => {
+      if (clicked) {
+        // After the click: the login page still, then a look in the middle of the navigation, then the dashboard.
+        looksAfter++;
+        if (looksAfter === 2) throw new Error("Execution context was destroyed");
+        if (looksAfter > 2) surface.go("home");
+      }
+      return observe();
+    };
+    const original = surface.perform.bind(surface);
+    surface.perform = async (action, options) => {
+      const out = await original(action, options);
+      if (action.kind !== "click") return out;
+      clicked = true;
+      surface.go("login");
+      return { ok: true, observation: null };
+    };
+    let t = 0;
+    const now = () => {
+      t += 100;
+      return t;
+    };
+    const report = await runPlan({ judge, ...ids, surface, scope: "a", now }, [
+      { do: "click", target: "Sign in", expect: "the dashboard shows" },
+    ]);
+    expect(report.stopped).toBeUndefined();
+    expect(report.steps[0]?.expected).toMatchObject({ met: true });
+    expect(looksAfter).toBe(3);
   });
 
   test("a banner in the way is closed once, then the step goes through", async () => {

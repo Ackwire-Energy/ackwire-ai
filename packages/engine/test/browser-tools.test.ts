@@ -308,6 +308,14 @@ test("browser_do runs a sign-in across pages, checks what it expects and stops w
   ]);
   // The step after the stop never ran.
   expect(b.calls.filter((c) => c.op === "browser.act" && c.command === "click")).toHaveLength(2);
+  // A single step whose click went through, and only its check didn't hold, isn't an error: it was done.
+  const single = await b.call("browser_do", {
+    steps: [{ do: "click", target: "Orders", expect: "the list of orders shows" }],
+  });
+  expect(single.isError).toBeUndefined();
+  expect(single.content).toStartWith(
+    "Clicked link (e20), but the page doesn't show \"the list of orders shows\". It was done: don't do it again",
+  );
 });
 
 test("a person who takes the browser and gives it back within a step stops the plan, and reading comes first", async () => {

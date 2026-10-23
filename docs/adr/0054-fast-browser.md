@@ -64,13 +64,13 @@ The agent names what it acts on, as a number (`e12`) or in words ("the Sign in b
 
 1. **A ref**, as given. The browser checks it; a stale one fails and says so.
 2. **Exactly one element with that name** and a fitting role, preferring a control over text with the same name (the heading "Sign in" next to the button). No judge.
-3. **The target memory:** what the same words found on the same page of the same site before, kept per agent (an LRU in the process, by host and generalized path, `/orders/:id`). It is found again by role, name **and place**: the Delete of the row for invoice 42 is found again only in that row, wherever the row moved, and when nothing or several things match the judge decides again.
+3. **The target memory:** what the same words found on the same page of the same site before, kept per agent (an LRU in the process, by host and generalized path, `/orders/:id`). It is found again by role, name **and place**: the Edit of the row for invoice 42 is found again only in that row, wherever the row moved, and when nothing or several things match the judge decides again. A costly one (delete, pay, send…) is never taken from memory, since its place is kept only in part (a row's text is cut short): the judge decides it each time, at 0.85.
 4. **The judge** picks among the page's fitting elements: only fields for a fill, boxes for a tick. Each element is described with where it sits (`button "Delete" — in row "Invoice 42 · R$ 42,00"`). A table row has no name of its own in `agent-browser`'s snapshot (the invoice number is a sibling cell), so a row is named by its other cells. One request carries a Choice over refs (plus "none") and a Noul for whether it's there at all. Rules:
    - The pick is taken at p ≥ 0.55, at least 0.2 ahead of the next.
    - An element whose wrong pick costs (pay, delete, send, confirm…) needs 0.85. So does a plain "Yes" or "OK" inside a dialog that asks for one ("Delete project Acme?").
    - Two elements that read the same are never picked, however sure the judge is.
    - Below that, the three closest go back to the agent, which picks by number.
-   - Only a calibrated judge picks: the request is marked `calibrated`, so without Jev (or when it fails) the cheap model, whose probabilities are all 1, is never asked. The closest by their words go back instead.
+   - Only a calibrated judge picks: the request is marked `calibrated`, so without Jev (or when it fails) the cheap model, whose probabilities are all 1, is never asked. The closest by their words go back instead, and the agent is told to give the element's number or its exact name.
 5. **An image of the page** (`browser.capture`, protocol 17), when the text has nothing that fits: an icon without a name, a canvas. The judge boxes the target and confirms it's there (≥ 0.6). A box over most of the image is refused. The point lands on a marked element's ref when there is one, so the action stays as exact as a ref; otherwise it is a click at the point. Passwords are only typed into elements found on the page, never at a point.
 
 ### 3. Every action answers with what changed
@@ -93,9 +93,9 @@ Page text stays inside the untrusted `page_content` block. `browser_open` answer
 
 `browser_do({ steps })` takes up to 15 steps: open, click, fill, select, check, uncheck, press, type_secret, scroll, hover, wait, back, read. Each step's target is found on the page as it is at that moment, so a plan crosses pages whose elements the agent never saw. `read` with `find` ("the status message") brings what the page says at that point into the answer, so a plan can end by reporting.
 
-A step may carry `expect` ("signed in", "the cart has 2 items"); the judge checks it on the settled page (≥ 0.6 true, < 0.35 false, unsure counts as not shown). An `expect` that isn't true yet gets up to 2 s to become true (a form that navigates after its submit), looked at again every 300 ms and judged only when the page changed; it gives up sooner when the page stays the same for 1 s.
+A step may carry `expect` ("signed in", "the cart has 2 items"); the judge checks it on the settled page (≥ 0.6 true, < 0.35 false, unsure counts as not shown). An `expect` that isn't true yet gets up to 2 s to become true (a form that navigates after its submit), looked at again every 300 ms and judged only when the page changed; it gives up sooner when the page stays the same for 1 s (counted from when the judge answered). A look or a judgment that fails once, as the page navigates, doesn't end it; three in a row do.
 
-The plan stops at the first step that fails, can't find its target, or doesn't show what it expected. A step whose action went through but whose `expect` didn't hold says so ("Clicked Export, but the page doesn't show … It was done: don't do it again"), so the agent never repeats an action it can't confirm. It answers with:
+The plan stops at the first step that fails, can't find its target, or doesn't show what it expected. A step whose action went through but whose `expect` didn't hold says so ("Clicked Export, but the page doesn't show … It was done: don't do it again"), so the agent never repeats an action it can't confirm; nor is such an answer marked as an error, which would read as "it didn't happen". It answers with:
 
 - what ran;
 - where it stopped and why, with the closest elements when a target wasn't clear;

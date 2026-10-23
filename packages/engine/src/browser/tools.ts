@@ -98,8 +98,10 @@ export interface BrowserToolDeps {
   /** A take over moving to the run that waits on it is told to its conversation (the card follows). */
   pubsub?: PubSub;
   /**
-   * Targets in words, checks and finds on the page (ADR 0054): Jev, or the
-   * org's cheap model. Without it, targets are numbers or exact names only.
+   * Targets in words, checks and finds on the page (ADR 0054). Only a calibrated
+   * judge (Jev) picks a target; checks and finds take Jev or the org's cheap
+   * model. Without Jev, targets are numbers or exact names only (the closest by
+   * their words come back).
    */
   judge?: Judge;
   /** The judge sees images (Jev's vision model): a target the page's text lacks is looked for on a screenshot. */
@@ -596,7 +598,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         data: { ...data, ...(waiting.data ?? {}) },
       };
     }
-    const nothingDone = report.steps.every((s) => s.status !== "done");
+    // A step that ran and only failed its check was done: not an error (it must not be done again).
+    const nothingDone = report.steps.every((s) => s.status !== "done" && !s.ran);
     return { content, ...(f.failed && nothingDone ? { isError: true } : {}), data };
   }
 

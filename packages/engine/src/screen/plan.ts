@@ -382,7 +382,9 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
       throw new Stop(
         r.reason === "unsure"
           ? `"${words}" could be more than one thing on the page`
-          : `couldn't find "${words}" on the page`,
+          : r.reason === "unjudged"
+            ? `couldn't match "${words}" to an element by its words here: give its number or its exact name (read the page for them)`
+            : `couldn't find "${words}" on the page`,
         r.candidates,
       );
     };
@@ -475,15 +477,27 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
         const until = now() + (deps.expectGraceMs ?? EXPECT_GRACE_MS);
         let judged = screenDigest(after);
         let changedAt = now();
+        let failures = 0;
         while (check.met !== true && now() < until && now() - changedAt < EXPECT_QUIET_MS) {
           if (deps.signal?.aborted) throw new Stop("stopped");
           await deps.surface.perform({ kind: "pause", ms: EXPECT_POLL_MS }, { settle: false });
-          after = await look();
-          const digest = screenDigest(after);
-          if (digest === judged) continue;
-          judged = digest;
-          changedAt = now();
-          check = await judgeOn(after);
+          try {
+            after = await look();
+            const digest = screenDigest(after);
+            if (digest !== judged) {
+              check = await judgeOn(after);
+              // Judged once the judge answered (a failed judgment is asked again), and quiet counts from
+              // then: nobody looked while it ran.
+              judged = digest;
+              changedAt = now();
+            }
+            failures = 0;
+          } catch (error) {
+            // A look or a judgment that failed once (the page navigating, a slow answer) isn't the end of the
+            // grace, nor a quiet page.
+            if (++failures >= WAIT_FAILURES) throw error;
+            changedAt = now();
+          }
         }
         report.expected = check;
         if (check.met !== true) {

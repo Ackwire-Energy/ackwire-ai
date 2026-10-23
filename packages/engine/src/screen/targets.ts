@@ -60,8 +60,8 @@ export type TargetFound = {
 };
 export type TargetMissing = {
   found: false;
-  /** `unsure`: several fit; `absent`: nothing on the screen fits. */
-  reason: "unsure" | "absent";
+  /** `unsure`: several fit; `absent`: nothing on the screen fits; `unjudged`: no calibrated judge answered. */
+  reason: "unsure" | "absent" | "unjudged";
   candidates: ScreenElement[];
 };
 export type TargetResult = TargetFound | TargetMissing;
@@ -229,7 +229,8 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
   const key = targetKey(input.scope, o.url, input.use, words);
   const remembered = input.cache?.get(key);
   const again = remembered ? fromMemory(remembered, o) : null;
-  if (again) return { found: true, ref: again.ref, element: again, via: "cache", confidence: 1 };
+  // A costly one (delete, pay) is never taken from memory: its place is kept only in part (row text cut short).
+  if (again && !isCostly(again)) return { found: true, ref: again.ref, element: again, via: "cache", confidence: 1 };
 
   const candidates = candidatesFor(words, input.use, o, MAX_OPTIONS);
   if (candidates.length === 0) return { found: false, reason: "absent", candidates: [] };
@@ -271,7 +272,7 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
     });
   } catch {
     // No calibrated judge (or it failed): the closest by their words go back, and the agent picks by number.
-    return { found: false, reason: "unsure", candidates: closestByWords(words, candidates) };
+    return { found: false, reason: "unjudged", candidates: closestByWords(words, candidates) };
   }
   return decide(answers, candidates, (picked) => {
     input.cache?.set(key, memoryOf(picked));
