@@ -57,7 +57,7 @@ export const privacyPtBR: LegalDocument = {
         "Agentes são modelos de IA que leem e agem dentro do espaço de trabalho. Para isso, o Conteúdo do Espaço de Trabalho sai dos nossos servidores nos casos abaixo, e só neles:",
         {
           list: [
-            "**Para responder.** Quando um agente trabalha, ele envia o contexto de que precisa (o contexto da organização, as instruções do agente, a conversa, a memória relevante e os resultados das ferramentas) ao provedor de modelo escolhido para esse agente. Com a chave da plataforma, esse provedor é nosso suboperador (Seção 7). Com uma chave que a organização adicionou, a chamada é feita na conta da própria organização e sob o contrato dela com esse provedor, que então não é nosso suboperador. Com um plano do Claude ou do ChatGPT conectado a um agente, o agente roda no computador conectado da pessoa, na conta dessa pessoa e sob os termos do provedor.",
+            "**Para responder.** Quando um agente trabalha, ele envia o contexto de que precisa (o contexto da organização, as instruções do agente, a conversa, a memória relevante e os resultados das ferramentas) ao provedor de modelo escolhido para esse agente. Com a chave da plataforma, esse provedor trata os dados em nosso nome. Com uma chave que a organização adicionou, a chamada é feita na conta da própria organização e sob o contrato dela com esse provedor. Com um plano do Claude ou do ChatGPT conectado a um agente, o agente roda no computador conectado da pessoa, na conta dessa pessoa e sob os termos do provedor.",
             "**Para decidir quem responde.** Um modelo de roteamento lê a mensagem nova, os nomes e papéis dos agentes da organização e a conversa recente para decidir qual agente deve responder, se algum. Ele roda na TypeSafe ou, como alternativa, no provedor de modelo da organização. O roteamento nunca dá permissão nenhuma a um agente.",
             "**Memória.** Os agentes guardam memória das conversas (resumos, fatos e lições) para melhorar com o tempo. Algumas avaliações sobre a memória (se algo vale ser guardado, ou se contradiz o que o agente já sabe) são feitas pela TypeSafe. A memória pode ser vista e apagada na página do agente, e é apagada junto com a organização.",
             "**Busca.** Para encontrar mensagens e documentos relacionados, o texto pode ser transformado em vetores (embeddings) pela Voyage AI.",
@@ -86,31 +86,8 @@ export const privacyPtBR: LegalDocument = {
       ],
     },
     {
-      id: "subprocessors",
-      heading: "7. Suboperadores",
-      blocks: [
-        "Usamos os seguintes suboperadores para operar o Serviço:",
-        {
-          list: [
-            "**Railway:** hospedagem da aplicação e do banco de dados. Estados Unidos.",
-            "**Cloudflare:** DNS, entrega de conteúdo, segurança de rede e armazenamento de arquivos (R2). Rede global.",
-            "**Anthropic:** modelos de IA para agentes que usam a chave da plataforma. Estados Unidos.",
-            "**OpenAI:** modelos de IA para agentes que usam a chave da plataforma. Estados Unidos.",
-            "**TypeSafe:** decidir qual agente responde e avaliações sobre a memória dos agentes. Estados Unidos.",
-            "**Voyage AI:** embeddings para a busca. Estados Unidos.",
-            "**Daytona:** computadores na nuvem para os agentes, quando a organização os usa. Estados Unidos.",
-            "**Composio:** conexões com caixas do Gmail e do Outlook, quando a organização conecta uma. Estados Unidos.",
-            "**Expo:** entrega de notificações push no app de celular, pelo Apple Push Notification service e pelo Firebase Cloud Messaging. Estados Unidos.",
-            "**MillionSend:** envio de e-mails da conta e de notificações. Um serviço da CODARI GLOBAL, LLC, que roda na Amazon Web Services. Estados Unidos.",
-            "**Himetrica:** análise do site público agentes.chat. Estados Unidos.",
-          ],
-        },
-        "Avisaremos as organizações que tiverem um DPA assinado sobre mudanças de suboperadores antes que elas entrem em vigor.",
-      ],
-    },
-    {
       id: "retention",
-      heading: "8. Retenção",
+      heading: "7. Retenção",
       blocks: [
         {
           list: [
@@ -125,70 +102,70 @@ export const privacyPtBR: LegalDocument = {
     },
     {
       id: "security",
-      heading: "9. Segurança",
+      heading: "8. Segurança",
       blocks: [
         "Os dados são cifrados em trânsito (TLS) e em repouso. Chaves de provedores de modelo, tokens de conectores e credenciais de bancos de dados são, além disso, cifrados com criptografia de envelope por organização e nunca voltam para o navegador nem para os apps. O acesso aos sistemas de produção é restrito e registrado. Se soubermos de um incidente com dados pessoais, avisaremos as organizações afetadas sem demora injustificada e dentro dos prazos que a LGPD e o GDPR exigem.",
       ],
     },
     {
       id: "transfers",
-      heading: "10. Transferências internacionais",
+      heading: "9. Transferências internacionais",
       blocks: [
-        "A nossa aplicação e o banco de dados rodam nos Estados Unidos, e os suboperadores da Seção 7 tratam dados onde indicado. Para dados sujeitos à LGPD, usamos as garantias contratuais do artigo 33. Quando dados pessoais sujeitos ao GDPR ou ao UK GDPR são transferidos para um terceiro país, usamos as Cláusulas Contratuais Padrão da Comissão Europeia e o Adendo do Reino Unido.",
+        "A nossa aplicação e o banco de dados rodam nos Estados Unidos, e os provedores citados nesta política tratam dados nos Estados Unidos. Para dados sujeitos à LGPD, usamos as garantias contratuais do artigo 33. Quando dados pessoais sujeitos ao GDPR ou ao UK GDPR são transferidos para um terceiro país, usamos as Cláusulas Contratuais Padrão da Comissão Europeia e o Adendo do Reino Unido.",
       ],
     },
     {
       id: "apps",
-      heading: "11. Apps de celular e de Mac",
+      heading: "10. Apps de celular e de Mac",
       blocks: [
         "O app de celular envia notificações pela Expo, pela Apple e pelo Google; uma notificação pode mostrar o nome de quem escreveu e o começo da mensagem, e você escolhe quais notificações recebe. O app de Mac e os computadores conectados guardam o login no próprio aparelho; excluir a sua conta (o que também dá para fazer nos apps) desconecta todos os aparelhos.",
       ],
     },
     {
       id: "gdpr",
-      heading: "12. Seus direitos pelo GDPR",
+      heading: "11. Seus direitos pelo GDPR",
       blocks: [
         "Se você está no Espaço Econômico Europeu ou no Reino Unido, pode pedir acesso, retificação, exclusão, limitação e portabilidade, se opor ao tratamento e apresentar reclamação à autoridade de controle. Para dados de conta, fale direto conosco; você também pode corrigir o seu perfil e excluir a sua conta sozinho em Configurações. Para dados pessoais no Conteúdo do Espaço de Trabalho, fale com a organização que os controla; encaminharemos a ela os pedidos que recebermos e a ajudaremos como operador.",
       ],
     },
     {
       id: "lgpd",
-      heading: "13. Seus direitos pela LGPD",
+      heading: "12. Seus direitos pela LGPD",
       blocks: [
-        "Se você está no Brasil, a Lei Geral de Proteção de Dados lhe dá os direitos de confirmação da existência de tratamento, acesso, correção, anonimização, bloqueio ou eliminação, portabilidade, informação sobre compartilhamento e revogação do consentimento. Os pedidos seguem pelos mesmos canais da Seção 12, e você pode peticionar à ANPD. A nossa equipe de privacidade, em privacy@agentes.chat, é o nosso canal de contato (encarregado).",
+        "Se você está no Brasil, a Lei Geral de Proteção de Dados lhe dá os direitos de confirmação da existência de tratamento, acesso, correção, anonimização, bloqueio ou eliminação, portabilidade, informação sobre compartilhamento e revogação do consentimento. Os pedidos seguem pelos mesmos canais da Seção 11, e você pode peticionar à ANPD. A nossa equipe de privacidade, em privacy@agentes.chat, é o nosso canal de contato (encarregado).",
       ],
     },
     {
       id: "dpa",
-      heading: "14. Acordo de Tratamento de Dados",
+      heading: "13. Acordo de Tratamento de Dados",
       blocks: [
-        "Um Acordo de Tratamento de Dados (DPA) que cobre o nosso tratamento do Conteúdo do Espaço de Trabalho, incluindo a lista de suboperadores acima, as Cláusulas Contratuais Padrão e os termos de tratamento da LGPD, está disponível para todas as organizações. Peça em legal@agentes.chat.",
+        "Um Acordo de Tratamento de Dados (DPA) que cobre o nosso tratamento do Conteúdo do Espaço de Trabalho, incluindo as Cláusulas Contratuais Padrão e os termos de tratamento da LGPD, está disponível para todas as organizações. Peça em legal@agentes.chat.",
       ],
     },
     {
       id: "cookies",
-      heading: "15. Cookies e armazenamento local",
+      heading: "14. Cookies e armazenamento local",
       blocks: [
         "O espaço de trabalho usa só os cookies e o armazenamento local necessários para manter você conectado, proteger formulários e lembrar preferências como tema e idioma. O site público agentes.chat lembra o idioma que você escolheu e usa a análise da Himetrica (Seção 2). Não usamos cookies de publicidade nem de rastreamento entre sites.",
       ],
     },
     {
       id: "children",
-      heading: "16. Crianças e adolescentes",
+      heading: "15. Crianças e adolescentes",
       blocks: [
         "O Serviço é uma ferramenta de trabalho para adultos. Ele não se destina a menores de 18 anos, e não coletamos dados deles de propósito. Se você acredita que um menor nos deu dados pessoais, escreva para privacy@agentes.chat e nós os apagaremos.",
       ],
     },
     {
       id: "changes",
-      heading: "17. Mudanças nesta política",
+      heading: "16. Mudanças nesta política",
       blocks: [
         "Podemos atualizar esta política; mudanças relevantes serão anunciadas por e-mail ou no app antes de entrarem em vigor. A versão atual fica sempre nesta página. Se as versões em português e em inglês divergirem, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
       ],
     },
     {
       id: "contact",
-      heading: "18. Contato",
+      heading: "17. Contato",
       blocks: [
         "CODARI GLOBAL, LLC, que atua sob o nome agentes.chat. Endereço para notificações: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, EUA · privacy@agentes.chat. Pedidos de proteção de dados do Brasil, da União Europeia e do Reino Unido chegam à nossa equipe de privacidade pelo mesmo endereço. Para o resto, escreva para hello@agentes.chat.",
       ],

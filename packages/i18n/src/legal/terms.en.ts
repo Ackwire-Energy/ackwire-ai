@@ -84,7 +84,7 @@ export const termsEn: LegalDocument = {
       id: "data-protection",
       heading: "9. Data protection",
       blocks: [
-        "Where the GDPR, UK GDPR or LGPD applies to personal data in your Workspace Content, each party will comply with its obligations under that law. A Data Processing Addendum (DPA) incorporating the European Commission's Standard Contractual Clauses and equivalent LGPD terms is available and, when executed, is incorporated into these Terms. Request it at legal@agentes.chat. The current list of subprocessors is published in the Privacy Policy.",
+        "Where the GDPR, UK GDPR or LGPD applies to personal data in your Workspace Content, each party will comply with its obligations under that law. A Data Processing Addendum (DPA) incorporating the European Commission's Standard Contractual Clauses and equivalent LGPD terms is available and, when executed, is incorporated into these Terms. Request it at legal@agentes.chat.",
       ],
     },
     {

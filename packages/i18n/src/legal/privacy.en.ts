@@ -57,7 +57,7 @@ export const privacyEn: LegalDocument = {
         "Agents are AI models that read and act inside the workspace. To do that, Workspace Content leaves our servers in the following cases, and only in them:",
         {
           list: [
-            "**Answering.** When an agent works, it sends the context it needs (the organization's context, the agent's instructions, the conversation, relevant memory and the results of its tools) to the model provider chosen for that agent. With the platform's key, that provider is our subprocessor (Section 7). With a key the organization added, the call is made under the organization's own account and agreement with that provider, which is then not our subprocessor. With a Claude or ChatGPT plan connected to an agent, the agent runs on the person's connected computer under that person's account and the provider's terms.",
+            "**Answering.** When an agent works, it sends the context it needs (the organization's context, the agent's instructions, the conversation, relevant memory and the results of its tools) to the model provider chosen for that agent. With the platform's key, that provider processes it on our behalf. With a key the organization added, the call is made under the organization's own account and agreement with that provider. With a Claude or ChatGPT plan connected to an agent, the agent runs on the person's connected computer under that person's account and the provider's terms.",
             "**Deciding who replies.** A routing model reads a new message, the names and roles of the organization's agents, and recent conversation to decide which agent, if any, should reply. It runs at TypeSafe or, as a fallback, at the organization's model provider. Routing never grants an agent any permission.",
             "**Memory.** Agents keep memory from conversations (summaries, facts and lessons) so they improve over time. Some judgments about memory (whether something is worth keeping, or conflicts with what an agent already knows) are made by TypeSafe. Memory can be seen and removed in the agent's page, and it is deleted with the organization.",
             "**Search.** To find related messages and documents, text may be turned into vectors (embeddings) by Voyage AI.",
@@ -86,31 +86,8 @@ export const privacyEn: LegalDocument = {
       ],
     },
     {
-      id: "subprocessors",
-      heading: "7. Subprocessors",
-      blocks: [
-        "We use the following subprocessors to operate the Service:",
-        {
-          list: [
-            "**Railway:** application hosting and database. United States.",
-            "**Cloudflare:** DNS, content delivery, network security and file storage (R2). Global network.",
-            "**Anthropic:** AI models for agents using the platform's key. United States.",
-            "**OpenAI:** AI models for agents using the platform's key. United States.",
-            "**TypeSafe:** deciding which agent replies, and judgments about agent memory. United States.",
-            "**Voyage AI:** embeddings for search. United States.",
-            "**Daytona:** cloud computers for agents, when an organization uses them. United States.",
-            "**Composio:** connections to Gmail and Outlook inboxes, when an organization connects one. United States.",
-            "**Expo:** delivery of push notifications to the phone app, through Apple Push Notification service and Firebase Cloud Messaging. United States.",
-            "**MillionSend:** delivery of account and notification email. A service of CODARI GLOBAL, LLC, running on Amazon Web Services. United States.",
-            "**Himetrica:** analytics for the public site agentes.chat. United States.",
-          ],
-        },
-        "We will give notice of subprocessor changes to organizations with an executed DPA before the change takes effect.",
-      ],
-    },
-    {
       id: "retention",
-      heading: "8. Retention",
+      heading: "7. Retention",
       blocks: [
         {
           list: [
@@ -125,70 +102,70 @@ export const privacyEn: LegalDocument = {
     },
     {
       id: "security",
-      heading: "9. Security",
+      heading: "8. Security",
       blocks: [
         "Data is encrypted in transit (TLS) and at rest. Model provider keys, connector tokens and database credentials are additionally encrypted with per-organization envelope encryption and are never sent back to the browser or the apps. Access to production systems is restricted and logged. If we learn of a personal-data breach, we will notify affected organizations without undue delay and within the timelines the GDPR and LGPD require.",
       ],
     },
     {
       id: "transfers",
-      heading: "10. International transfers",
+      heading: "9. International transfers",
       blocks: [
-        "Our application and its database run in the United States, and the subprocessors in Section 7 process data where listed. Where personal data subject to the GDPR or UK GDPR is transferred to a third country, we rely on the European Commission's Standard Contractual Clauses and the UK Addendum. For data subject to the LGPD, we rely on the contractual safeguards of Article 33.",
+        "Our application and its database run in the United States, and the providers named in this policy process data in the United States. Where personal data subject to the GDPR or UK GDPR is transferred to a third country, we rely on the European Commission's Standard Contractual Clauses and the UK Addendum. For data subject to the LGPD, we rely on the contractual safeguards of Article 33.",
       ],
     },
     {
       id: "apps",
-      heading: "11. Phone and Mac apps",
+      heading: "10. Phone and Mac apps",
       blocks: [
         "The phone app sends notifications through Expo, Apple and Google; a notification may show the name of who wrote and the beginning of the message, and you choose which notifications you get. The Mac app and connected computers keep their sign-in on the device; deleting your account (also available in the apps) signs every device out.",
       ],
     },
     {
       id: "gdpr",
-      heading: "12. Your rights under the GDPR",
+      heading: "11. Your rights under the GDPR",
       blocks: [
         "If you are in the EEA or the UK, you may request access, rectification, erasure, restriction and portability, and object to processing, and you may lodge a complaint with your supervisory authority. For account data, contact us directly; you can also correct your profile and delete your account yourself in Settings. For personal data in Workspace Content, contact the organization that controls it; we will refer requests we receive to that organization and assist it as processor.",
       ],
     },
     {
       id: "lgpd",
-      heading: "13. Your rights under the LGPD",
+      heading: "12. Your rights under the LGPD",
       blocks: [
-        "If you are in Brazil, the Lei Geral de Proteção de Dados gives you the corresponding rights: confirmation of processing, access, correction, anonymization, blocking or deletion, portability, information about sharing, and withdrawal of consent. Requests go through the same channels as Section 12, and you may petition the ANPD. Our privacy team, reachable at privacy@agentes.chat, acts as our point of contact (encarregado).",
+        "If you are in Brazil, the Lei Geral de Proteção de Dados gives you the corresponding rights: confirmation of processing, access, correction, anonymization, blocking or deletion, portability, information about sharing, and withdrawal of consent. Requests go through the same channels as Section 11, and you may petition the ANPD. Our privacy team, reachable at privacy@agentes.chat, acts as our point of contact (encarregado).",
       ],
     },
     {
       id: "dpa",
-      heading: "14. Data Processing Addendum",
+      heading: "13. Data Processing Addendum",
       blocks: [
-        "A DPA covering our processing of Workspace Content, including the subprocessor list above, the Standard Contractual Clauses and LGPD processing terms, is available to every organization. Request it at legal@agentes.chat.",
+        "A DPA covering our processing of Workspace Content, including the Standard Contractual Clauses and LGPD processing terms, is available to every organization. Request it at legal@agentes.chat.",
       ],
     },
     {
       id: "cookies",
-      heading: "15. Cookies and local storage",
+      heading: "14. Cookies and local storage",
       blocks: [
         "The workspace uses only the cookies and local storage needed to keep you signed in, protect forms, and remember preferences such as theme and language. The public site agentes.chat remembers the language you chose and uses Himetrica analytics (Section 2). We do not use advertising or cross-site tracking cookies.",
       ],
     },
     {
       id: "children",
-      heading: "16. Children",
+      heading: "15. Children",
       blocks: [
         "The Service is a work tool for adults. It is not directed to anyone under 18, and we do not knowingly collect their personal data. If you believe a minor has given us personal data, write to privacy@agentes.chat and we will delete it.",
       ],
     },
     {
       id: "changes",
-      heading: "17. Changes to this policy",
+      heading: "16. Changes to this policy",
       blocks: [
         "We may update this policy; material changes will be announced by email or in the app before they take effect. The current version always lives at this page. If the Portuguese and English versions differ, the English version prevails, except where the law requires otherwise.",
       ],
     },
     {
       id: "contact",
-      heading: "18. Contact",
+      heading: "17. Contact",
       blocks: [
         "CODARI GLOBAL, LLC, doing business as agentes.chat. Notices: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat. EU, UK and Brazil data-protection inquiries reach our privacy team at the same address. For anything else, write to hello@agentes.chat.",
       ],

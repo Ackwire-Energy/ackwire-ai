@@ -84,7 +84,7 @@ export const termsPtBR: LegalDocument = {
       id: "data-protection",
       heading: "9. Proteção de dados",
       blocks: [
-        "Quando a LGPD, o GDPR ou o UK GDPR se aplicarem a dados pessoais no seu Conteúdo do Espaço de Trabalho, cada parte cumprirá as suas obrigações sob essa lei. Um Acordo de Tratamento de Dados (DPA) com as Cláusulas Contratuais Padrão da Comissão Europeia e termos equivalentes da LGPD está disponível e, quando assinado, passa a fazer parte destes Termos. Peça em legal@agentes.chat. A lista atual de suboperadores está na Política de privacidade.",
+        "Quando a LGPD, o GDPR ou o UK GDPR se aplicarem a dados pessoais no seu Conteúdo do Espaço de Trabalho, cada parte cumprirá as suas obrigações sob essa lei. Um Acordo de Tratamento de Dados (DPA) com as Cláusulas Contratuais Padrão da Comissão Europeia e termos equivalentes da LGPD está disponível e, quando assinado, passa a fazer parte destes Termos. Peça em legal@agentes.chat.",
       ],
     },
     {
