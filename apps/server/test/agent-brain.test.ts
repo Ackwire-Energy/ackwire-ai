@@ -66,8 +66,8 @@ function fakeRunner() {
   };
 }
 
-async function workspace() {
-  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["ok"] }) });
+async function workspace(env: Record<string, string> = {}) {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true", ...env }, reply: () => ({ chunks: ["ok"] }) });
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
   const seeded = await seedOrg(owner);
@@ -81,7 +81,7 @@ async function workspace() {
   await member(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
   const asBia = (path: string, init?: Parameters<typeof member>[1]) =>
     member(`/api/app/organizations/${seeded.orgId}${path}`, init);
-  return { ...seeded, api, asBia };
+  return { ...seeded, api, asBia, owner };
 }
 
 function pairMac(api: (path: string, init?: Parameters<ReturnType<typeof browser>>[1]) => Promise<Response>) {
@@ -211,6 +211,56 @@ test("the agent list says who thinks: the brain, its model's label, the computer
     await api(`/agents/${agentId}`, { method: "PATCH", json: { role: "Marketing" } })
   ).json()) as Listed;
   expect(edited.brain).toEqual({ kind: "claude_code", model: "Opus", computer: "mac" });
+});
+
+test("a new agent starts on Automático on every brain (D83); one with a fixed model keeps the brain's default", async () => {
+  // The deployment's AGENT_DEFAULT_MODEL doesn't decide it any more.
+  const { api, owner, agentId: fixedId } = await workspace({ AGENT_DEFAULT_MODEL: "claude-haiku-5-5" });
+  expect(await (await owner("/api/app/models")).json()).toMatchObject({ defaultModel: "auto" });
+  const created = await api("/agents", { json: { name: "Eva", handle: "eva" } });
+  expect(created.status).toBe(201);
+  const eva = (await created.json()) as { id: string; model: string };
+  expect(eva.model).toBe("auto");
+  const [row] = await t.db.select().from(schema.agents).where(eq(schema.agents.id, eva.id));
+  expect(row).toMatchObject({ model: "auto", brain: "model", brainModel: "auto", brainEffort: "auto" });
+
+  // A computer with Claude Code and Codex, for both agents.
+  const mac = await pairMac(api);
+  await t.db
+    .update(schema.machines)
+    .set({
+      executors: { claude: { version: "2.1.0" }, codex: { version: "codex-cli 0.170.0" }, detectedAt: "2026-10-17" },
+    })
+    .where(eq(schema.machines.id, mac.machineId));
+  for (const id of [eva.id, fixedId]) {
+    await api(`/agents/${id}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
+  }
+  const brain = (id: string, json: Record<string, unknown>) => api(`/agents/${id}/brain`, { method: "PUT", json });
+
+  // Claude Code without a model chosen: Automático, model and effort; it stays through another switch.
+  const claude = await brain(eva.id, { brain: "claude_code", acceptPlanTerms: true });
+  expect(await claude.json()).toMatchObject({
+    brain: "claude_code",
+    model: "auto",
+    effectiveModel: "auto",
+    effort: "auto",
+  });
+  const codex = await brain(eva.id, { brain: "codex", acceptPlanTerms: true });
+  expect(await codex.json()).toMatchObject({ brain: "codex", model: "auto", effort: "auto" });
+  // A fixed model belongs to its brain: back on the API and over to Claude Code, it's that brain's default again.
+  expect((await brain(eva.id, { model: "gpt-6-sol" })).status).toBe(200);
+  await brain(eva.id, { brain: "model" });
+  const again = await brain(eva.id, { brain: "claude_code", acceptPlanTerms: true });
+  expect(await again.json()).toMatchObject({ model: null, effectiveModel: "sonnet" });
+
+  // An agent on a fixed model (chosen, or made before D83): Claude Code starts on its default, as before.
+  const fixed = await brain(fixedId, { brain: "claude_code", acceptPlanTerms: true });
+  expect(await fixed.json()).toMatchObject({
+    brain: "claude_code",
+    model: null,
+    effectiveModel: "sonnet",
+    effort: null,
+  });
 });
 
 test("mission brain: from the executor by default; the brain before Start, the model any time; who may", async () => {

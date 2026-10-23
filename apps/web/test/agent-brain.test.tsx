@@ -419,6 +419,29 @@ describe("Quem pensa: Automático (D83)", () => {
     expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", model: "opus", effort: "medium" });
   });
 
+  test("a new agent (Automático on every brain) switching to Claude Code starts there on Automático", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    // New agents are created with the effort on auto too (D83); the API brain doesn't show it.
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { effort: "auto" });
+    await open(state, api);
+    const d = await brainDialog();
+    await click(card(d, /^Claude Code/));
+    const models = within(d).getByRole("radiogroup", { name: "Modelo" });
+    expect(within(models).getByRole("radio", { name: /^Automático$/ }).getAttribute("aria-checked")).toBe("true");
+    expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toEqual({
+      brain: "claude_code",
+      model: "auto",
+      fallback: true,
+      acceptPlanTerms: true,
+    });
+  });
+
   test("a saved Automático reads as such in the cell", async () => {
     await onClaude({ model: "auto", effectiveModel: "auto", effort: "auto" });
     expect(sentence().textContent).toContain("Claude Code · Automático · esforço automático");
