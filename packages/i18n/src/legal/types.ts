@@ -8,7 +8,7 @@
 export type LegalBlock = string | { list: string[] };
 
 export interface LegalSection {
-  /** Anchor on the page (`#subprocessors`), the same in every language. */
+  /** Anchor on the page (`#retention`), the same in every language. */
   id: string;
   heading: string;
   blocks: LegalBlock[];
