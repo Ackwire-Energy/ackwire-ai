@@ -5,6 +5,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
 import { can, getMembership } from "./organizations";
+import { closeRoutineRun } from "./routine-ledger";
 import { releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
@@ -278,6 +279,12 @@ export async function stopRun(
   // The worker running it (here or on another instance) aborts and posts what was written.
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
+  // A routine's background run is stopped quietly (ADR 0053 §6.7): nothing in a conversation, its ledger
+  // ends `canceled` with who stopped it. Any other stop of it (a pause, a delete, the next slot) is closed
+  // by whoever stopped it, with its own reason.
+  if (run.background && actor.type === "person") {
+    await closeRoutineRun(deps, run, { status: "canceled", code: "stopped", byUserId: actor.id }).catch(() => null);
+  }
   // The app drops "pensando…" right away.
   const where = {
     channelId: run.channelId,
@@ -285,10 +292,14 @@ export async function stopRun(
     agentId: run.agentId,
     runId: run.id,
   };
-  if (actor.type === "person")
+  const bg = run.background ? { background: true as const } : {};
+  if (actor.type === "person" && !run.background)
     await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
-  await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, status: "canceled" });
-  if (previous !== "running") {
+  await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
+  if (previous !== "running" && run.background) {
+    await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
+    await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });
+  } else if (previous !== "running") {
     // Nobody is executing it: finish it for the app here.
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status: "canceled" });

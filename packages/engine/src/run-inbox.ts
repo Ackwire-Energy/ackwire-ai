@@ -1,10 +1,11 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { startOrJoinRun } from "./dispatch";
+import { type RunTrigger, startOrJoinRun } from "./dispatch";
 import { publishChannelEvent } from "./events";
+import type { Message } from "./messages";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
 
-const { agentRuns, messages } = schema;
+const { agentRuns, channels, messages } = schema;
 
 /**
  * A run's inbox (`agent_runs.pending_message_ids`): messages sent to the agent's conversation while
@@ -80,8 +81,9 @@ export async function releaseInbox(
     callers.filter((m) => m.meta.notice).at(-1) ??
     callers.at(-1);
   if (!last) return null;
+  const trigger = await triggerFor(db, run, last);
   const started = await db.transaction(async (tx) => {
-    const out = await startOrJoinRun(tx, last, run.agentId, run.trigger);
+    const out = await startOrJoinRun(tx, last, run.agentId, trigger);
     // Joined a run that already read its context: the rest go to it too (a new run reads them in the conversation).
     if (out && "joined" in out) {
       for (const m of rows) if (m.id !== last.id) await queueOnRun(tx, out.joined, m.id);
@@ -116,6 +118,25 @@ export async function releaseInbox(
     });
   }
   return { runId: newRunId, messageIds };
+}
+
+/**
+ * The trigger of the run a handed-on message starts (ADR 0053 §10): it matches the message, never the run
+ * that ended. A person's message in a DM is `dm`; a person's message or a notice elsewhere is `mention`
+ * (it was sent to this agent: it must answer, never pass as a router pick would). Another agent's message
+ * keeps how the ended run was called.
+ */
+async function triggerFor(
+  db: Executor,
+  run: Pick<AgentRun, "channelId" | "trigger">,
+  message: Pick<Message, "authorType" | "meta" | "channelId">,
+): Promise<RunTrigger> {
+  if (message.authorType === "person") {
+    const [channel] = await db.select({ kind: channels.kind }).from(channels).where(eq(channels.id, message.channelId));
+    return channel?.kind === "dm" ? "dm" : "mention";
+  }
+  if (message.meta.notice) return "mention";
+  return run.trigger;
 }
 
 /** How long an ended run's unread messages are left to the path that ended it before the sweeper takes them. */

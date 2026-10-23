@@ -7,7 +7,9 @@ import { publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
 import { insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
+import { closeRoutineRun } from "./routine-ledger";
 import { releaseInbox } from "./run-inbox";
+import { revokeRunToolTokens } from "./run-tool-tokens";
 import { type AgentRun, addRunStep, replyThreadOf, runErrorDetail, transitionRun } from "./runs";
 
 const { agentRuns, agentRunSteps, outbox, channels } = schema;
@@ -28,7 +30,8 @@ type StoredTranscript = {
  *   outbox from the saved transcript.
  * - Running with a tool call cut in half (it may have had effects), or
  *   recovered too often: failed with "Interrupted by a server update";
- *   what the agent wrote so far is posted; the app hears it.
+ *   what the agent wrote so far is posted (a routine's background run
+ *   posts nothing: its ledger fails with `interrupted`); the app hears it.
  * - Queued with no job left: its job is enqueued again.
  */
 export async function recoverStaleRuns(
@@ -100,9 +103,16 @@ export async function recoverStaleRuns(
   return out;
 }
 
+/** A computer brain's run (Claude Code, Codex): its turns hold bridge tokens. Older rows tell by their session. */
+const thinksOnComputer = (run: Pick<AgentRun, "brain" | "brainSessionId">) =>
+  run.brain ? run.brain !== "model" : Boolean(run.brainSessionId);
+
 /** Hands the run back to the outbox: its job is released (or a new one made); the executor continues from the transcript. */
 async function resume(db: Database, run: AgentRun) {
   await db.transaction(async (tx) => {
+    // The orphaned turn may still run on the computer: its tokens die now, so it can't keep calling our
+    // tools while the turn is sent again (with a new token).
+    if (thinksOnComputer(run)) await revokeRunToolTokens(tx, { runId: run.id });
     const released = await tx
       .update(outbox)
       .set({ status: "pending", lockedUntil: null, lockedBy: null, nextAttemptAt: new Date() })
@@ -146,16 +156,19 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
   const result = await db.transaction(async (tx) => {
     const failed = await transitionRun(tx, run.id, "running", "failed", { error: INTERRUPTED_BY_RESTART });
     if (!failed) return null;
-    const message = await insertMessage(tx, {
-      orgId: run.orgId,
-      channelId: run.channelId,
-      threadId,
-      author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-      body: said ? `${said}\n\n${note}` : note,
-      // `text`: what the agent wrote; the app explains the interruption in the person's language.
-      meta: { interrupted: { reason: "deploy", text: said } },
-    });
-    await tx.update(agentRuns).set({ replyMessageId: message.id }).where(eq(agentRuns.id, run.id));
+    // A routine's background run never posts by itself (ADR 0053 §5): its ledger says it was cut off.
+    const message = run.background
+      ? null
+      : await insertMessage(tx, {
+          orgId: run.orgId,
+          channelId: run.channelId,
+          threadId,
+          author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+          body: said ? `${said}\n\n${note}` : note,
+          // `text`: what the agent wrote; the app explains the interruption in the person's language.
+          meta: { interrupted: { reason: "deploy", text: said } },
+        });
+    if (message) await tx.update(agentRuns).set({ replyMessageId: message.id }).where(eq(agentRuns.id, run.id));
     await addRunStep(tx, run, "error", { reason: "interrupted", message: INTERRUPTED_BY_RESTART });
     // Its job is done for good.
     await tx
@@ -168,22 +181,28 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
           inArray(outbox.status, ["pending", "processing"]),
         ),
       );
-    return message;
+    return { message };
   });
   if (!result) return false;
+  if (run.background) {
+    await closeRoutineRun(deps, run, { status: "failed", code: "interrupted" }).catch(() => null);
+  }
   const where = { channelId: run.channelId, threadId, agentId: run.agentId, runId: run.id };
-  if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(result));
+  const bg = run.background ? { background: true as const } : {};
+  if (deps.pubsub && result.message) await publishMessageCreated(deps.pubsub, messageView(result.message));
   await publishChannelEvent(deps.pubsub, {
     type: "agent.run",
     ...where,
+    ...bg,
     status: "failed",
     error: INTERRUPTED_BY_RESTART,
     ...runErrorDetail(INTERRUPTED_BY_RESTART),
   });
-  await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
+  await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
   await publishChannelEvent(deps.pubsub, {
     type: "run.finished",
     ...where,
+    ...bg,
     status: "failed",
     error: INTERRUPTED_BY_RESTART,
     ...runErrorDetail(INTERRUPTED_BY_RESTART),

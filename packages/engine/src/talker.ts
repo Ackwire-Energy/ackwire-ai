@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, schema, sql } from "@agenteschat/db";
 import { type Agent, getAgentCached } from "./agents";
+import { runBrainOf } from "./brains/select";
 import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
@@ -217,7 +218,8 @@ export function createTalker(deps: TalkerDeps): Talker {
       ]);
       const skip = talkerPolicy({
         run: landed,
-        brain: agent.brain,
+        // The brain this run thinks with, not the agent's stored one (a fallback runs on the model).
+        brain: runBrainOf(landed, agent),
         message,
         waited,
         lastActivityAt: activity,

@@ -1,5 +1,6 @@
 import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import type { Agent } from "./agents";
+import { runBrainOf } from "./brains/select";
 import type { Message } from "./messages";
 import { latestPlan, missionOfThread, planMark } from "./missions";
 import { type AgentRun, replyThreadOf } from "./runs";
@@ -189,7 +190,7 @@ export async function loadTalkerSnapshot(
     status: run.status,
     waitingOn,
     waitOutcome: input.waited,
-    computerTurn: agent.brain !== "model" && run.status === "running" ? { live: input.live } : null,
+    computerTurn: runBrainOf(run, agent) !== "model" && run.status === "running" ? { live: input.live } : null,
     steps: steps.reverse().flatMap((s) => {
       const line = stepLine(s.kind, s.data);
       return line ? [`${ago(now, s.createdAt)}: ${line}`] : [];

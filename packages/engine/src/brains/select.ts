@@ -34,6 +34,29 @@ export function brainFor(
   return mission?.brain ?? kindOf(agent.brain);
 }
 
+/**
+ * The brain a run thinks with (ADR 0053 §10): its own (`agent_runs.brain`, stored when the engine resolves
+ * it and when a conversation run falls back), else the agent's until its first turn. Shared code (steering,
+ * the talker, "Continuar", the forum budget) reads this, never the agent's stored brain alone.
+ */
+export const runBrainOf = (
+  run: { brain?: string | null },
+  agent?: { brain?: string | null } | null,
+): BrainKind => kindOf(run.brain ?? agent?.brain);
+
+/** Stores the brain a run thinks with now (`agent_runs.brain`). */
+export async function recordRunBrain(db: Executor, runId: string, kind: BrainKind) {
+  await db.update(schema.agentRuns).set({ brain: kind }).where(eq(schema.agentRuns.id, runId));
+}
+
+/**
+ * Whether a run whose computer brain can't answer may hand the turn to the model brain (ADR 0032 §5).
+ * Never a background run (ADR 0053 §6.4): a routine thinks with its agent's own brain and waits quietly
+ * for its computer instead; the agent's owner may also turn the fallback off.
+ */
+export const mayFallBack = (agent: Pick<Agent, "brainFallback">, run: Pick<AgentRun, "background">) =>
+  !run.background && agent.brainFallback !== false;
+
 /** Plan limits seen on this process (`limit` events), by machine, brain and account: until when they hold. */
 const planLimits = new Map<string, number>();
 /** No account: the computer's own sign-in. Each account (ADR 0041) has its own plan, so its own limit. */

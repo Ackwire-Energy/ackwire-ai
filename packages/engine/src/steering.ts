@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { type Database, inArray, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
+import { runBrainOf } from "./brains/select";
 import { cancelRun, interruptRun } from "./cancel";
 import { publishChannelEvent } from "./events";
 import { isStopRequest, type Judge } from "./judge";
@@ -78,7 +79,8 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     // (`restartAfterStopAndSend`). Who may not stop it just leaves the message for its next step.
     if (now && active.status === "running") {
       const agent = await getAgentCached(deps.db, orgId, active.agentId);
-      if (agent && agent.brain !== "model") {
+      // The brain this run thinks with (a conversation run may have fallen back to the model brain).
+      if (agent && runBrainOf(active, agent) !== "model") {
         live = await deliverLive(deps, active, { messageId: message.id, urgent: true }).catch(() => false);
         if (!live) await cancelRun(deps, userId, orgId, runId).catch(() => undefined);
       } else await interruptRun(deps.pubsub, runId, message.id);
