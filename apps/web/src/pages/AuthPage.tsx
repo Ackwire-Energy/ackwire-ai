@@ -2,7 +2,7 @@ import { ApiError, type SignInOptions, type SignInProvider, useApi, useAuthConfi
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -481,9 +481,9 @@ export function AuthPage({
           {(step === "email" || step === "newPassword") && (
             <p className="auth__fine">
               {t("auth.termsBefore")}
-              <a href="https://agentes.chat/termos">{t("auth.terms")}</a>
+              <Link to="/terms">{t("auth.terms")}</Link>
               {t("auth.termsMiddle")}
-              <a href="https://agentes.chat/privacidade">{t("auth.privacy")}</a>
+              <Link to="/privacy">{t("auth.privacy")}</Link>
               {t("auth.termsAfter")}
             </p>
           )}

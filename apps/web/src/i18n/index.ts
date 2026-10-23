@@ -45,6 +45,14 @@ const bundles: Record<LocaleCode, () => Promise<object>> = {
   en: () => retryOnce(() => import("@agenteschat/i18n/en").then((m) => m.en)),
 };
 
+/** Downloads `code` into the instance without switching to it (a page shown in another language). */
+export function loadLocale(code: LocaleCode, instance: I18n = i18n): Promise<void> {
+  if (instance.hasResourceBundle(code, "translation")) return Promise.resolve();
+  return bundles[code]().then((strings) => {
+    instance.addResourceBundle(code, "translation", strings);
+  });
+}
+
 /** The language picked last (a slower download of an earlier pick must not win). */
 let wanted: LocaleCode | null = null;
 
@@ -62,11 +70,8 @@ export function setLocale(code: LocaleCode, instance: I18n = i18n) {
   };
   if (instance.hasResourceBundle(code, "translation")) apply();
   else
-    bundles[code]()
-      .then((strings) => {
-        instance.addResourceBundle(code, "translation", strings);
-        apply();
-      })
+    loadLocale(code, instance)
+      .then(apply)
       // Couldn't download it: the language stays as it was.
       .catch(() => {});
 }

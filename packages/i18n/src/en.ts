@@ -420,6 +420,11 @@ export const en: Translations = {
     lookOurs: "agentes.chat",
     lookSystem: "System",
   },
+  legal: {
+    updated: "Last updated {{date}}",
+    contents: "On this page",
+    home: "Go to the home page",
+  },
   shell: {
     // The Mac app's own title bar (D79).
     titleBar: { back: "Back", forward: "Forward" },

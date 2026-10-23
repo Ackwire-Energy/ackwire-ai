@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./pt-BR": "./src/pt-BR.ts",
-    "./en": "./src/en.ts"
+    "./en": "./src/en.ts",
+    "./legal": "./src/legal/index.ts"
   },
   "sideEffects": false,
   "scripts": {
