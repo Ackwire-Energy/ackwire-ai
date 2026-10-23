@@ -47,7 +47,6 @@ import "./threads.css";
  * channel) and no counts on the tabs (the API doesn't give them).
  */
 
-
 const actorsOf = (t: ThreadInfo): { type: ThreadActor["type"]; id: string }[] =>
   t.participants.flatMap((p) => (p.id ? [{ type: p.type, id: p.id }] : []));
 

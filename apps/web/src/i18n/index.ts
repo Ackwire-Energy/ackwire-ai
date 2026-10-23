@@ -37,28 +37,38 @@ export function savedLocale(languages?: readonly string[]): LocaleCode {
   return browserLocale(languages) ?? DEFAULT_LOCALE;
 }
 
-/** Each language is its own download: the app loads only the one in use. */
+const retryOnce = <T>(load: () => Promise<T>) => load().catch(() => load());
+
+/** Each language is its own download: the app loads only the one in use (a failed download is tried once more). */
 const bundles: Record<LocaleCode, () => Promise<object>> = {
-  "pt-BR": () => import("@agenteschat/i18n/pt-BR").then((m) => m.ptBR),
-  en: () => import("@agenteschat/i18n/en").then((m) => m.en),
+  "pt-BR": () => retryOnce(() => import("@agenteschat/i18n/pt-BR").then((m) => m.ptBR)),
+  en: () => retryOnce(() => import("@agenteschat/i18n/en").then((m) => m.en)),
 };
 
+/** The language picked last (a slower download of an earlier pick must not win). */
+let wanted: LocaleCode | null = null;
+
 export function setLocale(code: LocaleCode, instance: I18n = i18n) {
+  wanted = code;
   const apply = () => {
+    if (wanted !== code) return;
     void instance.changeLanguage(code);
     if (typeof document !== "undefined") document.documentElement.lang = code;
+    try {
+      localStorage.setItem(STORAGE_KEY, code);
+    } catch {
+      // Not persisted; still applies to this tab.
+    }
   };
   if (instance.hasResourceBundle(code, "translation")) apply();
   else
-    void bundles[code]().then((strings) => {
-      instance.addResourceBundle(code, "translation", strings);
-      apply();
-    });
-  try {
-    localStorage.setItem(STORAGE_KEY, code);
-  } catch {
-    // Not persisted; still applies to this tab.
-  }
+    bundles[code]()
+      .then((strings) => {
+        instance.addResourceBundle(code, "translation", strings);
+        apply();
+      })
+      // Couldn't download it: the language stays as it was.
+      .catch(() => {});
 }
 
 /** The app's instance, with only `lng` downloaded (another language loads when the person picks it). */

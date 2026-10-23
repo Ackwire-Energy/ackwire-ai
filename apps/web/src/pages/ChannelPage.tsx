@@ -323,7 +323,8 @@ const OLDER_PAGE = 50;
 /** Per channel, for this session: older pages already loaded, channels with no more, and scroll positions. */
 const olderPages = new Map<string, MessageType[]>();
 const olderDone = new Set<string>();
-const scrollPositions = new Map<string, number>();
+/** Where the person left a conversation: the first row in view and how far it sat from the top. */
+const scrollPositions = new Map<string, { id: string | null; offset: number; top: number }>();
 /** Same limit as the server (`MAX_MESSAGE_ATTACHMENTS`). */
 const MAX_ATTACHMENTS = 10;
 
@@ -344,6 +345,9 @@ function highlightMessage(scroller: HTMLElement | null, messageId: string) {
   const el = scroller?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
   if (!el) return false;
   el.scrollIntoView?.({ block: "center" });
+  // Rows off screen are laid out at an estimated height until drawn (`content-visibility`): once the
+  // ones around it are drawn, center it again.
+  requestAnimationFrame(() => el.scrollIntoView?.({ block: "center" }));
   // A soft plate that fades (CSS; static with reduced motion).
   el.classList.add("ac-msg--focus");
   setTimeout(() => el.classList.remove("ac-msg--focus"), HIGHLIGHT_MS);
@@ -1066,13 +1070,27 @@ function ChannelView({
     const saved = savedScroll.current;
     if (!el || saved === undefined || timeline.length === 0) return;
     savedScroll.current = undefined;
-    el.scrollTop = saved;
+    // Back to the same row (rows off screen have estimated heights, so a raw scrollTop would drift).
+    const row = saved.id ? el.querySelector<HTMLElement>(`[data-message-id="${saved.id}"]`) : null;
+    if (row) el.scrollTop += row.getBoundingClientRect().top - el.getBoundingClientRect().top - saved.offset;
+    else el.scrollTop = saved.top;
   }, [timeline.length > 0]);
-  // Leaving: remember where they were (only when scrolled up).
-  useEffect(
+  // Leaving: remember where they were (only when scrolled up). A layout effect: the rows are still there.
+  useLayoutEffect(
     () => () => {
-      if (stick.current || lastScrollTop.current === null) scrollPositions.delete(scrollKey);
-      else scrollPositions.set(scrollKey, lastScrollTop.current);
+      const el = scroller.current;
+      if (stick.current || lastScrollTop.current === null || !el) {
+        scrollPositions.delete(scrollKey);
+        return;
+      }
+      const top = el.getBoundingClientRect().top;
+      const rows = el.querySelectorAll<HTMLElement>("[data-message-id]");
+      const first = Array.from(rows).find((r) => r.getBoundingClientRect().bottom > top);
+      scrollPositions.set(scrollKey, {
+        id: first?.dataset.messageId ?? null,
+        offset: first ? first.getBoundingClientRect().top - top : 0,
+        top: lastScrollTop.current,
+      });
     },
     [scrollKey],
   );

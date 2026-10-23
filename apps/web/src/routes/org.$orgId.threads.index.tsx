@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Main } from "@/components/Main";
 import { openSearch } from "@/lib/open-param";
-import { THREAD_TABS, type ThreadsTab } from "@/pages/thread-tabs";
 import { ThreadsPage } from "@/pages/ThreadsPage";
+import { THREAD_TABS, type ThreadsTab } from "@/pages/thread-tabs";
 
 /** Threads (telas/Threads.html): `?tab=`, `?channel=` (from a channel's "Threads (N)") and `?open=` (a thread's details). */
 export const Route = createFileRoute("/org/$orgId/threads/")({

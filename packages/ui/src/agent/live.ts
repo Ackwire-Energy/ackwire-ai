@@ -1,10 +1,11 @@
 /**
  * Living agents: one shared loop draws every agent avatar on screen from the
  * agent engine (engine.js). Only visible avatars are drawn: about 24 times a
- * second while the agent works (or reacts), about 8 at rest (a blink and a slow
- * turn read the same); with reduced motion each one is drawn once, still. A page can set a
- * gaze point (the landing's pointer): avatars inside an element marked
- * `data-gaze` turn their heads toward it.
+ * second while the agent works, reacts or follows the gaze, about 12 at rest
+ * (every blink still shows; a slow turn reads the same); with reduced motion
+ * each one is drawn once, still. A page can set a gaze point (the landing's
+ * pointer): avatars inside an element marked `data-gaze` turn their heads
+ * toward it.
  */
 import { avatarSky } from "../sky/avatar";
 import { ACCESSORY_REACH, type DrawAgentOptions, drawAccessory, drawAgent, idlePose, type Pose } from "./engine.js";
@@ -104,7 +105,7 @@ let gaze: { x: number; y: number } | null = null;
 let observer: IntersectionObserver | null = null;
 /** Frame gaps (ms): an agent at work, and one at rest. */
 const ACTIVE_MS = 40;
-const REST_MS = 120;
+const REST_MS = 80;
 
 // Read every frame for every avatar: kept here instead of asking the page (a layout read, a media query).
 const sizes = new WeakMap<HTMLElement, number>();
@@ -281,10 +282,11 @@ function watchTheme() {
   themeWatch.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["data-theme"] });
 }
 
-/** Working, waiting on someone or making a face: drawn at the full rate. */
+/** Working, waiting on someone, making a face or following the gaze: drawn at the full rate. */
 const busy = (a: LiveAgent) => {
   const look = a.look();
-  return look.state !== "idle" || Boolean(look.reactionKey && reactions.has(look.reactionKey));
+  if (look.state !== "idle" || (look.reactionKey && reactions.has(look.reactionKey))) return true;
+  return Boolean(gaze && a.box.closest("[data-gaze]"));
 };
 
 function tick(now: number) {
