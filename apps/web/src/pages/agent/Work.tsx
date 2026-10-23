@@ -529,9 +529,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const all = models.data?.models ?? [];
   const choices = modelChoices(all, credentials.data ?? [], platform.data ?? false);
   const modelName = (value: string | null) =>
-    isAuto(value)
-      ? t("brain.auto.label")
-      : (option?.models.find((m) => m.value === value)?.label ?? value ?? "");
+    isAuto(value) ? t("brain.auto.label") : (option?.models.find((m) => m.value === value)?.label ?? value ?? "");
   const brainName = (k: BrainKind) =>
     k === "model"
       ? isAuto(model)
