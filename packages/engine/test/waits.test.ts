@@ -318,7 +318,7 @@ describe("ask_agent", () => {
       reply: (req) => {
         if (inAgentDm(req)) return { chunks: ["Staging deploys with deploy.sh"] };
         const last = lastText(req);
-        if (last.includes("answered your question")) return { chunks: ["Infra says: deploy.sh"] };
+        if (last.includes("your question to @infra")) return { chunks: ["Infra says: deploy.sh"] };
         if (last.includes("tool_result")) return { chunks: ["I asked Infra; I'll tell you."] };
         if (last.includes("deploy"))
           return {
@@ -347,7 +347,7 @@ describe("ask_agent", () => {
     expect(devRuns.every((r) => r.status === "done")).toBe(true);
     expect((await runs()).find((r) => r.agentId === infra.id)?.status).toBe("done");
     expect(allText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain(
-      "[@infra answered your question]: Staging deploys with deploy.sh",
+      "[Reply to your question to @infra]: Staging deploys with deploy.sh",
     );
   });
 
@@ -384,20 +384,20 @@ describe("ask_agent", () => {
     expect((await runs()).filter((r) => r.agentId === f.agent.id)).toHaveLength(1);
     expect((await runs()).find((r) => r.id === dev?.id)?.status).toBe("done");
     expect(allText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain(
-      "[@infra answered your question]: Staging deploys with deploy.sh",
+      "[Reply to your question to @infra]: Staging deploys with deploy.sh",
     );
   });
 
-  test("wait: true pauses; a person's message wakes it and the answer comes later as a notice", async () => {
+  test("ask_agent never pauses: a wait the model asks for is refused by the schema", async () => {
     f = await setup({
       askAgent: true,
       reply: (req) => {
         if (inAgentDm(req)) return { chunks: ["Staging deploys with deploy.sh"] };
         const last = lastText(req);
-        if (last.includes("tool_result")) return { chunks: ["Still waiting on Infra."] };
+        if (last.includes("tool_result")) return { chunks: ["Asked @infra; I'll relay it."] };
         if (last.includes("deploy"))
           return {
-            chunks: ["Asking @infra how staging is deployed; I'll wait for the answer."],
+            chunks: [],
             toolUses: [
               { name: "ask_agent", input: { agent: "@infra", question: "How is staging deployed?", wait: true } },
             ],
@@ -406,28 +406,12 @@ describe("ask_agent", () => {
       },
     });
     const infra = await addInfra();
-    const { handlers, release } = holdInfra(infra.id);
-    const ask = await say("@dev deploy please");
+    const { handlers } = holdInfra(infra.id);
+    await say("@dev deploy please");
     await drainOutbox(f.db, handlers);
-    const dev = (await runs()).find((r) => r.agentId === f.agent.id);
-    expect(dev?.status).toBe("waiting_input");
-
-    const events = f.listen(f.general.id);
-    await say("any news?", ask.id);
-    await stopChecksSettled();
-    expect(waitMessages(events)).toEqual([expect.objectContaining({ waitKind: "consultation", outcome: "woke" })]);
-    await drainOutbox(f.db, handlers);
-    expect((await runs()).find((r) => r.id === dev?.id)?.status).toBe("done");
-    expect(allText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("Still open: your question to @infra");
-
-    await release();
-    await drainOutbox(f.db, handlers);
-    expect((await f.db.select().from(schema.agentConsultations))[0]?.status).toBe("answered");
-    const [notice] = await notices();
-    expect(notice?.meta.notice).toMatchObject({ kind: "consult_reply", from: "@infra", refs: { runId: dev?.id } });
-    expect(allText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain(
-      "[@infra answered your question]: Staging deploys with deploy.sh",
-    );
+    // The input with `wait` is invalid (no such option): nothing asked, the run never paused.
+    expect(await f.db.select().from(schema.agentConsultations)).toHaveLength(0);
+    expect((await runs()).find((r) => r.agentId === f.agent.id)?.status).toBe("done");
   });
 });
 

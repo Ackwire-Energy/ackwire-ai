@@ -96,7 +96,7 @@ export type ChannelEvent =
       /** Background work (a routine's run): not the conversation's "working" indicator. */
       background?: true;
     }
-  /** An agent asked another agent (`ask_agent`, ADR 0034) and waits for it: "Dev is asking Infra…". */
+  /** An agent asked another agent (`ask_agent`, ADR 0034); the answer comes later as a notice: "Dev asked Infra…". */
   | {
       type: "agent.consulting";
       channelId: string;

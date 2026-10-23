@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
-import { createAgent, drainOutbox, listMessages, postPersonMessage } from "../src";
-import { EXPLAIN_FIRST, SAY_BEFORE_WAITING, silentWait, unexplainedPause } from "../src/executor";
+import { drainOutbox, listMessages, postPersonMessage } from "../src";
+import { EXPLAIN_FIRST, unexplainedPause } from "../src/executor";
 import type { ToolSource } from "../src/tools/types";
 import { type Fixture, setup } from "./fixtures";
 
@@ -128,92 +128,5 @@ describe("a card asked for with nothing said goes back once for the findings", (
 
     expect(calls).toBe(1);
     expect((await f.db.select().from(schema.agentQuestions)).length).toBe(1);
-  });
-});
-
-describe("silentWait", () => {
-  const wait = { name: "ask_agent", input: { agent: "@infra", question: "Mudou a env?", wait: true } };
-  test("waiting on another agent with nothing said, even on the first turn", () => {
-    expect(silentWait([wait], "")).toBe(true);
-    expect(silentWait([wait], "NO_REPLY")).toBe(true);
-  });
-  test("not with a word first, nor when it doesn't wait", () => {
-    expect(silentWait([wait], "Perguntei ao @infra e espero a resposta.")).toBe(false);
-    expect(silentWait([{ ...wait, input: { agent: "@infra", question: "Mudou a env?" } }], "")).toBe(false);
-    expect(silentWait([{ name: "ask_user", input: { wait: true } }], "")).toBe(false);
-  });
-});
-
-describe("a wait on another agent with nothing said never pauses mutely", () => {
-  const ask = (wait: boolean) => ({
-    name: "ask_agent",
-    input: { agent: "@infra", question: "A STRIPE_PRICE_ANNUAL mudou no deploy de ontem?", ...(wait ? { wait } : {}) },
-  });
-  const SAID = "Perguntei ao @infra se a STRIPE_PRICE_ANNUAL mudou ontem; espero a resposta dele.";
-
-  async function withInfra(reply: (last: string, call: number) => { chunks: string[]; toolUses?: unknown[] }) {
-    let calls = 0;
-    const requests: string[] = [];
-    f = await setup({
-      askAgent: true,
-      reply: (req: ModelRequest) => {
-        // Only the asking agent answers here (the consulted run is left queued).
-        const last = JSON.stringify(req.messages.at(-1)?.content);
-        requests.push(last);
-        calls++;
-        return reply(last, calls) as never;
-      },
-    });
-    const infra = await createAgent(
-      f.db,
-      f.owner.id,
-      f.org.id,
-      { name: "Infra", handle: "infra", role: "Infra", instructions: "Deploys.", credentialId: f.credential.id },
-      { model: "claude-sonnet-5-5" },
-    );
-    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
-      body: "@dev o checkout quebrou depois do deploy de ontem; pergunta pro infra se mexeram na STRIPE_PRICE_ANNUAL",
-    });
-    // The asking run only: the consulted agent's run would answer with the same fake.
-    await drainOutbox(f.db, f.handlers, { maxBatches: 1 });
-    return { infra, requests, calls: () => calls };
-  }
-
-  test("sent back once: it says whom it asked and that it waits, then the run pauses", async () => {
-    const { requests } = await withInfra((last) =>
-      last.includes("Not run, and nothing was posted")
-        ? { chunks: [SAID], toolUses: [ask(true)] }
-        : { chunks: [], toolUses: [ask(true)] },
-    );
-    expect(requests[1]).toContain(SAY_BEFORE_WAITING);
-    const [run] = (await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === f.agent.id);
-    expect(run?.status).toBe("waiting_input");
-    const bodies = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).map((m) => m.body);
-    expect(bodies).toContain(SAID);
-    expect(await f.db.select().from(schema.agentConsultations)).toHaveLength(1);
-  });
-
-  test("silent again: it asks without waiting (the answer comes as a message), never a mute pause", async () => {
-    const { calls } = await withInfra((last, call) =>
-      call <= 2
-        ? { chunks: [], toolUses: [ask(true)] }
-        : last.includes("tool_result")
-          ? { chunks: [SAID] }
-          : { chunks: [] },
-    );
-    expect(calls()).toBe(3);
-    const [run] = (await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === f.agent.id);
-    expect(run?.status).toBe("done");
-    const [consultation] = await f.db.select().from(schema.agentConsultations);
-    expect(consultation?.waitId.startsWith("async:")).toBe(true);
-    const bodies = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).map((m) => m.body);
-    expect(bodies).toContain(SAID);
-  });
-
-  test("a word first: it pauses at once, nothing sent back", async () => {
-    const { calls } = await withInfra(() => ({ chunks: [SAID], toolUses: [ask(true)] }));
-    expect(calls()).toBe(1);
-    const [run] = (await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === f.agent.id);
-    expect(run?.status).toBe("waiting_input");
   });
 });

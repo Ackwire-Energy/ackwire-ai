@@ -72,12 +72,13 @@ const TOO_DEEP = refuse(
  * The built-in `ask_agent` tool (ADR 0034): an agent asks another agent of
  * the organization. The question goes to the private DM between the two
  * agents, the consulted agent runs there (on behalf of the same person, with
- * its own scopes: nothing is granted). By default the asker doesn't wait:
- * the answer reaches its conversation later as a `consult_reply` notice
- * (read by the asking run at its next step, or by a new run). `wait: true`
- * pauses the asking run until the answer, like `ask_user` waits for a
- * person; a person writing meanwhile wakes it (`waits.ts`), and the answer
- * then comes as a notice too.
+ * its own scopes: nothing is granted). The asker never waits: the answer
+ * reaches its conversation later as a `consult_reply` notice (read by the
+ * asking run at its next step, or by a new run that picks the task up).
+ * A pause on another agent (the old `wait: true`) went away after the
+ * real-model eval (2026-10-23): agents paused saying "meanwhile I'll look
+ * at the code" and couldn't, and the person saw them stop. Consultations
+ * from before that still resume their paused runs (`onConsultedRunFinished`).
  *
  * Code decides who may be asked: an active agent of the org, not the asker,
  * one the person behind the run can talk to (D31), and not already in this
@@ -89,18 +90,13 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
   const tool: ToolDefinition = {
     name: ASK_AGENT_TOOL,
     description:
-      "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge, acting for the same person you are helping. By default you don't wait: the call returns at once, you carry on (or end your turn if there is nothing else to do), and its answer reaches you later as a message in this conversation; don't ask again meanwhile. Set wait: true only when you can't do anything else until it answers: you pause until it does (up to 15 minutes), so first tell the person in your reply text whom you asked, what, and that you're waiting; a wait with nothing said is sent back. Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Never relay to an agent what the person already asked that agent directly (it got the message too and is answering it): if it is already working on it here, you are told so; wait for its answer in the conversation. Write the question so it stands alone: the other agent doesn't see this conversation. To only let an agent know something, use tell_agent.",
+      "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge, acting for the same person you are helping. You never wait for it: the call returns at once and its answer reaches you later as a message in this conversation (you are woken with it even after your turn ended); don't ask again meanwhile. Meanwhile do what you can yourself (read the code, the logs) and tell the person what you asked and what you found so far. Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Never relay to an agent what the person already asked that agent directly (it got the message too and is answering it): if it is already working on it here, you are told so; wait for its answer in the conversation. Write the question so it stands alone: the other agent doesn't see this conversation. To only let an agent know something, use tell_agent.",
     scope: "",
     inputSchema: {
       type: "object",
       properties: {
         agent: { type: "string", minLength: 2, maxLength: 33, description: "The agent's handle, e.g. @infra." },
         question: { type: "string", minLength: 1, maxLength: 4000 },
-        wait: {
-          type: "boolean",
-          description:
-            "Pause until it answers (default false: carry on; the answer comes as a message). Say so in your reply text first.",
-        },
       },
       required: ["agent", "question"],
       additionalProperties: false,
@@ -109,7 +105,6 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
     async execute(input, ctx) {
       const question = String(input.question).trim();
       if (!question) return refuse("Write the question.");
-      const wait = input.wait === true;
       const { db } = ctx;
       const reached = await reachableAgent(ctx, input.agent);
       if (reached.refused) return reached.refused;
@@ -130,7 +125,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
       }
       if (reached.hop >= NOTICE_WAKE_MAX_HOP) return TOO_DEEP;
 
-      const waitId = wait ? Bun.randomUUIDv7() : `${ASYNC_WAIT}${Bun.randomUUIDv7()}`;
+      const waitId = `${ASYNC_WAIT}${Bun.randomUUIDv7()}`;
       const consultationId = Bun.randomUUIDv7();
       const created = await db.transaction(async (tx) => {
         const channel = await openAgentDm(tx, ctx.orgId, ctx.agentId, target.id);
@@ -165,13 +160,6 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
         return row;
       });
       if (!created) return refuse(`Could not reach @${handle}. Go on without it.`);
-      const consultation = { id: created.id, agentId: target.id };
-      if (!wait) {
-        return {
-          content: `Asked @${handle}. Its answer will reach you as a message in this conversation; carry on.`,
-          data: { consultation },
-        };
-      }
       await publishChannelEvent(deps.pubsub, {
         type: "agent.consulting",
         channelId: ctx.channelId,
@@ -180,7 +168,10 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
         agentId: ctx.agentId,
         consultedAgentId: target.id,
       });
-      return { content: "", data: { pause: { kind: "input", id: waitId }, consultation } };
+      return {
+        content: `Asked @${handle}. Its answer will reach you as a message in this conversation, even after this turn ends. Meanwhile do what you can yourself and tell the person what you asked and what you found so far; if there's nothing else to do now, say so and end your turn.`,
+        data: { consultation: { id: created.id, agentId: target.id } },
+      };
     },
   };
   return { name: "consultations", tools: async () => [tool, createTellAgentTool()] };
@@ -395,6 +386,16 @@ async function closeConsultation(
     if (!asker) return closed;
     const delivered = await deps.db.transaction((tx) => deliverNoticeToRun(tx, asker, notice));
     await publishDelivery(deps.pubsub, delivered).catch(() => {});
+    // "Dev asked Infra…" ends where it was asked (the answer itself is the notice).
+    await publishChannelEvent(deps.pubsub, {
+      type: "agent.consulted",
+      channelId: asker.channelId,
+      threadId: replyThreadOf(asker),
+      runId: closed.askerRunId,
+      agentId: closed.askerAgentId,
+      consultedAgentId: closed.targetAgentId,
+      status,
+    });
     return closed;
   }
   const resumed = await resumeRunWithResult(deps.db, {
