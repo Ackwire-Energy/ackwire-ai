@@ -3,6 +3,8 @@ import { eq, schema } from "@agenteschat/db";
 import {
   approvalView,
   bridgeToolsFor,
+  createMissionRunToolSource,
+  createToolGateway,
   grantScopes,
   insertMessage,
   type RoutineAccess,
@@ -132,6 +134,19 @@ describe("run policy table", () => {
     expect(decide(fromRead, app("github_create_issue", "github:issues.write"))).toBe("approve");
     // A routine that may act: the run its report wakes may too, with receipts.
     expect(decide({ ...unattended, routineAccess: "act" }, builtIn("create_issue", "issues:write"))).toBe("allow");
+  });
+
+  test("the computer's own permission prompt is listed for every run; a mission's tools for its own work", () => {
+    for (const who of [routine("read"), routine("act"), unattended, person])
+      expect(decide(who, builtIn("permission_prompt"))).toBe("allow");
+    expect(toolKind(builtIn("get_context")).kind).toBe("read");
+    const missionWork: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
+    for (const name of ["start_task", "upload_artifact"]) {
+      expect(decide(person, builtIn(name))).toBe("allow");
+      expect(decide(missionWork, builtIn(name))).toBe("allow");
+      expect(decide(routine("act"), builtIn(name))).toBe("refuse");
+      expect(decide({ ...unattended, routineAccess: "act" }, builtIn(name))).toBe("refuse");
+    }
   });
 
   test("person: unchanged (only hand_off, which is background work's)", () => {
@@ -391,6 +406,17 @@ describe("the gateway applies the run policy", () => {
     expect(maskCredentials(`found ${pem} in the repo, and ghp_abcdefghijklmnopqrstuvwxyz0123`)).toBe(
       "found •••• in the repo, and ••••",
     );
+  });
+
+  test("Claude Code's prompt tool reaches a routine's run through the bridge (or Claude Code won't start)", async () => {
+    await gatewaySetup();
+    const { run } = await runAs("read");
+    const gateway = createToolGateway({ sources: [createMissionRunToolSource({ pubsub: f.pubsub } as never)] });
+    const bridged = await bridgeToolsFor(
+      { db: f.db, pubsub: f.pubsub, tools: gateway },
+      { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId: crypto.randomUUID() },
+    );
+    expect(bridged.map((t) => t.name)).toContain("permission_prompt");
   });
 
   test("the bridge lists exactly what the model loop does, why included", async () => {

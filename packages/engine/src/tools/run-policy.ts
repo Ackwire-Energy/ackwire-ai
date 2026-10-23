@@ -44,6 +44,13 @@ export type ToolKind =
   | { kind: "internal"; area: InternalArea }
   /** A write to a connected app (connector tools that aren't reads, mail). */
   | { kind: "external" }
+  /**
+   * The computer's own permission prompt (`permission_prompt`, Claude Code's `--permission-prompt-tool`):
+   * what it allows is the command policy's, by the turn's profile. Every computer run needs it listed.
+   */
+  | { kind: "computer" }
+  /** A mission's machine tools for its main session (`start_task`, `upload_artifact`): its own work only. */
+  | { kind: "mission" }
   /** A tool this table doesn't know (no scope it reads): only for a person's run. */
   | { kind: "unknown" };
 
@@ -98,7 +105,11 @@ const READS = new Set([
   "list_files",
   "list_tasks",
   "task_status",
+  "get_context",
 ]);
+
+/** A mission's machine tools for its main session, by name (`mission-mcp.ts`). */
+const MISSION = new Set(["start_task", "upload_artifact"]);
 
 /** Internal changes outside their scope's own area, by name. */
 const INTERNAL_BY_NAME: Readonly<Record<string, InternalArea>> = {
@@ -123,6 +134,8 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (directoryRole(tool as ToolDefinition)) return { kind: "directory" };
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "pass") return { kind: "pass" };
+  if (tool.name === "permission_prompt") return { kind: "computer" };
+  if (MISSION.has(tool.name)) return { kind: "mission" };
   if (ELSEWHERE.has(tool.name)) return { kind: "elsewhere" };
   if (HERE.has(tool.name)) return { kind: "here" };
   if (READS.has(tool.name)) return { kind: "read" };
@@ -159,6 +172,8 @@ export const REFUSALS = {
   reportReadOnly:
     "The routine behind this report only looks and tells: change nothing yourself. Say in your reply what you'd do (the issue you'd open, with its title); a person asks you to go ahead.",
   handOffOnly: "Only background work (a routine's run) hands off: just reply.",
+  missionOnly:
+    "Only the mission's own work starts its tasks or uploads its files: say in your reply what you'd do; the people decide.",
   unknownTool:
     "This tool is only for work a person asked for. Say what you'd do (in hand_off for a routine's work, in your reply otherwise); a person asks you to go ahead.",
 } as const;
@@ -166,7 +181,14 @@ export const REFUSALS = {
 /** The table (see the file's comment): what `authority` may do with `tool`. */
 export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDecision {
   const what = toolKind(tool);
-  if (what.kind === "directory" || what.kind === "pass") return ALLOW;
+  if (what.kind === "directory" || what.kind === "pass" || what.kind === "computer") return ALLOW;
+  // The mission's own work (a person's run, or the run its inbox woke: nobody but the mission behind it);
+  // never a routine nor a run a report or a note woke in its thread.
+  if (what.kind === "mission") {
+    return authority.kind === "person" || (authority.kind === "unattended" && authority.reason === "agent")
+      ? ALLOW
+      : refuse(REFUSALS.missionOnly);
+  }
   if (authority.kind === "person") return what.kind === "hand_off" ? refuse(REFUSALS.handOffOnly) : ALLOW;
   if (authority.kind === "routine") {
     switch (what.kind) {
