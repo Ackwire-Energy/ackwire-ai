@@ -44,10 +44,17 @@ describe("cron in a time zone", () => {
     expect(iso(nextCronTime("0 8 1 * *", "UTC", new Date("2026-10-16T00:00:00Z")))).toBe("2026-11-01T08:00:00.000Z");
   });
 
-  test("DST: a skipped local time doesn't run; a repeated one runs once", () => {
-    // New York springs forward on 2026-03-08 (02:00 → 03:00): 02:30 doesn't exist that day.
-    expect(iso(nextCronTime("30 2 * * *", "America/New_York", new Date("2026-03-08T05:00:00Z")))).toBe(
-      "2026-03-09T06:30:00.000Z",
+  test("DST: a skipped local time moves forward (as in rules); a repeated one runs once", () => {
+    // New York springs forward on 2026-03-08 (02:00 → 03:00): 02:30 doesn't exist that day, so 03:00 EDT.
+    const moved = nextCronTime("30 2 * * *", "America/New_York", new Date("2026-03-08T05:00:00Z"));
+    expect(iso(moved)).toBe("2026-03-08T07:00:00.000Z");
+    expect(iso(nextCronTime("30 2 * * *", "America/New_York", moved as Date))).toBe("2026-03-09T06:30:00.000Z");
+    // Every 15 minutes across the gap: the slots inside it merge into one at 03:00.
+    expect(iso(nextCronTime("*/15 * * * *", "America/New_York", new Date("2026-03-08T06:45:00Z")))).toBe(
+      "2026-03-08T07:00:00.000Z",
+    );
+    expect(iso(nextCronTime("*/15 * * * *", "America/New_York", new Date("2026-03-08T07:00:00Z")))).toBe(
+      "2026-03-08T07:15:00.000Z",
     );
     // It falls back on 2026-11-01 (02:00 → 01:00): 01:30 happens twice; only the first runs.
     const first = nextCronTime("30 1 * * *", "America/New_York", new Date("2026-11-01T04:00:00Z"));

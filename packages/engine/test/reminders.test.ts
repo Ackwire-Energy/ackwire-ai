@@ -260,7 +260,7 @@ describe("reminders from the chat", () => {
     await say("manda no general, não no privado");
     const updated = (await results()).find((r) => r.name === "update_routine");
     expect(updated).toMatchObject({ isError: false });
-    expect(updated?.content).toContain("answers in #general");
+    expect(updated?.content).toContain("reports in #general");
     const [moved] = await listRoutines(f.db, f.owner.id, f.org.id);
     expect(moved?.target).toEqual({ type: "channel", channelId: f.general.id });
 
@@ -304,7 +304,7 @@ describe("reminders from the chat", () => {
       await drainOutbox(f.db, f.handlers);
     }
     const created = (await results()).filter((r) => r.name === "create_routine");
-    expect(created[0]?.content).toContain("answers in #general");
+    expect(created[0]?.content).toContain("reports in #general");
     expect(created[1]).toMatchObject({ isError: true });
     expect(created[1]?.content).toContain("No channel #secreto");
     const routines = await listRoutines(f.db, f.owner.id, f.org.id);

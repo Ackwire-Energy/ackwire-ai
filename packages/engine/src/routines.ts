@@ -1,12 +1,28 @@
 import type { MailAdapters, PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, inArray, isNotNull, isNull, lte, rowsOf, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  rowsOf,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
 import { audienceError, audienceNotice, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
+import type { BrainKind } from "./brains/types";
+import { canceledBy } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
-import { nextCronTime, zonedTime } from "./cron";
+import { nextCronTime, zonedTimeForward } from "./cron";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -26,6 +42,7 @@ import { getMessage, insertMessageWithRuns, type Message, messageView, replyExce
 import { notifyRoutineRun } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { type RoutineAccess, type RoutineReport, routineAccessOf, routineReportOf } from "./routine-brief";
 import {
   cronToRule,
   describeRule,
@@ -36,10 +53,22 @@ import {
   ruleToCron,
   type ScheduleRule,
 } from "./rrule";
-import { runErrorDetail } from "./runs";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 
-const { routines, routineRuns, agentRuns, usageRecords, channelMembers, channels } = schema;
+const {
+  routines,
+  routineRuns,
+  agentRuns,
+  agents,
+  approvals,
+  usageRecords,
+  channelMembers,
+  channels,
+  machines,
+  messages,
+  organizationMembers,
+  users,
+} = schema;
 
 export type RoutineTarget =
   | { type: "channel"; channelId: string }
@@ -90,20 +119,40 @@ export type RoutineTrigger =
       status?: "active" | "needs_reconnect" | "error";
     };
 
+/**
+ * A routine run as Rotinas shows it (ADR 0053 §5): the open ledger states read with its agent run
+ * (`queued`, `running`, `waiting` for a person or a computer), then its one end as stored.
+ */
+export type RoutineRunStatus =
+  | "queued"
+  | "running"
+  | "waiting"
+  | "reported"
+  | "silent"
+  | "failed"
+  | "canceled"
+  | "superseded"
+  | "missed"
+  | "skipped";
+
 export interface RoutineRunView {
   id: string;
   at: string;
-  /**
-   * `silent`: the background run finished without handing anything off (nothing posted); `ok` also
-   * covers a run that handed off its report (`reported` in `routine_runs`).
-   */
-  status: "ok" | "silent" | "failed" | "skipped";
-  /** Fallback text (English); the app shows `summaryCode` with `t()`. */
+  status: RoutineRunStatus;
+  /** The coded reason of a skip, miss, failure or stop (the app translates it); `stopped` carries `by`. */
+  code: string | null;
+  codeParams?: Record<string, string>;
+  /** Its record or report, cut; '' when the viewer may not see what routines read. */
   summary: string;
-  summaryCode: string | null;
-  summaryParams?: Record<string, string>;
-  /** Recent runs only: this run's cost relative to the priciest of them (0–1). A share, never money. */
+  /** Recent runs only: its cost (tokens on a plan) relative to the priciest of them (0–1). A share, never money. */
   weight?: number;
+  /** The brain that ran it (`model`, `claude_code`, `codex`). */
+  brain: string | null;
+  /** The agent's message people saw (its report), for readers. */
+  link: { channelId: string; threadId: string | null; messageId: string } | null;
+  /** While it waits for a person: the approval it waits on, if any (readers only). */
+  approvalId?: string | null;
+  finishedAt: string | null;
 }
 
 /** How much of a background run's record the views carry (the routine keeps it whole). */
@@ -112,20 +161,44 @@ const RECORD_EXCERPT = 500;
 /** How many recent runs each routine carries in the list (its run strip). */
 export const RECENT_RUNS = 14;
 
+/** The window of a routine's health and usage ("this week"). */
+export const ROUTINE_WEEK_MS = 7 * 86_400_000;
+
+/** What a routine is doing now, for its line in Rotinas. */
+export type RoutineState = "active" | "paused" | "running" | "waiting_computer" | "waiting_person" | "failing";
+
 export interface RoutineView {
   id: string;
   name: string;
   agentId: string;
-  prompt: string;
+  /** Null when the viewer may not see it (a DM, Drive or private-channel routine they don't read). */
+  prompt: string | null;
   target: RoutineTarget;
   trigger: RoutineTrigger;
   active: boolean;
   nextRunAt: string | null;
-  running: boolean;
+  createdAt: string;
+  access: RoutineAccess;
+  report: RoutineReport;
+  /** Why it paused itself (a coded reason the app translates); null when a person paused it, or it runs. */
+  pausedReason: string | null;
+  failuresInRow: number;
+  state: RoutineState;
+  /** Its run waits for the agent's computer since then. */
+  waitingFor: { machineId: string; machineName: string; since: string } | null;
+  /** Where it thinks: the agent's brain and, for a computer brain, the computer's name. */
+  brain: { kind: BrainKind; machineName: string | null };
+  /** The last week's runs by outcome (`ok`: reported; `total`: every run that ended). */
+  health: { ok: number; silent: number; failed: number; skipped: number; missed: number; total: number };
+  /** The viewer reads its records and reports (its creator, admins, the agent's owner, its conversation). */
+  canSeeDetails: boolean;
+  /** The viewer may change, pause, stop or delete it (its creator, admins, the agent's owner). */
+  canManage: boolean;
   lastRun: RoutineRunView | null;
   /** The last runs, newest first (at most RECENT_RUNS). */
   recentRuns: RoutineRunView[];
-  createdAt: string;
+  /** The last week: runs that started the agent, tokens and cost; `plan` when a computer brain's plan paid. */
+  usage: { runs: number; tokens: number; costNanoUsd: number; billedTo: "api" | "plan" | "mixed" };
 }
 
 export interface RoutineInput {
@@ -135,6 +208,10 @@ export interface RoutineInput {
   target: RoutineTarget;
   /** `timezone`: IANA zone the phrase is read in; default: the creator's, then the org's, then UTC. */
   trigger: RoutineTriggerInput;
+  /** What it may do while nobody watches (default `read`). */
+  access?: RoutineAccess;
+  /** When it speaks (default `when_new`). */
+  report?: RoutineReport;
 }
 
 export type RoutineTriggerInput =
@@ -215,54 +292,413 @@ function triggerOf(r: RoutineRow, watch?: MailWatchRow): RoutineTrigger {
   };
 }
 
-/** Run outcome, from the routine run and its agent run. */
-function runView(
-  run: RunRow,
-  agentRun: { status: string; error: string | null; replyMessageId: string | null } | undefined,
-) {
-  let status: RoutineRunView["status"] =
-    run.status === "skipped"
-      ? "skipped"
-      : run.status === "failed"
-        ? "failed"
-        : run.status === "silent"
-          ? "silent"
-          : "ok";
-  let summary = run.summary;
-  if (run.status === "silent" || run.status === "reported") {
-    // A background run's own record (its final text, or the report it handed off): the agent's words.
-    if (!summary.trim()) summary = RUN_SUMMARY["routine_run.nothing_new"];
-    else {
-      const shown = replyExcerpt(summary, RECORD_EXCERPT);
-      return { id: run.id, at: run.at.toISOString(), status, summary: shown, summaryCode: null };
-    }
-  } else if (run.status === "started" && agentRun) {
-    if (agentRun.status === "failed") {
-      status = "failed";
-      summary =
-        agentRun.error === "budget_exceeded"
-          ? RUN_SUMMARY["routine_run.agent_budget"]
-          : `${FAILED_PREFIX}${agentRun.error ?? "error"}`;
-    } else if (agentRun.status === "done" && !agentRun.replyMessageId) {
-      // Older runs in the conversation that ended without a reply (they answered NO_REPLY).
-      status = "silent";
-      summary = RUN_SUMMARY["routine_run.nothing_new"];
-    } else if (agentRun.status !== "done") {
-      summary =
-        agentRun.status === "waiting_approval"
-          ? RUN_SUMMARY["routine_run.waiting_approval"]
-          : RUN_SUMMARY["routine_run.running"];
-    }
-  } else if (run.status === "queued") summary = RUN_SUMMARY["routine_run.queued"];
-  const coded = summaryCode(summary, agentRun?.error ?? null);
+/** A routine run's agent run, as the views read it. */
+type AgentRunInfo = {
+  id: string;
+  status: string;
+  error: string | null;
+  waitingMachineId: string | null;
+  updatedAt: Date;
+};
+
+/** The ledger's open states: the run hasn't ended. */
+const OPEN_RUN = ["queued", "starting", "started"];
+/** The ledger's ends, shown as stored. */
+const ENDED_RUN = new Set(["reported", "silent", "failed", "canceled", "superseded", "missed", "skipped"]);
+/** An agent run still working or waiting. */
+const AGENT_ACTIVE = new Set(["queued", "running", "waiting_approval", "waiting_input"]);
+const agentWaiting = (a: AgentRunInfo | undefined) => a?.status === "waiting_approval" || a?.status === "waiting_input";
+/** Waiting for its computer (ADR 0032 §5), not for a person. */
+const agentAway = (a: AgentRunInfo | undefined) => a?.status === "waiting_input" && Boolean(a.waitingMachineId);
+
+/** How a stored end reads; anything else that ended (`ok`: a forum topic or a reminder) was delivered. */
+const endedAs = (status: string): RoutineRunStatus | null =>
+  OPEN_RUN.includes(status) ? null : ENDED_RUN.has(status) ? (status as RoutineRunStatus) : "reported";
+
+/** A run's status: its open state read with its agent run (queued, running, waiting), else its end as stored. */
+function runStatus(run: RunRow, agentRun: AgentRunInfo | undefined): RoutineRunStatus {
+  if (run.status === "queued" || run.status === "starting") return "queued";
+  if (run.status !== "started") return endedAs(run.status) ?? "running";
+  // For a person (an approval, an answer) or for its computer.
+  if (agentWaiting(agentRun)) return "waiting";
+  // Its agent run ended but the ledger isn't closed yet (the reaper closes it): its outcome already.
+  if (agentRun?.status === "done") return "silent";
+  if (agentRun?.status === "failed") return "failed";
+  if (agentRun?.status === "canceled") return "canceled";
+  return "running";
+}
+
+/** What run views read besides the rows: agent runs, usage, linked messages, approvals, who stopped them. */
+interface RunDetails {
+  agentRuns: Map<string, AgentRunInfo>;
+  usage: Map<string, { cost: number; tokens: number }>;
+  links: Map<string, { channelId: string; threadId: string | null }>;
+  /** The pending approval each waiting agent run waits on. */
+  approvals: Map<string, string>;
+  names: Map<string, string>;
+}
+
+/** Every token a call used (as the usage page counts them). */
+const TOKENS = sql`${usageRecords.inputTokens} + ${usageRecords.outputTokens}
+  + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens}`;
+
+/** A lookup that runs only when there is something to look up (else no rows, no round trip). */
+function lookup<T>(keys: readonly unknown[], query: () => PromiseLike<T[]>): Promise<T[]> {
+  return keys.length === 0 ? Promise.resolve([]) : Promise.resolve(query());
+}
+
+async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<RunDetails> {
+  const ids = runs.flatMap((r) => (r.agentRunId ? [r.agentRunId] : []));
+  const messageIds = runs.flatMap((r) => (r.messageId ? [r.messageId] : []));
+  const [agentRows, usageRows, linkRows] = await Promise.all([
+    lookup(ids, () =>
+      db
+        .select({
+          id: agentRuns.id,
+          status: agentRuns.status,
+          error: agentRuns.error,
+          waitingMachineId: agentRuns.waitingMachineId,
+          updatedAt: agentRuns.updatedAt,
+        })
+        .from(agentRuns)
+        .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, ids))),
+    ),
+    lookup(ids, () =>
+      db
+        .select({
+          runId: usageRecords.runId,
+          cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)`,
+          tokens: sql<string>`coalesce(sum(${TOKENS}), 0)`,
+        })
+        .from(usageRecords)
+        .where(and(eq(usageRecords.orgId, orgId), inArray(usageRecords.runId, ids)))
+        .groupBy(usageRecords.runId),
+    ),
+    lookup(messageIds, () =>
+      db
+        .select({ id: messages.id, channelId: messages.channelId, threadId: messages.threadId })
+        .from(messages)
+        .where(and(eq(messages.orgId, orgId), inArray(messages.id, messageIds))),
+    ),
+  ]);
+  const waiting = agentRows.filter((a) => a.status === "waiting_approval").map((a) => a.id);
+  const stoppers = [...new Set(agentRows.flatMap((a) => canceledBy(a.error) ?? []))];
+  const [approvalRows, nameRows] = await Promise.all([
+    lookup(waiting, () =>
+      db
+        .select({ id: approvals.id, runId: approvals.runId })
+        .from(approvals)
+        .where(and(eq(approvals.orgId, orgId), inArray(approvals.runId, waiting), eq(approvals.status, "pending")))
+        .orderBy(desc(approvals.createdAt)),
+    ),
+    lookup(stoppers, () =>
+      db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, stoppers)),
+    ),
+  ]);
+  const pending = new Map<string, string>();
+  for (const a of approvalRows) if (a.runId && !pending.has(a.runId)) pending.set(a.runId, a.id);
+  return {
+    agentRuns: new Map(agentRows.map((a) => [a.id, a])),
+    usage: new Map(usageRows.map((u) => [u.runId ?? "", { cost: Number(u.cost), tokens: Number(u.tokens) }])),
+    links: new Map(linkRows.map((m) => [m.id, { channelId: m.channelId, threadId: m.threadId }])),
+    approvals: pending,
+    names: new Map(nameRows.map((u) => [u.id, u.name])),
+  };
+}
+
+/** One run; `detailed`: the viewer reads the routine's records (else only its outcome). */
+function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRunView {
+  const agentRun = run.agentRunId ? details.agentRuns.get(run.agentRunId) : undefined;
+  const status = runStatus(run, agentRun);
+  // Stopped by a person: their name (the stop cancels the agent run in their name).
+  const stopper = run.code === "stopped" ? canceledBy(agentRun?.error) : null;
+  const by = stopper ? details.names.get(stopper) : undefined;
+  const link = detailed && run.messageId ? details.links.get(run.messageId) : undefined;
+  const approvalId = detailed && run.agentRunId ? (details.approvals.get(run.agentRunId) ?? null) : null;
   return {
     id: run.id,
     at: run.at.toISOString(),
     status,
-    summary,
-    summaryCode: coded?.code ?? null,
-    ...(coded?.params ? { summaryParams: coded.params } : {}),
+    code: run.code,
+    ...(by ? { codeParams: { by } } : {}),
+    summary: detailed ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
+    brain: run.brain,
+    link: link && run.messageId ? { ...link, messageId: run.messageId } : null,
+    ...(status === "waiting" ? { approvalId } : {}),
+    finishedAt: run.finishedAt?.toISOString() ?? null,
   };
+}
+
+/**
+ * A routine's recent runs, each with its weight in the run strip: its cost as a share of the priciest
+ * of them, or its tokens when none cost anything (a computer brain's plan pays).
+ */
+function recentViews(runs: RunRow[], details: RunDetails, detailed: boolean): RoutineRunView[] {
+  const used = (r: RunRow) => details.usage.get(r.agentRunId ?? "") ?? { cost: 0, tokens: 0 };
+  const byCost = runs.some((r) => used(r).cost > 0);
+  const amount = (r: RunRow) => (byCost ? used(r).cost : used(r).tokens);
+  const max = Math.max(0, ...runs.map(amount));
+  return runs.map((r) => ({
+    ...runView(r, details, detailed),
+    weight: max > 0 ? Math.round((amount(r) / max) * 100) / 100 : 0,
+  }));
+}
+
+/** The conversation a routine reports to (a channel, a thread's, a DM); null for DM, Drive and forum routines. */
+const conversationOf = (t: RoutineTarget) => (t.type === "channel" || t.type === "conversation" ? t.channelId : null);
+
+/** What a viewer may see of each routine (ADR 0053 §9). */
+interface ViewerRights {
+  /** Reads its prompt, records and reports: its creator, admins, the agent's owner, its conversation's members. */
+  reads: boolean;
+  /** Changes, pauses, stops or deletes it: its creator, admins, the agent's owner. */
+  manages: boolean;
+  /** Its prompt is shown even to who doesn't read it (a public channel's or a forum routine). */
+  publicPrompt: boolean;
+}
+
+/**
+ * The rights of `viewerId` on each routine; null `viewerId` is the engine itself (an agent's read tool
+ * filters on its own): it reads everything and manages nothing.
+ */
+async function viewerRights(
+  db: Database,
+  orgId: string,
+  rows: RoutineRow[],
+  viewerId: string | null,
+): Promise<Map<string, ViewerRights>> {
+  const channelIds = [...new Set(rows.flatMap((r) => conversationOf(targetOf(r)) ?? []))];
+  const agentIds = [...new Set(rows.map((r) => r.agentId))];
+  const [member, owners, channelRows, joined] = await Promise.all([
+    lookup(viewerId ? [viewerId] : [], () =>
+      db
+        .select({ role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, viewerId ?? ""))),
+    ),
+    db
+      .select({ id: agents.id, ownerUserId: agents.ownerUserId })
+      .from(agents)
+      .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds))),
+    lookup(channelIds, () =>
+      db
+        .select({ id: channels.id, kind: channels.kind, visibility: channels.visibility })
+        .from(channels)
+        .where(and(eq(channels.orgId, orgId), inArray(channels.id, channelIds))),
+    ),
+    lookup(viewerId ? channelIds : [], () =>
+      db
+        .select({ channelId: channelMembers.channelId })
+        .from(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.orgId, orgId),
+            eq(channelMembers.userId, viewerId ?? ""),
+            inArray(channelMembers.channelId, channelIds),
+          ),
+        ),
+    ),
+  ]);
+  const [me] = member;
+  const admin = me ? can(me.role, "manage_agents") : false;
+  const ownerOf = new Map(owners.map((a) => [a.id, a.ownerUserId]));
+  const publicChannels = new Set(
+    channelRows.filter((c) => c.kind === "channel" && c.visibility === "public").map((c) => c.id),
+  );
+  const inChannel = new Set(joined.map((m) => m.channelId));
+  const out = new Map<string, ViewerRights>();
+  for (const r of rows) {
+    const target = targetOf(r);
+    const channelId = conversationOf(target);
+    const manages =
+      !!viewerId && (admin || r.createdByUserId === viewerId || ownerOf.get(r.agentId) === viewerId);
+    out.set(r.id, {
+      manages,
+      reads: !viewerId || manages || target.type === "forum" || (!!channelId && inChannel.has(channelId)),
+      publicPrompt: target.type === "forum" || (!!channelId && publicChannels.has(channelId)),
+    });
+  }
+  return out;
+}
+
+const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex"];
+const brainKindOf = (v: unknown): BrainKind => (BRAINS.includes(v as BrainKind) ? (v as BrainKind) : "model");
+
+/** Who paid the week: a computer brain's plan, the API, or both; no usage yet: what its brain would bill. */
+function billedTo(used: { plan: boolean; api: boolean } | undefined, kind: BrainKind): RoutineView["usage"]["billedTo"] {
+  if (used?.plan && used.api) return "mixed";
+  if (used?.plan) return "plan";
+  if (used?.api) return "api";
+  return kind === "model" ? "api" : "plan";
+}
+
+/** Routines as `viewerId` sees them (see `viewerRights`), with their state, last week's health and usage. */
+async function views(
+  db: Database,
+  rows: RoutineRow[],
+  viewerId: string | null,
+  now = new Date(),
+): Promise<RoutineView[]> {
+  const first = rows[0];
+  if (!first) return [];
+  const orgId = first.orgId;
+  const ids = rows.map((r) => r.id);
+  const since = new Date(now.getTime() - ROUTINE_WEEK_MS);
+  // The last RECENT_RUNS of each routine (one query, ranked per routine).
+  const recentIds = await db.execute(sql`
+    select id from (
+      select ${routineRuns.id} as id,
+        row_number() over (partition by ${routineRuns.routineId} order by ${routineRuns.createdAt} desc) as n
+      from ${routineRuns}
+      where ${inArray(routineRuns.routineId, ids)}
+    ) ranked
+    where n <= ${RECENT_RUNS}`);
+  const recentRunIds = rowsOf<{ id: string }>(recentIds).map((r) => r.id);
+  const recentRows = await lookup(recentRunIds, () =>
+    db.select().from(routineRuns).where(inArray(routineRuns.id, recentRunIds)).orderBy(desc(routineRuns.createdAt)),
+  );
+  const recent = new Map<string, RunRow[]>();
+  for (const r of recentRows) recent.set(r.routineId, [...(recent.get(r.routineId) ?? []), r]);
+  const inWeek = and(eq(routineRuns.orgId, orgId), inArray(routineRuns.routineId, ids), gte(routineRuns.at, since));
+  const [details, rights, watches, weekRows, usageRows, agentRows] = await Promise.all([
+    runDetails(db, orgId, recentRows),
+    viewerRights(db, orgId, rows, viewerId),
+    watchesOf(db, rows.filter((r) => r.event === "email.received").map((r) => r.id)),
+    db
+      .select({
+        routineId: routineRuns.routineId,
+        status: routineRuns.status,
+        runs: sql<number>`count(*)::int`,
+        started: sql<number>`count(${routineRuns.agentRunId})::int`,
+      })
+      .from(routineRuns)
+      .where(inWeek)
+      .groupBy(routineRuns.routineId, routineRuns.status),
+    db
+      .select({
+        routineId: routineRuns.routineId,
+        tokens: sql<string>`coalesce(sum(${TOKENS}), 0)`,
+        cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)`,
+        plan: sql<boolean>`coalesce(bool_or(${usageRecords.billedTo} = 'plan'), false)`,
+        api: sql<boolean>`coalesce(bool_or(${usageRecords.billedTo} <> 'plan'), false)`,
+      })
+      .from(routineRuns)
+      .innerJoin(usageRecords, eq(usageRecords.runId, routineRuns.agentRunId))
+      .where(inWeek)
+      .groupBy(routineRuns.routineId),
+    db
+      .select({ id: agents.id, brain: agents.brain, machineId: agents.machineId })
+      .from(agents)
+      .where(and(eq(agents.orgId, orgId), inArray(agents.id, [...new Set(rows.map((r) => r.agentId))]))),
+  ]);
+  const machineIds = [
+    ...new Set([
+      ...agentRows.flatMap((a) => a.machineId ?? []),
+      ...[...details.agentRuns.values()].flatMap((a) => a.waitingMachineId ?? []),
+    ]),
+  ];
+  const machineRows = await lookup(machineIds, () =>
+    db
+      .select({ id: machines.id, name: machines.name })
+      .from(machines)
+      .where(and(eq(machines.orgId, orgId), inArray(machines.id, machineIds))),
+  );
+  const machineName = new Map(machineRows.map((m) => [m.id, m.name]));
+  const agentById = new Map(agentRows.map((a) => [a.id, a]));
+  const week = new Map<string, { status: string; runs: number; started: number }[]>();
+  for (const w of weekRows) {
+    const entry = { status: w.status, runs: Number(w.runs), started: Number(w.started) };
+    week.set(w.routineId, [...(week.get(w.routineId) ?? []), entry]);
+  }
+  const usageOf = new Map(usageRows.map((u) => [u.routineId, u]));
+  return rows.map((r): RoutineView => {
+    const right = rights.get(r.id) as ViewerRights;
+    const runs = recentViews(recent.get(r.id) ?? [], details, right.reads);
+    // The run in progress, if any: the newest queued one, or whose agent run still works (also after handing off).
+    const open = (recent.get(r.id) ?? []).find((run) => {
+      if (run.status === "queued" || run.status === "starting") return true;
+      if (run.status !== "started" && run.status !== "reported") return false;
+      const agentRun = run.agentRunId ? details.agentRuns.get(run.agentRunId) : undefined;
+      return AGENT_ACTIVE.has(agentRun?.status ?? "");
+    });
+    const openAgent = open?.agentRunId ? details.agentRuns.get(open.agentRunId) : undefined;
+    const waitingFor =
+      openAgent && agentAway(openAgent) && openAgent.waitingMachineId
+        ? {
+            machineId: openAgent.waitingMachineId,
+            machineName: machineName.get(openAgent.waitingMachineId) ?? "",
+            since: openAgent.updatedAt.toISOString(),
+          }
+        : null;
+    const state: RoutineState = !r.active
+      ? "paused"
+      : waitingFor
+        ? "waiting_computer"
+        : agentWaiting(openAgent)
+          ? "waiting_person"
+          : open
+            ? "running"
+            : r.failuresInRow > 0
+              ? "failing"
+              : "active";
+    const outcomes = new Map<string, number>();
+    let started = 0;
+    for (const w of week.get(r.id) ?? []) {
+      started += w.started;
+      const end = endedAs(w.status);
+      if (end) outcomes.set(end, (outcomes.get(end) ?? 0) + w.runs);
+    }
+    const count = (status: RoutineRunStatus) => outcomes.get(status) ?? 0;
+    const agent = agentById.get(r.agentId);
+    const kind = brainKindOf(agent?.brain);
+    const used = usageOf.get(r.id);
+    return {
+      id: r.id,
+      name: r.name,
+      agentId: r.agentId,
+      prompt: right.reads || right.publicPrompt ? r.prompt : null,
+      target: targetOf(r),
+      trigger: triggerOf(r, watches.get(r.id)),
+      active: r.active,
+      nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
+      createdAt: r.createdAt.toISOString(),
+      access: routineAccessOf(r.access),
+      report: routineReportOf(r.report),
+      pausedReason: r.active ? null : r.pausedReason,
+      failuresInRow: r.failuresInRow,
+      state,
+      waitingFor,
+      brain: {
+        kind,
+        machineName: kind !== "model" && agent?.machineId ? (machineName.get(agent.machineId) ?? null) : null,
+      },
+      health: {
+        ok: count("reported"),
+        silent: count("silent"),
+        failed: count("failed"),
+        skipped: count("skipped"),
+        missed: count("missed"),
+        total: [...outcomes.values()].reduce((a, b) => a + b, 0),
+      },
+      canSeeDetails: right.reads,
+      canManage: right.manages,
+      lastRun: runs[0] ?? null,
+      recentRuns: runs,
+      usage: {
+        runs: started,
+        tokens: Number(used?.tokens ?? 0),
+        costNanoUsd: Number(used?.cost ?? 0),
+        billedTo: billedTo(used, kind),
+      },
+    };
+  });
+}
+
+/** One routine as the person sees it (after a stop or a take-over, for instance). */
+export async function getRoutineView(db: Database, actorId: string, orgId: string, id: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  const [view] = await views(db, [await loadRoutine(db, orgId, id)], actorId);
+  return view as RoutineView;
 }
 
 /** The summaries we write (English fallback text), by their stable code; the app translates the code. */
@@ -283,150 +719,9 @@ const RUN_SUMMARY = {
   "routine_run.nothing_new": "Nothing new; nothing posted",
   "routine_run.waiting_computer": "Skipped: the previous run is still waiting for the agent's computer",
 } as const;
-type RunSummaryCode = keyof typeof RUN_SUMMARY;
 
 const PAUSED_PREFIX = "Paused: ";
 const FORUM_PREFIX = "Forum opened: ";
-const FAILED_PREFIX = "Failed: ";
-
-/**
- * LEGACY DATA, not UI text: the Portuguese summaries older versions stored in
- * `routine_runs.summary`, so past runs still map to their codes. Never write these.
- */
-const LEGACY_SUMMARY_CODES: Record<string, RunSummaryCode> = {
-  "Rotina apagada": "routine_run.deleted",
-  "Rotina pausada": "routine_run.paused",
-  "Quem criou a rotina saiu da organização": "routine_run.creator_left",
-  "O agente foi arquivado": "routine_run.agent_archived",
-  "Lembrete enviado": "routine_run.reminder_sent",
-  "O agente não está no canal": "routine_run.agent_not_in_channel",
-  "Esperando aprovação": "routine_run.waiting_approval",
-  "Em andamento": "routine_run.running",
-  "Na fila": "routine_run.queued",
-  "Orçamento do mês esgotado": "routine_run.agent_budget",
-  "Resposta no canal": "routine_run.delivered_channel",
-  "Arquivo no Drive": "routine_run.delivered_drive",
-  "Enviado na DM": "routine_run.delivered_dm",
-};
-/** LEGACY DATA: the prefixes older versions stored (paused, forum opened, failed). */
-const LEGACY_PREFIXES = { paused: "Pausada: ", forum: "Fórum aberto: ", failed: "Falhou: " };
-
-const SUMMARY_CODES = new Map<string, RunSummaryCode>([
-  ...(Object.entries(RUN_SUMMARY) as [RunSummaryCode, string][]).map(([code, text]) => [text, code] as const),
-  ...Object.entries(LEGACY_SUMMARY_CODES),
-]);
-
-/** The stable code of a run summary (ours, or a legacy stored one), for the app to translate. */
-function summaryCode(summary: string, error: string | null): { code: string; params?: Record<string, string> } | null {
-  const fixed = SUMMARY_CODES.get(summary);
-  if (fixed) return { code: fixed };
-  const after = (...prefixes: string[]) => {
-    const prefix = prefixes.find((p) => summary.startsWith(p));
-    return prefix === undefined ? null : summary.slice(prefix.length);
-  };
-  if (after(PAUSED_PREFIX, LEGACY_PREFIXES.paused) !== null) return { code: "routine_run.audience" };
-  const title = after(FORUM_PREFIX, LEGACY_PREFIXES.forum);
-  if (title !== null) return { code: "routine_run.forum_opened", params: { title } };
-  if (after(FAILED_PREFIX, LEGACY_PREFIXES.failed) !== null) {
-    return {
-      code: "routine_run.failed",
-      params: { reason: error ?? "", errorCode: runErrorDetail(error)?.errorCode ?? "" },
-    };
-  }
-  return null;
-}
-
-async function runDetails(db: Database, runs: RunRow[]) {
-  const ids = runs.flatMap((r) => (r.agentRunId ? [r.agentRunId] : []));
-  if (ids.length === 0) return { agentRunsById: new Map(), costById: new Map<string, number>() };
-  const [statusRows, costRows] = await Promise.all([
-    db
-      .select({
-        id: agentRuns.id,
-        status: agentRuns.status,
-        error: agentRuns.error,
-        replyMessageId: agentRuns.replyMessageId,
-      })
-      .from(agentRuns)
-      .where(inArray(agentRuns.id, ids)),
-    db
-      .select({ runId: usageRecords.runId, cost: sql<number>`coalesce(sum(${usageRecords.costNanoUsd}), 0)::bigint` })
-      .from(usageRecords)
-      .where(inArray(usageRecords.runId, ids))
-      .groupBy(usageRecords.runId),
-  ]);
-  return {
-    agentRunsById: new Map(statusRows.map((r) => [r.id, r])),
-    costById: new Map(costRows.map((r) => [r.runId ?? "", Number(r.cost)])),
-  };
-}
-
-/** A routine's recent runs, each with its cost as a share of the priciest of them (for the run strip). */
-function recentViews(runs: RunRow[], details: Awaited<ReturnType<typeof runDetails>>): RoutineRunView[] {
-  const cost = (r: RunRow) => details.costById.get(r.agentRunId ?? "") ?? 0;
-  const max = Math.max(0, ...runs.map(cost));
-  return runs.map((r) => ({
-    ...runView(r, r.agentRunId ? details.agentRunsById.get(r.agentRunId) : undefined),
-    weight: max > 0 ? Math.round((cost(r) / max) * 100) / 100 : 0,
-  }));
-}
-
-async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
-  if (rows.length === 0) return [];
-  const ids = rows.map((r) => r.id);
-  // The last RECENT_RUNS of each routine (one query, ranked per routine).
-  const recentIds = await db.execute(sql`
-    select id from (
-      select ${routineRuns.id} as id,
-        row_number() over (partition by ${routineRuns.routineId} order by ${routineRuns.createdAt} desc) as n
-      from ${routineRuns}
-      where ${inArray(routineRuns.routineId, ids)}
-    ) ranked
-    where n <= ${RECENT_RUNS}`);
-  const recentRunIds = rowsOf<{ id: string }>(recentIds).map((r) => r.id);
-  const recentRows =
-    recentRunIds.length === 0
-      ? []
-      : await db
-          .select()
-          .from(routineRuns)
-          .where(inArray(routineRuns.id, recentRunIds))
-          .orderBy(desc(routineRuns.createdAt));
-  const recent = new Map<string, RunRow[]>();
-  for (const r of recentRows) recent.set(r.routineId, [...(recent.get(r.routineId) ?? []), r]);
-  // The last run is the newest recent one.
-  const latest = new Map<string, RunRow>();
-  for (const [id, list] of recent) if (list[0]) latest.set(id, list[0]);
-  const details = await runDetails(db, recentRows);
-  const watches = await watchesOf(
-    db,
-    rows.filter((r) => r.event === "email.received").map((r) => r.id),
-  );
-  return rows.map((r) => {
-    const last = latest.get(r.id);
-    const agentRun = last?.agentRunId ? details.agentRunsById.get(last.agentRunId) : undefined;
-    const running =
-      last?.status === "queued" ||
-      // A run that handed off its report may still be working.
-      ((last?.status === "started" || last?.status === "reported") &&
-        !!agentRun &&
-        !["done", "failed", "canceled"].includes(agentRun.status));
-    return {
-      id: r.id,
-      name: r.name,
-      agentId: r.agentId,
-      prompt: r.prompt,
-      target: targetOf(r),
-      trigger: triggerOf(r, watches.get(r.id)),
-      active: r.active,
-      nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
-      running,
-      lastRun: last ? runView(last, agentRun) : null,
-      recentRuns: recentViews(recent.get(r.id) ?? [], details),
-      createdAt: r.createdAt.toISOString(),
-    };
-  });
-}
 
 /** The reader of schedule phrases; none without the context deps (then only cron expressions are read). */
 const readerOf = (deps: RoutineDeps) => (deps.context ? schedulesOf(deps.context) : null);
@@ -467,8 +762,17 @@ export async function parseScheduleForOrg(
   return parseSchedule(readerOf(deps), { orgId, phrase, timezone: zone });
 }
 
-/** The trigger columns of a routine, validated like on create; `nextRunAt` computed from now. */
-async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string, trigger: RoutineTriggerInput) {
+/**
+ * The trigger columns of a routine, validated like on create; `nextRunAt` computed from now. `keepZone`:
+ * the zone an edit keeps when none is given (the routine's own, not the editor's).
+ */
+async function resolveTrigger(
+  deps: RoutineDeps,
+  actorId: string,
+  orgId: string,
+  trigger: RoutineTriggerInput,
+  keepZone: string | null = null,
+) {
   const none = {
     phrase: null as string | null,
     cron: null as string | null,
@@ -477,20 +781,25 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
     event: null as string | null,
     rule: null as Record<string, unknown> | null,
   };
-  // The picker's "once": a one-off at its first day and time.
+  // The picker's "once": a one-off at its first day and time (a time skipped by DST moves forward).
   if (trigger.type === "schedule" && (trigger.rule?.freq as string | undefined) === "once") {
     const rule = trigger.rule as unknown as ScheduleRule;
-    const zone = await routineTimezone(deps.db, actorId, orgId, rule.timezone ?? trigger.timezone);
+    const zone = await routineTimezone(deps.db, actorId, orgId, rule.timezone ?? trigger.timezone ?? keepZone);
     const [y, m, d] = (rule.start ?? "").split("-").map(Number) as [number, number, number];
     const [h, mi] = (rule.times?.[0] ?? rule.time ?? "09:00").split(":").map(Number) as [number, number];
-    const at = y && m && d ? zonedTime(y, m, d, h, mi, zone) : null;
+    const at = y && m && d ? zonedTimeForward(y, m, d, h, mi, zone) : null;
     if (!at) throw new ValidationError("Pick the day and time", "routine.once_needs_time");
     return resolveTrigger(deps, actorId, orgId, { type: "once", at: at.toISOString(), timezone: zone });
   }
   if (trigger.type === "schedule") {
     const now = new Date();
     const phrase = trigger.phrase?.trim() ?? "";
-    const zone = await routineTimezone(deps.db, actorId, orgId, trigger.rule?.timezone ?? trigger.timezone);
+    const zone = await routineTimezone(
+      deps.db,
+      actorId,
+      orgId,
+      trigger.rule?.timezone ?? trigger.timezone ?? keepZone,
+    );
     if (!trigger.rule && !phrase)
       throw new ValidationError("Say when the routine should run", "routine.schedule_required");
     // A rule from the picker as it is; a phrase read by the schedule reader (a rule, a cron, or a one-off).
@@ -528,7 +837,7 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
     const at = new Date(trigger.at);
     if (Number.isNaN(at.getTime())) throw new ValidationError("Invalid date and time", "schedule.invalid_datetime");
     if (at.getTime() <= Date.now()) throw new ValidationError("Pick a moment in the future", "schedule.in_the_past");
-    const timezone = await routineTimezone(deps.db, actorId, orgId, trigger.timezone);
+    const timezone = await routineTimezone(deps.db, actorId, orgId, trigger.timezone ?? keepZone);
     // English, for the model and as a fallback; the app shows `at` in its own words.
     const description = describeWhen(at, timezone);
     return { ...none, triggerType: "once", timezone, description, nextRunAt: at as Date | null };
@@ -552,7 +861,18 @@ async function requireRoutineManager(db: Database, actorId: string, orgId: strin
   if (agent?.ownerUserId !== actorId) throw new ForbiddenError("Only an admin or the agent's owner can do this");
 }
 
-async function checkTarget(db: Database, orgId: string, agentId: string, target: RoutineTarget) {
+/**
+ * Where a routine reports must take it: the agent is in that conversation, and its creator (who stays
+ * accountable for what it says there) can post in it. `creatorId` null: the creator is gone (the routine
+ * pauses when it fires).
+ */
+async function checkTarget(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  target: RoutineTarget,
+  creatorId: string | null,
+) {
   if (target.type === "forum") {
     if (target.agentIds.length === 0 || target.agentIds.length > 8) {
       throw new ValidationError("Pick 1 to 8 agents for the forum", "routine.forum_agents", { min: 1, max: 8 });
@@ -570,6 +890,67 @@ async function checkTarget(db: Database, orgId: string, agentId: string, target:
       "Add the agent to the channel before creating the routine",
       "routine.agent_not_in_channel",
     );
+  if (!creatorId) return;
+  const access = await requireChannelAccess(db, creatorId, orgId, target.channelId).catch(() => null);
+  if (!access || !can(access.membership.role, "post")) {
+    throw new ValidationError(
+      "Who created the routine must be in that conversation and able to post there",
+      "routine.creator_cannot_post",
+    );
+  }
+}
+
+/** The shortest time between two runs of a routine that starts agent runs (ADR 0053 §6.5). */
+export const MIN_ROUTINE_INTERVAL_MS = 15 * 60_000;
+/** Active routines an agent may have at once. */
+export const MAX_ACTIVE_ROUTINES = 20;
+/** How far ahead a schedule's real occurrences are checked against the minimum interval. */
+const FREQUENCY_WINDOW_MS = 400 * 86_400_000;
+
+/** Whether a routine starts agent runs: reminders only post, one-offs fire once (both exempt from the limits). */
+const startsRuns = (triggerType: string, target: RoutineTarget) =>
+  triggerType !== "once" && !(target.type === "conversation" && target.reminder);
+
+/**
+ * Refuses a schedule whose real occurrences (DST and month ends included) come closer than the
+ * minimum interval anywhere in the next year.
+ */
+function checkFrequency(r: Pick<RoutineRow, "triggerType" | "rule" | "cron" | "timezone">, target: RoutineTarget) {
+  if (r.triggerType !== "schedule" || !startsRuns(r.triggerType, target)) return;
+  const now = new Date();
+  const slots = routineSlots(r, now, new Date(now.getTime() + FREQUENCY_WINDOW_MS), 300);
+  for (let i = 1; i < slots.length; i++) {
+    if ((slots[i] as Date).getTime() - (slots[i - 1] as Date).getTime() < MIN_ROUTINE_INTERVAL_MS) {
+      throw new ValidationError("A routine can run at most every 15 minutes", "routine.too_frequent", {
+        minutes: MIN_ROUTINE_INTERVAL_MS / 60_000,
+      });
+    }
+  }
+}
+
+/** Refuses one more active routine (one that starts runs) for an agent that has the most it may have. */
+async function checkRoutineCap(db: Database, orgId: string, agentId: string, exceptId?: string) {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        eq(routines.agentId, agentId),
+        eq(routines.active, true),
+        isNull(routines.deletedAt),
+        ne(routines.triggerType, "once"),
+        sql`coalesce(${routines.target}->>'reminder', 'false') <> 'true'`,
+        exceptId ? ne(routines.id, exceptId) : undefined,
+      ),
+    );
+  if (Number(row?.n ?? 0) >= MAX_ACTIVE_ROUTINES) {
+    throw new ValidationError(
+      `An agent can have at most ${MAX_ACTIVE_ROUTINES} active routines: pause or delete one first`,
+      "routine.too_many",
+      { max: MAX_ACTIVE_ROUTINES },
+    );
+  }
 }
 
 const emailWatch = (t: Extract<RoutineTriggerInput, { type: "email" }>) => ({
@@ -592,8 +973,10 @@ export async function createRoutine(
   if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
-  await checkTarget(db, orgId, agent.id, input.target);
+  await checkTarget(db, orgId, agent.id, input.target, actorId);
   const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
+  checkFrequency(trigger, input.target);
+  if (startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
   if (input.trigger.type === "email") await checkWatchable(db, orgId, agent.id, input.trigger.accountId);
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Routine";
   const [row] = await db
@@ -605,6 +988,8 @@ export async function createRoutine(
       prompt,
       target: input.target as unknown as Record<string, unknown>,
       ...trigger,
+      access: routineAccessOf(input.access),
+      report: routineReportOf(input.report),
       createdByUserId: actorId,
     })
     .returning();
@@ -615,12 +1000,13 @@ export async function createRoutine(
     actor: { type: "person", id: actorId },
     action: "routine.created",
     target: { type: "routine", id: row.id },
-    details: { agentId: agent.id, trigger: input.trigger.type },
+    details: { agentId: agent.id, trigger: input.trigger.type, access: row.access, report: row.report },
   });
-  const [view] = await views(db, [row]);
+  const [view] = await views(db, [row], actorId);
   return view as RoutineView;
 }
 
+/** The organization's routines as the person sees them (ADR 0053 §9: outcomes only where they don't read). */
 export async function listRoutines(db: Database, actorId: string, orgId: string) {
   await requirePermission(db, actorId, orgId, "read");
   const rows = await db
@@ -628,7 +1014,7 @@ export async function listRoutines(db: Database, actorId: string, orgId: string)
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
-  return views(db, rows);
+  return views(db, rows, actorId);
 }
 
 /**
@@ -648,7 +1034,7 @@ export async function listOrgRoutines(db: Database, orgId: string, options: { ag
       ),
     )
     .orderBy(routines.createdAt);
-  return views(db, rows);
+  return views(db, rows, null);
 }
 
 async function loadRoutine(db: Database, orgId: string, id: string, options: { deleted?: boolean } = {}) {
@@ -679,14 +1065,20 @@ export interface RoutinePatch {
   agentId?: string;
   trigger?: RoutineTriggerInput;
   target?: RoutineTarget;
+  /** `true` resumes it: the reason it paused itself and its failure streak are cleared. */
   active?: boolean;
+  access?: RoutineAccess;
+  report?: RoutineReport;
 }
 
 /**
  * Edits a routine (`PATCH …/routines/{id}`), validated like create: a new
  * agent must be one the person manages and can talk to (D31); the target is
- * checked against the agent; a new schedule is parsed again in its zone and
- * `nextRunAt` recomputed. Audited with the before/after of what changed.
+ * checked against the agent and the routine's creator; a new schedule is
+ * parsed again in the routine's own zone (unless one is given), checked
+ * against the minimum interval, and `nextRunAt` recomputed; resuming counts
+ * against the agent's active routines. Audited with the before/after of what
+ * changed.
  */
 export async function updateRoutine(
   deps: RoutineDeps,
@@ -717,12 +1109,16 @@ export async function updateRoutine(
     if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
     set.prompt = prompt;
   }
+  const target = patch.target ?? targetOf(current);
   if (patch.target !== undefined || set.agentId) {
-    const target = patch.target ?? targetOf(current);
-    await checkTarget(db, orgId, agentId, target);
+    await checkTarget(db, orgId, agentId, target, current.createdByUserId);
     if (patch.target !== undefined) set.target = target as unknown as Record<string, unknown>;
   }
-  if (patch.trigger !== undefined) Object.assign(set, await resolveTrigger(deps, actorId, orgId, patch.trigger));
+  if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
+  if (patch.report !== undefined) set.report = routineReportOf(patch.report);
+  if (patch.trigger !== undefined) {
+    Object.assign(set, await resolveTrigger(deps, actorId, orgId, patch.trigger, current.timezone));
+  }
   // A mail routine's agent must be able to read the mailbox it watches.
   const watched = await watchesOf(db, [current.id]);
   const mailTrigger =
@@ -736,20 +1132,30 @@ export async function updateRoutine(
   }
   const active = patch.active ?? current.active;
   if (patch.active !== undefined) set.active = active;
+  // A person resumes it: whatever paused it is behind it.
+  if (patch.active === true) {
+    set.pausedReason = null;
+    set.failuresInRow = 0;
+  }
+  const resuming = active && (!current.active || Boolean(set.agentId));
+  const triggerType = set.triggerType ?? current.triggerType;
+  if (patch.trigger !== undefined || patch.target !== undefined || resuming) {
+    checkFrequency({ ...current, ...set } as RoutineRow, target);
+  }
+  if (resuming && startsRuns(triggerType, target)) await checkRoutineCap(db, orgId, agentId, current.id);
   // Next slot: from the (new) trigger, only while active; paused routines have none.
   if (patch.trigger !== undefined || patch.active !== undefined) {
-    const type = set.triggerType ?? current.triggerType;
     set.nextRunAt = !active
       ? null
-      : type === "schedule"
+      : triggerType === "schedule"
         ? nextRoutineTime({ ...current, ...set } as RoutineRow, new Date())
-        : type === "once"
+        : triggerType === "once"
           ? (set.nextRunAt ?? current.nextRunAt)
           : null;
   }
   const changed = Object.keys(set).filter((k) => k !== "nextRunAt") as (keyof typeof set)[];
   if (changed.length === 0 && set.nextRunAt === undefined) {
-    const [view] = await views(db, [current]);
+    const [view] = await views(db, [current], actorId);
     return view as RoutineView;
   }
   const [row] = await db
@@ -775,7 +1181,7 @@ export async function updateRoutine(
     target: { type: "routine", id: row.id },
     details: { before, after },
   });
-  const [view] = await views(db, [row]);
+  const [view] = await views(db, [row], actorId);
   return view as RoutineView;
 }
 
@@ -815,6 +1221,8 @@ export async function duplicateRoutine(
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
+  // Whoever copies it becomes its creator: they must be able to post where it reports.
+  await checkTarget(db, orgId, agent.id, targetOf(current), actorId);
   const { id: _id, createdAt: _c, updatedAt: _u, lastRunAt: _l, deletedAt: _d, ...copy } = current;
   const [row] = await db
     .insert(routines)
@@ -823,6 +1231,8 @@ export async function duplicateRoutine(
       name: (options.name?.trim() || `${current.name} (copy)`).slice(0, 120),
       active: false,
       nextRunAt: null,
+      pausedReason: null,
+      failuresInRow: 0,
       createdByUserId: actorId,
     })
     .returning();
@@ -839,7 +1249,7 @@ export async function duplicateRoutine(
     target: { type: "routine", id: row.id },
     details: { from: current.id },
   });
-  const [view] = await views(db, [row]);
+  const [view] = await views(db, [row], actorId);
   return view as RoutineView;
 }
 
@@ -864,7 +1274,7 @@ export async function setRoutineActive(
     if (active && !current.active) await resetMailWatchState(deps.db, row.id);
     await syncMailWatch(deps, row, { accountId: watch.accountId, folder: watch.folder, filter: watch.filter });
   }
-  const [view] = await views(deps.db, row ? [row] : []);
+  const [view] = await views(deps.db, row ? [row] : [], actorId);
   return view as RoutineView;
 }
 
@@ -897,21 +1307,31 @@ export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: s
   const routine = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, routine.agentId);
   await queueRoutineRun(deps, routine, new Date(), "manual");
-  const [view] = await views(deps.db, [routine]);
+  const [view] = await views(deps.db, [routine], actorId);
   return view as RoutineView;
 }
 
-export async function listRoutineRuns(db: Database, actorId: string, orgId: string, id: string) {
+/** A routine's run history (the last 100), as the person may see it: outcomes only where they don't read it. */
+export async function listRoutineRuns(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  id: string,
+): Promise<RoutineRunView[]> {
   await requirePermission(db, actorId, orgId, "read");
   const routine = await loadRoutine(db, orgId, id, { deleted: true });
-  const runs = await db
-    .select()
-    .from(routineRuns)
-    .where(eq(routineRuns.routineId, routine.id))
-    .orderBy(desc(routineRuns.at))
-    .limit(100);
-  const details = await runDetails(db, runs);
-  return runs.map((r) => runView(r, r.agentRunId ? details.agentRunsById.get(r.agentRunId) : undefined));
+  const [runs, rights] = await Promise.all([
+    db
+      .select()
+      .from(routineRuns)
+      .where(and(eq(routineRuns.orgId, orgId), eq(routineRuns.routineId, routine.id)))
+      .orderBy(desc(routineRuns.at))
+      .limit(100),
+    viewerRights(db, orgId, [routine], actorId),
+  ]);
+  const details = await runDetails(db, orgId, runs);
+  const reads = rights.get(routine.id)?.reads ?? false;
+  return runs.map((r) => runView(r, details, reads));
 }
 
 /**
