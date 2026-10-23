@@ -1,21 +1,37 @@
 import path from "node:path";
-import { ruleMatches } from "./machine-protocol";
+import { commandParts, ruleMatches } from "./machine-protocol";
 
 /**
- * Deterministic command policy for mission work turns (ADR 0029). No model:
- * plain parsing of the shell line Claude Code wants to run.
+ * Deterministic command policy for computer turns (ADR 0029, ADR 0053 §3). No
+ * model: plain parsing of the call Claude Code (or Codex) wants to make. The
+ * runner's permission prompt, Codex's command approvals and the server's
+ * `permission_prompt` all decide with these functions, so every brain follows
+ * the same rules.
  *
+ * - `deniedInMissions`: the deny list, matched on normalized arguments (`gh -R`,
+ *   `git -C/-c`, `refs/heads/<default>`): refused at once, never asked.
+ * - `secretRead`: a call that reads keys, tokens or env files, with any read
+ *   tool (Read, Glob, Grep, a shell command): refused at once too.
  * - `readOnlyCall`: harmless reads (listing and reading files anywhere but
  *   secrets, read-only git, GET/HEAD fetches that save only into the
- *   mission folder). The runner's prompt tool allows these at once, with no
- *   card and nothing posted.
+ *   mission folder; in the `plan` profile no fetch and no write at all). The
+ *   runner's prompt tool allows these at once, with no card and nothing posted.
  * - `forbiddenReason`: what code never lets the judge approve (sudo, deletes
  *   and writes outside the mission folder, system services, uploads, remote
- *   shells, global installs, anything it can't read plainly). The judge only
- *   classifies what is left; the deny list stays first and hard.
+ *   shells, global installs, inline code, anything it can't read plainly).
+ *   The judge only classifies what is left; the deny list stays first and hard.
+ * - `localVerdict`: the part the computer decides by itself (the rest goes to
+ *   the server, which may ask a person).
  *
  * Anything this can't parse with certainty is "not read-only" (a card).
  */
+
+/**
+ * The permission profile of a computer turn (ADR 0053 §3). `plan`: reads only
+ * (no edits, read-only shell, no web, no fetches). `work`: edits in its folders,
+ * and commands by this policy (a person for the rest).
+ */
+export type CommandProfile = "plan" | "work";
 
 export interface CommandScope {
   /** Where the task runs (relative paths resolve here). */
@@ -200,13 +216,63 @@ const insideOrTmp = (scope: CommandScope, p: string) => {
   return r !== null && (insideFolders(scope, p) || TMP.some((t) => under(r, t)));
 };
 
-/** Secrets a read never gets without a person: keys, tokens, env files, the runner's own home. */
+/**
+ * Secrets a read never gets: keys, tokens, env files (not their `.env.example`
+ * and the like, which hold none), the runner's own home.
+ */
 const SECRET_PATH =
-  /(^|\/)(\.ssh|\.aws|\.gnupg|\.kube|\.docker|\.azure|\.gcloud|\.password-store|Keychains|\.agentes-runner)(\/|$)|(^|\/)\.config\/(gh|gcloud)(\/|$)|(^|\/)(\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.pgpass|\.env(\.[\w.-]+)?|id_[a-z0-9]+(\.pub)?|credentials(\.json)?|.*\.pem|.*\.key|mcp-token)$/i;
+  /(^|\/)(\.ssh|\.aws|\.gnupg|\.kube|\.docker|\.azure|\.gcloud|\.password-store|Keychains|\.agentes-runner)(\/|$)|(^|\/)\.config\/(gh|gcloud)(\/|$)|(^|\/)(\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.pgpass|\.env(\.(?!(example|sample|template|dist|defaults)$)[\w.-]+)?|id_[a-z0-9]+(\.pub)?|credentials(\.json)?|.*\.pem|.*\.key|mcp-token)$/i;
 
 function secretPath(scope: CommandScope, p: string) {
   const r = resolveIn(scope, p);
   return r === null || SECRET_PATH.test(r) || SECRET_PATH.test(p);
+}
+
+/** A word of a line that can't be parsed plainly, without the quotes and substitution marks around it (`$(cat`, `x)`). */
+const bareWord = (w: string) => w.replace(/^[$('"`{]+|[)'"`};]+$/g, "");
+
+/** A path or pattern names a secret (resolved in the scope when there is one; a bare one is tested as written). */
+const namesSecret = (p: string, scope?: CommandScope) =>
+  SECRET_PATH.test(p) || (scope ? (p.startsWith("/") || p.startsWith("~") ? secretPath(scope, p) : false) : false);
+
+/** Claude Code's own tools that read files, and the arguments that say where (Grep's `pattern` is a search, not a path). */
+const FILE_READ_TOOLS: Record<string, readonly string[]> = {
+  Read: ["file_path"],
+  Glob: ["pattern", "path"],
+  Grep: ["path", "glob"],
+  LS: ["path"],
+  NotebookRead: ["notebook_path"],
+};
+
+/**
+ * A call that reads a secret (keys, tokens, env files, the runner's own home),
+ * with any tool that reads: Read, Glob, Grep (by path, glob or pattern) and
+ * shell commands (any word naming one, or a file read with `<`). Refused at
+ * once on every path (ADR 0053 §3); a person never sees it as a card.
+ */
+export function secretRead(
+  toolName: string,
+  input: Record<string, unknown> | null | undefined,
+  scope?: CommandScope,
+): boolean {
+  const i = input ?? {};
+  const keys = Object.hasOwn(FILE_READ_TOOLS, toolName) ? FILE_READ_TOOLS[toolName] : undefined;
+  if (keys) return keys.some((k) => typeof i[k] === "string" && namesSecret(i[k] as string, scope));
+  if (toolName !== "Bash") return false;
+  const command = typeof i.command === "string" ? i.command : "";
+  const cmds = simpleCommands(command);
+  if (cmds) {
+    return cmds.some(
+      (s) => s.argv.slice(1).some((a) => namesSecret(a, scope)) || s.reads.some((r) => namesSecret(r, scope)),
+    );
+  }
+  // Not plainly readable: any word that names a secret.
+  return commandParts(command).some((part) =>
+    part
+      .split(" ")
+      .slice(1)
+      .some((w) => namesSecret(bareWord(w), scope)),
+  );
 }
 
 /** Commands that only read, whatever their arguments (minus the options that write or run). */
@@ -566,9 +632,11 @@ function fetchIntoFolders(argv: string[], scope: CommandScope) {
   }
 }
 
-function readOnlySimple(s: Simple, scope: CommandScope): boolean {
+function readOnlySimple(s: Simple, scope: CommandScope, plan = false): boolean {
   const [cmd, ...args] = s.argv;
   if (!cmd) return false;
+  // A plan turn writes nothing, not even into its own folder.
+  if (plan && s.writes.length > 0) return false;
   if (s.writes.some((w) => !insideFolders(scope, w))) return false;
   if (s.reads.some((r) => secretPath(scope, r))) return false;
   // Nothing that reads a secret, wherever it is named.
@@ -591,11 +659,13 @@ function readOnlySimple(s: Simple, scope: CommandScope): boolean {
     case "exiftool":
       return !args.some((a) => EXIF_WRITE.test(a));
     case "git":
-      return readOnlyGit(s.argv) || fetchIntoFolders(s.argv, scope);
+      // A plan turn fetches nothing (a clone or a pull writes into the folder).
+      return readOnlyGit(s.argv) || (!plan && fetchIntoFolders(s.argv, scope));
+    // No web in a plan turn, not even a GET.
     case "curl":
-      return readOnlyCurl(s.argv, scope);
+      return !plan && readOnlyCurl(s.argv, scope);
     case "wget":
-      return readOnlyWget(s.argv, scope);
+      return !plan && readOnlyWget(s.argv, scope);
     default:
       return false;
   }
@@ -604,21 +674,23 @@ function readOnlySimple(s: Simple, scope: CommandScope): boolean {
 const READ_TOOLS = new Set(["Read", "Glob", "Grep", "LS"]);
 
 /**
- * A call that only reads (or fetches into the mission folder): allowed at
- * once, no card. Every part of a pipeline or list must be read-only, so
- * `curl … | sh` or `ls | xargs rm` never pass.
+ * A call that only reads (or, in a `work` turn, fetches into the mission
+ * folder): allowed at once, no card. Every part of a pipeline or list must be
+ * read-only, so `curl … | sh` or `ls | xargs rm` never pass. Never a secret.
  */
-export function readOnlyCall(toolName: string, input: Record<string, unknown> | null | undefined, scope: CommandScope) {
+export function readOnlyCall(
+  toolName: string,
+  input: Record<string, unknown> | null | undefined,
+  scope: CommandScope,
+  profile: CommandProfile = "work",
+) {
   const i = input ?? {};
-  if (READ_TOOLS.has(toolName)) {
-    const p = [i.file_path, i.path].find((v): v is string => typeof v === "string");
-    return !p || !secretPath(scope, p);
-  }
+  if (READ_TOOLS.has(toolName)) return !secretRead(toolName, i, scope);
   if (toolName !== "Bash") return false;
   const command = typeof i.command === "string" ? i.command : "";
   if (!command.trim() || command.length > 2000) return false;
   const cmds = simpleCommands(command);
-  return Boolean(cmds && cmds.length > 0 && cmds.every((s) => readOnlySimple(s, scope)));
+  return Boolean(cmds && cmds.length > 0 && cmds.every((s) => readOnlySimple(s, scope, profile === "plan")));
 }
 
 /**
@@ -698,11 +770,223 @@ export const MISSION_DENY_RULES: readonly string[] = [
   "Bash(cargo publish*)",
   "Bash(gem push*)",
   "Bash(twine upload*)",
+  // The person's GitHub token, printed.
+  "Bash(gh auth token*)",
+  "Bash(gh auth status *--show-token*)",
+  "Bash(gh auth status *-t*)",
 ];
 
-/** On the deny list: refused at once, never shown to anyone, never judged. */
-export const deniedInMissions = (toolName: string, input: Record<string, unknown> | null | undefined) =>
-  MISSION_DENY_RULES.some((rule) => ruleMatches(rule, toolName, input));
+/**
+ * Code given inline to an interpreter (`node -e`, `python3 -c`, `perl -ne`…):
+ * never allowed by a settings rule such as `Bash(node *)`, whatever else a
+ * profile allows (Claude Code checks deny rules first). Our own check is
+ * `inlineCode`, which also catches the spellings these patterns can't.
+ */
+export const INLINE_CODE_DENY_RULES: readonly string[] = [
+  ...["node", "nodejs", "bun"].flatMap((i) =>
+    ["-e", "--eval", "-p", "--print"].flatMap((f) => [`Bash(${i} ${f}*)`, `Bash(${i} * ${f} *)`]),
+  ),
+  ...["python", "python2", "python3"].flatMap((i) => [`Bash(${i} -c*)`, `Bash(${i} * -c *)`]),
+  ...["ruby", "perl"].flatMap((i) => [`Bash(${i} -e*)`, `Bash(${i} * -e *)`, `Bash(${i} -*e *)`]),
+  "Bash(perl -E*)",
+  "Bash(deno eval*)",
+  "Bash(php -r*)",
+];
+
+/**
+ * Credential stores in the person's home, named in a shell command: refused by
+ * Claude Code itself even where a settings rule allows the command (`Bash(cat *)`
+ * in a mission). Our own check is `secretRead`, which covers more.
+ */
+export const SECRET_BASH_DENY_RULES: readonly string[] = [
+  ".ssh",
+  ".aws",
+  ".gnupg",
+  ".kube",
+  ".azure",
+  ".password-store",
+  ".config/gh",
+  ".config/gcloud",
+  ".agentes-runner",
+  ".git-credentials",
+  ".netrc",
+  ".pgpass",
+  "Library/Keychains",
+].flatMap((p) => [`Bash(*~/${p}*)`, `Bash(*/${p}/*)`]);
+
+/** The same secrets for Claude Code's own read tools (Read, and best effort Glob and Grep). */
+export const SECRET_READ_DENY_RULES: readonly string[] = [
+  ...[
+    ".ssh",
+    ".aws",
+    ".gnupg",
+    ".kube",
+    ".docker",
+    ".azure",
+    ".password-store",
+    ".config/gh",
+    ".config/gcloud",
+    ".agentes-runner",
+    "Library/Keychains",
+  ].map((p) => `Read(~/${p}/**)`),
+  ...[".netrc", ".npmrc", ".pypirc", ".git-credentials", ".pgpass"].map((p) => `Read(~/${p})`),
+  // `.env.example` and friends stay readable (no secrets; a project's setup needs them).
+  ...[
+    ".env",
+    ".env.local",
+    ".env.*.local",
+    ".env.production",
+    ".env.prod",
+    ".env.development",
+    ".env.dev",
+    ".env.staging",
+    ".env.test",
+    "*.pem",
+    "*.key",
+    "id_rsa",
+    "id_ed25519",
+    "id_ecdsa",
+    "id_dsa",
+    "mcp-token",
+  ].map((p) => `Read(**/${p})`),
+];
+
+/** Global options of git before its subcommand that take a value (`git -C <dir> push`, `git -c k=v push`). */
+const GIT_GLOBAL_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"]);
+const GIT_GLOBAL_FLAG =
+  /^(--no-pager|-p|--paginate|-P|--bare|--no-replace-objects|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks|--no-advice)$/;
+/** gh options that pick another repository or host, anywhere in the command. */
+const GH_VALUE = new Set(["-R", "--repo", "--hostname"]);
+/** Wrappers that run the next word as the command (`nice -n 5 git push …`, `env -u X git push …`). */
+const WRAPPERS = new Set(["command", "builtin", "nice", "nohup", "time", "env", "caffeinate"]);
+/** Wrapper options that take the next word. */
+const WRAPPER_VALUE = new Set(["-n", "-u", "-C", "-S", "-P", "-w", "-t"]);
+
+const baseName = (word: string) => word.split("/").pop() ?? word;
+
+/** The words with their wrappers (and the wrappers' options and env assignments) left out. */
+function unwrapped(words: string[]): string[] {
+  let argv = words.filter(Boolean);
+  while (argv.length > 1 && WRAPPERS.has(baseName(argv[0] as string))) {
+    argv = argv.slice(1);
+    while (argv.length > 1 && /^-|^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[0] as string)) {
+      const opt = argv[0] as string;
+      argv = argv.slice(WRAPPER_VALUE.has(opt) && argv.length > 2 ? 2 : 1);
+    }
+  }
+  return argv;
+}
+
+/**
+ * One command as the deny list reads it: its program by name (not path),
+ * wrappers dropped, git's global options and gh's repository options left
+ * out, and `refs/heads/<branch>` read as the branch, so `git -c x=y -C /w push
+ * origin refs/heads/main` reads `git push origin main` and `gh -R a/b pr merge 1`
+ * reads `gh pr merge 1`.
+ */
+export function normalizedCommand(words: string[]): string {
+  const [first = "", ...rest] = unwrapped(words);
+  const cmd = baseName(first);
+  const out = [cmd];
+  if (cmd === "git") {
+    let i = 0;
+    for (; i < rest.length; i++) {
+      const a = rest[i] as string;
+      if (GIT_GLOBAL_VALUE.has(a)) i++;
+      else if (/^--(git-dir|work-tree|namespace|exec-path|config-env)=/.test(a) || GIT_GLOBAL_FLAG.test(a)) continue;
+      else break;
+    }
+    out.push(...rest.slice(i).map((a) => a.replace(/^(\+?)refs\/heads\//, "$1").replace(/:refs\/heads\//, ":")));
+  } else if (cmd === "gh") {
+    for (let i = 0; i < rest.length; i++) {
+      const a = rest[i] as string;
+      if (GH_VALUE.has(a)) i++;
+      else if (!/^--(repo|hostname)=/.test(a)) out.push(a);
+    }
+  } else out.push(...rest);
+  return out.join(" ");
+}
+
+/** The words of each part of a command (quotes dropped), for matching only: never to run anything. */
+function commandWords(command: string): string[][] {
+  const cmds = simpleCommands(command);
+  if (cmds) return cmds.map((s) => s.argv);
+  return commandParts(command).map((part) => part.split(" ").map(bareWord));
+}
+
+/**
+ * On the deny list: refused at once, never shown to anyone, never judged. The
+ * rules match the command as written and each part normalized
+ * (`normalizedCommand`), so options in front can't slip past them.
+ */
+export function deniedInMissions(toolName: string, input: Record<string, unknown> | null | undefined) {
+  if (MISSION_DENY_RULES.some((rule) => ruleMatches(rule, toolName, input))) return true;
+  if (toolName !== "Bash") return false;
+  const command = typeof input?.command === "string" ? input.command : "";
+  return commandWords(command).some((words) => {
+    const normalized = { command: normalizedCommand(words) };
+    return MISSION_DENY_RULES.some((rule) => ruleMatches(rule, "Bash", normalized));
+  });
+}
+
+/** Interpreters and the options that run code given on the command line. */
+const INLINE_CODE: Array<[RegExp, RegExp]> = [
+  [/^(node|nodejs|bun)$/, /^(-e|--eval|-p|--print|-pe|-ep)$|^--(eval|print)=/],
+  // `-c` ends a cluster of python's flags (`-Bc`), or carries the code glued (`-cprint(1)`).
+  [/^python[\d.]*$/, /^-[a-zA-Z]*c/],
+  [/^ruby$/, /^-[a-zA-Z]*e/],
+  [/^perl$/, /^-[a-zA-Z0-9]*[eE]/],
+  [/^php$/, /^-r/],
+];
+
+/** Code given inline to an interpreter (`node -e`, `python3 -c`, `perl -ne`, `deno eval`): never auto-allowed. */
+export function inlineCode(argv: readonly string[]): boolean {
+  const [first = "", ...args] = unwrapped([...argv]);
+  const base = baseName(first);
+  if (base === "deno") return args.find((a) => !a.startsWith("-")) === "eval";
+  const rule = INLINE_CODE.find(([name]) => name.test(base));
+  if (!rule) return false;
+  // Options before the script: the first plain word is the script, and what follows it is its own.
+  for (const a of args) {
+    if (!a.startsWith("-")) return false;
+    if (rule[1].test(a)) return true;
+  }
+  return false;
+}
+
+/** Any part of a shell call runs inline code. */
+export const inlineCodeCall = (toolName: string, input: Record<string, unknown> | null | undefined) =>
+  toolName === "Bash" && commandWords(typeof input?.command === "string" ? input.command : "").some(inlineCode);
+
+/** Told to the agent when the deny list refuses a call. */
+export const DENIED_MESSAGE =
+  "This command is never allowed for agents (merges, pushes to the default branch, deploys, publishing, printing tokens): ask with request_approval and wait.";
+/** Told to the agent when a call reads a secret. */
+export const SECRET_MESSAGE =
+  "Agents never read secrets (keys, tokens, credentials, .env files). Do the work without them; if a search pattern only looks like one, search another way.";
+/** Told to the agent when a plan turn wants more than reading. */
+export const PLAN_MESSAGE =
+  "This turn may only read: no edits, no commands that change anything, no web. Report what you would do instead.";
+
+/**
+ * What the computer decides by itself, before anyone is asked: the deny list
+ * and secrets are refused, plain reads allowed; in a `plan` turn everything
+ * else is refused too. Null: the server decides (`permission_prompt`: a
+ * mission's card, or code's rules for a run). The runner's prompt tool for
+ * Claude Code and its answers to Codex's command approvals both start here.
+ */
+export function localVerdict(
+  toolName: string,
+  input: Record<string, unknown> | null | undefined,
+  scope: CommandScope | undefined,
+  profile: CommandProfile,
+): { behavior: "allow" } | { behavior: "deny"; message: string } | null {
+  if (deniedInMissions(toolName, input)) return { behavior: "deny", message: DENIED_MESSAGE };
+  if (secretRead(toolName, input, scope)) return { behavior: "deny", message: SECRET_MESSAGE };
+  if (scope && readOnlyCall(toolName, input, scope, profile)) return { behavior: "allow" };
+  if (profile === "plan") return { behavior: "deny", message: PLAN_MESSAGE };
+  return null;
+}
 
 // ── What the judge may never approve ──────────────────────────────────────────
 
@@ -752,16 +1036,27 @@ const WRITERS = new Set([
   "srm",
 ]);
 const INTERPRETERS = new Set(["sh", "bash", "zsh", "fish", "dash", "ksh", "eval", "exec", "source", ".", "xargs"]);
+/** Claude Code's tools that write a file (Codex's file changes are asked as `Write`). */
+const FILE_WRITE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 /**
  * Why code refuses a call even when the judge would allow it (null: the
- * judge may decide). Applies to Bash; other tools have no such rules.
+ * judge may decide). Secrets for every read tool; the rest applies to Bash.
  */
 export function forbiddenReason(
   toolName: string,
   input: Record<string, unknown> | null | undefined,
   scope: CommandScope,
 ): string | null {
+  if (secretRead(toolName, input, scope)) return "it touches secrets";
+  // An edit asked for is outside what the turn may write by itself (its folders): only there, or /tmp.
+  const edited = FILE_WRITE_TOOLS.has(toolName)
+    ? [input?.file_path, input?.notebook_path].find((v): v is string => typeof v === "string")
+    : undefined;
+  if (edited !== undefined) {
+    if (namesSecret(edited, scope)) return "it touches secrets";
+    return insideOrTmp(scope, edited) ? null : "it changes files outside the mission folder";
+  }
   if (toolName !== "Bash") return null;
   const command = typeof input?.command === "string" ? input.command : "";
   const cmds = simpleCommands(command);
@@ -773,6 +1068,7 @@ export function forbiddenReason(
     if (SYSTEM.has(base)) return "it changes the system";
     if (REMOTE.has(base)) return "it connects to another host";
     if (INTERPRETERS.has(base)) return "it runs other commands";
+    if (inlineCode(s.argv)) return "it runs code given inline";
     if (WRITERS.has(base)) {
       const paths = args.filter((a) => !a.startsWith("-"));
       if (paths.some((p) => !insideOrTmp(scope, p))) return "it changes files outside the mission folder";
@@ -808,6 +1104,9 @@ const FORBIDDEN_HINTS: Record<string, string> = {
   "it writes outside the mission folder": "Write only inside your folder or /tmp.",
   "it changes files outside the mission folder": "Change files only inside your folder or /tmp.",
   "it runs other commands": "Run the commands themselves, one at a time, not through a shell, eval or xargs.",
+  "it runs code given inline":
+    "Code passed on the command line (node -e, python -c…) is never run without a person: write it to a file in your folder and run that file.",
+  "it touches secrets": SECRET_MESSAGE,
 };
 
 export const forbiddenHint = (reason: string) => FORBIDDEN_HINTS[reason] ?? null;

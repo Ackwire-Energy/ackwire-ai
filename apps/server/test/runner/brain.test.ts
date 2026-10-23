@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   MACHINE_PROTOCOL_VERSION,
@@ -17,6 +18,7 @@ import {
   BRAIN_BUILTIN_TOOLS,
   BrainManager,
   type BrainManagerOptions,
+  brainProfileLaunch,
   ClaudeStreamParser,
   carryClaudeSession,
   claudeBrainArgs,
@@ -256,6 +258,34 @@ test("command line: stream-json both ways, opus falls back to sonnet, strict MCP
   });
 });
 
+test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no edits or web, our prompt", () => {
+  const base = {
+    session: SESSION(1),
+    resume: false,
+    systemFile: "/b/system.txt",
+    mcpConfigFile: "/b/mcp.json",
+    settingsFile: "/b/settings.json",
+  };
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(BRAIN_PROFILES_PROTOCOL);
+  // The owner's own MCP servers never reach a plan turn.
+  const plan = claudeBrainArgs({ ...base, ...brainProfileLaunch("plan", true) });
+  const at = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
+  expect(plan).toContain("--strict-mcp-config");
+  expect(at(plan, "--setting-sources")).toBe("");
+  expect(at(plan, "--permission-mode")).toBe("default");
+  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep");
+  expect(at(plan, "--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
+  const work = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", false) });
+  expect(at(work, "--permission-mode")).toBe("acceptEdits");
+  expect(at(work, "--setting-sources")).toBe("project");
+  expect(at(work, "--tools")).toBe(BRAIN_BUILTIN_TOOLS.join(","));
+  expect(work).toContain("--permission-prompt-tool");
+  // With the owner's servers (work): their settings and every tool, as D60 had it.
+  const personal = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", true) });
+  expect(personal).not.toContain("--strict-mcp-config");
+  expect(personal).not.toContain("--setting-sources");
+});
+
 // ── The manager with a fake Claude Code ──────────────────────────────────────
 
 function setup(over: Partial<BrainManagerOptions> = {}) {
@@ -490,7 +520,58 @@ test.if(posix)("keepAlive false: one-shot, the process ends with the turn", asyn
   const r = await turn(1, "once", { keepAlive: false });
   expect(r.final).toMatchObject({ type: "done", text: "echo 1: once" });
   expect(m.size).toBe(0);
+  // A background turn on a session that has a live process: it goes too, after the turn.
+  await turn(2, "kept");
+  expect(m.size).toBe(1);
+  const bg = await turn(3, "background", { keepAlive: false });
+  expect(bg.final).toMatchObject({ type: "done", text: "echo 2: background" });
+  expect(m.size).toBe(0);
 });
+
+test.if(posix)(
+  "a plan turn launches Claude Code read-only: our tools only, no settings files; edits, web and secrets denied",
+  async () => {
+    const { spawns, turn } = setup();
+    // Even when the agent opted into the owner's MCP servers.
+    const r = await turn(1, "look", { permissions: { mode: "plan" }, personalMcp: true });
+    expect(r.final).toMatchObject({ type: "done" });
+    const args = spawns()[0]?.args ?? [];
+    const at = (flag: string) => args[args.indexOf(flag) + 1];
+    expect(args).toContain("--strict-mcp-config");
+    expect(at("--setting-sources")).toBe("");
+    expect(at("--permission-mode")).toBe("default");
+    expect(at("--tools")).toBe("Bash,Read,Glob,Grep");
+    expect(at("--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
+    const settings = JSON.parse(readFileSync(at("--settings") as string, "utf8")) as {
+      permissions: { allow: string[]; deny: string[] };
+    };
+    const denied = ["Edit", "Write", "WebFetch", "WebSearch", "Read(~/.ssh/**)", "Bash(node -e*)", "Bash(gh pr merge *)"];
+    for (const rule of denied) expect(settings.permissions.deny).toContain(rule);
+    // Shell reads aren't allow rules: our prompt tool decides them (and refuses secrets).
+    expect(settings.permissions.allow.some((r) => r.startsWith("Bash("))).toBe(false);
+    // Its MCP process answers the prompts itself, reads only.
+    const config = JSON.parse(readFileSync(at("--mcp-config") as string, "utf8")) as {
+      mcpServers: { agentes: { env: Record<string, string> } };
+    };
+    expect(config.mcpServers.agentes.env.AGENTES_MCP_PROFILE).toBe("plan");
+    // A work turn: edits accepted, the same denials, no profile for its prompts.
+    const work = setup();
+    await work.turn(1, "do");
+    const wargs = work.spawns()[0]?.args ?? [];
+    expect(wargs[wargs.indexOf("--permission-mode") + 1]).toBe("acceptEdits");
+    const wsettings = JSON.parse(readFileSync(wargs[wargs.indexOf("--settings") + 1] as string, "utf8")) as {
+      permissions: { allow: string[]; deny: string[] };
+    };
+    expect(wsettings.permissions.deny).toContain("Bash(python3 -c*)");
+    expect(wsettings.permissions.deny).toContain("Bash(gh auth token*)");
+    expect(wsettings.permissions.deny).not.toContain("Edit");
+    expect(wsettings.permissions.allow).not.toContain("Bash(cat *)");
+    const wconfig = JSON.parse(readFileSync(wargs[wargs.indexOf("--mcp-config") + 1] as string, "utf8")) as {
+      mcpServers: { agentes: { env: Record<string, string> } };
+    };
+    expect(wconfig.mcpServers.agentes.env.AGENTES_MCP_PROFILE).toBeUndefined();
+  },
+);
 
 test.if(posix)("plan limit and login failures end the turn with retryable errors", async () => {
   const { turn } = setup();

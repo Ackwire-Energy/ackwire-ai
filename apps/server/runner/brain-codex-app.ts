@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import type { CommandProfile, CommandScope } from "@agenteschat/adapters/command-policy";
 import { type BrainSteerReply, type BrainSteerRequest, isBrainEffort } from "@agenteschat/adapters/machine-protocol";
 import {
   type CodexAppRunner,
@@ -14,11 +15,21 @@ import {
   codexEffort,
   codexFileChangeCall,
   codexProblem,
+  codexSandbox,
   codexThreadKey,
+  unwrapShell,
 } from "./brain-codex";
 import { killTree } from "./exec";
 import { resolveCommand } from "./executors";
-import { CODEX_MCP_ENV, codexWritableRoots, type McpTaskInfo, newMcpToken } from "./mcp";
+import {
+  CODEX_MCP_ENV,
+  codexWritableRoots,
+  type IpcReply,
+  ipcCall,
+  type McpTaskInfo,
+  newMcpToken,
+  permissionPrompt,
+} from "./mcp";
 import { isInside } from "./paths";
 
 /**
@@ -30,16 +41,23 @@ import { isInside } from "./paths";
  * - One app-server per (agent, session) stays alive between turns (closed
  *   after `idleMs` idle, at most `maxProcesses`; the least recently used idle
  *   one goes for a new one; all busy: that turn runs with `codex exec`).
- *   Started with the same `-c` overrides as exec (network on in the
- *   workspace-write sandbox, the agent's writable roots, our MCP bridge) and
- *   the same env (the agent's secrets, `CODEX_HOME` = the turn's account).
- *   A change of folder, roots, account or secrets starts it again.
+ *   Started with the same `-c` overrides as exec (the agent's writable roots,
+ *   our MCP bridge; no network) and the same env (the agent's secrets,
+ *   `CODEX_HOME` = the turn's account). A change of folder, roots, account,
+ *   secrets or permission profile starts it again; a background turn
+ *   (`keepAlive: false`) closes it when it ends.
  * - `initialize` + `initialized`, then the session's Codex thread:
  *   `thread/resume` of the stored id (the threads file exec keeps too), else
  *   `thread/start` with the instructions (`developerInstructions`), always
- *   `cwd`, `sandbox: "workspace-write"`, `approvalPolicy: "never"` (what exec
- *   forces) and the model. Each turn is `turn/start` with the prompt, the
- *   model and `effort`.
+ *   `cwd`, the profile's sandbox (`read-only` for `plan`, `workspace-write`
+ *   for `work`, never the network), `approvalPolicy: "untrusted"` and the
+ *   model. Each turn is `turn/start` with the prompt, the model and `effort`.
+ * - Approvals (ADR 0053 §3): Codex asks before a command it doesn't trust or a
+ *   change outside its sandbox (`item/commandExecution/requestApproval`,
+ *   `item/fileChange/requestApproval`); the runner answers with the same
+ *   decision Claude Code's permission prompt gets (`permissionPrompt`: deny
+ *   list, secrets, plain reads, a `plan` turn's refusals, then the server's
+ *   rules or a person), `accept` or `decline`.
  * - Notifications → the same events exec gives: `item/agentMessage/delta`
  *   streamed as text deltas (batched), a completed `commandExecution` /
  *   `fileChange` as an executed `tool_call`, `thread/tokenUsage/updated`
@@ -136,7 +154,11 @@ export function codexAtLeast(version: string | undefined, min = CODEX_APP_MIN_VE
   return true;
 }
 
-/** The `codex app-server` arguments: exec's `-c` overrides (a process serves one folder and one set of roots). */
+/**
+ * The `codex app-server` arguments: our `-c` overrides (a process serves one folder, one set of roots
+ * and one permission profile). No network in the sandbox (ADR 0053 §3): a command that needs it asks,
+ * and the command policy answers.
+ */
 export function codexAppServerArgs(input: {
   /** The process id: our MCP bridge is `mcp --run <id>` (`McpTaskInfo` in the bridge's registry). */
   processId: string;
@@ -145,12 +167,20 @@ export function codexAppServerArgs(input: {
 }): string[] {
   return [
     "app-server",
-    "-c",
-    "sandbox_workspace_write.network_access=true",
     ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
     ...(input.mcp ? codexBridgeOverrides({ runId: input.processId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
   ];
 }
+
+/**
+ * A thread's sandbox and approval policy for the turn's profile (`thread/start`, `thread/resume`):
+ * `plan` reads in a read-only sandbox, `work` writes in its folders; neither has the network. Codex
+ * asks before anything else (`untrusted`), and the runner answers with the command policy.
+ */
+export const codexThreadPolicy = (profile: CommandProfile) => ({
+  sandbox: codexSandbox(profile),
+  approvalPolicy: "untrusted" as const,
+});
 
 // ── JSON-RPC client ──────────────────────────────────────────────────────────
 
@@ -164,8 +194,16 @@ export class CodexRpcError extends Error {
   }
 }
 
-/** Server requests the runner answers (nothing should ask with `approvalPolicy: "never"`; a refusal never hangs a turn). */
-function serverRequestAnswer(method: string): { result: unknown } | { error: { code: number; message: string } } {
+/** The answer to a request the app-server sends the runner. */
+export type ServerRequestAnswer = { result: unknown } | { error: { code: number; message: string } };
+/** Answers the app-server's requests of a turn (null: not this turn's; the default answer goes). */
+export type ServerRequestHandler = (
+  method: string,
+  params: Record<string, unknown>,
+) => Promise<ServerRequestAnswer> | null;
+
+/** Server requests no turn handles (between turns, or legacy ones): refused, so a request never hangs a turn. */
+function serverRequestAnswer(method: string): ServerRequestAnswer {
   switch (method) {
     case "item/commandExecution/requestApproval":
     case "item/fileChange/requestApproval":
@@ -190,6 +228,7 @@ export class CodexAppClient {
   >();
   private readonly listeners = new Set<(method: string, params: Record<string, unknown>) => void>();
   private readonly exitHandlers = new Set<() => void>();
+  private requestHandler: ServerRequestHandler | null = null;
 
   constructor(file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }) {
     this.child = spawn(file, args, {
@@ -228,7 +267,17 @@ export class CodexAppClient {
     const method = typeof msg.method === "string" ? msg.method : null;
     const id = typeof msg.id === "number" || typeof msg.id === "string" ? msg.id : null;
     if (method && id !== null) {
-      this.send({ id, ...serverRequestAnswer(method) });
+      const params = isObj(msg.params) ? msg.params : {};
+      const handled = this.requestHandler?.(method, params) ?? null;
+      if (!handled) {
+        this.send({ id, ...serverRequestAnswer(method) });
+        return;
+      }
+      // Answered when decided (a person may be asked); a failure refuses, never hangs the turn.
+      handled.then(
+        (answer) => this.send({ id, ...answer }),
+        () => this.send({ id, ...serverRequestAnswer(method) }),
+      );
       return;
     }
     if (method) {
@@ -288,6 +337,11 @@ export class CodexAppClient {
   onNotification(handler: (method: string, params: Record<string, unknown>) => void): () => void {
     this.listeners.add(handler);
     return () => this.listeners.delete(handler);
+  }
+
+  /** The turn in progress answers the app-server's requests (its approvals); null between turns. */
+  onRequest(handler: ServerRequestHandler | null) {
+    this.requestHandler = handler;
   }
 
   onExit(handler: () => void): () => void {
@@ -462,6 +516,80 @@ export class CodexAppMapper {
   }
 }
 
+// ── Approvals (ADR 0053 §3) ──────────────────────────────────────────────────
+
+/** A call as the command policy reads it (Claude Code's permission prompt arguments). */
+export type PolicyCall = { tool_name: string; input: Record<string, unknown> };
+
+/** A command as Codex gives it: a line (`/bin/zsh -lc "npm test"`) or an argv. */
+function commandText(raw: unknown): string {
+  if (typeof raw === "string") return unwrapShell(raw);
+  if (!Array.isArray(raw)) return "";
+  const argv = raw.filter((a): a is string => typeof a === "string");
+  // `["/bin/zsh", "-lc", "npm test"]`: the shell's line.
+  if (argv.length === 3 && /(^|\/)(ba|z|da)?sh$/.test(argv[0] as string) && /^-l?c$/.test(argv[1] as string)) {
+    return (argv[2] as string).trim();
+  }
+  return argv.join(" ").trim();
+}
+
+/**
+ * What one approval Codex asks is, for the command policy: the shell command
+ * (`item/commandExecution/requestApproval`), or a write of each file a change
+ * touches and of the folder it wants (`item/fileChange/requestApproval`; the
+ * files come from the change's `item/started`). Empty: nothing to judge it by
+ * (declined). Null: not an approval.
+ */
+export function approvalCalls(
+  method: string,
+  params: Record<string, unknown>,
+  item: Record<string, unknown> | undefined,
+  cwd: string,
+): PolicyCall[] | null {
+  if (method === "item/commandExecution/requestApproval") {
+    const command = commandText(params.command ?? item?.command);
+    return command ? [{ tool_name: "Bash", input: { command } }] : [];
+  }
+  if (method === "item/fileChange/requestApproval") {
+    const changes: unknown[] = item && Array.isArray(item.changes) ? item.changes : [];
+    const files = changes.flatMap((c) => (isObj(c) && str(c.path) ? [path.resolve(cwd, str(c.path))] : []));
+    const root = str(params.grantRoot);
+    if (root) files.push(path.resolve(cwd, root));
+    return files.map((file) => ({ tool_name: "Write", input: { file_path: file } }));
+  }
+  return null;
+}
+
+/** `accept` only when the policy allows every call of the approval (`permissionPrompt`, as Claude Code's prompt). */
+export async function decideApproval(
+  calls: PolicyCall[],
+  ask: (tool: string, args: Record<string, unknown>) => Promise<IpcReply>,
+  opts: { scope: CommandScope; profile: CommandProfile; signal?: AbortSignal },
+): Promise<"accept" | "decline"> {
+  if (calls.length === 0) return "decline";
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => {
+      if (opts.signal?.aborted) return resolve();
+      const timer = setTimeout(resolve, ms);
+      opts.signal?.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+  // The turn ended while a person was asked: stop asking (the answer is a refusal).
+  const call = (tool: string, args: Record<string, unknown>): Promise<IpcReply> =>
+    opts.signal?.aborted ? Promise.resolve({ ok: false, error: "The turn ended." }) : ask(tool, args);
+  for (const c of calls) {
+    const answer = await permissionPrompt(c, call, { scope: opts.scope, profile: opts.profile, sleep });
+    if (answer.behavior !== "allow") return "decline";
+  }
+  return "accept";
+}
+
 // ── The processes ────────────────────────────────────────────────────────────
 
 /** A message for the turn in progress (`brain.steer`). */
@@ -501,6 +629,11 @@ export interface CodexAppServersOptions {
   /** Tests: the delta batching and how long `initialize` may take. */
   deltaMs?: number;
   startTimeoutMs?: number;
+  /**
+   * How an approval reaches the server (`permission_prompt` for the turn's run). Default: the daemon's MCP
+   * endpoint, as the process's own bridge (its id and local token). Tests: a fake server.
+   */
+  ask?: (process: { id: string; token: string }, tool: string, args: Record<string, unknown>) => Promise<IpcReply>;
   log?: (line: string) => void;
 }
 
@@ -596,6 +729,8 @@ export class CodexAppServers implements CodexAppRunner {
       mcp: opts.mcpCommand ?? null,
       socket: opts.socketPath ?? null,
       env: opts.env ?? {},
+      // A thread's sandbox is set when it opens: another profile is another process.
+      profile: input.profile ?? "work",
     });
   }
 
@@ -630,8 +765,9 @@ export class CodexAppServers implements CodexAppRunner {
       this.drop(live);
       return false;
     }
-    // Canceled, or a steered message it never read (Codex might still act on it unheard): the process goes.
-    if (out.canceled || out.unread?.length) this.drop(live);
+    // Canceled, a steered message it never read (Codex might still act on it unheard), or a background
+    // turn (nothing stays alive for it): the process goes.
+    if (out.canceled || out.unread?.length || input.keepAlive === false) this.drop(live);
     return true;
   }
 
@@ -770,8 +906,7 @@ export class CodexAppServers implements CodexAppRunner {
     const client = live.client;
     const common = {
       cwd: input.cwd,
-      sandbox: "workspace-write",
-      approvalPolicy: "never",
+      ...codexThreadPolicy(input.profile ?? "work"),
       ...(input.model ? { model: input.model } : {}),
     };
     const stored = opts.threads.get(live.threadKey);
@@ -841,6 +976,10 @@ export class CodexAppServers implements CodexAppRunner {
       const held: string[] = [];
       let buf = "";
       let timer: ReturnType<typeof setTimeout> | null = null;
+      /** Commands and changes Codex started (an approval names its item; a change's files are only here). */
+      const items = new Map<string, Record<string, unknown>>();
+      /** Approvals end with the turn: one still waiting for a person is refused then. */
+      const approvals = new AbortController();
 
       const flush = () => {
         if (timer) clearTimeout(timer);
@@ -865,6 +1004,8 @@ export class CodexAppServers implements CodexAppRunner {
         settled = true;
         for (const e of events) opts.emit(e);
         live.turn = null;
+        client.onRequest(null);
+        approvals.abort();
         offNote();
         offExit();
         opts.signal.removeEventListener("abort", onAbort);
@@ -983,6 +1124,10 @@ export class CodexAppServers implements CodexAppRunner {
           case "item/started":
           case "item/completed": {
             const item = isObj(params.item) ? params.item : {};
+            if ((item.type === "commandExecution" || item.type === "fileChange") && str(item.id)) {
+              if (method === "item/started") items.set(str(item.id), item);
+              else items.delete(str(item.id));
+            }
             if (item.type === "userMessage") {
               const ours = unread.get(str(item.clientId));
               if (ours) {
@@ -1013,6 +1158,27 @@ export class CodexAppServers implements CodexAppRunner {
         }
       });
       const offExit = client.onExit(() => finish([], { died: true }));
+      // Codex's approvals for this turn: the command policy decides, as for Claude Code's prompts.
+      const ask = this.approvalAsker(live, opts);
+      const scope: CommandScope = {
+        cwd: input.cwd,
+        folders: [...new Set([input.cwd, input.folder ?? input.cwd, ...(input.writableRoots ?? [])])],
+        ...(process.env.HOME ? { home: process.env.HOME } : {}),
+      };
+      client.onRequest((method, params) => {
+        if (settled) return null;
+        if (typeof params.threadId === "string" && params.threadId !== threadId) return null;
+        const calls = approvalCalls(method, params, items.get(str(params.itemId)), input.cwd);
+        if (calls === null) return null;
+        return decideApproval(calls, ask, {
+          scope,
+          profile: input.profile ?? "work",
+          signal: approvals.signal,
+        }).then((decision) => {
+          if (decision === "decline") this.log(`codex approval declined: ${redact(JSON.stringify(calls)).slice(0, 300)}`);
+          return { result: { decision } };
+        });
+      });
       function onAbort() {
         canceled = true;
         if (turnId) void interrupt(turnId);
@@ -1022,6 +1188,18 @@ export class CodexAppServers implements CodexAppRunner {
       opts.signal.addEventListener("abort", onAbort, { once: true });
       startTurn(input.runId, [input.prompt]);
     });
+  }
+
+  /** How this process's approvals reach the server: as its own bridge (its id and local token, relayed for the turn's run). */
+  private approvalAsker(live: AppLive, opts: CodexTurnOptions) {
+    const token = live.bridge?.token ?? "";
+    const custom = this.opts.ask;
+    if (custom) return (tool: string, args: Record<string, unknown>) => custom({ id: live.id, token }, tool, args);
+    const socketPath = opts.socketPath;
+    return (tool: string, args: Record<string, unknown>): Promise<IpcReply> =>
+      socketPath
+        ? ipcCall(socketPath, { taskId: live.id, token, tool, args })
+        : Promise.resolve({ ok: false, error: "This computer can't ask agentes.chat (no local endpoint)." });
   }
 
   private armIdle(live: AppLive) {

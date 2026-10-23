@@ -1,11 +1,13 @@
-import type { Adapters, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
+import type { Adapters, BrainTurnRequest, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   agentScopeFromDb,
+  type BrainTurn,
   CodexBrain,
   type ContextDeps,
+  computerTurnProfile,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -279,9 +281,18 @@ export function buildEngine(o: EngineOptions) {
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
-  /** A mission run's command policy (plan before Start and while a write item is live, work otherwise; ADR 0044). */
-  const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) =>
-    (await missionTurnPermissions(db, turn)) ?? undefined;
+  /**
+   * A computer turn's permission profile (ADR 0053 §3), the same for Claude Code and Codex: a mission run
+   * keeps its own (plan before Start and while a write item is live, work otherwise; ADR 0044); any other
+   * run follows who is behind it, read again every turn (`computerTurnProfile`: `plan` for a routine that
+   * only reads and for unattended runs, `work` for an `act` routine and a person's run). Its own branches
+   * are agentes/<handle>/… (what the git proxy accepts).
+   */
+  const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
+    (await missionTurnPermissions(db, turn)) ?? {
+      mode: await computerTurnProfile(db, turn),
+      branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
+    };
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
@@ -292,26 +303,25 @@ export function buildEngine(o: EngineOptions) {
         signal,
       },
     );
+  // A background run (a routine's) keeps no computer process alive after its turn.
   const brains: RunExecutorDeps["brains"] = {
-    claude_code: (_agent, _run, setup) =>
+    claude_code: (_agent, run, setup) =>
       createClaudeCodeBrain({
         hub: machineHub,
         pubsub: adapters.pubsub,
         agentScope,
         mcpToken: () => setup.mcpToken(),
-        // Outside missions: its own branches are agentes/<handle>/… (what the git proxy accepts).
-        permissions: async (turn) =>
-          (await missionPermissions(turn)) ?? {
-            mode: "work" as const,
-            branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
-          },
+        permissions: turnPermissions,
+        keepAlive: !run.background,
         prepare: prepareCode,
       }),
-    codex: (_agent, _run, setup) =>
+    codex: (_agent, run, setup) =>
       new CodexBrain({
         link: brainLink,
         mcp: async () => ({ token: setup.mcpToken() }),
         agent: agentScope,
+        permissions: turnPermissions,
+        keepAlive: !run.background,
         prepare: prepareCode,
       }),
   };

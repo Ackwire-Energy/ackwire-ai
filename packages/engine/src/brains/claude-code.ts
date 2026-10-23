@@ -10,8 +10,9 @@ import {
   STEER_PROTOCOL,
   type WireBrainEvent,
 } from "@agenteschat/adapters";
-import { type Database, schema } from "@agenteschat/db";
+import { type Database, type Executor, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { type RunAuthority, runAuthorityById } from "../authority";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
@@ -48,16 +49,44 @@ import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage,
  * `claude_failed`, `canceled`, `timeout`, `runner_error`, `bad_request` (not).
  */
 
+/**
+ * The permission profile of a computer turn (ADR 0053 §3), from who is behind
+ * its run: a person's run works (`work`: edits, commands by the command policy
+ * and a person); a routine works only with access `act`; a routine that only
+ * reads (`read`, the default, also a legacy brief-less one) and every
+ * unattended run read (`plan`: no edits, read-only shell, no web, our tools
+ * only). Missions keep their own profile (`missionTurnPermissions`).
+ */
+export function computerProfile(authority: RunAuthority): "plan" | "work" {
+  if (authority.kind === "person") return "work";
+  if (authority.kind === "routine") return authority.brief?.access === "act" ? "work" : "plan";
+  return "plan";
+}
+
+/**
+ * A turn's profile, read again for every turn: a person who writes into an
+ * unattended run while it works puts them behind it (`steeredBy`) from then on.
+ */
+export async function computerTurnProfile(
+  db: Executor,
+  turn: Pick<BrainTurn, "orgId" | "runId">,
+): Promise<"plan" | "work"> {
+  return computerProfile(await runAuthorityById(db, turn.orgId, turn.runId));
+}
+
 export interface ClaudeCodeBrainDeps {
   hub: Pick<MachineCaller, "call" | "status">;
   pubsub: PubSub;
   /** The agent as the runner names its folder (`agentScopeFromDb`). */
   agentScope: (turn: BrainTurn) => Promise<AgentScope>;
-  /** Keep one Claude Code process per thread alive between turns (default true). */
+  /** Keep one Claude Code process per thread alive between turns (default true; false for a background run). */
   keepAlive?: boolean;
   /** Also load the machine owner's own MCP servers (default false: only our bridge). */
   personalMcp?: (turn: BrainTurn) => boolean | Promise<boolean>;
-  /** Command policy for the turn (missions pass plan/work, branch prefix, allowed rules). */
+  /**
+   * The turn's permission profile (missions: their own plan/work, branch prefix and allowed rules; other
+   * runs: `computerTurnProfile`). Older runners know `plan` already: it goes to them as it is.
+   */
   permissions?: (
     turn: BrainTurn,
   ) => BrainTurnRequest["permissions"] | undefined | Promise<BrainTurnRequest["permissions"] | undefined>;

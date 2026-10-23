@@ -1,5 +1,6 @@
 import {
   type AgentScope,
+  BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   brainTopic,
@@ -33,6 +34,12 @@ import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } 
  * the engine `steer` (`BrainIO.steerable`, `brain.steer`); an app-server turn
  * takes the messages (`turn/steer`) and says which it read (`steer_read`); an
  * exec turn answers `unsupported` and they wait for its end, as before.
+ *
+ * Permissions (ADR 0053 §3): every turn carries its profile (`plan` reads in a
+ * read-only sandbox without network; `work` has each of Codex's approvals
+ * answered by the command policy) and a background turn `keepAlive: false`.
+ * A runner older than `BRAIN_PROFILES_PROTOCOL` would run Codex with no
+ * approvals and the network on: the turn fails with `runner_outdated` instead.
  */
 
 /** `brain.turn` as the server sends it to the runner (the shared wire type, `machine-protocol.ts`). */
@@ -78,6 +85,10 @@ export interface CodexBrainDeps {
   agent?(turn: BrainTurn): Promise<AgentScope | undefined>;
   /** Before a chat turn: the agent's checkouts updated, where it starts and the "# Your code" block (`prepareAgentCode`). */
   prepare?(turn: BrainTurn, signal: AbortSignal): Promise<{ cwd: string; prompt: string } | null>;
+  /** The turn's permission profile (missions: their own; other runs: `computerTurnProfile`). */
+  permissions?(turn: BrainTurn): Promise<BrainTurnRequest["permissions"] | undefined>;
+  /** False for a background run: the runner keeps no Codex process for it after the turn. */
+  keepAlive?: boolean;
 }
 
 /** `codex-cli 0.163.0` is new enough (`CODEX_MIN_VERSION`). */
@@ -186,6 +197,17 @@ export class CodexBrain implements Brain {
       yield { type: "error", code: account.code, message: account.message, retryable: true };
       return;
     }
+    const permissions = await this.deps.permissions?.(turn);
+    // An older runner ignores the profile (no approvals, network on): never more power than asked for.
+    if (permissions && status.protocol !== undefined && status.protocol < BRAIN_PROFILES_PROTOCOL) {
+      yield {
+        type: "error",
+        code: "runner_outdated",
+        message: "The runner on the computer is too old to keep Codex within this agent's permissions; update it.",
+        retryable: true,
+      };
+      return;
+    }
 
     const [mcp, agent, code] = await Promise.all([
       this.deps.mcp(turn),
@@ -203,6 +225,8 @@ export class CodexBrain implements Brain {
       mcp,
       ...(agent ? { agent } : {}),
       ...accountFields(status.protocol, turn),
+      ...(permissions ? { permissions } : {}),
+      ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
     };
 
     const events = channel<BrainEvent>();

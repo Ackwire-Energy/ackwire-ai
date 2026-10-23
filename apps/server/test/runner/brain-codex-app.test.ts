@@ -10,9 +10,16 @@ import {
   codexThreadsFile,
   handleCodexBrainTurn,
 } from "../../runner/brain-codex";
-import { CodexAppServers, codexAppServerArgs, codexAtLeast } from "../../runner/brain-codex-app";
+import {
+  approvalCalls,
+  CodexAppServers,
+  type CodexAppServersOptions,
+  codexAppServerArgs,
+  codexAtLeast,
+  codexThreadPolicy,
+} from "../../runner/brain-codex-app";
 import { handleRequest } from "../../runner/handlers";
-import { CODEX_MCP_SERVER, type McpTaskInfo } from "../../runner/mcp";
+import { CODEX_MCP_SERVER, type IpcReply, type McpTaskInfo } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -40,7 +47,13 @@ const run = (n: number) => `0193aaaa-0000-7000-8000-0000000000${String(n).padSta
 const U1 = "0193dddd-0000-7000-8000-000000000001";
 const U2 = "0193dddd-0000-7000-8000-000000000002";
 
-async function setup(opts: { accounts?: { accountDir(kind: string, id: string): string | null } } = {}) {
+async function setup(
+  opts: {
+    accounts?: { accountDir(kind: string, id: string): string | null };
+    /** A fake server for the approvals the runner can't decide by itself. */
+    ask?: CodexAppServersOptions["ask"];
+  } = {},
+) {
   const root = tempDir("brain-codex-app-");
   dirs.push(root);
   const ws = path.join(root, "ws");
@@ -54,7 +67,7 @@ async function setup(opts: { accounts?: { accountDir(kind: string, id: string): 
   const folder = await agentWorkspace(ws, AGENT);
   mkdirSync(path.join(folder, "app"), { recursive: true });
   const runs = new Map<string, McpTaskInfo>();
-  const app = new CodexAppServers({ runs, deltaMs: 5 });
+  const app = new CodexAppServers({ runs, deltaMs: 5, ...(opts.ask ? { ask: opts.ask } : {}) });
   servers.push(app);
   const ctx = {
     workspaceReal: ws,
@@ -103,7 +116,7 @@ function start(ctx: Parameters<typeof handleCodexBrainTurn>[0], req: Parameters<
 const deltas = (events: CodexBrainEvent[]) => events.map((e) => (e.type === "text_delta" ? e.text : "")).join("");
 const notDeltas = (events: CodexBrainEvent[]) => events.filter((e) => e.type !== "text_delta");
 
-test("version gate and the app-server command line: exec's overrides, our bridge per process", () => {
+test("version gate and the app-server command line: our overrides, our bridge per process, no network", () => {
   expect(codexAtLeast("codex-cli 0.163.0")).toBe(true);
   expect(codexAtLeast("codex-cli 0.200.1")).toBe(true);
   expect(codexAtLeast("codex-cli 0.162.9")).toBe(false);
@@ -113,7 +126,8 @@ test("version gate and the app-server command line: exec's overrides, our bridge
     mcp: { command: ["/usr/bin/bun", "/r/runner.js"] },
     writableRoots: ["/w/shared"],
   });
-  expect(args.slice(0, 3)).toEqual(["app-server", "-c", "sandbox_workspace_write.network_access=true"]);
+  expect(args[0]).toBe("app-server");
+  expect(args.join(" ")).not.toContain("network_access");
   expect(args).toContain('sandbox_workspace_write.writable_roots=["/w/shared"]');
   expect(args).toContain(`mcp_servers.${CODEX_MCP_SERVER}.args=["/r/runner.js","mcp","--run","proc-0001"]`);
   expect(args).toContain(`mcp_servers.${CODEX_MCP_SERVER}.default_tools_approval_mode="approve"`);
@@ -135,7 +149,7 @@ test.skipIf(!posix)(
     expect(threadStart).toMatchObject({
       cwd: path.join(t.folder, "app"),
       sandbox: "workspace-write",
-      approvalPolicy: "never",
+      approvalPolicy: "untrusted",
       developerInstructions: "You are Dev.",
     });
     expect(t.rpcs("turn/start")[0]).toMatchObject({
@@ -408,4 +422,110 @@ test("handler: brain.steer for a Codex run goes to its app-server (exec-only run
   expect(await handleRequest({ ...ctx, codex: { runnerHome: root, runs } }, req, scope)).toMatchObject({
     status: "unsupported",
   });
+});
+
+// ── Permission profiles (ADR 0053 §3) ────────────────────────────────────────
+
+const answerOf = (events: CodexBrainEvent[]) => {
+  const done = events.find((e) => e.type === "done");
+  return done?.type === "done" ? done.text : null;
+};
+
+test("profiles: plan is a read-only sandbox, work a workspace one; neither has the network, both ask", () => {
+  expect(codexThreadPolicy("plan")).toEqual({ sandbox: "read-only", approvalPolicy: "untrusted" });
+  expect(codexThreadPolicy("work")).toEqual({ sandbox: "workspace-write", approvalPolicy: "untrusted" });
+  // What one approval is for the command policy: the shell line, or a write of each file.
+  expect(
+    approvalCalls("item/commandExecution/requestApproval", { command: '/bin/zsh -lc "gh pr merge 1"' }, undefined, "/w"),
+  ).toEqual([{ tool_name: "Bash", input: { command: "gh pr merge 1" } }]);
+  expect(
+    approvalCalls("item/commandExecution/requestApproval", {}, { command: ["/bin/bash", "-lc", "git status"] }, "/w"),
+  ).toEqual([{ tool_name: "Bash", input: { command: "git status" } }]);
+  expect(
+    approvalCalls("item/fileChange/requestApproval", { grantRoot: "/etc" }, { changes: [{ path: "src/a.ts" }] }, "/w"),
+  ).toEqual([
+    { tool_name: "Write", input: { file_path: "/w/src/a.ts" } },
+    { tool_name: "Write", input: { file_path: "/etc" } },
+  ]);
+  // Nothing to judge it by: declined.
+  expect(approvalCalls("item/fileChange/requestApproval", {}, undefined, "/w")).toEqual([]);
+  expect(approvalCalls("turn/started", {}, undefined, "/w")).toBeNull();
+});
+
+test.skipIf(!posix)(
+  "a plan turn runs in a read-only sandbox without network; a background turn leaves no app-server",
+  async () => {
+    const t = await setup();
+    const first = start(t.ctx, request(1, "Say pong", { permissions: { mode: "plan" }, keepAlive: false }));
+    await first.done;
+    expect(answerOf(first.events)).toBe("pong");
+    expect(t.rpcs("thread/start")[0]).toMatchObject({ sandbox: "read-only", approvalPolicy: "untrusted" });
+    for (const s of t.starts()) expect(String(s.args)).not.toContain("network_access");
+    // Background: the process closed with the turn.
+    expect(t.app.process(AGENT.id, SESSION)).toBeUndefined();
+    expect(t.app.size).toBe(0);
+    // A work turn of the same session: another process, a workspace sandbox.
+    const second = start(t.ctx, request(2, "Say pong"));
+    await second.done;
+    expect(t.rpcs("thread/resume").at(-1)).toMatchObject({ sandbox: "workspace-write", approvalPolicy: "untrusted" });
+    expect(t.app.size).toBe(1);
+  },
+);
+
+test.skipIf(!posix)(
+  "a work turn's approvals get the command policy's answer: merges declined, reads accepted, the rest asks the server",
+  async () => {
+    const asked: Array<{ tool: string; args: Record<string, unknown> }> = [];
+    const replies: unknown[] = [{ behavior: "allow" }, { behavior: "deny", message: "A person said no." }];
+    const t = await setup({
+      ask: async (_process, tool, args): Promise<IpcReply> => {
+        asked.push({ tool, args });
+        return { ok: true, text: JSON.stringify(replies.shift() ?? { behavior: "deny", message: "no" }) };
+      },
+    });
+    const merge = start(t.ctx, request(1, "APPROVE gh pr merge 1"));
+    await merge.done;
+    expect(answerOf(merge.events)).toBe("decision: decline");
+    const status = start(t.ctx, request(2, "APPROVE git status"));
+    await status.done;
+    expect(answerOf(status.events)).toBe("decision: accept");
+    // Neither reached the server: the computer decides those by itself.
+    expect(asked).toEqual([]);
+    // An install: the server's rules decide (allowed here), then a person's no.
+    const install = start(t.ctx, request(3, "APPROVE npm install left-pad"));
+    await install.done;
+    expect(answerOf(install.events)).toBe("decision: accept");
+    expect(asked[0]).toMatchObject({
+      tool: "permission_prompt",
+      args: {
+        tool_name: "Bash",
+        input: { command: "npm install left-pad" },
+        scope: { cwd: path.join(t.folder, "app") },
+      },
+    });
+    const again = start(t.ctx, request(4, "APPROVE npm install other"));
+    await again.done;
+    expect(answerOf(again.events)).toBe("decision: decline");
+  },
+);
+
+test.skipIf(!posix)("a plan turn's approvals are refused on the computer, never asked of anyone", async () => {
+  const asked: unknown[] = [];
+  const t = await setup({
+    ask: async (_process, tool, args): Promise<IpcReply> => {
+      asked.push({ tool, args });
+      return { ok: true, text: JSON.stringify({ behavior: "allow" }) };
+    },
+  });
+  const plan = { permissions: { mode: "plan" as const } };
+  const install = start(t.ctx, request(1, "APPROVE npm install left-pad", plan));
+  await install.done;
+  expect(answerOf(install.events)).toBe("decision: decline");
+  const edit = start(t.ctx, request(2, `APPROVE_FILE ${path.join(t.folder, "app", "a.ts")}`, plan));
+  await edit.done;
+  expect(answerOf(edit.events)).toBe("decision: decline");
+  const read = start(t.ctx, request(3, "APPROVE git log --oneline -3", plan));
+  await read.done;
+  expect(answerOf(read.events)).toBe("decision: accept");
+  expect(asked).toEqual([]);
 });
