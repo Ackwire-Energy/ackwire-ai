@@ -50,6 +50,7 @@ import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useToast } from "@/lib/toast";
+import "./calendar.css";
 
 export { mondayOf } from "@agenteschat/client/lib/calendar";
 

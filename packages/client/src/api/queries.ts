@@ -255,14 +255,16 @@ export function useAddCredential(orgId: string) {
 
 export const useChannels = (orgId: string) => useQuery(channelsQuery(useApi(), orgId));
 
-export const useChannelMembers = (orgId: string, channelId: string, enabled = true) => {
-  const api = useApi();
-  return useQuery({
+export const channelMembersQuery = (api: ApiClient, orgId: string, channelId: string) =>
+  queryOptions({
     queryKey: keys.channelMembers(orgId, channelId),
     queryFn: () => api.chat.members(orgId, channelId),
-    enabled,
     staleTime: 30_000,
   });
+
+export const useChannelMembers = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ ...channelMembersQuery(api, orgId, channelId), enabled });
 };
 
 /** Messages per page: the latest page, then older pages on scroll-up. */
@@ -2092,14 +2094,16 @@ export function useThreadList(orgId: string, filters: ThreadFilters, enabled = t
 }
 
 /** A channel's threads (its "Threads (N)", closed lines and context marks). One page of 100. */
-export function useChannelThreads(orgId: string, channelId: string, tab: "all" | "archived", enabled = true) {
-  const api = useApi();
-  return useQuery({
+export const channelThreadsQuery = (api: ApiClient, orgId: string, channelId: string, tab: "all" | "archived") =>
+  queryOptions({
     queryKey: keys.channelThreads(orgId, channelId, tab),
     queryFn: () => api.threads.inChannel(orgId, channelId, { tab, limit: 100 }),
-    enabled,
     staleTime: 30_000,
   });
+
+export function useChannelThreads(orgId: string, channelId: string, tab: "all" | "archived", enabled = true) {
+  const api = useApi();
+  return useQuery({ ...channelThreadsQuery(api, orgId, channelId, tab), enabled });
 }
 
 export function useThreadInfo(orgId: string, threadId: string | null | undefined) {

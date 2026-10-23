@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { SETTINGS_SECTIONS } from "@/pages/SettingsPage";
+import { SETTINGS_SECTIONS } from "@/pages/settings-sections";
 
 /** ⌘K / Ctrl+K anywhere in the workspace (also when typing): opens the palette. */
 export const isPaletteShortcut = (e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">) =>

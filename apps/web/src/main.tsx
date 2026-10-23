@@ -7,7 +7,7 @@ import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
-import { createI18n, savedLocale } from "./i18n";
+import { loadI18n, savedLocale } from "./i18n";
 import {
   checkAppVersion,
   createVersionWatch,
@@ -21,7 +21,7 @@ import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
-const i18n = createI18n(savedLocale());
+const i18n = await loadI18n(savedLocale());
 document.documentElement.lang = i18n.language;
 // In agentes for Mac (D79): the site draws the window's title bar (desktop.css).
 if (inDesktopApp()) document.documentElement.dataset.desktop = "mac";

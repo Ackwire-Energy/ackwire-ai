@@ -58,6 +58,7 @@ import {
 import { inDesktopApp, thisMac } from "@/lib/desktop";
 import { importVault } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
+import "./onboarding.css";
 
 export const PRESETS = ["theo", "ada", "lia", "atlas"] as const;
 export type Preset = (typeof PRESETS)[number];

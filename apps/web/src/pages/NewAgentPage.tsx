@@ -85,6 +85,7 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
+import "./new-agent.css";
 
 /** The icon next to each group of roles on the first step. */
 const GROUP_ICON: Record<RoleGroupId, IconName> = { tech: "code", customers: "members", operations: "layers" };

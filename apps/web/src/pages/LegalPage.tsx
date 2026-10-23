@@ -3,7 +3,7 @@ import { Logo, Segmented } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type LocaleCode, locales } from "@/i18n";
+import { type LocaleCode, loadLocale, locales } from "@/i18n";
 import "./legal.css";
 
 /**
@@ -14,7 +14,14 @@ import "./legal.css";
 export function LegalPage({ kind }: { kind: LegalKind }) {
   const { i18n } = useTranslation();
   const [lang, setLang] = useState<LocaleCode>("en");
-  const t = i18n.getFixedT(lang);
+  // The app downloads only its own language; the page's labels wait for theirs.
+  const [loaded, setLoaded] = useState<LocaleCode | null>(null);
+  useEffect(() => {
+    loadLocale(lang, i18n)
+      .then(() => setLoaded(lang))
+      .catch(() => {});
+  }, [lang, i18n]);
+  const t = i18n.getFixedT(loaded === lang ? lang : i18n.language);
   const doc = legalDocument(kind, lang);
   const other = legalDocument(kind === "terms" ? "privacy" : "terms", lang);
   const updated = new Intl.DateTimeFormat(lang, { dateStyle: "long", timeZone: "UTC" }).format(
