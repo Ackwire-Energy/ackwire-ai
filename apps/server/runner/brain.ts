@@ -66,10 +66,14 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   answers join, so nothing runs unheard.
  * - Work moved to the background mid-turn (an urgent message) goes on after
  *   the turn's `result`, and when it ends Claude Code starts another turn by
- *   itself: the request stays open for it (bounded) and the answers join. A
- *   turn the CLI starts while no request listens (a background task of the
- *   agent's own that ended later) marks the process stray: the next request
- *   starts a fresh (resumed) one, so nothing leaks into another turn.
+ *   itself: the request stays open for it (bounded) and the answers join.
+ *   Past the bound the request ends and the process is left draining.
+ * - A turn the CLI runs by itself while no request listens (a background task
+ *   of the agent's own that ended later, or moved work past the bound): its
+ *   output goes nowhere. The next request waits for that turn's `result`
+ *   (`STRAY_TURN_WAIT_MS`) and then uses the same process, so the agent's
+ *   other background jobs (a dev server, a watcher) live on. Only a turn stuck
+ *   past that wait has its process killed (the next one resumes the session).
  */
 
 export const BRAIN_IDLE_MS = 10 * 60_000;
@@ -104,9 +108,15 @@ export const STEER_FOLLOW_UP_MS = 30_000;
 /**
  * A result came while work this turn moved to the background still runs: how
  * long the request waits for it to end (and for the turn the CLI then starts
- * by itself). Past it the request ends with what it has and the process goes.
+ * by itself). Past it the request ends with what it has and the process is
+ * left draining (the next request waits for that turn: `STRAY_TURN_WAIT_MS`).
  */
 export const STEER_BACKGROUND_WAIT_MS = 30 * 60_000;
+/**
+ * A request found the process in a turn of its own (or one due): how long it
+ * waits for that turn's `result` before killing the process and resuming fresh.
+ */
+export const STRAY_TURN_WAIT_MS = 60_000;
 
 /** The `capabilities` of a `system/init` line (none: an older CLI). */
 export const claudeCapabilities = (ev: Record<string, unknown>): string[] =>
@@ -519,10 +529,16 @@ export class ClaudeProcess {
   capabilities: string[] = [];
   /**
    * Claude Code started a turn by itself while no request listened (a background
-   * task that ended after its turn): until its `result`, a request here would
-   * read that turn's output as its own, so the manager starts a fresh process.
+   * task that ended after its turn): its output goes nowhere, and until its
+   * `result` a request here would read that turn's output as its own, so the
+   * manager waits for it (`waitOwnTurn`).
    */
   strayTurn = false;
+  /** Draining: work moved to the background outlived its request; the turn the CLI runs for it is still due. */
+  ownTurnDue = false;
+  /** Turns the CLI ran by itself and finished while no request listened (tests, logs). */
+  ownTurns = 0;
+  private ownTurnWaiters = new Set<() => void>();
   /** The turn in progress on this process (set by `runTurnOnProcess`): messages for it mid-turn. */
   turn: { steer(messages: SteerMessage[]): BrainSteerReply } | null = null;
   private lineHandler: ((line: string) => void) | null = null;
@@ -580,10 +596,41 @@ export class ClaudeProcess {
     if (!/"type":\s*"(result|assistant|stream_event)"|"subtype":\s*"(init|task_notification)"/.test(line)) return;
     try {
       const ev = JSON.parse(line) as Record<string, unknown>;
-      this.strayTurn = ev.type !== "result";
+      if (ev.type !== "result") {
+        this.strayTurn = true;
+        return;
+      }
+      // That turn is over (its output discarded): the process is clean again.
+      this.strayTurn = false;
+      this.ownTurnDue = false;
+      this.ownTurns++;
+      this.wakeOwnTurnWaiters();
     } catch {
       // not a JSON line
     }
+  }
+
+  /** In a turn of its own, or one is due: a request here must wait (`waitOwnTurn`). */
+  get onItsOwn() {
+    return !this.exited && (this.strayTurn || this.ownTurnDue);
+  }
+
+  /** Resolves true once no turn of its own runs or is due; false when `ms` pass first (or it exits). */
+  waitOwnTurn(ms: number): Promise<boolean> {
+    if (!this.onItsOwn) return Promise.resolve(!this.exited);
+    return new Promise<boolean>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.ownTurnWaiters.delete(done);
+        resolve(!this.onItsOwn && !this.exited);
+      };
+      const timer = setTimeout(done, ms);
+      this.ownTurnWaiters.add(done);
+    });
+  }
+
+  private wakeOwnTurnWaiters() {
+    for (const w of [...this.ownTurnWaiters]) w();
   }
 
   private markExit(code: number | null) {
@@ -592,6 +639,7 @@ export class ClaudeProcess {
     this.exitCode = code;
     // Lines still buffered in readline arrive first.
     setImmediate(() => {
+      this.wakeOwnTurnWaiters();
       for (const h of [...this.exitHandlers]) h();
     });
   }
@@ -652,8 +700,8 @@ interface TurnOutcome {
   died?: boolean;
   /** Steered messages (`uuid`s) the turn never said it read: the CLI would run them unheard, so the process goes. */
   unread?: string[];
-  /** Ended while work it moved to the background still ran (the CLI would answer it on its own later): the process goes. */
-  stale?: boolean;
+  /** Ended while work it moved to the background still ran: the CLI answers it on its own later (draining). */
+  draining?: boolean;
 }
 
 /**
@@ -836,9 +884,9 @@ export function runTurnOnProcess(
         between = true;
         proc.parser.beginTurn();
         if (work) {
-          // Bounded: past it the request ends with what it has, and the process (which would answer later) goes.
+          // Bounded: past it the request ends with what it has; the process drains (answers that work later, unheard).
           backgroundWait ??= setTimeout(
-            () => finish({ final: heldEnd(final), stale: true }),
+            () => finish({ final: heldEnd(final), draining: true }),
             opts.backgroundWaitMs ?? STEER_BACKGROUND_WAIT_MS,
           );
         } else followUp = setTimeout(() => finish({ final: heldEnd(final) }), followUpMs);
@@ -879,6 +927,8 @@ export interface BrainManagerOptions {
   steerFollowUpMs?: number;
   /** Tests: `STEER_BACKGROUND_WAIT_MS`. */
   steerBackgroundWaitMs?: number;
+  /** Tests: `STRAY_TURN_WAIT_MS`. */
+  strayWaitMs?: number;
   log?: (line: string) => void;
 }
 
@@ -1092,12 +1142,10 @@ export class BrainManager {
     if (ctx.signal?.aborted) return errorEvent("canceled", "The turn was canceled.", false);
     const sig = this.signature(cwd, req, ctx);
     let live = this.live.get(key);
-    if (live && (live.proc.exited || live.sig !== sig || live.proc.strayTurn)) {
-      // A turn Claude Code started by itself is still running there: its output would read as this turn's.
-      if (live.proc.strayTurn && !live.proc.exited) {
-        this.log(`[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} is in a turn of its own; restarting`);
-        live.proc.kill();
-      }
+    // A turn Claude Code runs by itself there (or one due): its output would read as this turn's. Wait for
+    // its end (output discarded) and keep the process, with the agent's background jobs; kill only a stuck one.
+    if (live && live.sig === sig && live.proc.onItsOwn) live = await this.awaitOwnTurn(live, session, ctx);
+    if (live && (live.proc.exited || live.sig !== sig)) {
       this.drop(live);
       live = undefined;
     }
@@ -1117,6 +1165,27 @@ export class BrainManager {
       return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx, true), true);
     }
     return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx), true);
+  }
+
+  /** Waits for the process's own turn to end (`STRAY_TURN_WAIT_MS`); past it the process is killed (undefined). */
+  private async awaitOwnTurn(live: Live, session: string, ctx: BrainTurnContext): Promise<Live | undefined> {
+    const what = live.proc.strayTurn ? "in a turn of its own" : "due a turn for work moved to the background";
+    this.log(`[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} is ${what}; waiting for it`);
+    // Busy meanwhile: neither evicted nor closed as idle.
+    live.busy = true;
+    if (live.idleTimer) clearTimeout(live.idleTimer);
+    live.idleTimer = null;
+    const clean = await live.proc.waitOwnTurn(this.opts.strayWaitMs ?? STRAY_TURN_WAIT_MS);
+    live.busy = false;
+    if (clean) return live;
+    if (!live.proc.exited) {
+      this.log(
+        `[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} still ${what} after ${Math.round((this.opts.strayWaitMs ?? STRAY_TURN_WAIT_MS) / 1000)} s; killing it (the session resumes in a new one)`,
+      );
+      live.proc.kill();
+    }
+    this.drop(live);
+    return undefined;
   }
 
   private resumeFor(cwd: string, session: string, req: BrainTurnRequest, ctx: BrainTurnContext, ranBefore = false) {
@@ -1155,16 +1224,21 @@ export class BrainManager {
         ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
       if (out.final?.type === "done") this.ran.add(live.ranKey);
-      // A steered message it never read, or work moved aside that still runs, would start a turn nobody
-      // listens to: the process goes (the engine sends that message again with its next turn, on a
-      // resumed process).
-      if ((out.unread?.length || out.stale) && !out.died) {
+      const short = live.key.split(":")[1]?.slice(0, 8) ?? "";
+      // A steered message it never read would start a turn nobody listens to: the process goes (the
+      // engine sends that message again with its next turn, on a resumed process; never read twice).
+      if (out.unread?.length && !out.died) {
         this.log(
-          `brain process ${live.key.split(":")[1]?.slice(0, 8) ?? ""} (Claude Code ${live.proc.cliVersion ?? "?"}) ended a turn with ${out.stale ? "background work still running" : "unread messages"}; closing`,
+          `brain process ${short} (Claude Code ${live.proc.cliVersion ?? "?"}) ended a turn with unread messages; closing`,
         );
         live.proc.kill();
         this.drop(live);
       } else if (out.died || (out.final?.type === "error" && out.final.code === "canceled")) this.drop(live);
+      else if (out.draining) {
+        // Work moved aside still runs: the CLI answers it on its own later (unheard); the next request waits for that.
+        this.log(`brain process ${short} ended a turn with background work still running; draining`);
+        live.proc.ownTurnDue = true;
+      }
       return out;
     } finally {
       if (this.running.get(req.runId) === live) this.running.delete(req.runId);

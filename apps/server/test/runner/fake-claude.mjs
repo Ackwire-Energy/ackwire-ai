@@ -227,13 +227,15 @@ async function answer(line) {
   });
   for (const uuid of read) lifecycleOf(uuid, "completed");
   if (moved && prompt.includes("STEERBGHANG")) await sleep(60_000);
-  else if (moved) await turnOfItsOwn("bg1", "background finished");
-  if (prompt.includes("BGSELF")) await turnOfItsOwn("self1", "stray", 1500);
+  // "STEERBGSLOW": the moved task ends 800 ms after the result.
+  else if (moved) await turnOfItsOwn("bg1", "background finished", 0, prompt.includes("STEERBGSLOW") ? 800 : 100);
+  // Its own turn takes 300 ms ("BGSELFSTUCK": never ends).
+  if (prompt.includes("BGSELF")) await turnOfItsOwn("self1", "stray", prompt.includes("BGSELFSTUCK") ? 60_000 : 300);
 }
 
-/** A background task ends: its notice starts a turn nobody sent (it answers `text`, `ms` later). */
-async function turnOfItsOwn(taskId, text, ms = 0) {
-  await sleep(100);
+/** A background task ends `after` ms on: its notice starts a turn nobody sent (it answers `text`, `ms` later). */
+async function turnOfItsOwn(taskId, text, ms = 0, after = 100) {
+  await sleep(after);
   out({ type: "system", subtype: "task_updated", task_id: taskId, patch: { status: "completed" } });
   out({ type: "system", subtype: "task_notification", task_id: taskId, status: "completed" });
   init();

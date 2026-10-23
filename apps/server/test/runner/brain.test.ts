@@ -890,37 +890,105 @@ test.if(posix)(
   },
 );
 
-test.if(posix)("moved work that outlives the wait: the request ends with what it has, the process goes", async () => {
+/** Nothing of a turn the CLI ran by itself reached this request. */
+const noLeak = (r: { final: WireBrainEvent; events: WireBrainEvent[] }) => {
+  const text = r.events.map((e) => (e.type === "text_delta" ? e.text : "")).join("");
+  expect(text).not.toContain("stray");
+  expect(text).not.toContain("background finished");
+  expect(r.final.type === "done" ? r.final.text : "").not.toMatch(/stray|background finished/);
+  expect(r.events.filter((e) => e.type === "done")).toHaveLength(1);
+};
+
+test.if(posix)(
+  "moved work that outlives the wait: the request ends, the process drains; the next request waits for that turn and reuses it",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup({ steerBackgroundWaitMs: 200 });
+      const pending = turn(1, "STEERBGSLOW work");
+      expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "x", urgent: true }])).status).toBe("accepted");
+      const first = await pending;
+      expect(first.final).toMatchObject({ type: "done", text: "echo 1: STEERBGSLOW work +now/human: x" });
+      // Not killed: the agent's background work goes on.
+      const proc = m.process(AGENT.id, SESSION(1));
+      expect(proc?.ownTurnDue).toBe(true);
+      expect(proc?.exited).toBe(false);
+      const next = await turn(2, "after");
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      noLeak(next);
+      expect(proc?.ownTurns).toBe(1);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)("moved work stuck past both waits: the next request kills the process and resumes", async () => {
   await withCli(NOW_CLI, async () => {
-    const { m, spawns, turn } = setup({ steerBackgroundWaitMs: 300 });
+    const { m, spawns, turn } = setup({ steerBackgroundWaitMs: 200, strayWaitMs: 300 });
     const pending = turn(1, "STEERBGHANG work");
     expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "x", urgent: true }])).status).toBe("accepted");
-    const { final } = await pending;
-    expect(final).toMatchObject({ type: "done", text: "echo 1: STEERBGHANG work +now/human: x" });
-    expect(m.size).toBe(0);
-    expect((await turn(2, "again")).final).toMatchObject({ type: "done", text: "echo 1: again" });
+    expect((await pending).final).toMatchObject({ type: "done", text: "echo 1: STEERBGHANG work +now/human: x" });
+    expect(m.size).toBe(1);
+    const stuck = m.process(AGENT.id, SESSION(1));
+    const next = await turn(2, "again");
+    expect(next.final).toMatchObject({ type: "done", text: "echo 1: again" });
+    noLeak(next);
+    await waitFor(() => stuck?.exited === true);
     expect(spawns()).toHaveLength(2);
     expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
   });
 });
 
 test.if(posix)(
-  "a turn the CLI starts by itself (the agent's own background task ended): the next request gets a fresh process",
+  "a turn the CLI ran by itself and finished (the agent's own background task ended): the process is reused, not killed",
   async () => {
     await withCli(NOW_CLI, async () => {
       const { m, spawns, turn } = setup();
       // The agent's own background task doesn't hold the answer.
       expect((await turn(1, "BGSELF serve")).final).toMatchObject({ type: "done", text: "echo 1: BGSELF serve" });
-      const first = m.process(AGENT.id, SESSION(1));
-      await waitFor(() => first?.strayTurn === true);
+      const proc = m.process(AGENT.id, SESSION(1));
+      await waitFor(() => proc?.ownTurns === 1);
+      expect(proc?.strayTurn).toBe(false);
       const next = await turn(2, "after");
-      expect(next.final).toMatchObject({ type: "done", text: "echo 1: after" });
-      expect(next.events.some((e) => e.type === "text_delta" && e.text.includes("stray"))).toBe(false);
-      expect(spawns()).toHaveLength(2);
-      expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      noLeak(next);
+      expect(proc?.exited).toBe(false);
+      expect(spawns()).toHaveLength(1);
     });
   },
 );
+
+test.if(posix)(
+  "a turn of its own still running when a request comes: waited for, then the process is reused",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup();
+      expect((await turn(1, "BGSELF serve")).final).toMatchObject({ type: "done", text: "echo 1: BGSELF serve" });
+      const proc = m.process(AGENT.id, SESSION(1));
+      await waitFor(() => proc?.strayTurn === true);
+      const next = await turn(2, "after");
+      expect(proc?.ownTurns).toBe(1);
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      noLeak(next);
+      expect(proc?.exited).toBe(false);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)("a turn of its own stuck past the wait: the process is killed and the session resumes", async () => {
+  await withCli(NOW_CLI, async () => {
+    const { m, spawns, turn } = setup({ strayWaitMs: 300 });
+    expect((await turn(1, "BGSELFSTUCK serve")).final).toMatchObject({ type: "done" });
+    const proc = m.process(AGENT.id, SESSION(1));
+    await waitFor(() => proc?.strayTurn === true);
+    const next = await turn(2, "after");
+    expect(next.final).toMatchObject({ type: "done", text: "echo 1: after" });
+    noLeak(next);
+    await waitFor(() => proc?.exited === true);
+    expect(spawns()).toHaveLength(2);
+    expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+  });
+});
 
 test.if(posix)("a message the CLI never confirms: the turn ends, the process goes (nothing runs unheard)", async () => {
   await withCli(NOW_CLI, async () => {
