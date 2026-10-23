@@ -377,3 +377,56 @@ describe("Quem pensa: the draft", () => {
     expect(sameBrain(cc, { ...cc, termsAccepted: true })).toBe(true);
   });
 });
+
+describe("Quem pensa: Automático (D83)", () => {
+  /** Ada thinks with Claude Code on the MacBook (as given). */
+  async function onClaude(patch: Partial<AgentBrain> = {}) {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", ...patch });
+    await open(state, api);
+    return state;
+  }
+
+  test("Claude Code: Automático comes first for the model and the effort, with what it does; Usar saves both", async () => {
+    const state = await onClaude();
+    const d = await brainDialog();
+    const models = within(within(d).getByRole("radiogroup", { name: "Modelo" })).getAllByRole("radio");
+    expect(models.map((r) => r.textContent)).toEqual(["Automático", "Opus", "Sonnet", "Haiku"]);
+    await model(d, /^Automático$/);
+    expect(d.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
+    // The effort ramp starts with Automático too (Médio is two steps to the right).
+    const effort = within(d).getByRole("slider", { name: "Esforço" });
+    expect(effort.getAttribute("aria-valuemax")).toBe("5");
+    expect(effort.getAttribute("aria-valuetext")).toBe("Médio");
+    await act(async () => fireEvent.keyDown(effort, { key: "ArrowLeft" }));
+    await act(async () => fireEvent.keyDown(effort, { key: "ArrowLeft" }));
+    expect(effort.getAttribute("aria-valuetext")).toBe("Automático");
+    expect(d.textContent).toContain("Escolhe o esforço para cada tarefa.");
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: "auto", fallback: true, effort: "auto" });
+  });
+
+  test("a saved Automático reads as such in the cell", async () => {
+    await onClaude({ model: "auto", effectiveModel: "auto", effort: "auto" });
+    expect(sentence().textContent).toContain("Claude Code · Automático · esforço automático");
+  });
+
+  test("the organization's model: Automático is the first choice, and Usar saves the agent's model as auto", async () => {
+    const { state } = await open();
+    const d = await brainDialog();
+    const trigger = within(d).getByRole("combobox", { name: "Modelo" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const first = screen().getAllByRole("option")[0] as HTMLElement;
+    expect(first.textContent).toBe("AutomáticoEscolhe o modelo e o esforço para cada tarefa");
+    await click(first);
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2])).toEqual([{ model: "auto" }]);
+    expect(document.body.textContent).toContain("A Ada agora pensa com Automático.");
+  });
+});

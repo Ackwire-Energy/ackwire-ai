@@ -2968,8 +2968,8 @@ export interface AgentBrain {
   canEdit: boolean;
   /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
   account: string | null;
-  /** How much it thinks before answering; null = the brain's default. */
-  effort: BrainEffort | null;
+  /** How much it thinks before answering; `auto` = picked per task (D83); null = the brain's default. */
+  effort: BrainEffortSetting | null;
   /** The accounts added on the agent's computer (both kinds); "Conta deste computador" isn't listed. */
   accounts: MachineAccount[];
   /** Whose subscriptions those are (the computer's owner); null without a computer. */
@@ -2982,6 +2982,8 @@ export interface AgentBrain {
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
 export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
+/** D83: a level, or "Automático" (each run picks low, medium or high with the model). */
+export type BrainEffortSetting = BrainEffort | "auto";
 
 export type MachineAccountKind = "claude_code" | "codex";
 
@@ -3006,7 +3008,7 @@ export interface AgentBrainInput {
   acceptPlanTerms?: boolean;
   /** Only the computer's owner; null = "Conta deste computador". */
   account?: string | null;
-  effort?: BrainEffort | null;
+  effort?: BrainEffortSetting | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */

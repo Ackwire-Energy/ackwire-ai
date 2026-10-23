@@ -1372,8 +1372,9 @@ export const en: Translations = {
         fallbackOnNow: "Uses the organization's model; counts in {{name}}'s budget.",
         fallbackOffNow: "{{name}} tells whoever asked and waits for it to come back.",
         effort: "Effort",
-        efforts: { low: "Low", medium: "Medium", high: "High", max: "Maximum" },
+        efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortText: {
+          auto: "Picks the effort for each task.",
           low: "Answers fast. Good for simple questions.",
           medium: "The default. Thinks enough most of the time.",
           high: "Thinks more on hard tasks. Slower and costs more.",
@@ -4926,6 +4927,10 @@ export const en: Translations = {
   },
   brain: {
     title: "Who thinks",
+    auto: {
+      label: "Automatic",
+      hint: "Picks the model and the effort for each task",
+    },
     sub: "Who writes {{name}}'s answers. It applies to every conversation.",
     line: {
       claude_code: "Claude Code · {{model}} on {{computer}}",

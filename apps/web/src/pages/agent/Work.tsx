@@ -1,7 +1,7 @@
 import type {
   AccountLoginStart,
   AgentBrain,
-  BrainEffort,
+  BrainEffortSetting,
   BrainKind,
   BrainOption,
   Machine,
@@ -29,7 +29,7 @@ import {
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { computerKind, computerState } from "@agenteschat/client/lib/machines";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
-import { modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import {
   BrainLogo,
@@ -153,11 +153,16 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const work = useWork();
   const view = work.brain.data;
   const kind: BrainKind = view?.brain ?? agent.brain?.kind ?? "model";
-  const orgModel = models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model;
-  const planModel = view
-    ? (view.options.find((o) => o.kind === kind)?.models.find((m) => m.value === view.effectiveModel)?.label ??
-      view.effectiveModel)
-    : (agent.brain?.model ?? null);
+  const orgModel = isAuto(saved.model)
+    ? t("brain.auto.label")
+    : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);
+  const shownPlanModel = view ? view.effectiveModel : (agent.brain?.model ?? null);
+  const planModel = isAuto(shownPlanModel)
+    ? t("brain.auto.label")
+    : view
+      ? (view.options.find((o) => o.kind === kind)?.models.find((m) => m.value === view.effectiveModel)?.label ??
+        view.effectiveModel)
+      : shownPlanModel;
   // The account only when the computer has more than one of that kind (telas/ContaClaude.html).
   const kindAccounts = view?.accountsSupported ? view.accounts.filter((a) => a.kind === kind) : [];
   const accountWord =
@@ -415,10 +420,11 @@ function Footer({
 /** Select values that aren't an account id: the computer's own sign-in, and "Adicionar conta". */
 const HERE = "__computer";
 const ADD = "__add";
-const EFFORTS = ["low", "medium", "high", "max"] as const;
+/** "Automático" first (D83): each task gets its effort; then the levels. */
+const EFFORTS = [AUTO, "low", "medium", "high", "max"] as const;
 type ShownEffort = (typeof EFFORTS)[number];
-/** The page offers four steps: a stored `xhigh` shows as Alto, no effort as Médio (the default). */
-const shownEffort = (e: BrainEffort | null): ShownEffort => (e === "xhigh" ? "high" : (e ?? "medium"));
+/** The page offers Automático and four levels: a stored `xhigh` shows as Alto, no effort as Médio (the default). */
+const shownEffort = (e: BrainEffortSetting | null): ShownEffort => (e === "xhigh" ? "high" : (e ?? "medium"));
 /** The plan as the CLI says it (`team`, `max`), as a name ("Team"). */
 const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
 
@@ -522,10 +528,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       : planModel === view.effectiveModel);
   const all = models.data?.models ?? [];
   const choices = modelChoices(all, credentials.data ?? [], platform.data ?? false);
+  const modelName = (value: string | null) =>
+    isAuto(value)
+      ? t("brain.auto.label")
+      : (option?.models.find((m) => m.value === value)?.label ?? value ?? "");
   const brainName = (k: BrainKind) =>
     k === "model"
-      ? (all.find((m) => m.id === model)?.label ?? model)
-      : `${t(`brain.card.${k}`)} · ${option?.models.find((m) => m.value === planModel)?.label ?? planModel ?? ""}`;
+      ? isAuto(model)
+        ? t("brain.auto.label")
+        : (all.find((m) => m.id === model)?.label ?? model)
+      : `${t(`brain.card.${k}`)} · ${modelName(planModel)}`;
   const use = async () => {
     setBusy(true);
     try {
@@ -676,8 +688,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           label={t("agentPage.work.brain.planModel")}
           value={planModel ?? option?.defaultModel ?? ""}
           onValueChange={setPlanModel}
-          options={(option?.models ?? []).map((m) => ({ value: m.value, label: m.label }))}
+          options={[
+            { value: AUTO, label: t("brain.auto.label") },
+            ...(option?.models ?? []).map((m) => ({ value: m.value, label: m.label })),
+          ]}
         />
+        {isAuto(planModel) && (
+          <SettingNote icon="bulb" live>
+            {t("brain.auto.hint")}
+          </SettingNote>
+        )}
       </BrainField>
       <EffortPixels
         label={t("agentPage.work.brain.effort")}
@@ -708,18 +728,31 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           value={model}
           onValueChange={setModel}
           renderValue={pickerValue}
-          options={choices.flatMap(([provider, list]) =>
-            list.map(({ model: m, available }) => ({
-              value: m.id,
-              label: m.label,
-              group: providerLabel(provider),
-              disabled: !available,
-              leading: providerMark(provider),
-              description: available
-                ? modelDescription(t, i18n.language, m)
-                : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
-            })),
-          )}
+          options={[
+            // "Automático" first (D83): each task gets its model and effort, from the line of the agent's key.
+            {
+              value: AUTO,
+              label: t("brain.auto.label"),
+              description: t("brain.auto.hint"),
+              leading: (
+                <span className="newag__ib">
+                  <Icon name="bulb" size={16} />
+                </span>
+              ),
+            },
+            ...choices.flatMap(([provider, list]) =>
+              list.map(({ model: m, available }) => ({
+                value: m.id,
+                label: m.label,
+                group: providerLabel(provider),
+                disabled: !available,
+                leading: providerMark(provider),
+                description: available
+                  ? modelDescription(t, i18n.language, m)
+                  : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
+              })),
+            ),
+          ]}
         />
       </BrainField>
       <BrainField label={t("agentPage.work.brain.keyLabel")}>

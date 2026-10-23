@@ -45,7 +45,7 @@ import {
   AgentAppearance,
   AgentAudience,
   AgentBrain,
-  BrainEffort,
+  BrainEffortSetting,
   BrainKind,
   Credential,
   Model,
@@ -82,7 +82,10 @@ const AgentFields = z.object({
   name: z.string().trim().min(1).max(80),
   role: z.string().max(200).optional(),
   instructions: z.string().max(50_000).optional(),
-  model: z.string().optional().openapi({ description: "Defaults to AGENT_DEFAULT_MODEL." }),
+  model: z.string().optional().openapi({
+    description:
+      "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to AGENT_DEFAULT_MODEL.",
+  }),
   credentialId: z
     .uuid()
     .nullable()
@@ -442,7 +445,7 @@ export function agentRoutes(deps: AppDeps) {
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
-                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name. Null = the brain's default; omitted = keep (reset when the brain changes).",
+                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier, D83). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
             acceptPlanTerms: z.boolean().optional(),
@@ -450,9 +453,9 @@ export function agentRoutes(deps: AppDeps) {
               description:
                 "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the person who connected the computer may change it (`account.not_owner`).",
             }),
-            effort: BrainEffort.nullable()
+            effort: BrainEffortSetting.nullable()
               .optional()
-              .openapi({ description: "Null = the CLI's default; omitted = keep." }),
+              .openapi({ description: "`auto` = picked per run (D83); null = the CLI's default; omitted = keep." }),
           }),
         ),
       },
