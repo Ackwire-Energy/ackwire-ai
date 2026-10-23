@@ -33,6 +33,7 @@ import {
   createMissionRunToolSource,
   createMissionToolSource,
   createModelGateway,
+  createPassToolSource,
   createPermissionToolSource,
   createReactToolSource,
   createSandboxToolSource,
@@ -222,6 +223,8 @@ export function buildEngine(o: EngineOptions) {
       createReactToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
       createHandOffToolSource({ pubsub: adapters.pubsub }),
+      // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
+      createPassToolSource(),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),

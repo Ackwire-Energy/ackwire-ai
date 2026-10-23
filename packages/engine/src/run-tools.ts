@@ -94,6 +94,8 @@ export interface ToolSideEffects {
   reacted?: boolean;
   /** A mission `report` card was posted: it is the answer, an empty final reply posts nothing. */
   reported?: boolean;
+  /** Nobody called it by name and it called `pass` (reply-policy.ts): the run ends without a message. */
+  passed?: { reason: string };
   /** The GitHub repository the run last worked in (`owner/name`), for "Trabalhando em" and Atividade. */
   repo?: string;
   /** A GitHub repository the run was refused (not in the agent's list): Atividade offers to add it. */
@@ -165,6 +167,8 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
   if (link?.missionId && link.threadId) t.missionLink = link;
   if (data.reacted) t.reacted = true;
   if (data.reported) t.reported = true;
+  const passed = data.passed as { reason?: unknown } | undefined;
+  if (passed) t.passed = { reason: typeof passed.reason === "string" ? passed.reason : "" };
   if (typeof data.repo === "string") t.repo = data.repo;
   if (typeof data.deniedRepo === "string") t.deniedRepo = data.deniedRepo;
   const update = data.memoryUpdate as MemoryUpdate | undefined;
@@ -180,6 +184,7 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.missionLink) t.missionLink = e.missionLink;
   if (e.reacted) t.reacted = true;
   if (e.reported) t.reported = true;
+  if (e.passed) t.passed = e.passed;
   if (e.repo) t.repo = e.repo;
   if (e.deniedRepo) t.deniedRepo = e.deniedRepo;
   if (e.browser?.length) t.browser = withTrail(t.browser, e.browser);
@@ -192,6 +197,7 @@ const hasEffects = (e: ToolSideEffects) =>
       e.missionLink ||
       e.reacted ||
       e.reported ||
+      e.passed ||
       e.repo ||
       e.deniedRepo ||
       e.browser?.length,

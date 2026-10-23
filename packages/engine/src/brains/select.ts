@@ -241,8 +241,9 @@ async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, session
 /**
  * The computer brain's session for a run (stored on the run, so a pause
  * resumes the same one): the conversation's previous session while it is
- * recent and small, else a fresh one. A routine run always starts fresh
- * (each firing is its own task; resuming made one routine re-read 700k tokens).
+ * recent and small, else a fresh one. A routine or background run always starts fresh
+ * (each firing is its own task; resuming made one routine re-read 700k tokens), and its
+ * session is never carried to a conversation run.
  */
 async function sessionFor(
   db: Executor,
@@ -257,8 +258,8 @@ async function sessionFor(
     return { id: run.brainSessionId, resume: await sessionUsed(db, run, kind, run.brainSessionId) };
   }
   let id: string | null = null;
-  if (!options.fresh) {
-    const { agentRuns, usageRecords } = schema;
+  if (!options.fresh && !run.background) {
+    const { agentRuns, usageRecords, messages } = schema;
     const [last] = await db
       .select({
         id: agentRuns.id,
@@ -280,6 +281,13 @@ async function sessionFor(
           ...(conversation === run.channelId ? [] : [eq(agentRuns.threadRootId, conversation)]),
           isNotNull(agentRuns.brainSessionId),
           ne(agentRuns.id, run.id),
+          // Never a session background work thought in (a routine's: it was told to answer NO_REPLY, and a
+          // conversation that picked it up answered that). Any run that shared it counts, older rows too.
+          sql`not exists (select 1 from ${agentRuns} r2
+            where r2.org_id = "agent_runs"."org_id" and r2.agent_id = "agent_runs"."agent_id"
+              and r2.brain_session_id = "agent_runs"."brain_session_id"
+              and (r2.background or exists (select 1 from ${messages} m
+                where m.org_id = r2.org_id and m.id = r2.trigger_message_id and m.meta->'routine' is not null)))`,
         ),
       )
       .orderBy(desc(agentRuns.createdAt))
