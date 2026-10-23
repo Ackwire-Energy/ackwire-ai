@@ -390,24 +390,33 @@ describe("Quem pensa: Automático (D83)", () => {
     return state;
   }
 
-  test("Claude Code: Automático comes first for the model and the effort, with what it does; Usar saves both", async () => {
+  test("Claude Code: Automático comes first for the model and picks the effort too; Usar saves both", async () => {
     const state = await onClaude();
     const d = await brainDialog();
     const models = within(within(d).getByRole("radiogroup", { name: "Modelo" })).getAllByRole("radio");
     expect(models.map((r) => r.textContent)).toEqual(["Automático", "Opus", "Sonnet", "Haiku"]);
+    // A fixed model: the effort's four levels, none of them Automático.
+    const ramp = within(d).getByRole("slider", { name: "Esforço" });
+    expect(ramp.getAttribute("aria-valuemax")).toBe("4");
+    expect(ramp.getAttribute("aria-valuetext")).toBe("Médio");
     await model(d, /^Automático$/);
     expect(d.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
-    // The effort ramp starts with Automático too (Médio is two steps to the right).
-    const effort = within(d).getByRole("slider", { name: "Esforço" });
-    expect(effort.getAttribute("aria-valuemax")).toBe("5");
-    expect(effort.getAttribute("aria-valuetext")).toBe("Médio");
-    await act(async () => fireEvent.keyDown(effort, { key: "ArrowLeft" }));
-    await act(async () => fireEvent.keyDown(effort, { key: "ArrowLeft" }));
-    expect(effort.getAttribute("aria-valuetext")).toBe("Automático");
-    expect(d.textContent).toContain("Escolhe o esforço para cada tarefa.");
+    // The model picks the effort too: no ramp to set.
+    expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: "auto", fallback: true, effort: "auto" });
+  });
+
+  test("back to a fixed model: the ramp returns at Médio and the effort is saved", async () => {
+    const state = await onClaude({ model: "auto", effectiveModel: "auto", effort: "auto" });
+    const d = await brainDialog();
+    expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    await model(d, /^Opus$/);
+    expect(within(d).getByRole("slider", { name: "Esforço" }).getAttribute("aria-valuetext")).toBe("Médio");
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", model: "opus", effort: "medium" });
   });
 
   test("a saved Automático reads as such in the cell", async () => {

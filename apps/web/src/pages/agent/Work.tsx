@@ -174,7 +174,9 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const effort =
     kind !== "model" && view
       ? t("agentPage.work.cell.effort", {
-          level: t(`agentPage.work.brain.efforts.${shownEffort(view.effort)}`).toLowerCase(),
+          level: t(
+            `agentPage.work.brain.efforts.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`,
+          ).toLowerCase(),
         })
       : null;
   const target = work.target;
@@ -420,11 +422,15 @@ function Footer({
 /** Select values that aren't an account id: the computer's own sign-in, and "Adicionar conta". */
 const HERE = "__computer";
 const ADD = "__add";
-/** "Automático" first (D83): each task gets its effort; then the levels. */
-const EFFORTS = [AUTO, "low", "medium", "high", "max"] as const;
+/**
+ * The effort's four levels. Automático (D83) is the model's choice, not a level: an automatic model picks the
+ * effort too, and the ramp goes away.
+ */
+const EFFORTS = ["low", "medium", "high", "max"] as const;
 type ShownEffort = (typeof EFFORTS)[number];
-/** The page offers Automático and four levels: a stored `xhigh` shows as Alto, no effort as Médio (the default). */
-const shownEffort = (e: BrainEffortSetting | null): ShownEffort => (e === "xhigh" ? "high" : (e ?? "medium"));
+/** A stored `xhigh` shows as Alto, no effort (or an automatic one) as Médio (the default). */
+const shownEffort = (e: BrainEffortSetting | null): ShownEffort =>
+  e === "xhigh" ? "high" : e === null || isAuto(e) ? "medium" : e;
 /** The plan as the CLI says it (`team`, `max`), as a name ("Team"). */
 const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
 
@@ -514,7 +520,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const current = accounts.find((a) => a.id === account) ?? null;
   const signedOut = current?.status === "signed_out";
   const accountChanged = accountsOn && account !== view.account;
-  const effortChanged = kind !== "model" && effort !== shownEffort(view.effort);
+  // An automatic model picks the effort too; a fixed one takes the ramp's level.
+  const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
+  const savedEffort: BrainEffortSetting = isAuto(view.effort) ? AUTO : shownEffort(view.effort);
+  const effortChanged = kind !== "model" && effortToSave !== savedEffort;
   // A plan brain not saved yet: the person confirms the warning with the button itself.
   const planKind = kind !== "model" && kind !== view.brain ? kind : null;
   const plan = planKind !== null;
@@ -554,7 +563,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           model: planModel === option?.defaultModel ? null : planModel,
           fallback,
           ...(plan ? { acceptPlanTerms: true } : {}),
-          ...(effortChanged ? { effort } : {}),
+          ...(effortChanged ? { effort: effortToSave } : {}),
           ...(accountChanged && view.canManageAccounts ? { account } : {}),
         });
       }
@@ -697,14 +706,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           </SettingNote>
         )}
       </BrainField>
-      <EffortPixels
-        label={t("agentPage.work.brain.effort")}
-        value={effort}
-        onValueChange={setEffort}
-        color={draft.look.color}
-        steps={EFFORTS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
-        hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
-      />
+      {!isAuto(planModel) && (
+        <EffortPixels
+          label={t("agentPage.work.brain.effort")}
+          value={effort}
+          onValueChange={setEffort}
+          color={draft.look.color}
+          steps={EFFORTS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
+          hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
+        />
+      )}
       {accountField}
       <div className="ac-optcard__foot">
         <label className="agp-brainoff" htmlFor={offId}>
