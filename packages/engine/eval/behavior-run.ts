@@ -4,7 +4,12 @@
  * path, observes what it did, and asks a judge model to grade it. The model
  * provider is passed in, so tests drive it with the fake provider (no network).
  */
-import { createMemoryPubSub, createPostgresSearchResolver, noPlatformCredentials } from "@agenteschat/adapters";
+import {
+  createMemoryBlobStore,
+  createMemoryPubSub,
+  createPostgresSearchResolver,
+  noPlatformCredentials,
+} from "@agenteschat/adapters";
 import { and, asc, eq, gt, inArray, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
@@ -22,7 +27,9 @@ import {
   createAgentRuns,
   createAskAgentToolSource,
   createAskUserToolSource,
+  createBlobStoreResolver,
   createChannel,
+  createChatToolSource,
   createContextToolSource,
   createCredential,
   createFakeJudge,
@@ -95,8 +102,9 @@ export interface BehaviorCase {
     trigger: CaseMessage;
     /**
      * The trigger is a routine's firing (ADR 0053): its background run starts in the routine's room with
-     * `trigger.body` as its instructions and reports to this conversation. `access` (default `read`) and
-     * `report` (default `when_new`) are the routine's settings.
+     * `trigger.body` as its instructions (written by `trigger.author`, its creator) and reports to this
+     * conversation, whose `prior` messages it reads under "# Where your report goes". `access` (default
+     * `read`) and `report` (default `when_new`) are the routine's settings.
      */
     routine?: { name: string; access?: "read" | "act"; report?: "always" | "when_new" };
     /**
@@ -124,6 +132,8 @@ export interface BehaviorCase {
   issues?: boolean;
   /** Workspace tools (add_agent_to_channel, update_thread): internal changes with undo. */
   workspace?: boolean;
+  /** The real chat tools (`post_message`, `send_dm`): speaking elsewhere or for someone. */
+  chat?: boolean;
   /** A `propose_mission` with the real description and findings schema (no computer; recorded only). */
   missions?: boolean;
   /** Issues already in the workspace. */
@@ -168,7 +178,11 @@ export interface CaseRun {
   /** The run passed (nobody called it by name and it had nothing to add): nothing posted. */
   passed?: boolean;
   approvals: string[];
+  /** The reason each approval request carries, as its card shows it. */
+  approvalReasons?: { tool: string; why: string }[];
   status: string[];
+  /** Routine cases: how the routine's run ended in its ledger (`reported`, `silent`, `failed` with a code…). */
+  routineRun?: { status: string; code: string | null };
   system: string;
   costNanoUsd: number;
   /** Handles of the other agents the trigger started. */
@@ -322,6 +336,18 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       createContextToolSource(context),
       ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
       ...(c.workspace ? [createWorkspaceToolSource({ pubsub })] : []),
+      ...(c.chat
+        ? [
+            createChatToolSource({
+              pubsub,
+              artifacts: {
+                db,
+                blobs: createBlobStoreResolver({ db, keyWrappers: [keyWrapper], platform: createMemoryBlobStore() }),
+                pubsub,
+              },
+            }),
+          ]
+        : []),
       ...(c.missions ? [fakeMissionSource().source] : []),
       ...fakes.map((f) => f.source),
     ];
@@ -620,13 +646,25 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           result: r?.content,
         };
       });
-    const approvals = runIds.length
-      ? (
-          await db
-            .select({ tool: schema.approvals.tool })
-            .from(schema.approvals)
-            .where(inArray(schema.approvals.runId, runIds))
-        ).map((r) => r.tool)
+    const approvalRows = runIds.length
+      ? await db
+          .select({
+            tool: schema.approvals.tool,
+            title: schema.approvals.title,
+            detail: schema.approvals.detail,
+            why: schema.approvals.why,
+          })
+          .from(schema.approvals)
+          .where(inArray(schema.approvals.runId, runIds))
+          .orderBy(asc(schema.approvals.createdAt))
+      : [];
+    const approvals = approvalRows.map((r) => r.tool);
+    // A routine's ledger row: a report every time (`always`) can arrive without a hand_off (`auto_report`).
+    const [routineRun] = routine
+      ? await db
+          .select({ status: schema.routineRuns.status, code: schema.routineRuns.code })
+          .from(schema.routineRuns)
+          .where(eq(schema.routineRuns.id, routine.routine.runId))
       : [];
     const posted = runIds.length
       ? await db
@@ -670,23 +708,29 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         ).map((r) => r.kind)
       : [];
     const turns = recorder.turns.map(({ text, toolCalls }) => ({ text, toolCalls }));
-    const cards = calls
-      .filter((t) => t.name === "propose_mission" && t.executed && !t.isError)
-      .map((t) => missionCard(t.input))
-      .join("\n\n");
+    const cards = [
+      ...calls.filter((t) => t.name === "propose_mission" && t.executed && !t.isError).map((t) => missionCard(t.input)),
+      // An approval's card: the action, its parameters and the agent's reason (ADR 0053 §8).
+      ...approvalRows.map(
+        (r) => `Approval card (waits for a person): ${r.title}${r.detail ? ` (${r.detail})` : ""}\nWhy: ${r.why}`,
+      ),
+    ].join("\n\n");
     const last = turns.at(-1);
     return {
       turns,
       calls,
       reply: posted.map((m) => m.body).join("\n\n"),
-      // A routine is silent unless it handed something off; the conversation run then posts the report.
+      // A routine is silent unless it reported (a hand_off, or its final text when it reports every time);
+      // the conversation run then posts the report.
       noReply: routine
-        ? !calls.some((t) => t.name === "hand_off" && t.executed && !t.isError)
+        ? !calls.some((t) => t.name === "hand_off" && t.executed && !t.isError) && routineRun?.status !== "reported"
         : Boolean(last && isNoReply(last.text)),
       // Ended quietly on purpose (reply-policy.ts records how on a context step).
       passed: steps.some((s) => s.kind === "context" && (s.data as { passed?: unknown }).passed !== undefined),
       approvals,
+      approvalReasons: approvalRows.map((r) => ({ tool: r.tool, why: r.why })),
       status: runs.map((r) => (r.error ? `${r.status} (${r.error})` : r.status)),
+      ...(routineRun ? { routineRun } : {}),
       system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
       costNanoUsd: Number(usage?.cost ?? 0),
       triggered,
@@ -766,9 +810,21 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
   for (const [i, text] of (c.expect.rubric ?? []).entries()) criteria.push({ id: `case_${i + 1}`, text });
   if (criteria.length === 0) return { checks: [] as CheckResult[], costNanoUsd: 0 };
   const a = agentOf(c, options.agentModel);
-  const conversation = [...(c.conversation.prior ?? []), c.conversation.trigger]
-    .map((m) => `[${m.author === "agent" ? a.name : m.author}]: ${m.body}`)
-    .join("\n");
+  const conv = c.conversation;
+  const line = (m: CaseMessage) => `[${m.author === "agent" ? a.name : m.author}]: ${m.body}`;
+  // A routine run starts from its instructions in its own room; the conversation is where its report goes.
+  const prior = (conv.prior ?? []).map(line);
+  const conversation = conv.routine
+    ? [
+        `# What was said lately where the routine reports (the run read it)\n${prior.join("\n") || "(nothing yet)"}`,
+        `# The routine's instructions (set up by ${conv.trigger.author}; this run started from them)\n${conv.trigger.body}`,
+      ].join("\n\n")
+    : `# Conversation (last line is the message the agent answered)\n${[...prior, line(conv.trigger)].join("\n")}`;
+  const routineSettings = conv.routine
+    ? ` (routine run: "${conv.routine.name}"; ${
+        conv.routine.access === "act" ? "it may act" : "it may only look and report"
+      }; ${conv.routine.report === "always" ? "it reports every run" : "it reports only when there is news"})`
+    : "";
   const toolLines = run.calls.length
     ? run.calls
         .map(
@@ -788,8 +844,8 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     : "(no tool calls)";
   const prompt = [
     `# Case: ${c.title}`,
-    `Agent: ${a.name}, ${a.role}. Where: ${c.conversation.where === "dm" ? "a DM" : `#${c.conversation.channel ?? "geral"}`}${c.conversation.routine ? ` (routine run: "${c.conversation.routine.name}")` : ""}.`,
-    `# Conversation (last line is the message the agent answered)\n${conversation}`,
+    `Agent: ${a.name}, ${a.role}. Where: ${conv.where === "dm" ? "a DM" : `#${conv.channel ?? "geral"}`}${routineSettings}.`,
+    conversation,
     `# What the agent already had in its prompt\nOrganization context: ${c.org.context}${
       c.memory?.length
         ? `\nIts memory:\n${c.memory.map((m) => `- [${m.kind ?? "note"}] ${m.title ? `${m.title}: ` : ""}${m.content}`).join("\n")}`

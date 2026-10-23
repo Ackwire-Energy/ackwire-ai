@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { systemText } from "@agenteschat/providers";
 import { createFakeProvider, type FakeReply } from "@agenteschat/providers/testing";
 import cases from "../eval/behavior-cases.json";
 import { deterministicChecks } from "../eval/behavior-checks";
@@ -22,6 +21,8 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "search_context",
     "ask_user",
     "ask_agent",
+    "post_message",
+    "send_dm",
     "list_routines",
     "update_routine",
     "create_routine",
@@ -51,6 +52,9 @@ test("every case is well formed: known presets, connectors and tools", () => {
 
 /** A scripted model: one reply per call, in order. */
 const script = (replies: FakeReply[]) => createFakeProvider((_req, n) => replies[n - 1] ?? { chunks: ["(done)"] });
+
+/** Every approval request says why (ADR 0053 §8): the scripted merges give a reason. */
+const MERGE_WHY = "PR #70 fixes the annual promo price; checks pass and the review approved it.";
 
 test("a case runs through the real engine: prompt, fake connector tools, transcript", async () => {
   const provider = script([
@@ -98,15 +102,7 @@ test("a sensitive call becomes an approval request and never runs", async () => 
     {
       chunks: [],
       toolUses: [
-        {
-          name: "github_merge_pull_request",
-          input: {
-            owner: "lumen",
-            repo: "api",
-            pullNumber: 70,
-            why: "CI is green on PR 70 and the review approved it: merging ships the fix.",
-          },
-        },
+        { name: "github_merge_pull_request", input: { owner: "lumen", repo: "api", pullNumber: 70, why: MERGE_WHY } },
       ],
     },
   ]);
@@ -120,7 +116,7 @@ test("a sensitive call becomes an approval request and never runs", async () => 
   expect(checks.find((k) => k.id === "requested_approval")?.pass).toBe(true);
 });
 
-test("a routine run: background work on the routine's trigger, earlier messages are history, no hand_off posts nothing", async () => {
+test("a routine run: background work from its brief, the conversation it reports to is read, no hand_off posts nothing", async () => {
   const provider = script([
     { chunks: [], toolUses: [{ name: "sentry_search_issues", input: { query: "is:unresolved firstSeen:-1h" } }] },
     { chunks: ["Nada novo: só o LUMEN-API-3A1, estável."] },
@@ -129,14 +125,46 @@ test("a routine run: background work on the routine's trigger, earlier messages 
   const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
   expect(run.system).toContain("This is a routine run");
   expect(run.tools).toContain("hand_off");
-  // Only the brief started a run, in the routine's room (ADR 0053 §4): the conversation it reports to,
-  // with the agent's old reply, is read-only context in its system prompt, not its messages.
+  // Only the routine started a run: the agent's old reply is what was said where the report goes.
   expect(run.status).toEqual(["done"]);
-  expect(systemText(provider.calls[0]?.request.system ?? "")).toContain("Sigo acompanhando LUMEN-API-3A1");
-  expect(JSON.stringify(provider.calls[0]?.request.messages)).not.toContain("Sigo acompanhando LUMEN-API-3A1");
+  expect(run.system).toContain("# Where your report goes");
+  expect(run.system).toContain("Sigo acompanhando LUMEN-API-3A1");
+  expect(run.routineRun?.status).toBe("silent");
   expect(run.noReply).toBe(true);
   expect(run.reply).toBe("");
   expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
+});
+
+test("a routine that only reads: posting, DMs, routine changes and mail sends aren't even listed", async () => {
+  const provider = script([
+    { chunks: [], toolUses: [{ name: "mail_suporte_read", input: { id: "m_102" } }] },
+    { chunks: ["Nada para reportar."] },
+  ]);
+  const c = byId("support-inbox-hostile-email");
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
+  expect(run.tools).toContain("mail_suporte_read");
+  expect(run.tools).toContain("hand_off");
+  const refused = ["update_routine", "post_message", "send_dm", "ask_agent", "mail_suporte_send"];
+  for (const name of refused) expect(run.tools, name).not.toContain(name);
+  // Mail reaches the model as untrusted email content, as the real mailbox tools give it.
+  expect(run.calls[0]?.result).toContain('<email_content untrusted="true">');
+});
+
+test("a routine that may act: a rollback is an approval request with its why, never run", async () => {
+  const why = "LUMEN-API-9E4 since api@3.8.0 (25 min ago): every checkout fails. Back to dep_9c7 (api@3.7.4).";
+  const provider = script([
+    { chunks: [], toolUses: [{ name: "railway_rollback", input: { service: "api", deploymentId: "dep_9c7", why } }] },
+  ]);
+  const c = byId("ops-routine-act-approval");
+  const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
+  expect(run.approvals).toEqual(["railway_rollback"]);
+  expect(run.approvalReasons).toEqual([{ tool: "railway_rollback", why }]);
+  expect(run.calls).toMatchObject([{ name: "railway_rollback", executed: false }]);
+  expect(run.cards).toContain(why);
+  const checks = deterministicChecks(c.expect, run);
+  for (const id of ["requested_approval", "no_sensitive_action", "approval_says_why"]) {
+    expect(checks.find((k) => k.id === id)?.pass, id).toBe(true);
+  }
 });
 
 test("a consultation case: the agent answers another agent's question as the person behind it", async () => {
@@ -166,15 +194,7 @@ test("act with undo: the issue is a receipt on the reply while the merge waits f
       chunks: [],
       toolUses: [
         { name: "create_issue", input: { title: "Preço do plano anual", assignee: "me" } },
-        {
-          name: "github_merge_pull_request",
-          input: {
-            owner: "lumen",
-            repo: "api",
-            pullNumber: 70,
-            why: "CI is green on PR 70 and the review approved it: merging ships the fix.",
-          },
-        },
+        { name: "github_merge_pull_request", input: { owner: "lumen", repo: "api", pullNumber: 70, why: MERGE_WHY } },
       ],
     },
   ]);
