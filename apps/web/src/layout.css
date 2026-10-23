@@ -531,6 +531,24 @@ p {
 .sidebar__channel-icon {
   color: var(--ink-muted);
 }
+/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials). */
+.sidebar__channel-abbr {
+  display: none;
+}
+.sidebar[data-rail="true"] .sidebar__item:has(> .sidebar__channel-abbr) > .sidebar__channel-icon {
+  display: none;
+}
+.sidebar[data-rail="true"] .sidebar__channel-abbr {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink-muted);
+}
+.sidebar[data-rail="true"] .sidebar__item[data-status="active"] .sidebar__channel-abbr {
+  color: var(--ink);
+}
 .sidebar__foot {
   margin-top: auto;
   display: flex;

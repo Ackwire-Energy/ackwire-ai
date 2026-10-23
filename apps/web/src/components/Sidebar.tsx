@@ -126,6 +126,16 @@ export function useSidebarCollapsed(): [boolean, () => void] {
 /** File → Novo canal in the desktop app's menu bar (DesktopMenus.tsx): the sidebar opens its dialog. */
 export const NEW_CHANNEL_EVENT = "agentes:new-channel";
 
+/**
+ * On the icon rail every channel would be the same "#": its initials instead ("eng-backend" → "Eb",
+ * "general" → "Ge"), so the rail still reads which is which.
+ */
+export function channelInitials(name: string) {
+  const words = name.split(/[-_.\s]+/).filter(Boolean).map((w) => Array.from(w));
+  const letters = (words.length > 1 ? [words[0]?.[0], words[1]?.[0]] : (words[0] ?? []).slice(0, 2)).join("");
+  return letters.charAt(0).toUpperCase() + letters.slice(1).toLowerCase();
+}
+
 /** The workspace sidebar. */
 export function Sidebar() {
   const { t } = useTranslation();
@@ -413,6 +423,9 @@ export function Sidebar() {
                 onContextMenu={channelMenu(c)}
               >
                 <Icon name="channel" className="sidebar__channel-icon" />
+                <span className="sidebar__channel-abbr" aria-hidden="true">
+                  {channelInitials(c.name)}
+                </span>
                 <span className="sidebar__item-label">{c.name}</span>
               </Link>
             ))}
