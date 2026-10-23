@@ -254,7 +254,7 @@
 }
 .vault-done > b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 30px;
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -300,7 +300,7 @@
 }
 .wiki-dropzone__in b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(26px, 4vw, 36px);
   letter-spacing: -0.03em;
 }

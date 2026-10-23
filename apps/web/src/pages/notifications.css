@@ -782,7 +782,7 @@
 }
 .nt-calm > b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 28px;
   letter-spacing: -0.03em;
 }
