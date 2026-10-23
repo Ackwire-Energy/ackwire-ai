@@ -131,6 +131,12 @@ export const agentRuns = pgTable(
      * (`resolveBrain`). Null for the model brain.
      */
     brainSessionId: text(),
+    /**
+     * Background work (a routine's run): it holds no conversation's slot. People's messages
+     * never join it and it never joins theirs; it posts no final reply (only cards and `hand_off`),
+     * and its computer session is never carried to the conversation's next run.
+     */
+    background: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),

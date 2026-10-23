@@ -29,7 +29,10 @@ import { enqueue } from "./outbox";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun } from "./run-scope";
 import { replyThreadOf } from "./runs";
+import { afterSteered } from "./steering";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
+
+export { stopChecksSettled } from "./steering";
 
 const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions, threads } = schema;
 
@@ -677,19 +680,6 @@ async function markOpenedByReply(db: Database, reply: Message, userId: string): 
   return marked.length > 0;
 }
 
-/** Stop checks still being judged (they run after the post returns). */
-const stopChecks = new Set<Promise<unknown>>();
-
-function trackStopCheck(check: Promise<unknown>) {
-  const tracked = check.catch(() => undefined).finally(() => stopChecks.delete(tracked));
-  stopChecks.add(tracked);
-}
-
-/** Resolves once every stop check started so far is judged (and its cancel done): for tests and shutdown. */
-export async function stopChecksSettled() {
-  while (stopChecks.size > 0) await Promise.all([...stopChecks]);
-}
-
 /**
  * A person posts in a channel: org membership, channel membership and the
  * `post` permission are checked, then message + outbox event commit together,
@@ -828,72 +818,16 @@ export async function postPersonMessage(
       messageId: message.id,
     });
   }
+  // Delivered to the agent's task in progress: it reads it at its next step, now, or wakes from a wait.
   if (steered.length > 0) {
-    // Delivered to the agent's task in progress: it reads it at its next step, or now ("Parar e mandar").
-    const now = input.steer === "now";
-    const steeredIds = steered.map((s) => s.id);
-    const activeRuns = await deps.db.select().from(agentRuns).where(inArray(agentRuns.id, steeredIds));
-    for (const s of steered) {
-      const active = activeRuns.find((r) => r.id === s.id);
-      const threadId = active ? replyThreadOf(active) : null;
-      await publishChannelEvent(deps.pubsub, {
-        type: "agent.run.steered",
-        channelId,
-        threadId,
-        runId: s.id,
-        agentId: s.agentId,
-        messageId: message.id,
-        ...(now ? { now: true as const } : {}),
-      });
-      // Its model call stops and the loop reads the message at once (a running tool finishes first).
-      // A computer brain (Claude Code, Codex) can't drop its turn halfway: the task stops for real, and
-      // stopping it starts it again from this message (`restartAfterStopAndSend`). Who may not stop it
-      // just leaves the message for its next step.
-      if (now && active?.status === "running") {
-        const agent = await getAgentCached(deps.db, orgId, s.agentId);
-        if (agent && agent.brain !== "model") await cancelRun(deps, userId, orgId, s.id).catch(() => undefined);
-        else await interruptRun(deps.pubsub, s.id, message.id);
-      }
-      // Parked waiting for its computer: look again now. Back (or never really away): the run resumes
-      // and reads this message with the rest; still away: it parks again quietly (one answer later).
-      else if (active?.status === "waiting_input" && active.waitingMachineId) {
-        const wait = (active.transcript as { waitingForBrain?: { waitId?: string } } | null)?.waitingForBrain?.waitId;
-        await enqueue(deps.db, {
-          orgId,
-          kind: "agent_run.execute",
-          payload: { runId: s.id, ...(wait ? { wait } : {}) },
-          dedupeKey: `agent_run.execute:${s.id}:steer:${message.id}`,
-          maxAttempts: 4,
-        }).catch(() => undefined);
-      }
-      // A plain "stop", in any language, cancels the task instead (the judge decides; short messages
-      // only). Never in the way of the send: judged after the response, the app hears `stop` then.
-      const judge = deps.judge;
-      if (judge) {
-        const judgeStop = async () => {
-          const agentName = (await getAgentCached(deps.db, orgId, s.agentId))?.name ?? "the agent";
-          const stop = await isStopRequest(judge, {
-            orgId,
-            text: message.body,
-            agentName,
-            agentId: s.agentId,
-            runId: s.id,
-          }).catch(() => false);
-          if (!stop) return;
-          await publishChannelEvent(deps.pubsub, {
-            type: "agent.run.steered",
-            channelId,
-            threadId,
-            runId: s.id,
-            agentId: s.agentId,
-            messageId: message.id,
-            stop: true,
-          });
-          await cancelRun(deps, userId, orgId, s.id);
-        };
-        trackStopCheck(judgeStop());
-      }
-    }
+    await afterSteered(deps, {
+      orgId,
+      userId,
+      channelId,
+      message,
+      runIds: steered.map((s) => s.id),
+      now: input.steer === "now",
+    });
   }
   // Receipts: who answers it — new runs, the task in progress it was steered into, the run its
   // answer resumes — and the mentioned agents that won't (D31). Nothing else routes this message.

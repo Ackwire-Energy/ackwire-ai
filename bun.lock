@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "agentes-chat",
@@ -11,7 +12,7 @@
     },
     "apps/desktop": {
       "name": "@agenteschat/desktop",
-      "version": "0.1.0",
+      "version": "0.5.5",
       "dependencies": {
         "@agenteschat/adapters": "workspace:*",
         "@agenteschat/i18n": "workspace:*",

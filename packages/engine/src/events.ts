@@ -177,6 +177,49 @@ export type ChannelEvent =
       messageIds: string[];
     }
   /**
+   * Handed to a computer brain mid-turn (Claude Code reads it at its next tool boundary), not
+   * confirmed read yet: "Ada recebeu". `agent.run.read` follows once the turn reports it read.
+   */
+  | {
+      type: "agent.run.delivered";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageIds: string[];
+    }
+  /**
+   * Messages a run took but never read (it ended, failed, was stopped or interrupted by a deploy)
+   * went to a run of their own: nothing sent to an agent is dropped.
+   */
+  | {
+      type: "agent.run.redispatched";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      newRunId: string;
+      messageIds: string[];
+    }
+  /** The run ended without posting: nobody called it by name and it had nothing to add (`pass`). */
+  | { type: "agent.passed"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  /**
+   * A person's message reached a run that was waiting (help in the browser, another agent's answer,
+   * an approval): `outcome` says what became of it. `resolved`: it ended the wait (e.g. "pronto,
+   * loguei" closed the browser help as done). `woke`: the run stopped waiting and reads it now (the
+   * wait stays open; its result comes later as a notice). `held`: it waits for the decision on a card.
+   */
+  | {
+      type: "agent.run.wait_message";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageId: string;
+      waitKind: string;
+      outcome: "resolved" | "woke" | "held";
+    }
+  /**
    * A person pressed "Continuar" under a stopped reply (`messageId`): `newRunId` picks up where
    * `runId` stopped (its reply's `meta.canceled.continuedRunId`), so every app hides the button.
    */

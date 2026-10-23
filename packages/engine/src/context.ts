@@ -21,6 +21,7 @@ import { isAgentOnlyDm } from "./dms";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
+import { noticeText } from "./notices";
 import type { AgentRun } from "./runs";
 import { agentScopeNames, loadTeam, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
@@ -741,6 +742,9 @@ export function accessNotice(m: Pick<Message, "body" | "meta">, current = false)
 export function taskNotice(m: Pick<Message, "body" | "meta">, current = false): string | null {
   const access = accessNotice(m, current);
   if (access) return access;
+  // An event delivered to the agent (a routine's report, another agent's answer, a late wait result).
+  const notice = noticeText(m.meta, current);
+  if (notice) return notice;
   // Agent mode (ADR 0029): what the mission tells its agent (an answer, a request, a message from people).
   const inbox = m.meta?.missionInbox as { from?: unknown; text?: unknown } | undefined;
   if (inbox && typeof inbox === "object") {
