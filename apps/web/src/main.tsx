@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { createApiClient, createSnapshot, meQuery } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
@@ -40,6 +41,7 @@ const queryClient = createQueryClient({
   onUnauthorized,
   onMutationError: (message) => toasts.show(message, "error"),
   unknownError: () => i18n.t("common.unknownError"),
+  describeError: (error) => knownErrorText(i18n.t, error),
 });
 
 // The last lists and chats saved on this device show at once; everything revalidates as usual.

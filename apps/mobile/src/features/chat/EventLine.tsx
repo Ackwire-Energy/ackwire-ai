@@ -8,10 +8,9 @@ import { eventLineOf } from "./logic";
 import { MessageText } from "./MessageText";
 
 /**
- * An automatic line of the conversation, not a voice (the web's `NoticeLine` / `RoutineRanLine`):
- * what reached an agent's conversation ("Rotina «Sentry» entregou um relatório", "@Infra respondeu",
- * "Nota de @Dev", "Chegou o resultado que Ada esperava") or a routine that ran in the background
- * ("Rotina «Bom dia» rodou", never as the person who created it). Quiet like `IssueTakenLine`; the
+ * An automatic line of the conversation, not a voice (the web's `NoticeLine`): what reached an agent's
+ * conversation ("Rotina «Sentry» entregou um relatório" while the agent hasn't told it yet, "@Infra
+ * respondeu", "Nota de @Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
  * text opens under it on "Ver". The agent's own reply, if it has one, follows as a normal message.
  */
 export function EventLine({ message }: { message: Message }) {
@@ -25,10 +24,6 @@ export function EventLine({ message }: { message: Message }) {
     agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
   });
   if (!line) return null;
-  const labels =
-    line.kind === "routine"
-      ? { show: t("channel.routineShow"), hide: t("channel.routineHide") }
-      : { show: t("chat.notice.show"), hide: t("chat.notice.hide") };
   return (
     <View style={styles.line}>
       <View style={styles.head}>
@@ -47,7 +42,7 @@ export function EventLine({ message }: { message: Message }) {
                 accessibilityState={{ expanded: open }}
                 suppressHighlighting
               >
-                {open ? labels.hide : labels.show}
+                {open ? t("chat.notice.hide") : t("chat.notice.show")}
               </Text>
             </>
           ) : null}

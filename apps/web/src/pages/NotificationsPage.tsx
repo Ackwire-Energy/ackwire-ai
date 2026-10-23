@@ -169,8 +169,7 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
     [icon, label] = ["issues", t("notifications.source.issue", { number: s.issueNumber })];
   else if (n.kind === "mission_finished" || n.kind === "mission_stopped")
     [icon, label] = ["flag", t("notifications.source.mission")];
-  else if (n.kind === "routine_finished" || n.kind === "routine_failed")
-    [icon, label] = ["routines", t("notifications.source.routine")];
+  else if (n.kind.startsWith("routine_")) [icon, label] = ["routines", t("notifications.source.routine")];
   else if (n.kind === "dm" || s.dmId) [icon, label] = ["person", t("notifications.source.dm")];
   else if (s.threadId) {
     const name = channel ? channelName(channel) : "";
@@ -202,6 +201,8 @@ type WhatKey =
   | "missionStopped"
   | "routineFinished"
   | "routineFailed"
+  | "routinePaused"
+  | "routineStalled"
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
@@ -253,6 +254,10 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routineFinished", { name });
     case "routine_failed":
       return k("routineFailed", { name });
+    case "routine_paused":
+      return k("routinePaused", { name });
+    case "routine_stalled":
+      return k("routineStalled", { name });
     case "machine_connected":
       return n.source.label
         ? k("machineConnected", { name, label: n.source.label })
@@ -571,8 +576,7 @@ function Row({
       ? `#${n.source.issueNumber} ${l.title}`
       : (n.kind === "mission_finished" ||
             n.kind === "mission_stopped" ||
-            n.kind === "routine_finished" ||
-            n.kind === "routine_failed" ||
+            n.kind.startsWith("routine_") ||
             n.kind === "forum_synthesis") &&
           n.source.label
         ? n.source.label
@@ -581,6 +585,12 @@ function Row({
   const expandable = isExpandable(n);
   const steps = l.steps && l.steps.total > 0 ? l.steps : null;
   const failed = n.kind === "mission_stopped" || n.kind === "routine_failed" || l.steps?.failedAt != null;
+  // A routine the server paused says why, in the person's language (`latest.reason`).
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const text =
+    n.kind === "routine_paused" && l.reason
+      ? tt(`routines.pausedReason.${l.reason}`, { defaultValue: l.text ?? "" })
+      : l.text;
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -653,11 +663,11 @@ function Row({
           </>
         ) : (
           <>
-            {(l.text || lead) && (
+            {(text || lead) && (
               <p className="nt-snip">
                 {lead && <b>{t("notifications.lead", { text: lead })} </b>}
                 {speaker && <b>{t("notifications.speaker", { name: speaker })} </b>}
-                {l.text && <Snippet text={l.text} mine={mine} />}
+                {text && <Snippet text={text} mine={mine} />}
               </p>
             )}
             {steps && (
@@ -1301,6 +1311,9 @@ export function NotificationsPage() {
         return void navigate({ to: target.to, params: { orgId, ...target.params } });
       case "/org/$orgId/settings/$section":
         return void navigate({ to: target.to, params: { orgId, ...target.params }, search: {} });
+      case "/org/$orgId/routines":
+        // A routine's trouble opens it in Rotinas, its state and fix in view.
+        return void navigate({ to: target.to, params: { orgId }, search: target.search ?? {} });
       default:
         return void navigate({ to: target.to, params: { orgId } });
     }

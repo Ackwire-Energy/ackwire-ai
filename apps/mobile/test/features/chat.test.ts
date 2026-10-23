@@ -20,7 +20,6 @@ import {
   reactionEmoji,
   reactionName,
   reactionPills,
-  routineAgents,
   standsAlone,
   stoppableInLine,
   threadFaces,
@@ -214,42 +213,39 @@ describe("working line", () => {
 });
 
 describe("routine messages", () => {
-  const routineMeta = { routineId: "rt1", routine: { id: "rt1", name: "Erros do Sentry", runId: "x" } };
+  const atlas = { type: "agent" as const, id: "atlas" };
+  const told = { routine: { id: "rt1", name: "Erros do Sentry", runId: "rr1", noticeId: "rep" } };
 
-  test("the routine's top-level call is left out; only the agent's answer shows", () => {
-    const call = message({ id: "call", body: "@atlas Verificar no Sentry…", meta: routineMeta, createdAt: at(10) });
-    const answer = message({
-      id: "ans",
-      threadId: "call",
-      author: { type: "agent", id: "atlas" },
-      meta: { viaRoutine: { id: "rt1", name: "Erros do Sentry" } },
-      createdAt: at(9),
-    });
+  test("a routine's call written as its creator is left out; only the agent's answer shows", () => {
+    const call = message({ id: "call", body: "@atlas Verificar no Sentry…", meta: told, createdAt: at(10) });
+    const answer = message({ id: "ans", threadId: "call", author: atlas, createdAt: at(9) });
     const rows = buildRows([call, answer]);
     expect(rows.filter((r) => r.kind === "message").map((r) => (r.kind === "message" ? r.message.id : ""))).toEqual([
       "ans",
     ]);
   });
 
-  test("a routine's message inside a thread shows with its own header: never grouped, nothing groups under it", () => {
-    const before = message({ id: "a", threadId: "t", createdAt: at(10) });
-    const routine = message({ id: "b", threadId: "t", meta: routineMeta, createdAt: at(9) });
-    const after = message({ id: "c", threadId: "t", createdAt: at(8) });
-    const rows = buildRows([before, routine, after]).flatMap((r) => (r.kind === "message" ? [r.grouped] : []));
-    expect(rows).toEqual([false, false, false]);
-    expect(standsAlone(routine)).toBe(true);
-  });
-
-  test("the agents it calls: known @handles, in order, once each", () => {
-    const agents = [
-      { handle: "atlas", name: "Atlas" },
-      { handle: "ada", name: "Ada" },
-    ];
-    expect(routineAgents("@ada veja os issues; @Atlas e @ada, @nobody", agents).map((a) => a.name)).toEqual([
-      "Ada",
-      "Atlas",
+  test("what a routine found stands alone with its own header; the report it answers folds into it", () => {
+    const before = message({ id: "a", author: atlas, createdAt: at(10) });
+    const report = message({
+      id: "rep",
+      author: atlas,
+      meta: { notice: { kind: "routine_handoff", text: "3 erros", refs: { routineName: "Erros do Sentry" } } },
+      createdAt: at(9),
+    });
+    const routine = message({ id: "b", author: atlas, meta: told, createdAt: at(8) });
+    const after = message({ id: "c", author: atlas, createdAt: at(7) });
+    const rows = buildRows([before, report, routine, after]).flatMap((r) =>
+      r.kind === "message" ? [[r.message.id, r.grouped] as const] : [],
+    );
+    expect(rows).toEqual([
+      ["a", false],
+      ["b", false],
+      ["c", false],
     ]);
-    expect(routineAgents("sem menção", agents)).toEqual([]);
+    expect(standsAlone(routine)).toBe(true);
+    // Without its answer, the report is still there, as its line.
+    expect(buildRows([report]).filter((r) => r.kind === "message")).toHaveLength(1);
   });
 });
 
@@ -559,17 +555,16 @@ describe("an agent's turn as one block", () => {
   });
 });
 
-describe("automatic lines (notices, a routine's background start) and fast replies", () => {
+describe("automatic lines (notices) and fast replies", () => {
   const handles: Record<string, string> = { infra: "Infra", dev: "Dev" };
   const names = { author: "Ada", agentByHandle: (handle: string) => handles[handle] ?? null };
   const agentMsg = (id: string, meta: Record<string, unknown>, over: Partial<Message> = {}) =>
     message({ id, author: { type: "agent", id: "ada" }, body: "", meta, ...over });
 
-  test("a routine's report: «name» from the message's routine, the refs or `from`; the text on demand", () => {
+  test("a routine's report: «name» from the refs or `from`; the text on demand", () => {
     const own = eventLineOf(
       agentMsg("n1", {
-        routine: { id: "rt1", name: "Sentry diário" },
-        notice: { kind: "routine_handoff", text: "3 erros novos" },
+        notice: { kind: "routine_handoff", text: "3 erros novos", refs: { routineName: "Sentry diário" } },
       }),
       names,
     );
@@ -627,21 +622,14 @@ describe("automatic lines (notices, a routine's background start) and fast repli
     expect(standsAlone(talker)).toBe(false);
   });
 
-  test("a routine's background start is one line «X» rodou, its instructions on demand, never the person", () => {
+  test("a routine's firing written as its creator (before its own room) is never shown, nor a line", () => {
     const start = message({
       id: "bg",
       body: "@ada veja os erros",
       meta: { background: true, routineId: "rt1", routine: { id: "rt1", name: "Sentry diário" } },
     });
-    expect(eventLineOf(start, names)).toEqual({
-      kind: "routine",
-      icon: "clock",
-      key: "chat.notice.routineRan",
-      values: { routine: "Sentry diário" },
-      text: "@ada veja os erros",
-    });
-    // Not hidden like a routine's plain call: it shows, as its line.
-    expect(buildRows([start]).filter((r) => r.kind === "message")).toHaveLength(1);
+    expect(eventLineOf(start, names)).toBeNull();
+    expect(buildRows([start]).filter((r) => r.kind === "message")).toHaveLength(0);
     expect(eventLineOf(message({ id: "plain" }), names)).toBeNull();
   });
 

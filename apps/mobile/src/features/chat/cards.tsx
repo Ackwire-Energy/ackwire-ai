@@ -15,7 +15,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Button, Chip, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
 import { approvalRisk } from "../approvals/logic";
-import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "../approvals/parts";
+import { ApprovalDetails, ApprovalFuse, ApprovalTraits, ApprovalWhy } from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -241,13 +241,13 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
         </Text>
         {high ? <Chip label={t("mobile.approval.highRisk")} /> : null}
       </View>
+      <ApprovalWhy approval={a} name={name} />
       <Text variant="title" style={styles.h4}>
         {a.title}
       </Text>
       <View style={styles.askBody}>
         <ApprovalTraits approval={a} />
         <ApprovalDetails approval={a} />
-        <ApprovalSaid approval={a} name={name} />
         <ApprovalFuse approval={a} />
       </View>
       {a.canDecide ? (

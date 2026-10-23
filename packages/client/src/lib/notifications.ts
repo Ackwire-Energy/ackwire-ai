@@ -203,10 +203,17 @@ export type OpenTarget =
   | { to: "/org/$orgId/issues/$number"; params: { number: string } }
   | { to: "/org/$orgId/forum/$topicId"; params: { topicId: string } }
   | { to: "/org/$orgId/approvals" }
-  | { to: "/org/$orgId/routines" }
+  | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
   | { to: "/org/$orgId/settings/$section"; params: { section: "computers" } };
+
+/** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
+export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
+  "routine_failed",
+  "routine_paused",
+  "routine_stalled",
+]);
 
 /**
  * An agent that needs a person in its browser (ADR 0040) goes to its request card in the
@@ -222,7 +229,10 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       : { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   if (s.topicId) return { to: "/org/$orgId/forum/$topicId", params: { topicId: s.topicId } };
   if (s.issueNumber != null) return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) } };
-  if (n.kind === "routine_finished" || n.kind === "routine_failed") return { to: "/org/$orgId/routines" };
+  // A routine that failed, paused or waits for its computer: the routine in Rotinas (its state and fix).
+  // What a routine found opens the agent's message in its conversation (below); without one, the routine.
+  if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
+    return s.routineId ? { to: "/org/$orgId/routines", search: { open: s.routineId } } : { to: "/org/$orgId/routines" };
   if (n.kind === "dm") {
     const who = n.actors[0];
     if (who?.type === "agent") return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: who.id } };

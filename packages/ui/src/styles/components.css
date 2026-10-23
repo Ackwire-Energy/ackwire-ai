@@ -846,6 +846,29 @@ textarea.ac-input {
 .ac-approval__who a {
   color: var(--ink);
 }
+/* Asked while nobody watched: one quiet line with its icon. */
+.ac-approval__origin {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ac-approval__origin > svg {
+  flex: none;
+  margin-top: 2px;
+}
+/* Why the agent asks, in its words, read before the action. */
+.ac-approval__why {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
 .ac-approval__title {
   margin: 0;
   font-size: 15px;
