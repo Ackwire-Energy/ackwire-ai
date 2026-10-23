@@ -1,20 +1,23 @@
 import { type LegalBlock, type LegalKind, legalDocument, legalInline } from "@agenteschat/i18n/legal";
 import { Logo, Segmented } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type LocaleCode, locales, setLocale } from "@/i18n";
+import { type LocaleCode, locales } from "@/i18n";
 import "./legal.css";
 
 /**
- * Terms of Use and Privacy Policy (`/terms`, `/privacy`): public pages in the
- * reader's language, the same text as the landing page's (`@agenteschat/i18n/legal`).
+ * Terms of Use and Privacy Policy (`/terms`, `/privacy`): public pages, the
+ * same text as the landing page's (`@agenteschat/i18n/legal`). They open in
+ * English wherever the reader is; the switch shows Portuguese here only.
  */
 export function LegalPage({ kind }: { kind: LegalKind }) {
-  const { t, i18n } = useTranslation();
-  const doc = legalDocument(kind, i18n.language);
-  const other = legalDocument(kind === "terms" ? "privacy" : "terms", i18n.language);
-  const updated = new Intl.DateTimeFormat(i18n.language, { dateStyle: "long", timeZone: "UTC" }).format(
+  const { i18n } = useTranslation();
+  const [lang, setLang] = useState<LocaleCode>("en");
+  const t = i18n.getFixedT(lang);
+  const doc = legalDocument(kind, lang);
+  const other = legalDocument(kind === "terms" ? "privacy" : "terms", lang);
+  const updated = new Intl.DateTimeFormat(lang, { dateStyle: "long", timeZone: "UTC" }).format(
     new Date(`${doc.updated}T00:00:00Z`),
   );
 
@@ -23,7 +26,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
   }, [doc.title]);
 
   return (
-    <div className="legal">
+    <div className="legal" lang={lang}>
       <header className="legal__bar">
         <Link to="/" aria-label={t("legal.home")}>
           <Logo size={24} />
@@ -31,8 +34,8 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
         <Segmented
           size="sm"
           label={t("shell.language")}
-          value={i18n.language}
-          onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
+          value={lang}
+          onValueChange={(v) => setLang(v as LocaleCode)}
           options={locales.map((l) => ({ value: l.code, label: l.label }))}
         />
       </header>
