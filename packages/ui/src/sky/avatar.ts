@@ -25,12 +25,20 @@ export function avatarSkyCell(x: number, y: number, n: number): 0 | 1 {
 export const avatarSkyCells = (px: number) => Math.max(8, Math.round(px / 4));
 
 const cache = new Map<string, HTMLCanvasElement | null>();
+// Asked every frame for every avatar: the color math once per color and theme.
+const looked = new Map<string, HTMLCanvasElement | null>();
 
 /** The sky as a `px`×`px` canvas, cached per color, size and theme (null without a DOM canvas). */
 export function avatarSky(color: string | undefined, px: number, dark: boolean): HTMLCanvasElement | null {
+  const asked = `${color ?? ""}|${dark ? 1 : 0}|${px}`;
+  if (looked.has(asked)) return looked.get(asked) ?? null;
   const [top, bottom] = avatarSkyTones(color, dark);
   const key = `${top}|${bottom}|${px}`;
-  if (cache.has(key)) return cache.get(key) ?? null;
+  if (cache.has(key)) {
+    const hit = cache.get(key) ?? null;
+    looked.set(asked, hit);
+    return hit;
+  }
   let canvas: HTMLCanvasElement | null = null;
   try {
     if (typeof document !== "undefined" && px > 0) {
@@ -52,5 +60,6 @@ export function avatarSky(color: string | undefined, px: number, dark: boolean):
     canvas = null;
   }
   cache.set(key, canvas);
+  looked.set(asked, canvas);
   return canvas;
 }
