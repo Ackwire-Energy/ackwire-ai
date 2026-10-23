@@ -63,6 +63,13 @@ export const envVars = {
     section: "Server",
     example: "https://chat.example.com",
   },
+  LANDING_URL: {
+    schema: z.url().optional(),
+    description:
+      "Public URL of the landing page when it is a separate site, without a trailing slash. That origin may call the waiting list (CORS on `/api/waitlist` only), and the confirmation email links there. Without it, the link points at PUBLIC_URL.",
+    section: "Server",
+    example: "https://agentes.chat",
+  },
   WEB_DIR: {
     schema: z.string().default("./public"),
     description:

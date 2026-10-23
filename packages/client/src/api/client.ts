@@ -969,12 +969,6 @@ export interface ApiClient {
     list(orgId: string): Promise<Reminder[]>;
     cancel(orgId: string, reminderId: string): Promise<Reminder>;
   };
-  /** Public waiting list (`POST /api/waitlist`, outside `/api/app`): same answer whether or not the email was there. */
-  waitlist: {
-    join(input: { email: string; locale: string }): Promise<void>;
-    /** The link in the confirmation email (`?confirm=`); `invalid_token` when unknown or expired. */
-    confirm(input: { token: string }): Promise<void>;
-  };
 }
 
 /** Everything is served by the HTTP backend (apps/server/src/routes/app). */

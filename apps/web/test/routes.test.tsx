@@ -14,10 +14,9 @@ afterEach(() => {
 });
 
 describe("route guards", () => {
-  test("signed out: / shows the landing page", async () => {
+  test("signed out: / goes to sign-in (the landing page is its own site)", async () => {
     const { router } = await renderApp("/", { api: createFakeApi(seedState({ me: null })) });
-    expect(router.state.location.pathname).toBe("/");
-    expect(screen().getByRole("heading", { level: 1, name: /trabalham com o seu time/ })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/login");
   });
 
   test("signed in without organizations: / goes to onboarding", async () => {

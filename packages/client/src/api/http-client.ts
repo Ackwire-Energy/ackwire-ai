@@ -287,14 +287,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }
       },
     },
-    waitlist: {
-      join: async (input) => {
-        await request<{ ok: true }>("/api/waitlist", { json: input });
-      },
-      confirm: async (input) => {
-        await request<{ ok: true }>("/api/waitlist/confirm", { json: input });
-      },
-    },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),
       signInOptions: (input) => request<SignInOptions>("/api/app/sign-in-options", { json: input }),

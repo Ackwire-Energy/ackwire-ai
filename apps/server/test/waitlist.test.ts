@@ -236,3 +236,47 @@ test("guessing confirmation links is throttled too", async () => {
   const limited = await anon("/api/waitlist/confirm", { json: { token: "x".repeat(32) }, headers });
   expect(limited.status).toBe(429);
 });
+
+test("the landing page on its own site (LANDING_URL) joins and confirms through CORS, and the link opens it", async () => {
+  await t.close();
+  const landing = "https://agentes.example";
+  t = await createTestServer({ env: { LANDING_URL: landing } });
+  // The browser's preflight for a JSON POST.
+  for (const path of ["/api/waitlist", "/api/waitlist/confirm"]) {
+    const preflight = await t.app.request(path, {
+      method: "OPTIONS",
+      headers: {
+        origin: landing,
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+      },
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(landing);
+    expect(preflight.headers.get("access-control-allow-headers")).toBe("content-type");
+    expect(preflight.headers.get("access-control-allow-credentials")).toBeNull();
+  }
+  const anon = browser(t);
+  const joined = await anon("/api/waitlist", { json: { email: "ana@acme.com" }, origin: landing });
+  expect(joined.status).toBe(202);
+  expect(joined.headers.get("access-control-allow-origin")).toBe(landing);
+  await t.drain();
+  expect(t.email.sent[0]?.text).toContain(`${landing}/?confirm=`);
+  const confirmed = await anon("/api/waitlist/confirm", { json: { token: lastToken() }, origin: landing });
+  expect(confirmed.status).toBe(200);
+  // The app's own origin still works; others are still refused.
+  expect((await anon("/api/waitlist", { json: { email: "bia@acme.com" } })).status).toBe(202);
+  const evil = await anon("/api/waitlist", { json: { email: "c@acme.com" }, origin: "https://evil.example" });
+  expect(evil.status).toBe(403);
+});
+
+test("CORS stays off everywhere else, and off entirely without LANDING_URL", async () => {
+  const preflight = (path: string, origin: string) =>
+    t.app.request(path, { method: "OPTIONS", headers: { origin, "access-control-request-method": "POST" } });
+  const off = await preflight("/api/waitlist", "https://agentes.example");
+  expect(off.headers.get("access-control-allow-origin")).toBeNull();
+  await t.close();
+  t = await createTestServer({ env: { LANDING_URL: "https://agentes.example" } });
+  const app = await preflight("/api/app/me", "https://agentes.example");
+  expect(app.headers.get("access-control-allow-origin")).toBeNull();
+});

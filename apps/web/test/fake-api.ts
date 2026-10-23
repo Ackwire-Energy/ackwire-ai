@@ -105,10 +105,6 @@ export interface FakeState {
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
   holdPosts?: Promise<void>;
-  /** Make `waitlist.join` fail with this error (429, 400…). */
-  waitlistError?: ApiError;
-  /** Make `waitlist.confirm` fail with this error (invalid_token…). */
-  waitlistConfirmError?: ApiError;
 }
 
 /** A small in-memory backend with the data of the approved screens ("Acme"). */
@@ -642,16 +638,6 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   return {
     system: { health: async () => ({ status: "ok", version: "test", edition: "cloud" }) },
-    waitlist: {
-      join: async (input) => {
-        log("waitlist.join", input);
-        if (state.waitlistError) throw state.waitlistError;
-      },
-      confirm: async (input) => {
-        log("waitlist.confirm", input);
-        if (state.waitlistConfirmError) throw state.waitlistConfirmError;
-      },
-    },
     account: {
       authConfig: async () => ({ socialProviders: { google: false, github: true }, signupOpen: true, firstRun: false }),
       signInOptions: async () => ({ account: false, password: false, providers: [], canSignUp: true }),

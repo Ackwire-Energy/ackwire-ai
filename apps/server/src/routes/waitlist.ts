@@ -1,5 +1,6 @@
 import { confirmWaitlist, joinWaitlist, WAITLIST_LOCALES } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import { cors } from "hono/cors";
 import { clientIp } from "../http/client-ip";
 import { apiError, errorResponse } from "../http/errors";
 import { type AppDeps, allowedOrigins } from "./app/context";
@@ -16,7 +17,7 @@ const join = createRoute({
   tags: ["Public"],
   summary: "Join the waiting list",
   description:
-    "Public, from the landing page (our origin only, JSON only). Emails a confirmation link (double opt-in). Answers 202 whether or not the email was already on the list or confirmed.",
+    "Public, from the landing page (our origin or `LANDING_URL`, JSON only). Emails a confirmation link (double opt-in). Answers 202 whether or not the email was already on the list or confirmed.",
   request: {
     body: {
       required: true,
@@ -62,10 +63,20 @@ const confirm = createRoute({
   },
 });
 
-/** `POST /api/waitlist` and `/api/waitlist/confirm`: the landing page's only call to action. */
+/**
+ * `POST /api/waitlist` and `/api/waitlist/confirm`: the landing page's only call to action.
+ * The landing page is its own site (`LANDING_URL`), so these two routes, and only these,
+ * answer it through CORS: JSON only, no cookies.
+ */
 export function registerWaitlist(api: OpenAPIHono, deps: AppDeps) {
-  const origins = allowedOrigins(deps.config);
+  const landing = deps.config.LANDING_URL ? new URL(deps.config.LANDING_URL).origin : null;
+  const origins = new Set([...allowedOrigins(deps.config), ...(landing ? [landing] : [])]);
   const { rateLimiter } = deps.adapters;
+  if (landing) {
+    const landingCors = cors({ origin: landing, allowMethods: ["POST"], allowHeaders: ["content-type"], maxAge: 600 });
+    api.use("/waitlist", landingCors);
+    api.use("/waitlist/confirm", landingCors);
+  }
 
   api.openapi(join, async (c) => {
     const origin = c.req.header("origin");
@@ -82,7 +93,8 @@ export function registerWaitlist(api: OpenAPIHono, deps: AppDeps) {
     const { email, locale } = c.req.valid("json");
     if (!(await rateLimiter.consume("waitlist:all", JOIN_TOTAL)).allowed)
       return apiError(c, 429, "rate_limited", "Too many requests; try again later");
-    await joinWaitlist(deps.db, { email, locale, publicUrl: deps.config.PUBLIC_URL });
+    // The link opens the landing page, which confirms it.
+    await joinWaitlist(deps.db, { email, locale, publicUrl: deps.config.LANDING_URL ?? deps.config.PUBLIC_URL });
     return c.json({ ok: true as const }, 202);
   });
 

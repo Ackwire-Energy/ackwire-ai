@@ -10,7 +10,7 @@
 :root {
   --font-sans: "Onest Variable", Onest, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Martian Mono Variable", "Martian Mono", ui-monospace, Menlo, monospace;
-  /* The wordmark (and the landing headings), and its dot-matrix ".chat". */
+  /* The wordmark, and its dot-matrix ".chat". */
   --font-display: "Funnel Display", var(--font-sans);
   --font-dot: "Doto", var(--font-mono);
 }

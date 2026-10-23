@@ -28,10 +28,6 @@ export const STORAGE_KEYS = {
   lastOrg: "agentes.lastOrg",
   /** How this browser signed in last ("google", "github", "apple" or "email"): marked on the sign-in screen. */
   lastSignIn: "agentes.lastSignIn",
-  /** The email the visitor put on the landing page's waiting list. */
-  waitlist: "agentes.waitlist",
-  /** Set once the visitor opened the link in the confirmation email. */
-  waitlistConfirmed: "agentes.waitlist.confirmed",
   /** The Drive's view: "grid" (default) or "list". */
   driveView: "agentes.drive.view",
   /** "1" when the person shrank the sidebar to its icon rail (desktop). */
