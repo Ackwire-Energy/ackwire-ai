@@ -3,6 +3,7 @@ import type { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import {
   type AccountKind,
   type AgentScope,
@@ -26,10 +27,15 @@ import { agentSecrets } from "./secrets";
  * messages mid-turn); this file stays the fallback and shares its mapping.
  *
  * - First turn of a session: `codex exec --json --skip-git-repo-check -C <cwd>
- *   --sandbox workspace-write -c sandbox_workspace_write.network_access=true
- *   -c developer_instructions=<system> <MCP bridge -c …> [-m <model>] -o
- *   <last.txt> -`, the prompt on stdin. Next turns: the same options without
- *   the instructions (the thread keeps them), then `resume <thread_id> -`.
+ *   --sandbox <workspace-write | read-only> -c developer_instructions=<system>
+ *   <MCP bridge -c …> [-m <model>] -o <last.txt> -`, the prompt on stdin. Next
+ *   turns: the same options without the instructions (the thread keeps them),
+ *   then `resume <thread_id> -`.
+ * - ADR 0053 §3: the turn's permission profile is its sandbox, never with the
+ *   network: `plan` is read-only, `work` writes in its folders. `exec` can't
+ *   ask for approvals (it forces approval_policy=never), so whatever the
+ *   sandbox refuses stays refused; the app-server mode answers Codex's
+ *   approvals with the command policy instead (`brain-codex-app.ts`).
  * - Codex picks its thread id (`thread.started`): our session id → that
  *   thread lives in `<runner home>/brain/codex-threads.json`. A runner that
  *   lost it starts a new thread (with the instructions again).
@@ -40,8 +46,7 @@ import { agentSecrets } from "./secrets";
  *   (the error; a usage limit is `limit` first). `error` events alone don't
  *   end a turn (Codex retries after some); exit code and `turn.failed` decide.
  *   Our MCP bridge's tool calls are not repeated: the engine ran them.
- * - Commands run in Codex's own sandbox (`exec` forces approval_policy=never);
- *   the MCP bridge needs `default_tools_approval_mode="approve"` or every tool
+ * - The MCP bridge needs `default_tools_approval_mode="approve"` or every tool
  *   without `readOnlyHint` is denied. The token reaches the bridge through
  *   the env (`env_vars`, or `bearer_token_env_var` for an HTTP bridge), never argv.
  * - ADR 0041: a turn with an `account` runs with `CODEX_HOME` set to that
@@ -100,7 +105,18 @@ export interface CodexBrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks. */
   effort?: BrainEffort;
+  /** Protocol 16: the turn's permission profile (absent: `work`). */
+  permissions?: { mode?: "plan" | "work" };
+  /** Protocol 16: false for a background turn (no app-server is kept for it). */
+  keepAlive?: boolean;
 }
+
+/** The profile a request asks for: anything but `plan` is `work`. */
+export const codexProfileOf = (req: { permissions?: { mode?: unknown } }): CommandProfile =>
+  req.permissions?.mode === "plan" ? "plan" : "work";
+
+/** The Codex sandbox of a profile (`--sandbox`, the app-server's `sandbox`): never with the network. */
+export const codexSandbox = (profile: CommandProfile) => (profile === "plan" ? "read-only" : "workspace-write");
 
 /** Codex's `model_reasoning_effort` for a brain effort (it has no `xhigh` or `max`). */
 export function codexEffort(effort: BrainEffort): "low" | "medium" | "high" {
@@ -216,8 +232,11 @@ export function codexTurnArgs(input: {
   writableRoots?: string[];
   /** Protocol 13: `-c model_reasoning_effort` (anything else is left out). */
   effort?: BrainEffort;
+  /** Protocol 16: the sandbox (default `work`: workspace-write; `plan`: read-only). Never the network. */
+  profile?: CommandProfile;
 }): string[] {
   const instructions = input.instructions?.trim();
+  const sandbox = codexSandbox(input.profile ?? "work");
   return [
     "exec",
     "--json",
@@ -225,10 +244,10 @@ export function codexTurnArgs(input: {
     "-C",
     input.cwd,
     "--sandbox",
-    "workspace-write",
-    "-c",
-    "sandbox_workspace_write.network_access=true",
-    ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
+    sandbox,
+    ...(sandbox === "workspace-write" && input.writableRoots?.length
+      ? ["-c", codexWritableRoots(input.writableRoots)]
+      : []),
     ...(instructions && !input.thread ? ["-c", `developer_instructions=${JSON.stringify(instructions)}`] : []),
     ...(input.mcp ? codexBridgeOverrides({ runId: input.runId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
     ...(isBrainEffort(input.effort)
@@ -478,6 +497,10 @@ export interface CodexTurnInput {
   /** App-server mode: the agent (one process per agent and session) and its folder (the MCP bridge's). */
   agentId?: string;
   folder?: string;
+  /** Protocol 16: the turn's permission profile (default `work`). */
+  profile?: CommandProfile;
+  /** Protocol 16: false for a background turn: its app-server closes when the turn ends. */
+  keepAlive?: boolean;
 }
 
 /** The app-server mode as `runCodexTurn` sees it (`CodexAppServers`). */
@@ -524,6 +547,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
     ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
+    profile: input.profile ?? "work",
   });
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -706,6 +730,8 @@ export async function handleCodexBrainTurn(
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
       agentId: String(req.agent.id),
       folder,
+      profile: codexProfileOf(req),
+      ...(req.keepAlive === false ? { keepAlive: false } : {}),
     },
     {
       threads,

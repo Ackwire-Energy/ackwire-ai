@@ -36,8 +36,10 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   sonnet` under opus), the engine's context appended to the system prompt
  *   from a file (no shell, no quoting: the process is spawned with an argv),
  *   our MCP bridge (`--mcp-config`, `--strict-mcp-config` unless the agent
- *   opted into the owner's own servers) and the missions' command policy
- *   (`--settings`, the permission prompt tool, the deny list).
+ *   opted into the owner's own servers) and the turn's permission profile
+ *   (`brainProfileLaunch`: `--settings`, the permission prompt tool, the deny
+ *   list; a `plan` turn reads only, ADR 0053 §3). A background turn
+ *   (`keepAlive: false`) leaves no process behind.
  * - The turn's prompt goes in as a stream-json user message on stdin. Output
  *   lines become `WireBrainEvent`s: text deltas (batched every ~50 ms), tool
  *   calls with their results (already executed: our tools through the bridge,
@@ -445,14 +447,15 @@ export interface ClaudeLaunch {
   strictMcp: boolean;
   /** Commands off the allow list ask a person through our tool. */
   promptTool: boolean;
-  permissionMode: "acceptEdits" | "dontAsk";
+  permissionMode: "acceptEdits" | "dontAsk" | "default";
   /** Protocol 10: folders allowed for the agent besides its own (`--add-dir` each). */
   addDirs?: string[];
   /** Protocol 13: `--effort` (anything else is left out). */
   effort?: BrainEffort;
   /**
    * D60: which settings files load (`--setting-sources`). "project" leaves out the computer owner's own
-   * CLAUDE.md, skills and plugins, which every agent there paid for on every step.
+   * CLAUDE.md, skills and plugins, which every agent there paid for on every step; "" (a plan turn) loads
+   * none, so a folder's own settings can't allow it anything.
    */
   settingSources?: string;
   /** D60: Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
@@ -464,6 +467,40 @@ export interface ClaudeLaunch {
  * and the web. Ours come through MCP. Names Claude Code doesn't know are ignored by it.
  */
 export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
+/** A plan turn's own tools (ADR 0053 §3): reading and a shell our prompt tool keeps read-only; no edits, no web. */
+export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep"] as const;
+
+/**
+ * How a brain turn's Claude Code starts for its permission profile (ADR 0053 §3).
+ * `work`: edits accepted in its folders, every command through our prompt tool
+ * (plain reads at once, the rest by the server's rules or a person), and with
+ * the owner's own MCP servers (`personalMcp`) the owner's settings and tools too.
+ * `plan` (a routine that only reads, an unattended run): our MCP tools only,
+ * no settings files of the folder or the owner, no edits and no web, and every
+ * command answered on the computer by `localVerdict` (reads only, never secrets);
+ * nothing is ever asked of a person.
+ */
+export function brainProfileLaunch(
+  mode: "plan" | "work",
+  personalMcp: boolean,
+): Pick<ClaudeLaunch, "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools"> {
+  if (mode === "plan") {
+    return {
+      strictMcp: true,
+      promptTool: true,
+      permissionMode: "default",
+      settingSources: "",
+      builtinTools: PLAN_BUILTIN_TOOLS,
+    };
+  }
+  return {
+    strictMcp: !personalMcp,
+    promptTool: true,
+    permissionMode: "acceptEdits",
+    // D60: with the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
+    ...(personalMcp ? {} : { settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS }),
+  };
+}
 
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
 export const fallbackModelFor = (model: string | undefined) => (model && /opus/i.test(model) ? "sonnet" : undefined);
@@ -492,7 +529,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.mcpConfigFile ? ["--allowedTools", "mcp__agentes"] : []),
     ...(l.promptTool && l.mcpConfigFile ? ["--permission-prompt-tool", PERMISSION_PROMPT_TOOL] : []),
     ...(l.addDirs ?? []).flatMap((d) => ["--add-dir", d]),
-    ...(l.settingSources ? ["--setting-sources", l.settingSources] : []),
+    ...(l.settingSources !== undefined ? ["--setting-sources", l.settingSources] : []),
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
@@ -1168,6 +1205,8 @@ export class BrainManager {
     }
     if (live) {
       const out = await this.onLive(live, req, ctx);
+      // A background turn (a routine's run): nothing stays alive for it afterwards, not even a process it found.
+      if (!keepAlive) this.drop(live);
       if (out.final) return out.final;
       // Died mid-turn: the same turn again, one-shot, resuming the session.
       this.log(`[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} died mid-turn; resuming one-shot`);
@@ -1348,6 +1387,8 @@ export class BrainManager {
             folders: [...new Set([cwd, ctx.folder])],
             // D60: our tools always loaded (no ToolSearch call before each one; the list is short since D65).
             alwaysLoad: true,
+            // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
+            profile: mode,
           }),
         ),
         { mode: 0o600 },
@@ -1370,7 +1411,14 @@ export class BrainManager {
     writeFileSync(
       settingsFile,
       JSON.stringify(
-        claudePermissionSettings(mode, missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix), allow),
+        claudePermissionSettings(
+          mode,
+          missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix),
+          allow,
+          undefined,
+          // Every command reaches our prompt tool: plain reads pass there at once, secrets never.
+          { promptReads: true },
+        ),
       ),
       { mode: 0o600 },
     );
@@ -1386,13 +1434,9 @@ export class BrainManager {
       systemFile,
       ...(mcpConfigFile ? { mcpConfigFile } : {}),
       settingsFile,
-      strictMcp: req.personalMcp !== true,
-      promptTool: mode === "work",
-      permissionMode: mode === "plan" ? "dontAsk" : "acceptEdits",
+      ...brainProfileLaunch(mode, req.personalMcp === true),
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
-      // D60: with the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
-      ...(req.personalMcp !== true ? { settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS } : {}),
     });
     const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
     const live: Live = {

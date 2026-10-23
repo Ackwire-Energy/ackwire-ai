@@ -8,7 +8,9 @@
 // bridge's call, a message whole and one streamed), "WAIT" (stays in progress
 // until steered or interrupted), "WAIT_END" (ends the turn when steered, then
 // refuses the steer as the real CLI does), "LIMIT" (usage limit), "CRASH"
-// (exits mid-turn); anything else answers "pong".
+// (exits mid-turn), "APPROVE <command>" (asks the runner to approve the
+// command, answers with the decision), "APPROVE_FILE <path>" (the same for a
+// change of that file); anything else answers "pong".
 import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
@@ -60,6 +62,14 @@ function appServer() {
   let turns = 0;
   /** The turn in progress: { id, mode }. */
   let active = null;
+  /** Requests sent to the runner (approvals), by id: what to do with its answer. */
+  const asked = new Map();
+  let askedIds = 0;
+  const askRunner = (method, params, then) => {
+    const id = `srv-${++askedIds}`;
+    asked.set(id, then);
+    send({ id, method, params });
+  };
   /** The thread's token totals (a resumed thread starts with some). */
   const total = { input: 1000, cached: 400, output: 100 };
 
@@ -158,6 +168,50 @@ function appServer() {
         if (/\bCRASH\b/.test(prompt)) {
           message("m-crash", "half an answ", true);
           return setTimeout(() => process.exit(1), 20);
+        }
+        const approve = /\bAPPROVE(_FILE)?\s+(.+)$/.exec(prompt.trim());
+        if (approve) {
+          const file = Boolean(approve[1]);
+          const what = (approve[2] ?? "").trim();
+          const it = file
+            ? {
+                type: "fileChange",
+                id: "f-ask",
+                changes: [{ path: what, kind: { type: "update", move_path: null }, diff: "" }],
+                status: "inProgress",
+              }
+            : {
+                type: "commandExecution",
+                id: "c-ask",
+                command: `/bin/zsh -lc "${what}"`,
+                cwd: params.cwd ?? "",
+                processId: null,
+                status: "inProgress",
+                commandActions: [],
+                aggregatedOutput: null,
+                exitCode: null,
+                durationMs: null,
+              };
+          item("item/started", it);
+          const turnId = active.id;
+          return askRunner(
+            file ? "item/fileChange/requestApproval" : "item/commandExecution/requestApproval",
+            {
+              threadId: THREAD,
+              turnId,
+              itemId: it.id,
+              reason: null,
+              ...(file ? { grantRoot: null } : { command: it.command, cwd: it.cwd }),
+            },
+            (answer) => {
+              const decision = answer.result?.decision ?? "none";
+              log({ approval: { item: it.id, what, decision } });
+              item("item/completed", { ...it, status: decision === "accept" ? "completed" : "declined" });
+              message("m-ask", `decision: ${decision}`, true);
+              usage(10, 0, 3);
+              complete("completed");
+            },
+          );
         }
         if (/\bLIMIT\b/.test(prompt)) {
           note("error", {
@@ -268,6 +322,11 @@ function appServer() {
     }
     if (msg.method && msg.id !== undefined) handle(msg);
     else if (msg.method) log({ notify: msg.method });
+    else if (msg.id !== undefined && asked.has(msg.id)) {
+      const then = asked.get(msg.id);
+      asked.delete(msg.id);
+      then(msg);
+    }
   });
   rl.on("close", () => process.exit(0));
 }

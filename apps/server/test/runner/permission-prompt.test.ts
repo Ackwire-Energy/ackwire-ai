@@ -12,6 +12,7 @@ import {
   DENY_RULES,
   handleMcpMessage,
   type IpcReply,
+  mcpProfileFromEnv,
   mcpScopeFromEnv,
   missionExecutorArgs,
   permissionPrompt,
@@ -288,4 +289,50 @@ test("refused commands: Claude Code's permission_denials and Codex's declined co
     }),
   );
   expect(frame).toMatchObject({ type: "task.done", denials: [{ tool: "Bash", command: "swift build" }] });
+});
+
+test("ADR 0053 §3: a plan turn's prompts are answered on the computer (reads only), never asked of the server", async () => {
+  const scope = { cwd: "/w/dev/app", folders: ["/w/dev/app", "/w/dev"], home: "/Users/w" };
+  const plan = { ...instant, scope, profile: "plan" as const };
+  for (const command of ["ls -la", "git log -3", "cat README.md"]) {
+    const s = server([]);
+    expect(await permissionPrompt(bash(command), s.call, plan)).toEqual({ behavior: "allow", updatedInput: { command } });
+    expect(s.calls).toHaveLength(0);
+  }
+  for (const call of [
+    bash("npm install"),
+    bash("curl -sI https://example.com"),
+    bash("git fetch"),
+    { tool_name: "Edit", input: { file_path: "/w/dev/app/a.ts" } },
+    { tool_name: "WebFetch", input: { url: "https://example.com" } },
+  ]) {
+    const s = server([{ behavior: "allow" }]);
+    expect(await permissionPrompt(call, s.call, plan)).toMatchObject({ behavior: "deny" });
+    expect(s.calls).toHaveLength(0);
+  }
+  // The profile reaches our MCP process through its env.
+  expect(mcpProfileFromEnv({ AGENTES_MCP_PROFILE: "plan" })).toBe("plan");
+  expect(mcpProfileFromEnv({})).toBe("work");
+});
+
+test("every profile: secrets and normalized deny-list commands are refused at once; inline code goes to the server", async () => {
+  const scope = { cwd: "/w/dev/app", folders: ["/w/dev/app", "/w/dev"], home: "/Users/w" };
+  for (const call of [
+    bash("cat ~/.ssh/id_rsa"),
+    { tool_name: "Read", input: { file_path: "/Users/w/.aws/credentials" } },
+    { tool_name: "Grep", input: { pattern: "KEY", glob: "**/.env" } },
+    bash("gh -R acme/web pr merge 1"),
+    bash("git -c x=y push origin refs/heads/main"),
+    bash("gh auth token"),
+  ]) {
+    const s = server([{ behavior: "allow" }]);
+    expect(await permissionPrompt(call, s.call, { ...instant, scope })).toMatchObject({ behavior: "deny" });
+    expect(s.calls).toHaveLength(0);
+  }
+  // Never allowed by the computer itself: the server's rules (or a person) decide.
+  const s = server([{ behavior: "deny", message: "This command was refused because it runs code given inline." }]);
+  expect(await permissionPrompt(bash("node -e 'process.exit(0)'"), s.call, { ...instant, scope })).toMatchObject({
+    behavior: "deny",
+  });
+  expect(s.calls).toHaveLength(1);
 });

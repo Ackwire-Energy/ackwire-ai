@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 15;
+export const MACHINE_PROTOCOL_VERSION = 16;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -127,6 +127,18 @@ export const MISSION_WORKTREE_PROTOCOL = 14;
  * `unsupported` (no new protocol number: the reply already says what it can).
  */
 export const STEER_PROTOCOL = 15;
+/**
+ * From this protocol on (ADR 0053 §3): a Codex `brain.turn` honours
+ * `permissions` and `keepAlive`. `plan`: a read-only sandbox without network;
+ * `work`: a workspace sandbox without network where each command or file
+ * approval Codex asks (`approvalPolicy: "untrusted"`) is answered by the same
+ * command policy as Claude Code's permission prompt. `keepAlive: false` (a
+ * background turn) leaves no app-server behind. Claude Code's `plan` turns read
+ * only on our prompt tool, with no settings files. An older runner would run
+ * Codex with no approvals and the network on: the server never sends it a
+ * Codex turn (`runner_outdated`); its Claude Code turns keep the plan mode it has.
+ */
+export const BRAIN_PROFILES_PROTOCOL = 16;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -583,11 +595,14 @@ export interface BrainTurnRequest {
   prompt: string;
   /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
   mcp: { token: string; url?: string };
-  /** Keep one process per (agent, session) alive between turns (default true). */
+  /** Keep one process per (agent, session) alive between turns (default true; false for a background turn). Codex: protocol 16. */
   keepAlive?: boolean;
-  /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`). */
+  /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`; never in a `plan` turn). */
   personalMcp?: boolean;
-  /** Command policy (as missions): `work` (default) edits and asks a person for the rest; `plan` reads only. */
+  /**
+   * The turn's permission profile (ADR 0053 §3): `work` (default) edits and asks a person (or the server's
+   * rules) for the rest; `plan` reads only. Codex honours it from `BRAIN_PROFILES_PROTOCOL` on.
+   */
   permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
   /** Protocol 13: the account folder to run in (`accounts/<kind>/<id>`); absent: the machine's own sign-in. */
   account?: string;
