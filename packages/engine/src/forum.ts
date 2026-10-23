@@ -14,8 +14,8 @@ import {
 } from "@agenteschat/db";
 import { type ArtifactDeps, createArtifact, updateArtifact } from "./artifacts";
 import { audienceError, canTalkTo } from "./audience";
-import { runBrainOf } from "./brains/select";
 import { recordAudit } from "./audit";
+import { runBrainOf } from "./brains/select";
 import { caches } from "./cache";
 import { requireChannelAccess } from "./channels";
 import { createAgentRuns } from "./dispatch";

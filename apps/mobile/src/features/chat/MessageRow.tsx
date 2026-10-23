@@ -223,9 +223,7 @@ export const MessageRow = memo(function MessageRow({
       accessibilityHint={t("mobile.chat.longPressHint")}
       style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && { backgroundColor: c.sunken }]}
     >
-      <View style={styles.avslot}>
-        {grouped ? null : <Face who={m.author} size={32} live={false} />}
-      </View>
+      <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
       <View style={styles.body}>
         {grouped ? null : (
           <View style={styles.who}>

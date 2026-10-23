@@ -150,7 +150,7 @@ const noRequester: ToolOutput = {
 };
 
 /** Events a routine can wait for instead of polling (mail comes through an email trigger: it needs a mailbox). */
-const TOOL_EVENTS = ROUTINE_EVENTS.filter((e) => e !== "email.received");
+const TOOL_EVENTS: readonly RoutineEvent[] = ROUTINE_EVENTS.filter((e) => e !== "email.received");
 
 /** What each event means, for the model and its answers (English). */
 const EVENT_WORDS: Record<RoutineEvent, string> = {
@@ -185,7 +185,12 @@ function whenText(t: RoutineTrigger) {
 function whenParams(t: RoutineTrigger): AgentActionParams {
   switch (t.type) {
     case "schedule":
-      return { trigger: "schedule", rule: t.rule, cron: t.rule ? null : t.cron, timezone: t.timezone };
+      return {
+        trigger: "schedule",
+        rule: t.rule ? { ...t.rule } : null,
+        cron: t.rule ? null : t.cron,
+        timezone: t.timezone,
+      };
     case "once":
       return { trigger: "once", at: t.at, timezone: t.timezone };
     case "event":
@@ -290,11 +295,7 @@ async function mailboxOf(ctx: ToolContext, raw: string) {
     .select({ id: mailAccounts.id, address: mailAccounts.address, label: mailAccounts.label })
     .from(mailAccounts)
     .where(
-      and(
-        eq(mailAccounts.orgId, ctx.orgId),
-        isNull(mailAccounts.revokedAt),
-        sql`${mailAccounts.status} <> 'pending'`,
-      ),
+      and(eq(mailAccounts.orgId, ctx.orgId), isNull(mailAccounts.revokedAt), sql`${mailAccounts.status} <> 'pending'`),
     );
   const readable: typeof accounts = [];
   for (const a of accounts) {
@@ -545,7 +546,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "list_routines",
       description:
-        'List routines (recurring, not reminders): yours by default; another agent\'s with `agent` (its handle, e.g. @atlas), or every agent\'s with `agent: "all"`, to check what they do before you answer about them. Shows each one\'s state (active, paused and why, running, waiting for its computer, failing), when it runs and its next run, where it reports, its instructions and its last 5 runs with their coded outcome (reported, silent, failed, skipped… and why). `id` shows one in full. Read only: you change only your own routines, when a person asks.',
+        "List routines (recurring, not reminders): yours by default; another agent's with `agent` (its handle, e.g. @atlas), or every agent's with `agent: \"all\"`, to check what they do before you answer about them. Shows each one's state (active, paused and why, running, waiting for its computer, failing), when it runs and its next run, where it reports, its instructions and its last 5 runs with their coded outcome (reported, silent, failed, skipped… and why). `id` shows one in full. Read only: you change only your own routines, when a person asks.",
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",

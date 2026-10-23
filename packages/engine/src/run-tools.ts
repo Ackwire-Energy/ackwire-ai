@@ -10,10 +10,11 @@ import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
 import { notifyQuestion } from "./notification-producers";
 import {
-  ASK_USER_TOOL,
   type AgentQuestionRow,
+  ASK_USER_TOOL,
   publishQuestion,
   QUESTION_TTL_MS,
+  questionCardMeta,
   questionView,
   syncQuestionMessage,
 } from "./questions";
@@ -505,7 +506,8 @@ export type RunPause = Exclude<InvokeResult, { type: "result" }> | { type: "wait
 /** What a run pauses on in one step: approvals, questions (`ask_user`) and secret requests (ADR 0027). */
 export interface PauseRequests {
   approvals: Approval[];
-  questions: { id: string; toolUseId: string; text: string; choices: string[] | null }[];
+  /** `why`: the agent's required reason (ADR 0053 §8), shown on the card. */
+  questions: { id: string; toolUseId: string; text: string; choices: string[] | null; why?: string }[];
   secretRequestIds: string[];
 }
 
@@ -626,7 +628,7 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .onConflictDoNothing()
       .returning();
     if (!inserted) continue;
-    const message = await card(home, ask.text, { questionId: ask.id, question: questionView(inserted) });
+    const message = await card(home, ask.text, questionCardMeta(inserted, ask.why ?? ""));
     const [linked] = await tx
       .update(agentQuestions)
       .set({ messageId: message.id })
@@ -756,7 +758,7 @@ export async function suspendRunForTool(
       approvals: gated.type === "approval" ? [gated.approval] : [],
       questions:
         gated.type === "question" && questionId
-          ? [{ id: questionId, toolUseId: call.id, text: gated.text, choices: gated.choices }]
+          ? [{ id: questionId, toolUseId: call.id, text: gated.text, choices: gated.choices, why: gated.why }]
           : [],
       secretRequestIds: gated.type === "secret" ? [gated.requestId] : [],
     });

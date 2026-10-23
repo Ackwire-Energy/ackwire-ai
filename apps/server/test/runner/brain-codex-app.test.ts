@@ -436,7 +436,12 @@ test("profiles: plan is a read-only sandbox, work a workspace one; neither has t
   expect(codexThreadPolicy("work")).toEqual({ sandbox: "workspace-write", approvalPolicy: "untrusted" });
   // What one approval is for the command policy: the shell line, or a write of each file.
   expect(
-    approvalCalls("item/commandExecution/requestApproval", { command: '/bin/zsh -lc "gh pr merge 1"' }, undefined, "/w"),
+    approvalCalls(
+      "item/commandExecution/requestApproval",
+      { command: '/bin/zsh -lc "gh pr merge 1"' },
+      undefined,
+      "/w",
+    ),
   ).toEqual([{ tool_name: "Bash", input: { command: "gh pr merge 1" } }]);
   expect(
     approvalCalls("item/commandExecution/requestApproval", {}, { command: ["/bin/bash", "-lc", "git status"] }, "/w"),

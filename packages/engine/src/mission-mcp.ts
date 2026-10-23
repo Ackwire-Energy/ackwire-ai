@@ -623,7 +623,7 @@ export function createMissionHooks(deps: HookDeps): MachineMissionHooks {
     online: async (machineId) => {
       await onMachineOnline(deps, machineId);
       // Runs that waited for this computer's brain (ADR 0032 §5) try again.
-      await resumeRunsWaitingForMachine(deps.db, machineId).catch(() => undefined);
+      await resumeRunsWaitingForMachine(deps.db, machineId, { pubsub: deps.pubsub }).catch(() => undefined);
     },
   };
 }

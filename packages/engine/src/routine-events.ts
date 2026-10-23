@@ -29,9 +29,7 @@ export type EventMerge = (
 const FLAGS = ["gathered", "held", "events", "extra", "dedupeKeys", "summary", "type"];
 const one = (e: Record<string, unknown>) => Object.fromEntries(Object.entries(e).filter(([k]) => !FLAGS.includes(k)));
 const listOf = (e: Record<string, unknown>) =>
-  Array.isArray(e.events)
-    ? (e.events as Record<string, unknown>[])
-    : [{ summary: String(e.summary ?? ""), ...one(e) }];
+  Array.isArray(e.events) ? (e.events as Record<string, unknown>[]) : [{ summary: String(e.summary ?? ""), ...one(e) }];
 const countOf = (e: Record<string, unknown>) => (typeof e.extra === "number" ? e.extra : 0);
 
 /** Events of any kind, merged into one list (newest last, the oldest dropped past the cap) and one summary. */

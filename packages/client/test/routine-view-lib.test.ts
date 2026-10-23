@@ -12,8 +12,8 @@ import {
   routineStateWords,
   runMessageLink,
   runOutcome,
-  runPixels,
   runPixelStatus,
+  runPixels,
   runsPerDay,
   usageParts,
   whereItRuns,
@@ -48,11 +48,9 @@ describe("a routine's runs", () => {
     for (const s of ["canceled", "superseded", "missed", "skipped"] as const) expect(runPixelStatus(s)).toBe("skipped");
     for (const s of ["queued", "running", "waiting"] as const) expect(runPixelStatus(s)).toBeNull();
     expect(
-      runPixels([
-        run({ status: "running" }),
-        run({ status: "reported", weight: 0.5 }),
-        run({ status: "missed" }),
-      ]).map((p) => [p.status, p.weight]),
+      runPixels([run({ status: "running" }), run({ status: "reported", weight: 0.5 }), run({ status: "missed" })]).map(
+        (p) => [p.status, p.weight],
+      ),
     ).toEqual([
       ["ok", 0.5],
       ["skipped", undefined],

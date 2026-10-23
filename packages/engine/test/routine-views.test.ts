@@ -303,12 +303,14 @@ describe("routine limits", () => {
       createdByUserId: f.owner.id,
       ...extra,
     });
-    await f.db.insert(schema.routines).values([
-      ...Array.from({ length: MAX_ACTIVE_ROUTINES - 1 }, (_, i) => values(i)),
-      values(100, { active: false }),
-      values(101, { triggerType: "once", event: null, nextRunAt: new Date(Date.now() + HOUR) }),
-      values(102, { target: { type: "conversation", channelId: f.general.id, threadId: null, reminder: true } }),
-    ]);
+    await f.db
+      .insert(schema.routines)
+      .values([
+        ...Array.from({ length: MAX_ACTIVE_ROUTINES - 1 }, (_, i) => values(i)),
+        values(100, { active: false }),
+        values(101, { triggerType: "once", event: null, nextRunAt: new Date(Date.now() + HOUR) }),
+        values(102, { target: { type: "conversation", channelId: f.general.id, threadId: null, reminder: true } }),
+      ]);
     const input = {
       agentId: f.agent.id,
       prompt: "Mais uma.",
@@ -326,9 +328,9 @@ describe("routine limits", () => {
     ).rejects.toMatchObject({ code: "routine.too_many" });
     // Pausing one frees a place.
     await updateRoutine(routineDeps(), f.owner.id, f.org.id, twentieth.id, { active: false });
-    expect(
-      (await updateRoutine(routineDeps(), f.owner.id, f.org.id, paused?.id ?? "", { active: true })).active,
-    ).toBe(true);
+    expect((await updateRoutine(routineDeps(), f.owner.id, f.org.id, paused?.id ?? "", { active: true })).active).toBe(
+      true,
+    );
   });
 
   test("an edit keeps the routine's own time zone unless one is given", async () => {

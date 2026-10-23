@@ -54,8 +54,7 @@ export const ROUTINE_CODE_TEXT: Record<string, string> = {
   reminder_sent: "Reminder sent",
 };
 
-export const routineCodeText = (code: string | null | undefined) =>
-  (code && ROUTINE_CODE_TEXT[code]) || code || "";
+export const routineCodeText = (code: string | null | undefined) => (code && ROUTINE_CODE_TEXT[code]) || code || "";
 
 /** The routine run's `routine.run` job is still queued or running (else nothing will ever start it). */
 export const routineJobAlive = (routineRunId: typeof routineRuns.id | SQL) =>

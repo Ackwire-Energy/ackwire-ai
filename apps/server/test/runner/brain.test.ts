@@ -545,7 +545,15 @@ test.if(posix)(
     const settings = JSON.parse(readFileSync(at("--settings") as string, "utf8")) as {
       permissions: { allow: string[]; deny: string[] };
     };
-    const denied = ["Edit", "Write", "WebFetch", "WebSearch", "Read(~/.ssh/**)", "Bash(node -e*)", "Bash(gh pr merge *)"];
+    const denied = [
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch",
+      "Read(~/.ssh/**)",
+      "Bash(node -e*)",
+      "Bash(gh pr merge *)",
+    ];
     for (const rule of denied) expect(settings.permissions.deny).toContain(rule);
     // Shell reads aren't allow rules: our prompt tool decides them (and refuses secrets).
     expect(settings.permissions.allow.some((r) => r.startsWith("Bash("))).toBe(false);

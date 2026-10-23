@@ -157,11 +157,11 @@ describe("routines", () => {
     expect(runs).toMatchObject([{ background: true, status: "done", replyMessageId: null }]);
     expect((await f.db.select().from(schema.messages)).filter((m) => m.authorAgentId === f.agent.id)).toEqual([]);
     const [view] = await listRoutines(f.db, f.owner.id, f.org.id);
-    expect(view?.lastRun).toMatchObject({ status: "silent", summary: "Resumo: tudo certo.", summaryCode: null });
+    expect(view?.lastRun).toMatchObject({ status: "silent", summary: "Resumo: tudo certo.", code: null });
     // No money in the view.
     expect(view?.lastRun).not.toHaveProperty("costUsd");
     expect(view).not.toHaveProperty("budgetUsedPercent");
-    expect(view?.running).toBe(false);
+    expect(view?.state).toBe("active");
     expect(new Date(view?.nextRunAt ?? 0).getTime()).toBeGreaterThan(Date.now());
   });
 
@@ -453,12 +453,9 @@ describe("routines", () => {
       target: { type: "channel", channelId: f.general.id },
       trigger: { type: "event", event: "issue.created" },
     });
-    const issue = await createIssue(
-      { db: f.db, pubsub: f.pubsub },
-      { type: "person", userId: f.owner.id },
-      f.org.id,
-      { title: "Checkout lento" },
-    );
+    const issue = await createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
+      title: "Checkout lento",
+    });
     await drainOutbox(f.db, f.handlers);
     const trigger = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineBrief !== undefined);
     expect(trigger?.body).toBe("Faça a triagem da issue nova.");

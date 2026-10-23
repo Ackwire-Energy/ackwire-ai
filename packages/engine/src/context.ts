@@ -25,13 +25,7 @@ import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { noticeForOthers, noticeText } from "./notices";
 import { WHY_YOU_WERE_CALLED } from "./reply-policy";
-import {
-  isRoutineRoomKey,
-  type RoutineBrief,
-  routineAccessOf,
-  routineBriefOf,
-  routineReportOf,
-} from "./routine-brief";
+import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { agentScopeNames, loadTeam, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
@@ -170,8 +164,8 @@ export const THIS_TURN_MAX_CHARS = 2000;
  * What a computer brain reads at the top of every turn (ADR 0053 §10): the run's per-turn blocks, with
  * the time rendered now, under one heading, clipped. "" when the run has none.
  */
-export function thisTurnText(system: readonly SystemBlock[], now = new Date()): string {
-  const blocks = system.filter(isTurnBlock) as ContextBlock[];
+export function thisTurnText(system: readonly ContextBlock[], now = new Date()): string {
+  const blocks = system.filter(isTurnBlock);
   if (blocks.length === 0) return "";
   // The time first: it is what a resumed session most needs fresh.
   const ordered = [...blocks.filter((b) => b.now), ...blocks.filter((b) => !b.now)];
@@ -288,43 +282,43 @@ export async function buildRunContext(
     background
       ? Promise.resolve([] as Message[])
       : range
-      ? // The range instead of "the channel before the root": its messages still in the
-        // channel (moved ones are replies now, read with the thread), minus the excluded.
-        db
-          .select()
-          .from(messages)
-          .where(
-            and(
-              eq(messages.orgId, run.orgId),
-              eq(messages.channelId, range.channelId),
-              isNull(messages.threadId),
-              isNull(messages.deletedAt),
-              // The bounds from the row itself (exact to the microsecond, unlike a JS Date).
-              sql`${messages.createdAt} >= (select t.context_first_at from ${schema.threads} t
+        ? // The range instead of "the channel before the root": its messages still in the
+          // channel (moved ones are replies now, read with the thread), minus the excluded.
+          db
+            .select()
+            .from(messages)
+            .where(
+              and(
+                eq(messages.orgId, run.orgId),
+                eq(messages.channelId, range.channelId),
+                isNull(messages.threadId),
+                isNull(messages.deletedAt),
+                // The bounds from the row itself (exact to the microsecond, unlike a JS Date).
+                sql`${messages.createdAt} >= (select t.context_first_at from ${schema.threads} t
                 where t.org_id = ${run.orgId}::uuid and t.root_message_id = ${run.threadRootId}::uuid)`,
-              sql`${messages.createdAt} <= (select t.context_last_at from ${schema.threads} t
+                sql`${messages.createdAt} <= (select t.context_last_at from ${schema.threads} t
                 where t.org_id = ${run.orgId}::uuid and t.root_message_id = ${run.threadRootId}::uuid)`,
-              ne(messages.id, run.threadRootId),
-              range.excluded.length > 0 ? notInArray(messages.id, range.excluded) : undefined,
-            ),
-          )
-          .orderBy(desc(messages.createdAt), desc(messages.id))
-          .limit(Math.max(1, options.maxMessages - 1))
-      : // The channel as people see it: top-level messages and the replies shown under them
-        // (agents answer in a thread per message), minus this thread (read above).
-        db
-          .select()
-          .from(messages)
-          .where(
-            and(
-              scope,
-              sql`${messages.threadId} is distinct from ${run.threadRootId}::uuid`,
-              sql`${messages.createdAt} <= ${rootTime}`,
-              ne(messages.id, run.threadRootId),
-            ),
-          )
-          .orderBy(desc(messages.createdAt), desc(messages.id))
-          .limit(Math.max(1, options.maxMessages - 1)),
+                ne(messages.id, run.threadRootId),
+                range.excluded.length > 0 ? notInArray(messages.id, range.excluded) : undefined,
+              ),
+            )
+            .orderBy(desc(messages.createdAt), desc(messages.id))
+            .limit(Math.max(1, options.maxMessages - 1))
+        : // The channel as people see it: top-level messages and the replies shown under them
+          // (agents answer in a thread per message), minus this thread (read above).
+          db
+            .select()
+            .from(messages)
+            .where(
+              and(
+                scope,
+                sql`${messages.threadId} is distinct from ${run.threadRootId}::uuid`,
+                sql`${messages.createdAt} <= ${rootTime}`,
+                ne(messages.id, run.threadRootId),
+              ),
+            )
+            .orderBy(desc(messages.createdAt), desc(messages.id))
+            .limit(Math.max(1, options.maxMessages - 1)),
   ]);
   const root = rootRows[0];
   // The thread comes first; earlier channel messages (or the range) fill what's left.
@@ -920,9 +914,7 @@ async function saidThere(
       and(
         eq(messages.orgId, orgId),
         eq(messages.channelId, to.channelId),
-        to.threadId
-          ? or(eq(messages.threadId, to.threadId), eq(messages.id, to.threadId))
-          : isNull(messages.threadId),
+        to.threadId ? or(eq(messages.threadId, to.threadId), eq(messages.id, to.threadId)) : isNull(messages.threadId),
         isNull(messages.deletedAt),
         ne(messages.id, triggerId),
       ),

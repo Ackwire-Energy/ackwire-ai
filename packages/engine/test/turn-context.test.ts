@@ -267,7 +267,7 @@ describe("# This turn", () => {
     expect(seen[1]?.prompt).toContain("replying in a thread");
     // The transcript keeps every block for the model brain (a fallback reads them), the per-turn ones last.
     const [, second] = await f.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
-    const stored = (second?.transcript as { system: ContextBlock[] }).system;
+    const stored = (second?.transcript as { system: ContextBlock[] } | undefined)?.system ?? [];
     expect(stored.at(-1)?.turn).toBe(true);
     expect(stored.some((b) => b.text.startsWith("# Now"))).toBe(true);
   });

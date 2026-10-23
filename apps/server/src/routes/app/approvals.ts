@@ -33,7 +33,17 @@ export const Approval = z
       .openapi({ description: "What the action returned once it ran (raw, short)." }),
     connector: z.string().nullable().openapi({ example: "github" }),
     connectorAccount: z.string().nullable().openapi({ example: "acme" }),
-    why: z.string().nullable().openapi({ description: "What the agent said right before asking." }),
+    why: z
+      .string()
+      .nullable()
+      .openapi({ description: "The agent's required reason: what it found and why this action." }),
+    origin: z
+      .union([
+        z.object({ kind: z.literal("routine"), routineId: z.string(), routineName: z.string() }),
+        z.object({ kind: z.literal("unattended") }),
+      ])
+      .nullable()
+      .openapi({ description: "Asked while nobody was watching: by a routine, or by unattended work." }),
     issue: z.object({ id: z.uuid(), number: z.number().int(), title: z.string() }).nullable(),
     trail: z
       .array(z.object({ text: z.string(), at: z.string() }))

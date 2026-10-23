@@ -19,7 +19,7 @@ import {
   viewRange,
 } from "@agenteschat/client/lib/calendar";
 import { formatTime, joinNames, toYmd } from "@agenteschat/client/lib/format";
-import { runPixels, runPixelStatus } from "@agenteschat/client/lib/routine-view";
+import { runPixelStatus, runPixels } from "@agenteschat/client/lib/routine-view";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
   ApprovalCard,

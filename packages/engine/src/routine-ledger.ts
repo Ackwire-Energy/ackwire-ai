@@ -52,6 +52,12 @@ export function routineFailureCode(error: string | null | undefined): string {
   return coded && coded !== "failed" ? coded : "error";
 }
 
+/** A failed run's end for its routine's ledger: the coded reason, with the run error's detail when it has one. */
+export function routineFailureEnd(error: string): { code: string; detail?: string } {
+  const detail = runErrorDetail(error)?.errorParams?.detail;
+  return detail ? { code: routineFailureCode(error), detail } : { code: routineFailureCode(error) };
+}
+
 /**
  * Closes the routine run of a background run, on every ending (ADR 0053 §5): its answer, a failure,
  * a stop, a deploy, a computer cut off, a supersede. The one place a routine's ledger moves to its
@@ -135,8 +141,8 @@ async function reportEveryTime(
       }),
     };
   });
-  if ("block" in outcome) return outcome.block;
-  await publishDelivery(deps.pubsub, outcome.delivered).catch(() => {});
+  if (outcome.block) return outcome.block;
+  if (outcome.delivered) await publishDelivery(deps.pubsub, outcome.delivered).catch(() => {});
   return null;
 }
 
@@ -272,11 +278,7 @@ export async function recordRoutineReportMessage(
     .update(routineRuns)
     .set({ messageId: input.messageId })
     .where(
-      and(
-        eq(routineRuns.id, input.routineRunId),
-        eq(routineRuns.orgId, input.orgId),
-        isNull(routineRuns.messageId),
-      ),
+      and(eq(routineRuns.id, input.routineRunId), eq(routineRuns.orgId, input.orgId), isNull(routineRuns.messageId)),
     )
     .returning({ routineId: routineRuns.routineId });
   if (!row) return false;

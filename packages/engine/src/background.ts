@@ -1,8 +1,8 @@
-import { and, desc, type Executor, eq, inArray, ne, schema } from "@agenteschat/db";
+import { and, type Executor, eq, schema } from "@agenteschat/db";
 import { type RoutineBrief, routineBriefOf } from "./routine-brief";
 import type { AgentRun } from "./runs";
 
-const { messages, routineRuns } = schema;
+const { messages } = schema;
 
 export interface RoutineOfRun {
   routineId: string;
@@ -39,27 +39,4 @@ export async function routineBriefOfRun(
     .from(messages)
     .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
   return routineBriefOf(m?.meta);
-}
-
-/** A routine's last finished background run before this one: when, whether it reported, and its record. */
-export async function lastRoutineRecord(
-  db: Executor,
-  orgId: string,
-  routineId: string,
-  currentRoutineRunId: string | null,
-): Promise<{ at: Date; reported: boolean; record: string } | null> {
-  const [row] = await db
-    .select({ at: routineRuns.at, status: routineRuns.status, summary: routineRuns.summary })
-    .from(routineRuns)
-    .where(
-      and(
-        eq(routineRuns.orgId, orgId),
-        eq(routineRuns.routineId, routineId),
-        inArray(routineRuns.status, ["silent", "reported"]),
-        currentRoutineRunId ? ne(routineRuns.id, currentRoutineRunId) : undefined,
-      ),
-    )
-    .orderBy(desc(routineRuns.createdAt))
-    .limit(1);
-  return row ? { at: row.at, reported: row.status === "reported", record: row.summary } : null;
 }

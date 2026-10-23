@@ -23,7 +23,6 @@ const {
   channels,
   channelMembers,
   threads,
-  agentRuns,
   agents,
   organizationMembers,
   issues,
@@ -578,7 +577,7 @@ export async function notifyRoutineFailed(
 
 /**
  * A routine paused itself (§6.2, §6.6): its creator and the agent's owner hear it once per pause
- * (`key`), with the coded reason (`latest.statusTo`, the app translates it) and its English fallback.
+ * (`key`), with the coded reason (`latest.reason`, the app translates it) and its English fallback.
  */
 export async function notifyRoutinePaused(
   deps: NotificationDeps,
@@ -600,7 +599,7 @@ export async function notifyRoutinePaused(
     groupKey: `routine_paused:${input.routineId}:${input.key}`,
     actor: agent(input.agentId),
     source: { routineId: input.routineId, label: input.name },
-    latest: { title: input.name, statusTo: input.reason, text: input.text },
+    latest: { title: input.name, reason: input.reason, text: input.text },
   });
 }
 

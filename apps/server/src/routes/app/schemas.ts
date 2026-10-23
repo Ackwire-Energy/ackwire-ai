@@ -177,6 +177,7 @@ export const AgentAction = z
         "memory.forgotten",
         "routine.created",
         "routine.updated",
+        "routine.deleted",
         "channel.agent_added",
         "wiki.page_created",
         "wiki.page_edited",
@@ -198,8 +199,21 @@ export const AgentAction = z
       slug: z.string().optional().openapi({ description: "Wiki pages." }),
     }),
     params: z
-      .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]))
-      .openapi({ description: "Values for the sentence (number, title, fields, status, text, agentName…)." }),
+      .record(
+        z.string(),
+        z.union([
+          z.string(),
+          z.number(),
+          z.boolean(),
+          z.null(),
+          z.array(z.string()),
+          z.record(z.string(), z.unknown()),
+        ]),
+      )
+      .openapi({
+        description:
+          "Values for the sentence (number, title, fields, status, text, agentName…); a routine's `rule` is an object the app words.",
+      }),
     createdAt: z.string(),
     undoableUntil: z
       .string()

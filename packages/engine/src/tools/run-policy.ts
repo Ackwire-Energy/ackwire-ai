@@ -143,8 +143,7 @@ export const REFUSALS = {
   routineAskUser:
     "This is a routine's background work: nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
   routineReact: "This is a routine's background work: there is no message to react to. Just finish, or use hand_off.",
-  routineHere:
-    "This is a routine's background work in a room nobody reads: put it in hand_off; the people decide.",
+  routineHere: "This is a routine's background work in a room nobody reads: put it in hand_off; the people decide.",
   routineReadOnly: "This routine only reads and reports: put what you'd do in hand_off; the people decide.",
   routineBrowserReadOnly:
     "This routine only reads and reports, and the browser can send data out: use your other tools, and say in hand_off what you'd check.",

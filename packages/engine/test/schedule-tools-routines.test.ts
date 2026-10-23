@@ -66,8 +66,7 @@ async function tools(fx: Fixture, ctx: ToolContext) {
 type RoutineRow = typeof schema.routines.$inferSelect;
 const routineOf = async (id: string) =>
   (await f.db.select().from(schema.routines).where(eq(schema.routines.id, id)))[0] as RoutineRow;
-const receipts = (runId: string) =>
-  f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, runId));
+const receipts = (runId: string) => f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, runId));
 
 describe("schedule tools: routines", () => {
   test("create_routine with an event trigger, report and access; the receipt carries no English schedule", async () => {
@@ -83,7 +82,7 @@ describe("schedule tools: routines", () => {
     expect(out.isError).toBeFalsy();
     expect(out.content).toContain("when a new error comes in from Sentry");
     expect(out.content).toContain("reports every run");
-    const id = (out.data?.routine as { id: string }).id;
+    const id = (out.data?.routine as { id: string } | undefined)?.id ?? "";
     expect(await routineOf(id)).toMatchObject({
       triggerType: "event",
       event: "sentry.issue_created",
@@ -98,7 +97,7 @@ describe("schedule tools: routines", () => {
 
     // A schedule's receipt carries its rule: the app words it in the person's language.
     const weekly = await call("create_routine", { prompt: "Resumo da semana.", schedule: "toda segunda às 9h" });
-    const weeklyId = (weekly.data?.routine as { id: string }).id;
+    const weeklyId = (weekly.data?.routine as { id: string } | undefined)?.id ?? "";
     const receipt = (await receipts(ctx.runId)).find((r) => r.targetId === weeklyId);
     expect(receipt?.params).toMatchObject({
       trigger: "schedule",
@@ -135,7 +134,7 @@ describe("schedule tools: routines", () => {
     const ctx = await runContext(f);
     const call = await tools(f, ctx);
     const created = await call("create_routine", { prompt: "Veja os PRs abertos.", schedule: "todo dia às 9h" });
-    const id = (created.data?.routine as { id: string }).id;
+    const id = (created.data?.routine as { id: string } | undefined)?.id ?? "";
 
     const updated = await call("update_routine", { id, report: "always", access: "act" });
     expect(updated.isError).toBeFalsy();
@@ -166,16 +165,18 @@ describe("schedule tools: routines", () => {
     const ctx = await runContext(f);
     const call = await tools(f, ctx);
     const created = await call("create_routine", { prompt: "Olhe o Sentry.", schedule: "todo dia às 9h" });
-    const id = (created.data?.routine as { id: string }).id;
+    const id = (created.data?.routine as { id: string } | undefined)?.id ?? "";
     const run = (hoursAgo: number, values: Partial<typeof schema.routineRuns.$inferInsert>) => {
       const at = new Date(Date.now() - hoursAgo * 3600_000);
       return { orgId: f.org.id, routineId: id, at, createdAt: at, trigger: "schedule", ...values };
     };
-    await f.db.insert(schema.routineRuns).values([
-      run(1, { status: "failed", code: "provider_error" }),
-      run(2, { status: "skipped", code: "previous_running" }),
-      run(3, { status: "reported", summary: "3 erros novos." }),
-    ]);
+    await f.db
+      .insert(schema.routineRuns)
+      .values([
+        run(1, { status: "failed", code: "provider_error" }),
+        run(2, { status: "skipped", code: "previous_running" }),
+        run(3, { status: "reported", summary: "3 erros novos." }),
+      ]);
     await f.db
       .update(schema.routines)
       .set({ active: false, nextRunAt: null, pausedReason: "failing", failuresInRow: 5 })

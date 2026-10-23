@@ -39,10 +39,8 @@ export function brainFor(
  * it and when a conversation run falls back), else the agent's until its first turn. Shared code (steering,
  * the talker, "Continuar", the forum budget) reads this, never the agent's stored brain alone.
  */
-export const runBrainOf = (
-  run: { brain?: string | null },
-  agent?: { brain?: string | null } | null,
-): BrainKind => kindOf(run.brain ?? agent?.brain);
+export const runBrainOf = (run: { brain?: string | null }, agent?: { brain?: string | null } | null): BrainKind =>
+  kindOf(run.brain ?? agent?.brain);
 
 /** Stores the brain a run thinks with now (`agent_runs.brain`). */
 export async function recordRunBrain(db: Executor, runId: string, kind: BrainKind) {

@@ -53,9 +53,7 @@ export async function unclaimRoutineRun(db: Database, routineRunId: string) {
   await db
     .update(routineRuns)
     .set({ status: "queued" })
-    .where(
-      and(eq(routineRuns.id, routineRunId), eq(routineRuns.status, "starting"), isNull(routineRuns.agentRunId)),
-    );
+    .where(and(eq(routineRuns.id, routineRunId), eq(routineRuns.status, "starting"), isNull(routineRuns.agentRunId)));
 }
 
 /** The slot never started a run (deleted, paused, the previous one still working…). */

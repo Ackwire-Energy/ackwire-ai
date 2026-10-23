@@ -730,6 +730,7 @@ export const en: Translations = {
       updated: "Changed {{fields}} of the routine <b>{{name}}</b>",
       updated_paused: "Paused the routine <b>{{name}}</b>",
       updated_resumed: "Resumed the routine <b>{{name}}</b>",
+      deleted: "Deleted the routine <b>{{name}}</b>",
     },
     channel: {
       agent_added: "Brought {{agentName}} into <b>#{{channel}}</b>",
@@ -758,6 +759,8 @@ export const en: Translations = {
       target: "the destination",
       schedule: "the schedule",
       active: "the state",
+      access: "what it may do on its own",
+      report: "when it speaks",
     },
     someFields: "some fields",
     and: " and ",

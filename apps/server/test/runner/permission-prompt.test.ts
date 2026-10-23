@@ -296,7 +296,10 @@ test("ADR 0053 §3: a plan turn's prompts are answered on the computer (reads on
   const plan = { ...instant, scope, profile: "plan" as const };
   for (const command of ["ls -la", "git log -3", "cat README.md"]) {
     const s = server([]);
-    expect(await permissionPrompt(bash(command), s.call, plan)).toEqual({ behavior: "allow", updatedInput: { command } });
+    expect(await permissionPrompt(bash(command), s.call, plan)).toEqual({
+      behavior: "allow",
+      updatedInput: { command },
+    });
     expect(s.calls).toHaveLength(0);
   }
   for (const call of [

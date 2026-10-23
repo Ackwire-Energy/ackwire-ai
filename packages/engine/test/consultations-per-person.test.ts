@@ -88,7 +88,7 @@ describe("the agents' DM works for one person at a time", () => {
     const infraRuns = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, infra.id));
     expect(infraRuns).toHaveLength(2);
     const anaRun = infraRuns.find((r) => r.id === first?.targetRunId);
-    expect(anaRun?.pendingMessageIds).toEqual([third?.messageId]);
+    expect(anaRun?.pendingMessageIds).toEqual([third?.messageId ?? ""]);
 
     // Who each exchange is for is derivable from the question itself (the history keeps them apart).
     expect(await personOfMessage(f.db, f.org.id, first?.messageId ?? "")).toBe(f.owner.id);

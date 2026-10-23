@@ -1,5 +1,6 @@
 import { and, eq, schema } from "@agenteschat/db";
 import { actWithUndo } from "./agent-actions";
+import { personBehindCall } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
   appendToWikiPage,
@@ -23,19 +24,17 @@ export const WIKI_WRITE_REFUSAL =
   'Not allowed: write to the wiki only when a person asks in the current message ("save this to the wiki", "document…"; in Portuguese "salva isso na wiki", "documenta…"). Offer to save it instead.';
 
 /**
- * Who asked: the person who wrote the trigger message. Forum turns, routines'
- * reminders and agents' messages are nobody's request, so agents can't write
- * the wiki on their own there.
+ * Who asked: the person behind the run (`authority.ts`). Forum turns, routines and agents' own
+ * messages are nobody's request, so agents can't write the wiki on their own there.
  */
 async function requester(ctx: ToolContext): Promise<string | null> {
   const [m] = await ctx.db
-    .select({ type: schema.messages.authorType, userId: schema.messages.authorUserId, meta: schema.messages.meta })
+    .select({ meta: schema.messages.meta })
     .from(schema.messages)
     .where(and(eq(schema.messages.id, ctx.triggerMessageId), eq(schema.messages.orgId, ctx.orgId)));
-  if (m?.type !== "person" || !m.userId) return null;
-  const forum = (m.meta as { forum?: { kickoff?: boolean } }).forum;
+  const forum = (m?.meta as { forum?: { kickoff?: boolean } } | undefined)?.forum;
   if (forum?.kickoff) return null;
-  return m.userId;
+  return personBehindCall(ctx);
 }
 
 /** The receipt of a wiki edit (none when the text came out the same). */

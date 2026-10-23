@@ -23,8 +23,7 @@ import type { BrainKind } from "./brains/types";
 import { canceledBy } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
-import { nextCronTime, zonedTime, zonedTimeForward } from "./cron";
-import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
+import { nextCronTime, zonedTimeForward } from "./cron";
 import { openDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
@@ -40,10 +39,10 @@ import {
   watchesOf,
 } from "./mail/watches";
 import { getOrgSettings } from "./management";
-import { getMessage, insertMessageWithRuns, type Message, messageView, replyExcerpt } from "./messages";
+import { getMessage, insertMessageWithRuns, messageView, replyExcerpt } from "./messages";
 import { resolveRoutinePaused } from "./notification-producers";
 import { can, getMembership, requirePermission } from "./organizations";
-import { enqueue, PermanentJobError } from "./outbox";
+import { PermanentJobError } from "./outbox";
 import {
   type RoutineAccess,
   type RoutineBrief,
@@ -397,7 +396,13 @@ async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<
     ),
   ]);
   const waiting = agentRows.filter((a) => a.status === "waiting_approval").map((a) => a.id);
-  const stoppers = [...new Set(agentRows.flatMap((a) => canceledBy(a.error) ?? []))];
+  // Who stopped a run: in its agent run's error, or kept on the routine run when it never started one.
+  const stoppers = [
+    ...new Set([
+      ...agentRows.flatMap((a) => canceledBy(a.error) ?? []),
+      ...runs.flatMap((r) => (r.status === "canceled" && r.summary ? [r.summary] : [])),
+    ]),
+  ];
   const [approvalRows, nameRows] = await Promise.all([
     lookup(waiting, () =>
       db
@@ -425,8 +430,10 @@ async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<
 function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRunView {
   const agentRun = run.agentRunId ? details.agentRuns.get(run.agentRunId) : undefined;
   const status = runStatus(run, agentRun);
-  // Stopped by a person: their name (the stop cancels the agent run in their name).
-  const stopper = run.code === "stopped" ? canceledBy(agentRun?.error) : null;
+  // Stopped by a person: their name (the stop cancels the agent run in their name; a run that never
+  // started keeps who stopped it on its row). A canceled run shows no text of its own.
+  const stopper =
+    run.status === "canceled" ? (canceledBy(agentRun?.error) ?? (run.summary ? run.summary : null)) : null;
   const by = stopper ? details.names.get(stopper) : undefined;
   const link = detailed && run.messageId ? details.links.get(run.messageId) : undefined;
   const approvalId = detailed && run.agentRunId ? (details.approvals.get(run.agentRunId) ?? null) : null;
@@ -436,7 +443,7 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
     status,
     code: run.code,
     ...(by ? { codeParams: { by } } : {}),
-    summary: detailed ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
+    summary: detailed && run.status !== "canceled" ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
     brain: run.brain,
     link: link && run.messageId ? { ...link, messageId: run.messageId } : null,
     ...(status === "waiting" ? { approvalId } : {}),
@@ -525,8 +532,7 @@ async function viewerRights(
   for (const r of rows) {
     const target = targetOf(r);
     const channelId = conversationOf(target);
-    const manages =
-      !!viewerId && (admin || r.createdByUserId === viewerId || ownerOf.get(r.agentId) === viewerId);
+    const manages = !!viewerId && (admin || r.createdByUserId === viewerId || ownerOf.get(r.agentId) === viewerId);
     out.set(r.id, {
       manages,
       reads: !viewerId || manages || target.type === "forum" || (!!channelId && inChannel.has(channelId)),
@@ -540,7 +546,10 @@ const BRAINS: readonly BrainKind[] = ["model", "claude_code", "codex"];
 const brainKindOf = (v: unknown): BrainKind => (BRAINS.includes(v as BrainKind) ? (v as BrainKind) : "model");
 
 /** Who paid the week: a computer brain's plan, the API, or both; no usage yet: what its brain would bill. */
-function billedTo(used: { plan: boolean; api: boolean } | undefined, kind: BrainKind): RoutineView["usage"]["billedTo"] {
+function billedTo(
+  used: { plan: boolean; api: boolean } | undefined,
+  kind: BrainKind,
+): RoutineView["usage"]["billedTo"] {
   if (used?.plan && used.api) return "mixed";
   if (used?.plan) return "plan";
   if (used?.api) return "api";
@@ -578,7 +587,10 @@ async function views(
   const [details, rights, watches, weekRows, usageRows, agentRows] = await Promise.all([
     runDetails(db, orgId, recentRows),
     viewerRights(db, orgId, rows, viewerId),
-    watchesOf(db, rows.filter((r) => r.event === "email.received").map((r) => r.id)),
+    watchesOf(
+      db,
+      rows.filter((r) => r.event === "email.received").map((r) => r.id),
+    ),
     db
       .select({
         routineId: routineRuns.routineId,
@@ -716,28 +728,6 @@ export async function getRoutineView(db: Database, actorId: string, orgId: strin
   return view as RoutineView;
 }
 
-/** The summaries we write (English fallback text), by their stable code; the app translates the code. */
-const RUN_SUMMARY = {
-  "routine_run.deleted": "Routine deleted",
-  "routine_run.paused": "Routine paused",
-  "routine_run.creator_left": "The routine's creator left the organization",
-  "routine_run.agent_archived": "The agent was archived",
-  "routine_run.reminder_sent": "Reminder sent",
-  "routine_run.agent_not_in_channel": "The agent isn't in the channel",
-  "routine_run.waiting_approval": "Waiting for approval",
-  "routine_run.running": "In progress",
-  "routine_run.queued": "Queued",
-  "routine_run.agent_budget": "Monthly budget used up",
-  "routine_run.delivered_channel": "Answered in the channel",
-  "routine_run.delivered_drive": "File in the Drive",
-  "routine_run.delivered_dm": "Sent in the DM",
-  "routine_run.nothing_new": "Nothing new; nothing posted",
-  "routine_run.waiting_computer": "Skipped: the previous run is still waiting for the agent's computer",
-} as const;
-
-const PAUSED_PREFIX = "Paused: ";
-const FORUM_PREFIX = "Forum opened: ";
-
 /** The reader of schedule phrases; none without the context deps (then only cron expressions are read). */
 const readerOf = (deps: RoutineDeps) => (deps.context ? schedulesOf(deps.context) : null);
 
@@ -809,12 +799,7 @@ async function resolveTrigger(
   if (trigger.type === "schedule") {
     const now = new Date();
     const phrase = trigger.phrase?.trim() ?? "";
-    const zone = await routineTimezone(
-      deps.db,
-      actorId,
-      orgId,
-      trigger.rule?.timezone ?? trigger.timezone ?? keepZone,
-    );
+    const zone = await routineTimezone(deps.db, actorId, orgId, trigger.rule?.timezone ?? trigger.timezone ?? keepZone);
     if (!trigger.rule && !phrase)
       throw new ValidationError("Say when the routine should run", "routine.schedule_required");
     // A rule from the picker as it is; a phrase read by the schedule reader (a rule, a cron, or a one-off).
@@ -1182,6 +1167,12 @@ export async function updateRoutine(
   if (mailTrigger || watched.has(current.id)) {
     if (mailTrigger && patch.active === true && !current.active) await resetMailWatchState(db, row.id);
     await syncMailWatch(deps, row, mailTrigger);
+  }
+  // Pausing also stops its work in progress (§6.7); resuming clears why it paused itself.
+  if (patch.active === false && current.active) {
+    await haltRoutineRuns(deps, orgId, row.id, { code: "paused", byUserId: actorId });
+  } else if (patch.active === true && !current.active) {
+    await resolveRoutinePaused(deps, orgId, row.id).catch(() => {});
   }
   const before: Record<string, unknown> = {};
   const after: Record<string, unknown> = {};

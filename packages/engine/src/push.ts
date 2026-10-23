@@ -26,6 +26,8 @@ export const PUSH_KINDS: ReadonlySet<string> = new Set([
   "dm",
   "mission_stopped",
   "routine_failed",
+  "routine_paused",
+  "routine_stalled",
   "machine_connected",
   "browser_handoff",
 ]);

@@ -16,8 +16,8 @@ import {
   startVersionWatch,
   VERSION_CHECK_MS,
 } from "./lib/app-version";
-import { snapshotStore } from "./lib/snapshot-store";
 import { inDesktopApp } from "./lib/desktop";
+import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 

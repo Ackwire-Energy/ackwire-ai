@@ -8,8 +8,8 @@ import {
 } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
-import { runAuthorityById } from "../authority";
 import { recordAudit } from "../audit";
+import { runAuthorityById } from "../authority";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {

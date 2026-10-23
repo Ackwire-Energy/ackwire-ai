@@ -1175,7 +1175,8 @@ export class CodexAppServers implements CodexAppRunner {
           profile: input.profile ?? "work",
           signal: approvals.signal,
         }).then((decision) => {
-          if (decision === "decline") this.log(`codex approval declined: ${redact(JSON.stringify(calls)).slice(0, 300)}`);
+          if (decision === "decline")
+            this.log(`codex approval declined: ${redact(JSON.stringify(calls)).slice(0, 300)}`);
           return { result: { decision } };
         });
       });

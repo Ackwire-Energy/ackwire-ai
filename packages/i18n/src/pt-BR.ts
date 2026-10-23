@@ -738,6 +738,7 @@ export const ptBR = {
       updated: "Mudei {{fields}} da rotina <b>{{name}}</b>",
       updated_paused: "Pausei a rotina <b>{{name}}</b>",
       updated_resumed: "Retomei a rotina <b>{{name}}</b>",
+      deleted: "Apaguei a rotina <b>{{name}}</b>",
     },
     channel: {
       agent_added: "Chamei {{agentName}} para <b>#{{channel}}</b>",
@@ -766,6 +767,8 @@ export const ptBR = {
       target: "o destino",
       schedule: "o horário",
       active: "o estado",
+      access: "o que pode fazer sozinha",
+      report: "quando falar",
     },
     someFields: "alguns campos",
     and: " e ",
@@ -2790,8 +2793,7 @@ export const ptBR = {
     pausedRunningToast: "Rotina pausada. A execução em andamento também parou.",
     deleteBodyRunning:
       "Ela para de rodar e sai da lista, e a execução em andamento também para. As execuções passadas continuam no histórico.",
-    detailsHidden:
-      "Só quem criou, o dono do agente, admins e quem está na conversa veem o que ela faz e o que contou.",
+    detailsHidden: "Só quem criou, o dono do agente, admins e quem está na conversa veem o que ela faz e o que contou.",
   },
   missions: {
     chip: "Missão · {{done}} de {{count}}",

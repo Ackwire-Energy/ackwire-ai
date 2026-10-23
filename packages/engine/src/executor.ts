@@ -77,7 +77,8 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineBriefOf } from "./routine-brief";
-import { closeRoutineRun, type RoutineRunEnd } from "./routine-ledger";
+import { routineRunWaitingForComputer } from "./routine-firing";
+import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
 import { type ReleaseReason, releaseInbox, takeInbox } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
@@ -316,17 +317,6 @@ export const WRAP_UP_TURNS = 2;
 export const WRAP_UP_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work. If the people need to know what you found, call hand_off now with what you have; then end with your record (a short summary of what you checked). Your tools stay available for these last calls.";
 
-/**
- * The coded reason of a failed run for its routine's ledger (`closeRoutineRun`): the run error's code
- * without its `run.` prefix (`budget_exceeded`, `provider_error`…), with its detail when it has one.
- */
-export function runFailureCode(reason: string): { code: string; detail?: string } {
-  const detail = runErrorDetail(reason);
-  const code = (detail?.errorCode ?? "run.failed").replace(/^run\./, "");
-  const text = detail?.errorParams?.detail;
-  return text ? { code, detail: text } : { code };
-}
-
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
   if (error instanceof BrainFailure) return error.retryable ? null : error.code;
@@ -476,12 +466,28 @@ async function executeRunInner(
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
   /** Messages that got receipts (`message.actions` goes out once they are published). */
   const withReceipts: string[] = [];
+  /**
+   * The first message a run woken by a routine's report posted (ADR 0053 §7): when the run stops, the
+   * routine run links to it and its creator hears about it (`recordRoutineReportMessage`).
+   */
+  let reportMessage: {
+    routineRunId: string;
+    messageId: string;
+    channelId: string;
+    threadId: string | null;
+    text: string;
+  } | null = null;
   const finished = async (
     status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
     error?: string,
   ) => {
     for (const id of withReceipts.splice(0)) {
       await publishMessageActions({ db, pubsub: deps.pubsub }, run.orgId, id).catch(() => {});
+    }
+    if (reportMessage) {
+      const posted = reportMessage;
+      reportMessage = null;
+      await recordRoutineReportMessage({ db, pubsub: deps.pubsub }, { orgId: run.orgId, ...posted }).catch(() => {});
     }
     // The turn's bridge tokens die with it (a resumed turn gets a new one).
     if (brainPlan && brainPlan.kind !== "model") await revokeRunToolTokens(db, { runId: run.id }).catch(() => {});
@@ -551,7 +557,7 @@ async function executeRunInner(
     await deferred;
     await addRunStep(db, run, "error", { reason });
     const failed = await transitionRun(db, run.id, "running", "failed", { error: reason });
-    if (failed) await closeRoutine({ status: "failed", ...(ledger ?? runFailureCode(reason)) });
+    if (failed) await closeRoutine({ status: "failed", ...(ledger ?? routineFailureEnd(reason)) });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
     // An archived agent answers nobody; any other failure leaves the waiting messages a run of their own.
@@ -638,11 +644,14 @@ async function executeRunInner(
   ) => {
     const tagged = report && !note ? { routine: report } : {};
     const m = await postAgentMessage(tx, run, threadId, body, { ...meta, ...runMeta, ...tagged }, createdAt);
-    if (report && !note) {
-      await tx
-        .update(routineRuns)
-        .set({ messageId: m.id })
-        .where(and(eq(routineRuns.id, report.runId), eq(routineRuns.orgId, run.orgId), isNull(routineRuns.messageId)));
+    if (report && !note && !reportMessage) {
+      reportMessage = {
+        routineRunId: report.runId,
+        messageId: m.id,
+        channelId: m.channelId,
+        threadId: m.threadId ?? null,
+        text: body,
+      };
     }
     // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
     if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
@@ -941,7 +950,10 @@ async function executeRunInner(
     const text = rows.map((m) => m.text).join("\n\n");
     const t = transcript as Transcript;
     appendUserText(t, text);
-    await oweAnswer(t, rows.map((m) => m.id));
+    await oweAnswer(
+      t,
+      rows.map((m) => m.id),
+    );
     await saveTranscript(db, t);
     later(() => addRunStep(db, run, "context", { steeredMessageIds: rows.map((m) => m.id) }));
     await publishChannelEvent(deps.pubsub, {
@@ -1192,6 +1204,8 @@ async function executeRunInner(
       waitingMachineId: machineId,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
+    // A routine's run waits for its own computer, never the API (ADR 0053 §6.4): its people hear it once.
+    if (run.background) await routineRunWaitingForComputer({ db, pubsub: deps.pubsub }, run, machineId).catch(() => {});
     if (note) {
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
@@ -1393,7 +1407,12 @@ async function executeRunInner(
       later(() => addRunStep(db, run, "context", { steeredMessageIds: read.map((m) => m.id), live: true }));
       // Read mid-turn: owed now (a `pass` later in this turn is refused), written without the rest of
       // the transcript (the bridge may be writing it).
-      if (await oweAnswer(t, read.map((m) => m.id)).catch(() => false)) {
+      if (
+        await oweAnswer(
+          t,
+          read.map((m) => m.id),
+        ).catch(() => false)
+      ) {
         await markAnswerOwed(db, run.id, t).catch(() => {});
       }
     },
@@ -1667,7 +1686,7 @@ async function executeRunInner(
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];
-        const asks: { id: string; toolUseId: string; text: string; choices: string[] | null }[] = [];
+        const asks: { id: string; toolUseId: string; text: string; choices: string[] | null; why: string }[] = [];
         const secretAsks: string[] = [];
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
@@ -1685,7 +1704,13 @@ async function executeRunInner(
           } else if (outcome.type === "question") {
             const questionId = Bun.randomUUIDv7();
             calls.push({ toolUseId: use.id, name: use.name, questionId });
-            asks.push({ id: questionId, toolUseId: use.id, text: outcome.text, choices: outcome.choices });
+            asks.push({
+              id: questionId,
+              toolUseId: use.id,
+              text: outcome.text,
+              choices: outcome.choices,
+              why: outcome.why,
+            });
           } else if (!outcome.output.isError && waitOf(outcome.output.data)) {
             const wait = waitOf(outcome.output.data) as { id: string };
             calls.push({ toolUseId: use.id, name: use.name, waitId: wait.id });

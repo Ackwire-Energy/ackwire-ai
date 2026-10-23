@@ -189,8 +189,7 @@ export async function agentSearchChannels(db: Database, orgId: string, agentId: 
   return rows
     .filter(
       (r) =>
-        r.id === currentChannelId ||
-        (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
+        r.id === currentChannelId || (r.visibility === "public" && r.kind === "channel" && !isRoutineRoomKey(r.dmKey)),
     )
     .map((r) => r.id);
 }

@@ -53,6 +53,10 @@ export const NOTIFICATION_KINDS = [
   "mission_stopped",
   "routine_finished",
   "routine_failed",
+  /** A routine paused itself (its reason in `latest.reason`), ADR 0053. */
+  "routine_paused",
+  /** A routine waits for its computer (once per outage), ADR 0053. */
+  "routine_stalled",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
@@ -101,6 +105,8 @@ export interface NotificationLatest {
   expiresAt?: string;
   round?: number;
   rounds?: number;
+  /** `routine_paused`: why it paused itself (a coded reason the app translates). */
+  reason?: string;
 }
 
 export interface NotificationView {

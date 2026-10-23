@@ -126,6 +126,8 @@ export function startWorkers(deps: WorkerDeps) {
         outcome,
         error: String(error),
       }),
+    // How long each job waited to be claimed (ADR 0053 §10): a person's run should never queue behind routines.
+    onTiming: (name, ms, attrs) => log.debug(name, { ms, ...attrs }),
   });
   every("outbox", WORKER_INTERVALS_MS.outbox, async () => {
     while (!stopped && (await outboxPump.pump()) > 0) {}

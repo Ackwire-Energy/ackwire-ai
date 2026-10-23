@@ -32,7 +32,11 @@ test("fatigue: the first failure after a good run notifies once, the fifth in a 
     return routineRunRow(f, rr.id);
   };
 
-  expect(await failOnce(60)).toMatchObject({ status: "failed", code: "provider_error", summary: "provider_error: 529" });
+  expect(await failOnce(60)).toMatchObject({
+    status: "failed",
+    code: "provider_error",
+    summary: "provider_error: 529",
+  });
   expect(await routineRow(f, routine.id)).toMatchObject({ failuresInRow: 1, active: true });
   const failed = await notificationsOf(f, "routine_failed");
   expect(failed).toHaveLength(1);
@@ -95,7 +99,9 @@ test("every ending closes the ledger once; a run that reported stays reported", 
   expect(await routineRow(f, routine.id)).toMatchObject({ failuresInRow: 0 });
 
   // A run that isn't a routine's has no ledger.
-  expect(await closeRoutineRun(ledger(), { ...reportedRun, background: false }, { status: "done", text: "" })).toBeNull();
+  expect(
+    await closeRoutineRun(ledger(), { ...reportedRun, background: false }, { status: "done", text: "" }),
+  ).toBeNull();
 });
 
 test("run errors become coded reasons", () => {
@@ -167,7 +173,10 @@ test("the reaper closes rows whose run ended, fails rows whose job died, and sta
     .where(eq(schema.routineRuns.id, alive?.id ?? ""));
   await reapRoutineRuns(ledger());
   expect((await routineRunRow(f, gathered?.id ?? "")).event).not.toHaveProperty("gathered");
-  const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.dedupeKey, `routine.run:${gathered?.id}`));
+  const jobs = await f.db
+    .select()
+    .from(schema.outbox)
+    .where(eq(schema.outbox.dedupeKey, `routine.run:${gathered?.id}`));
   expect(jobs).toHaveLength(1);
   // Closed rows stay closed: the next tick finds nothing.
   expect(await reapRoutineRuns(ledger())).toBe(0);

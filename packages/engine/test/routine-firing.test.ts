@@ -217,9 +217,7 @@ describe("one run at a time", () => {
 
     const fresh = await fire(f, routine.id, minutesFromNow(-60), "schedule");
     await park(fresh.agentRunId);
-    expect(await resumeRunsWaitingForMachine(f.db, machineId, { pubsub: f.pubsub })).toEqual([
-      fresh.agentRunId ?? "",
-    ]);
+    expect(await resumeRunsWaitingForMachine(f.db, machineId, { pubsub: f.pubsub })).toEqual([fresh.agentRunId ?? ""]);
     expect(await routineRunRow(f, fresh.id)).toMatchObject({ status: "started" });
   });
 });
@@ -283,8 +281,6 @@ describe("take over", () => {
       pausedReason: null,
       active: false,
     });
-    await expect(takeOverRoutine(routineDeps(f), carl.id, f.org.id, routine.id)).rejects.toBeInstanceOf(
-      ForbiddenError,
-    );
+    await expect(takeOverRoutine(routineDeps(f), carl.id, f.org.id, routine.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

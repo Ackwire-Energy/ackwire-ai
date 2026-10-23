@@ -247,7 +247,7 @@ const listed = async (ctx: ToolContext) => new Map((await tools().list(ctx)).map
 const call = (ctx: ToolContext, name: string, input: Record<string, unknown>) =>
   tools().invoke(ctx, { toolUseId: `tu_${name}_${crypto.randomUUID()}`, name, input });
 const requiresWhy = (t: ToolDefinition | undefined) =>
-  Array.isArray(t?.inputSchema.required) && (t?.inputSchema.required as string[]).includes("why");
+  Array.isArray(t?.inputSchema.required) && ((t?.inputSchema.required ?? []) as string[]).includes("why");
 
 describe("the gateway applies the run policy", () => {
   test("routine, read: refused tools aren't listed, and a call is refused anyway with the reason", async () => {
@@ -353,7 +353,7 @@ describe("the gateway applies the run policy", () => {
       expect(bridged.map((t) => t.name).sort()).toEqual(loop.map((t) => t.name).sort());
       const refund = bridged.find((t) => t.name === "shop_refund_order");
       if (kind === "read") expect(refund).toBeUndefined();
-      else if (kind !== "person") expect((refund?.inputSchema.required as string[]).includes("why")).toBe(true);
+      else if (kind !== "person") expect(((refund?.inputSchema.required ?? []) as string[]).includes("why")).toBe(true);
     }
   });
 });

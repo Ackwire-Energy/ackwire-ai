@@ -163,6 +163,7 @@ export * from "./tools/directory";
 export * from "./tools/gateway";
 export * from "./tools/json-schema";
 export * from "./tools/permission";
+export * from "./tools/run-policy";
 export * from "./tools/schema-compat";
 export * from "./tools/scopes";
 export * from "./tools/types";

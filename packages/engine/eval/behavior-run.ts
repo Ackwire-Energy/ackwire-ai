@@ -51,6 +51,7 @@ import {
   type Judge,
   openDm,
   postPersonMessage,
+  type RoutineBrief,
   startRoutineRun,
   type ToolSource,
   withJudgeFallback,
@@ -92,8 +93,12 @@ export interface BehaviorCase {
     thread?: boolean;
     prior?: CaseMessage[];
     trigger: CaseMessage;
-    /** The trigger is a routine's scheduled message (meta.routine), not a person typing. */
-    routine?: { name: string };
+    /**
+     * The trigger is a routine's firing (ADR 0053): its background run starts in the routine's room with
+     * `trigger.body` as its instructions and reports to this conversation. `access` (default `read`) and
+     * `report` (default `when_new`) are the routine's settings.
+     */
+    routine?: { name: string; access?: "read" | "act"; report?: "always" | "when_new" };
     /**
      * The trigger is another agent's question (`ask_agent`) on behalf of the person who wrote
      * `origin` in the channel: `trigger.author` is that person, `trigger.body` the question.
@@ -489,20 +494,54 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           ? withJudgeFallback(createJevJudge({ apiKey: options.jevKey, gateway, timeoutMs: 5000 }), llmJudge)
           : llmJudge
         : undefined;
-      if (routine) {
-        // As production fires it (routines.ts): background work on the person's behalf.
-        await startRoutineRun(
+      if (routine && conv.routine) {
+        // As production fires it (routines.ts, routine-room.ts): the routine's row, its firing claimed, and
+        // its background run started in the routine's own room; it reports to this conversation.
+        const access = conv.routine.access ?? "read";
+        const report = conv.routine.report ?? "when_new";
+        await db.insert(schema.routines).values({
+          id: routine.routine.id,
+          orgId: org.id,
+          agentId: agent.id,
+          name: conv.routine.name,
+          prompt: conv.trigger.body,
+          target:
+            conv.where === "dm"
+              ? { type: "dm" }
+              : threadId
+                ? { type: "conversation", channelId, threadId }
+                : { type: "channel", channelId },
+          triggerType: "schedule",
+          phrase: "a cada hora",
+          access,
+          report,
+          createdByUserId: triggerAuthor.id,
+        });
+        const at = new Date();
+        await db.insert(schema.routineRuns).values({
+          id: routine.routine.runId,
+          orgId: org.id,
+          routineId: routine.routine.id,
+          at,
+          trigger: "schedule",
+          status: "starting",
+        });
+        const brief: RoutineBrief = {
+          routineId: routine.routine.id,
+          routineRunId: routine.routine.runId,
+          name: conv.routine.name,
+          creatorUserId: triggerAuthor.id,
+          deliverTo: { channelId, threadId: threadId ?? null },
+          access,
+          report,
+          trigger: "schedule",
+          dueAt: at.toISOString(),
+        };
+        const started = await startRoutineRun(
           { db, pubsub },
-          {
-            orgId: org.id,
-            creatorId: triggerAuthor.id,
-            agentId: agent.id,
-            channelId,
-            threadId,
-            body: conv.trigger.body,
-            routine: routine.routine,
-          },
+          { orgId: org.id, agentId: agent.id, brief, body: conv.trigger.body, brain: "model" },
         );
+        if (!started) throw new Error(`${c.id}: the routine's run did not start`);
       } else {
         const sent = await postPersonMessage({ db, pubsub, judge }, triggerAuthor.id, org.id, channelId, {
           body: conv.trigger.body,

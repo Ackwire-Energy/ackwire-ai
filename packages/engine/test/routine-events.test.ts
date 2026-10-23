@@ -36,7 +36,12 @@ const runsOf = (routineId: string) =>
     .where(eq(schema.routineRuns.routineId, routineId))
     .orderBy(asc(schema.routineRuns.createdAt));
 const jobOf = async (routineRunId: string) =>
-  (await f.db.select().from(schema.outbox).where(eq(schema.outbox.dedupeKey, `routine.run:${routineRunId}`)))[0];
+  (
+    await f.db
+      .select()
+      .from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `routine.run:${routineRunId}`))
+  )[0];
 
 describe("events", () => {
   test("webhooks carry their identity: GitHub's delivery id, Sentry's issue id and action", () => {

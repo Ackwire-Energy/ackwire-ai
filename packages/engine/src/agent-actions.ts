@@ -30,6 +30,7 @@ export type AgentActionKind =
   | "memory.forgotten"
   | "routine.created"
   | "routine.updated"
+  | "routine.deleted"
   | "channel.agent_added"
   | "wiki.page_created"
   | "wiki.page_edited"
@@ -45,6 +46,7 @@ export const UNDOABLE_TOOLS = new Set([
   "forget",
   "create_routine",
   "update_routine",
+  "delete_routine",
   "add_agent_to_channel",
   "create_wiki_page",
   "update_wiki_page",
@@ -66,8 +68,11 @@ export interface AgentActionTarget {
   slug?: string;
 }
 
+/** A value of a receipt's sentence: plain values, or a small object the app renders (a schedule's rule). */
+export type AgentActionParam = string | number | boolean | null | string[] | { [key: string]: unknown };
+
 /** Values for the receipt's sentence (`agentActions.{kind}` in the app's i18n). */
-export type AgentActionParams = Record<string, string | number | boolean | null | string[]>;
+export type AgentActionParams = Record<string, AgentActionParam>;
 
 /** One receipt, as the app shows it under the agent's message. */
 export interface AgentActionView {
@@ -252,6 +257,8 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
       return `created the routine${title}`;
     case "routine.updated":
       return `changed the routine${title}`;
+    case "routine.deleted":
+      return `deleted the routine${title}`;
     case "channel.agent_added":
       return `added ${typeof p.agentName === "string" ? p.agentName : "an agent"} to #${t.title ?? "?"}`;
     case "wiki.page_created":

@@ -30,17 +30,17 @@ import {
   healthWords,
   isRunAtWork,
   pausedFix,
-  routineChannelOf,
   type RoutineFix,
+  routineChannelOf,
   routineStateWords,
   runMessageLink,
   runOutcome,
-  runPixels,
   runPixelStatus,
+  runPixels,
   runsPerDay,
   usageParts,
-  whereItRuns,
   type Words,
+  whereItRuns,
 } from "@agenteschat/client/lib/routine-view";
 import { browserTimezone, onceParts, timezoneName } from "@agenteschat/client/lib/routines";
 import {
@@ -978,9 +978,7 @@ function RoutineDetails({
         usage.tokens !== null
           ? t("routines.usage.tokens", { tokens: formatTokensShort(t, i18n.language, usage.tokens) })
           : null,
-        usage.costUsd !== null
-          ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) })
-          : null,
+        usage.costUsd !== null ? t("routines.usage.cost", { cost: formatUsd(t, i18n.language, usage.costUsd) }) : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -1045,9 +1043,7 @@ function RoutineDetails({
         <SwitchComputerDialog open={switching} onOpenChange={setSwitching} outage={outage} data={outages.data} />
       )}
       <DetailsSection title={t("routines.panel.week")}>
-        <p className="routine-details__sentence">
-          {health ? health.map(say).join(" · ") : t("routines.health.none")}
-        </p>
+        <p className="routine-details__sentence">{health ? health.map(say).join(" · ") : t("routines.health.none")}</p>
         {usageText && <p className="small muted">{`${t("routines.panel.usage")}: ${usageText}`}</p>}
       </DetailsSection>
       <DetailsSection title={t("routines.panel.what", agentGrammar(t, name))}>

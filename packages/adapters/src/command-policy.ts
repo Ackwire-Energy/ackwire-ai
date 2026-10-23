@@ -852,7 +852,15 @@ export const SECRET_READ_DENY_RULES: readonly string[] = [
 ];
 
 /** Global options of git before its subcommand that take a value (`git -C <dir> push`, `git -c k=v push`). */
-const GIT_GLOBAL_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"]);
+const GIT_GLOBAL_VALUE = new Set([
+  "-C",
+  "-c",
+  "--git-dir",
+  "--work-tree",
+  "--namespace",
+  "--exec-path",
+  "--config-env",
+]);
 const GIT_GLOBAL_FLAG =
   /^(--no-pager|-p|--paginate|-P|--bare|--no-replace-objects|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks|--no-advice)$/;
 /** gh options that pick another repository or host, anywhere in the command. */
