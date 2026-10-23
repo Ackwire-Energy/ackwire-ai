@@ -7258,7 +7258,11 @@ button.live-call__head:hover {
   position: relative;
   overflow: hidden;
 }
-.sidebar__item[data-busy="true"] > :not(.sidebar__trail):not(.sidebar__glow) {
+/*
+ * Above the trail and the glow. Zero specificity (`:where`): the collapsed rail hides the name with
+ * `position: absolute`, and this must not bring it back into the row (it pushed the avatar off center).
+ */
+.sidebar__item[data-busy="true"] > :where(:not(.sidebar__trail, .sidebar__glow)) {
   position: relative;
 }
 .sidebar__trail,
