@@ -22,6 +22,7 @@ import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { noticeText } from "./notices";
+import { WHY_YOU_WERE_CALLED } from "./reply-policy";
 import type { AgentRun } from "./runs";
 import { agentScopeNames, loadTeam, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
@@ -158,6 +159,8 @@ export async function buildRunContext(
     trigger?: Message;
     /** A routine started the run: its own task, so no "Your recent work" from other conversations. */
     routine?: boolean;
+    /** Nobody called it by name (`replyPolicyFor`): it may `pass`, and the prompt says why it is here. */
+    mayPass?: boolean;
   },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
@@ -553,6 +556,8 @@ export async function buildRunContext(
     ...(briefing ? await briefing.then((text) => (text ? [{ text }] : [])) : []),
     ...(issueBrief ? [{ text: issueBrief }] : []),
     ...(machineAccess ? await machineAccess.then((a) => (a ? [{ text: machineAccessText(a) }] : [])) : []),
+    // Brought in without being named (reply-policy.ts): staying quiet is an answer.
+    ...(options.mayPass ? [{ text: WHY_YOU_WERE_CALLED }] : []),
     ...(trigger.meta.routine
       ? [
           {

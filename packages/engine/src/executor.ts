@@ -12,6 +12,7 @@ import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
+import { finishBackgroundRun } from "./background";
 import { recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
 import { type BrainPlan, notePlanLimit, resolveBrain, UNAVAILABLE_CODES } from "./brains/select";
@@ -29,14 +30,7 @@ import {
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
 import { consultationCardThread, onConsultedRunFinished } from "./consultations";
-import {
-  buildRunContext,
-  getChannelCached,
-  isNoReply,
-  ROUTINE_NO_REPLY,
-  restatesReaction,
-  taskNotice,
-} from "./context";
+import { buildRunContext, getChannelCached, restatesReaction, taskNotice } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -65,6 +59,17 @@ import {
   questionView,
   syncQuestionMessage,
 } from "./questions";
+import {
+  ANSWER_NUDGE,
+  endsWithSentinel,
+  isSentinelOnly,
+  PASS_TOOL,
+  repliesAfterTrigger,
+  replyPolicyFor,
+  routedAsFollowUp,
+  stripSentinel,
+  visibleText,
+} from "./reply-policy";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
   absorbBrowserCall,
@@ -190,6 +195,12 @@ export interface Transcript {
   reacted?: boolean;
   /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
   reported?: boolean;
+  /** Nobody called it by name and it called `pass`: the run ends without a message. */
+  passed?: { reason: string };
+  /** It was told once to answer after a reply that was only the silence word (or nothing). */
+  nudged?: boolean;
+  /** A person decided or answered what it waited on (an approval, a question): it can't pass anymore. */
+  answerOwed?: boolean;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -592,6 +603,11 @@ async function executeRunInner(
       ? { id: routineCall.id, name: routineCall.name }
       : null;
   routineOfRun = viaRoutine;
+  // Who must answer (reply-policy.ts): a run nobody called by name may pass; a background run never posts.
+  const policy = replyPolicyFor(run, triggerMessage, {
+    followUp: await routedAsFollowUp(db, run).catch(() => false),
+    answerOwed: Boolean((run.transcript as unknown as Transcript | null)?.answerOwed),
+  });
   const post = async (
     tx: Executor,
     threadId: string | null,
@@ -648,6 +664,7 @@ async function executeRunInner(
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),
         trigger,
         routine: Boolean(viaRoutine),
+        mayPass: policy.mayPass,
       }),
       contextDeps
         ? retrieveForRun(contextDeps, {
@@ -785,6 +802,8 @@ async function executeRunInner(
       resumeText = `What a person decided on your waiting call${bridgedLines.length > 1 ? "s" : ""}:\n${bridgedLines.join("\n")}`;
       appendUserText(transcript, resumeText);
     }
+    // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
+    transcript.answerOwed = true;
     delete transcript.pending;
     await saveTranscript(db, transcript);
   }
@@ -815,8 +834,8 @@ async function executeRunInner(
       ...t.messages
         .slice(t.postedUpTo)
         .filter((m) => m.role === "assistant")
-        .map((m) => textOf(m.content).trim()),
-      partial.trim(),
+        .map((m) => stripSentinel(textOf(m.content))),
+      stripSentinel(partial),
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -934,7 +953,10 @@ async function executeRunInner(
   // Who (§5): the mission's brain in its thread, else the agent's; a computer brain that can't answer now
   // falls back to the model brain when a model credential exists, else the message waits for the computer.
   const turnToken = { current: "" };
-  brainPlan = await resolveBrain(deps, agent, run, replyThreadId ?? run.channelId, { fresh: Boolean(viaRoutine) });
+  brainPlan = await resolveBrain(deps, agent, run, replyThreadId ?? run.channelId, {
+    // A routine's or any background run's work never continues a conversation's session, nor the other way.
+    fresh: Boolean(viaRoutine) || run.background,
+  });
   let plan: BrainPlan = brainPlan;
   let brain = createBrain(deps, agent, run, plan.kind, turnToken, () => transcript as Transcript);
   let triggerText = trigger?.body ?? topTrigger?.body ?? "";
@@ -948,6 +970,60 @@ async function executeRunInner(
   // Read once: a later pause of this run resumes with its own text.
   delete transcript.continued;
   let computerTurns = 0;
+  // Brought in without being named: another agent may have answered the same message since (the context
+  // stops at the trigger). It reads that before its first call, so it can pass instead of answering twice.
+  if (needsContext && policy.mayPass && triggerMessage) {
+    const meanwhile = await repliesAfterTrigger(db, run, triggerMessage, replyThreadId).catch(() => null);
+    if (meanwhile) {
+      appendUserText(transcript, meanwhile);
+      if (plan.kind !== "model") nextPrompt = [nextPrompt ?? triggerText, meanwhile].join("\n\n");
+    }
+  }
+
+  /**
+   * Ends the run without a message (reply-policy.ts): nobody called it by name and it passed, or wrote
+   * only the silence word, or nothing. A message that came in meanwhile is read first instead (false).
+   */
+  const endQuietly = async (how: "pass" | "sentinel" | "empty", reason: string): Promise<boolean> => {
+    const [still] = await db
+      .select({ pending: agentRuns.pendingMessageIds })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, run.id));
+    const t = transcript as Transcript;
+    if ((still?.pending.length ?? 0) > 0) {
+      delete t.passed;
+      return false;
+    }
+    await deferred;
+    t.postedUpTo = t.messages.length;
+    await addRunStep(db, run, "context", { passed: { how, ...(reason ? { reason } : {}) } });
+    const done = await transitionRun(db, run.id, "running", "done", { error: null, transcript: storedTranscript(t) });
+    if (!done) throw new PermanentJobError("run changed state while executing");
+    // Said nothing at all: the apps drop its "thinking" and show nobody is answering.
+    if (t.postedCount === 0) await publishChannelEvent(deps.pubsub, { type: "agent.passed", ...where });
+    await publishChannelEvent(deps.pubsub, event("done"));
+    await finished("done");
+    await redispatchPending();
+    return true;
+  };
+
+  /**
+   * A background run (a routine's) reached its final answer: it is the run's own record
+   * (`finishBackgroundRun`), never a message here. Empty when it stayed quiet.
+   */
+  const finishBackground = async (text: string) => {
+    await deferred;
+    const t = transcript as Transcript;
+    await finishBackgroundRun({ db, pubsub: deps.pubsub }, run, text).catch((error) =>
+      addRunStep(db, run, "error", { reason: "background_finish", message: String(error) }),
+    );
+    t.postedUpTo = t.messages.length;
+    const done = await transitionRun(db, run.id, "running", "done", { error: null, transcript: storedTranscript(t) });
+    if (!done) throw new PermanentJobError("run changed state while executing");
+    await publishChannelEvent(deps.pubsub, event("done"));
+    await finished("done");
+    await redispatchPending();
+  };
 
   /** The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the computer. */
   const brainUnavailable = async (u: {
@@ -1070,10 +1146,10 @@ async function executeRunInner(
     // A question the brain asked mid-turn is already posted. Only what it wrote before asking leads to it
     // (posted just before the card, so it reads first); what it wrote after only repeats the question.
     const asked = await bridgedQuestionCard(t);
-    let text = said;
+    let text = stripSentinel(said);
     let at: Date | undefined;
     if (asked && textBefore) {
-      text = textBefore(asked.askedAt + ASKED_GRACE_MS).trim();
+      text = stripSentinel(textBefore(asked.askedAt + ASKED_GRACE_MS));
       at = new Date(asked.cardAt.getTime() - 1);
     }
     const message = text ? await post(db, replyThreadId, text, withFallback(t, takeMemoryUpdates(t)), at) : null;
@@ -1105,7 +1181,7 @@ async function executeRunInner(
     await deferred;
     const t = transcript as Transcript;
     const name = from === "codex" ? "Codex" : "Claude Code";
-    const said = partial.trim();
+    const said = stripSentinel(partial);
     const note = `_${name} stopped before finishing (${failure.message}). Already done, not repeated: ${executed.join(", ")}._`;
     await addRunStep(db, run, "error", {
       reason: "brain_interrupted",
@@ -1207,7 +1283,6 @@ async function executeRunInner(
           turn,
           event: { type: "agent.typing", ...where },
           onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
-          holdBack: viaRoutine ? ROUTINE_NO_REPLY : undefined,
         },
       );
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
@@ -1493,6 +1568,10 @@ async function executeRunInner(
             })),
           });
           await saveTranscript(db, transcript);
+          // It passed and did nothing else: the run ends here, no closing call spent.
+          if (transcript.passed && toolUses.every((u) => u.name === PASS_TOOL)) {
+            if (await endQuietly("pass", transcript.passed.reason)) return;
+          }
           continue;
         }
 
@@ -1502,7 +1581,7 @@ async function executeRunInner(
         const posted = await db.transaction(async (tx) => {
           const out: Message[] = [];
           // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
-          const said = turnText;
+          const said = stripSentinel(turnText);
           if (said) out.push(await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))));
           t.postedUpTo = t.messages.length;
           t.postedCount += out.length + waiting.length + asks.length + secretAsks.length;
@@ -1626,26 +1705,44 @@ async function executeRunInner(
       const updates = transcript.memoryUpdates ?? [];
       const saved = (transcript.artifacts ?? []).length > 0 ? "File saved." : "";
       const anythingPosted = transcript.postedCount > 0;
+      // The silence word (NO_REPLY) is never posted, on any run (reply-policy.ts): what it really wrote.
+      const said = stripSentinel(turnText);
+      const sentinelOnly = isSentinelOnly(turnText);
+      // Quiet on purpose: only the word, or a note it closes ("Nada novo desde ontem.\n\nNO_REPLY").
+      const wantsQuiet = endsWithSentinel(turnText);
+      if (run.background) return finishBackground(wantsQuiet ? "" : said);
+      // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted.
+      if (
+        policy.mayPass &&
+        !transcript.answerOwed &&
+        !transcript.reacted &&
+        (transcript.passed ||
+          (!anythingPosted && (wantsQuiet || !said) && updates.length === 0 && !saved && !transcript.reported))
+      ) {
+        const how = transcript.passed ? "pass" : wantsQuiet ? "sentinel" : "empty";
+        if (await endQuietly(how, transcript.passed?.reason ?? "")) return;
+        continue;
+      }
       // A routine with nothing to report ends here without posting (its instructions asked for silence).
       // Or it reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
       // the reaction is the answer.
       // Or it posted a mission report and has no card left to attach: the report is the answer. Coding CLIs
       // always close with a summary that repeats it, whatever the prompt says, so the text is dropped too.
       const silent =
-        (Boolean(viaRoutine) && isNoReply(turnText)) ||
-        (Boolean(transcript.reacted) && restatesReaction(turnText)) ||
+        (Boolean(viaRoutine) && wantsQuiet) ||
+        (Boolean(transcript.reacted) && restatesReaction(said)) ||
         (Boolean(transcript.reported) && !transcript.artifacts?.length && !transcript.memoryUpdates?.length);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const text = silent
         ? ""
-        : turnText ||
+        : said ||
           (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
           saved ||
           closingSummary(transcript, anythingPosted) ||
           (result.executedCount > 0 && !anythingPosted ? DONE_TEXT : "");
       // A line the server wrote (not the model): its code, so the app shows it in the person's language.
       const code =
-        turnText || text === ""
+        said || text === ""
           ? undefined
           : updates.length > 0
             ? bodyCode("memory")
@@ -1654,6 +1751,15 @@ async function executeRunInner(
               : text === DONE_TEXT
                 ? bodyCode("done")
                 : undefined;
+      // Addressed directly, it wrote only the silence word (or nothing): one more turn, told to answer.
+      if (!silent && !viaRoutine && !transcript.nudged && (sentinelOnly || (!text && !anythingPosted))) {
+        transcript.nudged = true;
+        appendUserText(transcript, ANSWER_NUDGE);
+        if (plan.kind !== "model") nextPrompt = ANSWER_NUDGE;
+        await saveTranscript(db, transcript);
+        later(() => addRunStep(db, run, "context", { nudged: sentinelOnly ? "sentinel" : "empty" }));
+        continue;
+      }
       if (!text && !anythingPosted && !silent) return fail("empty_reply");
       const t = transcript;
       // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
@@ -2009,7 +2115,7 @@ export async function executeToolForRun(
 function closingSummary(t: Transcript, anythingPosted: boolean): string {
   const turns = t.messages.slice(t.postedUpTo).filter((m) => m.role === "assistant");
   const last = turns
-    .map((m) => textOf(m.content).trim())
+    .map((m) => stripSentinel(textOf(m.content)))
     .filter(Boolean)
     .at(-1);
   if (last) return last;
@@ -2039,7 +2145,9 @@ function postAgentMessage(
 /**
  * Batches stream deltas so a fast model doesn't send one pub/sub message per
  * token (each is a NOTIFY on the Postgres adapter). Chunks stay well under the
- * NOTIFY payload limit. `seq` continues across the turns of a run.
+ * NOTIFY payload limit. `seq` continues across the turns of a run. The silence
+ * word (NO_REPLY) never shows live, on any run: what could still become it is
+ * held, and it is cut when it shows up (`visibleText`, reply-policy.ts).
  */
 function createDeltaPublisher(
   pubsub: PubSub,
@@ -2051,29 +2159,33 @@ function createDeltaPublisher(
     turn: number;
     event?: ChannelEvent;
     onFirst?: () => void;
-    /** A whole answer never shown live (a routine's NO_REPLY): held while the text could still be it. */
-    holdBack?: string;
   },
 ) {
   let started = false;
   const MAX_CHUNK = 2000;
-  let buffer = "";
   let all = "";
+  /** What was published so far (always a prefix of what may be shown). */
+  let shown = "";
+  /** Length of `all` at the last send. */
+  let sentUpTo = 0;
   /** When each piece arrived: [ms, length of `all` once it was added]. */
   const marks: [number, number][] = [];
   let seq = startSeq;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Promise<void> = Promise.resolve();
 
-  const holdBack = first.holdBack;
-  const held = () => holdBack?.startsWith(all.trim().replace(/\.$/, "")) === true;
-  const send = () => {
+  const send = (final = false) => {
     if (timer) clearTimeout(timer);
     timer = null;
-    if (held()) return;
-    while (buffer.length > 0) {
-      const text = buffer.slice(0, MAX_CHUNK);
-      buffer = buffer.slice(MAX_CHUNK);
+    sentUpTo = all.length;
+    const visible = visibleText(all, final);
+    // A held piece turned out to be the word (now cut): nothing new to show.
+    if (!visible.startsWith(shown)) return;
+    let rest = visible.slice(shown.length);
+    shown = visible;
+    while (rest.length > 0) {
+      const text = rest.slice(0, MAX_CHUNK);
+      rest = rest.slice(MAX_CHUNK);
       const evt: ChannelEvent = {
         type: "agent.delta",
         channelId: run.channelId,
@@ -2096,16 +2208,14 @@ function createDeltaPublisher(
         const typing = first.event;
         if (typing) pending = pending.then(() => publishChannelEvent(pubsub, typing));
       }
-      buffer += text;
       all += text;
       if (text) marks.push([Date.now(), all.length]);
-      if (flushMs === 0 || buffer.length >= MAX_CHUNK) send();
-      else timer ??= setTimeout(send, flushMs);
+      if (flushMs === 0 || all.length - sentUpTo >= MAX_CHUNK) send();
+      else timer ??= setTimeout(() => send(), flushMs);
     },
     async flush() {
-      // The whole answer was the held word (or a prefix of it): nothing to show.
-      if (held()) buffer = "";
-      send();
+      // The turn's text is complete: what was held is shown now, unless it was the word.
+      send(true);
       await pending;
     },
     seq: () => seq,

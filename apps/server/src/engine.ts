@@ -32,6 +32,7 @@ import {
   createMissionRunToolSource,
   createMissionToolSource,
   createModelGateway,
+  createPassToolSource,
   createPermissionToolSource,
   createReactToolSource,
   createSandboxToolSource,
@@ -211,6 +212,8 @@ export function buildEngine(o: EngineOptions) {
       createAskAgentToolSource({ pubsub: adapters.pubsub }),
       createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
+      createPassToolSource(),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
