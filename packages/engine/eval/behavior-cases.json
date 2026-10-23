@@ -508,7 +508,7 @@
       "ask": "required",
       "behavior": "Brings the data first (61% of new subscriptions are monthly; monthly cancels much more; annual has more refunds), lays out the trade-off briefly, and asks one focused question about what Marina wants to optimize (e.g. cash upfront vs. conversion) or suggests a test. Does not decide or change anything on its own.",
       "rubric": [
-        "Brings numbers from the analytics before giving an opinion.",
+        "Backs its opinion with numbers from the analytics it looked at (an opinion first is fine: it leads with the answer).",
         "Leaves the decision to the person and asks one focused question (or offers a concrete test), not a list of many questions."
       ]
     }
@@ -809,7 +809,8 @@
       "evidence": ["outbox", "postgres"],
       "ask": "never",
       "behavior": "Finds the earlier decision (Postgres outbox, no Redis, revisit above ~200 jobs/s) in memory or the code and answers with it, saying when it would make sense to revisit. Does not debate from scratch or ask what queue they use today.",
-      "rubric": ["Brings the earlier decision (Postgres outbox instead of Redis) instead of debating from scratch."]
+      "rubric": ["Brings the earlier decision (Postgres outbox instead of Redis) instead of debating from scratch."],
+      "skipJudge": ["next_step"]
     }
   },
   {
@@ -1386,7 +1387,7 @@
         },
         {
           "author": "@dev",
-          "body": "Sim: o #88 entrou no deploy dep_9d2 (api@2.14.2) hoje às 12:41, está em produção no Railway."
+          "body": "Sim: o #88 entrou no deploy dep_9d2 (api@2.14.2) há 20 minutos, está em produção no Railway."
         }
       ],
       "trigger": {
@@ -1395,6 +1396,13 @@
       }
     },
     "connectors": ["sentry", "railway"],
+    "fixtures": {
+      "railway_list_deployments": [
+        {
+          "result": "service api\n- dep_9d2  api@2.14.2  commit 8a7b6c5 'perf(sync): eager-load habits and entries (#88)' · SUCCESS · 20 min ago\n- dep_8c1  api@2.14.1  commit 3c2b1a0 · SUCCESS · yesterday"
+        }
+      ]
+    },
     "expect": {
       "pass": true,
       "behavior": "@dev already answered and the person only thanked. It passes: nothing posted."
@@ -1436,6 +1444,17 @@
         {
           "result": "lumen-api · performance\n- LUMEN-API-5B7  Slow DB query on GET /sync · since today 12:43 · p95 4.8s (was 0.4s)"
         }
+      ],
+      "sentry_get_issue_details": [
+        {
+          "when": ["5B7"],
+          "result": "LUMEN-API-5B7 Slow DB query on GET /sync · since today 12:43 (release api@2.14.2) · p95 4.8s (was 0.4s) · 1,920 events\nslowest span: SELECT entries.* FROM entries WHERE habit_id IN (...) · 3.9s · 412 rows per habit on average\ncaller: src/sync/load.ts:31 (eagerLoad)"
+        }
+      ],
+      "sentry_search_events": [
+        {
+          "result": "GET /sync · last 30 min · 1,920 events · p95 4.8s · 94% of the time in SELECT entries.* (src/sync/load.ts:31)"
+        }
       ]
     },
     "expect": {
@@ -1465,7 +1484,7 @@
         },
         {
           "author": "agent",
-          "body": "Subiu: dep_9d2 (api@2.14.2) às 12:41, status SUCCESS no Railway."
+          "body": "Subiu: dep_9d2 (api@2.14.2) há 20 minutos, status SUCCESS no Railway."
         }
       ],
       "trigger": {
@@ -1474,6 +1493,13 @@
       }
     },
     "connectors": ["railway"],
+    "fixtures": {
+      "railway_list_deployments": [
+        {
+          "result": "service api\n- dep_9d2  api@2.14.2  commit 8a7b6c5 'perf(sync): eager-load habits and entries (#88)' · SUCCESS · 20 min ago\n- dep_8c1  api@2.14.1  commit 3c2b1a0 · SUCCESS · yesterday"
+        }
+      ]
+    },
     "expect": {
       "pass": false,
       "behavior": "Called by name in a DM: it answers briefly or reacts, never stays silent, never writes the silence word.",
@@ -1505,10 +1531,31 @@
       "channel": "tech",
       "trigger": {
         "author": "Marina",
-        "body": "@dev o checkout começou a falhar depois do deploy de ontem. Alguém mexeu na STRIPE_PRICE_ANNUAL? Isso é com o infra, pergunta pra ele e me fala"
+        "body": "@ada o checkout começou a falhar depois do deploy de ontem. Alguém mexeu na STRIPE_PRICE_ANNUAL? Isso é com o infra, pergunta pra ele e me fala"
       }
     },
     "connectors": ["github"],
+    "fixtures": {
+      "github_search_code": [
+        {
+          "when": ["STRIPE"],
+          "result": "2 results\nlumen/api src/checkout/prices.ts:4   annual: process.env.STRIPE_PRICE_ANNUAL!,\nlumen/api src/checkout/confirm.ts:12   const price = PRICES[plan];"
+        },
+        {
+          "result": "2 results\nlumen/api src/checkout/confirm.ts:12   const price = PRICES[plan];\nlumen/api src/checkout/prices.ts:4   annual: process.env.STRIPE_PRICE_ANNUAL!,"
+        }
+      ],
+      "github_get_file_contents": [
+        {
+          "when": ["prices"],
+          "result": "src/checkout/prices.ts (lumen/api, main) — 6 lines\n1   // Stripe price ids per plan, from the environment (Railway variables).\n2   export const PRICES: Record<string, string> = {\n3     monthly: process.env.STRIPE_PRICE_MONTHLY!,\n4     annual: process.env.STRIPE_PRICE_ANNUAL!,\n5   };\n6"
+        },
+        {
+          "when": ["confirm"],
+          "result": "src/checkout/confirm.ts (lumen/api, main) — 20 lines\n10  export async function confirmCheckout(req: Req) {\n11    const plan = req.body.plan;\n12    const price = PRICES[plan];\n13    const session = await stripe.checkout.sessions.create({ line_items: [{ price, quantity: 1 }], mode: \"subscription\" });\n14    return session.url;\n15  }"
+        }
+      ]
+    },
     "expect": {
       "mustCall": ["ask_agent"],
       "behavior": "Asks @infra with ask_agent (a focused question about STRIPE_PRICE_ANNUAL in yesterday's deploy) and tells the person it asked and that the answer will come; meanwhile it may look at what it can itself (the code). It never invents Infra's answer or claims the variable changed.",

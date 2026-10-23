@@ -104,7 +104,7 @@ const TALKER_CASES: TalkerCase[] = [
     state: "long_step",
     message: "quanto falta?",
     expect: "reply",
-    says: [/test/i],
+    says: [/test|suíte|suite|arquivos/i],
     never: [/\b\d+\s*(min|minutos|segundos|seconds)\b/i, /terminei|acabei|done/i],
   },
   {

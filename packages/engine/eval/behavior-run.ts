@@ -5,7 +5,7 @@
  * provider is passed in, so tests drive it with the fake provider (no network).
  */
 import { createMemoryPubSub, createPostgresSearchResolver, noPlatformCredentials } from "@agenteschat/adapters";
-import { and, asc, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, gt, inArray, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   type ContentBlock,
@@ -340,6 +340,17 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       search,
       toolsOnDemand: options.toolsOnDemand ?? false,
     });
+    // Other agents' runs (an `ask_agent` question, a mention) are recorded, never executed.
+    const execute = handlers["agent_run.execute"];
+    handlers["agent_run.execute"] = async (job, ctx) => {
+      const runId = String(job.payload.runId ?? "");
+      const [row] = await db
+        .select({ agentId: schema.agentRuns.agentId })
+        .from(schema.agentRuns)
+        .where(eq(schema.agentRuns.id, runId));
+      if (row && others.has(row.agentId)) return;
+      await execute?.(job, ctx);
+    };
 
     // The conversation.
     let channelId: string;
@@ -522,6 +533,23 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         .where(and(eq(schema.outbox.kind, "agent_run.execute"), sql`${schema.outbox.payload}->>'runId' = ${r.id}`));
     }
     await drainOutbox(db, handlers, { maxBatches: 500 });
+    // A transient model failure (overloaded, a tool input that came back as unparseable JSON) retries
+    // the run's job after a backoff, as in production: retry it now instead of grading a half-done run.
+    for (let retry = 0; retry < 3; retry++) {
+      const retried = await db
+        .update(schema.outbox)
+        .set({ nextAttemptAt: new Date() })
+        .where(
+          and(
+            eq(schema.outbox.status, "pending"),
+            eq(schema.outbox.kind, "agent_run.execute"),
+            gt(schema.outbox.attempts, 0),
+          ),
+        )
+        .returning({ id: schema.outbox.id });
+      if (retried.length === 0) break;
+      await drainOutbox(db, handlers, { maxBatches: 500 });
+    }
 
     // What happened.
     const runs = await db
@@ -565,7 +593,15 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ? await db
           .select({ body: schema.messages.body })
           .from(schema.messages)
-          .where(and(eq(schema.messages.orgId, org.id), inArray(schema.messages.agentRunId, runIds)))
+          .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, schema.messages.agentRunId))
+          .where(
+            and(
+              eq(schema.messages.orgId, org.id),
+              // Where each run answers: not a question it sent another agent (`ask_agent`, a DM).
+              eq(schema.messages.channelId, schema.agentRuns.channelId),
+              inArray(schema.messages.agentRunId, runIds),
+            ),
+          )
           .orderBy(asc(schema.messages.createdAt))
       : [];
     const u = schema.usageRecords;
