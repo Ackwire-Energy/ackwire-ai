@@ -45,9 +45,22 @@ export interface ModelInfo {
   cheap?: boolean;
   /** Suggested for new agents of that provider. */
   recommended?: boolean;
+  /** Its size in the provider's line, for "Automático" (D83): each run picks a tier, mapped back to a model. */
+  tier?: ModelTier;
   /** Context window in tokens (prompt + output); absent = `DEFAULT_CONTEXT_WINDOW`. */
   contextWindow?: number;
 }
+
+/** The sizes "Automático" chooses between: a fast cheap model, the everyday one, the strongest. */
+export type ModelTier = "small" | "medium" | "large";
+export const MODEL_TIERS: readonly ModelTier[] = ["small", "medium", "large"];
+
+/**
+ * An agent's model setting that is no model: each run picks the tier and the
+ * effort (D83, `packages/engine/src/auto-model.ts`). Never sent to a provider.
+ */
+export const AUTO_MODEL = "auto";
+export const isAutoModel = (model: string | null | undefined) => model === AUTO_MODEL;
 
 /** Context window assumed for a model without one in the catalog: the smallest current one, so runs stay inside it. */
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
@@ -59,6 +72,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     prices: { input: 4000, output: 20000, cacheRead: 200, cacheWrite: 5000 },
     contextWindow: 1_000_000,
     serverSideFallback: true,
+    tier: "large",
   },
   "claude-sonnet-5-5": {
     provider: "anthropic",
@@ -67,6 +81,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     contextWindow: 1_000_000,
     serverSideFallback: true,
     recommended: true,
+    tier: "medium",
   },
   "claude-haiku-5-5": {
     provider: "anthropic",
@@ -76,6 +91,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     contextWindow: 1_000_000,
     serverSideFallback: false,
     cheap: true,
+    tier: "small",
   },
   // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-14).
   // TODO: the page lists long-context prices but not the threshold; add `longContext` once known.
@@ -87,6 +103,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     serverSideFallback: false,
     reasoning: true,
     recommended: true,
+    tier: "medium",
   },
   "gpt-6-luna": {
     provider: "openai",
@@ -95,12 +112,29 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     serverSideFallback: false,
     reasoning: true,
     cheap: true,
+    tier: "small",
   },
 };
 
 /** The cheap model of a provider (router fallback, summaries), from the catalog. */
 export const cheapModelOf = (provider: string) =>
   Object.entries(MODEL_CATALOG).find(([, m]) => m.provider === provider && m.cheap)?.[0] ?? null;
+
+/**
+ * A provider's model for a tier: that tier, else the nearest smaller one (a
+ * line without a large model answers with its medium one), else the nearest
+ * larger. Null when the provider has no tiered model.
+ */
+export function modelForTier(provider: string, tier: ModelTier): string | null {
+  const own = Object.entries(MODEL_CATALOG).filter(([, m]) => m.provider === provider && m.tier);
+  const at = MODEL_TIERS.indexOf(tier);
+  const order = [...MODEL_TIERS.slice(0, at + 1).reverse(), ...MODEL_TIERS.slice(at + 1)];
+  for (const t of order) {
+    const hit = own.find(([, m]) => m.tier === t);
+    if (hit) return hit[0];
+  }
+  return null;
+}
 
 /** The model's context window in tokens (`DEFAULT_CONTEXT_WINDOW` when the catalog doesn't say). */
 export const contextWindowOf = (model: string) => MODEL_CATALOG[model]?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;

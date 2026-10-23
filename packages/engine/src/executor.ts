@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import {
   type ContentBlock,
+  isAutoModel,
   type ModelMessage,
   ProviderError,
   type StopReason,
@@ -13,6 +14,19 @@ import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
 import { runAuthority } from "./authority";
+import {
+  type AutoChoice,
+  type AutoModelRecord,
+  autoApplied,
+  autoProvider,
+  autoWanted,
+  chooseAutoModel,
+  fallbackChoice,
+  inMission,
+  needsAutoChoice,
+  withAuto,
+} from "./auto-model";
+import { brainOf } from "./brain-settings";
 import { recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
@@ -190,6 +204,8 @@ export interface Transcript {
   messages: ModelMessage[];
   /** Tools on demand (D65): the tool groups this run listed up front; absent = every tool. */
   toolGroups?: string[];
+  /** "Automático" (D83): the model tier and effort chosen for this run; a resume thinks with the same. */
+  autoModel?: AutoModelRecord;
   /** Assistant text before this index was already posted to the chat (or was history). */
   postedUpTo: number;
   /** Chat messages this run posted so far. */
@@ -601,9 +617,38 @@ async function executeRunInner(
   // Tools on demand (D65): a new run lists the core tools and the groups the judge expects it to need.
   let toolChoice: ToolGroupChoice | null = null;
   const judge = deps.context?.judge;
+  /** The latest messages where the run answers, read once for every judge that needs them. */
+  let recentRead: Promise<string[]> | null = null;
+  const recentMessages = () => {
+    recentRead ??= recentForJudge(db, run).catch(() => [] as string[]);
+    return recentRead;
+  };
+  // "Automático" (D83): the judge picks the run's model tier and effort while the context is built; the
+  // choice is applied once the brain is known, before the first model call. Never blocks: no answer in time
+  // is medium/medium.
+  const askAuto = (): Promise<AutoChoice> => {
+    if (!judge) return Promise.resolve(fallbackChoice("none"));
+    return Promise.all([recentMessages(), inMission(db, run).catch(() => false)])
+      .then(([recent, mission]) =>
+        chooseAutoModel(judge, {
+          orgId: run.orgId,
+          agentId: agent.id,
+          runId: run.id,
+          agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+          message: trigger?.body ?? topTrigger?.body ?? "",
+          recent,
+          routine: run.background || Boolean(trigger?.meta?.routine),
+          mission,
+          computer: brainOf(agent.brain) !== "model",
+          tools: granted.length > 0,
+        }),
+      )
+      .catch(() => fallbackChoice("error"));
+  };
+  const autoAsked = needsContext && autoWanted(agent) ? askAuto() : null;
   if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
     const [recent, keep] = await Promise.all([
-      recentForJudge(db, run).catch(() => [] as string[]),
+      recentMessages(),
       keptToolGroups(db, run, granted).catch(() => [] as string[]),
     ]);
     toolChoice = await chooseToolGroups(judge, {
@@ -1035,8 +1080,37 @@ async function executeRunInner(
         .where(and(eq(routineRuns.id, routineRunId), eq(routineRuns.orgId, run.orgId)));
     }
   }
+  // "Automático" (D83): the model and effort this run thinks with, the same decision mapped onto its brain (the
+  // brain itself never changes). A resumed run keeps its choice; a run that couldn't ask is medium/medium.
+  /** The agent as this run's model brain sees it: its `auto` model replaced by the one chosen. */
+  let thinker: Agent = agent;
+  if (needsAutoChoice(agent, brainPlan)) {
+    const t = transcript;
+    const kept = t.autoModel;
+    const choice: AutoModelRecord =
+      kept ?? (await (autoAsked ?? (needsContext ? askAuto() : Promise.resolve(fallbackChoice("kept")))));
+    const provider =
+      isAutoModel(agent.model) && !choice.apiModel
+        ? await autoProvider(db, agent).catch(() => "anthropic")
+        : "anthropic";
+    const applied = autoApplied(agent, brainPlan, choice, provider);
+    ({ agent: thinker, plan: brainPlan } = withAuto(agent, brainPlan, applied));
+    if (!kept) {
+      t.autoModel = { ...choice, ...(applied.apiModel ? { apiModel: applied.apiModel } : {}) };
+      const chosen = {
+        tier: choice.tier,
+        effort: applied.effort ?? null,
+        brain: brainPlan.kind,
+        model: (brainPlan.kind === "model" ? thinker.model : brainPlan.model) ?? null,
+        reason: choice.reason,
+        source: choice.source,
+      };
+      later(() => addRunStep(db, run, "context", { autoModel: chosen }));
+      later(() => saveTranscript(db, t));
+    }
+  }
   let plan: BrainPlan = brainPlan;
-  let brain = createBrain(deps, agent, run, plan.kind, turnToken, () => transcript as Transcript);
+  let brain = createBrain(deps, thinker, run, plan.kind, turnToken, () => transcript as Transcript);
   let triggerText = trigger?.body ?? topTrigger?.body ?? "";
   if (plan.kind !== "model" && !triggerText) {
     triggerText = (await getMessage(db, run.orgId, run.triggerMessageId))?.body ?? "";
@@ -1156,11 +1230,17 @@ async function executeRunInner(
     if (
       !onlyThisComputer &&
       mayFallBack(agent, run) &&
-      (await deps.gateway.hasModelCredential(agent).catch(() => false))
+      (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
       t.fallback = { from, code: u.code, message: u.message };
-      plan = { kind: "model", ...(plan.missionId ? { missionId: plan.missionId } : {}) };
-      brain = createBrain(deps, agent, run, "model", turnToken, () => transcript as Transcript);
+      // On "Automático" the API answers with the model and effort chosen for this run (D83).
+      const autoEffort = isAutoModel(agent.model) ? t.autoModel?.effort : undefined;
+      plan = {
+        kind: "model",
+        ...(plan.missionId ? { missionId: plan.missionId } : {}),
+        ...(autoEffort ? { effort: autoEffort } : {}),
+      };
+      brain = createBrain(deps, thinker, run, "model", turnToken, () => transcript as Transcript);
       await saveTranscript(db, t);
       await recordRunBrain(db, run.id, "model");
       run = { ...run, brain: "model" };
@@ -1510,7 +1590,7 @@ async function executeRunInner(
           orgId: run.orgId,
           agentId: agent.id,
           runId: run.id,
-          model: agent.model,
+          model: thinker.model,
           windowTokens: deps.contextWindowTokens,
           maxOutputTokens: deps.maxOutputTokens,
           system: transcript.system,
@@ -1530,7 +1610,7 @@ async function executeRunInner(
         result = await thinkOnce(
           brain,
           // Memory and wiki once per run: its first turn, or a session started afresh.
-          brainTurnOf(run, agent, transcript, turnTools, prompt, turnPlan, {
+          brainTurnOf(run, thinker, transcript, turnTools, prompt, turnPlan, {
             found: computerTurns === 0 || !turnPlan.session?.resume,
           }),
           io,

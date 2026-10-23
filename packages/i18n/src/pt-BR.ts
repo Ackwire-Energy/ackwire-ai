@@ -1381,8 +1381,9 @@ export const ptBR = {
         fallbackOnNow: "Usa o modelo da organização e conta no orçamento {{of}} {{name}}.",
         fallbackOffNow: "{{The}} {{name}} avisa quem chamou e espera ele voltar.",
         effort: "Esforço",
-        efforts: { low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
+        efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortText: {
+          auto: "Escolhe o esforço para cada tarefa.",
           low: "Responde rápido. Bom para perguntas simples.",
           medium: "O padrão. Pensa o suficiente na maioria das vezes.",
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",
@@ -4932,6 +4933,10 @@ export const ptBR = {
   },
   brain: {
     title: "Quem pensa",
+    auto: {
+      label: "Automático",
+      hint: "Escolhe o modelo e o esforço para cada tarefa",
+    },
     sub: "Quem escreve as respostas {{of}} {{name}}. Vale para todas as conversas.",
     line: {
       claude_code: "Claude Code · {{model}} no {{computer}}",

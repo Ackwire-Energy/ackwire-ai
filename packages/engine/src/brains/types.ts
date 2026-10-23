@@ -45,7 +45,7 @@ export interface BrainTurn {
   session?: BrainSession;
   /** Computer brains: the account to run with (absent: the computer's own sign-in). */
   account?: BrainAccount;
-  /** Computer brains: how hard it thinks (absent: the CLI's default). */
+  /** How hard it thinks (absent: the CLI's or the API's default); the model brain only gets one from "Automático". */
   effort?: BrainEffort;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;

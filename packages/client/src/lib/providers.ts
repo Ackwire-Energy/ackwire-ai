@@ -52,3 +52,10 @@ export function suggestModel(models: Model[], provider: string, fallback?: strin
     fallback
   );
 }
+
+/**
+ * "Automático" (D83): the value an agent's model, a computer brain's model or
+ * its effort holds when each run picks them (the server's `auto-model.ts`).
+ */
+export const AUTO = "auto";
+export const isAuto = (value: string | null | undefined) => value === AUTO;

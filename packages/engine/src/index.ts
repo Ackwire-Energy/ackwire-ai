@@ -11,6 +11,7 @@ export * from "./artifacts";
 export * from "./audience";
 export * from "./audit";
 export * from "./authority";
+export * from "./auto-model";
 export * from "./avatars";
 export * from "./brain-settings";
 export * from "./brains/claude-code";

@@ -1,5 +1,5 @@
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
-import { isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentAppearance } from "./appearance";
 import { caches } from "./cache";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
@@ -28,8 +28,9 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
-  if (input.model !== undefined && !isKnownModel(input.model)) {
-    throw new ValidationError(`model must be one of: ${Object.keys(MODEL_CATALOG).join(", ")}`);
+  // "auto" (D83): each run picks the model from the line of the agent's key (any provider).
+  if (input.model !== undefined && !isAutoModel(input.model) && !isKnownModel(input.model)) {
+    throw new ValidationError(`model must be ${AUTO_MODEL} or one of: ${Object.keys(MODEL_CATALOG).join(", ")}`);
   }
   if (input.monthlyBudgetNanoUsd != null && input.monthlyBudgetNanoUsd < 0) {
     throw new ValidationError("budget can't be negative");
