@@ -148,6 +148,7 @@ export * from "./secrets";
 export * from "./skill-tools";
 export * from "./skills";
 export * from "./storage";
+export * from "./talker";
 export * from "./team";
 export * from "./thread-assess";
 export * from "./threads";

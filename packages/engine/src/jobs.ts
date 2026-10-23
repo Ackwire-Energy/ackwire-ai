@@ -219,6 +219,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
+      // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
+      if (message.meta.talker) return;
       const routed = async (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],
