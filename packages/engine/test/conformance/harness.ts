@@ -86,7 +86,10 @@ export interface Scenario {
 
 /** The script's run for a turn: the routine's own when the brain is offered `hand_off`. */
 export function pickRun(runs: readonly ScriptRun[], background: boolean): number {
-  return Math.max(0, runs.findIndex((r) => Boolean(r.background) === background));
+  return Math.max(
+    0,
+    runs.findIndex((r) => Boolean(r.background) === background),
+  );
 }
 
 /** A call's id, the same on every brain: which run, step and call of the script (unique per run). */
@@ -109,7 +112,10 @@ function nextModelStep(request: ModelRequest, run: number): number {
 /** The fake provider scripted per call: each model call gets its run's next step. */
 export function modelReply(runs: readonly ScriptRun[]) {
   return (request: ModelRequest): FakeReply | Error => {
-    const run = pickRun(runs, (request.tools ?? []).some((t) => t.name === HAND_OFF_TOOL));
+    const run = pickRun(
+      runs,
+      (request.tools ?? []).some((t) => t.name === HAND_OFF_TOOL),
+    );
     const steps = runs[run]?.steps ?? [];
     const at = Math.max(0, Math.min(nextModelStep(request, run), steps.length - 1));
     const step: ScriptStep = steps[at] ?? {};
@@ -139,7 +145,13 @@ function computerBrain(h: Harness, kind: BrainKind, runs: readonly ScriptRun[]):
       h.turns++;
       let cursor = h.cursors.get(turn.runId);
       if (!cursor) {
-        cursor = { run: pickRun(runs, turn.tools.some((t) => t.name === HAND_OFF_TOOL)), at: 0 };
+        cursor = {
+          run: pickRun(
+            runs,
+            turn.tools.some((t) => t.name === HAND_OFF_TOOL),
+          ),
+          at: 0,
+        };
         h.cursors.set(turn.runId, cursor);
       }
       const steps = runs[cursor.run]?.steps ?? [];

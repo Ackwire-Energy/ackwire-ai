@@ -280,7 +280,7 @@ export const SCENARIOS: Scenario[] = [
       });
       expect(rr).toMatchObject({ status: "reported", summary: RECORD, messageId: told?.id, brain: h.kind });
       // The routine's room holds only its brief: nothing of the agent's.
-      expect((await agentPosts(h)).map((m) => m.id)).toEqual([told?.id]);
+      expect((await agentPosts(h)).map((m) => m.id)).toEqual([told?.id ?? ""]);
     },
   },
 
