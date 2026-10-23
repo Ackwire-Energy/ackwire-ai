@@ -57,8 +57,13 @@ export function replyPolicyFor(
 ): ReplyPolicy {
   if (run.background) return { mayPass: false, background: true };
   if (options.answerOwed) return { mayPass: false, background: false };
-  const notice = (trigger?.meta?.notice as { kind?: unknown } | undefined)?.kind;
-  if (typeof notice === "string" && INFORMING_NOTICES.has(notice)) return { mayPass: true, background: false };
+  const notice = trigger?.meta?.notice as { kind?: unknown; refs?: { report?: unknown } } | undefined;
+  if (typeof notice?.kind === "string" && INFORMING_NOTICES.has(notice.kind))
+    return { mayPass: true, background: false };
+  // A routine that speaks only when there is news (ADR 0053 §7): the run its report woke may find nothing new
+  // for the people (only what it already told them) and stay quiet. One that reports every time always posts.
+  if (notice?.kind === "routine_handoff" && notice.refs?.report !== "always")
+    return { mayPass: true, background: false };
   if (run.trigger !== "router" || options.followUp) return { mayPass: false, background: false };
   const meta = trigger?.meta ?? {};
   // A routine's call is a person's message written for its creator; an agent's message about a routine's

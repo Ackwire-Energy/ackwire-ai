@@ -76,14 +76,15 @@ describe("notices", () => {
     expect(current).toContain("how big it is first");
     expect(current).toContain("the concrete findings (ids, numbers, names, links), even when you ask them to decide");
     expect(current).toContain("Don't redo the routine's lookups");
-    expect(current).toContain("If it turns out to be nothing they need, say nothing.");
+    expect(current).toContain("say nothing: pass.");
+    expect(current).toContain("don't repeat it, remind it or open a card about it");
     // A routine that reports every time keeps the whole report.
     const always = noticeText(handoff("always"), true) ?? "";
     expect(always).toContain("On a quiet day, one or two lines: nothing unusual, with the key numbers");
     expect(always).toContain("keep every finding and number");
     // What needs a person's approval is asked for with the tool, never in words.
     expect(current).toContain("ask for it with that tool and your reason instead of asking in words");
-    expect(always).not.toContain("say nothing");
+    expect(always).not.toContain("say nothing: pass");
     // As history, only the line.
     expect(noticeText(handoff("always"))).not.toContain("how big");
     // Without the name in refs, the sender's label becomes the agent's own.

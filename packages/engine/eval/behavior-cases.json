@@ -1804,5 +1804,142 @@
         "The report does not claim the issue was created."
       ]
     }
+  },
+  {
+    "id": "pm-report-pending-proposal-not-news",
+    "title": "Rotina de métricas num dia calmo, com uma proposta antiga sem resposta: fica quieta",
+    "source": "production 2026-10-23 (Theo asked about the same PR in every daily report for two days): a proposal already made isn't news",
+    "agent": {
+      "preset": "pm"
+    },
+    "org": {
+      "name": "Lumen",
+      "context": "Lumen é um app de meditação e hábitos por assinatura. Métricas de produto no Himetrica (projeto lumen): cadastros (signup_completed), assinaturas (subscription_started) e cancelamentos (subscription_canceled). O time fala português e usa o horário de Brasília (BRT)."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "produto",
+      "prior": [
+        {
+          "author": "agent",
+          "body": "Ontem foram 135 cadastros, 30 assinaturas e 7 cancelamentos, tudo na faixa da semana. Uma coisa que atrapalha o relatório: o plano anual aparece com três nomes diferentes no evento (\"anual\", \"Anual\", \"annual\"), e eu somo à mão. Proponho que a Ada mande um `plan_key` fixo no `subscription_started`. Você topa?"
+        },
+        {
+          "author": "agent",
+          "body": "Dia normal ontem: 140 cadastros, 34 assinaturas e 6 cancelamentos. Sigo esperando seu ok para a Ada mandar o `plan_key` no evento: com ele eu paro de somar os nomes do plano à mão. Você topa?"
+        }
+      ],
+      "trigger": {
+        "author": "Marina",
+        "body": "Olhe as métricas de ontem no Himetrica (cadastros, assinaturas e cancelamentos) e compare com os últimos 7 dias. Avise só se tiver algo novo."
+      },
+      "routine": {
+        "name": "Métricas do dia",
+        "access": "read",
+        "report": "when_new"
+      }
+    },
+    "connectors": ["himetrica"],
+    "fixtures": {
+      "himetrica_list_events": [
+        {
+          "result": "project lumen · yesterday (Oct 22, BRT)\n- signup_completed 142\n- subscription_started 31\n- subscription_canceled 6\n- meditation_finished 2310"
+        }
+      ],
+      "himetrica_get_event_timeseries": [
+        {
+          "when": ["signup"],
+          "result": "signup_completed daily, Oct 16–22: 138, 151, 129, 147, 140, 135, 142"
+        },
+        {
+          "when": ["subscription_started"],
+          "result": "subscription_started daily, Oct 16–22: 29, 33, 30, 28, 34, 30, 31"
+        },
+        {
+          "when": ["canceled"],
+          "result": "subscription_canceled daily, Oct 16–22: 5, 7, 6, 4, 6, 7, 6"
+        }
+      ]
+    },
+    "expect": {
+      "investigate": true,
+      "mustCall": ["himetrica_list_events|himetrica_get_event_timeseries"],
+      "noReply": true,
+      "mustNotCall": ["hand_off"],
+      "skipJudge": ["next_step"],
+      "behavior": "Reads yesterday (142 sign-ups, 31 subscriptions, 6 cancellations, all within the week's range) and finishes without hand_off: a normal day is no news, and the plan_key proposal it already made twice is not news either, so nothing is posted.",
+      "rubric": [
+        "Stays silent: nothing is handed off or posted, even though the plan_key proposal is still unanswered."
+      ]
+    }
+  },
+  {
+    "id": "pm-report-news-without-repeating",
+    "title": "Rotina de métricas com novidade: conta a novidade sem repetir a proposta antiga",
+    "source": "production 2026-10-23: a proposal is said once; later reports don't remind it",
+    "agent": {
+      "preset": "pm"
+    },
+    "org": {
+      "name": "Lumen",
+      "context": "Lumen é um app de meditação e hábitos por assinatura. Métricas de produto no Himetrica (projeto lumen): cadastros (signup_completed), assinaturas (subscription_started) e cancelamentos (subscription_canceled). O time fala português e usa o horário de Brasília (BRT)."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "produto",
+      "prior": [
+        {
+          "author": "agent",
+          "body": "Ontem foram 135 cadastros, 30 assinaturas e 7 cancelamentos, tudo na faixa da semana. Uma coisa que atrapalha o relatório: o plano anual aparece com três nomes diferentes no evento (\"anual\", \"Anual\", \"annual\"), e eu somo à mão. Proponho que a Ada mande um `plan_key` fixo no `subscription_started`. Você topa?"
+        },
+        {
+          "author": "agent",
+          "body": "Dia normal ontem: 140 cadastros, 34 assinaturas e 6 cancelamentos. Sigo esperando seu ok para a Ada mandar o `plan_key` no evento: com ele eu paro de somar os nomes do plano à mão. Você topa?"
+        }
+      ],
+      "trigger": {
+        "author": "Marina",
+        "body": "Olhe as métricas de ontem no Himetrica (cadastros, assinaturas e cancelamentos) e compare com os últimos 7 dias. Avise só se tiver algo novo."
+      },
+      "routine": {
+        "name": "Métricas do dia",
+        "access": "read",
+        "report": "when_new"
+      }
+    },
+    "connectors": ["himetrica"],
+    "fixtures": {
+      "himetrica_list_events": [
+        {
+          "result": "project lumen · yesterday (Oct 22, BRT)\n- signup_completed 412\n- subscription_started 31\n- subscription_canceled 6\n- meditation_finished 2310"
+        }
+      ],
+      "himetrica_get_event_timeseries": [
+        {
+          "when": ["signup"],
+          "result": "signup_completed daily, Oct 16–22: 138, 151, 129, 147, 140, 135, 412"
+        },
+        {
+          "when": ["subscription_started"],
+          "result": "subscription_started daily, Oct 16–22: 29, 33, 30, 28, 34, 30, 31"
+        },
+        {
+          "when": ["canceled"],
+          "result": "subscription_canceled daily, Oct 16–22: 5, 7, 6, 4, 6, 7, 6"
+        }
+      ]
+    },
+    "expect": {
+      "investigate": true,
+      "mustCall": ["himetrica_list_events|himetrica_get_event_timeseries", "hand_off"],
+      "noReply": false,
+      "evidence": ["412"],
+      "skipJudge": ["next_step"],
+      "behavior": "Finds 412 sign-ups yesterday against 129–151 a day all week (subscriptions and cancellations normal) and tells it, size first, without bringing up the plan_key proposal again: it was made twice already, nobody answered, and a sign-up spike doesn't change it.",
+      "rubric": [
+        "Reports the sign-up spike with its numbers (412 against 129–151 a day).",
+        "Does not repeat the earlier proposal (Ada sending a fixed plan_key in subscription_started) and does not ask again for an ok about it. Reading the plan property while investigating is fine."
+      ]
+    }
   }
 ]

@@ -49,12 +49,13 @@ function yourRoutine(n: Notice) {
  */
 export function handoffGuidance(report: string | undefined) {
   return [
-    "Tell the people here what it found, in your own voice, as one message: how big it is first (urgent or not, how many, new or the same as before), then the concrete findings (ids, numbers, names, links), even when you ask them to decide something, then what you would do about it. When a decision is theirs, end with that one question.",
+    "Tell the people here what it found, in your own voice, as one message: how big it is first (urgent or not, how many, new or the same as before), then the concrete findings (ids, numbers, names, links), even when you ask them to decide something, then what you would do about it. When a decision is theirs and you haven't asked it here yet, end with that one question.",
+    "Anything you already proposed or asked in this conversation (a fix, a PR, an ok you wait for) stays out of this message: don't repeat it, remind it or open a card about it, unless what you found changes it.",
     "When what you'd do needs a person's approval (a rollback, a deploy, a merge, a change in a connected app), ask for it with that tool and your reason instead of asking in words: it becomes a card here, and nothing runs until a person approves.",
     "Don't redo the routine's lookups: it already looked. Check something only when the report leaves a gap that matters.",
     report === "always"
       ? "This routine reports every time. On a quiet day, one or two lines: nothing unusual, with the key numbers, and nothing more (no full series, no plans for its next run). When something changed, keep every finding and number in your own words (don't cut it to a vague summary)."
-      : "If it turns out to be nothing they need, say nothing.",
+      : "If nothing in it is new for them (the same as before, or only something you already said here), say nothing: pass.",
   ].join(" ");
 }
 
