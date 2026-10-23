@@ -23,6 +23,12 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
+/** Posting where the run already is: a reply (background work speaks there only through `hand_off`). */
+const sameConversation = (ctx: ToolContext) =>
+  ctx.background
+    ? "That is this conversation, and this is background work: tell the people with hand_off."
+    : "That is this conversation: just reply.";
+
 /** The person whose message started this run (null when an agent or a routine did). */
 async function requesterOf(ctx: ToolContext): Promise<string | null> {
   const [m] = await ctx.db
@@ -145,7 +151,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           if (!channel || !members.some((m) => m.userId === requester)) {
             return { content: `No channel #${name} that the person who asked is in.`, isError: true };
           }
-          if (channel.id === ctx.channelId) return { content: "That is this conversation: just reply.", isError: true };
+          if (channel.id === ctx.channelId) return { content: sameConversation(ctx), isError: true };
           if (channel.visibility !== "public" && !members.some((m) => m.agentId === ctx.agentId)) {
             return {
               content: `You are not in #${channel.name} (private). Ask someone to add you to it, then try again.`,
@@ -250,7 +256,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             return { content: `You already sent ${MAX_DMS_PER_RUN} DMs in this turn.`, isError: true };
           }
           const dm = await openPersonAgentDm(ctx.db, ctx.orgId, to.userId, ctx.agentId);
-          if (dm.id === ctx.channelId) return { content: "That is this conversation: just reply.", isError: true };
+          if (dm.id === ctx.channelId) return { content: sameConversation(ctx), isError: true };
           const [run] = await ctx.db
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)

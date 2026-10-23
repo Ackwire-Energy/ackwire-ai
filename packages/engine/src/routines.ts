@@ -7,6 +7,7 @@ import { recordAudit } from "./audit";
 import { requireChannelAccess } from "./channels";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { nextCronTime, zonedTime } from "./cron";
+import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
@@ -21,7 +22,7 @@ import {
   watchesOf,
 } from "./mail/watches";
 import { getOrgSettings } from "./management";
-import { getMessage, insertMessageWithRuns, messageView, postPersonMessage, replyExcerpt } from "./messages";
+import { getMessage, insertMessageWithRuns, type Message, messageView, replyExcerpt } from "./messages";
 import { notifyRoutineRun } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -92,7 +93,10 @@ export type RoutineTrigger =
 export interface RoutineRunView {
   id: string;
   at: string;
-  /** `silent`: the agent found nothing new and stayed quiet (NO_REPLY). */
+  /**
+   * `silent`: the background run finished without handing anything off (nothing posted); `ok` also
+   * covers a run that handed off its report (`reported` in `routine_runs`).
+   */
   status: "ok" | "silent" | "failed" | "skipped";
   /** Fallback text (English); the app shows `summaryCode` with `t()`. */
   summary: string;
@@ -101,6 +105,9 @@ export interface RoutineRunView {
   /** Recent runs only: this run's cost relative to the priciest of them (0–1). A share, never money. */
   weight?: number;
 }
+
+/** How much of a background run's record the views carry (the routine keeps it whole). */
+const RECORD_EXCERPT = 500;
 
 /** How many recent runs each routine carries in the list (its run strip). */
 export const RECENT_RUNS = 14;
@@ -214,9 +221,22 @@ function runView(
   agentRun: { status: string; error: string | null; replyMessageId: string | null } | undefined,
 ) {
   let status: RoutineRunView["status"] =
-    run.status === "skipped" ? "skipped" : run.status === "failed" ? "failed" : "ok";
+    run.status === "skipped"
+      ? "skipped"
+      : run.status === "failed"
+        ? "failed"
+        : run.status === "silent"
+          ? "silent"
+          : "ok";
   let summary = run.summary;
-  if (run.status === "started" && agentRun) {
+  if (run.status === "silent" || run.status === "reported") {
+    // A background run's own record (its final text, or the report it handed off): the agent's words.
+    if (!summary.trim()) summary = RUN_SUMMARY["routine_run.nothing_new"];
+    else {
+      const shown = replyExcerpt(summary, RECORD_EXCERPT);
+      return { id: run.id, at: run.at.toISOString(), status, summary: shown, summaryCode: null };
+    }
+  } else if (run.status === "started" && agentRun) {
     if (agentRun.status === "failed") {
       status = "failed";
       summary =
@@ -224,7 +244,7 @@ function runView(
           ? RUN_SUMMARY["routine_run.agent_budget"]
           : `${FAILED_PREFIX}${agentRun.error ?? "error"}`;
     } else if (agentRun.status === "done" && !agentRun.replyMessageId) {
-      // The agent answered NO_REPLY: its instructions said to stay quiet without news.
+      // Older runs in the conversation that ended without a reply (they answered NO_REPLY).
       status = "silent";
       summary = RUN_SUMMARY["routine_run.nothing_new"];
     } else if (agentRun.status !== "done") {
@@ -387,7 +407,10 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
     const agentRun = last?.agentRunId ? details.agentRunsById.get(last.agentRunId) : undefined;
     const running =
       last?.status === "queued" ||
-      (last?.status === "started" && !!agentRun && !["done", "failed", "canceled"].includes(agentRun.status));
+      // A run that handed off its report may still be working.
+      ((last?.status === "started" || last?.status === "reported") &&
+        !!agentRun &&
+        !["done", "failed", "canceled"].includes(agentRun.status));
     return {
       id: r.id,
       name: r.name,
@@ -974,7 +997,6 @@ async function waitsForComputer(db: Database, routineId: string): Promise<boolea
     .where(
       and(
         eq(routineRuns.routineId, routineId),
-        eq(routineRuns.status, "started"),
         eq(agentRuns.status, "waiting_input"),
         isNotNull(agentRuns.waitingMachineId),
       ),
@@ -988,9 +1010,69 @@ async function finishRun(db: Database, runId: string, status: "skipped" | "faile
 }
 
 /**
- * Job `routine.run`: the routine's creator "asks" the agent where the result
- * goes (the channel, with a mention; or their DM with the agent), so the
- * normal run path applies: budget, scopes, approvals, delivery.
+ * A routine fires as background work (`agent_runs.background`): its trigger
+ * is written in the conversation it reports to on the creator's behalf (their
+ * permissions start the run and they stay the requester), shown as the
+ * routine's (`meta.routine`, compact), and its run starts on its own. The
+ * trigger joins no run in progress and answers no open question; the run holds
+ * no conversation slot, so people's messages there start or join a normal run
+ * meanwhile. It speaks only through `hand_off`. Null when the agent can't run
+ * there (not a member, or the creator can't talk to it).
+ */
+export async function startRoutineRun(
+  deps: { db: Database; pubsub?: PubSub },
+  input: {
+    orgId: string;
+    creatorId: string;
+    agentId: string;
+    channelId: string;
+    threadId: string | null;
+    body: string;
+    routine: { id: string; name: string; runId: string };
+  },
+): Promise<{ message: Message; runId: string } | null> {
+  const { db } = deps;
+  const { membership } = await requireChannelAccess(db, input.creatorId, input.orgId, input.channelId);
+  if (!can(membership.role, "post")) throw new ForbiddenError();
+  const [eligible] = await eligibleChannelAgents(db, input.orgId, input.channelId, [input.agentId], {
+    requesterUserId: input.creatorId,
+  });
+  if (!eligible) return null;
+  const started = await db.transaction(async (tx) => {
+    const { message } = await insertMessageWithRuns(
+      tx,
+      {
+        orgId: input.orgId,
+        channelId: input.channelId,
+        threadId: input.threadId,
+        author: { type: "person", userId: input.creatorId },
+        body: input.body,
+        meta: {
+          routineId: input.routine.id,
+          routineRunId: input.routine.runId,
+          routine: input.routine,
+          background: true,
+        },
+      },
+      { startRuns: false, deliver: false },
+    );
+    const [agentRun] = await createAgentRuns(tx, message, [input.agentId], "mention", { background: true });
+    if (!agentRun) return null;
+    await tx
+      .update(routineRuns)
+      .set({ status: "started", agentRunId: agentRun.id, summary: "" })
+      .where(and(eq(routineRuns.id, input.routine.runId), eq(routineRuns.orgId, input.orgId)));
+    return { message, runId: agentRun.id };
+  });
+  if (started && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(started.message));
+  return started;
+}
+
+/**
+ * Job `routine.run`: the routine's work runs in the background where its
+ * result goes (the channel, the conversation it was asked in, or the
+ * creator's DM with the agent), with the normal run path: budget, scopes,
+ * approvals. What people hear is what it hands off (`startRoutineRun`).
  */
 export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string) {
   const { db } = deps;
@@ -1130,36 +1212,19 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
       channelId = (await openDm(db, creator, routine.orgId, { agentId: agent.id })).id;
       body =
         target.type === "artifact"
-          ? `${routine.prompt}${eventText}\n\nSave the result as a file in the Drive (create_artifact).`
+          ? `${routine.prompt}${eventText}\n\nSave the result as a file in the Drive (create_artifact), then hand off where it is.`
           : `${routine.prompt}${eventText}`;
     }
-    // Posted on the creator's behalf (their permissions start the run, they stay the requester),
-    // but shown as the routine's message: `meta.routine` makes the app and the agent's context
-    // read "Routine · {name}" instead of the person, who didn't type it.
-    const message = await postPersonMessage({ db, pubsub: deps.pubsub }, creator, routine.orgId, channelId, {
+    const started = await startRoutineRun(deps, {
+      orgId: routine.orgId,
+      creatorId: creator,
+      agentId: agent.id,
+      channelId,
+      threadId: target.type === "conversation" ? target.threadId : null,
       body,
-      threadId: target.type === "conversation" ? target.threadId : undefined,
-      meta: {
-        routineId: routine.id,
-        routineRunId: run.id,
-        routine: { id: routine.id, name: routine.name, runId: run.id },
-      },
+      routine: { id: routine.id, name: routine.name, runId: run.id },
     });
-    const [agentRun] = await db
-      .select({ id: agentRuns.id })
-      .from(agentRuns)
-      .where(and(eq(agentRuns.triggerMessageId, message.id), eq(agentRuns.agentId, agent.id)));
-    if (!agentRun) return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.agent_not_in_channel"]);
-    const delivered =
-      target.type === "channel" || target.type === "conversation"
-        ? RUN_SUMMARY["routine_run.delivered_channel"]
-        : target.type === "artifact"
-          ? RUN_SUMMARY["routine_run.delivered_drive"]
-          : RUN_SUMMARY["routine_run.delivered_dm"];
-    await db
-      .update(routineRuns)
-      .set({ status: "started", agentRunId: agentRun.id, summary: delivered })
-      .where(eq(routineRuns.id, run.id));
+    if (!started) return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.agent_not_in_channel"]);
     await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
     await finishOnce();
   } catch (error) {

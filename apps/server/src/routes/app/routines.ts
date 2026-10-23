@@ -126,9 +126,10 @@ const RoutineRun = z
   .object({
     id: z.uuid(),
     at: z.string(),
-    status: z
-      .enum(["ok", "silent", "failed", "skipped"])
-      .openapi({ description: "`silent`: nothing new, the agent stayed quiet (NO_REPLY)." }),
+    status: z.enum(["ok", "silent", "failed", "skipped"]).openapi({
+      description:
+        "`silent`: the routine's background run handed nothing off, so nothing was posted (`summary` is its own record). `ok` includes a run that handed off its report to the conversation.",
+    }),
     summary: z.string(),
     weight: z
       .number()

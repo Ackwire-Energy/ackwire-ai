@@ -189,7 +189,10 @@ export const routineRuns = pgTable(
     /** `schedule`, `manual` or `event`. */
     trigger: text().notNull(),
     agentRunId: uuid(),
-    /** `queued`, `started`, `skipped` or `failed` (a started run's outcome comes from its agent run). */
+    /**
+     * `queued`, `started`, `skipped` or `failed` (a started run's outcome comes from its agent run);
+     * a finished background run is `reported` (it handed off) or `silent`, with its record in `summary`.
+     */
     status: text().notNull().default("queued"),
     summary: text().notNull().default(""),
     event: jsonb().$type<Record<string, unknown>>(),

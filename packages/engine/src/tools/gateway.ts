@@ -41,6 +41,16 @@ export const wrapExternal = (source: string, text: string) =>
 const shown = (text: string) =>
   text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
 
+/**
+ * Tools that speak in the conversation, refused on a background run (a routine's work, `ctx.background`):
+ * nobody there is waiting for it. Not listed to it either; a call gets the reason.
+ */
+export const BACKGROUND_REFUSED: Readonly<Record<string, string>> = {
+  ask_user:
+    "This is background work (a routine): nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
+  react: "This is background work (a routine): there is no message to react to. Just finish, or use hand_off.",
+};
+
 export type ToolCall = { toolUseId: string; name: string; input: Record<string, unknown> };
 export type Approval = typeof approvals.$inferSelect;
 
@@ -80,7 +90,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
   async function granted(ctx: ToolContext): Promise<ToolDefinition[]> {
     const keys = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
     return [...(await allTools(ctx)).values()]
-      .filter((t) => isAllowed(toolAccess(keys, t)))
+      .filter((t) => isAllowed(toolAccess(keys, t)) && !(ctx.background && BACKGROUND_REFUSED[t.name]))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -169,6 +179,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       };
 
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
+      const backgroundRefusal = ctx.background ? BACKGROUND_REFUSED[call.name] : undefined;
+      if (backgroundRefusal) return finish({ content: backgroundRefusal, isError: true });
       const tool = all.get(call.name) ?? directoryTool;
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
       const builtIn = tool.scope === "" && !tool.connectionId;

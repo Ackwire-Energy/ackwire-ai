@@ -221,6 +221,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
       // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
       if (message.meta.talker) return;
+      // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
+      if (message.meta.background) return;
       const routed = async (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],

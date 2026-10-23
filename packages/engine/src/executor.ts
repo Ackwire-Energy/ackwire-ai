@@ -12,6 +12,7 @@ import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
+import { finishBackgroundRun } from "./background";
 import { recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
 import { type BrainPlan, notePlanLimit, resolveBrain, UNAVAILABLE_CODES } from "./brains/select";
@@ -29,14 +30,7 @@ import {
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
 import { consultationCardThread, onConsultedRunFinished } from "./consultations";
-import {
-  buildRunContext,
-  getChannelCached,
-  isNoReply,
-  ROUTINE_NO_REPLY,
-  restatesReaction,
-  taskNotice,
-} from "./context";
+import { buildRunContext, getChannelCached, restatesReaction, taskNotice } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -458,8 +452,9 @@ async function executeRunInner(
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
-    // A routine's run ended: its creator hears it (D46). A silent run (NO_REPLY) found nothing: no notification.
-    if (routineOfRun && (status === "done" || status === "failed")) {
+    // A routine's run ended: its creator hears it (D46). A background run that ended well was heard
+    // already if it handed something off (`hand_off`); without that it found nothing: no notification.
+    if (routineOfRun && (status === "failed" || (status === "done" && !run.background))) {
       const routine = routineOfRun;
       const notifyDeps = { db, pubsub: deps.pubsub };
       await routineReplyText(notifyDeps, run.orgId, run.id)
@@ -521,6 +516,7 @@ async function executeRunInner(
     signal,
     // A resumed run keeps the tools it started with (the list, and the prompt cache, stay the same).
     loadedGroups: (run.transcript as unknown as Transcript | null)?.toolGroups ?? null,
+    ...(run.background ? { background: true } : {}),
   };
   const needsContext = !run.transcript;
   // Independent reads together: the agent (cached), the trigger, and the tools it may use.
@@ -1193,7 +1189,7 @@ async function executeRunInner(
           turn,
           event: { type: "agent.typing", ...where },
           onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
-          holdBack: viaRoutine ? ROUTINE_NO_REPLY : undefined,
+          quiet: run.background,
         },
       );
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
@@ -1609,16 +1605,27 @@ async function executeRunInner(
 
       // Final answer.
       if (result.stopReason === "refusal") return fail("model_refused");
+      // Background work (a routine's run) posts no final answer: its text is its own record, and what
+      // people needed went through `hand_off` already.
+      if (run.background) {
+        const done = await transitionRun(db, run.id, "running", "done", {
+          error: null,
+          transcript: storedTranscript(transcript),
+        });
+        if (!done) throw new PermanentJobError("run changed state while executing");
+        await finishBackgroundRun({ db, pubsub: deps.pubsub }, run, turnText).catch(() => {});
+        await publishChannelEvent(deps.pubsub, event("done"));
+        await finished("done");
+        return;
+      }
       const updates = transcript.memoryUpdates ?? [];
       const saved = (transcript.artifacts ?? []).length > 0 ? "File saved." : "";
       const anythingPosted = transcript.postedCount > 0;
-      // A routine with nothing to report ends here without posting (its instructions asked for silence).
-      // Or it reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
+      // It reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
       // the reaction is the answer.
       // Or it posted a mission report and has no card left to attach: the report is the answer. Coding CLIs
       // always close with a summary that repeats it, whatever the prompt says, so the text is dropped too.
       const silent =
-        (Boolean(viaRoutine) && isNoReply(turnText)) ||
         (Boolean(transcript.reacted) && restatesReaction(turnText)) ||
         (Boolean(transcript.reported) && !transcript.artifacts?.length && !transcript.memoryUpdates?.length);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
@@ -2039,6 +2046,8 @@ function createDeltaPublisher(
     onFirst?: () => void;
     /** A whole answer never shown live (a routine's NO_REPLY): held while the text could still be it. */
     holdBack?: string;
+    /** Background work (a routine's run): nothing of its text shows live in the conversation. */
+    quiet?: boolean;
   },
 ) {
   let started = false;
@@ -2052,7 +2061,7 @@ function createDeltaPublisher(
   let pending: Promise<void> = Promise.resolve();
 
   const holdBack = first.holdBack;
-  const held = () => holdBack?.startsWith(all.trim().replace(/\.$/, "")) === true;
+  const held = () => first.quiet === true || holdBack?.startsWith(all.trim().replace(/\.$/, "")) === true;
   const send = () => {
     if (timer) clearTimeout(timer);
     timer = null;
@@ -2079,7 +2088,7 @@ function createDeltaPublisher(
         started = true;
         first.onFirst?.();
         // Published in order, before the first delta.
-        const typing = first.event;
+        const typing = first.quiet ? undefined : first.event;
         if (typing) pending = pending.then(() => publishChannelEvent(pubsub, typing));
       }
       buffer += text;

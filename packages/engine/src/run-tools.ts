@@ -382,6 +382,7 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
       ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
       // Tools on demand (D65): the same list the run's turns see.
       loadedGroups: loadedGroupsOf(run.transcript),
+      ...(run.background ? { background: true } : {}),
     },
   };
 }

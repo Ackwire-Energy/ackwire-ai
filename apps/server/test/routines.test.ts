@@ -41,7 +41,8 @@ test("routines API: parse, create, run now, history, pause", async () => {
   await api(`/routines/${routine.id}/run`, { json: {} });
   await t.drain();
   const runs = (await (await api(`/routines/${routine.id}/runs`)).json()) as { runs: { status: string }[] };
-  expect(runs.runs.map((r) => r.status)).toEqual(["ok"]);
+  // Background work that handed nothing off: silent (nothing posted in the channel).
+  expect(runs.runs.map((r) => r.status)).toEqual(["silent"]);
   const paused = await api(`/routines/${routine.id}`, { method: "PATCH", json: { active: false } });
   expect(await paused.json()).toMatchObject({ active: false, nextRunAt: null });
 });

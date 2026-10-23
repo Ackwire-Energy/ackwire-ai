@@ -22,6 +22,7 @@ import {
   createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
+  createHandOffToolSource,
   createIssueToolSource,
   createJevJudge,
   createJobHandlers,
@@ -219,6 +220,8 @@ export function buildEngine(o: EngineOptions) {
       createAskAgentToolSource({ pubsub: adapters.pubsub }),
       createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // Background runs (routines) speak only through it.
+      createHandOffToolSource({ pubsub: adapters.pubsub }),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),

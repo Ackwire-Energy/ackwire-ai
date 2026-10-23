@@ -157,7 +157,7 @@ async function evalCase(c: BehaviorCase): Promise<CaseReport> {
     out.push(
       `  tools: ${run.calls.map((t) => t.name).join(", ") || "(none)"}${approval} · runs: ${run.status.join(", ")}`,
     );
-    out.push(`  reply: ${clip((run.noReply ? "NO_REPLY" : run.reply).replace(/\s+/g, " "), 240)}`);
+    out.push(`  reply: ${clip((run.noReply ? "(silent)" : run.reply).replace(/\s+/g, " "), 240)}`);
   }
   for (const k of checks) out.push(`  ${k.pass ? "ok  " : "FAIL"} ${k.id}: ${k.detail}`);
   console.log(`${out.join("\n")}\n`);
