@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
-import { approvalCardThreads } from "./approvals";
+import { approvalCardThreads, approvalOriginOf } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
 import {
@@ -301,7 +301,10 @@ export async function resolveQuestionNotifications(deps: NotificationDeps, orgId
 
 // ── Approvals ─────────────────────────────────────────────────────────────────
 
-/** A sensitive action waits: everyone who may decide it. */
+/**
+ * A sensitive action waits: everyone who may decide it, with the agent's why (short, in `text`) and,
+ * asked while nobody watched, where it came from (`origin`: a routine, or no one): ADR 0053 §8.
+ */
 export async function notifyApproval(deps: NotificationDeps, approval: ApprovalRow, deciders: string[]) {
   const [[channel], cardThreads] = await Promise.all([
     deps.db
@@ -329,7 +332,8 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
     },
     latest: {
       title: notificationSnippet(approval.title, 200),
-      text: notificationSnippet(approval.detail),
+      text: notificationSnippet(approval.why, 200),
+      origin: approvalOriginOf(approval.origin) ?? undefined,
       expiresAt: approval.expiresAt.toISOString(),
     },
   });
@@ -556,11 +560,12 @@ async function routineAudience(deps: Pick<NotificationDeps, "db">, orgId: string
 
 /**
  * A routine's run failed after a good one (§6.6): its creator (else the agent's owner) hears it
- * once per failure streak (`streakKey`: the streak's first failed run). Resolved by the next good run.
+ * once per failure streak (`streakKey`: the streak's first failed run), with the run's coded reason
+ * (`latest.reason`: the app says it in the person's language). Resolved by the next good run.
  */
 export async function notifyRoutineFailed(
   deps: NotificationDeps,
-  input: { orgId: string; routineId: string; streakKey: string; text?: string | null },
+  input: { orgId: string; routineId: string; streakKey: string; reason?: string | null },
 ) {
   const r = await routineAudience(deps, input.orgId, input.routineId);
   if (!r) return;
@@ -571,7 +576,7 @@ export async function notifyRoutineFailed(
     groupKey: `routine_failed:${input.routineId}:${input.streakKey}`,
     actor: agent(r.agentId),
     source: { routineId: input.routineId, label: r.name },
-    latest: { title: r.name, ...(input.text ? { text: notificationSnippet(input.text) } : {}) },
+    latest: { title: r.name, reason: input.reason ?? undefined },
   });
 }
 

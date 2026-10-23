@@ -25,6 +25,7 @@ import {
   Text,
   weights,
 } from "@/ui";
+import { ApprovalWhy } from "../approvals/parts";
 import { agentDmOf, notificationHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
@@ -38,6 +39,7 @@ import {
   emojisOf,
   nextRoutine,
   placeOf,
+  type SayWords,
   subtitleOf,
   upcomingDay,
   waitingCardOf,
@@ -172,6 +174,10 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
           {card.title}
         </Text>
       ) : null}
+      {/* Who asked while nobody watched, then why (ADR 0053 §8), as on the request itself. */}
+      {card.kind === "approval" ? (
+        <ApprovalWhy approval={{ origin: n.latest.origin ?? null, why: n.latest.text ?? null }} name={name} />
+      ) : null}
       <View style={styles.ft}>
         {minutes !== null && card.expiresAt ? (
           <>
@@ -305,11 +311,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const template = t(`mobile.activity.kind.${n.kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
   const parts = template.split(NAMES);
   const title = parts.join(names);
-  const reasonText = (reason: string) =>
-    (t as unknown as (key: string, options?: Record<string, unknown>) => string)(`routines.pausedReason.${reason}`, {
-      defaultValue: n.latest.text ?? "",
-    });
-  const sub = [emojisOf(n).join(" "), [subtitleOf(n, reasonText), placeOf(n)].filter(Boolean).join(" · ")]
+  // Coded words in the person's language: why a routine paused or failed, who asked for an approval.
+  const say: SayWords = (w, otherwise = "") => {
+    const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+    return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
+  };
+  const sub = [emojisOf(n).join(" "), [subtitleOf(n, say), placeOf(n)].filter(Boolean).join(" · ")]
     .filter(Boolean)
     .join(" ");
   const time = when.short(n.updatedAt);

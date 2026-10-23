@@ -1614,7 +1614,10 @@ export interface Routine {
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /** Who thinks for it, and on which computer (`machineName` null for the API). */
   brain: { kind: BrainKind; machineName: string | null };
-  /** The last 7 days: `ok` counts runs that reported; `total` all of them. */
+  /**
+   * The last 7 days: `ok` counts runs that reported; `skipped` slots that didn't run (replaced ones too);
+   * `total` their sum, without the runs a person stopped.
+   */
   health: { ok: number; silent: number; failed: number; skipped: number; missed: number; total: number };
   /** The viewer sees its prompt, records and reports (else only outcomes, without text). */
   canSeeDetails: boolean;
@@ -3385,7 +3388,7 @@ export interface NotificationSource {
 
 /** What the card shows (plain text; only @mentions are highlighted). */
 export interface NotificationLatest {
-  /** Snippet of the latest message, comment, question or summary (≤ 280 chars). */
+  /** Snippet of the latest message, comment, question or summary (≤ 280 chars); an approval's why. */
   text?: string;
   /** Issue title, the approval's action title, the topic's question. */
   title?: string;
@@ -3403,8 +3406,13 @@ export interface NotificationLatest {
   /** Forum turns. */
   round?: number;
   rounds?: number;
-  /** `routine_paused`: why (a `RoutinePausedReason`), said in the person's language. */
+  /**
+   * `routine_paused`: why (a `RoutinePausedReason`); `routine_failed`: its failed run's code (`routines.code.*`).
+   * Both said in the person's language.
+   */
   reason?: string;
+  /** `approval`: asked while nobody watched, by a routine or an unattended run (ADR 0053 §8). */
+  origin?: ApprovalOrigin;
 }
 
 export interface AppNotification {

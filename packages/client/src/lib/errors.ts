@@ -66,6 +66,9 @@ const KNOWN = {
   "run.continue_forbidden": "errors.run.continueForbidden",
   "routine.too_frequent": "errors.routine.tooFrequent",
   "routine.too_many": "errors.routine.tooMany",
+  "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
+  "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
+  "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
 } as const;
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */

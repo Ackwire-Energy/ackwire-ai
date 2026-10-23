@@ -18,6 +18,7 @@ import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
+import type { ApprovalOrigin } from "./tools/run-policy";
 
 const { notifications, organizationMembers } = schema;
 
@@ -93,7 +94,7 @@ export interface NotificationSource {
 }
 
 export interface NotificationLatest {
-  /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars). */
+  /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars); an approval's why. */
   text?: string;
   title?: string;
   emojis?: string[];
@@ -105,8 +106,13 @@ export interface NotificationLatest {
   expiresAt?: string;
   round?: number;
   rounds?: number;
-  /** `routine_paused`: why it paused itself (a coded reason the app translates). */
+  /**
+   * `routine_paused`: why it paused itself; `routine_failed`: its failed run's code (coded reasons the app
+   * translates).
+   */
   reason?: string;
+  /** `approval`: asked while nobody watched, by a routine (its name) or an unattended run (ADR 0053 §8). */
+  origin?: ApprovalOrigin;
 }
 
 export interface NotificationView {

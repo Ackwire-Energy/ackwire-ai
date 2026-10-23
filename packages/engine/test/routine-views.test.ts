@@ -203,7 +203,8 @@ describe("routine views", () => {
     expect(view.state).toBe("waiting_computer");
     expect(view.waitingFor).toMatchObject({ machineId: machine?.id, machineName: "MacBook da Ana" });
     expect(view.brain).toEqual({ kind: "claude_code", machineName: "MacBook da Ana" });
-    expect(view.health).toEqual({ ok: 1, silent: 0, failed: 1, skipped: 1, missed: 0, total: 4 });
+    // The run a person stopped counts nowhere: the week adds up.
+    expect(view.health).toEqual({ ok: 1, silent: 0, failed: 1, skipped: 1, missed: 0, total: 3 });
     expect(view.usage).toEqual({ runs: 5, tokens: 1500, costNanoUsd: 0, billedTo: "plan" });
     const byStatus = Object.fromEntries(view.recentRuns.map((r) => [r.code ?? r.status, r]));
     expect(view.recentRuns.map((r) => r.status)).toEqual([
@@ -221,6 +222,9 @@ describe("routine views", () => {
     expect(byStatus.stopped?.codeParams).toEqual({ by: "ana" });
     expect(view.recentRuns[5]?.approvalId).toBe(approval?.id);
     expect(view.recentRuns[0]?.approvalId).toBeNull();
+    // Waiting for its computer, or for a person: the app says which.
+    expect(view.recentRuns[0]).toMatchObject({ status: "waiting", code: "waiting_computer" });
+    expect(view.recentRuns[5]).toMatchObject({ status: "waiting", code: null });
 
     // Someone who doesn't read it never gets the approval to open.
     const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -232,6 +236,105 @@ describe("routine views", () => {
     await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, asking.id));
     await f.db.update(schema.routines).set({ failuresInRow: 2 }).where(eq(schema.routines.id, routine.id));
     expect((await getRoutineView(f.db, f.owner.id, f.org.id, routine.id)).state).toBe("failing");
+  });
+
+  test("a run at work comes first: a paused routine's manual run, a one-off's run after it fired", async () => {
+    f = await setup();
+    const [machine] = await f.db
+      .insert(schema.machines)
+      .values({ orgId: f.org.id, name: "MacBook da Ana" })
+      .returning();
+    // Inactive: paused by a person, or a one-off once it fired.
+    const deactivate = (id: string) =>
+      f.db.update(schema.routines).set({ active: false, nextRunAt: null }).where(eq(schema.routines.id, id));
+    const paused = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Resumo.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: daily(),
+    });
+    await deactivate(paused.id);
+    const manual = await agentRun("running");
+    await routineRun(paused.id, 0.1, { status: "started", trigger: "manual", agentRunId: manual.id });
+    const view = () => getRoutineView(f.db, f.owner.id, f.org.id, paused.id);
+    expect(await view()).toMatchObject({ active: false, state: "running" });
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "waiting_input", waitingMachineId: machine?.id })
+      .where(eq(schema.agentRuns.id, manual.id));
+    expect(await view()).toMatchObject({
+      state: "waiting_computer",
+      waitingFor: { machineId: machine?.id, machineName: "MacBook da Ana" },
+    });
+    // Its run ended: paused again.
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, manual.id));
+    expect((await view()).state).toBe("paused");
+
+    // A one-off is inactive as soon as it fires; while its run waits for a person, that is what it says.
+    const once = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Veja o deploy.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: { type: "once", at: new Date(Date.now() + HOUR).toISOString() },
+    });
+    await deactivate(once.id);
+    const asking = await agentRun("waiting_approval");
+    await routineRun(once.id, 0.1, { status: "started", agentRunId: asking.id });
+    expect(await getRoutineView(f.db, f.owner.id, f.org.id, once.id)).toMatchObject({
+      active: false,
+      state: "waiting_person",
+    });
+  });
+
+  test("the week adds up: a replaced slot is a skip, as in the strip; a run a person stopped counts nowhere", async () => {
+    f = await setup();
+    const routine = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Veja os erros novos.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: daily(),
+    });
+    const ended = [
+      { status: "reported" },
+      { status: "silent" },
+      { status: "failed", code: "provider_error" },
+      { status: "skipped", code: "previous_running" },
+      { status: "superseded", code: "waiting_computer" },
+      { status: "missed", code: "stale" },
+      { status: "canceled", code: "stopped" },
+    ];
+    for (const [i, run] of ended.entries()) await routineRun(routine.id, i + 1, { ...run, finishedAt: new Date() });
+    const view = await getRoutineView(f.db, f.owner.id, f.org.id, routine.id);
+    expect(view.health).toEqual({ ok: 1, silent: 1, failed: 1, skipped: 2, missed: 1, total: 6 });
+    expect(view.recentRuns.map((r) => r.status)).toEqual(ended.map((r) => r.status));
+  });
+
+  test("emails held for the next email are no run: the routine isn't busy and no list shows them", async () => {
+    f = await setup();
+    const routine = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Leia os emails novos.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: { type: "event", event: "issue.created" },
+    });
+    const failed = await agentRun("failed", { error: "provider_error: overloaded" });
+    await routineRun(routine.id, 1, { status: "failed", code: "provider_error", agentRunId: failed.id });
+    await f.db.update(schema.routines).set({ failuresInRow: 1 }).where(eq(schema.routines.id, routine.id));
+    // Its emails wait for the next email: queued on purpose, with no job to stop.
+    const held = await routineRun(routine.id, 0.5, {
+      trigger: "event",
+      event: { type: "email.received", summary: "2 emails", held: true },
+    });
+    const view = await getRoutineView(f.db, f.owner.id, f.org.id, routine.id);
+    expect(view.state).toBe("failing");
+    expect(view.recentRuns.map((r) => r.status)).toEqual(["failed"]);
+    expect((await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id)).map((r) => r.id)).not.toContain(held.id);
+    // The next email starts them: then it is a run in the queue like any other.
+    await f.db
+      .update(schema.routineRuns)
+      .set({ event: { type: "email.received", summary: "3 emails" } })
+      .where(eq(schema.routineRuns.id, held.id));
+    expect((await getRoutineView(f.db, f.owner.id, f.org.id, routine.id)).state).toBe("running");
   });
 
   test("a paused routine shows its reason; resuming clears the reason and the failure streak", async () => {

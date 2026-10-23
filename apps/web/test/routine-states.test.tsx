@@ -4,7 +4,12 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { ApiClient, Routine, RoutineRun } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { RUN_CODES, runOutcome } from "@agenteschat/client/lib/routine-view";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import type { TFunction } from "i18next";
+import { createI18n } from "@/i18n";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { routineRun } from "./fakes/planning";
 import { renderApp, screen, settle } from "./render";
@@ -230,6 +235,66 @@ describe("Rotinas: a routine's details", () => {
     expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem");
     expect(panel.textContent).toContain("Contou o que achou");
     expect(within(panel).queryByRole("button", { name: "Editar" })).toBeNull();
+  });
+});
+
+describe("Rotinas: a run at work, whatever the routine says", () => {
+  test("a paused routine's manual run and a fired one-off's run read as running, with Parar", async () => {
+    const once = { type: "once" as const, at: ago(5), timezone: "America/Sao_Paulo", description: "" };
+    const { calls } = await open([
+      routine({ id: "rt-paused", name: "Resumo pausado", active: false, state: "running", nextRunAt: null }),
+      routine({
+        id: "rt-once",
+        name: "Resumo de hoje",
+        active: false,
+        state: "running",
+        nextRunAt: null,
+        trigger: once,
+      }),
+    ]);
+    // The one-off isn't done while its run works: it is in the list, not under "Concluídos".
+    expect(screen().queryByRole("button", { name: /Concluídos/ })).toBeNull();
+    expect(within(card("Resumo pausado")).getByRole("button", { name: "Parar Resumo pausado" })).toBeTruthy();
+    const fired = card("Resumo de hoje");
+    // Nothing to turn on or run again: only Parar.
+    expect(within(fired).queryByRole("switch")).toBeNull();
+    expect(within(fired).queryByRole("button", { name: "Rodar agora" })).toBeNull();
+    await click(within(fired).getByRole("button", { name: "Parar Resumo de hoje" }));
+    await settle(4);
+    expect(calls).toContain("stop:rt-once");
+    // The details say it runs, with Parar, instead of "Pausada".
+    const panel = await details("Resumo pausado");
+    expect(panel.textContent).toContain("Rodando");
+    expect(within(panel).getByRole("button", { name: "Parar" })).toBeTruthy();
+  });
+});
+
+describe("Rotinas: every code in the person's words", () => {
+  test("each run code the server writes has its own words; a report it couldn't deliver isn't 'Não rodou'", () => {
+    const i18n = createI18n("pt-BR");
+    const said = (lng: string, code: string) => i18n.getResource(lng, "translation", `routines.code.${code}`);
+    const missing = ["pt-BR", "en"].flatMap((lng) => RUN_CODES.filter((c) => !said(lng, c)).map((c) => `${lng}:${c}`));
+    expect(missing).toEqual([]);
+    const say = i18n.t.bind(i18n) as unknown as (key: string) => string;
+    expect(say(runOutcome({ status: "skipped", code: "creator_no_access" }).key)).toBe(
+      "Não pôde contar: quem criou não pode mais escrever ali",
+    );
+    expect(say(runOutcome({ status: "failed", code: "empty_reply" }).key)).toBe("O modelo não respondeu nada");
+  });
+
+  test("a routine refused by the server says why in the person's language", () => {
+    const i18n = createI18n("pt-BR");
+    const t = i18n.t.bind(i18n) as TFunction;
+    const refused = (status: number, code: string) => errorText(t, new ApiError(status, code, "English message"));
+    expect(refused(400, "routine.creator_cannot_post")).toBe(
+      "Quem cria a rotina precisa estar na conversa e poder escrever nela.",
+    );
+    expect(refused(403, "routine.take_over_no_access")).toBe("Entre na conversa da rotina antes de assumi-la.");
+    expect(refused(400, "routine.agent_not_in_channel")).toBe("Adicione o agente à conversa antes.");
+    const en = createI18n("en");
+    expect(errorText(en.t.bind(en) as TFunction, new ApiError(400, "routine.agent_not_in_channel", "x"))).toBe(
+      "Add the agent to the conversation first.",
+    );
   });
 });
 

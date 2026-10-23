@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, WorkingRun } from "@agenteschat/client";
-import { activitySections, dayGroupOf, emojisOf, subtitleOf, whoOf } from "../../src/features/activity/logic";
+import type { AgentAccess, AppNotification, WorkingRun } from "@agenteschat/client";
+import { resources } from "@agenteschat/i18n";
+import i18next from "i18next";
+import {
+  activitySections,
+  dayGroupOf,
+  emojisOf,
+  type SayWords,
+  subtitleOf,
+  whoOf,
+} from "../../src/features/activity/logic";
 import {
   agoOf,
   busyAgents,
@@ -10,11 +19,26 @@ import {
   teamLines,
   workingNow,
 } from "../../src/features/agents/logic";
+import { featureKeysEn } from "../../src/features/i18n/keys.en";
+import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import { filterResults, fold, isEmpty, matches, searchCounts, searchResults } from "../../src/features/search/logic";
+import { withMobileKeys } from "../../src/i18n/merge";
 import { agent, mission, notification } from "./fixtures";
 
 const NOW = new Date(2026, 9, 17, 15, 0);
 const ago = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString();
+
+/** Says coded words as the screen does, in pt-BR. */
+async function sayer(): Promise<SayWords> {
+  const i18n = i18next.createInstance();
+  await i18n.init({
+    lng: "pt-BR",
+    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
+    interpolation: { escapeValue: false },
+  });
+  const tt = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return (w, otherwise = "") => tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
+}
 
 describe("Atividade", () => {
   const items = [
@@ -67,19 +91,61 @@ describe("Atividade", () => {
     ).toEqual({ first: "Theo", second: "Ana", more: 1, total: 3 });
   });
 
-  test("the line under the title", () => {
+  test("the line under the title", async () => {
+    const say = await sayer();
     expect(
       subtitleOf(
         notification({ id: "r", kind: "reaction", latest: { quote: "a campanha bateu a meta", emojis: ["🎉"] } }),
+        say,
       ),
     ).toBe("a campanha bateu a meta");
-    expect(subtitleOf(notification({ id: "a", kind: "approval", latest: { title: "Publicar o ajuste" } }))).toBe(
+    expect(subtitleOf(notification({ id: "a", kind: "approval", latest: { title: "Publicar o ajuste" } }), say)).toBe(
       "Publicar o ajuste",
     );
     expect(emojisOf(notification({ id: "r", kind: "reaction", latest: { emojis: ["🎉", "👏"] } }))).toEqual([
       "🎉",
       "👏",
     ]);
+  });
+
+  test("a routine's trouble in the person's words, never the server's English", async () => {
+    const say = await sayer();
+    const routine = (kind: AppNotification["kind"], latest: AppNotification["latest"]) =>
+      subtitleOf(notification({ id: kind, kind, source: { routineId: "rt1", label: "Sentry diário" }, latest }), say);
+    expect(routine("routine_failed", { title: "Sentry diário", reason: "budget_exceeded" })).toBe(
+      "O orçamento do mês acabou",
+    );
+    expect(routine("routine_failed", { title: "Sentry diário", reason: "creator_no_access" })).toBe(
+      "Não pôde contar: quem criou não pode mais escrever ali",
+    );
+    // A code the app doesn't know, or none: the plain failure.
+    expect(routine("routine_failed", { title: "Sentry diário", reason: "brand_new" })).toBe("Não deu certo");
+    expect(routine("routine_failed", { title: "Sentry diário", text: "It failed several times" })).toBe(
+      "Não deu certo",
+    );
+    expect(routine("routine_paused", { title: "Sentry diário", reason: "agent_not_in_channel" })).toBe(
+      "Pausada: o agente não está mais no canal",
+    );
+  });
+
+  test("an approval asked while nobody watched says who asked before the action", async () => {
+    const say = await sayer();
+    const approval = (origin: AppNotification["latest"]["origin"]) =>
+      subtitleOf(
+        notification({
+          id: "a",
+          kind: "approval",
+          waiting: true,
+          latest: { title: "Fazer merge do PR #42", text: "Os testes passaram e a correção é pequena.", origin },
+        }),
+        say,
+      );
+    expect(approval({ kind: "routine", routineId: "rt1", routineName: "Revisar PRs" })).toBe(
+      "Pedido pela rotina «Revisar PRs» enquanto ninguém acompanhava · Fazer merge do PR #42",
+    );
+    expect(approval({ kind: "unattended" })).toBe("Pedido enquanto ninguém acompanhava · Fazer merge do PR #42");
+    // A person was there: only the action.
+    expect(approval(undefined)).toBe("Fazer merge do PR #42");
   });
 });
 
