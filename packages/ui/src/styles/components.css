@@ -1154,6 +1154,11 @@ textarea.ac-input {
 .ac-menu.ac-menu--at[data-state="open"] {
   animation: none;
 }
+/* The text right-clicked stays marked while its menu is open (Menu.tsx, keepSelection). */
+::highlight(ac-kept-selection) {
+  background-color: Highlight;
+  color: HighlightText;
+}
 .ac-menu__reactions {
   display: flex;
   gap: 2px;
