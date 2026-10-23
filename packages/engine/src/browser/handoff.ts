@@ -770,6 +770,26 @@ export async function requirePageRead(
   };
 }
 
+/**
+ * A person had the agent's browser and gave it back after `since` (a take over that began and
+ * ended within one step of a plan): the page may not be what the plan's next steps expect.
+ */
+export async function handedBackSince(db: Database, ctx: { orgId: string; agentId: string }, since: Date) {
+  const [row] = await db
+    .select({ id: browserHandoffs.id })
+    .from(browserHandoffs)
+    .where(
+      and(
+        eq(browserHandoffs.orgId, ctx.orgId),
+        eq(browserHandoffs.agentId, ctx.agentId),
+        isNotNull(browserHandoffs.controllerUserId),
+        gt(browserHandoffs.resolvedAt, since),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 /** The agent read its page: whatever a person changed before is now seen. */
 export async function markPageRead(db: Database, ctx: { orgId: string; agentId: string }) {
   await db

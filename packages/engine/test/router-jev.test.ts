@@ -126,7 +126,7 @@ describe("Jev strategy end to end", () => {
       inputTokens: 1200,
       costNanoUsd: jevCostNanoUsd(1200),
     });
-    expect(jevCostNanoUsd(1_000_000)).toBe(42_000); // $0.042 per million input tokens
+    expect(jevCostNanoUsd(1_000_000)).toBe(42_000_000); // $0.042 per million input tokens
   });
 
   test("on a Jev error the LLM strategy decides, and the decision says so", async () => {

@@ -208,6 +208,15 @@ export const envVars = {
     description: "Timeout for a Jev router call; after it the LLM router decides.",
     section: "Agents",
   },
+  JEV_VISION_MODEL: {
+    schema: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9._-]{0,63}$/)
+      .default("jev-preview"),
+    description:
+      "Jev model for judgments over images (the agent browser finding a target on a screenshot). Needs a release that takes images.",
+    section: "Agents",
+  },
   OPENAI_CHEAP_MODEL: {
     schema: modelId.default("gpt-6-luna"),
     description:

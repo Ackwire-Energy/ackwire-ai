@@ -7211,6 +7211,10 @@ export const en: Translations = {
       label: "Check the computer",
       description: "Says whether it is on, the disk used and this month's cost.",
     },
+    browser_do: {
+      label: "Do steps in the browser",
+      description: "Does several steps in the browser in one go (open, fill, click, wait), checking each one.",
+    },
     browser_open: {
       label: "Open a page",
       description: "Opens a website in the agent's own browser.",
@@ -7483,6 +7487,7 @@ export const en: Translations = {
       stoppedAt: "at {{time}}",
       open: "View live",
       step: {
+        browser_do: "Did several steps",
         browser_open: "Opened {{detail}}",
         browser_open_plain: "Opened a page",
         browser_back: "Went back a page",

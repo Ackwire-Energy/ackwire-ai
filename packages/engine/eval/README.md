@@ -5,6 +5,8 @@ Manual, never in CI: they call real models and cost a little. Keys come from `.e
 - `bun run eval:memory`: memory judgments (ADR 0028).
 - `bun run eval:mentions`: an agent's @mention of another agent, hand-off (it gets a run) or only a reference (D49). `--judge llm` scores the fallback instead of Jev.
 - `bun run eval:behavior`: agent behavior: investigate before answering, cite evidence, concrete next step, ask only the person's decisions, sensitive actions only with approval (ADR 0037). Needs `ANTHROPIC_API_KEY`.
+- `bun run eval:browser`: the agent browser before and after ADR 0054, the same task done by the real model with the old tools (read, act by number, read again) and the new ones (`browser_do`, targets in words, answers with what changed), on local Acme pages (`browser/pages`): a sign-in and export, and a settings change behind an icon on a 150-row dashboard. Prints time, turns, input tokens and whether it really got done (the page shows it and the answer says so). `EVAL_BROWSER_RUNS` (default 2), `EVAL_BROWSER_SCENARIOS` (`simple,settings`), `EVAL_BROWSER_RTT_MS` (the server↔runner trip, default 100), `EVAL_LLM_MODEL` (default claude-sonnet-5-5). Needs `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY` and `agent-browser` with its Chrome (`AGENT_BROWSER_BIN`, else the desktop app's sidecar).
+- `bun run eval:browser:micro`: the parts: one action on the runner, targets in words (time and right element), Jev's Box on a screenshot, checks, `find`, a whole plan on protocol 12 against 17. Needs `TYPESAFE_API_KEY` and `agent-browser`.
 
 ## Behavior eval
 
