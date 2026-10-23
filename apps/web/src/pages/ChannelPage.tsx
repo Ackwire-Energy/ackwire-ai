@@ -228,6 +228,7 @@ import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine"
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { useDocumentTitle } from "@/lib/desktop";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -398,6 +399,8 @@ export function ChannelPage({
   const { org } = useOrg();
   const channels = useChannels(org.id);
   const channel = channels.data?.find((c) => c.id === channelId) ?? fallback;
+  // "#loja · Acme": the window's name in the app (Window menu, Mission Control), the tab's in a browser.
+  useDocumentTitle(channel && !fallback && !thread ? `#${channel.name} · ${org.name}` : undefined);
 
   if (channels.isPending && !fallback) return <ChannelSkeleton />;
   if (!channel) {

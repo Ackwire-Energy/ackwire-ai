@@ -1,0 +1,60 @@
+/* The main window's cover (cover.rs, telas/CapaApp.html): the boot sky with the agent, over the site. */
+.cover {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #0a3f9c;
+  color: #fff;
+  font: 500 13.5px/1.5 "Onest", -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  transition: opacity 0.26s ease-out;
+}
+.cover[data-fading] {
+  opacity: 0;
+}
+.cover__sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.cover__in {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+.cover__agent {
+  width: 72px;
+  height: 72px;
+}
+.cover__word {
+  margin: 0;
+  font-family: "Funnel Display", "Onest", sans-serif;
+  font-weight: 300;
+  font-size: 30px;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 8px rgba(4, 32, 63, 0.5);
+}
+.cover__word span {
+  opacity: 0.6;
+}
+.cover__line {
+  margin: 0;
+  min-height: 20px;
+  opacity: 0.85;
+  text-shadow: 0 1px 6px rgba(4, 32, 63, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cover {
+    transition: none;
+  }
+}

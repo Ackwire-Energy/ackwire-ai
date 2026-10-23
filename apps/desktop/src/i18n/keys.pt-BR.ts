@@ -245,6 +245,8 @@ export const desktopPtBR = {
       notifyDesc: "Pastas novas, por exemplo.",
       notifyBrowserTitle: "Avisar quando um agente precisar de você no navegador",
       notifyBrowserDesc: "O pedido já chega no celular e no site; isto avisa também no Mac.",
+      dockTitle: "Mostrar no Dock",
+      dockDesc: "Com o número do que espera por você. Desligado, o app fica só na barra de menus quando não há janela aberta.",
       notchTitle: "Mostrar os agentes no notch",
       notchDesc: "Em MacBooks com notch: quem está trabalhando aparece em volta da câmera.",
     },
@@ -370,6 +372,11 @@ export const desktopPtBR = {
       folderDesc: "Uma pasta por organização, com uma pasta para cada agente.",
     },
   },
+  /** The main window's cover (cover/main.ts) when the site can't be reached; it tries again by itself. */
+  cover: {
+    offline: "Sem conexão com a internet · tentando de novo…",
+    down: "O agentes.chat não respondeu · tentando de novo…",
+  },
   /** The Mac's menu bar (menus.rs): one label per item id. */
   menu: {
     about: "Sobre o agentes.chat",
@@ -385,6 +392,7 @@ export const desktopPtBR = {
     newChannel: "Novo canal",
     newAgent: "Novo agente",
     search: "Buscar ou perguntar…",
+    print: "Imprimir…",
     closeWindow: "Fechar janela",
     edit: "Editar",
     undo: "Desfazer",
@@ -414,6 +422,8 @@ export const desktopPtBR = {
     thisMac: "Este Mac",
     requests: "Pedidos de acesso",
     bringAllToFront: "Trazer tudo para a frente",
+    help: "Ajuda",
+    downloaded: "Download concluído",
   },
 };
 

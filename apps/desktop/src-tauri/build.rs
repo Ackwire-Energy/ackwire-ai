@@ -24,6 +24,11 @@ const COMMANDS: &[&str] = &[
     "this_mac_reply",
     "app_menu_set",
     "context_menu",
+    "page_ready",
+    "cover_retry",
+    "cover_hide",
+    "this_mac_listening",
+    "dock_set",
 ];
 
 fn main() {
