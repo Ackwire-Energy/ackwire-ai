@@ -12,7 +12,6 @@ import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
-import { finishBackgroundRun } from "./background";
 import { recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
 import { type BrainPlan, notePlanLimit, resolveBrain, UNAVAILABLE_CODES } from "./brains/select";
@@ -70,6 +69,7 @@ import {
   stripSentinel,
   visibleText,
 } from "./reply-policy";
+import { closeRoutineRun } from "./routine-ledger";
 import { type ReleaseReason, releaseInbox, takeInbox } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
@@ -1008,12 +1008,12 @@ async function executeRunInner(
 
   /**
    * A background run (a routine's) reached its final answer: it is the run's own record
-   * (`finishBackgroundRun`), never a message here. Empty when it stayed quiet.
+   * (`closeRoutineRun`), never a message here. Empty when it stayed quiet.
    */
   const finishBackground = async (text: string) => {
     await deferred;
     const t = transcript as Transcript;
-    await finishBackgroundRun({ db, pubsub: deps.pubsub }, run, text).catch((error) =>
+    await closeRoutineRun({ db, pubsub: deps.pubsub }, run, { status: "done", text }).catch((error) =>
       addRunStep(db, run, "error", { reason: "background_finish", message: String(error) }),
     );
     t.postedUpTo = t.messages.length;

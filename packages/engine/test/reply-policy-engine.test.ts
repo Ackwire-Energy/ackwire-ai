@@ -13,17 +13,18 @@ import {
   postPersonMessage,
   resolveBrain,
 } from "../src";
-import * as background from "../src/background";
+import * as ledger from "../src/routine-ledger";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 // PGlite setup on a slow machine.
 setDefaultTimeout(30_000);
 
-/** Background runs hand their answer to `finishBackgroundRun` (background.ts): what it got. */
-const finishSpy = spyOn(background, "finishBackgroundRun");
+/** Background runs hand their answer to `closeRoutineRun` (routine-ledger.ts): what it got. */
+const finishSpy = spyOn(ledger, "closeRoutineRun");
 afterAll(() => finishSpy.mockRestore());
-const finished = () => finishSpy.mock.calls.map(([, run, text]) => ({ runId: run.id, text }));
+const finished = () =>
+  finishSpy.mock.calls.map(([, run, end]) => ({ runId: run.id, text: end.status === "done" ? end.text : "" }));
 
 let f: Fixture;
 afterEach(async () => {
@@ -186,7 +187,7 @@ describe("a run nobody called by name may stay quiet", () => {
 });
 
 describe("background runs", () => {
-  test("the final answer goes to finishBackgroundRun, never to the conversation", async () => {
+  test("the final answer goes to closeRoutineRun, never to the conversation", async () => {
     f = await setup({ reply: () => ({ chunks: ["Tudo certo: 3 PRs abertos."] }) });
     await routed("@dev checa os PRs", { background: true, trigger: "mention" });
     expect(await agentMessages()).toEqual([]);

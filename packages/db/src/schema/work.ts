@@ -162,6 +162,18 @@ export const routines = pgTable(
     /** A structured schedule (`ScheduleRule`): wins over `cron`, which is kept when it can express it. */
     rule: jsonb().$type<Record<string, unknown>>(),
     active: boolean().notNull().default(true),
+    /**
+     * What it may do while nobody watches (ADR 0053): `read` (the default) looks and reports through
+     * `hand_off`; `act` may also change things inside agentes.chat and on the agent's own branches,
+     * and asks before any change in a connected app.
+     */
+    access: text().notNull().default("read"),
+    /** When it speaks: `when_new` (only when there is news) or `always` (a report every time). */
+    report: text().notNull().default("when_new"),
+    /** Why it paused itself (a coded reason the app translates); cleared when a person resumes it. */
+    pausedReason: text(),
+    /** Failed runs in a row since its last good one: after a few it pauses itself. */
+    failuresInRow: integer().notNull().default(0),
     nextRunAt: timestamp({ withTimezone: true }),
     lastRunAt: timestamp({ withTimezone: true }),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
@@ -190,15 +202,30 @@ export const routineRuns = pgTable(
     trigger: text().notNull(),
     agentRunId: uuid(),
     /**
-     * `queued`, `started`, `skipped` or `failed` (a started run's outcome comes from its agent run);
-     * a finished background run is `reported` (it handed off) or `silent`, with its record in `summary`.
+     * The routine run's own ledger (ADR 0053): `queued` → `starting` → `started`, then exactly one end:
+     * `reported` (it handed off) or `silent` (nothing new; its record in `summary`), `failed`,
+     * `canceled` (a person stopped it), `superseded` (the next slot replaced it while it waited),
+     * `missed` (it could not run in time). `skipped`: the slot never started a run.
      */
     status: text().notNull().default("queued"),
     summary: text().notNull().default(""),
+    /** The coded reason of a skip, miss, failure or stop (the app translates it). */
+    code: text(),
+    /** The brain that ran it (`model`, `claude_code` or `codex`). */
+    brain: text(),
     event: jsonb().$type<Record<string, unknown>>(),
+    /** An event's identity (a delivery or issue id): the same event never fires the routine twice. */
+    dedupeKey: text(),
+    /** Where people saw its result: the agent's message in the routine's conversation. */
+    messageId: uuid(),
+    finishedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.routineId, t.at), index().on(t.routineId, t.createdAt)],
+  (t) => [
+    unique().on(t.routineId, t.at),
+    unique().on(t.routineId, t.dedupeKey),
+    index().on(t.routineId, t.createdAt),
+  ],
 );
 
 /**

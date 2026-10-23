@@ -30,7 +30,7 @@ export const WHY_YOU_WERE_CALLED =
 export interface ReplyPolicy {
   /** Nobody called it by name: it may end without a message (`pass`, an empty or sentinel-only answer). */
   mayPass: boolean;
-  /** Background work (`agent_runs.background`): its final answer is never posted (`finishBackgroundRun`). */
+  /** Background work (`agent_runs.background`): its final answer is never posted (`closeRoutineRun`). */
   background: boolean;
 }
 
