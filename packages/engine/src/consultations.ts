@@ -1,13 +1,27 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, lt, or, schema } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { canTalkTo } from "./audience";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
-import { createAgentRuns, requesterOf } from "./dispatch";
+import { createAgentRuns, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm, openAgentDm } from "./dms";
 import { publishChannelEvent } from "./events";
 import { getMessage, insertMessage } from "./messages";
 import type { Notice } from "./notices";
+import { personBehindCall } from "./requester";
 import { deliverNoticeToRun, NOTICE_WAKE_MAX_HOP, resumeRunWithResult } from "./run-resume";
 import { isTerminal, replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -49,8 +63,7 @@ async function reachableAgent(ctx: ToolContext, input: unknown) {
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
   if (!target) return { refused: refuse(`There is no agent @${handle} in this organization.`) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
-  const trigger = await getMessage(db, ctx.orgId, ctx.triggerMessageId);
-  const person = trigger ? await requesterOf(db, trigger) : null;
+  const person = await personBehindCall(ctx);
   if (!canTalkTo(target, person)) {
     return {
       refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
@@ -136,10 +149,10 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
           body: question,
           meta: { consultation: { id: consultationId } },
         });
-        // A run of the consulted agent still active in this DM reads the question at its next step
-        // (one run per agent and conversation): the consultation waits on that run then.
-        const [created] = await createAgentRuns(tx, message, [target.id], "dm");
-        const targetRun = created ?? (await activeRunIn(tx, ctx.orgId, target.id, channel.id));
+        // A run of the consulted agent still active in this DM for the same person reads the question at
+        // its next step: the consultation waits on that run then. Another person's run never takes it.
+        const started = await startOrJoinRun(tx, message, target.id, "dm");
+        const targetRunId = started ? ("created" in started ? started.created.id : started.joined) : null;
         const [row] = await tx
           .insert(agentConsultations)
           .values({
@@ -150,7 +163,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
             targetAgentId: target.id,
             channelId: channel.id,
             messageId: message.id,
-            targetRunId: targetRun?.id ?? null,
+            targetRunId,
             waitId,
             question,
             chain,
@@ -184,23 +197,6 @@ async function chainOf(db: Executor, ctx: Pick<ToolContext, "orgId" | "runId">) 
     .from(agentConsultations)
     .where(and(eq(agentConsultations.orgId, ctx.orgId), eq(agentConsultations.targetRunId, ctx.runId)));
   return parent?.chain ?? [];
-}
-
-async function activeRunIn(tx: Executor, orgId: string, agentId: string, channelId: string) {
-  const [run] = await tx
-    .select({ id: agentRuns.id })
-    .from(agentRuns)
-    .where(
-      and(
-        eq(agentRuns.orgId, orgId),
-        eq(agentRuns.agentId, agentId),
-        eq(agentRuns.channelId, channelId),
-        inArray(agentRuns.status, [...ACTIVE_RUN]),
-      ),
-    )
-    .orderBy(desc(agentRuns.createdAt))
-    .limit(1);
-  return run ?? null;
 }
 
 /**
@@ -247,6 +243,7 @@ function createTellAgentTool(): ToolDefinition {
       if (reached.hop >= NOTICE_WAKE_MAX_HOP) return TOO_DEEP;
       const sent = await db.transaction(async (tx) => {
         const channel = await openAgentDm(tx, ctx.orgId, ctx.agentId, target.id);
+        if (await sameNoteSent(tx, ctx, channel.id, body)) return null;
         const message = await insertMessage(tx, {
           orgId: ctx.orgId,
           channelId: channel.id,
@@ -258,12 +255,56 @@ function createTellAgentTool(): ToolDefinition {
         await createAgentRuns(tx, message, [target.id], "dm");
         return message;
       });
+      if (!sent) {
+        return {
+          content: `You already told @${handle} exactly this in the last hour, so it wasn't sent again. Carry on.`,
+          data: { agentNote: { duplicate: true, agentId: target.id } },
+        };
+      }
       return {
         content: `Told @${handle}. Carry on; if it replies with something that matters, you'll get it as a message here.`,
         data: { agentNote: { messageId: sent.id, agentId: target.id } },
       };
     },
   };
+}
+
+/** A note with the same text to the same agent within this long is dropped (a loop, or a routine's repeats). */
+export const NOTE_DEDUPE_MS = 3600_000;
+
+/** A note's text as compared for repeats: case, accents, spacing and trailing punctuation don't count. */
+export const normalizeNote = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[\s.!?…]+$/u, "")
+    .trim();
+
+/** Whether this agent already sent this note (normalized) in this agents' DM within `NOTE_DEDUPE_MS`. */
+async function sameNoteSent(
+  tx: Executor,
+  ctx: Pick<ToolContext, "orgId" | "agentId">,
+  channelId: string,
+  body: string,
+): Promise<boolean> {
+  const recent = await tx
+    .select({ body: messages.body })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, ctx.orgId),
+        eq(messages.channelId, channelId),
+        eq(messages.authorAgentId, ctx.agentId),
+        gte(messages.createdAt, new Date(Date.now() - NOTE_DEDUPE_MS)),
+        sql`${messages.meta} ? 'agentNote'`,
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(50);
+  const wanted = normalizeNote(body);
+  return recent.some((m) => normalizeNote(m.body) === wanted);
 }
 
 const ACTIVE_RUN = ["queued", "running", "waiting_approval", "waiting_input"] as const;

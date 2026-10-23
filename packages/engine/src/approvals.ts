@@ -8,6 +8,7 @@ import { notifyApproval, resolveApprovalNotifications } from "./notification-pro
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { Approval } from "./tools/gateway";
+import type { ApprovalOrigin } from "./tools/run-policy";
 
 const {
   approvals,
@@ -56,21 +57,35 @@ export interface ApprovalView {
   /** The connector the action goes through (`github`), and its account (`acme`); null for built-in tools. */
   connector: string | null;
   connectorAccount: string | null;
-  /** What the agent said right before asking (its narration of that turn): the why, in its own words. */
+  /** The agent's required reason (ADR 0053): what it found and why this action, shown on the card. */
   why: string | null;
+  /** Asked while nobody watched: by a routine (its name) or an unattended run; null when a person was behind it. */
+  origin: ApprovalOrigin | null;
   /** The issue the run works on, when there is one. */
   issue: { id: string; number: number; title: string } | null;
   /** How the run got here: what the agent said at each turn before asking (one approval only). */
   trail?: { text: string; at: string }[];
 }
 
-/** What the approval row alone doesn't say: the connector, the agent's why, the issue (and, for one, the trail). */
+/** What the approval row alone doesn't say: the connector, the issue (and, for one, the trail). */
 interface ApprovalContext {
   connector: string | null;
   connectorAccount: string | null;
-  why: string | null;
   issue: { id: string; number: number; title: string } | null;
   trail: { text: string; at: string }[];
+}
+
+/** The stored origin (`approvals.origin`), read safely. */
+function originOf(value: Approval["origin"]): ApprovalOrigin | null {
+  if (value?.kind === "unattended") return { kind: "unattended" };
+  if (value?.kind === "routine" && typeof value.routineId === "string") {
+    return {
+      kind: "routine",
+      routineId: value.routineId,
+      routineName: typeof value.routineName === "string" ? value.routineName : "",
+    };
+  }
+  return null;
 }
 
 const resultOf = (a: Approval): ApprovalView["result"] => {
@@ -124,7 +139,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
   const connectionOf = new Map(connections.map((c) => [c.id, c]));
   const issueOfRun = new Map(runs.map((r) => [r.id, issueRows.find((i) => i.id === r.issueId) ?? null]));
   for (const row of rows) {
-    // The narration of every turn before this approval's step; the last one is the why.
+    // The narration of every turn before this approval's step.
     const trail: ApprovalContext["trail"] = [];
     for (const s of steps) {
       if (s.runId !== row.runId) continue;
@@ -135,7 +150,6 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
     out.set(row.id, {
       connector: connection?.connector ?? null,
       connectorAccount: connection?.account ?? null,
-      why: trail.at(-1)?.text.slice(0, 1000) ?? null,
       issue: row.runId ? (issueOfRun.get(row.runId) ?? null) : null,
       trail: trail.slice(-12),
     });
@@ -162,7 +176,7 @@ export async function approvalCardThreads(db: Executor, rows: Pick<Approval, "id
   );
 }
 
-/** Views with their context (connector, why, issue); `trail` only when asked (one approval's details). */
+/** Views with their context (connector, issue); `trail` only when asked (one approval's details). */
 async function viewsOf(db: Database, rows: Approval[], canDecide: (row: Approval) => boolean, trail = false) {
   const [contexts, cardThreads] = await Promise.all([
     approvalContexts(db, rows).catch(() => new Map<string, ApprovalContext>()),
@@ -172,7 +186,6 @@ async function viewsOf(db: Database, rows: Approval[], canDecide: (row: Approval
     const { trail: steps, ...context } = contexts.get(r.id) ?? {
       connector: null,
       connectorAccount: null,
-      why: null,
       issue: null,
       trail: [],
     };
@@ -219,7 +232,8 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   result: resultOf(a),
   connector: null,
   connectorAccount: null,
-  why: null,
+  why: a.why.trim() || null,
+  origin: originOf(a.origin),
   issue: null,
 });
 

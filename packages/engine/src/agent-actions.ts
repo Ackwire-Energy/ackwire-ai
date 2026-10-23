@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { publishChannelEvent } from "./events";
+import { personBehindCall } from "./requester";
 import type { ToolContext } from "./tools/types";
 
 const { agentActions, messages } = schema;
@@ -117,16 +118,6 @@ export const actionView = (r: Row): AgentActionView => {
   };
 };
 
-/** The person behind the run: the trigger message's author when a person wrote it. */
-async function requesterOf(db: Executor, orgId: string, triggerMessageId: string): Promise<string | null> {
-  if (!triggerMessageId) return null;
-  const [m] = await db
-    .select({ type: messages.authorType, userId: messages.authorUserId })
-    .from(messages)
-    .where(and(eq(messages.orgId, orgId), eq(messages.id, triggerMessageId)));
-  return m?.type === "person" ? (m.userId ?? null) : null;
-}
-
 /** Writes receipts for a run's change (call it in the change's transaction). Returns their ids. */
 export async function recordAgentActions(
   db: Executor,
@@ -135,7 +126,8 @@ export async function recordAgentActions(
   now = new Date(),
 ): Promise<string[]> {
   if (records.length === 0 || !ctx.runId) return [];
-  const requestedByUserId = await requesterOf(db, ctx.orgId, ctx.triggerMessageId);
+  // Who asked for the change (`authority.ts`); nobody for a routine's or an unattended run.
+  const requestedByUserId = await personBehindCall({ ...ctx, db });
   const rows = await db
     .insert(agentActions)
     .values(

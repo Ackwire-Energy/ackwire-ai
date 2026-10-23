@@ -1,11 +1,14 @@
 import { and, eq, schema, sql } from "@agenteschat/db";
+import { type RunAuthority, runAuthorityById } from "../authority";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
+import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
+import { approvalOrigin, type PolicyDecision, takeWhy, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
@@ -29,27 +32,46 @@ export const APPROVAL_TTL_MS = 24 * 3600_000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_RESULT_CHARS = 50_000;
 
-const EXTERNAL_MARKER = /<\s*\/?\s*external_data\b[^>]*>/gi;
 /**
- * An `external` tool's output (an MCP server's answer) reaches the model inside
- * an `<external_data>` block, with any copy of the marker in it neutralised so
- * the text can't close the block early. The system prompt says what it means.
+ * An `external` tool's output (an MCP server's answer) reaches the model inside the one envelope for
+ * outside content (`untrustedBlock`): markers in it neutralised, so the text can't close the block
+ * early. The result is already capped (`MAX_RESULT_CHARS`), so the envelope doesn't cut it again.
  */
-export const wrapExternal = (source: string, text: string) =>
-  `<external_data source="${source}">\n${text.replace(EXTERNAL_MARKER, "[marker removed]")}\n</external_data>`;
+export const wrapExternal = (source: string, text: string) => untrustedBlock(source, text, MAX_RESULT_CHARS + 100);
 /** What run steps and approvals keep: the text people see, without the model's envelope. */
 const shown = (text: string) =>
   text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
 
+/** `ask_user` (questions.ts): it waits for a person, so it carries a `why` like an approval. */
+const ASK_USER = "ask_user";
+
+const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool.scope === "" && !tool.connectionId;
+
+/** Whether a call of this tool waits for a person: an approval, or a built-in question. */
+const asksPerson = (tool: ToolDefinition, decision: PolicyDecision) =>
+  decision.action === "approve" || isSensitive(tool) || (tool.name === ASK_USER && isBuiltIn(tool));
+
+/** Who is behind the call's run (ADR 0053). Null for a mission task's call: no run, the mission's own gates. */
+const authorityOf = (ctx: ToolContext): Promise<RunAuthority | null> =>
+  ctx.runId ? runAuthorityById(ctx.db, ctx.orgId, ctx.runId) : Promise.resolve(null);
+
+const ALLOWED: PolicyDecision = { action: "allow" };
+const policyFor = (authority: RunAuthority | null, tool: ToolDefinition) =>
+  authority ? toolPolicy(authority, tool) : ALLOWED;
+
 /**
- * Tools that speak in the conversation, refused on a background run (a routine's work, `ctx.background`):
- * nobody there is waiting for it. Not listed to it either; a call gets the reason.
+ * A tool as a run sees it: one the policy says asks a person becomes sensitive (its card, and the
+ * "asks a person's approval" in a directory), and every tool that asks a person takes the required
+ * `why` the card shows. The same list goes to the model loop and to the bridge.
  */
-export const BACKGROUND_REFUSED: Readonly<Record<string, string>> = {
-  ask_user:
-    "This is background work (a routine): nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
-  react: "This is background work (a routine): there is no message to react to. Just finish, or use hand_off.",
-};
+function asListed(tool: ToolDefinition, decision: PolicyDecision): ToolDefinition {
+  if (!asksPerson(tool, decision)) return tool;
+  return {
+    ...tool,
+    ...(decision.action === "approve" ? { sensitive: true } : {}),
+    inputSchema: withWhy(tool.inputSchema),
+  };
+}
 
 export type ToolCall = { toolUseId: string; name: string; input: Record<string, unknown> };
 export type Approval = typeof approvals.$inferSelect;
@@ -58,7 +80,7 @@ export type InvokeResult =
   | { type: "result"; output: ToolOutput }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
-  | { type: "question"; text: string; choices: string[] | null }
+  | { type: "question"; text: string; choices: string[] | null; why: string }
   /** `request_secret`: the executor posts the card and suspends the run. */
   | { type: "secret"; requestId: string };
 
@@ -68,9 +90,13 @@ export type InvokeResult =
  *    model's claim of what it is);
  * 2. the agent's scope for it is read from `agent_scopes` (a prompt can't change it);
  * 3. the input is validated against the tool's JSON Schema;
- * 4. sensitive tools create an `approvals` row bound to the action hash and
+ * 4. the run's policy (`run-policy.ts`: who is behind the run) refuses it,
+ *    lets it run, or makes it ask a person;
+ * 5. a call that asks a person (an approval, `ask_user`) must say why: the
+ *    `why` is taken out of the input and kept on the approval or question;
+ * 6. sensitive tools create an `approvals` row bound to the action hash and
  *    stop there; others run, with errors turned into error results;
- * 5. `tool_call` / `tool_result` / `approval` steps are recorded.
+ * 7. `tool_call` / `tool_result` / `approval` steps are recorded.
  */
 export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Date }) {
   const now = deps.now ?? (() => new Date());
@@ -86,11 +112,22 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     return byName;
   }
 
-  /** Every tool this agent may call now, as is: every source, filtered by granted scopes, by name. */
+  /**
+   * Every tool this agent may call now: every source, filtered by granted scopes and by the run's
+   * policy (a refused tool isn't listed), by name. Tools that ask a person carry the required `why`.
+   */
   async function granted(ctx: ToolContext): Promise<ToolDefinition[]> {
-    const keys = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-    return [...(await allTools(ctx)).values()]
-      .filter((t) => isAllowed(toolAccess(keys, t)) && !(ctx.background && BACKGROUND_REFUSED[t.name]))
+    return grantedFor(ctx, await authorityOf(ctx));
+  }
+
+  async function grantedFor(ctx: ToolContext, authority: RunAuthority | null): Promise<ToolDefinition[]> {
+    const [keys, all] = await Promise.all([grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId), allTools(ctx)]);
+    return [...all.values()]
+      .filter((t) => isAllowed(toolAccess(keys, t)))
+      .flatMap((t) => {
+        const decision = policyFor(authority, t);
+        return decision.action === "refuse" ? [] : [asListed(t, decision)];
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -135,14 +172,17 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     granted,
 
     async invoke(ctx: ToolContext, requested: ToolCall): Promise<InvokeResult> {
-      const all = await allTools(ctx);
+      // Who is behind the run decides what it may do: listing already hid refused tools, this is the call.
+      const [all, authority] = await Promise.all([allTools(ctx), authorityOf(ctx)]);
       // A big connector's directory (tools/directory.ts): `use_tool` runs the real tool by its own name, so
-      // everything below (steps, scope, schema, checks, approval) is that tool's; `find_tools` runs as is.
+      // everything below (steps, policy, scope, schema, checks, approval) is that tool's; `find_tools` runs as is.
       let call = requested;
       let directoryTool: ToolDefinition | undefined;
       let unknownInDirectory: string | null = null;
       if (!all.has(call.name)) {
-        const listed = (await list(ctx)).find((t) => t.name === call.name);
+        const listed = presentTools(await grantedFor(ctx, authority), isSensitive, ctx.loadedGroups).find(
+          (t) => t.name === call.name,
+        );
         const role = directoryRole(listed);
         if (role?.kind === "find") directoryTool = listed;
         else if (role?.kind === "use") {
@@ -179,11 +219,13 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       };
 
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
-      const backgroundRefusal = ctx.background ? BACKGROUND_REFUSED[call.name] : undefined;
-      if (backgroundRefusal) return finish({ content: backgroundRefusal, isError: true });
       const tool = all.get(call.name) ?? directoryTool;
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
-      const builtIn = tool.scope === "" && !tool.connectionId;
+      const builtIn = isBuiltIn(tool);
+      const decision = policyFor(authority, tool);
+      if (decision.action === "refuse") {
+        return finish({ content: decision.reason, isError: true, data: { code: "tool.not_allowed" } });
+      }
       // A directory's search lists only tools the agent already holds; each real tool is checked on its own.
       if (tool !== directoryTool) {
         const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
@@ -194,6 +236,15 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
               : `this agent lacks the scope ${tool.scope}. If the request needs it, ask for it with request_permission`;
           return finish({ content: `Not allowed: ${reason}`, isError: true });
         }
+      }
+      // A call that asks a person says why (shown on its card); the tool itself never sees it.
+      const approves = decision.action === "approve" || isSensitive(tool);
+      let why = "";
+      if (asksPerson(tool, decision)) {
+        const taken = takeWhy(tool.inputSchema, call.input);
+        if (!taken.why) return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
+        why = taken.why;
+        call = { ...call, input: taken.input };
       }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) {
@@ -207,10 +258,16 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 
-      if (isSensitive(tool)) {
+      if (approves) {
         const owner = await ownerOf(ctx);
-        // Asked by another agent (ADR 0034): the request shows where the person is, not in the agents' DM.
-        const origin = ctx.runId ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId) : null;
+        // A routine's request goes to the conversation it reports to, never its room; one asked by another
+        // agent (ADR 0034) where the person is, not in the agents' DM.
+        const deliverTo = authority?.kind === "routine" ? authority.brief?.deliverTo : undefined;
+        const origin = deliverTo
+          ? { channelId: deliverTo.channelId, threadRootId: deliverTo.threadId ?? ctx.threadRootId }
+          : ctx.runId
+            ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId)
+            : null;
         const described = tool.describe?.(call.input) ?? { title: `${tool.name}`, detail: canonicalJson(call.input) };
         const connectionId = tool.connectionId ?? null;
         const [approval] = await ctx.db
@@ -230,6 +287,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             actionHash: actionHash({ tool: tool.name, scope: tool.scope, connectionId, params: call.input }),
             title: described.title.slice(0, 300),
             detail: (described.detail ?? "").slice(0, 2000),
+            why,
+            origin: authority ? approvalOrigin(authority) : null,
             ownerUserId: owner,
             expiresAt: new Date(now().getTime() + APPROVAL_TTL_MS),
           })
@@ -249,7 +308,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       }
       const output = withRepo(await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId }));
       if (builtIn && output.waitForAnswer?.text) {
-        return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices };
+        return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
       }
       if (!tool.connectionId && output.waitForSecret?.requestId) {
         return { type: "secret", requestId: output.waitForSecret.requestId };
