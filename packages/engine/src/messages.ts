@@ -257,6 +257,11 @@ export function parseMentionHandles(body: string): string[] {
 export const AGENT_CHIME_IN_MAX_HOP = 2;
 /** A reply waits this long before its thread is assessed (`threads.assess`); a newer reply's job takes over. */
 export const THREAD_ASSESS_DELAY_MS = 2 * 60_000;
+/**
+ * The floor: a person's follow-up without @ in a channel's main timeline goes to the agent's run
+ * still answering that person there, when it was asked within this window (else the router decides).
+ */
+export const FLOOR_WINDOW_MS = 30 * 60_000;
 
 export type MessageAuthor =
   | { type: "person"; userId: string }
@@ -482,10 +487,12 @@ export async function insertMessageWithRuns(
         -- message in the channel joins the agent's run that answers in the channel itself (not one in
         -- a thread's panel, a range thread or a mission), while it is queued or working (one waiting for
         -- an approval or an answer would hold the new request): two people calling Ada get one Ada.
+        -- Background runs (a routine's) hold no conversation: a person's message never goes to one.
         select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
         join ${agents} ra on ra.id = r.agent_id
         where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+          and not r.background
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
@@ -496,8 +503,28 @@ export async function insertMessageWithRuns(
                 or ${threadId ? sql`false` : sql`(r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`}))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
+            -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
+            -- answering this same person there, asked within the last minutes. Deterministic, no router.
+            or (${startRuns && !threadId}::boolean and not exists (select 1 from mentioned)
+              and r.status in ('queued', 'running') and ${inChannelRun(sql`r`)}
+              and r.created_at > now() - ${FLOOR_WINDOW_MS / 1000}::int * interval '1 second'
+              and ra.archived_at is null
+              and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
+              and exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid
+                and tm.id = r.trigger_message_id and tm.author_user_id = ${userId})
+              and ${audienceSql("ra", sql`${userId}::text`)})
           )
         order by r.agent_id, r.created_at desc
+      ), steered as (
+        -- Queued on the run only while it is still active: one that ended since (its unread messages
+        -- already handed on) is never appended to; the message starts a run of its own below instead.
+        -- Same conditions as m (the message is written).
+        update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
+          updated_at = now()
+        from active a where r.id = a.id
+          and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+          and ${threadOk} and not exists (select 1 from archived) and exists (select 1 from fresh)
+        returning r.id, r.agent_id
       ), m as (
         insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
           author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, mentioned_user_ids, meta)
@@ -508,7 +535,7 @@ export async function insertMessageWithRuns(
           ${JSON.stringify(input.meta ?? {})}::jsonb
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).
-            || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(ac.id)) from active ac
+            || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(st.id)) from steered st
                 having count(*) > 0), '{}'::jsonb)
             -- Addressed the mission's agent without the right to: a suggestion the owner decides.
             || coalesce((select jsonb_build_object('missionSuggestion',
@@ -528,17 +555,12 @@ export async function insertMessageWithRuns(
         where ${person}::boolean and ${threadId}::uuid is not null and t.org_id = ${input.orgId}::uuid
           and t.root_message_id = ${threadId}::uuid and t.state = 'closed' and exists (select 1 from m)
         returning t.id
-      ), steered as (
-        update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
-          updated_at = now()
-        from active a where r.id = a.id and exists (select 1 from m)
-        returning r.id, r.agent_id
       ), runs as (
         insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
         select gen_random_uuid(), ${input.orgId}::uuid, an.agent_id, ${input.channelId}::uuid,
           coalesce(${threadId}::uuid, ${id}::uuid), ${id}::uuid, an.trig::agent_run_trigger, ${hop} + 1
         from answering an where exists (select 1 from m)
-          and an.agent_id not in (select agent_id from active)
+          and an.agent_id not in (select agent_id from steered)
         on conflict do nothing
         returning id, agent_id
       ), jobs as (

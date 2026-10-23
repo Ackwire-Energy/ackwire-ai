@@ -97,6 +97,9 @@ export function chatRoutes(deps: AppDeps) {
                   pendingMessageIds: z.array(z.uuid()).openapi({
                     description: "Messages sent to it while it works that it hasn't read yet.",
                   }),
+                  background: z.boolean().openapi({
+                    description: "A routine's work in the background: people's messages never go to it.",
+                  }),
                 })
                 .openapi("WorkingRun"),
             ),
@@ -238,7 +241,10 @@ export function chatRoutes(deps: AppDeps) {
                 createdAt: z.string(),
                 pendingMessageIds: z.array(z.uuid()).openapi({
                   description:
-                    "Messages sent while it works that it hasn't read yet. A message whose `meta.steeredRunIds` names a run that is not here, or is here without it in this list, was read.",
+                    "Messages sent while it works that it hasn't read yet. A message whose `meta.steeredRunIds` names a run that is not here, or is here without it in this list, was read (or handed on: `agent.run.redispatched`).",
+                }),
+                background: z.boolean().openapi({
+                  description: "A routine's work in the background: people's messages never go to it.",
                 }),
               }),
             ),

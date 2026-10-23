@@ -7,6 +7,7 @@ import { publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
 import { insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
+import { releaseInbox } from "./run-inbox";
 import { type AgentRun, addRunStep, replyThreadOf, runErrorDetail, transitionRun } from "./runs";
 
 const { agentRuns, agentRunSteps, outbox, channels } = schema;
@@ -200,6 +201,8 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
   }
   // It was answering another agent: the asker hears it now instead of waiting for the question to expire.
   await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, "failed", INTERRUPTED_BY_RESTART).catch(() => {});
+  // What was sent to it and not read gets a run of its own.
+  await releaseInbox(db, deps.pubsub, run, { reason: "interrupted" }).catch(() => null);
   return true;
 }
 
@@ -216,9 +219,10 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     created_at: string | Date;
     kind: string;
     pending: string[] | string | null;
+    background: boolean | string;
   }>(
     await db.execute(sql`select r.id, r.agent_id, r.status, r.thread_root_id, r.trigger_message_id, r.started_at,
-        r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending
+        r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending, r.background
       from ${agentRuns} r join ${channels} c on c.id = r.channel_id
       where r.org_id = ${orgId}::uuid and r.channel_id = ${channelId}::uuid
         and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
@@ -238,6 +242,8 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     createdAt: iso(r.created_at) as string,
     // Sent while it works and not read yet ("lê na próxima pausa"); the rest it already read.
     pendingMessageIds: pendingIds(r.pending),
+    // A routine's work: it holds no conversation (people's messages never go to it).
+    background: r.background === true || r.background === "t",
   }));
 }
 
