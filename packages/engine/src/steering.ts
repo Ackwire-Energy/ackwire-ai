@@ -70,7 +70,6 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
       ...(now ? { now: true as const } : {}),
     });
     let live = false;
-    let waited: WaitMessageOutcome | null = null;
     // Its model call stops and the loop reads the message at once (a running tool finishes first).
     // A computer brain (Claude Code, Codex) can't drop its turn halfway: the task stops for real, and
     // stopping it starts it again from this message (`restartAfterStopAndSend`). Who may not stop it
@@ -95,24 +94,31 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
         dedupeKey: `agent_run.execute:${runId}:steer:${message.id}`,
         maxAttempts: 4,
       }).catch(() => undefined);
-    } else if (active.status === "waiting_input" || active.status === "waiting_approval") {
-      waited = await onMessageWhileWaiting(deps, active, message).catch(() => null);
-      if (waited) {
-        await publishChannelEvent(deps.pubsub, {
-          type: "agent.run.wait_message",
-          channelId,
-          threadId,
-          runId,
-          agentId: active.agentId,
-          messageId: message.id,
-          waitKind: waited.waitKind,
-          outcome: waited.outcome,
-        });
-      }
     }
-    if (deps.talker && !now) {
-      const talker = deps.talker;
-      trackStopCheck(talker.consider({ run: active, message, live, waited }).catch(() => undefined));
+    // What it does to a wait, then the fast reply: after the response (the judge may take a moment), in order.
+    const waiting =
+      !active.waitingMachineId && (active.status === "waiting_input" || active.status === "waiting_approval");
+    if (waiting || (deps.talker && !now)) {
+      const followUp = async () => {
+        let waited: WaitMessageOutcome | null = null;
+        if (waiting) {
+          waited = await onMessageWhileWaiting(deps, active, message).catch(() => null);
+          if (waited) {
+            await publishChannelEvent(deps.pubsub, {
+              type: "agent.run.wait_message",
+              channelId,
+              threadId,
+              runId,
+              agentId: active.agentId,
+              messageId: message.id,
+              waitKind: waited.waitKind,
+              outcome: waited.outcome,
+            });
+          }
+        }
+        if (deps.talker && !now) await deps.talker.consider({ run: active, message, live, waited });
+      };
+      trackStopCheck(followUp());
     }
     // A plain "stop", in any language, cancels the task instead (the judge decides; short messages
     // only). Never in the way of the send: judged after the response, the app hears `stop` then.

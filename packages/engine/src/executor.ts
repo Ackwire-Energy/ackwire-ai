@@ -421,7 +421,9 @@ async function executeRunInner(
   ]);
   const replyThreadId = replyThreadOf(run);
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
-  await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where });
+  // Background work (a routine's run) says so: the apps keep it out of the conversation's "working" row.
+  const bg = run.background ? { background: true as const } : {};
+  await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
   await publishChannelEvent(deps.pubsub, {
     type: "message.claimed",
     channelId: run.channelId,
@@ -445,10 +447,11 @@ async function executeRunInner(
     }
     // The turn's bridge tokens die with it (a resumed turn gets a new one).
     if (brainPlan && brainPlan.kind !== "model") await revokeRunToolTokens(db, { runId: run.id }).catch(() => {});
-    await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
+    await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, {
       type: "run.finished",
       ...where,
+      ...bg,
       status,
       ...(error ? { error, ...runErrorDetail(error) } : {}),
     });
@@ -498,6 +501,7 @@ async function executeRunInner(
     runId: run.id,
     agentId: run.agentId,
     status,
+    ...bg,
     ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */

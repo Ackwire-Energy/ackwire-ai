@@ -75,6 +75,8 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       status: RunStatus;
+      /** Background work (a routine's run): not the conversation's "working" indicator. */
+      background?: true;
       error?: string;
       /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
       errorCode?: string;
@@ -85,7 +87,15 @@ export type ChannelEvent =
    * show "thinking" right away. `runId` is null when announced at post time,
    * before the run exists.
    */
-  | { type: "agent.thinking"; channelId: string; threadId: string | null; agentId: string; runId: string | null }
+  | {
+      type: "agent.thinking";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string | null;
+      /** Background work (a routine's run): not the conversation's "working" indicator. */
+      background?: true;
+    }
   /** An agent asked another agent (`ask_agent`, ADR 0034) and waits for it: "Dev is asking Infra…". */
   | {
       type: "agent.consulting";
@@ -138,12 +148,20 @@ export type ChannelEvent =
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */
-  | { type: "agent.idle"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  | {
+      type: "agent.idle";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      background?: true;
+    }
   | {
       type: "run.finished";
       channelId: string;
       threadId: string | null;
       agentId: string;
+      background?: true;
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       error?: string;
