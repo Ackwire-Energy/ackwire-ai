@@ -296,7 +296,11 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
       const result = await executeToolForRun(
         f.jobDeps,
         { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
-        { id: "call-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 42 } },
+        {
+          id: "call-1",
+          name: "github_merge_pr",
+          input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+        },
       );
       yield { type: "tool_call", id: "call-1", name: "github_merge_pr", input: {}, executed: result };
       yield { type: "usage", input: 10, output: 2, source: "plan" };
@@ -349,7 +353,14 @@ test("a question asked through the bridge: the text written before it comes firs
     const result = await executeToolForRun(
       f.jobDeps,
       { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
-      { id: "ask-1", name: "ask_user", input: { question: "Quais datas eu coloco?" } },
+      {
+        id: "ask-1",
+        name: "ask_user",
+        input: {
+          why: "I need a person's answer before I go on: this decides what I change next.",
+          question: "Quais datas eu coloco?",
+        },
+      },
     );
     yield { type: "tool_call", id: "ask-1", name: "ask_user", input: {}, executed: result };
     // After the call the brain repeats itself (what the person saw in production).
@@ -871,7 +882,11 @@ test("a routine's run: a bridged gated call posts its card and events in the mai
   const out = await invokeToolForRun(
     { db: f.db, pubsub: f.pubsub, tools: f.tools },
     { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId },
-    { id: "call-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 1 } },
+    {
+      id: "call-1",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 1, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    },
   );
   expect(out.result.pause?.kind).toBe("approval");
   const card = (await f.db.select().from(schema.messages)).find((m) => typeof m.meta.approvalId === "string");
@@ -1053,7 +1068,7 @@ test("a computer brain that fails after a bridged pause: the run keeps waiting w
       const result = await executeToolForRun(f.jobDeps, id, {
         id: "call-1",
         name: "github_merge_pr",
-        input: { repo: "acme/app", pr: 42 },
+        input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
       });
       yield { type: "tool_call", id: "call-1", name: "github_merge_pr", input: {}, executed: result };
       yield { type: "error", code: "executor_crashed", message: "Claude Code exited", retryable: true };
@@ -1102,8 +1117,16 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const deps = { db: f.db, pubsub: f.pubsub, tools: f.tools };
   const id = { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId };
   const [first, second] = await Promise.all([
-    invokeToolForRun(deps, id, { id: "m-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 1 } }),
-    invokeToolForRun(deps, id, { id: "m-2", name: "github_merge_pr", input: { repo: "acme/app", pr: 2 } }),
+    invokeToolForRun(deps, id, {
+      id: "m-1",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 1, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    }),
+    invokeToolForRun(deps, id, {
+      id: "m-2",
+      name: "github_merge_pr",
+      input: { repo: "acme/app", pr: 2, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+    }),
   ]);
   expect(first.result.pause?.kind).toBe("approval");
   expect(second.result.pause?.kind).toBe("approval");
@@ -1120,7 +1143,7 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const late = await invokeToolForRun(deps, id, {
     id: "m-3",
     name: "github_merge_pr",
-    input: { repo: "acme/app", pr: 3 },
+    input: { repo: "acme/app", pr: 3, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
   });
   expect(late).toMatchObject({ code: "bridge.run_not_running", result: { isError: true } });
   expect(late.result.pause).toBeUndefined();

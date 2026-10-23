@@ -129,7 +129,19 @@ describe("ask_agent", () => {
       reply: consultReply((req) =>
         lastText(req).includes("tool_result")
           ? answer("Merged.")
-          : { chunks: [], toolUses: [{ name: "github_merge_pr", input: { repo: "acme/app", pr: 7 } }] },
+          : {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "github_merge_pr",
+                  input: {
+                    repo: "acme/app",
+                    pr: 7,
+                    why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                  },
+                },
+              ],
+            },
       ),
     });
     const infra = await addInfra();

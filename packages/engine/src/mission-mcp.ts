@@ -15,6 +15,7 @@ import type { MachineMissionHooks } from "./machine-hub";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
 import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
 import { completeMission } from "./mission-delivery";
+import { MISSION_LIMITS } from "./mission-limits";
 import { onMachineOnline } from "./mission-sync";
 import {
   ensureMissionWorktree,
@@ -27,7 +28,6 @@ import {
   askDecision,
   checkMissionToolRate,
   getMissionRow,
-  MISSION_LIMITS,
   type MissionDeps,
   type MissionRow,
   missionOfThread,

@@ -206,7 +206,13 @@ describe("enforcement in the Tool Gateway", () => {
     expect(await f.db.select().from(schema.approvals)).toEqual([]);
     // Inside the list it still asks a person.
     expect(
-      (await gateway.invoke(ctx, { toolUseId: "f", name: "github_merge_pull_request", input: pr("acme", "app") })).type,
+      (
+        await gateway.invoke(ctx, {
+          toolUseId: "f",
+          name: "github_merge_pull_request",
+          input: { ...pr("acme", "app"), why: "CI passed and the review is done: merging ships the fix today." },
+        })
+      ).type,
     ).toBe("approval");
 
     // A call that names no repository can't run while the agent has a list.

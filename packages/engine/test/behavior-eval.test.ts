@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { systemText } from "@agenteschat/providers";
 import { createFakeProvider, type FakeReply } from "@agenteschat/providers/testing";
 import cases from "../eval/behavior-cases.json";
 import { deterministicChecks } from "../eval/behavior-checks";
@@ -96,7 +97,17 @@ test("a sensitive call becomes an approval request and never runs", async () => 
   const provider = script([
     {
       chunks: [],
-      toolUses: [{ name: "github_merge_pull_request", input: { owner: "lumen", repo: "api", pullNumber: 70 } }],
+      toolUses: [
+        {
+          name: "github_merge_pull_request",
+          input: {
+            owner: "lumen",
+            repo: "api",
+            pullNumber: 70,
+            why: "CI is green on PR 70 and the review approved it: merging ships the fix.",
+          },
+        },
+      ],
     },
   ]);
   const c = byId("dev-merge-pr-sensitive");
@@ -118,10 +129,11 @@ test("a routine run: background work on the routine's trigger, earlier messages 
   const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
   expect(run.system).toContain("This is a routine run");
   expect(run.tools).toContain("hand_off");
-  // Only the trigger started a run: the earlier routine message and the agent's old reply are history.
+  // Only the brief started a run, in the routine's room (ADR 0053 §4): the conversation it reports to,
+  // with the agent's old reply, is read-only context in its system prompt, not its messages.
   expect(run.status).toEqual(["done"]);
-  const history = JSON.stringify(provider.calls[0]?.request.messages);
-  expect(history).toContain("Sigo acompanhando LUMEN-API-3A1");
+  expect(systemText(provider.calls[0]?.request.system ?? "")).toContain("Sigo acompanhando LUMEN-API-3A1");
+  expect(JSON.stringify(provider.calls[0]?.request.messages)).not.toContain("Sigo acompanhando LUMEN-API-3A1");
   expect(run.noReply).toBe(true);
   expect(run.reply).toBe("");
   expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
@@ -154,7 +166,15 @@ test("act with undo: the issue is a receipt on the reply while the merge waits f
       chunks: [],
       toolUses: [
         { name: "create_issue", input: { title: "Preço do plano anual", assignee: "me" } },
-        { name: "github_merge_pull_request", input: { owner: "lumen", repo: "api", pullNumber: 70 } },
+        {
+          name: "github_merge_pull_request",
+          input: {
+            owner: "lumen",
+            repo: "api",
+            pullNumber: 70,
+            why: "CI is green on PR 70 and the review approved it: merging ships the fix.",
+          },
+        },
       ],
     },
   ]);

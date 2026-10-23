@@ -237,13 +237,16 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           return finish({ content: `Not allowed: ${reason}`, isError: true });
         }
       }
-      // A call that asks a person says why (shown on its card); the tool itself never sees it.
+      // A call that asks a person says why (shown on its card); the tool itself never sees it. It is
+      // asked for last: a call refused for any other reason (its input, a repository outside the agent's
+      // list) gets that reason first.
       const approves = decision.action === "approve" || isSensitive(tool);
       let why = "";
+      let whyMissing = false;
       if (asksPerson(tool, decision)) {
         const taken = takeWhy(tool.inputSchema, call.input);
-        if (!taken.why) return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
-        why = taken.why;
+        why = taken.why ?? "";
+        whyMissing = !taken.why;
         call = { ...call, input: taken.input };
       }
       const problems = validateJson(tool.inputSchema, call.input);
@@ -255,6 +258,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
       const check = await checkToolCall(tool, call.input, ctx);
       if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} });
+      if (whyMissing) return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 

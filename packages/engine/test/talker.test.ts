@@ -36,7 +36,12 @@ function script(talker: (req: ModelRequest) => ReturnType<NonNullable<Parameters
     if (all.includes("github_get_pr ok"))
       return {
         chunks: ["Testes ok, vou mergear."],
-        toolUses: [{ name: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }],
+        toolUses: [
+          {
+            name: "github_merge_pr",
+            input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+          },
+        ],
       };
     void call;
     return { chunks: ["Vou ver o PR."], toolUses: [{ name: "github_get_pr", input: { repo: "acme/app", pr: 42 } }] };
