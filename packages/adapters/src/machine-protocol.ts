@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 16;
+export const MACHINE_PROTOCOL_VERSION = 17;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -140,6 +140,15 @@ export const STEER_PROTOCOL = 15;
  * Codex turn nor a Claude Code `plan` turn (`runner_outdated`).
  */
 export const BRAIN_PROFILES_PROTOCOL = 16;
+/**
+ * From this protocol on (ADR 0054): `browser.batch` runs several browser
+ * commands in one round trip (an action, the wait for the page to settle and
+ * the look after it), and `browser.capture` returns the page as a JPEG with
+ * its elements numbered and boxed. Older runners get the same commands one
+ * `browser.act` at a time, and no images: targets are then found on the
+ * page's text only.
+ */
+export const BROWSER_FAST_PROTOCOL = 17;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -219,6 +228,8 @@ export const BROWSER_LIMITS = {
   /** A `browser.act` command name, and its arguments as JSON characters. */
   command: 64,
   args: 64 * 1024,
+  /** Commands in one `browser.batch` (protocol 17). */
+  batchCommands: 40,
   url: 2048,
   message: 500,
 } as const;
@@ -856,7 +867,29 @@ export type MachineRequest = (
   | { op: "browser.stream.stop" }
   /** Protocol 12: a person's input during a take over, in order. */
   | { op: "browser.input"; events: BrowserInputEvent[] }
+  /**
+   * Protocol 17: several `browser.act` commands in one round trip, run back to
+   * back in the agent's session (nothing else in between), each with the
+   * same checks. Stops at the first failure of a command without `tolerate`.
+   */
+  | {
+      op: "browser.batch";
+      commands: BrowserBatchCommand[];
+      allowedDomains?: string[];
+      link?: string;
+    }
+  /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
+  | { op: "browser.capture" }
 ) & { agent?: AgentScope };
+
+/** One command of a `browser.batch` (protocol 17). */
+export interface BrowserBatchCommand {
+  command: string;
+  args: string[];
+  timeoutSeconds: number;
+  /** Its failure doesn't stop the batch (a wait that may time out, a settle check). */
+  tolerate?: boolean;
+}
 
 export type MachineOp = MachineRequest["op"];
 
@@ -883,6 +916,8 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.stream.start",
   "browser.stream.stop",
   "browser.input",
+  "browser.batch",
+  "browser.capture",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -943,6 +978,29 @@ export interface MachineReplies {
   /** Events sent to the page. */
   /** `failed`: events the browser didn't confirm (absent when all went through). */
   "browser.input": { accepted: number; failed?: number };
+  /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
+  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[] };
+  /**
+   * The page as a JPEG (base64), its size in pixels, the page's size in CSS
+   * pixels, and its numbered elements with their boxes (CSS pixels).
+   */
+  "browser.capture": {
+    data: string;
+    width: number;
+    height: number;
+    viewport: { width: number; height: number };
+    marks: BrowserCaptureMark[];
+    url?: string;
+  };
+}
+
+/** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
+export interface BrowserCaptureMark {
+  ref: string;
+  number: number;
+  role: string;
+  name?: string;
+  box: { x: number; y: number; width: number; height: number };
 }
 
 /** Error codes the runner reports; the message is for people. */

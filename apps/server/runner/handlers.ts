@@ -43,6 +43,8 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "brain.turn",
   "git.sync",
   "browser.act",
+  "browser.batch",
+  "browser.capture",
   "browser.stream.start",
 ]);
 
@@ -304,6 +306,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   }
   if (
     req.op === "browser.act" ||
+    req.op === "browser.batch" ||
+    req.op === "browser.capture" ||
     req.op === "browser.stop" ||
     req.op === "browser.stream.start" ||
     req.op === "browser.stream.stop" ||
@@ -365,7 +369,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
 }
 
 /**
- * Protocol 12: the agent's browser (ADR 0040). Needs the machine's browser
+ * Protocol 12: the agent's browser (ADR 0040); `browser.batch` and
+ * `browser.capture` from protocol 17 (ADR 0054). Needs the machine's browser
  * switch on; stopping (the browser, its live view) always goes, so Stop works
  * even after the switch went off.
  */
@@ -373,7 +378,16 @@ async function handleBrowser(
   ctx: HandlerContext,
   req: Extract<
     MachineRequest,
-    { op: "browser.act" | "browser.stop" | "browser.stream.start" | "browser.stream.stop" | "browser.input" }
+    {
+      op:
+        | "browser.act"
+        | "browser.batch"
+        | "browser.capture"
+        | "browser.stop"
+        | "browser.stream.start"
+        | "browser.stream.stop"
+        | "browser.input";
+    }
   >,
   scope: RequestScope,
 ) {
@@ -388,6 +402,12 @@ async function handleBrowser(
     case "browser.act":
       requireTool(ctx, "browser");
       return browser.act(req.agent, ctx.workspaceReal, req, scope.signal);
+    case "browser.batch":
+      requireTool(ctx, "browser");
+      return browser.batch(req.agent, ctx.workspaceReal, req, scope.signal);
+    case "browser.capture":
+      requireTool(ctx, "browser");
+      return browser.capture(req.agent, ctx.workspaceReal, scope.signal);
     case "browser.stream.start":
       requireTool(ctx, "browser");
       return browser.streamStart(req.agent, req.mode);
@@ -656,6 +676,11 @@ function describeOp(req: MachineRequest): string {
       const nav = ["open", "goto", "navigate"].includes(command) ? ` ${first.slice(0, 120)}` : "";
       return `browser.act ${command}${nav}`;
     }
+    case "browser.batch": {
+      // The commands only (`click, eval, wait, snapshot`): never their arguments.
+      const commands = Array.isArray(req.commands) ? req.commands.map((c) => String(c?.command ?? "")) : [];
+      return `browser.batch ${commands.join(", ").slice(0, 200)}`;
+    }
     case "browser.stream.start":
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
@@ -715,7 +740,11 @@ export class RequestRunner {
     const controller = new AbortController();
     this.inflight.set(id, controller);
     // A browser command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
-    const timed = req.op === "browser.act" || req.op === "browser.input";
+    const timed =
+      req.op === "browser.act" ||
+      req.op === "browser.batch" ||
+      req.op === "browser.capture" ||
+      req.op === "browser.input";
     const startedAt = Date.now();
     if (!timed) this.log(describeRequest(req));
     this.observe(() => this.observer?.started(id, req));

@@ -7230,6 +7230,10 @@ export const ptBR = {
       label: "Ver o computador",
       description: "Diz se está ligado, o disco usado e o custo do mês.",
     },
+    browser_do: {
+      label: "Fazer passos no navegador",
+      description: "Faz vários passos no navegador de uma vez (abrir, preencher, clicar, esperar), conferindo cada um.",
+    },
     browser_open: {
       label: "Abrir uma página",
       description: "Abre um site no navegador do próprio agente.",
@@ -7504,6 +7508,7 @@ export const ptBR = {
       stoppedAt: "às {{time}}",
       open: "Ver ao vivo",
       step: {
+        browser_do: "Fez vários passos",
         browser_open: "Abriu {{detail}}",
         browser_open_plain: "Abriu uma página",
         browser_back: "Voltou uma página",

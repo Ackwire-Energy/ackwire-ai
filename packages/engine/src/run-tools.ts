@@ -140,7 +140,11 @@ const browserTool = (name: string) => {
 const withTrail = (list: BrowserTrailStep[] | undefined, more: BrowserTrailStep[]) =>
   [...(list ?? []), ...more].slice(-BROWSER_TRAIL_MAX);
 
-/** Adds a browser call to `t`'s trail; any other tool leaves it as it is. */
+/**
+ * Adds a browser call to `t`'s trail; any other tool leaves it as it is. A
+ * `browser_do` isn't one step: its steps come in its result (`absorbToolData`,
+ * `browserTrail`), each as the tool it stands for.
+ */
 export function absorbBrowserCall(
   t: ToolSideEffects,
   call: { name: string; input: unknown },
@@ -148,7 +152,7 @@ export function absorbBrowserCall(
   at = new Date(),
 ) {
   const tool = browserTool(call.name);
-  if (!tool) return;
+  if (!tool || tool === "browser_do") return;
   const detail = toolDetail(tool, call.input as Record<string, unknown> | undefined);
   t.browser = withTrail(t.browser, [
     { tool, ...(detail ? { detail } : {}), at: at.toISOString(), ...(failed ? { failed: true as const } : {}) },
@@ -184,6 +188,22 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
   if (passed) t.passed = { reason: typeof passed.reason === "string" ? passed.reason : "" };
   if (typeof data.repo === "string") t.repo = data.repo;
   if (typeof data.deniedRepo === "string") t.deniedRepo = data.deniedRepo;
+  if (Array.isArray(data.browserTrail)) {
+    const at = new Date().toISOString();
+    const steps = data.browserTrail.flatMap((s): BrowserTrailStep[] => {
+      const step = s as { tool?: unknown; detail?: unknown; failed?: unknown };
+      if (typeof step.tool !== "string" || !step.tool.startsWith("browser_")) return [];
+      return [
+        {
+          tool: step.tool,
+          ...(typeof step.detail === "string" ? { detail: step.detail } : {}),
+          at,
+          ...(step.failed === true ? { failed: true as const } : {}),
+        },
+      ];
+    });
+    if (steps.length > 0) t.browser = withTrail(t.browser, steps);
+  }
   const update = data.memoryUpdate as MemoryUpdate | undefined;
   if (update) t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
   return update ?? null;

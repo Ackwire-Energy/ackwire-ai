@@ -148,6 +148,7 @@ export function buildEngine(o: EngineOptions) {
             apiKey: config.TYPESAFE_API_KEY,
             gateway,
             timeoutMs: config.JEV_TIMEOUT_MS,
+            visionModel: config.JEV_VISION_MODEL,
             fetch: o.jevFetch,
           }),
           llmJudge,
@@ -259,7 +260,13 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
       }),
       // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
-      createBrowserToolSource({ machines: { hub: machineHub }, pubsub: adapters.pubsub }),
+      // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
+      createBrowserToolSource({
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+      }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
       createGitToolSource({

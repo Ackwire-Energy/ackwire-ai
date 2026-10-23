@@ -1,17 +1,49 @@
-import type { AgentScope, MachineReplies, PubSub } from "@agenteschat/adapters";
+import {
+  type AgentScope,
+  BROWSER_FAST_PROTOCOL,
+  type BrowserBatchCommand,
+  type MachineReplies,
+  type PubSub,
+} from "@agenteschat/adapters";
 import { and, type Database, desc, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import type { Judge } from "../judge";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { getSandboxSettings, SANDBOX_SCOPE, withConnectedMachine } from "../sandbox";
+import {
+  createTargetCache,
+  findInPage,
+  formatPlanReport,
+  MAX_WAIT_MS,
+  type PlanReport,
+  resolveTarget,
+  runPlan,
+  type ScreenImage,
+  type ScreenObservation,
+  type ScreenStep,
+  type ScreenVerb,
+  screenRef,
+  type TargetCache,
+} from "../screen";
 import { requestSecretTool } from "../secret-request-tool";
 import { REQUEST_SECRET_TOOL } from "../secrets";
+import { toolDetail } from "../tool-detail";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
-import { agentBrowserStatus, browserUnavailableText } from "./status";
+import { type AgentBrowserStatus, agentBrowserStatus, browserUnavailableText } from "./status";
+import {
+  type BrowserLink,
+  type BrowserReply,
+  browserSurface,
+  COMMAND_SECONDS,
+  LOOK,
+  OPEN_SECONDS,
+  observationOf,
+} from "./surface";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserToolName } from "./types";
 
 export {
@@ -65,6 +97,16 @@ export interface BrowserToolDeps {
   machines?: { hub: MachineCaller };
   /** A take over moving to the run that waits on it is told to its conversation (the card follows). */
   pubsub?: PubSub;
+  /**
+   * Targets in words, checks and finds on the page (ADR 0054): Jev, or the
+   * org's cheap model. Without it, targets are numbers or exact names only.
+   */
+  judge?: Judge;
+  /** The judge sees images (Jev's vision model): a target the page's text lacks is looked for on a screenshot. */
+  vision?: boolean;
+  /** Tests: the memory of targets per site (default: one per source, in memory). */
+  targets?: TargetCache;
+  now?: () => number;
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -73,10 +115,9 @@ const int = (v: unknown, fallback: number, min: number, max: number) =>
 
 /** At most this much page text reaches the model per read. */
 export const MAX_PAGE_TEXT = 40_000;
-/** Default time for one browser command; waits and page loads may take longer. */
-const COMMAND_SECONDS = 30;
-const OPEN_SECONDS = 60;
-const MAX_WAIT_SECONDS = 120;
+const MAX_WAIT_SECONDS = MAX_WAIT_MS / 1000;
+/** Steps one `browser_do` takes. */
+export const MAX_PLAN_STEPS = 15;
 
 /**
  * Page text is untrusted (ADR 0040 §5): anyone can write a web page, so what
@@ -90,14 +131,16 @@ export function wrapPage(text: string) {
   const cut = text.length > MAX_PAGE_TEXT;
   const body = (cut ? text.slice(0, MAX_PAGE_TEXT) : text).replace(MARKER, "[marker removed]");
   return `${PAGE_UNTRUSTED_NOTE}\n<page_content untrusted="true">\n${body}\n</page_content>${
-    cut ? "\n[The page is longer: read a part with `selector`, or `interactive_only` for just the controls.]" : ""
+    cut
+      ? "\n[The page is longer: read a part with `selector`, ask for something with `find`, or `interactive_only` for just the controls.]"
+      : ""
   }`;
 }
 
 /** `e7`, `@e7` or `[ref=e7]` → `@e7`; anything else (a CSS selector) as given. */
 export function normalizeRef(ref: string) {
-  const m = /^(?:\[?ref=)?@?(e\d+)\]?$/.exec(ref.trim());
-  return m ? `@${m[1]}` : ref.trim();
+  const r = screenRef(ref);
+  return r ? `@${r}` : ref.trim();
 }
 
 /** A path inside the agent's own folder (relative, no `..`), or null. */
@@ -113,7 +156,7 @@ const STALE = /stale|unknown ref|ref\b.*\b(not found|no longer|invalid)|no eleme
 /** What the agent reads when a command failed on the page. */
 export function browserErrorText(error: string) {
   if (STALE.test(error)) {
-    return `stale_ref: ${error}\nThe page changed since you read it, so that number no longer points at anything. Read the page again (browser_read) and use a number from the new reading.`;
+    return `stale_ref: ${error}\nThe page changed since you read it, so that number no longer points at anything. Read the page again (browser_read) and use a number from the new reading, or name the element in words.`;
   }
   return `The browser said: ${error}`;
 }
@@ -157,60 +200,207 @@ function dataText(data: unknown): string {
   return JSON.stringify(data);
 }
 
-/** The active page's address in an answer, when `agent-browser` says it. */
+/** The active page's address in an answer, when `agent-browser` says it (`url`, or a snapshot's `origin`). */
 function urlOf(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
-  const url = (data as Record<string, unknown>).url;
-  return typeof url === "string" ? url.slice(0, 2048) : null;
+  const d = data as Record<string, unknown>;
+  const url = typeof d.url === "string" ? d.url : typeof d.origin === "string" ? d.origin : null;
+  return url && /^(https?:|about:)/.test(url) ? url.slice(0, 2048) : null;
 }
 
-type Command = { command: string; args: string[]; timeoutSeconds: number };
+/** An image a judge can take (Jev: each side 280 to 1568 pixels), or null. */
+function judgeImage(shot: MachineReplies["browser.capture"]): ScreenImage | null {
+  const { width, height } = shot;
+  if (!shot.data || width < 280 || height < 280 || width > 1568 || height > 1568 || width * height < 78_400)
+    return null;
+  return { data: shot.data, width, height, viewport: shot.viewport, marks: shot.marks };
+}
 
-/** Tools that act on the page the agent last read (refs): held back after a person changed it. */
-const ON_THE_PAGE = new Set<BrowserToolName>([
-  "browser_click",
-  "browser_fill",
-  "browser_select",
-  "browser_check",
-  "browser_press",
-  "browser_scroll",
-  "browser_upload",
-  "browser_type_secret",
+/** Steps that act on what the agent last saw: after a person changed the page, they wait for a fresh look. */
+const ON_THE_PAGE = new Set<ScreenVerb>([
+  "click",
+  "hover",
+  "fill",
+  "select",
+  "check",
+  "uncheck",
+  "press",
+  "scroll",
+  "type_secret",
 ]);
-/** Tools after which the agent knows what the page is: reading it, or opening a new one. */
-const SEES_THE_PAGE = new Set<BrowserToolName>(["browser_read", "browser_open"]);
 
-const refProp = {
+/** A plan acts on the page before it opens one (so it relies on what the agent saw). */
+const actsBeforeOpening = (steps: ScreenStep[]) => {
+  for (const s of steps) {
+    if (s.do === "open") return false;
+    if (ON_THE_PAGE.has(s.do)) return true;
+  }
+  return false;
+};
+
+/** The chat's trail of where it browsed (`meta.browser.steps`): each step as the tool it stands for. */
+const TRAIL_TOOL: Record<ScreenVerb, BrowserToolName> = {
+  open: "browser_open",
+  click: "browser_click",
+  hover: "browser_click",
+  fill: "browser_fill",
+  select: "browser_select",
+  check: "browser_check",
+  uncheck: "browser_check",
+  press: "browser_press",
+  type_secret: "browser_type_secret",
+  scroll: "browser_scroll",
+  wait: "browser_wait",
+  back: "browser_back",
+};
+
+function trailOf(report: PlanReport) {
+  return report.steps
+    .filter((s) => s.status !== "skipped")
+    .map((s) => {
+      const tool = TRAIL_TOOL[s.step.do];
+      const detail = tool === "browser_open" ? toolDetail(tool, { url: s.step.url ?? s.step.target }) : undefined;
+      return { tool, ...(detail ? { detail } : {}), ...(s.status === "failed" ? { failed: true as const } : {}) };
+    });
+}
+
+/** The page the agent last saw, per agent: what changes are counted from, and the first target found on. */
+const SEEN_MAX = 1000;
+/** A look this recent is the page as it is (the first target of a call can be found on it). */
+const FRESH_MS = 8000;
+/** A look this recent is still what the agent knows of the page (changes are counted from it). */
+const KNOWN_MS = 10 * 60_000;
+
+const targetProp = {
   type: "string",
-  description: "The element's number from browser_read (`e7` or `@e7`); a CSS selector also works.",
+  description:
+    "What to act on: the element's number from the page (`e7`) or plain words (`the Sign in button`, `the Email field`, `Edit in the row for invoice 42`). For something that can't be undone (pay, delete, send), give its number.",
   maxLength: 500,
 } as const;
 
+const VERBS: readonly ScreenVerb[] = [
+  "open",
+  "click",
+  "fill",
+  "select",
+  "check",
+  "uncheck",
+  "press",
+  "type_secret",
+  "scroll",
+  "hover",
+  "wait",
+  "back",
+];
+
+/** One step of `browser_do`. */
+const STEP_SCHEMA: JsonSchema = {
+  type: "object",
+  properties: {
+    do: { type: "string", enum: [...VERBS] },
+    target: targetProp,
+    url: { type: "string", description: "`open`: the full address (https://…).", maxLength: 2048 },
+    text: {
+      type: "string",
+      description: "`fill`: what to write. `wait`: wait until this text shows.",
+      maxLength: 10_000,
+    },
+    value: { type: "string", description: "`select`: the option's value or visible text.", maxLength: 1000 },
+    key: { type: "string", description: "`press`: `Enter`, `Tab`, `Escape`, `Control+a`…", maxLength: 64 },
+    secret: {
+      type: "string",
+      description: "`type_secret`: the secret's name, asked with request_secret for this site.",
+      maxLength: 128,
+    },
+    direction: { type: "string", enum: ["up", "down", "left", "right"] },
+    pixels: { type: "integer", minimum: 50, maximum: 10_000 },
+    until: {
+      type: "string",
+      description: "`wait`: until this is true on the page, in words (`the export finished`).",
+      maxLength: 500,
+    },
+    seconds: { type: "integer", minimum: 1, maximum: MAX_WAIT_SECONDS, description: "`wait`: at most this long." },
+    expect: {
+      type: "string",
+      description:
+        "After this step the page should show this (`the cart has 2 items`, `signed in`). It is checked; the plan stops there when it isn't true.",
+      maxLength: 500,
+    },
+  },
+  required: ["do"],
+  additionalProperties: false,
+};
+
+/** A `browser_do` step from the model's input (unknown fields dropped). */
+function stepOf(v: unknown): ScreenStep | null {
+  if (!v || typeof v !== "object") return null;
+  const s = v as Record<string, unknown>;
+  if (typeof s.do !== "string" || !(VERBS as readonly string[]).includes(s.do)) return null;
+  const out: ScreenStep = { do: s.do as ScreenVerb };
+  for (const k of ["target", "url", "text", "value", "key", "secret", "until", "expect"] as const) {
+    if (typeof s[k] === "string") out[k] = s[k] as string;
+  }
+  if (s.direction === "up" || s.direction === "down" || s.direction === "left" || s.direction === "right") {
+    out.direction = s.direction;
+  }
+  if (typeof s.pixels === "number") out.pixels = s.pixels;
+  if (typeof s.seconds === "number") out.seconds = s.seconds;
+  return out;
+}
+
+/** Without a judge, words can't be matched: only numbers and exact names work. */
+const NO_JUDGE: Judge = {
+  name: "none",
+  ask() {
+    return Promise.reject(new Error("name it by its number from browser_read: this server can't match words"));
+  },
+};
+
 /**
- * The agent browser as tools (ADR 0040 §5): every `browser_*` tool except
- * `browser_ask_person` (the handoff, its own source), under `browser:use`.
- * Offered only when the agent's computer serves the browser
- * (`agentBrowserStatus`). Each call is one `agent-browser` command run by the
- * runner in the agent's own session (`browser.act`), with the agent's site
+ * The agent browser as tools (ADR 0040 §5, ADR 0054): every `browser_*` tool
+ * except `browser_ask_person` (the handoff, its own source), under
+ * `browser:use`. Offered only when the agent's computer serves the browser
+ * (`agentBrowserStatus`). Actions take targets as numbers or words, wait for
+ * the page to settle and answer with what changed, so the agent rarely reads
+ * again between steps; `browser_do` runs several steps in one call. Commands
+ * run in the agent's own session on its computer with the agent's site
  * allowlist; page text reaches the model only as untrusted content. Secrets
  * are typed by the runner from what `request_secret` delivered: the value
  * never reaches the server.
  */
 export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
   const hub = deps.machines?.hub;
+  const judge = deps.judge ?? NO_JUDGE;
+  const targets = deps.targets ?? createTargetCache();
+  const now = deps.now ?? Date.now;
+  const seen = new Map<string, ScreenObservation>();
+  const seenKey = (ctx: ToolContext) => `${ctx.orgId}:${ctx.agentId}`;
+  const remember = (key: string, o: ScreenObservation) => {
+    seen.delete(key);
+    seen.set(key, o);
+    if (seen.size > SEEN_MAX) seen.delete(seen.keys().next().value as string);
+  };
+  const seenWithin = (key: string, ms: number) => {
+    const o = seen.get(key);
+    return o && now() - o.at < ms ? o : null;
+  };
 
   async function machineOf(ctx: ToolContext) {
     const mission = await missionOfRun(ctx);
     return agentBrowserStatus(ctx.db, hub, ctx.orgId, ctx.agentId, mission?.machineId ?? null);
   }
 
-  async function act(
+  /** The agent's browser for this call: its computer, the agent, its sites (or why it can't be used). */
+  async function linkFor(
     ctx: ToolContext,
-    cmd: Command,
-  ): Promise<{ ok: true; data: unknown } | { ok: false; text: string }> {
+  ): Promise<
+    | { ok: true; link: BrowserLink; status: Extract<AgentBrowserStatus, { available: true }> }
+    | { ok: false; text: string }
+  > {
     const status = await machineOf(ctx);
     if (!status.available) return { ok: false, text: browserUnavailableText(status) };
     if (!hub) return { ok: false, text: "Connected computers are not available on this server." };
+    const caller = hub;
     const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
     const scope: AgentScope = {
       id: ctx.agentId,
@@ -218,42 +408,204 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       ...(agent?.name ? { name: agent.name } : {}),
     };
     const domains = agent?.browserAllowedDomains ?? null;
-    let reply: MachineReplies["browser.act"];
-    try {
-      reply = await hub.call<"browser.act">(
-        status.machineId,
-        {
-          op: "browser.act",
-          agent: scope,
-          command: cmd.command,
-          args: cmd.args,
-          timeoutSeconds: cmd.timeoutSeconds,
-          ...(domains ? { allowedDomains: domains } : {}),
-          // The computer's tray opens this conversation ("Ver").
-          link: `/org/${ctx.orgId}/c/${ctx.channelId}`,
-        },
-        { signal: ctx.signal, timeoutMs: (cmd.timeoutSeconds + 30) * 1000 },
-      );
-    } catch (error) {
-      return { ok: false, text: explain(error, status.machineName) };
-    }
+    const common = {
+      agent: scope,
+      ...(domains ? { allowedDomains: domains } : {}),
+      // The computer's tray opens this conversation ("Ver").
+      link: `/org/${ctx.orgId}/c/${ctx.channelId}`,
+    };
+    const fast = status.protocol >= BROWSER_FAST_PROTOCOL;
+    let reached = false;
     // The live view, take over and Stop follow the computer the browser runs on (a mission's or the agent's own).
-    await rememberBrowserMachine(ctx.db, ctx.orgId, ctx.agentId, status.machineId).catch(() => {});
-    if (!reply.success) return { ok: false, text: browserErrorText(reply.error || "the command failed") };
-    return { ok: true, data: reply.data };
+    const reachedOnce = async () => {
+      if (reached) return;
+      reached = true;
+      await rememberBrowserMachine(ctx.db, ctx.orgId, ctx.agentId, status.machineId).catch(() => {});
+    };
+    const failed = (error: string | undefined): BrowserReply => ({
+      ok: false,
+      text: browserErrorText(error || "the command failed"),
+    });
+    const act = async (c: BrowserBatchCommand): Promise<BrowserReply> => {
+      let reply: MachineReplies["browser.act"];
+      try {
+        reply = await caller.call<"browser.act">(
+          status.machineId,
+          { op: "browser.act", command: c.command, args: c.args, timeoutSeconds: c.timeoutSeconds, ...common },
+          { signal: ctx.signal, timeoutMs: (c.timeoutSeconds + 30) * 1000 },
+        );
+      } catch (error) {
+        return { ok: false, text: explain(error, status.machineName) };
+      }
+      await reachedOnce();
+      return reply.success ? { ok: true, data: reply.data } : failed(reply.error);
+    };
+    const link: BrowserLink = {
+      act,
+      async batch(commands) {
+        if (!fast) {
+          // An older runner: the same commands, one round trip each.
+          const out: BrowserReply[] = [];
+          for (const c of commands) {
+            const r = await act(c);
+            out.push(r);
+            if (!r.ok && !c.tolerate) break;
+          }
+          return out;
+        }
+        const seconds = Math.min(
+          600,
+          commands.reduce((n, c) => n + c.timeoutSeconds, 0),
+        );
+        let reply: MachineReplies["browser.batch"];
+        try {
+          reply = await caller.call<"browser.batch">(
+            status.machineId,
+            { op: "browser.batch", commands, ...common },
+            { signal: ctx.signal, timeoutMs: (seconds + 30) * 1000 },
+          );
+        } catch (error) {
+          return [{ ok: false, text: explain(error, status.machineName) }];
+        }
+        await reachedOnce();
+        return reply.answers.map((a) => (a.success ? { ok: true, data: a.data } : failed(a.error)));
+      },
+      async capture() {
+        if (!fast || !deps.vision) return null;
+        try {
+          const shot = await caller.call<"browser.capture">(
+            status.machineId,
+            { op: "browser.capture", agent: scope },
+            { signal: ctx.signal, timeoutMs: 45_000 },
+          );
+          return judgeImage(shot);
+        } catch {
+          return null;
+        }
+      },
+    };
+    return { ok: true, link, status };
   }
 
-  /** Runs one command and answers with `done(data)`, or the failure as an error result. */
+  /** Runs one `agent-browser` command and answers with `done(data)`, or the failure as an error result. */
   async function run(
     ctx: ToolContext,
-    cmd: Command,
+    cmd: BrowserBatchCommand,
     done: (data: unknown) => string,
     extra?: (data: unknown) => Record<string, unknown>,
   ): Promise<ToolOutput> {
-    const r = await act(ctx, cmd);
+    const linked = await linkFor(ctx);
+    if (!linked.ok) return { content: linked.text, isError: true };
+    const r = await linked.link.act(cmd);
     if (!r.ok) return { content: r.text, isError: true };
     const url = urlOf(r.data);
     return { content: done(r.data), data: { ...(url ? { url } : {}), ...(extra?.(r.data) ?? {}) } };
+  }
+
+  /**
+   * Runs steps on the agent's browser (`runPlan`) and answers with the report:
+   * what was done, where it stopped, and the page at the end. `trail`: the
+   * steps go to the chat's trail from here (a `browser_do`; single tools are
+   * on it by their own name).
+   */
+  async function plan(ctx: ToolContext, steps: ScreenStep[], options: { trail?: boolean } = {}): Promise<ToolOutput> {
+    const linked = await linkFor(ctx);
+    if (!linked.ok) return { content: linked.text, isError: true };
+    // A secret is typed only on the site the person gave it for: found before anything runs.
+    const sites = new Map<string, string>();
+    for (const s of steps) {
+      const name = s.do === "type_secret" ? s.secret?.trim() : undefined;
+      if (!name || sites.has(name)) continue;
+      const held = await browserSecret(ctx, name, linked.status.machineId);
+      if (!held?.site) return { content: secretMissingText(name, held), isError: true };
+      sites.set(name, held.site);
+    }
+    const key = seenKey(ctx);
+    let paused: ToolOutput | null = null;
+    const report = await runPlan(
+      {
+        judge,
+        orgId: ctx.orgId,
+        agentId: ctx.agentId,
+        runId: ctx.runId,
+        surface: browserSurface({
+          link: linked.link,
+          secretSite: (name) => sites.get(name) ?? null,
+          onLook: (o) => remember(key, o),
+        }),
+        cache: targets,
+        scope: key,
+        signal: ctx.signal,
+        // A person taking the browser stops the plan at the next step; the run waits on them.
+        hold: async () => {
+          const wait = await waitIfPersonInControl(ctx.db, ctx, deps.pubsub);
+          if (!wait) return null;
+          paused = wait;
+          return "a person took over the browser";
+        },
+        last: seenWithin(key, FRESH_MS),
+        before: seenWithin(key, KNOWN_MS),
+        vision: deps.vision === true && linked.status.protocol >= BROWSER_FAST_PROTOCOL,
+        now,
+      },
+      steps,
+    );
+    // The agent has seen the page (the report shows it), or opened one of its own.
+    if (report.after || report.steps.some((s) => s.status === "done" && s.step.do === "open")) {
+      await markPageRead(ctx.db, ctx);
+    }
+    const f = formatPlanReport(report);
+    const content = f.screen ? `${f.summary}\n${wrapPage(f.screen)}` : f.summary;
+    const url = report.after?.url ?? null;
+    const timing = { ms: report.ms, steps: report.steps.map((s) => s.ms) };
+    const data: Record<string, unknown> = {
+      ...(url ? { url } : {}),
+      ...(options.trail ? { browserTrail: trailOf(report) } : {}),
+      timing,
+    };
+    const waiting = paused as ToolOutput | null;
+    if (waiting) {
+      return {
+        content: `${content}\n${waiting.content}`,
+        ...(waiting.isError ? { isError: true } : {}),
+        data: { ...data, ...(waiting.data ?? {}) },
+      };
+    }
+    const nothingDone = report.steps.every((s) => s.status !== "done");
+    return { content, ...(f.failed && nothingDone ? { isError: true } : {}), data };
+  }
+
+  /** A target in words or as a number → the element's ref, on the page as it is now. */
+  async function refFor(
+    ctx: ToolContext,
+    target: string,
+    link: BrowserLink,
+    use: "upload",
+  ): Promise<string | { error: string }> {
+    const given = screenRef(target);
+    if (given) return given;
+    const key = seenKey(ctx);
+    let page = seenWithin(key, FRESH_MS);
+    if (!page) {
+      const r = await link.act(LOOK);
+      if (!r.ok) return { error: r.text };
+      page = observationOf(r.data);
+      if (!page) return { error: "The browser didn't return the page." };
+      remember(key, page);
+    }
+    const found = await resolveTarget({
+      judge,
+      orgId: ctx.orgId,
+      agentId: ctx.agentId,
+      runId: ctx.runId,
+      target,
+      use,
+      observation: page,
+      cache: targets,
+      scope: key,
+    }).catch((error: unknown) => ({ found: false as const, reason: "absent" as const, candidates: [], error }));
+    if (found.found) return found.ref;
+    return { error: `Couldn't find "${target}" on the page. Read it (browser_read) and give the element's number.` };
   }
 
   const tool = (
@@ -261,32 +613,55 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     description: string,
     inputSchema: JsonSchema,
     execute: (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolOutput>,
-    extra: Partial<Pick<ToolDefinition, "checkCall" | "describe">> = {},
-  ): ToolDefinition => ({
-    name,
-    description,
-    inputSchema,
-    scope: BROWSER_SCOPE,
-    // A person in control of this browser, or asked to take it, makes the agent wait; after
-    // they had it, only browser_read works until the agent has seen the page again.
-    execute: async (input, ctx) => {
-      const waiting = await waitIfPersonInControl(ctx.db, ctx, deps.pubsub);
-      if (waiting) return waiting;
-      // Only tools that act on what the agent last read are held back: reading, opening a page,
-      // tabs or closing always work (so a browser closed meanwhile can always be opened again).
-      if (ON_THE_PAGE.has(name)) {
-        const stale = await requirePageRead(ctx.db, ctx);
-        if (stale) return stale;
-      }
-      const out = await execute(input, ctx);
-      if (SEES_THE_PAGE.has(name) && !out.isError) await markPageRead(ctx.db, ctx);
-      return out;
-    },
-    ...extra,
-  });
+    extra: Partial<Pick<ToolDefinition, "checkCall" | "describe">> & {
+      onThePage?: boolean;
+      seesThePage?: boolean;
+    } = {},
+  ): ToolDefinition => {
+    const { onThePage, seesThePage, ...rest } = extra;
+    return {
+      name,
+      description,
+      inputSchema,
+      scope: BROWSER_SCOPE,
+      // A person in control of this browser, or asked to take it, makes the agent wait; after
+      // they had it, only reading (or opening a page) works until the agent has seen the page again.
+      execute: async (input, ctx) => {
+        const waiting = await waitIfPersonInControl(ctx.db, ctx, deps.pubsub);
+        if (waiting) return waiting;
+        if (onThePage) {
+          const stale = await requirePageRead(ctx.db, ctx);
+          if (stale) return stale;
+        }
+        const out = await execute(input, ctx);
+        if (seesThePage && !out.isError) await markPageRead(ctx.db, ctx);
+        return out;
+      },
+      ...rest,
+    };
+  };
 
-  const changed = (what: string) => () =>
-    `${what} Read the page (browser_read) to see the result before the next step.`;
+  /** A tool that is one step of a plan: the same finding, settling and report as `browser_do`. */
+  const step = (
+    name: Exclude<BrowserToolName, "browser_ask_person">,
+    description: string,
+    inputSchema: JsonSchema,
+    toStep: (input: Record<string, unknown>) => ScreenStep | string,
+    extra: Partial<Pick<ToolDefinition, "checkCall">> = {},
+  ) =>
+    tool(
+      name,
+      description,
+      inputSchema,
+      (input, ctx) => {
+        const s = toStep(input);
+        return typeof s === "string" ? Promise.resolve({ content: s, isError: true }) : plan(ctx, [s]);
+      },
+      { ...extra, onThePage: name !== "browser_open" && name !== "browser_back" },
+    );
+
+  const changes =
+    "It waits for the page to settle and answers with what changed (or, on a new page, what you can act on), so you rarely need to read the page again.";
 
   /** `request_secret` for an agent that may only use the browser: a password bound to one site, made on the browser's computer. */
   const requestBrowserSecret = requestSecretTool({
@@ -306,32 +681,56 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     },
   });
 
+  const targetSchema = (more: Record<string, JsonSchema> = {}, required: string[] = []): JsonSchema => ({
+    type: "object",
+    properties: { target: targetProp, ...more },
+    required: ["target", ...required],
+    additionalProperties: false,
+  });
+
   const definitions: ToolDefinition[] = [
     tool(
+      "browser_do",
+      `${BROWSER_TOOL_INFO.browser_do.description} The fastest way to use the browser: write the whole sequence you'd do by hand (open, fill the fields, click, wait) as \`steps\`, naming each target in words when you haven't seen its number; they run one after another on the page as it is at each step, even across pages. Give \`expect\` on steps whose result matters (\`signed in\`, \`the order is confirmed\`): it's checked, and the plan stops at the first step that fails or doesn't show what you expected, telling you why and what's on the page then. ${changes}`,
+      {
+        type: "object",
+        properties: { steps: { type: "array", minItems: 1, maxItems: MAX_PLAN_STEPS, items: STEP_SCHEMA } },
+        required: ["steps"],
+        additionalProperties: false,
+      },
+      async (input, ctx) => {
+        const raw = Array.isArray(input.steps) ? input.steps : [];
+        const steps = raw.map(stepOf);
+        if (steps.length === 0 || steps.some((s) => s === null)) {
+          return { content: "Give `steps`, each with a known `do`.", isError: true };
+        }
+        const valid = steps as ScreenStep[];
+        if (actsBeforeOpening(valid)) {
+          const stale = await requirePageRead(ctx.db, ctx);
+          if (stale) return stale;
+        }
+        return plan(ctx, valid, { trail: true });
+      },
+    ),
+    step(
       "browser_open",
-      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. Then read it with browser_read.`,
+      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. It answers with what you can act on there, so you can act right away.`,
       {
         type: "object",
         properties: { url: { type: "string", description: "Full address (https://…).", maxLength: 2048 } },
         required: ["url"],
         additionalProperties: false,
       },
-      (input, ctx) => {
+      (input) => {
         const url = str(input.url).trim();
-        if (!/^https?:\/\//i.test(url)) {
-          return Promise.resolve({ content: "Give a full web address starting with https://.", isError: true });
-        }
-        return run(ctx, { command: "open", args: [url], timeoutSeconds: OPEN_SECONDS }, (d) => {
-          const at = urlOf(d);
-          return `Opened ${at ?? url}. Read it with browser_read.`;
-        });
+        return /^https?:\/\//i.test(url) ? { do: "open", url } : "Give a full web address starting with https://.";
       },
     ),
-    tool(
+    step(
       "browser_back",
-      BROWSER_TOOL_INFO.browser_back.description,
+      `${BROWSER_TOOL_INFO.browser_back.description} ${changes}`,
       { type: "object", properties: {}, additionalProperties: false },
-      (_input, ctx) => run(ctx, { command: "back", args: [], timeoutSeconds: COMMAND_SECONDS }, changed("Went back.")),
+      () => ({ do: "back" }),
     ),
     tool(
       "browser_tabs",
@@ -373,10 +772,16 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
     tool(
       "browser_read",
-      `${BROWSER_TOOL_INFO.browser_read.description} Act on an element by its number (\`e7\`). Numbers change when the page changes: read again after navigating or clicking something that changes the page.`,
+      `${BROWSER_TOOL_INFO.browser_read.description} Act on an element by its number (\`e7\`) or name it in words. To get one thing from a long page (a total, a status, an error), say it in \`find\`: you get just the lines that answer it.`,
       {
         type: "object",
         properties: {
+          find: {
+            type: "string",
+            description:
+              "What you're looking for (`the order total`, `whether the export finished`): only those lines.",
+            maxLength: 500,
+          },
           interactive_only: {
             type: "boolean",
             description: "Only buttons, fields and links (shorter); default: the whole page.",
@@ -385,89 +790,76 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         },
         additionalProperties: false,
       },
-      (input, ctx) => {
+      async (input, ctx) => {
+        const question = str(input.find).trim();
+        const whole = input.interactive_only !== true && !str(input.selector);
         const args = ["-c", ...(input.interactive_only === true ? ["-i"] : [])];
         if (str(input.selector)) args.push("-s", str(input.selector));
-        return run(ctx, { command: "snapshot", args, timeoutSeconds: COMMAND_SECONDS }, (d) => {
-          const text = dataText(d).trim();
-          const url = urlOf(d);
-          return `${url ? `Page: ${url}\n` : ""}${wrapPage(text || "(the page is empty)")}`;
-        });
+        const linked = await linkFor(ctx);
+        if (!linked.ok) return { content: linked.text, isError: true };
+        const r = await linked.link.act({ command: "snapshot", args, timeoutSeconds: COMMAND_SECONDS });
+        if (!r.ok) return { content: r.text, isError: true };
+        const url = urlOf(r.data);
+        const page = whole ? observationOf(r.data) : null;
+        if (page) remember(seenKey(ctx), page);
+        const head = url ? `Page: ${url}\n` : "";
+        if (question && page && deps.judge) {
+          const found = await findInPage({
+            judge,
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            runId: ctx.runId,
+            question,
+            observation: page,
+          }).catch(() => null);
+          if (found && found.answered !== "no") {
+            const partly = found.answered === "partly" ? " (it may only partly answer it)" : "";
+            return {
+              content: `${head}Where the page answers "${question}"${partly}:\n${wrapPage(found.text)}`,
+              data: url ? { url } : {},
+            };
+          }
+          if (found) {
+            return {
+              content: `${head}Nothing on the page answers "${question}". Read the whole page (no \`find\`) to look yourself, or go where it would be.`,
+              data: url ? { url } : {},
+            };
+          }
+        }
+        const text = dataText(r.data).trim();
+        return { content: `${head}${wrapPage(text || "(the page is empty)")}`, data: url ? { url } : {} };
       },
+      { seesThePage: true },
     ),
-    tool(
+    step(
       "browser_click",
-      `${BROWSER_TOOL_INFO.browser_click.description} If something covers it (a cookie banner, a dialog), the error says what: deal with that first.`,
-      { type: "object", properties: { ref: refProp }, required: ["ref"], additionalProperties: false },
-      (input, ctx) =>
-        run(
-          ctx,
-          { command: "click", args: [normalizeRef(str(input.ref))], timeoutSeconds: COMMAND_SECONDS },
-          changed("Clicked."),
-        ),
+      `${BROWSER_TOOL_INFO.browser_click.description} A banner or dialog in the way (cookies, a pop-up) is closed first when it clearly can be, without agreeing to anything. ${changes}`,
+      targetSchema(),
+      (input) => ({ do: "click", target: str(input.target) }),
     ),
-    tool(
+    step(
       "browser_fill",
-      `${BROWSER_TOOL_INFO.browser_fill.description} It clears the field first. Never put passwords or codes here: use browser_type_secret.`,
-      {
-        type: "object",
-        properties: { ref: refProp, text: { type: "string", maxLength: 10_000 } },
-        required: ["ref", "text"],
-        additionalProperties: false,
-      },
-      (input, ctx) =>
-        run(
-          ctx,
-          { command: "fill", args: [normalizeRef(str(input.ref)), str(input.text)], timeoutSeconds: COMMAND_SECONDS },
-          () => "Filled in.",
-        ),
+      `${BROWSER_TOOL_INFO.browser_fill.description} It clears the field first. Never put passwords or codes here: use browser_type_secret. ${changes}`,
+      targetSchema({ text: { type: "string", maxLength: 10_000 } }, ["text"]),
+      (input) => ({ do: "fill", target: str(input.target), text: str(input.text) }),
     ),
-    tool(
+    step(
       "browser_select",
-      BROWSER_TOOL_INFO.browser_select.description,
-      {
-        type: "object",
-        properties: {
-          ref: refProp,
-          value: { type: "string", description: "The option's value or visible text.", maxLength: 1000 },
-        },
-        required: ["ref", "value"],
-        additionalProperties: false,
-      },
-      (input, ctx) =>
-        run(
-          ctx,
-          {
-            command: "select",
-            args: [normalizeRef(str(input.ref)), str(input.value)],
-            timeoutSeconds: COMMAND_SECONDS,
-          },
-          () => "Selected.",
-        ),
+      `${BROWSER_TOOL_INFO.browser_select.description} ${changes}`,
+      targetSchema({ value: { type: "string", description: "The option's value or visible text.", maxLength: 1000 } }, [
+        "value",
+      ]),
+      (input) => ({ do: "select", target: str(input.target), value: str(input.value) }),
     ),
-    tool(
+    step(
       "browser_check",
-      BROWSER_TOOL_INFO.browser_check.description,
-      {
-        type: "object",
-        properties: { ref: refProp, checked: { type: "boolean", description: "Default true; false unticks it." } },
-        required: ["ref"],
-        additionalProperties: false,
-      },
-      (input, ctx) =>
-        run(
-          ctx,
-          {
-            command: input.checked === false ? "uncheck" : "check",
-            args: [normalizeRef(str(input.ref))],
-            timeoutSeconds: COMMAND_SECONDS,
-          },
-          () => (input.checked === false ? "Unticked." : "Ticked."),
-        ),
+      `${BROWSER_TOOL_INFO.browser_check.description} ${changes}`,
+      targetSchema({ checked: { type: "boolean", description: "Default true; false unticks it." } }),
+      (input) => ({ do: input.checked === false ? "uncheck" : "check", target: str(input.target) }),
     ),
-    tool(
+    step(
       "browser_press",
-      BROWSER_TOOL_INFO.browser_press.description,
+      `${BROWSER_TOOL_INFO.browser_press.description} ${changes}`,
       {
         type: "object",
         properties: {
@@ -476,12 +868,11 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         required: ["key"],
         additionalProperties: false,
       },
-      (input, ctx) =>
-        run(ctx, { command: "press", args: [str(input.key)], timeoutSeconds: COMMAND_SECONDS }, changed("Pressed.")),
+      (input) => ({ do: "press", key: str(input.key) }),
     ),
-    tool(
+    step(
       "browser_scroll",
-      BROWSER_TOOL_INFO.browser_scroll.description,
+      `${BROWSER_TOOL_INFO.browser_scroll.description} ${changes}`,
       {
         type: "object",
         properties: {
@@ -491,74 +882,44 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         required: ["direction"],
         additionalProperties: false,
       },
-      (input, ctx) =>
-        run(
-          ctx,
-          {
-            command: "scroll",
-            args: [str(input.direction), String(int(input.pixels, 800, 50, 10_000))],
-            timeoutSeconds: COMMAND_SECONDS,
-          },
-          changed("Scrolled."),
-        ),
+      (input) => ({
+        do: "scroll",
+        direction: str(input.direction) as ScreenStep["direction"],
+        pixels: int(input.pixels, 800, 50, 10_000),
+      }),
     ),
     tool(
       "browser_upload",
       `${BROWSER_TOOL_INFO.browser_upload.description} The path is relative to your folder on the computer.`,
-      {
-        type: "object",
-        properties: {
-          ref: refProp,
-          path: { type: "string", description: "A file in your folder (`reports/q3.pdf`).", maxLength: 1000 },
-        },
-        required: ["ref", "path"],
-        additionalProperties: false,
-      },
-      (input, ctx) => {
+      targetSchema(
+        { path: { type: "string", description: "A file in your folder (`reports/q3.pdf`).", maxLength: 1000 } },
+        ["path"],
+      ),
+      async (input, ctx) => {
         const path = agentFolderPath(str(input.path));
-        if (!path) {
-          return Promise.resolve({
-            content: "Give a path inside your own folder (relative, without `..`).",
-            isError: true,
-          });
-        }
-        return run(
-          ctx,
-          { command: "upload", args: [normalizeRef(str(input.ref)), path], timeoutSeconds: OPEN_SECONDS },
-          changed(`Sent ${path}.`),
-        );
+        if (!path) return { content: "Give a path inside your own folder (relative, without `..`).", isError: true };
+        const linked = await linkFor(ctx);
+        if (!linked.ok) return { content: linked.text, isError: true };
+        const ref = await refFor(ctx, str(input.target), linked.link, "upload");
+        if (typeof ref !== "string") return { content: ref.error, isError: true };
+        const r = await linked.link.act({ command: "upload", args: [`@${ref}`, path], timeoutSeconds: OPEN_SECONDS });
+        if (!r.ok) return { content: r.text, isError: true };
+        const url = urlOf(r.data);
+        return {
+          content: `Sent ${path}. Read the page (browser_read) to see what the site did with it.`,
+          data: url ? { url } : {},
+        };
       },
+      { onThePage: true },
     ),
-    tool(
+    step(
       "browser_type_secret",
       `${BROWSER_TOOL_INFO.browser_type_secret.description} \`secret\` is the name you asked for with request_secret, giving its \`site\` (it must have been delivered to this computer). It is typed only into password or one-time-code fields, and only while the page is on that site.`,
-      {
-        type: "object",
-        properties: {
-          ref: refProp,
-          secret: { type: "string", description: "The secret's name (`STRIPE_TEST_PASSWORD`).", maxLength: 128 },
-        },
-        required: ["ref", "secret"],
-        additionalProperties: false,
-      },
-      async (input, ctx) => {
-        const name = str(input.secret);
-        const status = await machineOf(ctx);
-        if (!status.available) return { content: browserUnavailableText(status), isError: true };
-        const held = await browserSecret(ctx, name, status.machineId);
-        if (!held?.site) return { content: secretMissingText(name, held), isError: true };
-        // The site comes from the request the person answered, never from the agent: the runner
-        // types it only while the page is on that site.
-        return run(
-          ctx,
-          {
-            command: "agentes:type_secret",
-            args: [normalizeRef(str(input.ref)), name, held.site],
-            timeoutSeconds: COMMAND_SECONDS,
-          },
-          () => `Typed ${name} (you never see its value).`,
-        );
-      },
+      targetSchema(
+        { secret: { type: "string", description: "The secret's name (`STRIPE_TEST_PASSWORD`).", maxLength: 128 } },
+        ["secret"],
+      ),
+      (input) => ({ do: "type_secret", target: str(input.target), secret: str(input.secret) }),
       {
         async checkCall(input, ctx): Promise<CallCheck> {
           const name = str(input.secret);
@@ -571,10 +932,15 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
     tool(
       "browser_wait",
-      `${BROWSER_TOOL_INFO.browser_wait.description} Prefer this to waiting blindly after something that loads.`,
+      `${BROWSER_TOOL_INFO.browser_wait.description} Prefer this to waiting blindly after something that loads. \`until\` takes a condition in words (\`the export finished\`, \`the payment shows as approved\`), checked each time the page changes.`,
       {
         type: "object",
         properties: {
+          until: {
+            type: "string",
+            description: "Wait until this is true on the page, in words.",
+            maxLength: 500,
+          },
           text: { type: "string", description: "Wait until this text shows up.", maxLength: 500 },
           url: { type: "string", description: "Wait until the address contains this.", maxLength: 2048 },
           selector: { type: "string", description: "Wait until this element shows up (CSS).", maxLength: 500 },
@@ -585,12 +951,25 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       },
       (input, ctx) => {
         const seconds = int(input.timeout_seconds, COMMAND_SECONDS, 1, MAX_WAIT_SECONDS);
+        if (str(input.until).trim()) {
+          if (!deps.judge)
+            return Promise.resolve({
+              content: "Wait for a `text` instead: this server can't check conditions in words.",
+              isError: true,
+            });
+          return plan(ctx, [{ do: "wait", until: str(input.until).trim(), seconds }]);
+        }
         const args: string[] = [];
         if (str(input.text)) args.push("--text", str(input.text));
         else if (str(input.url)) args.push("--url", str(input.url));
         else if (str(input.selector)) args.push(str(input.selector));
         else if (str(input.load)) args.push("--load", str(input.load));
-        else return Promise.resolve({ content: "Say what to wait for: text, url, selector or load.", isError: true });
+        else {
+          return Promise.resolve({
+            content: "Say what to wait for: until, text, url, selector or load.",
+            isError: true,
+          });
+        }
         args.push("--timeout", String(seconds * 1000));
         return run(ctx, { command: "wait", args, timeoutSeconds: seconds }, () => "It's there.");
       },
@@ -637,8 +1016,14 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       "browser_close",
       `${BROWSER_TOOL_INFO.browser_close.description} It also closes by itself after a while unused.`,
       { type: "object", properties: {}, additionalProperties: false },
-      (_input, ctx) =>
-        run(ctx, { command: "close", args: [], timeoutSeconds: COMMAND_SECONDS }, () => "Closed. Logins stay saved."),
+      (_input, ctx) => {
+        seen.delete(seenKey(ctx));
+        return run(
+          ctx,
+          { command: "close", args: [], timeoutSeconds: COMMAND_SECONDS },
+          () => "Closed. Logins stay saved.",
+        );
+      },
     ),
   ];
 

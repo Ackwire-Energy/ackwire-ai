@@ -48,6 +48,7 @@ function scrollerOf(el: HTMLElement | null): HTMLElement | null {
 }
 
 const STEP_ICON = {
+  browser_do: "bolt",
   browser_open: "globe",
   browser_back: "chevronLeft",
   browser_tabs: "layers",
