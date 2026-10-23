@@ -352,7 +352,7 @@ function SteerLine({ message: m }: { message: Message }) {
       style={[styles.status, styles.statusEnd]}
       accessibilityLiveRegion="polite"
     >
-      {steer.state === "read" ? (
+      {steer.state === "read" || steer.state === "resolved" ? (
         <AgentFace agentId={steer.agentId} size={16} live={false} framed={false} />
       ) : steer.state === "now" ? (
         <Icon name="bolt" size={12} color={c.muted} />

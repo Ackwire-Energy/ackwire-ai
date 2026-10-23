@@ -85,6 +85,7 @@ import {
   parseMissionCommand,
   taskNoticeOf,
 } from "@agenteschat/client/lib/missions";
+import { backgroundRoutineOf, isTalkerReply, noticeOf } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
@@ -171,6 +172,7 @@ import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
+import { NoticeLine, RoutineRanLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
@@ -1963,6 +1965,10 @@ const Timeline = memo(function Timeline({
   );
   /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
   const threadRow = (key: string, m: MessageType) => {
+    // What reached an agent's conversation (a routine's report, another agent's answer) and a routine
+    // that ran in the background: quiet lines, never a person's or the agent's own voice.
+    if (noticeOf(m.meta)) return <NoticeLine key={key} message={m} />;
+    if (backgroundRoutineOf(m.meta)) return <RoutineRanLine key={key} message={m} />;
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
     if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
     if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
@@ -2379,7 +2385,9 @@ function StoppedLine({
 
 /**
  * Under a message sent while an agent worked: "Theo lê na próxima pausa" → "Theo leu" (its face);
- * "Theo parou para ler" when the person asked it to stop and read now.
+ * "Theo parou para ler" when the person asked it to stop and read now (or it woke a wait); "Theo
+ * recebeu" once handed to Claude Code mid-turn; "lê depois da sua decisão no card" while an approval
+ * holds it; "encerrou o pedido de ajuda" when it ended the wait.
  */
 function SteerLine({ steer }: { steer: SteerState }) {
   const { t } = useTranslation();
@@ -2401,10 +2409,20 @@ function SteerLine({ steer }: { steer: SteerState }) {
             <Icon name="bolt" size={14} />
             {t("run.steer.now", { name })}
           </>
+        ) : steer.state === "delivered" ? (
+          <>
+            <Icon name="check" size={14} />
+            {t("run.steer.delivered", { name })}
+          </>
+        ) : steer.state === "held" ? (
+          <>
+            <Icon name="waiting" size={14} />
+            {t("run.steer.held", { name })}
+          </>
         ) : (
           <>
             <AgentAvatar agentId={steer.agentId} name={name} size="xs" state="idle" />
-            {t("run.steer.read", { name })}
+            {t(steer.state === "resolved" ? "run.steer.resolved" : "run.steer.read", { name })}
           </>
         )}
       </span>
@@ -2731,6 +2749,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const routine = routineOfMessage(m.meta);
   // An agent's answer to a routine (`meta.viaRoutine`): the routine's call is hidden, so a small tag says so.
   const viaRoutine = viaRoutineOf(m.meta);
+  // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
+  const talker = m.author.type === "agent" && isTalkerReply(m.meta);
   // Its text is the instructions it gives the agent: one line ("Chamou @Theo"), the instructions on demand.
   const [routineOpen, setRoutineOpen] = useState(false);
   const routineAgents = useMemo(() => {
@@ -2935,6 +2955,11 @@ export const TimelineMessage = memo(function TimelineMessage({
                 <Icon name="routines" size={14} />
                 {t("channel.viaRoutine", { name: viaRoutine.name })}
               </Link>
+            )}
+            {talker && (
+              <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
+                {t("chat.notice.talker")}
+              </span>
             )}
           </>
         ) : (

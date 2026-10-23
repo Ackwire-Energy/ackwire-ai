@@ -4786,7 +4786,10 @@ export const en: Translations = {
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
+      delivered: "{{name}} got it",
+      held: "{{name}} reads it after your decision on the card",
       read: "{{name}} read it",
+      resolved: "{{name}} closed the help request",
     },
     well: {
       readYours: "Read your note",
@@ -6661,6 +6664,22 @@ export const en: Translations = {
       noAnswer: "No answer in {{minutes}} min. {{from}} answered without it.",
       couldNot: "{{to}} couldn't answer. {{from}} went on without it.",
       private: "A talk only between {{from}} and {{to}}",
+    },
+    /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
+    notice: {
+      routineHandoff: "Routine «{{routine}}» delivered a report",
+      routineHandoffAnon: "A routine delivered a report",
+      consultReply: "{{from}} answered",
+      consultReplyAnon: "Another agent answered",
+      agentNote: "Note from {{from}}",
+      agentNoteAnon: "Note from another agent",
+      waitResult: "What {{name}} was waiting for came in",
+      other: "Notice for {{name}}",
+      show: "Show",
+      hide: "Hide",
+      routineRan: "Routine «{{routine}}» ran",
+      talker: "while working",
+      talkerTip: "Answered without stopping the task in progress.",
     },
     /** Next to the time on a reply of an agent nobody called. */
     joined: {

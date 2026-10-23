@@ -232,7 +232,10 @@ export const featureKeysPtBR = {
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
+      delivered: "{{name}} recebeu",
+      held: "{{name}} lê depois da sua decisão no card",
       read: "{{name}} leu",
+      resolved: "{{name}} encerrou o pedido de ajuda",
       well: "Leu seu recado",
       wellNow: "Parou para ler seu recado",
     },

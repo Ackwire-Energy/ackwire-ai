@@ -1,5 +1,6 @@
 import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
+import { isEventLine, isTalkerReply } from "./notices";
 import { quoteExcerpt } from "./reply";
 import { isRoutineCall, routineOfMessage } from "./routines";
 
@@ -99,9 +100,9 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
       const m = entry.item.message;
       // The message a routine posts to call its agent isn't shown: only the agent's answer is.
       if (isRoutineCall(m)) continue;
-      // A routine's message always shows its own header, and nothing groups under it.
-      const routine = Boolean(routineOfMessage(m.meta));
-      const prevRoutine = Boolean(prev && routineOfMessage(prev.meta));
+      // A routine's message (or an automatic line: a notice) always shows its own header, and nothing groups under it.
+      const routine = Boolean(routineOfMessage(m.meta)) || isEventLine(m.meta);
+      const prevRoutine = Boolean(prev && (routineOfMessage(prev.meta) || isEventLine(prev.meta)));
       const root = m.threadId ? byId.get(m.threadId) : undefined;
       const away =
         root && lastShown && lastShown.id !== root.id && lastShown.threadId !== root.id && !replyQuotes(m, root.id);
@@ -116,8 +117,10 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
         : undefined;
       out.push({
         ...entry.item,
-        // A reply that quotes its root starts its own block.
-        grouped: !context && !routine && !prevRoutine && groupsWith(prev, m.author, m.createdAt),
+        // A reply that quotes its root starts its own block; a fast reply while it works shows its header
+        // ("enquanto trabalha").
+        grouped:
+          !context && !routine && !prevRoutine && !isTalkerReply(m.meta) && groupsWith(prev, m.author, m.createdAt),
         ...(context ? { context } : {}),
       });
       prev = m;

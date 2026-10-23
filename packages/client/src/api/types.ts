@@ -305,6 +305,9 @@ export interface MessageReceipts {
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
 
+/** What became of a person's message that reached a waiting run (`agent.run.wait_message`). */
+export type WaitMessageOutcome = "resolved" | "woke" | "held";
+
 /** A run the server still considers active in a channel (`GET …/channels/{id}/active-runs`). */
 export interface ActiveRun {
   runId: string;
@@ -320,6 +323,8 @@ export interface ActiveRun {
   createdAt?: string;
   /** Messages sent to it while it works that it hasn't read yet (the others steered into it, it read). */
   pendingMessageIds?: string[];
+  /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
+  background?: boolean;
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -380,6 +385,8 @@ export type ChannelEvent =
       /** The message that started the run (anchors its live row). */
       triggerMessageId?: string | null;
       startedAt?: string | null;
+      /** A routine's background run: never the conversation's working indicator. */
+      background?: boolean;
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -392,7 +399,15 @@ export type ChannelEvent =
     }
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
-  | { type: "agent.thinking"; channelId: string; threadId: string; agentId: string; runId: string | null }
+  | {
+      type: "agent.thinking";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string | null;
+      /** A routine's background run: never the conversation's working indicator. */
+      background?: boolean;
+    }
   /** An agent asked another agent (`ask_agent`) and waits for it: "Dev está perguntando ao Infra…". */
   | {
       type: "agent.consulting";
@@ -424,6 +439,46 @@ export type ChannelEvent =
       runId: string;
       status: "done" | "failed" | "waiting_approval";
       error?: string;
+    }
+  // ── Chat delivery (packages/engine/src/events.ts) ───────────────────────────
+  /**
+   * Handed to a computer brain mid-turn (Claude Code reads it at its next tool boundary), not
+   * confirmed read yet: "Ada recebeu". `agent.run.read` follows once it is read.
+   */
+  | {
+      type: "agent.run.delivered";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageIds: string[];
+    }
+  /** Messages a run took but never read (it ended, failed, was stopped) went to a run of their own. */
+  | {
+      type: "agent.run.redispatched";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      newRunId: string;
+      messageIds: string[];
+    }
+  /** The run ended without posting (nobody called it by name and it had nothing to add): drop its row now. */
+  | { type: "agent.passed"; channelId: string; threadId: string | null; agentId: string; runId: string }
+  /**
+   * A person's message reached a run that was waiting (browser help, another agent's answer, an approval).
+   * `resolved`: it ended the wait; `woke`: the run stopped waiting and reads it now; `held`: it waits for
+   * the decision on a card.
+   */
+  | {
+      type: "agent.run.wait_message";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageId: string;
+      waitKind: string;
+      outcome: WaitMessageOutcome;
     }
   /** A person is typing; drop it after `ttlMs`. */
   | { type: "user.typing"; channelId: string; threadId: string | null; userId: string; ttlMs: number }
