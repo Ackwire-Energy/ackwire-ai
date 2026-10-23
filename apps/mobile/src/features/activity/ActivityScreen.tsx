@@ -1,6 +1,7 @@
 import {
   type AppNotification,
   type Routine,
+  useDms,
   useNotificationAction,
   useNotifications,
   useRoutines,
@@ -24,7 +25,7 @@ import {
   Text,
   weights,
 } from "@/ui";
-import { notificationHref } from "../links/logic";
+import { agentDmOf, notificationHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
@@ -128,7 +129,9 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const surface = useSurface();
   const act = useNotificationAction(orgId);
   const card = waitingCardOf(n);
-  const href = notificationHref(n);
+  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
+  const dms = useDms(orgId);
+  const href = notificationHref(n, agentDmOf(dms.data));
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
@@ -288,7 +291,9 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const when = useWhen();
   const act = useNotificationAction(orgId);
   const x = useRef(new Animated.Value(0)).current;
-  const href = notificationHref(n);
+  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
+  const dms = useDms(orgId);
+  const href = notificationHref(n, agentDmOf(dms.data));
   const unread = n.readAt === null;
 
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));
@@ -300,7 +305,11 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const template = t(`mobile.activity.kind.${n.kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
   const parts = template.split(NAMES);
   const title = parts.join(names);
-  const sub = [emojisOf(n).join(" "), [subtitleOf(n), placeOf(n)].filter(Boolean).join(" · ")]
+  const reasonText = (reason: string) =>
+    (t as unknown as (key: string, options?: Record<string, unknown>) => string)(`routines.pausedReason.${reason}`, {
+      defaultValue: n.latest.text ?? "",
+    });
+  const sub = [emojisOf(n).join(" "), [subtitleOf(n, reasonText), placeOf(n)].filter(Boolean).join(" · ")]
     .filter(Boolean)
     .join(" ");
   const time = when.short(n.updatedAt);

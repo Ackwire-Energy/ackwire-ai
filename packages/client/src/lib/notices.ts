@@ -1,4 +1,4 @@
-import { routineOfMessage } from "./routines";
+import { routineReplyOf } from "./routines";
 
 type Meta = Record<string, unknown> | undefined;
 
@@ -41,18 +41,9 @@ export function isTalkerReply(meta: Meta): boolean {
   return (meta?.notice as { kind?: unknown } | undefined)?.kind === "talker_reply";
 }
 
-/**
- * The message that started a routine's background run (`meta.background` with `meta.routine`):
- * one line, "Rotina «Sentry diário» rodou", never shown as the person's message.
- */
-export function backgroundRoutineOf(meta: Meta): { id: string; name: string } | null {
-  return meta?.background === true ? routineOfMessage(meta) : null;
-}
-
-/** The routine a report came from: the message's `meta.routine`, the notice's refs, or the «name» in `from`. */
-export function noticeRoutineName(meta: Meta, notice: MessageNotice): string | null {
-  const own = routineOfMessage(meta)?.name ?? notice.refs.routineName;
-  if (own) return own;
+/** The routine a report came from: the notice's refs, or the «name» in `from`. */
+export function noticeRoutineName(notice: MessageNotice): string | null {
+  if (notice.refs.routineName) return notice.refs.routineName;
   return notice.from?.match(/«([^»]+)»/)?.[1] ?? null;
 }
 
@@ -62,5 +53,34 @@ export function noticeAgentHandle(notice: MessageNotice): string | null {
   return handle ? handle.replace(/^@/, "") : null;
 }
 
-/** An automatic line in the conversation (a notice, a background routine's start): nothing groups with it. */
-export const isEventLine = (meta: Meta) => noticeOf(meta) !== null || backgroundRoutineOf(meta) !== null;
+/** An automatic line in the conversation (a notice): nothing groups with it. */
+export const isEventLine = (meta: Meta) => noticeOf(meta) !== null;
+
+type Said = { id: string; author: { type: string }; body: string; meta?: Record<string, unknown> };
+
+/**
+ * The routine reports the agent already told people about (ADR 0053 §7): the `noticeId` of every agent
+ * message that answers one. Such a `routine_handoff` notice folds into that message (hidden in the
+ * timeline); a report nobody answered still shows as its compact line.
+ */
+export function answeredNotices(messages: readonly Said[]): Set<string> {
+  const out = new Set<string>();
+  for (const m of messages) {
+    const noticeId = routineReplyOf(m)?.noticeId;
+    if (noticeId) out.add(noticeId);
+  }
+  return out;
+}
+
+/** A routine report answered by an agent's message in `answered`: left out of the timeline. */
+export const isAnsweredNotice = (m: Pick<Said, "id" | "meta">, answered: ReadonlySet<string>) =>
+  answered.has(m.id) && noticeOf(m.meta)?.kind === "routine_handoff";
+
+/** The report a routine's message answers (its notice's text), when that notice is loaded here. */
+export function routineReportText(messages: readonly Said[], noticeId: string | null): string | null {
+  if (!noticeId) return null;
+  const found = messages.find((m) => m.id === noticeId);
+  const notice = found ? noticeOf(found.meta) : null;
+  if (!found || !notice) return null;
+  return found.body.trim() || notice.text.trim() || null;
+}

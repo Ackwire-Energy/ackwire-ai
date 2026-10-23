@@ -1482,20 +1482,34 @@ export function useRoutineAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (
+    mutationFn: async (
       action:
         | { type: "create"; input: RoutineInput }
         | { type: "active"; id: string; active: boolean }
         | { type: "run"; id: string }
+        | { type: "stop"; id: string }
         | { type: "update"; id: string; patch: RoutinePatch }
         | { type: "delete"; id: string }
-        | { type: "duplicate"; id: string; name?: string },
+        | { type: "duplicate"; id: string; name?: string }
+        /** "Assumir rotina": I become its creator, and it runs again. */
+        | { type: "takeOver"; id: string }
+        /** "Adicionar agente ao canal": the agent joins the channel it delivers to, and it runs again. */
+        | { type: "addAgent"; id: string; agentId: string; channelId: string },
     ): Promise<unknown> => {
       if (action.type === "create") return api.routines.create(orgId, action.input);
       if (action.type === "update") return api.routines.update(orgId, action.id, action.patch);
       if (action.type === "delete") return api.routines.remove(orgId, action.id);
       if (action.type === "duplicate") return api.routines.duplicate(orgId, action.id, action.name);
       if (action.type === "active") return api.routines.setActive(orgId, action.id, action.active);
+      if (action.type === "stop") return api.routines.stop(orgId, action.id);
+      if (action.type === "takeOver") {
+        await api.routines.takeOver(orgId, action.id);
+        return api.routines.setActive(orgId, action.id, true);
+      }
+      if (action.type === "addAgent") {
+        await api.chat.addMember(orgId, action.channelId, { agentId: action.agentId });
+        return api.routines.setActive(orgId, action.id, true);
+      }
       return api.routines.runNow(orgId, action.id);
     },
     onSettled: () => {

@@ -1,13 +1,9 @@
 import type { Message } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
-import {
-  backgroundRoutineOf,
-  type MessageNotice,
-  noticeAgentHandle,
-  noticeOf,
-  noticeRoutineName,
-} from "@agenteschat/client/lib/notices";
+import { type MessageNotice, noticeAgentHandle, noticeOf, noticeRoutineName } from "@agenteschat/client/lib/notices";
+import type { RoutineReply } from "@agenteschat/client/lib/routines";
 import { Icon, type IconName } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,7 +23,6 @@ const NOTICE_ICON: Record<string, IconName> = {
 function noticeLabel(
   t: TFunction,
   notice: MessageNotice,
-  meta: Message["meta"],
   agentName: string,
   nameOfHandle: (handle: string) => string | null,
 ): string {
@@ -35,7 +30,7 @@ function noticeLabel(
   const from = handle ? `@${nameOfHandle(handle) ?? handle}` : notice.from;
   switch (notice.kind) {
     case "routine_handoff": {
-      const routine = noticeRoutineName(meta, notice);
+      const routine = noticeRoutineName(notice);
       return routine ? t("chat.notice.routineHandoff", { routine }) : t("chat.notice.routineHandoffAnon");
     }
     case "consult_reply":
@@ -108,7 +103,7 @@ export function NoticeLine({ message }: { message: Message }) {
     <EventLine
       message={message}
       icon={NOTICE_ICON[notice.kind] ?? "info"}
-      label={noticeLabel(t, notice, message.meta, dir.authorName(message.author), nameOfHandle)}
+      label={noticeLabel(t, notice, dir.authorName(message.author), nameOfHandle)}
       text={message.body.trim() || notice.text}
       labels={{ show: t("chat.notice.show"), hide: t("chat.notice.hide") }}
     />
@@ -116,20 +111,51 @@ export function NoticeLine({ message }: { message: Message }) {
 }
 
 /**
- * A routine ran in the background (`meta.background`): one line where its start was posted, never
- * as the person who created it; its instructions on demand. Its report comes as a notice.
+ * The routine an agent's message answers (ADR 0053 §7): a small tag next to its name, "Rotina «X»",
+ * that opens the routine in Rotinas; with the report it answers loaded here, "Ver relatório" unfolds it
+ * (the report's own line is folded into this message).
  */
-export function RoutineRanLine({ message }: { message: Message }) {
+export function RoutineTag({
+  routine,
+  report,
+  open,
+  onToggle,
+}: {
+  routine: RoutineReply;
+  report: string | null;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation();
-  const routine = backgroundRoutineOf(message.meta);
-  if (!routine) return null;
+  const { org } = useOrg();
   return (
-    <EventLine
-      message={message}
-      icon="routines"
-      label={t("chat.notice.routineRan", { routine: routine.name })}
-      text={message.body.trim()}
-      labels={{ show: t("channel.routineShow"), hide: t("channel.routineHide") }}
-    />
+    <>
+      <Link
+        to="/org/$orgId/routines"
+        params={{ orgId: org.id }}
+        search={{ open: routine.id }}
+        className="msg-reminder msg-reminder--link"
+        title={t("channel.routineTagTip")}
+      >
+        <Icon name="routines" size={14} />
+        {t("channel.routineTag", { name: routine.name })}
+      </Link>
+      {report && (
+        <button type="button" className="cn-line__toggle cn-report__toggle" aria-expanded={open} onClick={onToggle}>
+          {open ? t("channel.routineReportHide") : t("channel.routineReport")}
+        </button>
+      )}
+    </>
+  );
+}
+
+/** The report a routine's message answers, unfolded under it (its words, as the notice had them). */
+export function RoutineReport({ text }: { text: string }) {
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  return (
+    <div className="cn-report">
+      <MessageBody body={text} resolveMention={dir.mentionName} />
+    </div>
   );
 }

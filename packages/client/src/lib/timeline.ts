@@ -1,8 +1,8 @@
 import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
-import { isEventLine, isTalkerReply } from "./notices";
+import { answeredNotices, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
 import { quoteExcerpt } from "./reply";
-import { isRoutineCall, routineOfMessage } from "./routines";
+import { isRoutineCall, routineReplyOf } from "./routines";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
   a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1;
@@ -87,6 +87,8 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
   let lastDay = "";
   let prev: Message | null = null;
   const byId = new Map(messages.map((m) => [m.id, m]));
+  // Routine reports an agent's message already answers: they fold into it.
+  const answered = answeredNotices(messages);
   // The last message shown, across day dividers and cards (to tell a reply that lands far from its root).
   let lastShown: Message | null = null;
   for (const entry of entries) {
@@ -98,11 +100,11 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     }
     if (entry.item.kind === "message") {
       const m = entry.item.message;
-      // The message a routine posts to call its agent isn't shown: only the agent's answer is.
-      if (isRoutineCall(m)) continue;
-      // A routine's message (or an automatic line: a notice) always shows its own header, and nothing groups under it.
-      const routine = Boolean(routineOfMessage(m.meta)) || isEventLine(m.meta);
-      const prevRoutine = Boolean(prev && (routineOfMessage(prev.meta) || isEventLine(prev.meta)));
+      // A routine's call written as its creator, and a report the agent already told people about: not shown.
+      if (isRoutineCall(m) || isAnsweredNotice(m, answered)) continue;
+      // A routine's answer (or an automatic line: a notice) always shows its own header, and nothing groups under it.
+      const routine = Boolean(routineReplyOf(m)) || isEventLine(m.meta);
+      const prevRoutine = Boolean(prev && (routineReplyOf(prev) || isEventLine(prev.meta)));
       const root = m.threadId ? byId.get(m.threadId) : undefined;
       const away =
         root && lastShown && lastShown.id !== root.id && lastShown.threadId !== root.id && !replyQuotes(m, root.id);

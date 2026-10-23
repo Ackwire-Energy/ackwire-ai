@@ -11,33 +11,36 @@ export function reminderBody(body: string, meta: Record<string, unknown> | undef
 }
 
 /**
- * A message a routine posted (`meta.routine`): shown as the routine's, not as
- * its creator's. Plain reminders are the agent's own messages, so not here.
+ * The routine an agent's message answers (ADR 0053 §7): the run a routine's report woke tells people in
+ * the agent's voice, and its message carries `meta.routine` (`id`, `name`, the routine run `runId`, the
+ * `noticeId` of the report it answers). Shown as a small tag ("Rotina «X»") that opens the routine and
+ * unfolds the report. A plain reminder is the agent's own message, so not here.
  */
-export function routineOfMessage(meta: Record<string, unknown> | undefined): { id: string; name: string } | null {
-  if (isReminderMessage(meta)) return null;
-  const r = meta?.routine as { id?: unknown; name?: unknown } | undefined;
-  return r && typeof r.id === "string" && typeof r.name === "string" ? { id: r.id, name: r.name } : null;
+export interface RoutineReply {
+  id: string;
+  name: string;
+  /** The routine run (`routine_runs.id`). */
+  runId: string | null;
+  /** The `routine_handoff` notice it answers (hidden in the timeline while this answer is there). */
+  noticeId: string | null;
 }
 
-/** The routine an agent's message answers (`meta.viaRoutine`), shown as a small tag next to its name. */
-export function viaRoutineOf(meta: Record<string, unknown> | undefined): { id: string; name: string } | null {
-  const r = meta?.viaRoutine as { id?: unknown; name?: unknown } | undefined;
-  return r && typeof r.id === "string" && typeof r.name === "string" ? { id: r.id, name: r.name } : null;
+export function routineReplyOf(m: { author: { type: string }; meta?: Record<string, unknown> }): RoutineReply | null {
+  if (m.author.type !== "agent" || isReminderMessage(m.meta)) return null;
+  const r = m.meta?.routine as Record<string, unknown> | undefined;
+  if (!r || typeof r.id !== "string" || typeof r.name !== "string") return null;
+  const text = (v: unknown) => (typeof v === "string" && v ? v : null);
+  return { id: r.id, name: r.name, runId: text(r.runId) ?? text(r.routineRunId), noticeId: text(r.noticeId) };
 }
 
 /**
- * The message a routine posts on its creator's behalf to call its agent
- * (top level): hidden from the timeline, only the agent's answer shows. A
- * background routine's start (`meta.background`) stays, as one line: its
- * report comes later, maybe elsewhere (`backgroundRoutineOf` in lib/notices).
+ * A person's message carrying `meta.routine`: a routine's call or firing written as its creator (before
+ * routines fired in their own room, ADR 0053 §4). Never shown: it isn't something the person said.
  */
-export const isRoutineCall = (m: {
-  threadId: string | null;
-  author: { type: string };
-  meta?: Record<string, unknown>;
-}) =>
-  m.threadId === null && m.author.type === "person" && m.meta?.background !== true && routineOfMessage(m.meta) !== null;
+export const isRoutineCall = (m: { author: { type: string }; meta?: Record<string, unknown> }) => {
+  const r = m.meta?.routine as { id?: unknown } | undefined;
+  return m.author.type === "person" && typeof r?.id === "string";
+};
 
 /** Zones people pick most often; the select also keeps whatever zone a routine already has. */
 export const COMMON_TIMEZONES = [

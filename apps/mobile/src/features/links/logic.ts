@@ -1,4 +1,5 @@
-import type { AppNotification } from "@agenteschat/client";
+import type { AppNotification, DirectMessage } from "@agenteschat/client";
+import { ROUTINE_TROUBLE } from "@agenteschat/client/lib/notifications";
 import { isSafeId } from "../shared/logic";
 
 /**
@@ -112,9 +113,29 @@ function queryParam(query: string, name: string): string | undefined {
   return undefined;
 }
 
-/** Where an inbox item opens in the app; null when the app has no screen for it (issues, forum, routines). */
-export function notificationHref(n: Pick<AppNotification, "kind" | "source" | "actors">): AppHref | null {
+/** The DM with an agent among the conversations loaded (`useDms`), for `notificationHref`'s `dmOf`. */
+export const agentDmOf =
+  (dms: readonly Pick<DirectMessage, "channelId" | "with">[] | undefined) =>
+  (agentId: string): string | null =>
+    dms?.find((d) => d.with.type === "agent" && d.with.id === agentId)?.channelId ?? null;
+
+/**
+ * Where an inbox item opens in the app; null when the app has no screen for it (issues, forum). What a
+ * routine found opens the agent's message in its conversation; a routine's trouble (failed, paused,
+ * waiting for its computer) opens the agent's DM (`dmOf`, its known DM), else the agent: the phone has
+ * no Rotinas screen yet.
+ */
+export function notificationHref(
+  n: Pick<AppNotification, "kind" | "source" | "actors">,
+  dmOf: (agentId: string) => string | null = () => null,
+): AppHref | null {
   const s = n.source;
+  if (ROUTINE_TROUBLE.has(n.kind)) {
+    const agent = n.actors.find((a) => a.type === "agent");
+    if (!agent || !isSafeId(agent.id)) return null;
+    const dm = dmOf(agent.id);
+    return isSafeId(dm) ? chatHref(dm) : `/agent/${agent.id}`;
+  }
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.
   if (n.kind === "browser_handoff" && isSafeId(s.handoffId))
@@ -122,7 +143,6 @@ export function notificationHref(n: Pick<AppNotification, "kind" | "source" | "a
   if ((n.kind === "mission_finished" || n.kind === "mission_stopped") && isSafeId(s.missionId))
     return `/mission/${s.missionId}`;
   if (s.topicId || s.issueId || s.issueNumber != null) return null;
-  if (n.kind === "routine_finished" || n.kind === "routine_failed") return null;
   const channelId = s.channelId ?? s.dmId;
   if (isSafeId(channelId)) return chatHref(channelId, isSafeId(s.threadId) ? s.threadId : null);
   if (isSafeId(s.missionId)) return `/mission/${s.missionId}`;

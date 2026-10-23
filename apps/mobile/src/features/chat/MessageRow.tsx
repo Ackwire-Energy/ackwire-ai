@@ -1,5 +1,6 @@
 import {
   browserHandoffOf,
+  keys,
   type Message,
   type ThreadInfo,
   useApi,
@@ -13,12 +14,12 @@ import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
-import { isTalkerReply } from "@agenteschat/client/lib/notices";
+import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
+import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -56,7 +57,6 @@ import {
   missionPlanOf,
   questionOf,
   reactionPills,
-  routineAgents,
   workStepsOf,
 } from "./logic";
 import { MessageText } from "./MessageText";
@@ -97,22 +97,27 @@ export const MessageRow = memo(function MessageRow({
   const agent = isAgent && m.author.id ? dir.agentById.get(m.author.id) : undefined;
   const name = dir.nameOf(m.author) || t("mobile.chat.someone");
   const meta = m.meta;
-  // Posted by a routine on its creator's behalf (as on the web): shown as the routine, never as if the person
-  // typed it; its text is the instructions it gives the agent, one line ("Chamou @Atlas…") and the rest on demand.
-  const routine = routineOfMessage(meta);
-  const [routineOpen, setRoutineOpen] = useState(false);
-  const called = useMemo(() => (routine ? routineAgents(m.body, dir.agents) : []), [routine, m.body, dir.agents]);
-  // An agent's answer to a routine: the routine's call is hidden, so a small tag says so.
-  const viaRoutine = isAgent ? viaRoutineOf(meta) : null;
+  // What a routine found, told by its agent (as on the web): a small tag, and the report it answers on demand
+  // (that report's own line folds into this message).
+  const routine = routineReplyOf(m);
+  const [reportOpen, setReportOpen] = useState(false);
+  const qc = useQueryClient();
+  const orgId = useOrgId();
+  const report = routine?.noticeId
+    ? routineReportText(
+        [
+          ...(qc.getQueryData<Message[]>(keys.messages(orgId, m.channelId)) ?? []),
+          ...((m.threadId && qc.getQueryData<Message[]>(keys.thread(orgId, m.channelId, m.threadId))) || []),
+        ],
+        routine.noticeId,
+      )
+    : null;
   // A plain reminder: the agent's own message with a "Lembrete" label (the server's prefix dropped).
   const reminder = isReminderMessage(meta);
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = isAgent && isTalkerReply(meta);
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
-  const body =
-    hidesBody(m) || (routine && !routineOpen)
-      ? ""
-      : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
+  const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   const steps = isAgent && m.agentRunId ? workStepsOf(meta) : null;
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
@@ -134,7 +139,7 @@ export const MessageRow = memo(function MessageRow({
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
   const issueWork = issueWorkOf(meta);
   // My own message: a light bubble on the right, no face or name (MobileIntencional.html, `.me`).
-  const mine = !routine && m.author.type === "person" && Boolean(meId) && m.author.id === meId;
+  const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
 
   const cards = (
     <>
@@ -219,39 +224,23 @@ export const MessageRow = memo(function MessageRow({
       style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && { backgroundColor: c.sunken }]}
     >
       <View style={styles.avslot}>
-        {grouped ? null : routine ? (
-          <View
-            style={[styles.routineMark, { backgroundColor: c.sunken }]}
-            accessible
-            accessibilityLabel={t("channel.routineAuthor", { name: routine.name })}
-          >
-            <Icon name="clock" size={17} color={c.ink2} />
-          </View>
-        ) : (
-          <Face who={m.author} size={32} live={false} />
-        )}
+        {grouped ? null : <Face who={m.author} size={32} live={false} />}
       </View>
       <View style={styles.body}>
-        {grouped ? null : routine ? (
-          <View style={styles.who}>
-            <Text variant="footnote" tone="ink2" style={[styles.name, styles.shrink]} numberOfLines={1}>
-              {t("channel.routineAuthor", { name: routine.name })}
-            </Text>
-            <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
-              {t("channel.routineBy", { name })}
-            </Text>
-            <Text variant="footnote" tone="faint">
-              {when.time(m.createdAt)}
-            </Text>
-            {m.pinned ? <PinMark /> : null}
-          </View>
-        ) : (
+        {grouped ? null : (
           <View style={styles.who}>
             <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
               {name}
             </Text>
             {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
-            {viaRoutine ? <Tag icon="clock" label={t("channel.viaRoutine", { name: viaRoutine.name })} /> : null}
+            {routine ? (
+              <Tag
+                icon="clock"
+                label={t("channel.routineTag", { name: routine.name })}
+                onPress={report ? () => setReportOpen((o) => !o) : undefined}
+                hint={report ? t(reportOpen ? "channel.routineReportHide" : "channel.routineReport") : undefined}
+              />
+            ) : null}
             {talker ? (
               <Text
                 variant="caption"
@@ -263,7 +252,7 @@ export const MessageRow = memo(function MessageRow({
                 {t("chat.notice.talker")}
               </Text>
             ) : null}
-            {!reminder && !viaRoutine && !talker && agent?.role ? (
+            {!reminder && !routine && !talker && agent?.role ? (
               <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
                 {agent.role}
               </Text>
@@ -282,23 +271,10 @@ export const MessageRow = memo(function MessageRow({
             </Text>
           </View>
         ) : null}
-        {routine ? (
-          <Text variant="small" tone="muted">
-            {called.length
-              ? t("channel.routineCalled", { names: called.map((a) => `@${a.name}`).join(", ") })
-              : t("channel.routineRan")}{" "}
-            <Text
-              variant="small"
-              tone="ink"
-              style={styles.link}
-              onPress={() => setRoutineOpen((o) => !o)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: routineOpen }}
-              suppressHighlighting
-            >
-              {routineOpen ? t("channel.routineHide") : t("channel.routineShow")}
-            </Text>
-          </Text>
+        {report && reportOpen ? (
+          <View style={[styles.report, { borderLeftColor: c.line }]}>
+            <MessageText body={report} />
+          </View>
         ) : null}
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
@@ -466,16 +442,35 @@ function StoppedLine({
   );
 }
 
-/** A small neutral chip next to the name ("Lembrete", "Rotina · Bom dia"): icon, no colored dot. */
-function Tag({ icon, label }: { icon: "bell" | "clock"; label: string }) {
+/**
+ * A small neutral chip next to the name ("Lembrete", "Rotina «Bom dia»"): icon, no colored dot. With
+ * `onPress` it unfolds what it stands for (the report a routine's message answers).
+ */
+function Tag({
+  icon,
+  label,
+  onPress,
+  hint,
+}: {
+  icon: "bell" | "clock";
+  label: string;
+  onPress?: () => void;
+  hint?: string;
+}) {
   const c = useColors();
-  return (
+  const chip = (
     <View style={[styles.tag, { backgroundColor: c.sunken }]}>
       <Icon name={icon} size={11} color={c.muted} />
       <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
         {label}
       </Text>
     </View>
+  );
+  if (!onPress) return chip;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityHint={hint} hitSlop={6}>
+      {chip}
+    </Pressable>
   );
 }
 
@@ -582,8 +577,8 @@ const styles = StyleSheet.create({
   medium: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
   pin: { alignSelf: "center" },
-  routineMark: { width: 32, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  link: { fontWeight: "600" },
+  // The routine report a message answers, unfolded under its name (like the notice line's text).
+  report: { marginTop: 2, marginBottom: 4, paddingLeft: 10, borderLeftWidth: 2 },
   tag: {
     flexDirection: "row",
     alignItems: "center",
