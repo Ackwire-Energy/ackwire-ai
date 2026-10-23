@@ -54,7 +54,7 @@ const consultReply = (infraSays: (req: ModelRequest) => ReturnType<typeof answer
     return { chunks: [`Relaying: ${/instructions\):\\n\\n([^"]+)/.exec(last)?.[1] ?? last}`] };
   if (last.includes("deploy"))
     return {
-      chunks: [],
+      chunks: ["Asking @infra how staging is deployed; I'll wait for the answer."],
       toolUses: [{ name: "ask_agent", input: { agent: "@infra", question: "How is staging deployed?", wait: true } }],
     };
   return { chunks: ["ok"] };

@@ -89,7 +89,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
   const tool: ToolDefinition = {
     name: ASK_AGENT_TOOL,
     description:
-      "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge, acting for the same person you are helping. By default you don't wait: the call returns at once, you carry on (or end your turn if there is nothing else to do), and its answer reaches you later as a message in this conversation; don't ask again meanwhile. Set wait: true only when you can't do anything else until it answers: you pause until it does (up to 15 minutes). Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Never relay to an agent what the person already asked that agent directly (it got the message too and is answering it): if it is already working on it here, you are told so; wait for its answer in the conversation. Write the question so it stands alone: the other agent doesn't see this conversation. To only let an agent know something, use tell_agent.",
+      "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge, acting for the same person you are helping. By default you don't wait: the call returns at once, you carry on (or end your turn if there is nothing else to do), and its answer reaches you later as a message in this conversation; don't ask again meanwhile. Set wait: true only when you can't do anything else until it answers: you pause until it does (up to 15 minutes), so first tell the person in your reply text whom you asked, what, and that you're waiting; a wait with nothing said is sent back. Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Never relay to an agent what the person already asked that agent directly (it got the message too and is answering it): if it is already working on it here, you are told so; wait for its answer in the conversation. Write the question so it stands alone: the other agent doesn't see this conversation. To only let an agent know something, use tell_agent.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -98,7 +98,8 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
         question: { type: "string", minLength: 1, maxLength: 4000 },
         wait: {
           type: "boolean",
-          description: "Pause until it answers (default false: carry on; the answer comes as a message).",
+          description:
+            "Pause until it answers (default false: carry on; the answer comes as a message). Say so in your reply text first.",
         },
       },
       required: ["agent", "question"],

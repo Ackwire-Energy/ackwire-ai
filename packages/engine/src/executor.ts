@@ -29,7 +29,7 @@ import {
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
-import { consultationCardThread, onConsultedRunFinished } from "./consultations";
+import { ASK_AGENT_TOOL, consultationCardThread, onConsultedRunFinished } from "./consultations";
 import { buildRunContext, getChannelCached, restatesReaction } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
@@ -202,6 +202,8 @@ export interface Transcript {
   nudged?: boolean;
   /** A card it asked for with nothing said went back once for the findings (`unexplainedPause`). */
   explainNudged?: boolean;
+  /** A wait on another agent with nothing said went back once to tell the person first (`silentWait`). */
+  waitNudged?: boolean;
   /** A person decided or answered what it waited on (an approval, a question): it can't pass anymore. */
   answerOwed?: boolean;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
@@ -312,6 +314,20 @@ export function unexplainedPause(
     const tool = byName.get(c.name);
     return tool !== undefined && isSensitive(tool);
   });
+}
+
+/** What a turn's calls get back when it would wait on another agent with nothing said (`silentWait`). */
+export const SAY_BEFORE_WAITING =
+  "Not run, and nothing was posted: you were about to pause for another agent's answer without a word, and the person would see you stop. Reply now with text: what you asked and whom, and that you're waiting for the answer (plus anything you already found). Then call ask_agent again in the same reply. Or, if you can carry on meanwhile, call it without wait: its answer reaches you later as a message. None of this turn's calls ran.";
+
+/**
+ * A turn that would pause the run on another agent's answer (`ask_agent` with `wait: true`) with no
+ * text: the person sees the agent stop with nothing said (eval 2026-10-23, dev-asks-infra-async).
+ * Unlike `unexplainedPause`, it holds on the first turn too: waiting always needs a word first.
+ */
+export function silentWait(calls: { name: string; input?: unknown }[], turnText: string): boolean {
+  if (stripSentinel(turnText).trim()) return false;
+  return calls.some((c) => c.name === ASK_AGENT_TOOL && (c.input as { wait?: unknown } | undefined)?.wait === true);
 }
 
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
@@ -1530,14 +1546,27 @@ async function executeRunInner(
       const lookedBefore = transcript.messages.some(
         (m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c) => c.type === "tool_result"),
       );
-      if (
-        result.stopReason === "tool_use" &&
-        turnPlan.kind === "model" &&
-        !run.background &&
-        !transcript.explainNudged &&
-        unexplainedPause(toolUses, turnTools, turnText, lookedBefore)
-      ) {
-        transcript.explainNudged = true;
+      const waitsSilently = result.stopReason === "tool_use" && silentWait(toolUses, turnText);
+      // Still silent after being told: it asks without waiting (the answer comes as a message), never a mute pause.
+      if (waitsSilently && transcript.waitNudged) {
+        for (const use of toolUses) {
+          if (use.name === ASK_AGENT_TOOL && (use.input as { wait?: unknown }).wait === true) {
+            use.input = { ...(use.input as Record<string, unknown>), wait: false };
+          }
+        }
+        later(() => addRunStep(db, run, "context", { waitMadeAsync: true }));
+      }
+      const nudge =
+        result.stopReason !== "tool_use" || turnPlan.kind !== "model" || run.background
+          ? null
+          : waitsSilently && !transcript.waitNudged
+            ? "wait"
+            : !transcript.explainNudged && unexplainedPause(toolUses, turnTools, turnText, lookedBefore)
+              ? "explain"
+              : null;
+      if (nudge) {
+        if (nudge === "wait") transcript.waitNudged = true;
+        else transcript.explainNudged = true;
         transcript.messages.push({
           role: "user",
           content: toolUses.map((use) => ({
@@ -1548,9 +1577,12 @@ async function executeRunInner(
           })),
         });
         // Said as the conversation's next line, not only as the tools' error: models follow it there.
-        appendUserText(transcript, EXPLAIN_FIRST);
+        appendUserText(transcript, nudge === "wait" ? SAY_BEFORE_WAITING : EXPLAIN_FIRST);
         await saveTranscript(db, transcript);
-        later(() => addRunStep(db, run, "context", { explainNudged: toolUses.map((u) => u.name) }));
+        const names = toolUses.map((u) => u.name);
+        later(() =>
+          addRunStep(db, run, "context", nudge === "wait" ? { waitNudged: names } : { explainNudged: names }),
+        );
         continue;
       }
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {

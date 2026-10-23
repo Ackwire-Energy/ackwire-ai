@@ -397,7 +397,7 @@ describe("ask_agent", () => {
         if (last.includes("tool_result")) return { chunks: ["Still waiting on Infra."] };
         if (last.includes("deploy"))
           return {
-            chunks: [],
+            chunks: ["Asking @infra how staging is deployed; I'll wait for the answer."],
             toolUses: [
               { name: "ask_agent", input: { agent: "@infra", question: "How is staging deployed?", wait: true } },
             ],
