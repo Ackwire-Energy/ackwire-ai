@@ -64,14 +64,15 @@ export interface SteerMessage {
   uuid: string;
   /** Rendered as the loop renders messages read between turns. */
   text: string;
-  /** "Parar e mandar": read now where the brain can, else at its next tool boundary. */
+  /** "Parar e mandar": read now (the running tool moved to the background); a brain that can't is `unsupported`. */
   urgent?: boolean;
 }
 
 /**
  * `accepted`: handed to the turn (read later: `steer_read`). `unsupported`:
- * this turn can't take messages mid-turn (they wait for its end). `no_turn`:
- * the turn isn't there (just ended, or not started yet).
+ * this turn can't take messages mid-turn (they wait for its end), or not an
+ * urgent one (the turn is stopped and started again instead). `no_turn`: the
+ * turn isn't there (just ended, or not started yet).
  */
 export type SteerReply =
   | { status: "accepted"; accepted: string[] }

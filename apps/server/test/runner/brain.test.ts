@@ -20,12 +20,12 @@ import {
   ClaudeStreamParser,
   carryClaudeSession,
   claudeBrainArgs,
+  claudeCapabilities,
   fallbackModelFor,
-  STEER_MIN_VERSION,
-  STEER_NOW_MIN_VERSION,
+  STEER_CAPABILITY,
+  STEER_NOW_CAPABILITY,
   steerSupport,
   userMessageLine,
-  versionAtLeast,
 } from "../../runner/brain";
 import { claudeAuth } from "../../runner/executors";
 import { handleRequest } from "../../runner/handlers";
@@ -669,16 +669,31 @@ test.if(posix)("an account that isn't on the computer is account_missing, never 
 
 const U = (n: number) => `0193cccc-0000-7000-8000-${String(n).padStart(12, "0")}`;
 
-/** Runs `fn` with the fake CLI saying this version (none: an old CLI). */
-async function withVersion<T>(version: string | null, fn: () => Promise<T>): Promise<T> {
-  if (version) process.env.FAKE_CLAUDE_VERSION = version;
-  else delete process.env.FAKE_CLAUDE_VERSION;
+/** What 2.1.220 says it can do (lifecycle, no "now"); 2.1.309 adds `interrupt_send_now_v1`. */
+const CAPS_NEXT = ["interrupt_receipt_v1", "interrupt_cancel_queued_v1", "msg_lifecycle_v1"];
+const CAPS_NOW = [...CAPS_NEXT, "interrupt_send_now_v1", "queued_notifications"];
+
+/** Runs `fn` with the fake CLI saying this version and these capabilities (none: an old CLI). */
+async function withCli<T>(
+  cli: { version?: string; caps?: string[]; noResultUuids?: boolean },
+  fn: () => Promise<T>,
+): Promise<T> {
+  const env = {
+    FAKE_CLAUDE_VERSION: cli.version,
+    FAKE_CLAUDE_CAPS: cli.caps?.join(","),
+    FAKE_CLAUDE_NO_RESULT_UUIDS: cli.noResultUuids ? "1" : undefined,
+  };
+  for (const [k, v] of Object.entries(env)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
   try {
     return await fn();
   } finally {
-    delete process.env.FAKE_CLAUDE_VERSION;
+    for (const k of Object.keys(env)) delete process.env[k];
   }
 }
+const NOW_CLI = { version: "2.1.309", caps: CAPS_NOW };
 
 /** Steers once the turn is there (its CLI started): `no_turn` until then. */
 async function steerWhenReady(
@@ -710,14 +725,16 @@ test("protocol 15: brain.steer parses; steer_read events travel, empty ones are 
   ).toBeNull();
 });
 
-test("steering: versions, the stdin line, and what the parser reads back", () => {
-  expect(versionAtLeast("2.1.259", STEER_MIN_VERSION)).toBe(true);
-  expect(versionAtLeast("2.1.300 (Claude Code)", STEER_MIN_VERSION)).toBe(true);
-  expect(versionAtLeast("2.1.258", STEER_MIN_VERSION)).toBe(false);
-  expect(versionAtLeast("1.9.999", STEER_MIN_VERSION)).toBe(false);
-  expect(versionAtLeast(undefined, STEER_MIN_VERSION)).toBe(false);
-  expect(steerSupport("2.1.270")).toEqual({ next: true, now: false });
-  expect(steerSupport(STEER_NOW_MIN_VERSION)).toEqual({ next: true, now: true });
+test("steering: capabilities (not versions), the stdin line, and what the parser reads back", () => {
+  // 2.1.175 says none; 2.1.220 the lifecycle; 2.1.309 also "now". A version alone is never enough.
+  expect(steerSupport(undefined)).toEqual({ next: false, now: false });
+  expect(steerSupport([])).toEqual({ next: false, now: false });
+  expect(steerSupport(CAPS_NEXT)).toEqual({ next: true, now: false });
+  expect(steerSupport(CAPS_NOW)).toEqual({ next: true, now: true });
+  expect(steerSupport([STEER_NOW_CAPABILITY])).toEqual({ next: false, now: false });
+  expect(steerSupport([STEER_CAPABILITY])).toEqual({ next: true, now: false });
+  expect(claudeCapabilities({ capabilities: ["msg_lifecycle_v1", 3, null] })).toEqual(["msg_lifecycle_v1"]);
+  expect(claudeCapabilities({})).toEqual([]);
   expect(JSON.parse(userMessageLine("hi"))).not.toHaveProperty("uuid");
   expect(JSON.parse(userMessageLine("hi", { uuid: U(1), priority: "now", origin: { kind: "human" } }))).toMatchObject({
     type: "user",
@@ -746,22 +763,57 @@ test("steering: versions, the stdin line, and what the parser reads back", () =>
   expect(r.events[0]).toEqual({ type: "steer_read", uuids: [U(1), U(2)] });
   expect(r.queued).toBe(1);
   expect(r.final).toMatchObject({ type: "done", text: "ok" });
+  // msg_lifecycle_v1: `started` is the read (as 2.1.309 prints it); queued and completed say nothing.
+  const life = (state: string) =>
+    p.push(line({ type: "command_lifecycle", command_uuid: U(3), state, uuid: "x", session_id: SESSION(1) })).events;
+  expect(life("queued")).toEqual([]);
+  expect(life("started")).toEqual([{ type: "steer_read", uuids: [U(3)] }]);
+  expect(life("completed")).toEqual([]);
+  // Tasks: started in the foreground, moved to the background, over (both ways it's said).
+  const sys = (o: Record<string, unknown>) => p.push(line({ type: "system", session_id: SESSION(1), ...o }));
+  expect(sys({ subtype: "task_started", task_id: "b1", is_backgrounded: false, task_type: "local_bash" }).task).toEqual(
+    { id: "b1", started: true, backgrounded: false },
+  );
+  expect(sys({ subtype: "task_updated", task_id: "b1", patch: { is_backgrounded: true } }).task).toEqual({
+    id: "b1",
+    backgrounded: true,
+  });
+  expect(sys({ subtype: "task_updated", task_id: "b1", patch: { status: "completed", end_time: 1 } }).task).toEqual({
+    id: "b1",
+    ended: true,
+  });
+  expect(sys({ subtype: "task_notification", task_id: "b1", status: "completed" }).task).toEqual({
+    id: "b1",
+    ended: true,
+  });
+  expect(sys({ subtype: "task_summary", detail: "x" }).task).toBeUndefined();
+  expect(sys({ subtype: "init", capabilities: CAPS_NOW }).turnStart).toBe(true);
+  // Any tool result is a tool boundary (queued messages and task notices are read there).
+  expect(
+    p.push(
+      line({
+        type: "user",
+        parent_tool_use_id: null,
+        message: { content: [{ type: "tool_result", tool_use_id: "zz", content: "ok" }] },
+      }),
+    ).boundary,
+  ).toBe(true);
 });
 
 test.if(posix)(
   "a message steered mid-turn is read at the next tool boundary: accepted, steer_read, one answer",
   async () => {
-    await withVersion("2.1.300", async () => {
+    await withCli(NOW_CLI, async () => {
       const { m, turn } = setup();
       const pending = turn(1, "STEER work");
-      const reply = await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "also the docs", urgent: true }]);
+      const reply = await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "also the docs" }]);
       expect(reply).toEqual({ status: "accepted", accepted: [U(1)] });
       const { final, events } = await pending;
-      // Urgent on a CLI that moves work aside: "now", from a person.
-      expect(final).toMatchObject({ type: "done", text: "echo 1: STEER work +now/human: also the docs" });
-      const read = events.findIndex((e) => e.type === "steer_read");
-      expect(events[read]).toEqual({ type: "steer_read", uuids: [U(1)] });
-      expect(read).toBeLessThan(events.findIndex((e) => e.type === "done"));
+      // At the next tool boundary, from a person.
+      expect(final).toMatchObject({ type: "done", text: "echo 1: STEER work +next/human: also the docs" });
+      // Read once: the lifecycle's `started` and the result's list are the same read.
+      expect(events.filter((e) => e.type === "steer_read")).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+      expect(events.findIndex((e) => e.type === "steer_read")).toBeLessThan(events.findIndex((e) => e.type === "done"));
       // The process stays for the next turn; nothing is left over.
       expect(m.size).toBe(1);
       expect((await turn(2, "next")).final).toMatchObject({ text: "echo 2: next" });
@@ -773,21 +825,124 @@ test.if(posix)(
   },
 );
 
-test.if(posix)("urgent on a CLI that can't move work aside goes as next", async () => {
-  await withVersion("2.1.270", async () => {
+test.if(posix)("the read is the lifecycle's `started`, before the result (which may list nothing)", async () => {
+  // 2.1.220: the lifecycle, but no `user_message_uuids` in its results.
+  await withCli({ version: "2.1.220", caps: CAPS_NEXT, noResultUuids: true }, async () => {
+    const { m, turn } = setup();
+    const seen: string[] = [];
+    const pending = turn(1, "STEER work");
+    expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "also this" }])).status).toBe("accepted");
+    const { final, events } = await pending;
+    seen.push(...events.map((e) => e.type));
+    expect(final).toMatchObject({ text: "echo 1: STEER work +next/human: also this" });
+    expect(events.filter((e) => e.type === "steer_read")).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+    // Said before the turn's usage (the result's first event) and its answer.
+    expect(seen.indexOf("steer_read")).toBeLessThan(seen.indexOf("usage"));
+    expect(m.size).toBe(1);
+  });
+});
+
+test.if(posix)("urgent: `now` where the CLI can move work aside; unsupported where it can't", async () => {
+  await withCli({ version: "2.1.220", caps: CAPS_NEXT }, async () => {
+    const { m, turn } = setup();
+    const pending = turn(1, "STEER work");
+    const reply = await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "stop that", urgent: true }]);
+    // The engine stops the turn and starts it again from the message instead.
+    expect(reply).toMatchObject({ status: "unsupported" });
+    expect((reply as { reason: string }).reason).toContain("2.1.220");
+    // Nothing was written: the turn ends on its own (the fake waits for a line a moment).
+    expect((await pending).final).toMatchObject({ text: "echo 1: STEER work" });
+  });
+  await withCli(NOW_CLI, async () => {
     const { m, turn } = setup();
     const pending = turn(1, "STEER work");
     expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "stop that", urgent: true }])).status).toBe(
       "accepted",
     );
-    expect((await pending).final).toMatchObject({ text: "echo 1: STEER work +next/human: stop that" });
+    expect((await pending).final).toMatchObject({ text: "echo 1: STEER work +now/human: stop that" });
+  });
+});
+
+test.if(posix)(
+  "work an urgent message moved to the background: the request waits for the CLI's own turn, answers join",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup();
+      const pending = turn(1, "STEERBG work");
+      expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "check this", urgent: true }])).status).toBe(
+        "accepted",
+      );
+      const { final, events } = await pending;
+      expect(final).toMatchObject({
+        type: "done",
+        text: "echo 1: STEERBG work +now/human: check this\n\nbackground finished",
+      });
+      expect(events.filter((e) => e.type === "steer_read")).toEqual([{ type: "steer_read", uuids: [U(1)] }]);
+      expect(events.filter((e) => e.type === "done")).toHaveLength(1);
+      // Both turns' usage, one answer: the follow-up never reaches the next request.
+      expect(events.filter((e) => e.type === "usage")).toHaveLength(2);
+      expect(m.size).toBe(1);
+      const next = await turn(2, "after");
+      expect(next.final).toMatchObject({ type: "done", text: "echo 2: after" });
+      expect(next.events.filter((e) => e.type === "done")).toHaveLength(1);
+      expect(spawns()).toHaveLength(1);
+    });
+  },
+);
+
+test.if(posix)("moved work that outlives the wait: the request ends with what it has, the process goes", async () => {
+  await withCli(NOW_CLI, async () => {
+    const { m, spawns, turn } = setup({ steerBackgroundWaitMs: 300 });
+    const pending = turn(1, "STEERBGHANG work");
+    expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "x", urgent: true }])).status).toBe("accepted");
+    const { final } = await pending;
+    expect(final).toMatchObject({ type: "done", text: "echo 1: STEERBGHANG work +now/human: x" });
+    expect(m.size).toBe(0);
+    expect((await turn(2, "again")).final).toMatchObject({ type: "done", text: "echo 1: again" });
+    expect(spawns()).toHaveLength(2);
+    expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+  });
+});
+
+test.if(posix)(
+  "a turn the CLI starts by itself (the agent's own background task ended): the next request gets a fresh process",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup();
+      // The agent's own background task doesn't hold the answer.
+      expect((await turn(1, "BGSELF serve")).final).toMatchObject({ type: "done", text: "echo 1: BGSELF serve" });
+      const first = m.process(AGENT.id, SESSION(1));
+      await waitFor(() => first?.strayTurn === true);
+      const next = await turn(2, "after");
+      expect(next.final).toMatchObject({ type: "done", text: "echo 1: after" });
+      expect(next.events.some((e) => e.type === "text_delta" && e.text.includes("stray"))).toBe(false);
+      expect(spawns()).toHaveLength(2);
+      expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+    });
+  },
+);
+
+test.if(posix)("a message the CLI never confirms: the turn ends, the process goes (nothing runs unheard)", async () => {
+  await withCli(NOW_CLI, async () => {
+    const { m, spawns, turn } = setup({ steerFollowUpMs: 200 });
+    const pending = turn(1, "STEERDROP work");
+    expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "lost" }])).status).toBe("accepted");
+    const { final, events } = await pending;
+    expect(final).toMatchObject({ type: "done", text: "echo 1: STEERDROP work" });
+    // Queued, never started: not read (the engine puts it back in the run's inbox).
+    expect(events.some((e) => e.type === "steer_read")).toBe(false);
+    expect(m.size).toBe(0);
+    // The next turn starts it again, resumed.
+    expect((await turn(2, "again")).final).toMatchObject({ type: "done" });
+    expect(spawns()).toHaveLength(2);
+    expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
   });
 });
 
 test.if(posix)(
   "a message the turn ended before reading starts the CLI's next turn: the request waits for it, answers join",
   async () => {
-    await withVersion("2.1.300", async () => {
+    await withCli(NOW_CLI, async () => {
       const { m, spawns, turn } = setup();
       const pending = turn(1, "STEERLATE work");
       expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "one more thing" }])).status).toBe("accepted");
@@ -802,38 +957,23 @@ test.if(posix)(
   },
 );
 
-test.if(posix)("a message the CLI never confirms: the turn ends, the process goes (nothing runs unheard)", async () => {
-  await withVersion("2.1.300", async () => {
-    const { m, spawns, turn } = setup({ steerFollowUpMs: 200 });
-    const pending = turn(1, "STEERDROP work");
-    expect((await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "lost" }])).status).toBe("accepted");
-    const { final, events } = await pending;
-    expect(final).toMatchObject({ type: "done", text: "echo 1: STEERDROP work" });
-    expect(events.some((e) => e.type === "steer_read")).toBe(false);
-    expect(m.size).toBe(0);
-    // The next turn starts it again, resumed.
-    expect((await turn(2, "again")).final).toMatchObject({ type: "done" });
-    expect(spawns()).toHaveLength(2);
-    expect(spawns()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
-  });
-});
-
 test.if(posix)("an old CLI, a one-shot turn, another agent or session: unsupported or no_turn", async () => {
-  await withVersion("2.1.100", async () => {
+  // A version new enough by number, but no capabilities said: not steerable.
+  await withCli({ version: "2.1.300" }, async () => {
     const { m, turn } = setup();
     const pending = turn(1, "SLOW old");
     const reply = await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "hey" }]);
     expect(reply).toMatchObject({ status: "unsupported" });
-    expect((reply as { reason: string }).reason).toContain("2.1.100");
+    expect((reply as { reason: string }).reason).toContain("2.1.300");
     await pending;
   });
-  await withVersion(null, async () => {
+  await withCli({}, async () => {
     const { m, turn } = setup();
     const pending = turn(1, "SLOW unknown");
     expect(await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "hey" }])).toMatchObject({ status: "unsupported" });
     await pending;
   });
-  await withVersion("2.1.300", async () => {
+  await withCli(NOW_CLI, async () => {
     const { m, turn } = setup();
     const once = turn(1, "SLOW once", { keepAlive: false });
     expect(await steerWhenReady(m, RUN(1), [{ uuid: U(1), text: "hey" }])).toMatchObject({ status: "unsupported" });
