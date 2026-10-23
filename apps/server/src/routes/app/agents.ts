@@ -84,8 +84,7 @@ const AgentFields = z.object({
   role: z.string().max(200).optional(),
   instructions: z.string().max(50_000).optional(),
   model: z.string().optional().openapi({
-    description:
-      "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to `auto`.",
+    description: "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to `auto`.",
   }),
   credentialId: z
     .uuid()

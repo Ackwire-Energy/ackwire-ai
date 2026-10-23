@@ -283,7 +283,11 @@ describe("Criar agente: what gets created", () => {
     const sonnet = screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ });
     await click(sonnet);
     expect(sonnet.getAttribute("aria-pressed")).toBe("true");
-    expect(screen().getByRole("button", { name: /^Automático/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(
+      screen()
+        .getByRole("button", { name: /^Automático/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
     await proceed();
     expect(document.querySelector(".newag__review")?.textContent).toContain("Claude Sonnet 5.5 ·");
     await click(screen().getByRole("button", { name: "Criar Eva" }));

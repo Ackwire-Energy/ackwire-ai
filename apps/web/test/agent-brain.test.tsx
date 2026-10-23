@@ -430,7 +430,11 @@ describe("Quem pensa: Automático (D83)", () => {
     const d = await brainDialog();
     await click(card(d, /^Claude Code/));
     const models = within(d).getByRole("radiogroup", { name: "Modelo" });
-    expect(within(models).getByRole("radio", { name: /^Automático$/ }).getAttribute("aria-checked")).toBe("true");
+    expect(
+      within(models)
+        .getByRole("radio", { name: /^Automático$/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
