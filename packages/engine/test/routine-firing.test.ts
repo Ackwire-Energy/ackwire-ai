@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
@@ -13,6 +13,7 @@ import {
   stopRoutineRun,
   takeOverRoutine,
 } from "../src";
+import * as ledgerModule from "../src/routine-ledger";
 import { addMember, type Fixture, setup } from "./fixtures";
 import {
   agentRunRow,
@@ -200,6 +201,37 @@ describe("one run at a time", () => {
     expect((await notificationsOf(f, "routine_stalled"))[0]?.doneAt).not.toBeNull();
   });
 
+  test("a computer online that can't take the turn (an old runner, its plan's limit) notifies once, not every slot", async () => {
+    f = await setup();
+    const routine = await channelRoutine(f);
+    const [machine] = await f.db
+      .insert(schema.machines)
+      .values({ orgId: f.org.id, name: "MacBook da Ana" })
+      .returning();
+    const park = async (agentRunId: string | null) => {
+      await f.db
+        .update(schema.agentRuns)
+        .set({ status: "waiting_input", waitingMachineId: machine?.id })
+        .where(eq(schema.agentRuns.id, agentRunId ?? ""));
+      // Online: it answers every ping, so its last sign of life moves on every slot.
+      await f.db.update(schema.machines).set({ lastSeenAt: new Date() });
+    };
+    let last = await fire(f, routine.id, minutesFromNow(-240), "schedule");
+    for (const at of [-180, -120, -60]) {
+      await park(last.agentRunId);
+      last = await fire(f, routine.id, minutesFromNow(at), "schedule");
+    }
+    expect(await notificationsOf(f, "routine_stalled")).toHaveLength(1);
+    // It runs again, then the next outage is news again.
+    await closeRoutineRun(ledger(), await agentRunRow(f, last.agentRunId), { status: "done", text: "ok" });
+    const next = await fire(f, routine.id, minutesFromNow(-30), "schedule");
+    await park(next.agentRunId);
+    await fire(f, routine.id, minutesFromNow(-10), "schedule");
+    const stalled = await notificationsOf(f, "routine_stalled");
+    expect(stalled).toHaveLength(2);
+    expect(stalled.filter((n) => n.doneAt === null)).toHaveLength(1);
+  });
+
   test("a computer back after more than 12 hours: the stale run is missed, a fresh one resumes", async () => {
     f = await setup();
     const routine = await channelRoutine(f);
@@ -250,6 +282,32 @@ describe("stop, pause and delete end the work in progress quietly", () => {
     expect(await routineRunRow(f, deleted.id)).toMatchObject({ status: "canceled", code: "deleted" });
     expect((await agentRunRow(f, deleted.agentRunId)).status).toBe("canceled");
     expect(await messagesIn(f, f.general.id)).toEqual([]);
+  });
+
+  test("Stop racing a start: the agent run the start got is stopped too", async () => {
+    f = await setup();
+    const routine = await channelRoutine(f);
+    const queued = await queueRoutineRun({ db: f.db }, await routineRow(f, routine.id), minutesFromNow(-5), "manual");
+    // Claimed, not started yet: Stop reads it without an agent run.
+    await f.db
+      .update(schema.routineRuns)
+      .set({ status: "starting" })
+      .where(eq(schema.routineRuns.id, queued?.id ?? ""));
+    const realEnd = ledgerModule.endRoutineRun;
+    const spy = spyOn(ledgerModule, "endRoutineRun").mockImplementationOnce(async (deps, ref, end) => {
+      // Its start commits first: the routine run is started, with its agent run.
+      await executeRoutineRun(routineDeps(f), queued?.id ?? "");
+      return realEnd(deps, ref, end);
+    });
+    try {
+      expect(await stopRoutineRun(routineDeps(f), f.owner.id, f.org.id, routine.id)).toEqual({ stopped: 1 });
+    } finally {
+      spy.mockRestore();
+    }
+    const row = await routineRunRow(f, queued?.id ?? "");
+    expect(row).toMatchObject({ status: "canceled", code: "stopped" });
+    expect(row.agentRunId).not.toBeNull();
+    expect((await agentRunRow(f, row.agentRunId)).status).toBe("canceled");
   });
 
   test("only its creator, the agent's owner or an admin can stop it", async () => {

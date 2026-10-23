@@ -12,6 +12,7 @@ import {
   readOnlyCall,
   SECRET_BASH_DENY_RULES,
   SECRET_MESSAGE,
+  SECRET_READ_DENY_RULES,
   secretRead,
   shellWords,
   simpleCommands,
@@ -339,6 +340,24 @@ describe("secrets are refused to every read tool", () => {
       expect(forbiddenReason(tool, input, scope)).toBe("it touches secrets");
     }
     expect(forbiddenHint("it touches secrets")).toBe(SECRET_MESSAGE);
+  });
+
+  test("Claude Code's read rules cover what the server refuses, in the home folder and in a project", () => {
+    // Claude Code's gitignore-like patterns, enough for these rules: `**` any folders, `*` one name.
+    const pattern = (rule: string) => {
+      const glob = /^Read\((.*)\)$/.exec(rule)?.[1] ?? "";
+      const parts = glob.split("**").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*"));
+      return new RegExp(`^${parts.join(".*")}$`);
+    };
+    const denied = (file: string) => SECRET_READ_DENY_RULES.some((r) => pattern(r).test(file));
+    for (const file of [".npmrc", "credentials.json", ".gcloud/key.json", ".env.production", ".pgpass", "id_rsa"]) {
+      // The server refuses it anywhere; Claude Code's own Read is denied it at home and in a repository.
+      expect([file, secretRead("Read", { file_path: `/w/dev/repos/acme/app/${file}` }, scope)]).toEqual([file, true]);
+      expect([file, denied(`~/${file}`)]).toEqual([file, true]);
+      expect([file, denied(`repos/acme/app/${file}`)]).toEqual([file, true]);
+    }
+    expect(denied("repos/acme/app/.env.example")).toBe(false);
+    expect(denied("repos/acme/app/src/credentials.ts")).toBe(false);
   });
 
   test("Claude Code's own rules for credential stores match the shell spellings", () => {

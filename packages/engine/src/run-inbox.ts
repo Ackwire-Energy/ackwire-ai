@@ -1,6 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { type RunTrigger, startOrJoinRun } from "./dispatch";
+import { mayJoin, type RunTrigger, startOrJoinRun } from "./dispatch";
 import { publishChannelEvent } from "./events";
 import type { Message } from "./messages";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
@@ -84,9 +84,15 @@ export async function releaseInbox(
   const trigger = await triggerFor(db, run, last);
   const started = await db.transaction(async (tx) => {
     const out = await startOrJoinRun(tx, last, run.agentId, trigger);
-    // Joined a run that already read its context: the rest go to it too (a new run reads them in the conversation).
-    if (out && "joined" in out) {
-      for (const m of rows) if (m.id !== last.id) await queueOnRun(tx, out.joined, m.id);
+    if (!out) return out;
+    const taker = "created" in out ? out.created.id : out.joined;
+    for (const m of rows) {
+      if (m.id === last.id) continue;
+      // One that may not reach the run that took them (a routine's report next to a person's message,
+      // ADR 0053 §4) goes its own way.
+      if (!(await mayJoin(tx, m, taker))) await startOrJoinRun(tx, m, run.agentId, await triggerFor(tx, run, m));
+      // Joined a run that already read its context: the rest go to it too (a new run reads them in the conversation).
+      else if ("joined" in out) await queueOnRun(tx, out.joined, m.id);
     }
     return out;
   });

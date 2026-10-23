@@ -135,8 +135,9 @@ export const STEER_PROTOCOL = 15;
  * command policy as Claude Code's permission prompt. `keepAlive: false` (a
  * background turn) leaves no app-server behind. Claude Code's `plan` turns read
  * only on our prompt tool, with no settings files. An older runner would run
- * Codex with no approvals and the network on: the server never sends it a
- * Codex turn (`runner_outdated`); its Claude Code turns keep the plan mode it has.
+ * Codex with no approvals and the network on, and its Claude Code `plan` reads
+ * secrets and loads the project's settings files: the server never sends it a
+ * Codex turn nor a Claude Code `plan` turn (`runner_outdated`).
  */
 export const BRAIN_PROFILES_PROTOCOL = 16;
 

@@ -34,6 +34,13 @@ describe("replyPolicyFor", () => {
     expect(replyPolicyFor(run(), person(), { answerOwed: true }).mayPass).toBe(false);
   });
 
+  test("another agent's message about its routine's report: an agent the router brings in may still pass", () => {
+    const report = { routine: { id: "r", name: "Sentry", runId: "rr" } };
+    expect(replyPolicyFor(run(), { authorType: "agent", meta: report }).mayPass).toBe(true);
+    // A routine's own call (a person's message written for its creator) never.
+    expect(replyPolicyFor(run(), person(report)).mayPass).toBe(false);
+  });
+
   test("a run brought in passes on a thanks without looking anything up first", () => {
     // Eval 2026-10-23 (router-pass-already-answered): on "perfeito, obrigada!" after another agent
     // answered, the run re-checked the deploy instead of passing.

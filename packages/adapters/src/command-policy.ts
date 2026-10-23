@@ -11,7 +11,11 @@ import { commandParts, ruleMatches } from "./machine-protocol";
  * - `deniedInMissions`: the deny list, matched on normalized arguments (`gh -R`,
  *   `git -C/-c`, `refs/heads/<default>`): refused at once, never asked.
  * - `secretRead`: a call that reads keys, tokens or env files, with any read
- *   tool (Read, Glob, Grep, a shell command): refused at once too.
+ *   tool (Read, Glob, Grep, a shell command): refused at once too. Only calls
+ *   that reach a prompt are seen: Claude Code's own reads meet the same list
+ *   as deny rules (`SECRET_READ_DENY_RULES`); Codex runs the commands it deems
+ *   safe (`cat`, `grep`…) without asking, so there secrets are kept from
+ *   leaving rather than from being read (ADR 0053 §3).
  * - `readOnlyCall`: harmless reads (listing and reading files anywhere but
  *   secrets, read-only git, GET/HEAD fetches that save only into the
  *   mission folder; in the `plan` profile no fetch and no write at all). The
@@ -217,11 +221,68 @@ const insideOrTmp = (scope: CommandScope, p: string) => {
 };
 
 /**
+ * Folders that hold keys and tokens, anywhere (the runner's own home too): nothing under them is read.
+ * One list for the server's checks (`SECRET_PATH`) and Claude Code's own rules (`SECRET_READ_DENY_RULES`).
+ */
+const SECRET_DIRS = [
+  ".ssh",
+  ".aws",
+  ".gnupg",
+  ".kube",
+  ".docker",
+  ".azure",
+  ".gcloud",
+  ".password-store",
+  "Keychains",
+  ".agentes-runner",
+  ".config/gh",
+  ".config/gcloud",
+] as const;
+/** Files that hold tokens, anywhere (a project's `.npmrc` or service account too). */
+const SECRET_FILES = [
+  ".netrc",
+  ".npmrc",
+  ".pypirc",
+  ".git-credentials",
+  ".pgpass",
+  "credentials",
+  "credentials.json",
+  "mcp-token",
+] as const;
+/** Env files with values in them; `.env.example` and the like hold none (`SECRET_PATH` refuses every other `.env.*`). */
+const SECRET_ENV_FILES = [
+  ".env",
+  ".env.local",
+  ".env.*.local",
+  ".env.production",
+  ".env.prod",
+  ".env.prd",
+  ".env.development",
+  ".env.dev",
+  ".env.staging",
+  ".env.stage",
+  ".env.preview",
+  ".env.test",
+  ".env.ci",
+  ".env.qa",
+  ".env.uat",
+  ".env.backup",
+  ".env.bak",
+  ".env.old",
+] as const;
+/** Keys and certificates, by name. */
+const SECRET_KEY_FILES = ["*.pem", "*.key", "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"] as const;
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+
+/**
  * Secrets a read never gets: keys, tokens, env files (not their `.env.example`
  * and the like, which hold none), the runner's own home.
  */
-const SECRET_PATH =
-  /(^|\/)(\.ssh|\.aws|\.gnupg|\.kube|\.docker|\.azure|\.gcloud|\.password-store|Keychains|\.agentes-runner)(\/|$)|(^|\/)\.config\/(gh|gcloud)(\/|$)|(^|\/)(\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.pgpass|\.env(\.(?!(example|sample|template|dist|defaults)$)[\w.-]+)?|id_[a-z0-9]+(\.pub)?|credentials(\.json)?|.*\.pem|.*\.key|mcp-token)$/i;
+const SECRET_PATH = new RegExp(
+  `(^|/)(${SECRET_DIRS.map(escapeRe).join("|")})(/|$)|(^|/)(${SECRET_FILES.map(escapeRe).join("|")}|\\.env(\\.(?!(example|sample|template|dist|defaults)$)[\\w.-]+)?|id_[a-z0-9]+(\\.pub)?|.*\\.pem|.*\\.key)$`,
+  "i",
+);
 
 function secretPath(scope: CommandScope, p: string) {
   const r = resolveIn(scope, p);
@@ -814,41 +875,15 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
   "Library/Keychains",
 ].flatMap((p) => [`Bash(*~/${p}*)`, `Bash(*/${p}/*)`]);
 
-/** The same secrets for Claude Code's own read tools (Read, and best effort Glob and Grep). */
+/**
+ * The same secrets for Claude Code's own read tools (Read, and best effort Glob and Grep), from the
+ * lists `SECRET_PATH` is built from: in the home folder and anywhere under the turn's folder. Its rules
+ * can't say "every `.env.*` but the example", so the env files are the usual names.
+ */
 export const SECRET_READ_DENY_RULES: readonly string[] = [
-  ...[
-    ".ssh",
-    ".aws",
-    ".gnupg",
-    ".kube",
-    ".docker",
-    ".azure",
-    ".password-store",
-    ".config/gh",
-    ".config/gcloud",
-    ".agentes-runner",
-    "Library/Keychains",
-  ].map((p) => `Read(~/${p}/**)`),
-  ...[".netrc", ".npmrc", ".pypirc", ".git-credentials", ".pgpass"].map((p) => `Read(~/${p})`),
-  // `.env.example` and friends stay readable (no secrets; a project's setup needs them).
-  ...[
-    ".env",
-    ".env.local",
-    ".env.*.local",
-    ".env.production",
-    ".env.prod",
-    ".env.development",
-    ".env.dev",
-    ".env.staging",
-    ".env.test",
-    "*.pem",
-    "*.key",
-    "id_rsa",
-    "id_ed25519",
-    "id_ecdsa",
-    "id_dsa",
-    "mcp-token",
-  ].map((p) => `Read(**/${p})`),
+  ...SECRET_DIRS.flatMap((p) => [`Read(~/${p}/**)`, `Read(**/${p}/**)`]),
+  "Read(~/Library/Keychains/**)",
+  ...[...SECRET_FILES, ...SECRET_ENV_FILES, ...SECRET_KEY_FILES].flatMap((p) => [`Read(~/${p})`, `Read(**/${p})`]),
 ];
 
 /** Global options of git before its subcommand that take a value (`git -C <dir> push`, `git -c k=v push`). */

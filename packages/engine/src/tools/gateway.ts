@@ -4,6 +4,7 @@ import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
+import { carriesCredential } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
@@ -41,6 +42,10 @@ export const wrapExternal = (source: string, text: string) => untrustedBlock(sou
 /** What run steps and approvals keep: the text people see, without the model's envelope. */
 const shown = (text: string) =>
   text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
+
+/** The answer to a call of a run nobody is behind that carries a credential (`carriesCredential`). */
+export const CREDENTIAL_REFUSAL =
+  "Refused: this call carries what looks like a key, token or private key. Work no person asked for never sends credentials anywhere: leave the value out (you may say one was found, and where).";
 
 /** `ask_user` (questions.ts): it waits for a person, so it carries a `why` like an approval. */
 const ASK_USER = "ask_user";
@@ -254,6 +259,11 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         // Through a directory the model never saw the schema up front: show it, so the next call can be right.
         const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}` : "";
         return finish({ content: `Invalid input: ${problems.join("; ")}${schemaHint}`, isError: true });
+      }
+      // A run nobody is behind never sends a credential anywhere (ADR 0053 §3): a key it read on its computer
+      // (a sandbox that can't keep it from being read) can't leave through any tool, on any brain.
+      if (authority && authority.kind !== "person" && carriesCredential(call.input)) {
+        return finish({ content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential" } });
       }
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
       const check = await checkToolCall(tool, call.input, ctx);

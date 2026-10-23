@@ -9,6 +9,7 @@ import {
   type BrainEvent,
   cancelRun,
   claimJobs,
+  createAgent,
   createAgentRuns,
   createChannel,
   createJobHandlers,
@@ -588,6 +589,49 @@ describe("what a run owes", () => {
     expect(after?.transcript).toMatchObject({ answerOwed: true, steeredBy: f.owner.id });
     // The pass went nowhere: it answered the person.
     expect((await agentMessages()).map((m) => m.body)).toEqual(["O staging também foi atualizado."]);
+  });
+
+  test("a person's message to another agent in the thread is only context: it may still pass, nobody behind it", async () => {
+    let notice = "";
+    f = await setup({
+      toolSources: [
+        createPassToolSource(),
+        workTools({
+          onLook: async (ctx) => {
+            const m = await insertMessage(ctx.db, {
+              orgId: f.org.id,
+              channelId: f.general.id,
+              threadId: notice,
+              author: { type: "person", userId: f.owner.id },
+              body: "@qa e o staging?",
+            });
+            await queueOnRun(ctx.db, ctx.runId, m.id);
+          },
+        }),
+      ],
+      reply: (_req, call) =>
+        call === 1
+          ? { chunks: [], toolUses: [{ name: "look", input: {} }] }
+          : { chunks: [], toolUses: [{ name: "pass", input: { reason: "é com o QA" } }] },
+    });
+    const qa = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "QA", handle: "qa", role: "QA", instructions: "Test the app.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: qa.id });
+    const woken = await noteRun();
+    notice = woken.notice.id;
+    await drainOutbox(f.db, f.handlers);
+
+    const after = await runById(woken.run.id);
+    expect(after?.status).toBe("done");
+    expect(after?.transcript).not.toHaveProperty("answerOwed");
+    expect(after?.transcript).not.toHaveProperty("steeredBy");
+    // It passed: the person was talking to QA.
+    expect(await agentMessages()).toEqual([]);
   });
 
   test("a run that changed something posts its receipts instead of passing", async () => {

@@ -1,6 +1,6 @@
 import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { audienceSql } from "./audience";
-import { personOfMessage, runAuthorityById } from "./authority";
+import { messageRoot, personOfMessage, runAuthorityById } from "./authority";
 import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
@@ -8,7 +8,7 @@ import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
 import type { AgentRun } from "./runs";
 
-const { agents, channelMembers, channels, agentRuns } = schema;
+const { agents, channelMembers, channels, agentRuns, messages } = schema;
 
 export type RunTrigger = AgentRun["trigger"];
 
@@ -72,7 +72,8 @@ export async function startOrJoinRun(
   // One active run per agent and conversation (forum turns are driven separately; background runs
   // hold no slot): the message goes to it, read at its next step, instead of a second run.
   if (trigger !== "forum" && !options.background) {
-    // In the agents' DM several runs may be active, one per person behind them: join that person's.
+    // Several runs may be active (in the agents' DM one per person behind them; elsewhere a person's run
+    // next to an unattended one): the message joins the newest it may (`mayJoin`).
     const active = await tx
       .select({ id: agentRuns.id, triggerMessageId: agentRuns.triggerMessageId })
       .from(agentRuns)
@@ -95,7 +96,7 @@ export async function startOrJoinRun(
       .orderBy(sql`${agentRuns.createdAt} desc`)
       .limit(10);
     for (const run of active) {
-      if (run.triggerMessageId === message.id || !(await samePersonInAgentsDm(tx, message, run.id))) continue;
+      if (run.triggerMessageId === message.id || !(await mayJoin(tx, message, run.id))) continue;
       if (await queueOnRun(tx, run.id, message.id)) return { joined: run.id };
       break;
     }
@@ -126,12 +127,14 @@ export async function startOrJoinRun(
 }
 
 /**
- * In the agents' DM a run works for one person (ADR 0053 §9): a question or note joins the run active
- * there only when the same person is behind both (or nobody is behind either); otherwise it starts a
- * run of its own, so one person's exchange never reaches a run working for another. Any other
- * conversation: true.
+ * Whether a message may join a run active in its conversation (ADR 0053 §4, §9). A person's own words
+ * steer the agent's run there (and put them behind an unattended one), except in the agents' DM, where a
+ * run works for one person. Another agent's message for a person joins only a run working for that same
+ * person. A routine's report or another agent's note joins only a run such news woke: never one working
+ * for a person, nor the agent's own work (a mission's); it starts a run of its own. The agent's own
+ * events (a task that ended, a folder decision) still go to whatever run is working there.
  */
-async function samePersonInAgentsDm(
+export async function mayJoin(
   tx: Executor,
   message: Pick<Message, "id" | "orgId" | "channelId">,
   runId: string,
@@ -140,10 +143,18 @@ async function samePersonInAgentsDm(
     .select({ kind: channels.kind, dmKey: channels.dmKey })
     .from(channels)
     .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
-  if (!channel || !isAgentOnlyDm(channel)) return true;
-  const person = await personOfMessage(tx, message.orgId, message.id);
-  const behindRun = await runAuthorityById(tx, message.orgId, runId);
-  return person === behindRun.personId;
+  const agentsDm = !!channel && isAgentOnlyDm(channel);
+  const [row] = await tx
+    .select({ authorType: messages.authorType })
+    .from(messages)
+    .where(and(eq(messages.orgId, message.orgId), eq(messages.id, message.id)));
+  if (row?.authorType === "person" && !agentsDm) return true;
+  const root = await messageRoot(tx, message.orgId, message.id);
+  if (root.kind === "agent" && !agentsDm) return true;
+  const behind = await runAuthorityById(tx, message.orgId, runId);
+  if (root.kind === "person") return behind.personId === root.personId;
+  if (root.kind === "agent") return behind.personId === null;
+  return behind.kind === "unattended" && behind.reason !== "agent";
 }
 
 /** Active agents among `agentIds` that are members of the channel (re-checked at dispatch time). */

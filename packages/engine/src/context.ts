@@ -145,6 +145,11 @@ function ago(at: Date, now = Date.now()) {
  */
 export interface ContextBlock extends SystemBlock {
   turn?: boolean;
+  /**
+   * Found for this trigger (memory, wiki), already bounded when retrieved: a computer brain reads it
+   * whole after the clipped part of "# This turn", on the run's first turn (its session keeps it).
+   */
+  found?: boolean;
   /** The "# Now" block's inputs, so each turn renders the time it runs at (`gapMs`: since the message before). */
   now?: { zone: string; who: string | null; gapMs: number | null };
 }
@@ -157,30 +162,42 @@ export const stableFirst = <T extends SystemBlock>(system: T[]): T[] => [
   ...system.filter(isTurnBlock),
 ];
 
-/** How long "# This turn" may be: the time, where it is, why it was called, then what fits of memory and wiki. */
+/** How long the fixed part of "# This turn" may be: the time, where it is, why it was called, a routine's time line. */
 export const THIS_TURN_MAX_CHARS = 2000;
 
 /**
  * What a computer brain reads at the top of every turn (ADR 0053 §10): the run's per-turn blocks, with
- * the time rendered now, under one heading, clipped. "" when the run has none.
+ * the time rendered now, under one heading. The fixed part is clipped; what was found for the trigger
+ * (memory, wiki) follows whole when `found` (the run's first turn, or a session started afresh), so a
+ * live session doesn't read it again every turn. "" when there is nothing.
  */
-export function thisTurnText(system: readonly ContextBlock[], now = new Date()): string {
+export function thisTurnText(
+  system: readonly ContextBlock[],
+  now = new Date(),
+  options: { found?: boolean } = {},
+): string {
   const blocks = system.filter(isTurnBlock);
-  if (blocks.length === 0) return "";
+  const fixed = blocks.filter((b) => !b.found);
+  const found = options.found === false ? [] : blocks.filter((b) => b.found);
+  if (fixed.length === 0 && found.length === 0) return "";
+  // One level under "# This turn": "## Now", "## Where you are".
+  const level = (text: string) => text.replace(/^# /, "## ");
   // The time first: it is what a resumed session most needs fresh.
-  const ordered = [...blocks.filter((b) => b.now), ...blocks.filter((b) => !b.now)];
-  const parts = ordered.map((b) => {
-    const text = b.now
-      ? nowLine(b.now.zone, b.now.who, b.now.gapMs === null ? null : new Date(now.getTime() - b.now.gapMs), now)
-      : b.text;
-    // One level under "# This turn": "## Now", "## Where you are".
-    return text.replace(/^# /, "## ");
-  });
+  const ordered = [...fixed.filter((b) => b.now), ...fixed.filter((b) => !b.now)];
+  const parts = ordered.map((b) =>
+    level(
+      b.now
+        ? nowLine(b.now.zone, b.now.who, b.now.gapMs === null ? null : new Date(now.getTime() - b.now.gapMs), now)
+        : b.text,
+    ),
+  );
   const intro = "What is true now, for this turn (it replaces what earlier turns said here):";
-  const text = ["# This turn", intro, ...parts].join("\n\n");
-  return text.length > THIS_TURN_MAX_CHARS
-    ? `${text.slice(0, THIS_TURN_MAX_CHARS).trimEnd()}\n[… cut; look it up with your tools if you need more]`
-    : text;
+  const head = ["# This turn", intro, ...parts].join("\n\n");
+  const clipped =
+    head.length > THIS_TURN_MAX_CHARS
+      ? `${head.slice(0, THIS_TURN_MAX_CHARS).trimEnd()}\n[… cut; look it up with your tools if you need more]`
+      : head;
+  return [clipped, ...found.map((b) => level(b.text))].join("\n\n");
 }
 
 export interface RunContext {
@@ -1211,9 +1228,10 @@ export function toTurns(
     const own = m.authorAgentId === agentId;
     const role = own ? "assistant" : "user";
     const authorId = m.authorUserId ?? m.authorAgentId;
-    const routine = m.meta?.routine as { name?: unknown } | undefined;
+    // A routine's call: a person's message posted for its creator on a schedule, not typed by them (an
+    // agent's message about its routine's report carries the tag too, and keeps its author's name).
+    const routine = m.authorType === "person" ? (m.meta?.routine as { name?: unknown } | undefined) : undefined;
     const who = (authorId && names.get(authorId)) || "unknown";
-    // A routine's message: posted for its creator on a schedule, not typed by them.
     const forum = m.meta?.forum as { kickoff?: boolean } | undefined;
     const label = forum?.kickoff
       ? "Forum"

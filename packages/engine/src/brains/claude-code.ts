@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   ACCOUNTS_PROTOCOL,
   type AgentScope,
+  BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   brainTopic,
@@ -85,7 +86,8 @@ export interface ClaudeCodeBrainDeps {
   personalMcp?: (turn: BrainTurn) => boolean | Promise<boolean>;
   /**
    * The turn's permission profile (missions: their own plan/work, branch prefix and allowed rules; other
-   * runs: `computerTurnProfile`). Older runners know `plan` already: it goes to them as it is.
+   * runs: `computerTurnProfile`). A `plan` turn needs `BRAIN_PROFILES_PROTOCOL` (an older runner's plan
+   * reads secrets and loads project settings): below it the turn fails with `runner_outdated`.
    */
   permissions?: (
     turn: BrainTurn,
@@ -354,6 +356,16 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           Promise.resolve(deps.personalMcp?.(turn) ?? false),
         ]);
         const permissions = await deps.permissions?.(turn);
+        // An older runner's `plan` lets the CLI read secrets and loads the project's settings files: the
+        // turn waits for an updated runner instead of reading with more power than asked for (§3).
+        if (permissions?.mode === "plan" && (status?.protocol ?? 0) < BRAIN_PROFILES_PROTOCOL) {
+          yield err(
+            "runner_outdated",
+            "The runner on the computer is too old to keep Claude Code within this agent's permissions; update it.",
+            true,
+          );
+          return;
+        }
         const code = await deps.prepare?.(turn, io.signal).catch(() => null);
         const request: BrainTurnRequest = {
           runId: turn.runId,

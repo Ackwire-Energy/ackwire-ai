@@ -61,7 +61,9 @@ export function replyPolicyFor(
   if (typeof notice === "string" && INFORMING_NOTICES.has(notice)) return { mayPass: true, background: false };
   if (run.trigger !== "router" || options.followUp) return { mayPass: false, background: false };
   const meta = trigger?.meta ?? {};
-  if (meta.routine) return { mayPass: false, background: false };
+  // A routine's call is a person's message written for its creator; an agent's message about a routine's
+  // report carries the tag too (§7), and another agent the router brings in may still pass on it.
+  if (meta.routine && trigger?.authorType === "person") return { mayPass: false, background: false };
   const replyTo = meta.replyTo as { author?: { type?: unknown; id?: unknown } } | undefined;
   const quotesThisAgent = replyTo?.author?.type === "agent" && replyTo.author.id === run.agentId;
   return { mayPass: !quotesThisAgent, background: false };

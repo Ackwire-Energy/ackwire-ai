@@ -63,14 +63,17 @@ export const skipRoutineRun = (db: Database, routineRunId: string, code: string)
 /**
  * Ends an open routine run and, when its agent run still works, stops that run quietly (nothing is
  * posted: a background run never speaks on a stop). The ledger is closed first, so its code wins.
+ * A run being started as the caller read the row (no agent run yet) is read again once the ledger
+ * closed: when its start won the race, the agent run it got is stopped too.
  */
 async function endWithRun(
   deps: FiringDeps,
   rr: Pick<RunRow, "id" | "orgId" | "routineId">,
-  ar: AgentRunRow | null,
+  seen: AgentRunRow | null,
   end: { status: "canceled" | "superseded" | "missed"; code: string; byUserId?: string | null },
 ) {
   await endRoutineRun(deps, { orgId: rr.orgId, routineId: rr.routineId, routineRunId: rr.id }, end);
+  const ar = seen ?? (await agentRunOfRoutineRun(deps.db, rr.id));
   if (ar && ACTIVE_RUN.includes(ar.status)) {
     const actor = end.byUserId
       ? ({ type: "person", id: end.byUserId } as const)
@@ -79,18 +82,36 @@ async function endWithRun(
   }
 }
 
-/** A routine's run waits for the agent's computer: its creator and the agent's owner hear it once per outage. */
+/** The agent run a routine run started, read now. */
+async function agentRunOfRoutineRun(db: Database, routineRunId: string): Promise<AgentRunRow | null> {
+  const [row] = await db
+    .select({ ar: agentRuns })
+    .from(routineRuns)
+    .innerJoin(agentRuns, eq(agentRuns.id, routineRuns.agentRunId))
+    .where(eq(routineRuns.id, routineRunId));
+  return row?.ar ?? null;
+}
+
+/**
+ * A routine's run waits for the agent's computer: its creator and the agent's owner hear it once per
+ * outage. An outage lasts until a run of the routine really runs again (it reports, stays silent or
+ * fails on its own), whatever the computer does meanwhile: one that is online but can't take the turn
+ * (an old runner, its plan's limit, signed out) stays connected, and must not notify every slot.
+ */
 async function stalled(deps: FiringDeps, routineId: string, orgId: string, machineId: string) {
-  const [m] = await deps.db
-    .select({ name: machines.name, lastSeenAt: machines.lastSeenAt, updatedAt: machines.updatedAt })
-    .from(machines)
-    .where(eq(machines.id, machineId));
+  const [m] = await deps.db.select({ name: machines.name }).from(machines).where(eq(machines.id, machineId));
+  const [ran] = await deps.db
+    .select({ id: routineRuns.id })
+    .from(routineRuns)
+    .where(and(eq(routineRuns.routineId, routineId), inArray(routineRuns.status, ["reported", "silent", "failed"])))
+    .orderBy(desc(routineRuns.createdAt))
+    .limit(1);
   await notifyRoutineStalled(deps, {
     orgId,
     routineId,
     machineId,
     machineName: m?.name ?? "",
-    outageKey: String((m?.lastSeenAt ?? m?.updatedAt)?.getTime() ?? "unknown"),
+    outageKey: ran?.id ?? "none",
   }).catch(() => {});
 }
 

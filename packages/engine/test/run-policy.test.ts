@@ -12,6 +12,8 @@ import {
   type ToolDefinition,
   type ToolSource,
 } from "../src";
+import { carriesCredential, maskCredentials } from "../src/tool-detail";
+import { CREDENTIAL_REFUSAL } from "../src/tools/gateway";
 import { REFUSALS, takeWhy, toolKind, toolPolicy, WHY_MIN_CHARS, WHY_REFUSAL, withWhy } from "../src/tools/run-policy";
 import { type Fixture, setup } from "./fixtures";
 
@@ -342,6 +344,38 @@ describe("the gateway applies the run policy", () => {
       output: { content: "refunded" },
     });
     expect(executed).toEqual([{ order: "3" }]);
+  });
+
+  test("a run nobody is behind never sends a credential, through any tool; a person's run is unchanged", async () => {
+    await gatewaySetup();
+    const key = "AKIAIOSFODNN7EXAMPLE";
+    const privateKey =
+      "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----";
+    for (const kind of ["read", "unattended"] as const) {
+      const { ctx } = await runAs(kind);
+      for (const query of [`customer ${key}`, privateKey]) {
+        expect(await call(ctx, "list_issues", { query })).toMatchObject({
+          type: "result",
+          output: { isError: true, content: CREDENTIAL_REFUSAL, data: { code: "tool.credential" } },
+        });
+      }
+      // Anything else still runs.
+      const fine = await call(ctx, "list_issues", { query: "checkout" });
+      expect(fine.type === "result" && fine.output.isError).toBeFalsy();
+    }
+    const { ctx } = await runAs("person");
+    const asked = await call(ctx, "list_issues", { query: `customer ${key}` });
+    expect(asked.type === "result" && asked.output.content).not.toBe(CREDENTIAL_REFUSAL);
+  });
+
+  test("credentials by their format: found in any value, masked in what people read", () => {
+    const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----";
+    expect(carriesCredential({ query: "AKIAIOSFODNN7EXAMPLE" })).toBe(true);
+    expect(carriesCredential(`a key:\n${pem}`)).toBe(true);
+    expect(carriesCredential({ query: "checkout errors since Monday" })).toBe(false);
+    expect(maskCredentials(`found ${pem} in the repo, and ghp_abcdefghijklmnopqrstuvwxyz0123`)).toBe(
+      "found •••• in the repo, and ••••",
+    );
   });
 
   test("the bridge lists exactly what the model loop does, why included", async () => {

@@ -39,6 +39,28 @@ test("toTurns: own messages are assistant turns, others are prefixed user turns,
   ]);
 });
 
+test("toTurns: a routine's call reads as the routine's; an agent's message about its report keeps its author", () => {
+  const names = new Map([
+    ["u1", "Ana"],
+    ["a2", "QA (@qa)"],
+  ]);
+  const routine = { routine: { id: "r", name: "Sentry", runId: "rr" } };
+  const turns = toTurns(
+    [
+      msg({ authorType: "person", authorUserId: "u1", body: "Veja os erros novos.", meta: routine }),
+      msg({ authorType: "agent", authorAgentId: "a2", body: "3 erros novos no checkout.", meta: routine }),
+    ],
+    "me",
+    names,
+  );
+  expect(turns).toEqual([
+    {
+      role: "user",
+      content: '[Routine "Sentry", created by Ana]: Veja os erros novos.\n\n[QA (@qa)]: 3 erros novos no checkout.',
+    },
+  ]);
+});
+
 test("toTurns: with older unanswered messages, the one being answered is marked current", () => {
   const names = new Map([["u1", "Ana"]]);
   const older = msg({ id: "m1", authorUserId: "u1", body: "alguém viu o deploy?" });
