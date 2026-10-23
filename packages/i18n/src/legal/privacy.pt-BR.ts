@@ -2,14 +2,15 @@ import type { LegalDocument } from "./types";
 
 export const privacyPtBR: LegalDocument = {
   title: "Política de privacidade",
-  summary: "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu espaço de trabalho e os seus direitos.",
+  summary:
+    "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu espaço de trabalho e os seus direitos.",
   updated: "2026-10-23",
   sections: [
     {
       id: "overview",
       heading: "1. Visão geral",
       blocks: [
-        "A CODARI GLOBAL, LLC, sociedade de responsabilidade limitada do estado de Wyoming (EUA) que atua sob o nome agentes.chat (\"agentes.chat\", \"nós\"), opera o agentes.chat: um espaço de trabalho onde pessoas e agentes de IA trabalham juntos, disponível na web, como app de Mac e como app de celular (o \"Serviço\"). Esta política distingue dois papéis:",
+        'A CODARI GLOBAL, LLC, sociedade de responsabilidade limitada do estado de Wyoming (EUA) que atua sob o nome agentes.chat ("agentes.chat", "nós"), opera o agentes.chat: um espaço de trabalho onde pessoas e agentes de IA trabalham juntos, disponível na web, como app de Mac e como app de celular (o "Serviço"). Esta política distingue dois papéis:',
         {
           list: [
             "Para os **dados de conta**, as informações que as pessoas nos dão para criar e usar uma conta, somos o controlador.",
