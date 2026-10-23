@@ -151,8 +151,9 @@ export function formatPlanReport(r: PlanReport): FormattedReport {
     .filter((s) => s.status === "done" && s.found)
     .map((s) => {
       const f = s.found as NonNullable<StepReport["found"]>;
-      if (f.answered === "no" || !f.text) return `Nothing on the page answers "${f.question}".`;
-      return `Where the page answers "${f.question}"${f.answered === "partly" ? " (maybe only in part)" : ""}:\n${f.text}`;
+      const part = f.searched ? ` (searched ${f.searched.lines} of the page's ${f.searched.of} lines)` : "";
+      if (f.answered === "no" || !f.text) return `Nothing on the page answers "${f.question}"${part}.`;
+      return `Where the page answers "${f.question}"${f.answered === "partly" ? " (maybe only in part)" : ""}${part}:\n${f.text}`;
     });
   // A page just opened shows what can be acted on there, even when it is the page the agent saw before.
   const opened = done.at(-1)?.step.do === "open";

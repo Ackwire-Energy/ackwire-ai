@@ -348,18 +348,18 @@ describe("checks", () => {
     const judge = createFakeJudge((kind, id, _state, q) => {
       if (kind !== "screen_find") return undefined;
       if (id === "answers") return 0.95;
-      // Windows of 200 lines, each its own question.
       const keys = Object.keys((q as { criteria: Record<string, string> }).criteria);
       return keys.includes("L301") ? { choice: "L301", probabilities: { L301: 0.9 } } : "none";
     });
     const found = await findInPage({ judge, ...ids, question: "the total", observation: page });
-    expect(judge.calls[0] && Object.keys(judge.calls[0].questions)).toEqual([
-      "answers",
-      "where_0",
-      "where_1",
-      "where_2",
+    // Windows of 200 lines, each its own request (Jev reads 32k tokens per question), all asked at once.
+    expect(judge.calls.map((c) => Object.keys(c.questions))).toEqual([
+      ["answers", "where"],
+      ["answers", "where"],
+      ["answers", "where"],
     ]);
     expect(found.answered).toBe("yes");
+    expect(found.searched).toBeUndefined();
     expect(found.text.split("\n")).toEqual([
       "- paragraph: line 298",
       "- paragraph: line 299",
@@ -371,6 +371,30 @@ describe("checks", () => {
     ]);
     const no = createFakeJudge((kind, id) => (kind === "screen_find" && id === "answers" ? 0.02 : "none"));
     expect((await findInPage({ judge: no, ...ids, question: "the total", observation: page })).answered).toBe("no");
+  });
+
+  test("find on a long page: every request small enough for Jev; past 12 windows, those with the question's words", async () => {
+    const lines = Array.from(
+      { length: 3000 },
+      (_, i) => `- paragraph: line ${i + 1} ${"of a long report ".repeat(i % 7)}`,
+    );
+    lines[2900] = '- row "Total R$ 42,00"';
+    const page = observeSnapshot({ text: lines.join("\n"), url: "https://shop.example/report" });
+    const judge = createFakeJudge((kind, id, _state, q) => {
+      if (kind !== "screen_find") return undefined;
+      if (id === "answers") return 0.95;
+      const keys = Object.keys((q as { criteria: Record<string, string> }).criteria);
+      return keys.includes("L2901") ? { choice: "L2901", probabilities: { L2901: 0.9 } } : "none";
+    });
+    const found = await findInPage({ judge, ...ids, question: "the total", observation: page });
+    expect(judge.calls).toHaveLength(12);
+    // Jev reads at most 32k tokens per question: no request comes near it (a token is ~3 characters or more).
+    for (const c of judge.calls) {
+      expect(JSON.stringify(c.state).length + JSON.stringify(c.questions).length).toBeLessThan(45_000);
+    }
+    expect(found).toMatchObject({ answered: "yes", searched: { of: 3000 } });
+    expect(found.searched?.lines).toBeLessThan(3000);
+    expect(found.text).toContain('- row "Total R$ 42,00"');
   });
 
   test("a dismiss is taken only when the judge is sure", async () => {

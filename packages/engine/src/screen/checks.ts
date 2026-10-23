@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Judge, JudgeAnswer, JudgeQuestion } from "../judge";
+import type { Judge, JudgeAnswer } from "../judge";
 import {
   describeElement,
   type ScreenChanges,
@@ -83,6 +83,16 @@ export async function checkCondition(
 
 /** Lines one Choice offers when finding an answer in a page (Jev takes 255 options). */
 const WINDOW = 200;
+/**
+ * What one window holds at most, in characters: its lines in `state` (each cut at `LINE_CHARS`) and
+ * as options (cut at `OPTION_CHARS`). Jev reads at most 32k tokens per question and 64k per request,
+ * so a page goes in windows, each its own request, all asked at once.
+ */
+const WINDOW_CHARS = 20_000;
+const LINE_CHARS = 300;
+const OPTION_CHARS = 120;
+/** Windows asked at once, at most: on a longer page, those with the most of the question's words. */
+const MAX_WINDOWS = 12;
 /** Lines of context kept around each hit. */
 const AROUND = 3;
 
@@ -91,12 +101,59 @@ export interface FoundInPage {
   answered: "yes" | "partly" | "no";
   /** The lines that answer it, with a little context, in page order. */
   text: string;
+  /** Only part of a long page was searched (where the question's words are, or a request failed): how much. */
+  searched?: { lines: number; of: number };
+}
+
+type Window = { from: number; to: number };
+
+/** The page in windows of at most `WINDOW` lines and `WINDOW_CHARS` characters. */
+function windowsOf(lines: string[]): Window[] {
+  const out: Window[] = [];
+  let from = 0;
+  let size = 0;
+  lines.forEach((line, i) => {
+    const n = line.trim().length;
+    const cost = Math.min(n, LINE_CHARS) + Math.min(n, OPTION_CHARS) + 12;
+    if (i > from && (i - from >= WINDOW || size + cost > WINDOW_CHARS)) {
+      out.push({ from, to: i });
+      from = i;
+      size = 0;
+    }
+    size += cost;
+  });
+  out.push({ from, to: lines.length });
+  return out;
+}
+
+const wordsOf = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2);
+
+/** All the windows, or on a page too long for that, the ones with the most of the question's words. */
+function windowsToAsk(windows: Window[], lines: string[], question: string): Window[] {
+  if (windows.length <= MAX_WINDOWS) return windows;
+  const terms = [...new Set(wordsOf(question))];
+  return windows
+    .map((w, order) => {
+      const text = new Set(wordsOf(lines.slice(w.from, w.to).join(" ")));
+      return { w, order, score: terms.filter((t) => text.has(t)).length };
+    })
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .slice(0, MAX_WINDOWS)
+    .sort((a, b) => a.order - b.order)
+    .map((s) => s.w);
 }
 
 /**
  * Where on the page `question` is answered ("the order total", "is the
- * export done?"): the lines themselves, not the whole page. One request:
- * a Choice per window of lines and whether the page answers at all.
+ * export done?"): the lines themselves, not the whole page. Each window of
+ * lines is one request (a Choice over its lines, and whether they answer it
+ * at all), all at once: a long page takes about as long as a short one.
  */
 export async function findInPage(
   input: Ids & { question: string; observation: ScreenObservation; maxChars?: number },
@@ -104,48 +161,54 @@ export async function findInPage(
   const lines = input.observation.lines;
   if (lines.length === 0) return { answered: "no", text: "" };
   const id = (i: number) => `L${i + 1}`;
-  const numbered = lines.map((l, i) => `${id(i)}: ${l.trim()}`).join("\n");
-  const questions: Record<string, JudgeQuestion> = {
-    answers: {
-      type: "noul",
-      instructions: "Does `page` answer `question` (states it, or shows it)?",
-      criteria: {
-        true: "At least one line of the page states or clearly shows the answer.",
-        false: "No line of the page addresses it.",
-      },
-    },
-  };
-  const windows = Math.ceil(lines.length / WINDOW);
-  for (let w = 0; w < windows; w++) {
-    const criteria: Record<string, string> = {};
-    for (let i = w * WINDOW; i < Math.min(lines.length, (w + 1) * WINDOW); i++) {
-      criteria[id(i)] = (lines[i] as string).trim().slice(0, 120) || "(empty)";
-    }
-    criteria.none = "No line here answers it.";
-    questions[`where_${w}`] = {
-      type: "choice",
-      instructions: `Which line of \`page\` (from ${id(w * WINDOW)} to ${id(Math.min(lines.length, (w + 1) * WINDOW) - 1)}) best answers \`question\`?`,
-      criteria,
-    };
-  }
-  const answers = await input.judge.ask({
-    orgId: input.orgId,
-    agentId: input.agentId,
-    runId: input.runId,
-    kind: "screen_find",
-    state: { question: input.question.trim(), page: { address: input.observation.url, lines: numbered } },
-    questions,
-  });
-  const exists = answers.answers?.noul ?? 0;
+  const question = input.question.trim();
+  const windows = windowsToAsk(windowsOf(lines), lines, question);
+  const asked = await Promise.allSettled(
+    windows.map((w) => {
+      const numbered: string[] = [];
+      const criteria: Record<string, string> = {};
+      for (let i = w.from; i < w.to; i++) {
+        const line = (lines[i] as string).trim();
+        numbered.push(`${id(i)}: ${line.slice(0, LINE_CHARS)}`);
+        criteria[id(i)] = line.slice(0, OPTION_CHARS) || "(empty)";
+      }
+      criteria.none = "No line here answers it.";
+      return input.judge.ask({
+        orgId: input.orgId,
+        agentId: input.agentId,
+        runId: input.runId,
+        kind: "screen_find",
+        state: { question, page: { address: input.observation.url, lines: numbered.join("\n") } },
+        questions: {
+          answers: {
+            type: "noul",
+            instructions: "Do the lines of `page` answer `question` (state it, or show it)?",
+            criteria: {
+              true: "At least one of these lines states or clearly shows the answer.",
+              false: "None of these lines addresses it.",
+            },
+          },
+          where: { type: "choice", instructions: "Which line of `page` best answers `question`?", criteria },
+        },
+      });
+    }),
+  );
+  const failed = asked.find((a): a is PromiseRejectedResult => a.status === "rejected");
+  if (failed && asked.every((a) => a.status === "rejected")) throw failed.reason;
+  let exists = 0;
+  let searched = 0;
   // Each line the judge points at, with its probability: the most likely are kept, then shown in page order.
   const hits = new Map<number, number>();
-  for (let w = 0; w < windows; w++) {
-    const probs = answers[`where_${w}`]?.probabilities ?? {};
-    for (const [key, p] of Object.entries(probs)) {
+  asked.forEach((a, k) => {
+    if (a.status !== "fulfilled") return;
+    const w = windows[k] as Window;
+    searched += w.to - w.from;
+    exists = Math.max(exists, a.value.answers?.noul ?? 0);
+    for (const [key, p] of Object.entries(a.value.where?.probabilities ?? {})) {
       const m = /^L(\d+)$/.exec(key);
       if (m && p >= 0.2) hits.set(Number(m[1]) - 1, p);
     }
-  }
+  });
   const keep = new Set<number>();
   for (const [i] of [...hits].sort((a, b) => b[1] - a[1]).slice(0, 8)) {
     for (let k = Math.max(0, i - AROUND); k <= Math.min(lines.length - 1, i + AROUND); k++) keep.add(k);
@@ -159,7 +222,7 @@ export async function findInPage(
   }
   const text = out.join("\n").slice(0, input.maxChars ?? 6000);
   const answered = exists >= 0.7 && text ? "yes" : exists >= 0.35 && text ? "partly" : "no";
-  return { answered, text };
+  return { answered, text, ...(searched < lines.length ? { searched: { lines: searched, of: lines.length } } : {}) };
 }
 
 /** A dismiss is clicked from this probability: it must clearly be one. */

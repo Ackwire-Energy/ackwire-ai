@@ -87,7 +87,7 @@ Then it looks once, at the whole tree (`snapshot`, not `-c`: on a page of plain 
 - **on a new page:** what can be acted on, meaning lines with a ref plus headings, dialogs and alerts (up to 6,000 characters);
 - **in both cases:** the address.
 
-Page text stays inside the untrusted `page_content` block. `browser_open` answers with the new page's controls, so the agent acts at once. `browser_read` is for reading text. With `find` it returns only the lines that answer a question ("the order total"), with three lines of context: a Choice per window of 200 lines and a Noul over the whole page, in one request.
+Page text stays inside the untrusted `page_content` block. `browser_open` answers with the new page's controls, so the agent acts at once. `browser_read` is for reading text. With `find` it returns only the lines that answer a question ("the order total"), with three lines of context. The page goes in windows of at most 200 lines and 20,000 characters. Each window is its own request, with a Choice over its lines and a Noul for whether they answer the question, and all of them are asked at once. Jev reads at most 32k tokens per question and 64k per request, so a long page in one request fails. Past 12 windows, the ones with the question's words are asked, and the answer says how much of the page was searched.
 
 ### 4. Plans: `browser_do`
 
@@ -156,7 +156,16 @@ The setup: real Claude, real Chrome for Testing through `agent-browser` 0.39.1 a
 | Settings behind an icon on a 150-row dashboard, Sonnet 5.5 | done **0/2** · 27.9–28.2 s · 8–11 turns · 130–185k | done 2/2 · **13.6–13.7 s · 3 turns · 11.8k** |
 | The same, Opus 5.5 | done 1/2 · 17.8–36.4 s · 7–11 turns · 102–207k | done 2/2 · **17.1–18.3 s · 3 turns · 12.2k** |
 
-**All rounds, scored the same way:** the old tools got **9 of 22** tasks done, the new ones **22 of 22**.
+**Again after the two reviews of the PR** (Sonnet 5.5, 2 runs each):
+
+| | Old | New |
+|---|---|---|
+| Sign-in + export | done 2/2 · 16.7–17.5 s · 7–8 turns · 22–25k | done 2/2 · **11.2–13.2 s · 2–3 turns · 7.2–11.9k** |
+| Settings behind an icon | done 2/2 · 24.4–25.5 s · 6 turns · 77–78k | done 2/2 · **14.1–14.6 s · 3–4 turns · 11.7–25.1k** |
+
+One new run's `read` with `find` on the 150-row dashboard failed: Jev answered 400 `max_tokens_exceeded`. The page was 1,526 lines, 121 KB in one request, over Jev's 64k tokens per request. The run went on with a click, one turn more. Each window is now its own request (below).
+
+**All rounds, scored the same way:** the old tools got **13 of 26** tasks done, the new ones **26 of 26**.
 
 - **Why the old one failed:** in each miss it told the person it "couldn't confirm" the result. It reads the page before the site's answer has rendered.
 - **Turns:** with a `read` step the model plans the whole sign-in-and-export (open, fill, fill, click, click, wait, read) in one `browser_do`.
@@ -181,6 +190,7 @@ The setup: real Claude, real Chrome for Testing through `agent-browser` 0.39.1 a
 - The Box looks for controls that may be only an icon.
 - There is a `read` step with `find`: the model asked for one at the end of a plan.
 - Jev's recorded price is fixed.
+- `find` asks each window of the page in its own request, all at once: one request for a whole long page went over Jev's limit.
 
 ## Order
 

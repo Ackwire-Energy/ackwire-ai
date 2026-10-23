@@ -125,7 +125,12 @@ export interface StepReport {
   /** Its action went through (a failed step with this only failed its `expect`: it must not be done again). */
   ran?: boolean;
   /** `read` with `find`: the lines that answer it (page text, untrusted), or why there are none. */
-  found?: { question: string; text: string; answered: "yes" | "partly" | "no" };
+  found?: {
+    question: string;
+    text: string;
+    answered: "yes" | "partly" | "no";
+    searched?: { lines: number; of: number };
+  };
   ms: number;
 }
 
@@ -270,7 +275,12 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
       observation: current,
     });
     report.note = `"${question}"`;
-    report.found = { question, text: found.text, answered: found.answered };
+    report.found = {
+      question,
+      text: found.text,
+      answered: found.answered,
+      ...(found.searched ? { searched: found.searched } : {}),
+    };
   }
 
   async function waitStep(step: ScreenStep, report: StepReport) {

@@ -848,16 +848,19 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
             question,
             observation: page,
           }).catch(() => null);
+          const part = found?.searched
+            ? ` (searched ${found.searched.lines} of the page's ${found.searched.of} lines)`
+            : "";
           if (found && found.answered !== "no") {
             const partly = found.answered === "partly" ? " (it may only partly answer it)" : "";
             return {
-              content: `${head}Where the page answers "${question}"${partly}:\n${wrapPage(found.text)}`,
+              content: `${head}Where the page answers "${question}"${partly}${part}:\n${wrapPage(found.text)}`,
               data: url ? { url } : {},
             };
           }
           if (found) {
             return {
-              content: `${head}Nothing on the page answers "${question}". Read the whole page (no \`find\`) to look yourself, or go where it would be.`,
+              content: `${head}Nothing on the page answers "${question}"${part}. Read the whole page (no \`find\`) to look yourself, or go where it would be.`,
               data: url ? { url } : {},
             };
           }
