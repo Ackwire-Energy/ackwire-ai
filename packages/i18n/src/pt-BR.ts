@@ -2560,6 +2560,7 @@ export const ptBR = {
       silent: "Nada novo {{when}}",
       failed: "Falhou {{when}}",
       skipped: "Não rodou {{when}}",
+      stopped: "Parada {{when}}",
     },
     stripLabel: "Últimas execuções: {{list}}",
     stripNone: "Nenhuma execução ainda",
@@ -3751,6 +3752,8 @@ export const ptBR = {
     phraseUnknown: "Não entendi essa frase; ajuste no seletor acima.",
     s: {
       once: "Uma vez, em {{date}}",
+      minutely_one: "A cada minuto",
+      minutely_other: "A cada {{count}} minutos",
       hourly_one: "A cada hora",
       hourly_other: "A cada {{count}} horas",
       daily_one: "Todos os dias",

@@ -155,6 +155,27 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(off.querySelector(".ac-chip--waiting")).toBeNull();
     expect(within(off).queryByRole("button", { name: "Retomar" })).toBeNull();
   });
+
+  test("a run a person stopped reads 'Parada', not 'Não rodou'; every N minutes in Portuguese", async () => {
+    const stopped = routineRun({ at: ago(5), status: "canceled", code: "stopped" });
+    await open([
+      routine({ id: "rt-stop", name: "Issues da Ada", lastRun: stopped, recentRuns: [stopped] }),
+      routine({
+        id: "rt-30",
+        name: "Avaliações",
+        trigger: {
+          type: "schedule",
+          cron: "*/30 * * * *",
+          timezone: "America/Sao_Paulo",
+          description: "Every 30 minutes",
+        },
+      }),
+    ]);
+    expect(card("Issues da Ada").textContent).toContain("Parada há 5 min");
+    expect(card("Issues da Ada").textContent).not.toContain("Não rodou");
+    expect(card("Avaliações").textContent).toContain("A cada 30 minutos");
+    expect(card("Avaliações").textContent).not.toContain("Every");
+  });
 });
 
 describe("Rotinas: a routine's details", () => {

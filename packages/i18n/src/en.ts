@@ -2547,6 +2547,7 @@ export const en: Translations = {
       silent: "Nothing new {{when}}",
       failed: "Failed {{when}}",
       skipped: "Didn't run {{when}}",
+      stopped: "Stopped {{when}}",
     },
     stripLabel: "Last runs: {{list}}",
     stripNone: "No runs yet",
@@ -3737,6 +3738,8 @@ export const en: Translations = {
     phraseUnknown: "Couldn't read that phrase; adjust it in the picker above.",
     s: {
       once: "Once, on {{date}}",
+      minutely_one: "Every minute",
+      minutely_other: "Every {{count}} minutes",
       hourly_one: "Every hour",
       hourly_other: "Every {{count}} hours",
       daily_one: "Every day",

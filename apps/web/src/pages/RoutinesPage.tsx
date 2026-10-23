@@ -76,6 +76,7 @@ import {
   zonedInstant,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
 import { type CSSProperties, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
@@ -211,7 +212,7 @@ function useWhen() {
       return `${
         r.trigger.rule
           ? ruleSentence(t, i18n.language, fromApiRule(r.trigger.rule, toYmd(new Date())), new Date(), false)
-          : r.trigger.description
+          : everyMinutes(t, r.trigger.cron) || r.trigger.description
       }${zoneNote}`;
     if (r.trigger.type === "once")
       return t("routines.once", { ...onceParts(i18n.language, r.trigger.at, zone), zone: zoneNote });
@@ -440,6 +441,12 @@ export function routineTitle(r: Pick<Routine, "name" | "prompt">) {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).trimEnd()}…`;
 }
 
+/** "A cada 30 minutos" for a routine every N minutes (kept as cron `*\/N * * * *`, no rule); "" otherwise. */
+function everyMinutes(t: TFunction, cron: string) {
+  const every = /^\*\/(\d+) \* \* \* \*$/.exec(cron.trim())?.[1] ?? (cron.trim() === "* * * * *" ? "1" : null);
+  return every ? t("recurrence.s.minutely", { count: Number(every) }) : "";
+}
+
 /** The runs as words, for the strip's label and the horizon's tooltips. */
 function useRunWords() {
   const { t, i18n } = useTranslation();
@@ -453,7 +460,11 @@ function useRunWords() {
       if (!last) return t("routines.neverRan");
       const silent = runs.filter((x) => x.status === "silent").length;
       if (last.status === "silent" && silent > 1) return t("routines.silentOf", { count: silent, total: runs.length });
-      return t(`routines.lastRun.${last.status}`, { when: relativeTime(t, i18n.language, last.at, now) });
+      const when = relativeTime(t, i18n.language, last.at, now);
+      // A person stopped it: that's no skipped slot (the strip draws both gray).
+      if (r.recentRuns[0]?.status === "canceled" && r.recentRuns[0].at === last.at)
+        return t("routines.lastRun.stopped", { when });
+      return t(`routines.lastRun.${last.status}`, { when });
     },
     label: (r: Routine) => {
       const runs = runPixels(r.recentRuns).slice(0, RUN_SLOTS);
