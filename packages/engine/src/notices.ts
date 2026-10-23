@@ -53,7 +53,7 @@ export function handoffGuidance(report: string | undefined) {
     "When what you'd do needs a person's approval (a rollback, a deploy, a merge, a change in a connected app), ask for it with that tool and your reason instead of asking in words: it becomes a card here, and nothing runs until a person approves.",
     "Don't redo the routine's lookups: it already looked. Check something only when the report leaves a gap that matters.",
     report === "always"
-      ? "This routine reports every time: on a quiet day say so in one line with the key numbers; when something changed, keep every finding and number in your own words (don't cut it to a vague summary)."
+      ? "This routine reports every time. On a quiet day, one or two lines: nothing unusual, with the key numbers, and nothing more (no full series, no plans for its next run). When something changed, keep every finding and number in your own words (don't cut it to a vague summary)."
       : "If it turns out to be nothing they need, say nothing.",
   ].join(" ");
 }

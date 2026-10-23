@@ -79,7 +79,7 @@ describe("notices", () => {
     expect(current).toContain("If it turns out to be nothing they need, say nothing.");
     // A routine that reports every time keeps the whole report.
     const always = noticeText(handoff("always"), true) ?? "";
-    expect(always).toContain("on a quiet day say so in one line with the key numbers");
+    expect(always).toContain("On a quiet day, one or two lines: nothing unusual, with the key numbers");
     expect(always).toContain("keep every finding and number");
     // What needs a person's approval is asked for with the tool, never in words.
     expect(current).toContain("ask for it with that tool and your reason instead of asking in words");

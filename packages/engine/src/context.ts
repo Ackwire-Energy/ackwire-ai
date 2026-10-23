@@ -796,7 +796,7 @@ async function routineContext(
     `Its instructions, set up by ${creator ?? "its creator"}:\n${(row?.prompt ?? trigger.body).trim()}`,
     `What it may do: ${
       brief.access === "act"
-        ? `look and act. Besides reading, you may change things inside agentes.chat that people can undo (issues, memory, wiki, Drive files) and work on your own branches (agentes/${agent.handle}/…) and their pull requests. Any change in a connected app asks a person first: an approval card in ${place}, with your reason. Merge, deploy and rollback always do. When the instructions ask you to fix or resolve something and the fix is such a change, call that tool with your reason (nothing runs until a person approves) and say in hand_off what you asked for; don't only describe it.`
+        ? `look and act. Besides reading, you may change things inside agentes.chat that people can undo (issues, memory, wiki, Drive files) and work on your own branches (agentes/${agent.handle}/…) and their pull requests. Any change in a connected app asks a person first: an approval card in ${place}, with your reason. Merge, deploy and rollback always do. When its instructions ask you to fix or resolve things and the fix is such a change, hand off your report first (saying what you're asking for), then call that tool with your reason: your run waits for the person's decision, so anything after it waits too.`
         : "look and report. Read and search anything your tools reach (on your computer too, read-only) and change nothing: tools that change things are refused. Put what you would do in hand_off; the people decide."
     }`,
     `When it speaks: ${
