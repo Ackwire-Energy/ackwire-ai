@@ -17,6 +17,7 @@ import {
   getTeam,
   listAgents,
   listCredentials,
+  NEW_AGENT_DEFAULTS,
   NotFoundError,
   publishMachineAgentsChanged,
   revokeCredential,
@@ -84,7 +85,7 @@ const AgentFields = z.object({
   instructions: z.string().max(50_000).optional(),
   model: z.string().optional().openapi({
     description:
-      "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to AGENT_DEFAULT_MODEL.",
+      "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to `auto`.",
   }),
   credentialId: z
     .uuid()
@@ -109,7 +110,7 @@ const budget = (usd: number | null | undefined) =>
 
 /** Provider credentials, agents, usage and the model catalog. */
 export function agentRoutes(deps: AppDeps) {
-  const { db, config, adapters } = deps;
+  const { db, adapters } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
   app.use("/models", requireSession(deps.auth));
@@ -121,12 +122,22 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Models agents can use, with prices",
-      responses: { 200: json(z.object({ models: z.array(Model), defaultModel: z.string() })), 401: errors[401] },
+      responses: {
+        200: json(
+          z.object({
+            models: z.array(Model),
+            defaultModel: z
+              .string()
+              .openapi({ description: "What a new agent gets when no model is chosen: `auto` (D83)." }),
+          }),
+        ),
+        401: errors[401],
+      },
     }),
     (c) =>
       c.json(
         {
-          defaultModel: config.AGENT_DEFAULT_MODEL,
+          defaultModel: NEW_AGENT_DEFAULTS.model,
           models: Object.entries(MODEL_CATALOG).map(([id, m]) => ({
             id,
             label: m.label,
@@ -327,7 +338,8 @@ export function agentRoutes(deps: AppDeps) {
         c.get("user").id,
         orgId,
         { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
-        { model: config.AGENT_DEFAULT_MODEL },
+        // New agents start on "Automático" (D83).
+        NEW_AGENT_DEFAULTS,
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);

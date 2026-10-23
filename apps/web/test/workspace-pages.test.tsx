@@ -271,7 +271,7 @@ describe("Criar agente", () => {
       name: "Íris",
       handle: "iris",
       role: "Dev",
-      model: "claude-sonnet-5-5",
+      model: "auto",
       ownerUserId: "u-walter",
       // "Chave padrão do workspace".
       credentialId: null,

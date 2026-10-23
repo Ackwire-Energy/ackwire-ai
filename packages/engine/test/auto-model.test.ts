@@ -8,11 +8,13 @@ import {
   type BrainPlan,
   brainModelForTier,
   chooseAutoModel,
+  createAgent,
   createCredential,
   createFakeJudge,
   drainOutbox,
   isBrainEffortSetting,
   type Judge,
+  NEW_AGENT_DEFAULTS,
   needsAutoChoice,
   normalizeBrainModel,
   postPersonMessage,
@@ -173,6 +175,31 @@ describe("one decision, mapped per brain (D83)", () => {
     expect(isBrainEffortSetting("auto")).toBe(true);
     expect(isBrainEffortSetting("high")).toBe(true);
     expect(isBrainEffortSetting("turbo")).toBe(false);
+  });
+});
+
+describe("new agents start on Automático (D83)", () => {
+  test("no model chosen: auto for the API and for any computer brain; a fixed model leaves the brain's default", async () => {
+    f = await setup();
+    const born = await createAgent(f.db, f.owner.id, f.org.id, { name: "Eva", handle: "eva" }, NEW_AGENT_DEFAULTS);
+    expect(born).toMatchObject({ model: "auto", brain: "model", brainModel: "auto", brainEffort: "auto" });
+    const fixed = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Leo", handle: "leo", model: "claude-sonnet-5-5" },
+      NEW_AGENT_DEFAULTS,
+    );
+    expect(fixed).toMatchObject({ model: "claude-sonnet-5-5", brainModel: null, brainEffort: null });
+    // Callers with a default of their own (scripts, evals) keep it: only `auto` makes the brain settings automatic.
+    const own = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Bia", handle: "bia" },
+      { model: "claude-haiku-5-5" },
+    );
+    expect(own).toMatchObject({ model: "claude-haiku-5-5", brainModel: null, brainEffort: null });
   });
 });
 

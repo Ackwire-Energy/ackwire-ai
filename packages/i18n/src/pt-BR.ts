@@ -350,7 +350,7 @@ export const ptBR = {
     platformChoice: "Usar créditos da plataforma",
     platformKeyDesc:
       "Sem chave: a plataforma cobra por uso, com US$ 5 grátis para testar. Você vê o custo de cada agente.",
-    suggestedModel: "Começa com {{model}}. Dá para trocar depois.",
+    suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",
       lead: "Para rodar código e mexer em arquivos, a gente precisa de um computador. Ações sensíveis continuam pedindo aprovação.",
@@ -2033,6 +2033,7 @@ export const ptBR = {
       other: "US$ {{input}} / US$ {{output}} por milhão de tokens",
     },
     price: "US$ {{input}} / {{output}} por milhão de tokens",
+    autoCost: "O custo acompanha cada tarefa",
     noKeyFor: "Sem chave da {{provider}}",
     key: "Chave",
     defaultKey: "Chave padrão do workspace",

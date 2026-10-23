@@ -342,7 +342,7 @@ export const en: Translations = {
     optional: "Optional.",
     platformChoice: "Use platform credits",
     platformKeyDesc: "No key: the platform charges per use, with US$ 5 free to try. You see each agent's cost.",
-    suggestedModel: "Starts with {{model}}. You can change it later.",
+    suggestedAuto: "Starts on Automatic: it picks the model and effort for each task. You can change it later.",
     computer: {
       title: "Where will we work?",
       lead: "To run code and work with files, we need a computer. Sensitive actions still ask for approval.",
@@ -2023,6 +2023,7 @@ export const en: Translations = {
       other: "US$ {{input}} / US$ {{output}} per million tokens",
     },
     price: "US$ {{input}} / {{output}} per million tokens",
+    autoCost: "The cost follows each task",
     noKeyFor: "No {{provider}} key",
     key: "Key",
     defaultKey: "Workspace default key",

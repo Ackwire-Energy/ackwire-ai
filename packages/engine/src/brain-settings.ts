@@ -405,16 +405,16 @@ export async function setAgentBrain(
       );
     }
   }
+  // "Automático" (D83) is one choice for every brain: it stays through a switch (and while on the API brain, for
+  // the next one), so an agent born automatic is automatic on Claude Code or Codex too. A fixed model belongs to
+  // its brain: another brain starts on its default.
+  const carried = isAutoModel(agent.brainModel) ? AUTO_MODEL : null;
   const model =
-    brain === "model"
-      ? input.model === undefined || input.model === null || input.model === ""
-        ? null
-        : normalizeBrainModel(brain, input.model)
-      : input.model !== undefined
-        ? normalizeBrainModel(brain, input.model)
-        : changed
-          ? null
-          : agent.brainModel;
+    input.model !== undefined
+      ? normalizeBrainModel(brain, input.model)
+      : brain === "model" || changed
+        ? carried
+        : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
   if (input.effort !== undefined && input.effort !== null && !isBrainEffortSetting(input.effort)) {
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");

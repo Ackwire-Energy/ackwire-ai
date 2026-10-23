@@ -11,7 +11,6 @@ import {
   handleProblem,
   presetChannels,
   presetLevels,
-  presetModel,
   ROLE_GROUPS,
   ROLE_IDS,
   ROLE_PRESETS,
@@ -109,11 +108,15 @@ describe("Criar agente: steps", () => {
     expect(screen().getByRole("checkbox", { name: "#general" }).getAttribute("aria-checked")).toBe("false");
 
     await proceed();
+    // "Automático" (D83) comes first and is chosen for every role; the fixed models follow.
+    const auto = screen().getByRole("button", { name: /^Automático/ });
+    expect(auto.getAttribute("aria-pressed")).toBe("true");
+    expect(auto.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
     expect(
       screen()
         .getByRole("button", { name: /^Claude Sonnet 5\.5/ })
         .getAttribute("aria-pressed"),
-    ).toBe("true");
+    ).toBe("false");
     // Real catalog prices; a model without a key can't be picked.
     expect(screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ }).textContent).toContain(
       "US$ 2 / 10 por milhão de tokens",
@@ -126,13 +129,14 @@ describe("Criar agente: steps", () => {
 
     await proceed();
     expect(title()).toBe("Tudo certo com o Iris?");
+    expect(document.querySelector(".newag__review")?.textContent).toContain("Automático ·");
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(createdWith(state)).toMatchObject({
       name: "Iris",
       handle: "iris",
       role: "QA",
-      model: "claude-sonnet-5-5",
+      model: "auto",
       appearance: { color: "violet", eyes: "round", accessory: "headset" },
     });
   });
@@ -269,6 +273,22 @@ describe("Criar agente: what gets created", () => {
     expect(puts).toHaveLength(1);
     const body = puts[0]?.args[2] as { connectors: Record<string, boolean> };
     expect(body.connectors).toEqual({ "conn-gh": true });
+  });
+
+  test("model: a fixed model can replace Automático; it is what gets created and reviewed", async () => {
+    const state = await open();
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    const sonnet = screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ });
+    await click(sonnet);
+    expect(sonnet.getAttribute("aria-pressed")).toBe("true");
+    expect(screen().getByRole("button", { name: /^Automático/ }).getAttribute("aria-pressed")).toBe("false");
+    await proceed();
+    expect(document.querySelector(".newag__review")?.textContent).toContain("Claude Sonnet 5.5 ·");
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)?.model).toBe("claude-sonnet-5-5");
   });
 
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {
@@ -431,7 +451,7 @@ describe("new-agent rules", () => {
     expect(readBudget("dez").invalid).toBe(true);
   });
 
-  test("presets: levels by catalog connector, channels by name, the model family when usable", () => {
+  test("presets: levels by catalog connector, channels by name", () => {
     const items = [
       { id: "c1", def: { id: "github" } },
       { id: "c2", def: { id: "notion" } },
@@ -448,15 +468,6 @@ describe("new-agent rules", () => {
     expect(presetChannels("dev", chans)).toEqual(["1"]);
     expect(presetChannels("ops", chans)).toEqual(["3"]);
     expect(presetChannels("custom", chans)).toEqual([]);
-    const models = [
-      { id: "claude-sonnet-5-5", label: "", provider: "anthropic", inputUsdPerMTok: 2, outputUsdPerMTok: 10 },
-      { id: "claude-haiku-5-5", label: "", provider: "anthropic", inputUsdPerMTok: 0.1, outputUsdPerMTok: 0.5 },
-      { id: "gpt-5", label: "", provider: "openai", inputUsdPerMTok: 1, outputUsdPerMTok: 10 },
-    ];
-    const anthropic = (m: { provider: string }) => m.provider === "anthropic";
-    expect(presetModel("haiku", models, anthropic)).toBe("claude-haiku-5-5");
-    expect(presetModel("opus", models, anthropic, "claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
-    expect(presetModel("sonnet", models, (m) => m.provider === "openai")).toBe("gpt-5");
   });
 
   test("roles: each one in exactly one group, with its texts in both languages and its own starter name", () => {
@@ -477,9 +488,8 @@ describe("new-agent rules", () => {
       expect(new Set(agents).size).toBe(agents.length);
       for (const g of ROLE_GROUPS) expect((dict.newAgent.roleGroups as Record<string, string>)[g.id]).toBeTruthy();
     }
-    // Money starts read-only; the assistant does volume work on the cheaper family.
+    // Money starts read-only.
     expect(ROLE_PRESETS.finance.levels).toEqual({ stripe: "read", paypal: "read", square: "read", drive: "read" });
-    expect(ROLE_PRESETS.assistant.model).toBe("haiku");
   });
 
   test("what each step needs", () => {

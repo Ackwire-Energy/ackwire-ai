@@ -506,7 +506,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     setAccount(k === view.brain ? view.account : null);
     if (k === "model") return;
     const opt = homeOf(k)?.options.find((o) => o.kind === k);
-    setPlanModel(k === view.brain ? view.effectiveModel : (opt?.defaultModel ?? null));
+    // An agent on "Automático" (new agents start there, D83) stays automatic on another brain.
+    setPlanModel(k === view.brain ? view.effectiveModel : isAuto(view.effort) ? AUTO : (opt?.defaultModel ?? null));
   };
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
   const accountKind = kind === "claude_code" || kind === "codex" ? kind : null;
