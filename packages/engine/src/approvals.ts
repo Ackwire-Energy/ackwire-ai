@@ -75,8 +75,8 @@ interface ApprovalContext {
   trail: { text: string; at: string }[];
 }
 
-/** The stored origin (`approvals.origin`), read safely. */
-function originOf(value: Approval["origin"]): ApprovalOrigin | null {
+/** The stored origin (`approvals.origin`), read safely: its card and its notification say it. */
+export function approvalOriginOf(value: Approval["origin"]): ApprovalOrigin | null {
   if (value?.kind === "unattended") return { kind: "unattended" };
   if (value?.kind === "routine" && typeof value.routineId === "string") {
     return {
@@ -233,7 +233,7 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   connector: null,
   connectorAccount: null,
   why: a.why.trim() || null,
-  origin: originOf(a.origin),
+  origin: approvalOriginOf(a.origin),
   issue: null,
 });
 

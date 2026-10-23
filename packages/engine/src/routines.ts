@@ -202,7 +202,10 @@ export interface RoutineView {
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /** Where it thinks: the agent's brain and, for a computer brain, the computer's name. */
   brain: { kind: BrainKind; machineName: string | null };
-  /** The last week's runs by outcome (`ok`: reported; `total`: every run that ended). */
+  /**
+   * The last week's runs by outcome (`ok`: reported; `skipped`: slots that didn't run, replaced ones too, as in
+   * the run strip; `total`: their sum, without the runs a person stopped).
+   */
   health: { ok: number; silent: number; failed: number; skipped: number; missed: number; total: number };
   /** The viewer reads its records and reports (its creator, admins, the agent's owner, its conversation). */
   canSeeDetails: boolean;
@@ -324,6 +327,11 @@ const AGENT_ACTIVE = new Set(["queued", "running", "waiting_approval", "waiting_
 const agentWaiting = (a: AgentRunInfo | undefined) => a?.status === "waiting_approval" || a?.status === "waiting_input";
 /** Waiting for its computer (ADR 0032 §5), not for a person. */
 const agentAway = (a: AgentRunInfo | undefined) => a?.status === "waiting_input" && Boolean(a.waitingMachineId);
+/**
+ * Not an email run held for the next email (§6.8): that row stays queued with no job on purpose and is no
+ * run yet, so no view shows it and it never makes a routine look busy.
+ */
+const NOT_HELD = sql`not (${routineRuns.status} = 'queued' and coalesce(${routineRuns.event}->>'held', '') = 'true')`;
 
 /** How a stored end reads; anything else that ended (`ok`: a forum topic or a reminder) was delivered. */
 const endedAs = (status: string): RoutineRunStatus | null =>
@@ -441,7 +449,8 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
     id: run.id,
     at: run.at.toISOString(),
     status,
-    code: run.code,
+    // Waiting for its computer, not for a person: the app says which.
+    code: status === "waiting" && agentAway(agentRun) ? "waiting_computer" : run.code,
     ...(by ? { codeParams: { by } } : {}),
     summary: detailed && run.status !== "canceled" ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
     brain: run.brain,
@@ -574,7 +583,7 @@ async function views(
       select ${routineRuns.id} as id,
         row_number() over (partition by ${routineRuns.routineId} order by ${routineRuns.createdAt} desc) as n
       from ${routineRuns}
-      where ${inArray(routineRuns.routineId, ids)}
+      where ${inArray(routineRuns.routineId, ids)} and ${NOT_HELD}
     ) ranked
     where n <= ${RECENT_RUNS}`);
   const recentRunIds = rowsOf<{ id: string }>(recentIds).map((r) => r.id);
@@ -640,31 +649,38 @@ async function views(
   const usageOf = new Map(usageRows.map((u) => [u.routineId, u]));
   return rows.map((r): RoutineView => {
     const right = rights.get(r.id) as ViewerRights;
-    const runs = recentViews(recent.get(r.id) ?? [], details, right.reads);
-    // The run in progress, if any: the newest queued one, or whose agent run still works (also after handing off).
-    const open = (recent.get(r.id) ?? []).find((run) => {
+    const lastRuns = recent.get(r.id) ?? [];
+    const runs = recentViews(lastRuns, details, right.reads);
+    // Its runs in progress: queued or being started (held emails are left out above), or whose agent run
+    // still works or waits (also after handing off).
+    const open = lastRuns.filter((run) => {
       if (run.status === "queued" || run.status === "starting") return true;
       if (run.status !== "started" && run.status !== "reported") return false;
       const agentRun = run.agentRunId ? details.agentRuns.get(run.agentRunId) : undefined;
       return AGENT_ACTIVE.has(agentRun?.status ?? "");
     });
-    const openAgent = open?.agentRunId ? details.agentRuns.get(open.agentRunId) : undefined;
-    const waitingFor =
-      openAgent && agentAway(openAgent) && openAgent.waitingMachineId
-        ? {
-            machineId: openAgent.waitingMachineId,
-            machineName: machineName.get(openAgent.waitingMachineId) ?? "",
-            since: openAgent.updatedAt.toISOString(),
-          }
-        : null;
-    const state: RoutineState = !r.active
-      ? "paused"
-      : waitingFor
-        ? "waiting_computer"
-        : agentWaiting(openAgent)
-          ? "waiting_person"
-          : open
-            ? "running"
+    const openAgents = open.flatMap((run) => {
+      const agentRun = run.agentRunId ? details.agentRuns.get(run.agentRunId) : undefined;
+      return agentRun ? [agentRun] : [];
+    });
+    const away = openAgents.find(agentAway);
+    const waitingFor = away?.waitingMachineId
+      ? {
+          machineId: away.waitingMachineId,
+          machineName: machineName.get(away.waitingMachineId) ?? "",
+          since: away.updatedAt.toISOString(),
+        }
+      : null;
+    // A run at work says what it does first (a manual run of a paused routine, a one-off's run after it
+    // fired: both inactive, both stoppable); paused, failing or active only when nothing is at work.
+    const state: RoutineState = waitingFor
+      ? "waiting_computer"
+      : openAgents.some(agentWaiting)
+        ? "waiting_person"
+        : open.length > 0
+          ? "running"
+          : !r.active
+            ? "paused"
             : r.failuresInRow > 0
               ? "failing"
               : "active";
@@ -676,6 +692,15 @@ async function views(
       if (end) outcomes.set(end, (outcomes.get(end) ?? 0) + w.runs);
     }
     const count = (status: RoutineRunStatus) => outcomes.get(status) ?? 0;
+    // The week as the app says it, adding up: a slot the next one replaced is a skip (as in the run strip),
+    // and a run a person stopped says nothing about the routine, so it counts nowhere.
+    const health = {
+      ok: count("reported"),
+      silent: count("silent"),
+      failed: count("failed"),
+      skipped: count("skipped") + count("superseded"),
+      missed: count("missed"),
+    };
     const agent = agentById.get(r.agentId);
     const kind = brainKindOf(agent?.brain);
     const used = usageOf.get(r.id);
@@ -699,14 +724,7 @@ async function views(
         kind,
         machineName: kind !== "model" && agent?.machineId ? (machineName.get(agent.machineId) ?? null) : null,
       },
-      health: {
-        ok: count("reported"),
-        silent: count("silent"),
-        failed: count("failed"),
-        skipped: count("skipped"),
-        missed: count("missed"),
-        total: [...outcomes.values()].reduce((a, b) => a + b, 0),
-      },
+      health: { ...health, total: health.ok + health.silent + health.failed + health.skipped + health.missed },
       canSeeDetails: right.reads,
       canManage: right.manages,
       lastRun: runs[0] ?? null,
@@ -1334,7 +1352,7 @@ export async function listRoutineRuns(
     db
       .select()
       .from(routineRuns)
-      .where(and(eq(routineRuns.orgId, orgId), eq(routineRuns.routineId, routine.id)))
+      .where(and(eq(routineRuns.orgId, orgId), eq(routineRuns.routineId, routine.id), NOT_HELD))
       .orderBy(desc(routineRuns.at))
       .limit(100),
     viewerRights(db, orgId, [routine], actorId),

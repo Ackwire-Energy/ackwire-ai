@@ -118,11 +118,16 @@ const isEventDriven = (r: Routine) => r.trigger.type === "event" || r.trigger.ty
 const mailTrouble = (r: Routine) =>
   r.trigger.type === "email" && r.trigger.status && r.trigger.status !== "active" ? r.trigger.status : null;
 
-/** A one-off that already fired (or was cancelled): shown muted, under "Concluídos". */
-export const isDoneOnce = (r: Routine) => r.trigger.type === "once" && !r.active;
-const isPaused = (r: Routine) => !isDoneOnce(r) && !r.active;
 /** A run of it is working now (Parar stops it). */
 const isRunning = (r: Routine) => r.state === "running";
+/** A run of it is at work: working, or waiting for a person or its computer. */
+const isAtWork = (r: Routine) => isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer";
+/** A one-off that already fired (or was cancelled): no switch, no "Rodar agora", nothing left to run. */
+const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
+/** A one-off that fired and whose run ended: shown muted, under "Concluídos" (while its run works, it is live). */
+export const isDoneOnce = (r: Routine) => hasFired(r) && !isAtWork(r);
+/** Paused: inactive and not a one-off (a fired one-off is done, or live while its run works). */
+const isPaused = (r: Routine) => !r.active && r.trigger.type !== "once";
 
 /** Says the routine's words (`lib/routine-view`): its key and values, else its fallback key. */
 function useSay() {
@@ -465,7 +470,7 @@ function useNextText() {
   const { t, i18n } = useTranslation();
   return (r: Routine, now: Date) => {
     if (isRunning(r)) return t("routines.runningNow");
-    if (isDoneOnce(r))
+    if (hasFired(r))
       return r.lastRun
         ? t("routines.firedAt", { when: whenAt(t, i18n.language, r.lastRun.at) })
         : t("routines.canceled");
@@ -598,6 +603,7 @@ function RoutineRow({
   const title = routineTitle(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const done = isDoneOnce(r);
+  const fired = hasFired(r);
   const paused = isPaused(r);
   const running = isRunning(r);
   const more = t("routines.more", { name: title });
@@ -673,7 +679,7 @@ function RoutineRow({
         <small>{words.caption(r, now)}</small>
       </div>
       <div className="routine-row__actions">
-        {done || !r.canManage ? (
+        {fired || !r.canManage ? (
           <span className="routine-row__ph routine-row__ph--switch" aria-hidden="true" />
         ) : (
           <Switch
@@ -682,7 +688,8 @@ function RoutineRow({
             aria-label={t("routines.activeLabel", { name: title })}
           />
         )}
-        {!done && !reminder && r.canManage ? (
+        {/* Parar for a run at work, also a paused routine's or a fired one-off's; "Rodar agora" while it may run. */}
+        {(running || !fired) && !reminder && r.canManage ? (
           running ? (
             <Button
               size="sm"
@@ -957,6 +964,7 @@ function RoutineDetails({
   const name = actors.name(agent);
   const title = routineTitle(r);
   const done = isDoneOnce(r);
+  const fired = hasFired(r);
   const running = isRunning(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const described = useRuleDescribe(
@@ -1021,7 +1029,7 @@ function RoutineDetails({
           <Button size="sm" icon="edit" onClick={onEdit}>
             {t("routines.edit")}
           </Button>
-          {!done &&
+          {(running || !fired) &&
             !reminder &&
             (running ? (
               <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
@@ -1032,7 +1040,7 @@ function RoutineDetails({
                 {t("routines.runNow")}
               </Button>
             ))}
-          {!done && (
+          {!fired && (
             <Button size="sm" icon={r.active ? "pause" : "play"} onClick={() => controls.setActive(!r.active)}>
               {r.active ? t("routines.panel.pause") : t("routines.resume")}
             </Button>

@@ -6,7 +6,7 @@ import { deliverRoutineReport, routineDeliveryBlock } from "./hand-off";
 import { releaseRoutineEmails } from "./mail/inbound";
 import { notifyRoutineFailed, notifyRoutineFinished, resolveRoutineTrouble } from "./notification-producers";
 import { startGatheredRun } from "./routine-events";
-import { pauseRoutine, ROUTINE_FATIGUE_LIMIT, routineCodeText, routineJobAlive } from "./routine-state";
+import { pauseRoutine, ROUTINE_FATIGUE_LIMIT, routineJobAlive } from "./routine-state";
 import { type AgentRun, runErrorDetail } from "./runs";
 
 const { routineRuns, routines, agentRuns } = schema;
@@ -183,13 +183,7 @@ async function finishRoutineRow(deps: LedgerDeps, ref: RoutineRunRef, end: Routi
     )
     .returning({ status: routineRuns.status, code: routineRuns.code, event: routineRuns.event });
   if (!row) return null;
-  await afterRoutineRunEnded(deps, {
-    ...ref,
-    status: row.status,
-    code: row.code,
-    event: row.event,
-    detail: end.status === "failed" ? end.detail : undefined,
-  });
+  await afterRoutineRunEnded(deps, { ...ref, status: row.status, code: row.code, event: row.event });
   return row;
 }
 
@@ -208,18 +202,14 @@ export async function endRoutineRun(
 /**
  * What follows a routine run's end (ADR 0053 §6): a good run (reported or silent) resets the failure
  * streak and resolves its failure and outage notifications; a failure counts in `failures_in_row`
- * (the first after a good run notifies once, the fifth in a row pauses the routine: `failing`); the
- * emails of an email run that didn't finish are released to the next run (§6.8); and the event run
- * gathered while it worked starts (§6.3). Never throws into the ending.
+ * (the first after a good run notifies once, with its coded reason for the app to say; the fifth in a
+ * row pauses the routine: `failing`); the emails of an email run that didn't finish are released to
+ * the next run (§6.8); and the event run gathered while it worked starts (§6.3). Never throws into the
+ * ending.
  */
 export async function afterRoutineRunEnded(
   deps: LedgerDeps,
-  ended: RoutineRunRef & {
-    status: string;
-    code: string | null;
-    event: Record<string, unknown> | null;
-    detail?: string;
-  },
+  ended: RoutineRunRef & { status: string; code: string | null; event: Record<string, unknown> | null },
 ) {
   const { db } = deps;
   try {
@@ -242,7 +232,7 @@ export async function afterRoutineRunEnded(
           orgId: ended.orgId,
           routineId: ended.routineId,
           streakKey: ended.routineRunId,
-          text: routineCodeText(ended.code) || ended.detail,
+          reason: ended.code,
         }).catch(() => {});
       }
       if (r?.active && r.failures >= ROUTINE_FATIGUE_LIMIT) await pauseRoutine(deps, r, "failing");

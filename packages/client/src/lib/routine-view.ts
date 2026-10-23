@@ -1,4 +1,4 @@
-import type { ApiRule, Routine, RoutineRun, RoutineRunStatus, RoutineTarget } from "../api/types";
+import type { ApiRule, AppNotification, Routine, RoutineRun, RoutineRunStatus, RoutineTarget } from "../api/types";
 import type { RunStatus } from "./calendar";
 
 /**
@@ -51,7 +51,11 @@ export function runPixels(runs: readonly RoutineRun[]): { status: RunStatus; wei
   });
 }
 
-/** Run codes said with their own words (`routines.code.<code>`); any other falls back to the status. */
+/**
+ * Run codes said with their own words (`routines.code.<code>`): every code the routine ledger writes
+ * (routines, firing, ledger, hand-off) and the run errors a failed run carries. Any other (a computer's
+ * own failure, a plain `error`) falls back to the status.
+ */
 export const RUN_CODES = [
   "previous_running",
   "previous_waiting",
@@ -64,13 +68,21 @@ export const RUN_CODES = [
   "deleted",
   "paused",
   "lost",
+  "creator_left",
+  "creator_no_access",
+  "audience",
+  "agent_not_in_channel",
   "budget_exceeded",
   "provider_error",
   "provider_unavailable",
+  "gave_up",
+  "empty_reply",
+  "model_refused",
   "runner_outdated",
   "too_many_tool_calls",
   "missing_credential",
   "credential_revoked",
+  "credential_wrong_provider",
   "agent_archived",
   "interrupted",
 ] as const;
@@ -110,6 +122,18 @@ export function runMessageLink(run: Pick<RoutineRun, "link">) {
   return l.threadId && l.threadId !== l.messageId
     ? { channelId: l.channelId, threadId: l.threadId, messageId: l.messageId }
     : { channelId: l.channelId, threadId: null, messageId: l.messageId };
+}
+
+/**
+ * Why a routine's notification came, in words: a pause by its coded reason ("Pausada: o agente não está
+ * mais no canal"), a failed run by its code ("O orçamento do mês acabou", else "Não deu certo"). Null for
+ * other notifications, and for a pause without a reason (its text says it).
+ */
+export function routineNotificationWords(n: Pick<AppNotification, "kind" | "latest">): Words | null {
+  if (n.kind === "routine_failed") return runOutcome({ status: "failed", code: n.latest.reason ?? null });
+  if (n.kind === "routine_paused" && n.latest.reason)
+    return { key: `routines.pausedReason.${n.latest.reason}`, values: {} };
+  return null;
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -198,7 +222,9 @@ export function routineStateWords(
 
 /**
  * The week's health: "12 de 14 OK esta semana · 2 puladas · 1 falhou". OK is a run that told people or
- * had nothing new; a skip is any slot that didn't run (missed counts too). Null before its first run.
+ * had nothing new; a skip is any slot that didn't run (replaced and missed ones count too, as in the run
+ * strip). The server leaves the runs a person stopped out of the total, so it adds up. Null before its
+ * first run.
  */
 export function healthWords(h: Routine["health"]): Words[] | null {
   if (h.total <= 0) return null;

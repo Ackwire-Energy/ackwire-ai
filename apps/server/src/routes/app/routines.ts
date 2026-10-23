@@ -244,7 +244,10 @@ const Routine = z
         missed: z.number().int(),
         total: z.number().int(),
       })
-      .openapi({ description: "The last 7 days by outcome (`ok`: reported; `total`: every run that ended)." }),
+      .openapi({
+        description:
+          "The last 7 days by outcome (`ok`: reported; `skipped`: slots that didn't run, replaced ones too; `total`: their sum, without runs a person stopped).",
+      }),
     canSeeDetails: z.boolean().openapi({ description: "You read its prompt, records and reports." }),
     canManage: z.boolean().openapi({ description: "You may change, pause, stop or delete it." }),
     lastRun: RoutineRun.nullable(),

@@ -9,6 +9,7 @@ import {
   healthWords,
   pausedFix,
   routineChannelOf,
+  routineNotificationWords,
   routineStateWords,
   runMessageLink,
   runOutcome,
@@ -77,6 +78,11 @@ describe("a routine's runs", () => {
     expect(say(run({ status: "missed", code: "stale" })).key).toBe("routines.code.stale");
     expect(say(run({ status: "failed", code: "budget_exceeded" })).key).toBe("routines.code.budget_exceeded");
     expect(say(run({ status: "failed", code: "no_report" })).key).toBe("routines.code.no_report");
+    // A report it couldn't deliver says why, not "Não rodou"; every code the ledger writes has its words.
+    expect(say(run({ status: "skipped", code: "creator_no_access" })).key).toBe("routines.code.creator_no_access");
+    expect(say(run({ status: "canceled", code: "creator_left" })).key).toBe("routines.code.creator_left");
+    for (const code of ["empty_reply", "model_refused", "credential_wrong_provider", "gave_up"])
+      expect(say(run({ status: "failed", code })).key).toBe(`routines.code.${code}`);
     // Stopped by a person: their name; an unknown id as is; nobody named: "alguém".
     expect(say(run({ status: "canceled", code: "stopped", codeParams: { by: "u-joao" } }))).toEqual({
       key: "routines.code.stoppedBy",
@@ -218,6 +224,27 @@ describe("approvals asked while nobody watched", () => {
     expect(approvalWhy({ why: "  O teste passou.  " })).toBe("O teste passou.");
     expect(approvalWhy({ why: "   " })).toBeNull();
     expect(approvalWhy({})).toBeNull();
+  });
+});
+
+describe("routine notifications in the person's words", () => {
+  const n = (kind: AppNotification["kind"], reason?: string) => ({ kind, latest: reason ? { reason } : {} });
+
+  test("a failure by its run's code, else the plain failure; a pause by its reason", () => {
+    expect(routineNotificationWords(n("routine_failed", "budget_exceeded"))).toEqual({
+      key: "routines.code.budget_exceeded",
+      values: {},
+      fallback: "routines.outcome.failed",
+    });
+    expect(routineNotificationWords(n("routine_failed", "brand_new"))?.key).toBe("routines.outcome.failed");
+    expect(routineNotificationWords(n("routine_failed"))?.key).toBe("routines.outcome.failed");
+    expect(routineNotificationWords(n("routine_paused", "agent_not_in_channel"))).toEqual({
+      key: "routines.pausedReason.agent_not_in_channel",
+      values: {},
+    });
+    // A pause without a reason keeps its own text; other kinds have none.
+    expect(routineNotificationWords(n("routine_paused"))).toBeNull();
+    expect(routineNotificationWords(n("mention", "failing"))).toBeNull();
   });
 });
 

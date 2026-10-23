@@ -35,6 +35,8 @@ export interface PushTextInput {
   text?: string | null;
   /** An approval of a production, irreversible or external action. */
   highRisk?: boolean;
+  /** The routine that asked for an approval while nobody watched (ADR 0053 §8): the push says so. */
+  routine?: string | null;
 }
 
 interface Strings {
@@ -43,6 +45,7 @@ interface Strings {
   approvalTitle: (actor: string) => string;
   approvalBody: string;
   approvalHighRisk: (what: string) => string;
+  approvalFromRoutine: (routine: string) => string;
   questionTitle: (actor: string) => string;
   questionBody: string;
   forumTitle: string;
@@ -69,6 +72,7 @@ const STRINGS: Record<PushLocale, Strings> = {
     approvalTitle: (a) => `${a} precisa da sua aprovação`,
     approvalBody: "Toque para ver o pedido.",
     approvalHighRisk: (what) => `${what}. Abra o app para revisar com calma.`,
+    approvalFromRoutine: (routine) => `Rotina «${routine}»`,
     questionTitle: (a) => `${a} tem uma pergunta para você`,
     questionBody: "Toque para responder.",
     forumTitle: "Sua vez de opinar",
@@ -93,6 +97,7 @@ const STRINGS: Record<PushLocale, Strings> = {
     approvalTitle: (a) => `${a} needs your approval`,
     approvalBody: "Tap to see the request.",
     approvalHighRisk: (what) => `${what}. Open the app to review it.`,
+    approvalFromRoutine: (routine) => `Routine «${routine}»`,
     questionTitle: (a) => `${a} has a question for you`,
     questionBody: "Tap to answer.",
     forumTitle: "Your turn to weigh in",
@@ -129,9 +134,14 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     body: clip(body, PUSH_BODY_MAX),
   });
   switch (input.kind) {
-    case "approval":
-      if (input.highRisk) return out(s.approvalTitle(actor), s.approvalHighRisk(clip(what || s.approvalBody, 120)));
-      return out(s.approvalTitle(actor), what || s.approvalBody);
+    case "approval": {
+      // Asked by a routine while nobody watched: its name leads, so the person knows where it comes from.
+      const routine = input.routine?.trim();
+      const from = (body: string) => (routine ? `${s.approvalFromRoutine(routine)}: ${body}` : body);
+      if (input.highRisk)
+        return out(s.approvalTitle(actor), from(s.approvalHighRisk(clip(what || s.approvalBody, 120))));
+      return out(s.approvalTitle(actor), from(what || s.approvalBody));
+    }
     case "agent_question":
       return out(s.questionTitle(actor), text || s.questionBody);
     case "forum_turn":

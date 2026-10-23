@@ -41,6 +41,8 @@ test("fatigue: the first failure after a good run notifies once, the fifth in a 
   const failed = await notificationsOf(f, "routine_failed");
   expect(failed).toHaveLength(1);
   expect(failed[0]).toMatchObject({ userId: f.owner.id, source: { routineId: routine.id } });
+  // The coded reason for the app to say in the person's language; never the server's English.
+  expect(failed[0]?.latest).toEqual({ title: "Avaliações", reason: "provider_error" });
 
   for (const minutesAgo of [50, 40, 30]) await failOnce(minutesAgo);
   expect(await routineRow(f, routine.id)).toMatchObject({ failuresInRow: 4, active: true, pausedReason: null });

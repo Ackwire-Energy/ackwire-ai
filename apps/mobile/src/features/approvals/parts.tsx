@@ -63,8 +63,15 @@ export function ApprovalDetails({ approval: a, max = 3 }: { approval: Approval; 
 /**
  * Why it asks, read before the action (ADR 0053 §8): "Pedido pela rotina «X» enquanto ninguém
  * acompanhava" when nobody was watching, then "Theo disse: “…”" (its reason, else its last words).
+ * The request itself, or its notification (only its origin and why).
  */
-export function ApprovalWhy({ approval: a, name }: { approval: Approval; name: string }) {
+export function ApprovalWhy({
+  approval: a,
+  name,
+}: {
+  approval: Pick<Approval, "origin" | "why" | "trail">;
+  name: string;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const said = approvalSaid(a);
