@@ -4,9 +4,17 @@
  * the top-left corner (main_window.rs puts them in the middle of these 40px).
  */
 :root {
-  --titlebar-h: 40px;
+  /*
+   * The app sets --app-zoom with ⌘+/⌘− (main_window.rs `fit_page`): the bar stays 40pt and the room for the
+   * window's buttons stays theirs, which don't zoom.
+   */
+  --titlebar-h: calc(40px / var(--app-zoom, 1));
   /* The window's close, minimize and zoom buttons. */
-  --titlebar-lights: 78px;
+  --titlebar-lights: calc(78px / var(--app-zoom, 1));
+}
+/* Full screen: the buttons hide, so does their room. */
+html[data-fullscreen] {
+  --titlebar-lights: 12px;
 }
 
 .titlebar {

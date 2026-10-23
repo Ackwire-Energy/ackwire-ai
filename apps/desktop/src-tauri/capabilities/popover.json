@@ -17,6 +17,8 @@
     "allow-notch-set",
     "allow-notify",
     "allow-this-mac-reply",
-    "allow-app-menu-set"
+    "allow-app-menu-set",
+    "allow-this-mac-listening",
+    "allow-dock-set"
   ]
 }
