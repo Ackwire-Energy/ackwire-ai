@@ -351,7 +351,7 @@ export function chatRoutes(deps: AppDeps) {
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
       const started = performance.now();
       const message = await postPersonMessage(
-        { db, pubsub: adapters.pubsub, judge: deps.extras?.context?.judge },
+        { db, pubsub: adapters.pubsub, judge: deps.extras?.context?.judge, talker: deps.extras?.talker },
         user.id,
         orgId,
         channelId,

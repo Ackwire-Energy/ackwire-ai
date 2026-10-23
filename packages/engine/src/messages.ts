@@ -30,6 +30,7 @@ import { afterReplyAnswered } from "./questions";
 import { inChannelRun } from "./run-scope";
 import { replyThreadOf } from "./runs";
 import { afterSteered } from "./steering";
+import type { Talker } from "./talker";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 
 export { stopChecksSettled } from "./steering";
@@ -696,8 +697,11 @@ async function resendView(deps: { db: Database; pubsub: PubSub }, orgId: string,
 }
 
 export async function postPersonMessage(
-  /** `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop). */
-  deps: { db: Database; pubsub: PubSub; judge?: Judge },
+  /**
+   * `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop).
+   * `talker`: the agents' conversation layer, for fast replies while they work (none = no fast replies).
+   */
+  deps: { db: Database; pubsub: PubSub; judge?: Judge; talker?: Talker },
   userId: string,
   orgId: string,
   channelId: string,

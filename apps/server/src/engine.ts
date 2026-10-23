@@ -37,6 +37,7 @@ import {
   createSandboxToolSource,
   createScheduleToolSource,
   createSkillToolSource,
+  createTalker,
   createToolGateway,
   createWikiToolSource,
   createWorkspaceToolSource,
@@ -149,6 +150,13 @@ export function buildEngine(o: EngineOptions) {
         )
       : llmJudge;
   }
+  // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
+  const talker = createTalker({
+    db,
+    pubsub: adapters.pubsub,
+    gateway,
+    resolveModel: (orgId) => resolveSummaryModel(context, orgId),
+  });
   const connectorDeps = {
     db,
     keyWrappers,
@@ -357,6 +365,7 @@ export function buildEngine(o: EngineOptions) {
     machineHub,
     browserLive,
     mail,
+    talker,
   };
 }
 
