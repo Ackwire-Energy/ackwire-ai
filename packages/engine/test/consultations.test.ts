@@ -46,7 +46,7 @@ async function addInfra() {
   );
 }
 
-/** @dev asks @infra on "deploy"; @infra answers from its DM; @dev relays what it heard. */
+/** @dev asks @infra on "deploy" and waits; @infra answers from its DM; @dev relays what it heard. */
 const consultReply = (infraSays: (req: ModelRequest) => ReturnType<typeof answer>) => (req: ModelRequest) => {
   if (inAgentDm(req)) return infraSays(req);
   const last = lastText(req);
@@ -55,7 +55,7 @@ const consultReply = (infraSays: (req: ModelRequest) => ReturnType<typeof answer
   if (last.includes("deploy"))
     return {
       chunks: [],
-      toolUses: [{ name: "ask_agent", input: { agent: "@infra", question: "How is staging deployed?" } }],
+      toolUses: [{ name: "ask_agent", input: { agent: "@infra", question: "How is staging deployed?", wait: true } }],
     };
   return { chunks: ["ok"] };
 };
