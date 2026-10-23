@@ -24,22 +24,78 @@ if (flag("--resume") && process.env.FAKE_CLAUDE_NO_SESSION) {
   process.exit(1);
 }
 const out = (o) => process.stdout.write(`${JSON.stringify({ ...o, session_id: session })}\n`);
-out({ type: "system", subtype: "init", model: flag("--model") ?? "claude-sonnet" });
+// $FAKE_CLAUDE_VERSION: the version its init line says (none: an old CLI that can't be steered).
+const version = process.env.FAKE_CLAUDE_VERSION;
+out({
+  type: "system",
+  subtype: "init",
+  model: flag("--model") ?? "claude-sonnet",
+  ...(version ? { claude_code_version: version } : {}),
+});
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let turns = 0;
-let chain = Promise.resolve();
+// Lines wait here: a turn may read the ones sent while it runs ("STEER"), the rest start the next turns.
+const queue = [];
+let wake = null;
+let closed = false;
 const rl = createInterface({ input: process.stdin });
 rl.on("line", (line) => {
-  chain = chain.then(() => answer(line));
+  queue.push(line);
+  wake?.();
 });
 rl.on("close", () => {
-  chain.then(() => process.exit(0));
+  closed = true;
+  wake?.();
 });
+const waitForLine = (ms) =>
+  new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    wake = () => {
+      clearTimeout(t);
+      resolve();
+    };
+  }).finally(() => {
+    wake = null;
+  });
+(async () => {
+  for (;;) {
+    const line = queue.shift();
+    if (line !== undefined) await answer(line);
+    else if (closed) process.exit(0);
+    else await waitForLine(60_000);
+  }
+})();
 
 async function answer(line) {
   const msg = JSON.parse(line);
   const prompt = String(msg.message?.content ?? "");
+  const read = msg.uuid ? [msg.uuid] : [];
+  let steered = "";
   turns++;
+  // "STEER": a tool runs, then the messages sent meanwhile are read at its boundary (same turn).
+  // "STEERLATE": the turn ends before reading them (they start the next turn).
+  // "STEERDROP": they vanish unread and nothing waits (a CLI that lost them).
+  if (prompt.includes("STEER")) {
+    if (queue.length === 0) await waitForLine(3000);
+    if (prompt.includes("STEERDROP")) queue.length = 0;
+    else if (!prompt.includes("STEERLATE")) {
+      out({
+        type: "assistant",
+        message: { content: [{ type: "tool_use", id: "s1", name: "Bash", input: { command: "make" } }] },
+        parent_tool_use_id: null,
+      });
+      out({
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "s1", content: "built" }] },
+        parent_tool_use_id: null,
+      });
+      while (queue.length) {
+        const m = JSON.parse(queue.shift());
+        if (m.uuid) read.push(m.uuid);
+        steered += ` +${m.priority ?? "-"}/${m.origin?.kind ?? "-"}: ${m.message?.content ?? ""}`;
+      }
+    }
+  }
   const marker = log ? path.join(path.dirname(log), "crashed") : "";
   if (prompt.includes("CRASH") && marker && !existsSync(marker)) {
     writeFileSync(marker, "");
@@ -107,8 +163,10 @@ async function answer(line) {
     type: "result",
     subtype: "success",
     is_error: false,
-    result: `echo ${turns}: ${prompt}`,
+    result: `echo ${turns}: ${prompt}${steered}`,
     usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 },
     modelUsage: { [flag("--model") ?? "claude-sonnet"]: { inputTokens: 10, outputTokens: 7 } },
+    ...(read.length ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),
+    ...(version ? { queued_turn_count: queue.length } : {}),
   });
 }

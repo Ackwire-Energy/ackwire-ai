@@ -225,6 +225,8 @@ export function isNewWork(request: MachineRequest) {
     case "task.cancel":
     case "task.output":
     case "access.reduce":
+    // A person's message for a turn already running (live steering).
+    case "brain.steer":
     // The owner managing the brains' accounts (ADR 0041) isn't agent work.
     case "account":
       return false;

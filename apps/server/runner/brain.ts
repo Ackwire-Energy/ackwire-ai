@@ -9,6 +9,8 @@ import {
   type AgentScope,
   BRAIN_LIMITS,
   type BrainEffort,
+  type BrainSteerReply,
+  type BrainSteerRequest,
   type BrainTurnRequest,
   isAccountId,
   isBrainEffort,
@@ -52,6 +54,13 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   that account's folder (its sessions live there too; a missing folder is
  *   `account_missing`, never another account), and `effort` is `--effort`.
  *   A change of either starts the process again.
+ * - Protocol 15 (live steering): `steer` writes messages into the turn in
+ *   progress as stream-json user lines (each with its `uuid`); Claude Code
+ *   reads them at its next tool boundary (`priority: "next"`; "now" for an
+ *   urgent one where the CLI can move background work aside). The result's
+ *   `user_message_uuids` say which it read (`steer_read`). One it hadn't read
+ *   when the turn ended starts the CLI's next turn: this request waits for
+ *   that turn too and the answers join, so nothing runs unheard.
  */
 
 export const BRAIN_IDLE_MS = 10 * 60_000;
@@ -64,6 +73,36 @@ const SESSION_ID = /^[a-fA-F0-9-]{36}$/;
 const RUN_ID = /^[a-zA-Z0-9-]{8,64}$/;
 const MODEL = /^[A-Za-z0-9._:[\]-]{1,100}$/;
 const STDERR_KEEP = 4000;
+
+/**
+ * From this Claude Code version on, a stream-json message sent mid-turn is read
+ * at the next tool boundary and listed in the result's `user_message_uuids`.
+ * Older ones (or an unknown version) can't be steered: their turns read new
+ * messages at the end, as before.
+ */
+export const STEER_MIN_VERSION = "2.1.259";
+/** From this version on, `priority: "now"` with a human origin moves background-able work aside instead of interrupting. */
+export const STEER_NOW_MIN_VERSION = "2.1.286";
+/** A result came while steered messages were still queued: how long the CLI's next turn (which reads them) may take to start. */
+export const STEER_FOLLOW_UP_MS = 30_000;
+
+/** `a >= b` for dotted versions ("2.1.259", "2.1.300 (Claude Code)"); an unreadable one is never enough. */
+export function versionAtLeast(a: string | undefined, b: string): boolean {
+  const parse = (v: string) => /^\s*(\d+)\.(\d+)\.(\d+)/.exec(v)?.slice(1).map(Number) ?? null;
+  const x = a ? parse(a) : null;
+  const y = parse(b);
+  if (!x || !y) return false;
+  for (let i = 0; i < 3; i++) {
+    if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  }
+  return true;
+}
+
+/** What a Claude Code of this version takes mid-turn: messages at all (`next`), and urgent ones (`now`). */
+export const steerSupport = (version: string | undefined) => ({
+  next: versionAtLeast(version, STEER_MIN_VERSION),
+  now: versionAtLeast(version, STEER_NOW_MIN_VERSION),
+});
 
 /** The prefix Claude Code gives our bridge's tools; the engine knows them by their own names. */
 const OUR_TOOL_PREFIX = "mcp__agentes__";
@@ -94,6 +133,13 @@ const cutInput = (input: unknown): unknown => {
   }
 };
 
+/** The user messages (our `uuid`s) a reply or result says the turn read: the list, else the single field (older CLIs). */
+const readUuids = (ev: Record<string, unknown>): string[] => {
+  if (Array.isArray(ev.user_message_uuids))
+    return ev.user_message_uuids.filter((u): u is string => typeof u === "string");
+  return typeof ev.user_message_uuid === "string" ? [ev.user_message_uuid] : [];
+};
+
 const secondsToIso = (v: unknown) => {
   const n = num(v);
   if (n <= 0) return undefined;
@@ -105,6 +151,8 @@ const secondsToIso = (v: unknown) => {
 export interface ParsedBrainLine {
   events: WireBrainEvent[];
   final?: WireBrainEvent;
+  /** On a result: how many human messages still wait in the CLI's queue (`queued_turn_count`; absent: unknown). */
+  queued?: number;
 }
 
 /**
@@ -169,6 +217,9 @@ export class ClaudeStreamParser {
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
         const events: WireBrainEvent[] = [];
+        // A turn's first reply names the messages that started it (a steered one the CLI read after a result).
+        const read = readUuids(ev);
+        if (read.length) events.push({ type: "steer_read", uuids: read });
         for (const block of content) {
           if (!isObj(block)) continue;
           if (
@@ -227,6 +278,14 @@ export class ClaudeStreamParser {
   }
 
   private result(ev: Record<string, unknown>): ParsedBrainLine {
+    const parsed = this.resultInner(ev);
+    const read = readUuids(ev);
+    if (read.length) parsed.events.unshift({ type: "steer_read", uuids: read });
+    if (typeof ev.queued_turn_count === "number") parsed.queued = ev.queued_turn_count;
+    return parsed;
+  }
+
+  private resultInner(ev: Record<string, unknown>): ParsedBrainLine {
     const events: WireBrainEvent[] = [];
     const usage = isObj(ev.usage) ? ev.usage : {};
     const cacheRead = num(usage.cache_read_input_tokens);
@@ -365,9 +424,25 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
   ];
 }
 
-/** One user message on Claude Code's stream-json stdin. */
-export const userMessageLine = (prompt: string) =>
-  `${JSON.stringify({ type: "user", message: { role: "user", content: prompt }, parent_tool_use_id: null, session_id: "" })}\n`;
+/**
+ * One user message on Claude Code's stream-json stdin. Steered ones carry
+ * their `uuid` (the result lists it once read), a `priority` and the human
+ * origin (a person wrote it).
+ */
+export const userMessageLine = (
+  prompt: string,
+  steer?: { uuid: string; priority: "now" | "next" | "later"; origin?: { kind: "human" } },
+) =>
+  `${JSON.stringify({
+    type: "user",
+    message: { role: "user", content: prompt },
+    parent_tool_use_id: null,
+    session_id: "",
+    ...(steer ? { uuid: steer.uuid, priority: steer.priority, ...(steer.origin ? { origin: steer.origin } : {}) } : {}),
+  })}\n`;
+
+/** A message for a turn in progress (`brain.steer`). */
+export type SteerMessage = BrainSteerRequest["messages"][number];
 
 // ── One process ──────────────────────────────────────────────────────────────
 
@@ -379,6 +454,12 @@ export class ClaudeProcess {
   exited = false;
   exitCode: number | null = null;
   stderr = "";
+  /** Claude Code said `system` `init` (its version, when it has one, is known from then on). */
+  initSeen = false;
+  /** Claude Code's version, from its `system` `init` line (absent: not said yet, or an old CLI). */
+  cliVersion?: string;
+  /** The turn in progress on this process (set by `runTurnOnProcess`): messages for it mid-turn. */
+  turn: { steer(messages: SteerMessage[]): BrainSteerReply } | null = null;
   private lineHandler: ((line: string) => void) | null = null;
   private exitHandlers = new Set<() => void>();
 
@@ -403,12 +484,27 @@ export class ClaudeProcess {
     this.child.stdin?.on("error", () => {});
     if (this.child.stdout) {
       const rl = createInterface({ input: this.child.stdout, crlfDelay: Number.POSITIVE_INFINITY });
-      (rl as unknown as EventEmitter).on("line", (line: string) => this.lineHandler?.(line));
+      (rl as unknown as EventEmitter).on("line", (line: string) => {
+        // Read whether a turn listens or not (the CLI may say it before the first turn's prompt).
+        if (line.includes('"init"')) this.noteInit(line);
+        this.lineHandler?.(line);
+      });
     }
     this.child.stderr?.setEncoding("utf8");
     this.child.stderr?.on("data", (chunk: string) => {
       this.stderr = (this.stderr + chunk).slice(-STDERR_KEEP);
     });
+  }
+
+  private noteInit(line: string) {
+    try {
+      const ev = JSON.parse(line) as Record<string, unknown>;
+      if (ev.type !== "system" || ev.subtype !== "init") return;
+      this.initSeen = true;
+      if (typeof ev.claude_code_version === "string") this.cliVersion = ev.claude_code_version.slice(0, 40);
+    } catch {
+      // not a JSON line
+    }
   }
 
   private markExit(code: number | null) {
@@ -475,6 +571,8 @@ export class ClaudeProcess {
 interface TurnOutcome {
   final?: WireBrainEvent;
   died?: boolean;
+  /** Steered messages (`uuid`s) the turn never said it read: the CLI would run them unheard, so the process goes. */
+  unread?: string[];
 }
 
 /**
@@ -492,6 +590,8 @@ export function runTurnOnProcess(
     redact?: (text: string) => string;
     /** One-shot: stdin closes after the prompt. */
     endInput?: boolean;
+    /** How long the CLI's next turn may take to start when it still has steered messages (`STEER_FOLLOW_UP_MS`). */
+    followUpMs?: number;
   },
 ): Promise<TurnOutcome> {
   const redact = opts.redact ?? ((s: string) => s);
@@ -501,6 +601,40 @@ export function runTurnOnProcess(
     let buf = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
     let settled = false;
+    /** Steered messages written to this turn and not yet said read. */
+    const outstanding = new Set<string>();
+    /** Answers of results that came while steered messages were still queued: they lead the final one. */
+    const held: string[] = [];
+    let followUp: ReturnType<typeof setTimeout> | null = null;
+    /** The last result the turn went on from (its answer is in `held`). */
+    let heldFinal: WireBrainEvent | null = null;
+    const joinText = (texts: string[]) => texts.filter(Boolean).join("\n\n").slice(0, BRAIN_LIMITS.doneText);
+    /** A final answer led by the held ones. */
+    const joined = (final: WireBrainEvent): WireBrainEvent =>
+      final.type === "done" && held.length ? { ...final, text: joinText([...held, final.text]) } : final;
+    /** No next turn came (or the process went): the result it went on from ends the turn, with the held answers. */
+    const heldEnd = (final: WireBrainEvent): WireBrainEvent =>
+      final.type === "done" ? { ...final, text: joinText(held) } : final;
+    proc.turn = {
+      steer: (messages) => {
+        if (settled) return { status: "no_turn" };
+        // Stdin closes after a one-shot's prompt: nothing more can go in.
+        if (opts.endInput) return { status: "unsupported", reason: "one-shot process" };
+        // Not started yet (its version unknown): the messages wait for the turn's end, as before.
+        if (!proc.initSeen) return { status: "no_turn", reason: "Claude Code is still starting" };
+        const support = steerSupport(proc.cliVersion);
+        if (!support.next) {
+          const version = proc.cliVersion ?? "(version unknown)";
+          return { status: "unsupported", reason: `Claude Code ${version} reads messages only between turns` };
+        }
+        for (const m of messages) {
+          const priority = m.urgent && support.now ? "now" : "next";
+          proc.write(userMessageLine(m.text, { uuid: m.uuid, priority, origin: { kind: "human" } }));
+          outstanding.add(m.uuid);
+        }
+        return { status: "accepted", accepted: messages.map((m) => m.uuid) };
+      },
+    };
     const flush = () => {
       if (timer) clearTimeout(timer);
       timer = null;
@@ -524,6 +658,9 @@ export function runTurnOnProcess(
     const finish = (out: TurnOutcome) => {
       if (settled) return;
       settled = true;
+      if (followUp) clearTimeout(followUp);
+      proc.turn = null;
+      if (outstanding.size) out = { ...out, unread: [...outstanding] };
       flush();
       proc.onLine(null);
       offExit();
@@ -532,8 +669,19 @@ export function runTurnOnProcess(
     };
     proc.onLine((line) => {
       if (settled) return;
+      if (followUp) clearTimeout(followUp);
+      followUp = null;
       const parsed = proc.parser.push(line);
       for (const e of parsed.events) {
+        if (e.type === "steer_read") {
+          // Only ours (the list may name messages this turn never sent).
+          const ours = e.uuids.filter((u) => outstanding.delete(u));
+          if (ours.length) {
+            flush();
+            opts.emit({ type: "steer_read", uuids: ours });
+          }
+          continue;
+        }
         if (e.type === "text_delta") {
           buf += e.text;
           if (!timer) timer = setTimeout(flush, deltaMs);
@@ -542,9 +690,23 @@ export function runTurnOnProcess(
         flush();
         opts.emit(clean(e));
       }
-      if (parsed.final) finish({ final: parsed.final });
+      const final = parsed.final;
+      if (!final) return;
+      // Steered messages still queued (the turn ended before a tool boundary): the CLI reads them in the
+      // turn it starts next, so this turn goes on until then and its answers join. A plan limit or a
+      // failed login ends it (the queued turn would fail the same way).
+      const goesOn = final.type === "done" || (final.type === "error" && final.code === "claude_failed");
+      if (outstanding.size > 0 && parsed.queued !== 0 && goesOn && !proc.exited) {
+        if (final.type === "done" && final.text) held.push(final.text);
+        heldFinal = final;
+        proc.parser.beginTurn();
+        followUp = setTimeout(() => finish({ final: heldEnd(final) }), opts.followUpMs ?? STEER_FOLLOW_UP_MS);
+        return;
+      }
+      finish({ final: joined(final) });
     });
-    const offExit = proc.onExit(() => finish({ died: true }));
+    // Gone after a result it went on from: that result ends the turn (running it again would redo its tools).
+    const offExit = proc.onExit(() => finish(heldFinal ? { final: heldEnd(heldFinal) } : { died: true }));
     function onAbort() {
       proc.kill();
       finish({ final: { type: "error", code: "canceled", message: "The turn was canceled.", retryable: false } });
@@ -572,6 +734,8 @@ export interface BrainManagerOptions {
   idleMs?: number;
   maxProcesses?: number;
   deltaMs?: number;
+  /** Tests: `STEER_FOLLOW_UP_MS`. */
+  steerFollowUpMs?: number;
   log?: (line: string) => void;
 }
 
@@ -655,6 +819,8 @@ export class BrainManager {
   private readonly live = new Map<string, Live>();
   private readonly chains = new Map<string, Promise<unknown>>();
   private readonly bridge = new Map<string, BridgeEntry>();
+  /** The process each run's turn is on now (live steering finds it by run). */
+  private readonly running = new Map<string, Live>();
   /** Sessions that answered here (`ranKeyOf`): resumed next time even where Claude Code's folder can't be looked at. */
   private readonly ran = new Set<string>();
   private closed = false;
@@ -700,6 +866,16 @@ export class BrainManager {
       ...(b.runToken && isRunToolToken(b.runToken) ? { serverToken: b.runToken } : {}),
       ...(b.redact ? { redact: b.redact } : {}),
     };
+  }
+
+  /**
+   * Protocol 15: messages for the turn of `runId` in progress, on the agent's
+   * process for that session (another agent's turn is never reached).
+   */
+  steer(agentId: string, req: BrainSteerRequest): BrainSteerReply {
+    const live = this.running.get(req.runId);
+    if (!live || live.key !== `${agentId}:${req.session}` || live.proc.exited) return { status: "no_turn" };
+    return live.proc.turn?.steer(req.messages) ?? { status: "no_turn" };
   }
 
   /** One turn; resolves with its final event (also emitted). Turns of one session queue. */
@@ -819,6 +995,7 @@ export class BrainManager {
       bridge.runId = req.runId;
       bridge.runToken = typeof req.mcp?.token === "string" ? req.mcp.token : null;
     }
+    this.running.set(req.runId, live);
     try {
       const out = await runTurnOnProcess(live.proc, req.prompt, {
         emit: ctx.emit,
@@ -826,11 +1003,21 @@ export class BrainManager {
         deltaMs: this.opts.deltaMs,
         redact: ctx.secrets?.redact,
         endInput: !live.persistent,
+        ...(this.opts.steerFollowUpMs !== undefined ? { followUpMs: this.opts.steerFollowUpMs } : {}),
       });
       if (out.final?.type === "done") this.ran.add(live.ranKey);
-      if (out.died || (out.final?.type === "error" && out.final.code === "canceled")) this.drop(live);
+      // A steered message it never read would start a turn nobody listens to: the process goes (the
+      // engine sends that message again with its next turn, on a resumed process).
+      if (out.unread?.length && !out.died) {
+        this.log(
+          `brain process ${live.key.split(":")[1]?.slice(0, 8) ?? ""} ended a turn with unread messages; closing`,
+        );
+        live.proc.kill();
+        this.drop(live);
+      } else if (out.died || (out.final?.type === "error" && out.final.code === "canceled")) this.drop(live);
       return out;
     } finally {
+      if (this.running.get(req.runId) === live) this.running.delete(req.runId);
       live.busy = false;
       live.lastUsed = Date.now();
       if (bridge) {
