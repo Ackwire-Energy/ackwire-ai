@@ -28,13 +28,16 @@ export function viaRoutineOf(meta: Record<string, unknown> | undefined): { id: s
 
 /**
  * The message a routine posts on its creator's behalf to call its agent
- * (top level): hidden from the timeline, only the agent's answer shows.
+ * (top level): hidden from the timeline, only the agent's answer shows. A
+ * background routine's start (`meta.background`) stays, as one line: its
+ * report comes later, maybe elsewhere (`backgroundRoutineOf` in lib/notices).
  */
 export const isRoutineCall = (m: {
   threadId: string | null;
   author: { type: string };
   meta?: Record<string, unknown>;
-}) => m.threadId === null && m.author.type === "person" && routineOfMessage(m.meta) !== null;
+}) =>
+  m.threadId === null && m.author.type === "person" && m.meta?.background !== true && routineOfMessage(m.meta) !== null;
 
 /** Zones people pick most often; the select also keeps whatever zone a routine already has. */
 export const COMMON_TIMEZONES = [

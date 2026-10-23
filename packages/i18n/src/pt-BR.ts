@@ -4796,7 +4796,10 @@ export const ptBR = {
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
+      delivered: "{{name}} recebeu",
+      held: "{{name}} lê depois da sua decisão no card",
       read: "{{name}} leu",
+      resolved: "{{name}} encerrou o pedido de ajuda",
     },
     well: {
       readYours: "Leu seu recado",
@@ -6682,6 +6685,22 @@ export const ptBR = {
       noAnswer: "Sem resposta em {{minutes}} min. {{theFrom}} {{from}} respondeu sem ela.",
       couldNot: "{{theTo}} {{to}} não conseguiu responder. {{theFrom}} {{from}} seguiu sem ela.",
       private: "Conversa só entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
+    },
+    /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
+    notice: {
+      routineHandoff: "Rotina «{{routine}}» entregou um relatório",
+      routineHandoffAnon: "Uma rotina entregou um relatório",
+      consultReply: "{{from}} respondeu",
+      consultReplyAnon: "Outro agente respondeu",
+      agentNote: "Nota de {{from}}",
+      agentNoteAnon: "Nota de outro agente",
+      waitResult: "Chegou o resultado que {{name}} esperava",
+      other: "Aviso para {{name}}",
+      show: "Ver",
+      hide: "Ocultar",
+      routineRan: "Rotina «{{routine}}» rodou",
+      talker: "enquanto trabalha",
+      talkerTip: "Respondeu sem parar a tarefa em andamento.",
     },
     /** Next to the time on a reply of an agent nobody called. */
     joined: {

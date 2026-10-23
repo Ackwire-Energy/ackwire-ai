@@ -228,7 +228,10 @@ export const featureKeysEn: FeatureTranslations = {
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
+      delivered: "{{name}} got it",
+      held: "{{name}} reads it after your decision on the card",
       read: "{{name}} read it",
+      resolved: "{{name}} closed the help request",
       well: "Read your note",
       wellNow: "Stopped to read your note",
     },
