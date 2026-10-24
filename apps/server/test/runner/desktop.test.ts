@@ -46,7 +46,7 @@ afterEach(() => {
 });
 
 interface Logged {
-  start?: { env: Record<string, string>; cwd: string };
+  start?: { env: Record<string, string>; cwd: string; argv: string[] };
   request?: { id: number; op: string; [key: string]: unknown };
 }
 
@@ -102,6 +102,9 @@ function setup(opts: Partial<DesktopManagerOptions> & { state?: Record<string, u
       : [];
   return {
     manager,
+    desktops,
+    logFile,
+    stateFile,
     dir,
     home,
     lines,
@@ -221,6 +224,41 @@ describe("only as the agent's own user", () => {
       message: expect.stringMatching(/runner's own user/),
     });
     expect([t.ensured, t.starts()]).toEqual([[], 0]);
+  });
+
+  test("system mode's root says whether the computer can, and serves none itself: each agent's worker does", async () => {
+    const root = { ...linux, uid: 0 };
+    const t = setup({ workers: true, uids: () => null, system: root });
+    expect(t.manager.info()).toEqual({ available: true });
+    expect(await failure(() => t.manager.look(AGENT))).toEqual({
+      code: "desktop_unavailable",
+      message: expect.stringMatching(/runner's own user/),
+    });
+    expect([t.ensured, t.starts()]).toEqual([[], 0]);
+    // What the computer lacks still shows.
+    const noScrot = { ...root, which: (c: string) => (c === "scrot" ? null : `/usr/bin/${c}`) };
+    expect(setup({ workers: true, system: noScrot }).manager.info().reason).toMatch(/\(missing: scrot\)/);
+  });
+
+  test("root's desktop-check runs the helper through the agent's launcher, as the agent's own user", async () => {
+    const t = setup();
+    const asRoot = (launcher?: DesktopManagerOptions["launcher"]) => {
+      const m = new DesktopManager({
+        desktops: t.desktops,
+        uids: () => UIDS,
+        log: () => {},
+        system: { ...linux, uid: 0 },
+        ...(launcher ? { launcher } : {}),
+      });
+      managers.push(m);
+      return m;
+    };
+    expect(await failure(() => asRoot().look(AGENT))).toMatchObject({ code: "desktop_unavailable" });
+    expect(t.starts()).toBe(0);
+    // The fake helper stands for the launcher: what follows its own two arguments is the command it would run.
+    const look = await asRoot({ prefix: [process.execPath, FAKE, t.logFile, t.stateFile], uid: OWN_UID }).look(AGENT);
+    expect(look.address).toBe("desktop://thunar/main");
+    expect(t.logged()[0]?.start?.argv.slice(0, 3)).toEqual(["/usr/bin/python3", "-I", "-c"]);
   });
 });
 

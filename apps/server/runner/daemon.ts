@@ -82,7 +82,7 @@ import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspa
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
 import { DataSockets } from "./streams";
-import { launchWorker, Supervisor, type SupervisorOptions, type WorkerState } from "./supervisor";
+import { launchWorker, Supervisor, type SupervisorOptions, type WorkerDesktop, type WorkerState } from "./supervisor";
 import { type SettledTask, TaskManager } from "./tasks";
 import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalUser } from "./terminal";
 
@@ -359,6 +359,21 @@ export class RunnerDaemon implements RequestObserver {
     if (!agentUser) return runnerUser(this.opts.home, await this.agentFolder(agent), agent);
     const u = agentUser(agent);
     return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
+  }
+
+  /**
+   * System mode: the agent's desktop for its worker's desktop use (the worker asks only while serving such a
+   * request), behind the same switches the worker checks.
+   */
+  private async workerDesktop(agent: AgentScope): Promise<WorkerDesktop> {
+    const { tools } = this.access();
+    if (tools.desktop !== true || !tools.commands) {
+      throw new RunnerError("not_allowed", "Desktop use needs this computer's desktop and commands switches on");
+    }
+    const started = await this.desktops.ensure(agent);
+    const s = this.desktops.session(agent.id);
+    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
+    return { ...started, xauthority: s.xauthority, home: s.home };
   }
 
   /** As whom a terminal on the agent's computer runs, like its desktop. */
@@ -720,9 +735,11 @@ export class RunnerDaemon implements RequestObserver {
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
-    // Every agent here works as this runner's own user, so no `uids`: desktop use stays off (ADR 0060 §3).
+    // Single-user: every agent works as this runner's own user, so no `uids` and desktop use stays off (ADR 0060
+    // §3). System mode: each agent's worker serves it as the agent's own user.
     const desktopUse = new DesktopManager({
       desktops: this.desktops,
+      workers: config.mode === "system",
       secrets: (agent) => agentSecrets(secretsDir, agent),
       browserPid: (agentId) => browser.chromePid(agentId),
       numbered: this.desktopRefsGiven,
@@ -743,6 +760,7 @@ export class RunnerDaemon implements RequestObserver {
         user: agentUser,
         start: launchWorker(this.self.command),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
+        desktop: (agent) => this.workerDesktop(agent),
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
         token: config.token,

@@ -11,6 +11,7 @@ import {
   type DesktopRegion,
   MAX_FRAME_BYTES,
   type MachineReplies,
+  type RunnerDesktopInfo,
   type RunnerDesktopUseInfo,
 } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -27,7 +28,7 @@ import {
   type HelperWindow,
   helperCommand,
 } from "./desktop-helper";
-import { DESKTOP_IDLE_MS, type DesktopSessions, type DesktopSystem, hostSystem } from "./desktop-session";
+import { DESKTOP_IDLE_MS, type DesktopSystem, hostSystem } from "./desktop-session";
 import {
   centerOf,
   contains,
@@ -56,8 +57,9 @@ import { KeyedQueue } from "./queue";
  *
  * - The helper runs as this process's own user, so desktop use is served
  *   only where this process is the agent's own OS user (system mode: the
- *   agent's worker), never the runner's user nor one another agent shares
- *   (`ownUserRefusal`).
+ *   agent's worker, ADR 0057), never the runner's user nor one another agent
+ *   shares (`ownUserRefusal`). The desktop itself is root's there (ADR 0058
+ *   §10): the worker gets it through the supervisor (`WorkerLink.desktop`).
  * - One request at a time per agent. An action is checked against the screen
  *   as it is right then (the element still there, where the last look saw
  *   it, on the screen, nothing above it), done, settled and looked at again,
@@ -239,8 +241,8 @@ export interface AgentUids {
 }
 
 /**
- * Why an agent can't use its desktop here, or null when it can (ADR 0060 §3). The helper runs as `own`, this
- * process's uid, so this process must be the agent's own user: neither the runner's nor any other agent's. A
+ * Why an agent can't use its desktop here, or null when it can (ADR 0060 §3). The helper runs as `own` (this
+ * process's uid, or its launcher's), which must be the agent's own user: neither the runner's nor any other agent's. A
  * desktop has a terminal, and whoever drives it reads everything its user can; the runner's user holds every
  * agent's delivered secrets and the computer's token. `agentId` null: whether this process could serve any.
  */
@@ -258,11 +260,35 @@ export function ownUserRefusal(agentId: string | null, own: number | null, uids:
   return null;
 }
 
+/** The ops of desktop use: system mode runs them in the agent's worker (`OP_ROUTES`). */
+export const DESKTOP_USE_OPS: ReadonlySet<string> = new Set([
+  "desktop.look",
+  "desktop.act",
+  "desktop.capture",
+  "desktop.apps",
+]);
+
+/**
+ * The agents' desktops as desktop use needs them (`DesktopSessions`, or in a worker the supervisor's): the
+ * agent's starts on its first use and is kept up while it is used; where it runs, never its VNC passwords.
+ */
+export interface DesktopUseSessions {
+  info(): RunnerDesktopInfo;
+  ensure(agent: AgentScope): Promise<MachineReplies["desktop.session.start"]>;
+  session(agentId: string): { display: number; xauthority: string; home: string } | null;
+}
+
 export interface DesktopManagerOptions {
-  /** The agents' desktops: the agent's starts on its first use and is kept up while it is used. */
-  desktops: Pick<DesktopSessions, "info" | "ensure" | "session">;
+  desktops: DesktopUseSessions;
   /** System mode: who each agent works as (`ownUserRefusal`). Absent or null: every agent is the runner's user. */
   uids?: () => AgentUids | null;
+  /**
+   * System mode, in root: each agent's worker serves its desktop use as the agent's own user (`OP_ROUTES`), so
+   * this one only says whether the computer can (`info`) and serves none itself.
+   */
+  workers?: boolean;
+  /** Root (system mode's `desktop-check`): the helper starts through the agent's launcher, as its `uid`. */
+  launcher?: { prefix: string[]; uid: number };
   /** The agent's delivered secrets: everything it reads is redacted with them (`agentSecrets`). */
   secrets?: (agent: AgentScope) => Promise<DesktopLookOptions["secrets"]>;
   /** The agent browser's Chrome while it runs: its window is one line in a look, and its tree isn't read. */
@@ -555,10 +581,15 @@ export class DesktopManager {
     this.numbered = opts.numbered ?? new Map();
   }
 
+  /** Who the helper runs as. */
+  private get helperUid() {
+    return this.opts.launcher?.uid ?? this.sys.uid;
+  }
+
   /** `hello.desktopUse`: whether agents can use their desktops here, and what is missing when they can't. */
   info(): RunnerDesktopUseInfo {
     if (this.sys.platform !== "linux") return { available: false, reason: NEEDS_LINUX };
-    const refusal = ownUserRefusal(null, this.sys.uid, this.opts.uids?.() ?? null);
+    const refusal = this.opts.workers ? null : ownUserRefusal(null, this.helperUid, this.opts.uids?.() ?? null);
     if (refusal) return { available: false, reason: refusal };
     const desktops = this.opts.desktops.info();
     if (!desktops.available) {
@@ -665,7 +696,10 @@ export class DesktopManager {
   /** The agent's desktop, started when it isn't running; a desktop that started afresh gets a new helper and refs. */
   private async use(agent: AgentScope): Promise<Use> {
     if (this.sys.platform !== "linux") throw new RunnerError("desktop_unavailable", NEEDS_LINUX);
-    const refusal = ownUserRefusal(agent.id, this.sys.uid, this.opts.uids?.() ?? null);
+    // Root in system mode serves none: `OP_ROUTES` sends these to the agent's worker.
+    const refusal = this.opts.workers
+      ? RUNNER_USER
+      : ownUserRefusal(agent.id, this.helperUid, this.opts.uids?.() ?? null);
     if (refusal) throw new RunnerError("desktop_unavailable", refusal);
     const started = await this.opts.desktops.ensure(agent);
     const s = this.opts.desktops.session(agent.id);
@@ -972,8 +1006,8 @@ export class DesktopManager {
   }
 
   /**
-   * A helper for the agent's desktop, as this process's user, with the desktop's display and cookie and a UTF-8
-   * locale. A desktop that just started gets a few seconds for its accessibility bus to come up.
+   * A helper for the agent's desktop, as this process's user (or the launcher's), with the desktop's display and
+   * cookie and a UTF-8 locale. A desktop that just started gets a few seconds for its accessibility bus to come up.
    */
   private async start(use: Use): Promise<Helper> {
     const python = this.opts.command ? null : this.sys.which("python3");
@@ -986,7 +1020,7 @@ export class DesktopManager {
       ...HELPER_ENV,
     };
     const helper = new Helper(
-      this.opts.command ?? helperCommand(python ?? "python3"),
+      this.opts.command ?? [...(this.opts.launcher?.prefix ?? []), ...helperCommand(python ?? "python3")],
       { cwd: use.home, env },
       (h, why) => {
         if (use.helper === h) use.helper = null;

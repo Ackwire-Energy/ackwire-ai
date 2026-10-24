@@ -634,10 +634,12 @@ async function desktopCheck(p: Parsed): Promise<number> {
     if (stored?.mode === "system") {
       const u = new AgentUsers({ home, range: stored.agentUidRange ?? DEFAULT_AGENT_UID_RANGE }).ensure(agent);
       const launcher = systemLauncher(u);
-      const desktop = await checkDesktop(home, agent, {
-        user: async () => systemDesktopUser(launcher, { uid: u.uid, gid: agentGid(u.user) }),
-        agentUsers: true,
-      });
+      const desktop = await checkDesktop(
+        home,
+        agent,
+        { user: async () => systemDesktopUser(launcher, { uid: u.uid, gid: agentGid(u.user) }), agentUsers: true },
+        { prefix: launcher.prefix, uid: u.uid },
+      );
       const terminal = await checkTerminal(agent, {
         user: async () => systemTerminalUser(launcher, agent),
         agentUsers: true,
@@ -661,6 +663,7 @@ async function checkDesktop(
   home: string,
   agent: AgentScope,
   as: Pick<DesktopSessionsOptions, "user" | "agentUsers">,
+  launcher?: { prefix: string[]; uid: number },
 ): Promise<boolean> {
   const desktops = new DesktopSessions({ home, log: (line) => console.log(`     ${line}`), ...as });
   desktops.restore();
@@ -709,7 +712,7 @@ async function checkDesktop(
       if (after !== "100,120") throw new Error(`a watcher moved the pointer (to ${after})`);
       console.log("ok   view-only: a watcher's pointer is ignored, the controller's moves it");
     }
-    return await checkDesktopUse(desktops, agent);
+    return await checkDesktopUse(desktops, agent, launcher);
   } catch (err) {
     console.log(`FAIL desktop: ${errorText(err)}`);
     return false;
@@ -726,21 +729,27 @@ async function checkDesktop(
 /**
  * Desktop use on that desktop through the runner's own code (ADR 0060), with how long each part takes: a
  * look, an action that settles and looks again, a screenshot and a close-up, the apps. It runs as this
- * command's user, the person at this computer; whether agents may use their desktops here is said first.
+ * command's user, the person at this computer, or in system mode as the agent's own (`launcher`); whether
+ * agents may use their desktops here is said first.
  */
-async function checkDesktopUse(desktops: DesktopSessions, agent: AgentScope): Promise<boolean> {
-  const forAgents = new DesktopManager({ desktops, log: () => undefined }).info();
+async function checkDesktopUse(
+  desktops: DesktopSessions,
+  agent: AgentScope,
+  launcher?: { prefix: string[]; uid: number },
+): Promise<boolean> {
+  const forAgents = new DesktopManager({ desktops, workers: launcher !== undefined, log: () => undefined }).info();
   console.log(
     forAgents.available
       ? "ok   desktop use: agents can use their desktops here"
       : `--   desktop use: agents can't use their desktops here: ${forAgents.reason}`,
   );
-  const uid = process.getuid?.() ?? null;
+  const uid = launcher?.uid ?? process.getuid?.() ?? null;
   const use = new DesktopManager({
     desktops,
     log: (line) => console.log(`     ${line}`),
-    // The person at this computer drives the desktop this check started, as its own user.
+    // The person at this computer drives the desktop this check started, as its own user (or the agent's).
     uids: () => (uid === null ? null : { runner: -1, agents: new Map([[agent.id, uid]]) }),
+    ...(launcher ? { launcher } : {}),
   });
   try {
     let t0 = performance.now();

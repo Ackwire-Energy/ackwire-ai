@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-10-24
-- Builds on: ADR 0054 (the screen layer: plans, targets in words, checks), ADR 0058 (a desktop per agent, the `desktop` handoff, the switches, `desktop:use` only with `sandbox:run`), ADR 0027 (secrets and redaction), ADR 0040 (the agent browser)
+- Builds on: ADR 0054 (the screen layer: plans, targets in words, checks), ADR 0058 (a desktop per agent, the `desktop` handoff, the switches, `desktop:use` only with `sandbox:run`), ADR 0057 (system mode: each agent its own OS user, its worker), ADR 0027 (secrets and redaction), ADR 0040 (the agent browser)
 - Supersedes, for the agent's desktop on a connected Linux computer: ADR 0031 §1 (one `computer_*` tool family under `computer:use`), §1a (`agents.screen`) and §6 (the virtual desktop's tools). None of them was built.
 - Changes ADR 0054 for the browser too (§5, §8): a box taller than half the screenshot or wider than 80% of it is refused; words that can't be undone are never taken at a bare point; more words count as costly; an unsure check is judged once more with an image when the judge sees images
 - Code: `packages/engine/src/screen/*` (desktop verbs, `ScreenSurface.kind`, `capture(region)` and `regions`, the close-up, `dismiss: false`); then the desktop surface and tools, and the runner's `desktop.ts`, `desktop-tree.ts` and `desktop-helper.py`
@@ -64,7 +64,8 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 ### 3. Desktop use is running commands
 
 - Its tools use ADR 0058's `desktop:use` and are offered, and allowed on each call, only with `sandbox:run`, the org's sandbox setting on, and the machine's `commands` and `desktop` switches on. No new scope and no migration. Routines follow ADR 0058 §8.
-- `hello.desktopUse` is available only when the agent runs as its own OS user (system mode), different from the runner's and from every other agent's. A desktop as the runner's user would put a terminal in reach of every agent's delivered secrets and the machine's token, on a machine that self-hosters share across workspaces. The helper runs as the process that serves the agent (its worker, as that user), and the runner checks the rule on every request too; a runner where every agent works as the runner's own user reports it unavailable, with the reason.
+- `hello.desktopUse` is available only when the agent runs as its own OS user (system mode, ADR 0057), different from the runner's and from every other agent's. A desktop as the runner's user would put a terminal in reach of every agent's delivered secrets and the machine's token, on a machine that self-hosters share across workspaces. The helper runs as the process that serves the agent, and the runner checks the rule on every request too; a runner where every agent works as the runner's own user reports it unavailable, with the reason.
+- In system mode `desktop.look`, `desktop.act`, `desktop.capture` and `desktop.apps` are the agent's worker's ops (`OP_ROUTES`), so the helper runs as the agent's own user, next to its secrets, its folder and its browser. The desktop itself is root's (ADR 0058 §10): the worker asks the supervisor for it over their link (`desktop.ensure`), the supervisor starts it when it isn't running and answers with its display, cookie and home, never its VNC passwords, and only while that worker serves a desktop use request the server sent it, with the machine's `desktop` and `commands` switches on. `agentes-runner desktop-check`, run as root there, starts the helper through the agent's launcher.
 - The runner also needs the machine's `desktop` and `commands` switches on for every desktop use request.
 - Mac and Windows runners have none: the reason says it needs a Linux machine with the agents' desktops.
 

@@ -1,6 +1,7 @@
 // A fake desktop helper for desktop tests: speaks desktop-helper.py's JSON lines with canned data.
 // Arguments: a log file and a state file (the runner gives a helper its own environment, not the test's).
-// It appends `{ start: { env, cwd } }` once and `{ request }` for each line to the log.
+// It appends `{ start: { env, cwd, argv } }` once (`argv`: what follows those two) and `{ request }` for
+// each line to the log.
 // The state file (read again for each request) is the desktop:
 //   { snapshot, boxes: { "<bus> <path>": box | null }, windows, hello, apps,
 //     crash: "<op>" (exits instead of answering), fail: { "<op>": { code, error } }, garbage: "<op>" }
@@ -9,7 +10,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 
 const [logFile, stateFile] = process.argv.slice(2);
 const log = (entry) => appendFileSync(logFile, `${JSON.stringify(entry)}\n`);
-log({ start: { env: process.env, cwd: process.cwd() } });
+log({ start: { env: process.env, cwd: process.cwd(), argv: process.argv.slice(4) } });
 
 const state = () => JSON.parse(readFileSync(stateFile, "utf8"));
 const out = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);

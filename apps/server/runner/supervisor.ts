@@ -8,6 +8,8 @@ import {
   type AgentScope,
   HEARTBEAT_MS,
   MAX_FRAME_BYTES,
+  type MachineErrorCode,
+  type MachineReplies,
   type MachineRequest,
   parseRunnerFrame,
   type RunnerAccess,
@@ -18,7 +20,8 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
 import { backoffDelay } from "./connection";
-import { RunnerError } from "./errors";
+import { DESKTOP_USE_OPS } from "./desktop";
+import { RunnerError, toMachineError } from "./errors";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
@@ -71,6 +74,9 @@ export interface WorkerState {
   limits: { maxConcurrentTasks: number; taskMaxSeconds: number; brainIdleMinutes: number; brainMaxProcesses: number };
 }
 
+/** The agent's desktop as its worker drives it (desktop use): where it runs, never its VNC passwords. */
+export type WorkerDesktop = MachineReplies["desktop.session.start"] & { xauthority: string; home: string };
+
 /** The link's own frames, besides the machine protocol's. */
 export type WorkerLinkFrame =
   /** To the worker. */
@@ -82,7 +88,16 @@ export type WorkerLinkFrame =
   /** From the worker: a piece of a `push`'s bytes (base64). */
   | { type: "upload.chunk"; uploadId: string; data: string }
   /** From the worker: every piece was sent; upload them. */
-  | { type: "upload.end"; uploadId: string; contentType: string; name: string; sha256: string };
+  | { type: "upload.end"; uploadId: string; contentType: string; name: string; sha256: string }
+  /** From the worker: its agent's desktop, started when it isn't running (root's, ADR 0058 §10). */
+  | { type: "desktop.ensure"; ensureId: string }
+  /** To the worker: where its agent's desktop runs, or why it can't. */
+  | {
+      type: "desktop.ensured";
+      ensureId: string;
+      desktop?: WorkerDesktop;
+      error?: { code: MachineErrorCode; message: string };
+    };
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
@@ -116,6 +131,8 @@ export interface SupervisorOptions {
   guard?: { start(): void; stop(): void };
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
   lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
+  /** Desktop use: the agent's desktop for its worker (`DesktopSessions`); without it a worker gets none. */
+  desktop?: (agent: AgentScope) => Promise<WorkerDesktop>;
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -583,6 +600,7 @@ export class Supervisor {
     } catch {
       return;
     }
+    if (f?.type === "desktop.ensure") return this.ensureDesktop(w, typeof f.ensureId === "string" ? f.ensureId : "");
     if (f?.type !== "upload.chunk" && f?.type !== "upload.end") return;
     const uploadId = typeof f.uploadId === "string" ? f.uploadId : "";
     const e = [...w.inflight.values()].find((x) => x.req.op === "push" && x.req.uploadId === uploadId);
@@ -616,6 +634,24 @@ export class Supervisor {
           })
         : this.upload(req, body, f, e.scope.signal);
     void reply.then((r) => this.send(w, { type: "upload.reply", uploadId, ...r }));
+  }
+
+  /**
+   * The worker's agent's desktop, only while it serves a desktop use request the server sent it: the agent's
+   * own code runs as the worker's user and could ask at any other time.
+   */
+  private ensureDesktop(w: Worker, ensureId: string) {
+    const reply = (r: { desktop: WorkerDesktop } | { error: { code: MachineErrorCode; message: string } }) =>
+      this.send(w, { type: "desktop.ensured", ensureId, ...r });
+    const agent = [...w.inflight.values()].find((e) => DESKTOP_USE_OPS.has(e.req.op))?.req.agent;
+    if (!agent || !this.opts.desktop) {
+      reply({ error: { code: "not_allowed", message: "No desktop use request of this agent is running" } });
+      return;
+    }
+    this.opts.desktop(agent).then(
+      (desktop) => reply({ desktop }),
+      (err: unknown) => reply({ error: toMachineError(err) }),
+    );
   }
 
   /** To the request's upload on the server this computer is paired with, with the machine token; from the worker only the file's name, type and hash. */
