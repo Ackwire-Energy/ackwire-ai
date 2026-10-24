@@ -354,8 +354,7 @@ report.judge = {
 
 /**
  * The bars a model must clear: a little under what `jev-1.14.0` measured here (ADR 0062: small targets with the
- * enlarged close-up 104/104 over two runs of 4 trials, the rest all right), so that noise alone doesn't fail a run
- * and a worse model does.
+ * close-up 63/64 at 4 trials, the rest all right), so that noise alone doesn't fail a run and a worse model does.
  */
 const box = report.box as Record<string, Record<string, { share: number; right: string }>>;
 const none = { share: 0, right: "-" };
