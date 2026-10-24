@@ -154,6 +154,8 @@ test.skipIf(process.platform === "win32")(
     expect(r.out).toContain("The runner needs Bun 1.3.5 or newer, or Node.js 22 or newer.");
     expect(r.runtime).toBeUndefined();
   },
+  // Six whole installs, each a shell running real tools: seconds on a busy computer.
+  30_000,
 );
 
 test("every Bun build the installer picks has its SHA-256", () => {
