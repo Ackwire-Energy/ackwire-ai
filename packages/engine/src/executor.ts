@@ -578,13 +578,14 @@ async function executeRunInner(
     if (failed) await closeRoutine({ status: "failed", ...(ledger ?? routineFailureEnd(reason)) });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
-    // An archived agent answers nobody, nor does a paused workspace; any other failure leaves the waiting
-    // messages a run of their own.
+    // An archived agent answers nobody, nor does a paused workspace or agent; any other failure leaves the
+    // waiting messages a run of their own.
     if (reason !== "agent_archived" && !standingErrorDetail(reason)) await redispatchPending("failed");
   };
 
-  // A workspace on hold or suspended (`standing.ts`): the run ends here and says why, before it starts anything.
-  const refusal = await standingRefusal(db, run.orgId);
+  // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
+  // before it starts anything.
+  const refusal = await standingRefusal(db, run.orgId, run.agentId);
   if (refusal) return fail(refusal.message);
 
   const ctx: ToolContext = {
@@ -976,8 +977,9 @@ async function executeRunInner(
       const { restartAfterStopAndSend } = await import("./continue-run");
       await restartAfterStopAndSend(deps, run.id, { id: message.id, threadId: message.threadId }, t).catch(() => null);
     }
-    // Anything else sent to it and not read gets a run of its own (the "stop" itself was dropped by `stopRun`).
-    await redispatchPending("canceled");
+    // Anything else sent to it and not read gets a run of its own (the "stop" itself was dropped by `stopRun`),
+    // unless its workspace stopped it.
+    if (!standingErrorDetail(row?.error ?? "")) await redispatchPending("canceled");
   };
 
   /** Messages this run already read (a "stop and send" for one of them has nothing to interrupt). */
@@ -1727,7 +1729,7 @@ async function executeRunInner(
           if (handled === "waited") return;
         }
         // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
-        const paused = await standingRefusal(db, run.orgId);
+        const paused = await standingRefusal(db, run.orgId, run.agentId);
         if (paused) return fail(paused.message);
         const reason = userFacing(error);
         if (reason) return fail(reason);

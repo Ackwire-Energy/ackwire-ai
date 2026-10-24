@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import { orgTopic } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
-import { schema, sql } from "@agenteschat/db";
+import { desc, eq, schema, sql } from "@agenteschat/db";
 import { createLogger } from "../src/logger";
 import { createOperatorApp, type OperatorDeps, serveOperatorApi } from "../src/operator/app";
 import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
@@ -14,12 +15,19 @@ let deps: OperatorDeps;
 let op: (path: string, authorization?: string | null) => Promise<Response>;
 /** A PUT of JSON to the operator API. */
 let put: (path: string, json: unknown) => Promise<Response>;
-let acme: { orgId: string; ownerId: string };
+let acme: { orgId: string; ownerId: string; agentId: string; channelId: string };
 let owner: Browser;
 
 beforeAll(async () => {
-  t = await createTestServer({ env: { OPERATOR_API_TOKEN: TOKEN } });
-  deps = { db: t.db, config: t.config, version: "test", log: createLogger("error"), pubsub: t.adapters.pubsub };
+  t = await createTestServer({ env: { OPERATOR_API_TOKEN: TOKEN, ALLOW_SIGNUP: "true" } });
+  deps = {
+    db: t.db,
+    config: t.config,
+    version: "test",
+    log: createLogger("error"),
+    pubsub: t.adapters.pubsub,
+    hub: t.engine.machineHub,
+  };
   const app = createOperatorApp(deps, TOKEN);
   op = async (path, authorization = BEARER) =>
     app.request(`/api/operator/v1${path}`, { headers: authorization === null ? {} : { authorization } });
@@ -32,10 +40,10 @@ beforeAll(async () => {
 
   owner = browser(t);
   await signUp(owner, "owner@acme.test");
-  const { orgId } = await seedOrg(owner);
+  const { orgId, agentId, channelId } = await seedOrg(owner);
   const [user] = await t.db.select({ id: schema.users.id }).from(schema.users);
   if (!user) throw new Error("no user");
-  acme = { orgId, ownerId: user.id };
+  acme = { orgId, ownerId: user.id, agentId, channelId };
 
   // Same millisecond, different microseconds; and two at the same instant: paging must keep them all.
   await t.db.insert(schema.organizations).values([
@@ -287,6 +295,100 @@ test("standing: hold, suspend and restore a workspace; the app API enforces it",
   expect(restored).toMatchObject({ state: "active", reason: "Cleared", note: null });
   expect((await app("/members")).status).toBe(200);
   expect((await invite()).status).toBe(201);
+});
+
+test("agent hold: that agent stops, the workspace works; let go, it answers", async () => {
+  const { orgId, agentId, channelId } = acme;
+  const hold = (json: unknown, id = agentId, org = orgId) => put(`/orgs/${org}/agents/${id}/hold`, json);
+  const ask = async (text: string) => {
+    expect(
+      (await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: text } })).status,
+    ).toBe(201);
+    await t.drain();
+    const [run] = await t.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.agentId, agentId))
+      .orderBy(desc(schema.agentRuns.createdAt))
+      .limit(1);
+    return run;
+  };
+
+  for (const bad of [{}, { held: "yes" }, { held: true, reason: "" }, { held: true, reason: "x".repeat(65) }]) {
+    expect({ bad, status: (await hold(bad)).status }).toEqual({ bad, status: 400 });
+  }
+  expect((await hold({ held: true }, "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b")).status).toBe(404);
+  const [other] = await t.db
+    .select({ id: schema.organizations.id })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.name, "Paging A"));
+  expect((await hold({ held: true }, agentId, other?.id)).status).toBe(404);
+
+  expect(await body(await hold({ held: true, reason: "Spam" }))).toEqual({
+    held: true,
+    heldAt: expect.any(String),
+    reason: "Spam",
+  });
+  const calls = t.provider.calls.length;
+  expect(await ask("@dev status?")).toMatchObject({ status: "failed", error: "This agent is paused for now." });
+  expect(t.provider.calls).toHaveLength(calls);
+  // People still use the workspace.
+  expect((await owner(`/api/app/organizations/${orgId}/members`)).status).toBe(200);
+
+  expect(await body(await hold({ held: false }))).toEqual({ held: false, heldAt: null, reason: null });
+  expect(await ask("@dev and now?")).toMatchObject({ status: "done" });
+  expect(t.provider.calls).toHaveLength(calls + 1);
+});
+
+test("user block: refused at once even with a cached session, signed out, no sign-in; unblocked, back in", async () => {
+  const bia = browser(t);
+  await signUp(bia, "bia@acme.test");
+  const [row] = await t.db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.email, "bia@acme.test"));
+  if (!row) throw new Error("no user");
+  const biaId = row.id;
+  await t.db.insert(schema.organizationMembers).values({ orgId: acme.orgId, userId: biaId, role: "member" });
+  const members = () => bia(`/api/app/organizations/${acme.orgId}/members`);
+  const signIn = () =>
+    bia("/api/auth/sign-in/email", { json: { email: "bia@acme.test", password: "correct horse battery" } });
+  expect((await members()).status).toBe(200);
+  const revoked: unknown[] = [];
+  t.adapters.pubsub.subscribe(orgTopic(acme.orgId), (e) => {
+    if (e.type === "membership.revoked") revoked.push(e);
+  });
+
+  for (const bad of [{}, { blocked: "yes" }, { blocked: true, reason: "x".repeat(65) }]) {
+    expect({ bad, status: (await put(`/users/${biaId}/block`, bad)).status }).toEqual({ bad, status: 400 });
+  }
+  expect((await put("/users/nobody/block", { blocked: true })).status).toBe(404);
+
+  const blocked = await body(await put(`/users/${biaId}/block`, { blocked: true, reason: "Phishing" }));
+  expect(blocked).toEqual({ blocked: true, blockedAt: expect.any(String), reason: "Phishing", sessionsRevoked: 1 });
+  expect(revoked).toEqual([{ type: "membership.revoked", orgId: acme.orgId, userId: biaId }]);
+  // The browser still holds the session in its signed cookie cache for minutes: refused all the same.
+  expect(bia.cookie()).toContain("session_data");
+  expect((await members()).status).toBe(403);
+  expect(await (await bia("/api/app/me")).json()).toMatchObject({ organizations: [] });
+  const refused = await signIn();
+  expect(refused.status).toBe(403);
+  expect(await refused.json()).toMatchObject({ code: "ACCOUNT_BLOCKED" });
+  expect(await body(await op(`/users/${biaId}`))).toMatchObject({
+    blockedAt: blocked.blockedAt,
+    blockedReason: "Phishing",
+    sessions: [],
+  });
+
+  expect(await body(await put(`/users/${biaId}/block`, { blocked: false }))).toEqual({
+    blocked: false,
+    blockedAt: null,
+    reason: null,
+    sessionsRevoked: 0,
+  });
+  expect((await signIn()).status).toBe(200);
+  expect((await members()).status).toBe(200);
+  expect(await body(await op(`/users/${biaId}`))).toMatchObject({ blockedAt: null, blockedReason: null });
 });
 
 test("no answer carries a secret or a field named like one", async () => {

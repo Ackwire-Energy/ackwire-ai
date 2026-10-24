@@ -138,7 +138,14 @@ export function AuthPage({
     setPending(false);
     if (!result.ok) {
       setWrong(result.status === 401);
-      setError(result.status === 401 ? null : result.message || t("common.unknownError"));
+      // 403: the account is blocked (the server's own text is English).
+      setError(
+        result.status === 401
+          ? null
+          : result.status === 403
+            ? t("auth.accountBlocked")
+            : result.message || t("common.unknownError"),
+      );
       return;
     }
     rememberSignIn("email");

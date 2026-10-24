@@ -4,7 +4,7 @@ import { apiError, errorResponse } from "../http/errors";
 import { iso, json, OrgParams } from "../routes/app/context";
 import { Role } from "../routes/app/schemas";
 import type { OperatorDeps } from "./app";
-import { Standing, StandingState, standingJson } from "./standing";
+import { Standing, StandingState, standingJson, UserParams } from "./standing";
 
 const tags = ["Operator"];
 const errors = {
@@ -80,6 +80,11 @@ const User = z
     name: z.string(),
     emailVerified: z.boolean(),
     createdAt: z.string(),
+    blockedAt: z
+      .string()
+      .nullable()
+      .openapi({ description: "Since when it is blocked (`PUT /users/{userId}/block`)." }),
+    blockedReason: z.string().nullable(),
     orgs: z.array(
       z.object({
         orgId: z.uuid(),
@@ -94,14 +99,6 @@ const User = z
       .openapi({ description: "Its 10 newest sessions on record, newest first. Signing out deletes a session." }),
   })
   .openapi("OperatorUser");
-
-const UserParams = z.object({
-  userId: z
-    .string()
-    .min(1)
-    .max(200)
-    .openapi({ param: { name: "userId", in: "path" } }),
-});
 
 export function registerOperatorOrgs(api: OpenAPIHono, { db, version }: OperatorDeps) {
   api.openapi(
@@ -178,6 +175,7 @@ export function registerOperatorOrgs(api: OpenAPIHono, { db, version }: Operator
         {
           ...user,
           createdAt: user.createdAt.toISOString(),
+          blockedAt: iso(user.blockedAt),
           orgs: user.orgs.map((o) => ({ ...o, joinedAt: o.joinedAt.toISOString(), lastSeenAt: iso(o.lastSeenAt) })),
           sessions: user.sessions.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() })),
         },

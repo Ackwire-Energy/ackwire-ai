@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
-import { safeEqual } from "@agenteschat/engine";
+import { type MachineHub, safeEqual } from "@agenteschat/engine";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { apiError, domainErrorResponse, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
@@ -19,6 +19,8 @@ export interface OperatorDeps {
   log: Logger;
   /** Tells a workspace's members and admins of a change of standing (absent: nobody hears it live). */
   pubsub?: PubSub;
+  /** Stops a suspended workspace's tasks on its computers. */
+  hub?: MachineHub;
 }
 
 /**

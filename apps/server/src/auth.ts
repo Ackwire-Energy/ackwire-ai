@@ -5,6 +5,7 @@ import {
   deriveSecret,
   emailLocale,
   isSignupAllowed,
+  isUserBlocked,
   onUserCreated,
   queueEmail,
   recordSession,
@@ -210,6 +211,13 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       },
       session: {
         create: {
+          // A blocked account (ADR 0056 §9) gets no session, whatever the sign-in method. The code also
+          // makes a social sign-in's callback send the person back to the sign-in page.
+          before: async (session) => {
+            if (await isUserBlocked(db, session.userId)) {
+              throw new APIError("FORBIDDEN", { code: "ACCOUNT_BLOCKED", message: "This account can't sign in." });
+            }
+          },
           after: async (session) => {
             await recordSession(db, session).catch((error) =>
               log.error("operator event failed", { type: "session.created", error: String(error) }),

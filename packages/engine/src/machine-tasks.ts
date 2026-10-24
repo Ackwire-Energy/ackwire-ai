@@ -899,6 +899,47 @@ export async function interruptOfflineMachineTasks(deps: TaskDeps, machineId: st
 }
 
 /**
+ * Stops every live task of a workspace (it was suspended), all at once: its computer stops each one it
+ * runs, and that task's `task.done` ends the row; one it doesn't run (queued here, its computer offline or
+ * not answering) ends `canceled` now, and an interrupted one never resumes. Returns how many.
+ */
+export async function cancelOrgTasks(deps: TaskDeps & { call?: TaskCall }, orgId: string, canceledBy: string) {
+  const rows = await deps.db
+    .select({ task: machineTasks, handle: schema.agents.handle })
+    .from(machineTasks)
+    .innerJoin(schema.agents, eq(schema.agents.id, machineTasks.agentId))
+    .where(and(eq(machineTasks.orgId, orgId), liveTaskWhere()));
+  await Promise.all(
+    rows.map(async ({ task, handle }) => {
+      await deps.db.update(machineTasks).set({ canceledBy, updatedAt: new Date() }).where(eq(machineTasks.id, task.id));
+      // A task with a start request still waits in our queue: its computer never had it.
+      const reply =
+        deps.call && !task.startRequest
+          ? await deps
+              .call<"task.cancel">(task.machineId, {
+                agent: { id: task.agentId, handle },
+                op: "task.cancel",
+                taskId: task.id,
+              })
+              .catch(() => null)
+          : null;
+      if (reply?.canceled) return;
+      const now = new Date();
+      const [ended] = await deps.db
+        .update(machineTasks)
+        .set({ status: "canceled", endedAt: now, wokeAt: now, updatedAt: now })
+        .where(and(eq(machineTasks.id, task.id), isNull(machineTasks.endedAt)))
+        .returning();
+      if (ended) {
+        await recordTaskFinished(deps.db, ended);
+        await publishTaskEvent(deps.pubsub, ended);
+      }
+    }),
+  );
+  return rows.length;
+}
+
+/**
  * On `hello` from a runner with tasks: what the server thinks runs is
  * checked against the runner's journal. Running there: running here (an
  * offline grace may have said interrupted). Ended there: its `task.done`

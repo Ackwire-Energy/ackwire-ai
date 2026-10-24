@@ -107,7 +107,7 @@ const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
- * 0. refuse it for a workspace on hold or suspended (`standing.ts`);
+ * 0. refuse it for a workspace on hold or suspended, or a held agent (`standing.ts`);
  * 1. resolve the model from the catalog (agent's model, or the fixed org-call model);
  * 2. agent calls: atomically reserve the worst-case cost against the agent's
  *    monthly counter (row lock), shrinking `maxTokens` to fit the budget;
@@ -508,7 +508,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /** An agent's model call (runs). Streams deltas through `onDelta`. */
     async stream(call: GatewayCall): Promise<GatewayResult> {
-      await assertCanWork(db, call.orgId);
+      await assertCanWork(db, call.orgId, call.agentId);
       const row =
         call.agent && call.agent.id === call.agentId && call.agent.orgId === call.orgId
           ? call.agent

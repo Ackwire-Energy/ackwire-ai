@@ -6,7 +6,7 @@ import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
-import { assertCanWork, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
+import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
 
 const {
   organizations,
@@ -77,11 +77,21 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-    .where(eq(organizationMembers.userId, userId))
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(and(eq(organizationMembers.userId, userId), isNull(users.blockedAt)))
     .orderBy(asc(organizations.createdAt));
 }
 
-export async function getMembership(db: Database, userId: string, orgId: string): Promise<Membership | null> {
+/**
+ * A person's membership, or null. A blocked account (`standing.ts`) has none, so every permission check
+ * refuses it at once; `includeBlocked` is for acting on them (removing them, changing their role).
+ */
+export async function getMembership(
+  db: Database,
+  userId: string,
+  orgId: string,
+  options: { includeBlocked?: boolean } = {},
+): Promise<Membership | null> {
   const [row] = await db
     .select({
       orgId: organizations.id,
@@ -91,7 +101,14 @@ export async function getMembership(db: Database, userId: string, orgId: string)
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId)));
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(
+      and(
+        eq(organizationMembers.userId, userId),
+        eq(organizationMembers.orgId, orgId),
+        options.includeBlocked ? undefined : isNull(users.blockedAt),
+      ),
+    );
   return row ?? null;
 }
 
@@ -113,9 +130,9 @@ function assertInviting(membership: Membership) {
 }
 
 /**
- * Creates an organization owned by `userId`, with a `general` channel. Refused while they are in a
- * workspace on hold or suspended: they don't carry on in a new one (`org.create_refused`, the same words
- * whatever the notice).
+ * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
+ * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
+ * (`org.create_refused`, the same words whatever the cause).
  */
 export async function createOrganization(db: Database, userId: string, input: { name: string; context?: string }) {
   const [paused] = await db
@@ -124,7 +141,8 @@ export async function createOrganization(db: Database, userId: string, input: { 
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
     .limit(1);
-  if (paused) throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
+  if (paused || (await isUserBlocked(db, userId)))
+    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
   return db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)
@@ -411,7 +429,7 @@ export async function changeMemberRole(
   role: MemberRole,
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
-  const target = await getMembership(db, targetUserId, orgId);
+  const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
   if (!target) throw new ConflictError("That user is not a member");
   if ((target.role === "owner" || role === "owner") && !can(actor.role, "manage_owners")) {
     throw new ForbiddenError("Only owners can grant or revoke ownership");
@@ -436,7 +454,8 @@ export async function removeMember(
   targetUserId: string,
   options: { pubsub?: PubSub } = {},
 ) {
-  const target = await getMembership(db, targetUserId, orgId);
+  // Admins can remove a blocked member; a blocked person can't act, not even to leave.
+  const target = await getMembership(db, targetUserId, orgId, { includeBlocked: actorId !== targetUserId });
   if (!target) return;
   if (actorId !== targetUserId) {
     const actor = await requirePermission(db, actorId, orgId, "manage_members");
@@ -472,13 +491,15 @@ export async function removeMember(
  * everything in them. The rest follows the foreign keys: sessions, sign-in
  * methods, memberships, channel memberships, notifications and phones are
  * deleted; messages and records they authored stay without an author (the
- * same as any deleted user).
+ * same as any deleted user). Not for a blocked account: it can't act, and
+ * its workspaces would go with it.
  */
 export async function deleteAccount(
   db: Database,
   userId: string,
   options: { pubsub?: PubSub } = {},
 ): Promise<{ deletedOrgIds: string[] }> {
+  if (await isUserBlocked(db, userId)) throw new ForbiddenError();
   const { left, deleted } = await db.transaction(async (tx) => {
     const mine = await tx
       .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
@@ -673,13 +694,17 @@ export async function previewInvitation(db: Database, token: string, now = new D
   return { orgName: row.orgName, email: row.email, role: row.role, kind: "email" as const };
 }
 
-/** Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. */
+/**
+ * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
+ * a blocked account, nor into a workspace on hold or suspended.
+ */
 export async function acceptInvitation(
   db: Database,
   user: { id: string; email: string },
   token: string,
   now = new Date(),
 ) {
+  if (await isUserBlocked(db, user.id)) throw new ForbiddenError();
   return db.transaction(async (tx) => {
     const [invitation] = await tx
       .select()

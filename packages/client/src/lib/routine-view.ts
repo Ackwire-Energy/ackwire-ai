@@ -87,6 +87,7 @@ export const RUN_CODES = [
   "interrupted",
   "org_paused",
   "org_suspended",
+  "agent_paused",
 ] as const;
 
 /**

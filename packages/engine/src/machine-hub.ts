@@ -217,7 +217,8 @@ type RpcReply = { ok: true; data: unknown } | { ok: false; error: { code: string
 
 /**
  * Requests that start something new on the machine: refused while it is
- * paused (ADR 0036 §6) or its workspace isn't active (`standing.ts`).
+ * paused (ADR 0036 §6), its workspace isn't active or the agent is held
+ * (`standing.ts`).
  * Following running work (a task's output, canceling it), cleaning up and
  * reducing access still go through.
  */
@@ -336,12 +337,12 @@ export function createMachineHub(deps: MachineHubDeps) {
     return true;
   };
 
-  /** Starts a task through this socket (resuming one after an interruption); not in a paused workspace. */
+  /** Starts a task through this socket (resuming one after an interruption); not in a paused workspace or for a held agent. */
   const localStarter =
     (conn: MachineConnection): LocalTaskStarter =>
     (input) => {
       const call: TaskCall = async (_machineId, request) => {
-        if (conn.orgId) await assertCanWork(db, conn.orgId);
+        if (conn.orgId) await assertCanWork(db, conn.orgId, input.agent.id);
         return callLocal(conn, await withAgentName(conn.orgId, request));
       };
       return startMachineTask({ db, pubsub, call }, input);
@@ -977,8 +978,8 @@ export function createMachineHub(deps: MachineHubDeps) {
       const conn = local.get(machineId);
       if (conn) {
         if (isNewWork(request)) {
-          // A workspace on hold or suspended starts nothing (`standing.ts`).
-          if (conn.orgId) await assertCanWork(db, conn.orgId);
+          // A workspace on hold or suspended, or a held agent, starts nothing (`standing.ts`).
+          if (conn.orgId) await assertCanWork(db, conn.orgId, request.agent?.id);
           // Paused (ADR 0036 §6): nothing new starts; the row says until when, in whose time zone.
           if (pauseActive(conn.pause)) {
             const row = await getMachineById(db, machineId);
@@ -993,7 +994,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         throw new MachineOfflineError(row.name);
       }
       if (isNewWork(request)) {
-        await assertCanWork(db, row.orgId);
+        await assertCanWork(db, row.orgId, request.agent?.id);
         await assertNotPaused(db, row);
       }
       const named = await withAgentName(row.orgId, request);

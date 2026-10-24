@@ -9,7 +9,7 @@ import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { OrgPausedError, STANDING_COLUMNS } from "./standing";
 
-const { channels, channelMembers, agents, organizationMembers, organizations } = schema;
+const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
 
 export type Channel = typeof channels.$inferSelect;
 
@@ -189,8 +189,9 @@ export async function isChannelMember(db: Database, orgId: string, channelId: st
 
 /**
  * The single authorization check for reading a channel (HTTP and WebSocket):
- * the user belongs to the organization, the channel belongs to that
- * organization, and the user is a member of the channel.
+ * the user belongs to the organization (a blocked account belongs nowhere,
+ * as in `getMembership`), the channel belongs to that organization, and the
+ * user is a member of the channel.
  */
 export async function requireChannelAccess(db: Database, userId: string, orgId: string, channelId: string) {
   // One round trip: membership of the org, the channel, and membership of the channel.
@@ -204,12 +205,13 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
     .leftJoin(channels, and(eq(channels.id, channelId), eq(channels.orgId, orgId)))
     .leftJoin(
       channelMembers,
       and(eq(channelMembers.channelId, channelId), eq(channelMembers.orgId, orgId), eq(channelMembers.userId, userId)),
     )
-    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId)));
+    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId), isNull(users.blockedAt)));
   if (!row) throw new ForbiddenError("You are not a member of this organization");
   if (row.standing.state === "suspended") throw new OrgPausedError(row.standing);
   const channel = row.channel;

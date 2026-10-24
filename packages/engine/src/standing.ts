@@ -1,13 +1,14 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { type Database, type Executor, eq, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError } from "./errors";
 import { publishOrgEvent } from "./events";
 import type { Judge } from "./judge";
+import type { MachineHub } from "./machine-hub";
 import { notifyOrgStanding } from "./notification-producers";
 
-const { organizations } = schema;
+const { organizations, agents, users, sessions, pushDevices, organizationMembers } = schema;
 
 /**
  * A workspace's standing (ADR 0056 §8), set by the people who run this server through the operator API and
@@ -16,10 +17,14 @@ const { organizations } = schema;
  * - `hold`: its agents stop. No model call (Model Gateway), no new computer work and no bridge call (machine
  *   hub), no judge or router call (they bill the server, not the workspace), no routine, no invitation; a run
  *   that starts fails at once and says why. People still read and write.
- * - `suspended`: the same, and every permission check refuses (`org.suspended`).
+ * - `suspended`: the same, every permission check refuses (`org.suspended`), and what its agents still have
+ *   going stops at once (`stopOrgWork`).
  * - notice `shown`: the workspace is told the reason, the change goes into its audit log and a new state
  *   notifies its owners and admins. `silent`: it is told only that it is paused, never why or by whom, and
  *   nothing is written where it can read it.
+ *
+ * Also one agent held (the same refusals, for that agent only) and one account blocked (no sign-in, no
+ * membership anywhere): ADR 0056 §9.
  */
 export const STANDING_STATES = ["active", "hold", "suspended"] as const;
 export type StandingState = (typeof STANDING_STATES)[number];
@@ -61,6 +66,7 @@ const PAUSED = "Agents in this workspace are paused for now.";
 const UNAVAILABLE = "This workspace is unavailable for now.";
 const ON_HOLD = "This workspace is on hold: ";
 const SUSPENDED = "This workspace is suspended: ";
+const AGENT_PAUSED = "This agent is paused for now.";
 
 /** What the workspace reads when work is refused; silent, only that it is paused. */
 export function standingText(s: WorkspaceStanding): string {
@@ -69,8 +75,9 @@ export function standingText(s: WorkspaceStanding): string {
   return reason ? `${ON_HOLD}${reason}` : PAUSED;
 }
 
-/** The app's code (and the reason told) of a run that failed with `standingText`; null for any other error. */
+/** The app's code (and the reason told) of a run refused by its standing; null for any other error. */
 export function standingErrorDetail(error: string): { errorCode: string; errorParams?: Record<string, string> } | null {
+  if (error === AGENT_PAUSED) return { errorCode: "run.agent_paused" };
   if (error === PAUSED) return { errorCode: "run.org_paused" };
   if (error === UNAVAILABLE) return { errorCode: "run.org_suspended" };
   if (error.startsWith(ON_HOLD))
@@ -96,6 +103,17 @@ export class OrgPausedError extends ForbiddenError {
   }
 }
 
+/** Work refused because this agent is held (`agent.paused`, 403). The workspace never reads why. */
+export class AgentHeldError extends ForbiddenError {
+  /** Like `OrgPausedError`: a job that hits it fails at once. */
+  readonly retryable = false;
+
+  constructor() {
+    super(AGENT_PAUSED, "agent.paused");
+    this.name = "AgentHeldError";
+  }
+}
+
 /** A workspace's standing, cached 5 s per process. An unknown id reads as active: what needs the row fails on its own. */
 export async function orgStanding(db: Executor, orgId: string): Promise<WorkspaceStanding> {
   return (await caches.standing.getOrLoad(`${orgId}:`, async () => {
@@ -104,15 +122,31 @@ export async function orgStanding(db: Executor, orgId: string): Promise<Workspac
   })) as WorkspaceStanding;
 }
 
-/** Why work in this workspace is refused now, or null while it is active. */
-export async function standingRefusal(db: Executor, orgId: string): Promise<OrgPausedError | null> {
-  const standing = await orgStanding(db, orgId);
-  return standing.state === "active" ? null : new OrgPausedError(standing);
+/** Whether this agent is held, cached 5 s per process like the workspace's standing. */
+async function agentHeld(db: Executor, orgId: string, agentId: string): Promise<boolean> {
+  return (await caches.standing.getOrLoad(`${orgId}:${agentId}`, async () => {
+    const [row] = await db
+      .select({ heldAt: agents.operatorHoldAt })
+      .from(agents)
+      .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+    return Boolean(row?.heldAt);
+  })) as boolean;
 }
 
-/** Throws `OrgPausedError` unless the workspace is active. */
-export async function assertCanWork(db: Executor, orgId: string) {
-  const refusal = await standingRefusal(db, orgId);
+/** Why work in this workspace (by this agent, when given) is refused now, or null while it may go on. */
+export async function standingRefusal(
+  db: Executor,
+  orgId: string,
+  agentId?: string | null,
+): Promise<OrgPausedError | AgentHeldError | null> {
+  const standing = await orgStanding(db, orgId);
+  if (standing.state !== "active") return new OrgPausedError(standing);
+  return agentId && (await agentHeld(db, orgId, agentId)) ? new AgentHeldError() : null;
+}
+
+/** Throws `OrgPausedError` unless the workspace is active, and `AgentHeldError` when the agent given is held. */
+export async function assertCanWork(db: Executor, orgId: string, agentId?: string | null) {
+  const refusal = await standingRefusal(db, orgId, agentId);
   if (refusal) throw refusal;
 }
 
@@ -137,14 +171,21 @@ export interface StandingChange {
   notice: StandingNotice;
 }
 
+export interface StandingDeps {
+  db: Database;
+  pubsub?: PubSub;
+  /** Stops the tasks of a suspended workspace on its computers (absent: they are only marked canceled). */
+  hub?: Pick<MachineHub, "call">;
+}
+
 /**
  * Sets a workspace's standing (the operator API): at once in this process, within 5 s in the others. When
  * what the workspace sees changes (the state, or the reason it is told), its members hear `org.standing`;
  * with the notice `shown` the change goes into its audit log, and a new state notifies its owners and
- * admins. Null when there is no such workspace.
+ * admins. Suspending it also stops its runs and tasks now. Null when there is no such workspace.
  */
 export async function setOrgStanding(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: StandingDeps,
   orgId: string,
   change: StandingChange,
 ): Promise<OrgStanding | null> {
@@ -192,5 +233,81 @@ export async function setOrgStanding(
     });
   }
   if (done.moved && after.notice === "shown") await notifyOrgStanding(deps, orgId, after).catch(() => {});
+  // Every time, not only on the move: setting it again (a retry after a failure) finishes the job.
+  if (after.state === "suspended") {
+    // Loaded here: the run engine builds on this module.
+    const { stopOrgWork } = await import("./cancel");
+    await stopOrgWork(deps, orgId, standingText(after));
+  }
   return after;
+}
+
+/**
+ * Holds an agent, or lets it go (the operator API): held, it starts nothing (no run, model call, computer
+ * work, routine slot or bridge call) and the router never picks it, while the rest of the workspace works.
+ * What it is doing now stops at its next model, computer or bridge call. At once in this process, within
+ * 5 s in the others. Null when the workspace has no such agent.
+ */
+export async function setAgentHold(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  change: { held: boolean; reason: string | null },
+) {
+  const [row] = await db
+    .update(agents)
+    .set(
+      change.held
+        ? { operatorHoldAt: sql`coalesce(${agents.operatorHoldAt}, now())`, operatorHoldReason: change.reason }
+        : { operatorHoldAt: null, operatorHoldReason: null },
+    )
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
+    .returning({ heldAt: agents.operatorHoldAt, reason: agents.operatorHoldReason });
+  if (!row) return null;
+  caches.standing.delete(`${orgId}:${agentId}`);
+  caches.agents.delete(`${orgId}:${agentId}`);
+  return row;
+}
+
+/** Whether this account is blocked (`setUserBlocked`). */
+export async function isUserBlocked(db: Executor, userId: string) {
+  const [row] = await db.select({ blockedAt: users.blockedAt }).from(users).where(eq(users.id, userId));
+  return Boolean(row?.blockedAt);
+}
+
+/**
+ * Blocks an account, or lets it back (the operator API). Blocked, it can't sign in (`auth.ts`), its sessions
+ * and phones are gone, and every membership check reads it as no member (`getMembership`): that bites on
+ * its next request, even while a browser's cookie cache still holds the session for minutes. Its open
+ * sockets in every workspace close (`membership.revoked`). Null when there is no such account.
+ */
+export async function setUserBlocked(
+  deps: { db: Database; pubsub?: PubSub },
+  userId: string,
+  change: { blocked: boolean; reason: string | null },
+) {
+  const done = await deps.db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(users)
+      .set(
+        change.blocked
+          ? { blockedAt: sql`coalesce(${users.blockedAt}, now())`, blockedReason: change.reason }
+          : { blockedAt: null, blockedReason: null },
+      )
+      .where(eq(users.id, userId))
+      .returning({ blockedAt: users.blockedAt, reason: users.blockedReason });
+    if (!row) return null;
+    if (!change.blocked) return { ...row, sessionsRevoked: 0, orgIds: [] };
+    const revoked = await tx.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id });
+    await tx.delete(pushDevices).where(eq(pushDevices.userId, userId));
+    const orgs = await tx
+      .select({ orgId: organizationMembers.orgId })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.userId, userId));
+    return { ...row, sessionsRevoked: revoked.length, orgIds: orgs.map((o) => o.orgId) };
+  });
+  if (!done) return null;
+  const { orgIds, ...state } = done;
+  for (const orgId of orgIds) await publishOrgEvent(deps.pubsub, { type: "membership.revoked", orgId, userId });
+  return state;
 }

@@ -1505,8 +1505,9 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
   if (!routine || routine.deletedAt) return skip("deleted");
   if (!routine.active && run.trigger !== "manual") return skip("paused");
-  // Its workspace is on hold or suspended: the slot passes, the routine keeps its schedule (`standing.ts`).
-  const refusal = await standingRefusal(db, run.orgId);
+  // Its workspace is on hold or suspended, or its agent held: the slot passes, the routine keeps its
+  // schedule (`standing.ts`).
+  const refusal = await standingRefusal(db, run.orgId, routine.agentId);
   if (refusal) return skip(refusal.code.replace(".", "_"));
   const paused = async (reason: RoutinePausedReason) => {
     await pauseRoutine(deps, routine, reason);

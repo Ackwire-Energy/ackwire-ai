@@ -410,6 +410,8 @@ export async function routeMessage(
       and(
         eq(agents.orgId, message.orgId),
         isNull(agents.archivedAt),
+        // Held (`standing.ts`): the others answer instead.
+        isNull(agents.operatorHoldAt),
         eq(channelMembers.autoReply, true),
         // Never the agent that wrote it.
         byAgent && message.authorAgentId ? ne(agents.id, message.authorAgentId) : undefined,

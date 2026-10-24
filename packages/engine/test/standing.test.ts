@@ -1,26 +1,40 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
+import { channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import type { ModelRequest } from "@agenteschat/providers";
 import {
+  AgentHeldError,
   acceptInvitation,
+  addChannelMember,
   assertCanWork,
+  changeMemberRole,
+  createAgent,
   createFakeJudge,
   createInvitation,
   createInviteLink,
   createOrganization,
+  deleteAccount,
   drainOutbox,
+  ForbiddenError,
+  getMembership,
+  isUserBlocked,
+  listMemberships,
   type MachineHub,
   OrgPausedError,
   postPersonMessage,
   type RouterStrategy,
+  removeMember,
+  requireChannelAccess,
   requirePermission,
   resendInvitation,
   routeMessage,
   runErrorDetail,
+  setAgentHold,
   setOrgStanding,
+  setUserBlocked,
   standingJudge,
 } from "../src";
-import { addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { channelRoutine, fire, routineRow } from "./routine-fixtures";
 
@@ -34,7 +48,12 @@ afterEach(async () => {
 
 const REASON = "Unpaid invoice";
 const standing = (state: "active" | "hold" | "suspended", notice: "shown" | "silent" = "shown") =>
-  setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, { state, reason: REASON, note: "card declined", notice });
+  setOrgStanding({ db: f.db, pubsub: f.pubsub, hub: f.machineHub ?? undefined }, f.org.id, {
+    state,
+    reason: REASON,
+    note: "card declined",
+    notice,
+  });
 const post = (body: string) =>
   postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
 const runs = () => f.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
@@ -207,6 +226,234 @@ describe("suspended", () => {
     expect(await acceptInvitation(f.db, bia, sent.token)).toEqual({ orgId: f.org.id });
     expect((await createOrganization(f.db, f.owner.id, { name: "Acme 2" })).organization.name).toBe("Acme 2");
   });
+
+  test("a run mid-reply stops at once: what it wrote is posted, it says why and hands nothing on", async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    f = await setup({
+      reply: (_req: ModelRequest, call: number) =>
+        call === 1 ? { chunks: ["Looking at the logs. ", "Never sent."], hold: held } : { chunks: ["no"] },
+    });
+    let suspending: Promise<unknown> | null = null;
+    f.pubsub.subscribe(channelTopic(f.general.id), (event) => {
+      if (event.type === "agent.delta" && !suspending) suspending = standing("suspended").finally(release);
+    });
+    await post("@dev check the logs");
+    await drainOutbox(f.db, f.handlers);
+    await suspending;
+
+    const [run] = await runs();
+    expect(run).toMatchObject({ status: "canceled", error: `This workspace is suspended: ${REASON}` });
+    expect(runErrorDetail(run?.error)).toEqual({ errorCode: "run.org_suspended", errorParams: { reason: REASON } });
+    expect(await runs()).toHaveLength(1);
+    expect(f.provider.calls).toHaveLength(1);
+    const posted = await f.db.select().from(schema.messages).where(eq(schema.messages.authorType, "agent"));
+    expect(posted.map((m) => m.body)).toEqual(["Looking at the logs.\n\n_Stopped._"]);
+    const [audit] = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "run.canceled"));
+    expect(audit).toMatchObject({ actorType: "system", actorId: null, details: { from: "running" } });
+  });
+
+  test("its computers stop its tasks and a queued run never starts", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      name: "MacBook",
+      ...RUNNER,
+    });
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const task = async (status: "queued" | "running", extra: Partial<typeof schema.machineTasks.$inferInsert> = {}) => {
+      const [row] = await f.db
+        .insert(schema.machineTasks)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          machineId: paired.machineId,
+          channelId: f.general.id,
+          title: "Build",
+          executor: "shell",
+          command: "make",
+          status,
+          ...extra,
+        })
+        .returning();
+      if (!row) throw new Error("no task");
+      return row;
+    };
+    const running = await task("running", { startedAt: new Date() });
+    const waiting = await task("queued", { startRequest: { title: "Build" } });
+    await post("@dev deploy it");
+    await standing("suspended", "silent");
+
+    expect((await runs()).map((r) => [r.status, r.error])).toEqual([
+      ["canceled", "This workspace is unavailable for now."],
+    ]);
+    // The computer stops the one it runs (its `task.done` ends the row); the one in our queue ends here.
+    expect(runner.requests().filter((r) => r.op === "task.cancel")).toMatchObject([{ taskId: running.id }]);
+    const tasks = Object.fromEntries((await f.db.select().from(schema.machineTasks)).map((t) => [t.id, t]));
+    expect(tasks[running.id]).toMatchObject({ status: "running", canceledBy: "system" });
+    expect(tasks[waiting.id]).toMatchObject({ status: "canceled", canceledBy: "system" });
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls).toHaveLength(0);
+  });
+});
+
+describe("agent hold", () => {
+  test("only that agent stops: runs, routines, computer work and model calls; let go, it answers", async () => {
+    f = await setup({ reply: () => ({ chunks: ["On it."] }), machines: true });
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ops.id });
+    expect(await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: "Spam" })).toEqual({
+      heldAt: expect.any(Date),
+      reason: "Spam",
+    });
+
+    await post("@dev check the build");
+    await post("@ops check the build");
+    await drainOutbox(f.db, f.handlers);
+    const of = async (agentId: string) => (await runs()).filter((r) => r.agentId === agentId);
+    const [refused] = await of(f.agent.id);
+    expect(refused).toMatchObject({ status: "failed", error: "This agent is paused for now." });
+    expect(runErrorDetail(refused?.error)).toEqual({ errorCode: "run.agent_paused" });
+    expect((await of(ops.id)).map((r) => r.status)).toEqual(["done"]);
+    expect(f.provider.calls).toHaveLength(1);
+    // The operator's reason never reaches the workspace.
+    expect(JSON.stringify(await runs())).not.toContain("Spam");
+
+    const routine = await channelRoutine(f);
+    expect(await fire(f, routine.id, new Date())).toMatchObject({
+      status: "skipped",
+      code: "agent_paused",
+      agentRunId: null,
+    });
+    expect(await routineRow(f, routine.id)).toMatchObject({ active: true, pausedReason: null });
+
+    const call = { orgId: f.org.id, system: "x", messages: [{ role: "user" as const, content: "hi" }], maxTokens: 50 };
+    await expect(f.gateway.stream({ ...call, agentId: f.agent.id, onDelta: () => {} })).rejects.toBeInstanceOf(
+      AgentHeldError,
+    );
+
+    const hub = f.machineHub as MachineHub;
+    const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      name: "MacBook",
+      ...RUNNER,
+    });
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const ls = (agent: { id: string; handle: string }) =>
+      hub.call(paired.machineId, { op: "exec", command: "ls", timeoutSeconds: 5, stream: false, agent });
+    await expect(ls({ id: f.agent.id, handle: "dev" })).rejects.toMatchObject({
+      code: "agent.paused",
+      message: "This agent is paused for now.",
+    });
+    expect(await ls({ id: ops.id, handle: "ops" })).toMatchObject({ exitCode: 0 });
+
+    expect(await setAgentHold(f.db, f.org.id, f.agent.id, { held: false, reason: null })).toEqual({
+      heldAt: null,
+      reason: null,
+    });
+    await post("@dev and now?");
+    await drainOutbox(f.db, f.handlers);
+    expect((await of(f.agent.id)).map((r) => r.status)).toEqual(["failed", "done"]);
+    expect(await ls({ id: f.agent.id, handle: "dev" })).toMatchObject({ exitCode: 0 });
+    expect(await setAgentHold(f.db, crypto.randomUUID(), f.agent.id, { held: true, reason: null })).toBeNull();
+  });
+
+  test("the router never picks a held agent: the others answer", async () => {
+    f = await setup();
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ops.id });
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: null });
+    const seen: string[][] = [];
+    const strategy: RouterStrategy = {
+      name: "spy",
+      decide: async (input) => {
+        seen.push(input.candidates.map((c) => c.handle));
+        return { agents: [] };
+      },
+    };
+    const message = await post("anyone around?");
+    await routeMessage(
+      { db: f.db, strategy, policy: { minScore: 0.5, maxAgents: 2, maxHops: 3 } },
+      { orgId: f.org.id, messageId: message.id },
+    );
+    expect(seen).toEqual([["ops"]]);
+  });
+});
+
+describe("user block", () => {
+  test("no membership anywhere at once, sessions and phones gone, sockets told; let back in", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const day = 86_400_000;
+    await f.db
+      .insert(schema.sessions)
+      .values(
+        [1, 2].map((i) => ({ id: `s-${i}`, token: `t-${i}`, userId: bia.id, expiresAt: new Date(Date.now() + day) })),
+      );
+    await f.db
+      .insert(schema.pushDevices)
+      .values({ userId: bia.id, token: "ExponentPushToken[bia]", platform: "ios", locale: "en" });
+    const link = await createInviteLink(f.db, f.owner.id, f.org.id);
+    const events: unknown[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e));
+
+    expect(await setUserBlocked({ db: f.db, pubsub: f.pubsub }, bia.id, { blocked: true, reason: "Phishing" })).toEqual(
+      {
+        blockedAt: expect.any(Date),
+        reason: "Phishing",
+        sessionsRevoked: 2,
+      },
+    );
+    expect(await isUserBlocked(f.db, bia.id)).toBe(true);
+    expect(await f.db.select().from(schema.sessions).where(eq(schema.sessions.userId, bia.id))).toEqual([]);
+    expect(await f.db.select().from(schema.pushDevices)).toEqual([]);
+    expect(events).toEqual([{ type: "membership.revoked", orgId: f.org.id, userId: bia.id }]);
+
+    expect(await getMembership(f.db, bia.id, f.org.id)).toBeNull();
+    expect(await listMemberships(f.db, bia.id)).toEqual([]);
+    await expect(requirePermission(f.db, bia.id, f.org.id, "read")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(requireChannelAccess(f.db, bia.id, f.org.id, f.general.id)).rejects.toMatchObject({
+      message: "You are not a member of this organization",
+    });
+    await expect(createOrganization(f.db, bia.id, { name: "Bia's" })).rejects.toMatchObject({
+      code: "org.create_refused",
+    });
+    await expect(acceptInvitation(f.db, bia, link.token)).rejects.toMatchObject({ code: "forbidden" });
+    // Nor erase their workspaces with their account.
+    await expect(deleteAccount(f.db, bia.id)).rejects.toBeInstanceOf(ForbiddenError);
+    // The workspace still manages them; they can't act, not even to leave.
+    await changeMemberRole(f.db, f.owner.id, f.org.id, bia.id, "admin");
+    await removeMember(f.db, bia.id, f.org.id, bia.id);
+    expect(await getMembership(f.db, bia.id, f.org.id, { includeBlocked: true })).toMatchObject({ role: "admin" });
+
+    expect(await setUserBlocked({ db: f.db }, bia.id, { blocked: false, reason: null })).toEqual({
+      blockedAt: null,
+      reason: null,
+      sessionsRevoked: 0,
+    });
+    expect(await requirePermission(f.db, bia.id, f.org.id, "manage_members")).toMatchObject({ role: "admin" });
+    expect((await createOrganization(f.db, bia.id, { name: "Bia's" })).organization.name).toBe("Bia's");
+
+    await setUserBlocked({ db: f.db }, bia.id, { blocked: true, reason: null });
+    await removeMember(f.db, f.owner.id, f.org.id, bia.id);
+    expect(await getMembership(f.db, bia.id, f.org.id, { includeBlocked: true })).toBeNull();
+    expect(await setUserBlocked({ db: f.db }, "nobody", { blocked: true, reason: null })).toBeNull();
+  });
 });
 
 describe("notice", () => {
@@ -292,7 +539,9 @@ function fakeRunner(hub: MachineHub) {
       ? { exitCode: 0, stdout: "ok", stderr: "", timedOut: false }
       : req.op === "task.output"
         ? { lines: [], truncated: false }
-        : {};
+        : req.op === "task.cancel"
+          ? { canceled: true }
+          : {};
   const conn = hub.open({
     send(text: string) {
       const frame = JSON.parse(text) as ServerFrame;

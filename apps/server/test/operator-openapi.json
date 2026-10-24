@@ -109,7 +109,7 @@
       "OperatorStandingState": {
         "type": "string",
         "enum": ["active", "hold", "suspended"],
-        "description": "`active`; `hold`: its agents stop (no model, computer, routine or invitation), people still read and write; `suspended`: the workspace refuses everything to everyone."
+        "description": "`active`; `hold`: its agents stop (no model, computer, routine or invitation), people still read and write; `suspended`: the workspace refuses everything to everyone, and its runs and tasks stop at once."
       },
       "OperatorOrg": {
         "type": "object",
@@ -235,6 +235,13 @@
           "createdAt": {
             "type": "string"
           },
+          "blockedAt": {
+            "type": ["string", "null"],
+            "description": "Since when it is blocked (`PUT /users/{userId}/block`)."
+          },
+          "blockedReason": {
+            "type": ["string", "null"]
+          },
           "orgs": {
             "type": "array",
             "items": {
@@ -280,7 +287,51 @@
             "description": "Its 10 newest sessions on record, newest first. Signing out deletes a session."
           }
         },
-        "required": ["id", "email", "name", "emailVerified", "createdAt", "orgs", "sessions"]
+        "required": [
+          "id",
+          "email",
+          "name",
+          "emailVerified",
+          "createdAt",
+          "blockedAt",
+          "blockedReason",
+          "orgs",
+          "sessions"
+        ]
+      },
+      "OperatorAgentHold": {
+        "type": "object",
+        "properties": {
+          "held": {
+            "type": "boolean"
+          },
+          "heldAt": {
+            "type": ["string", "null"]
+          },
+          "reason": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["held", "heldAt", "reason"]
+      },
+      "OperatorUserBlock": {
+        "type": "object",
+        "properties": {
+          "blocked": {
+            "type": "boolean"
+          },
+          "blockedAt": {
+            "type": ["string", "null"]
+          },
+          "reason": {
+            "type": ["string", "null"]
+          },
+          "sessionsRevoked": {
+            "type": "integer",
+            "description": "Sessions deleted by this call (0 when unblocking)."
+          }
+        },
+        "required": ["blocked", "blockedAt", "reason", "sessionsRevoked"]
       },
       "OperatorEventPage": {
         "type": "object",
@@ -604,7 +655,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Hold, suspend or restore a workspace",
-        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
+        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
         "parameters": [
           {
             "schema": {
@@ -652,6 +703,178 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OperatorStanding"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/agents/{agentId}/hold": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Hold one agent, or let it go",
+        "description": "Held, the agent starts nothing (no run, model call, computer work, routine or bridge call) and is never picked to answer; the rest of the workspace works. What it is doing stops at its next model, computer or bridge call. The workspace reads only that the agent is paused, never the reason. At once in this process, within 5 seconds in the others.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "agentId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "held": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["held"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorAgentHold"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{userId}/block": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Block an account, or let it back",
+        "description": "Blocked: its sessions and phones are signed out now, it can't sign in again, every workspace refuses it on its next request (no waiting for a session cookie to expire) and its open connections close. Unblocking lets it sign in again; it keeps its workspaces.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "blocked": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["blocked"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorUserBlock"
                 }
               }
             }
