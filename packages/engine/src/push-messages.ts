@@ -37,6 +37,8 @@ export interface PushTextInput {
   highRisk?: boolean;
   /** The routine that asked for an approval while nobody watched (ADR 0053 §8): the push says so. */
   routine?: string | null;
+  /** `browser_handoff`: the agent's screen it is on, when not its browser. */
+  screen?: string | null;
 }
 
 interface Strings {
@@ -61,6 +63,8 @@ interface Strings {
   machineConnectedTitle: string;
   browserHandoffTitle: (actor: string) => string;
   browserHandoffBody: string;
+  desktopHandoffTitle: (actor: string) => string;
+  desktopHandoffBody: string;
   waitingTitle: string;
   openBody: string;
 }
@@ -88,6 +92,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     machineConnectedTitle: "Um computador novo entrou na organização",
     browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
     browserHandoffBody: "Toque para abrir a tela.",
+    desktopHandoffTitle: (a) => `${a} precisa de você no computador`,
+    desktopHandoffBody: "Abra num computador para ver a tela.",
     waitingTitle: "Tem algo esperando você",
     openBody: "Toque para abrir.",
   },
@@ -113,6 +119,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     machineConnectedTitle: "A new computer joined the organization",
     browserHandoffTitle: (a) => `${a} needs you in the browser`,
     browserHandoffBody: "Tap to open the screen.",
+    desktopHandoffTitle: (a) => `${a} needs you on the computer`,
+    desktopHandoffBody: "Open it on a computer to see the screen.",
     waitingTitle: "Something is waiting for you",
     openBody: "Tap to open.",
   },
@@ -165,7 +173,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
       return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);
     case "browser_handoff":
-      // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste").
+      // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste"). A desktop doesn't
+      // open on the phone: its body says where it does.
+      if (input.screen === "desktop") return out(s.desktopHandoffTitle(actor), text || s.desktopHandoffBody);
       return out(s.browserHandoffTitle(actor), text || s.browserHandoffBody);
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);

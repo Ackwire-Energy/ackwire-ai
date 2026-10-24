@@ -7212,6 +7212,7 @@ export const en: Translations = {
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",
       browser_handoff: "I need help in my browser.",
+      desktop_handoff: "I need help on my computer.",
       file_saved: "File saved.",
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
@@ -7492,6 +7493,11 @@ export const en: Translations = {
       label: "Close the browser",
       description: "Closes the agent's browser; logins stay saved.",
     },
+    desktop_ask_person: {
+      label: "Ask for help on the desktop",
+      description:
+        "Asks a person to do something on the agent's desktop (like signing in to an app) and waits until they're done.",
+    },
   },
   browser: {
     title: "Browser",
@@ -7747,6 +7753,12 @@ export const en: Translations = {
         browser_close: "Closed the browser",
         other: "Used the browser",
       },
+    },
+  },
+  /** The agent's desktop (ADR 0056): watching it, taking control, its terminal. */
+  desktop: {
+    control: {
+      notice: "While you're in control, programs running on this computer can see the screen and what you type.",
     },
   },
 };

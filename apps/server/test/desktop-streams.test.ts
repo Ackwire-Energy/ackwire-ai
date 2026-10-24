@@ -80,12 +80,27 @@ async function seeded() {
   return { owner, org, machine, desktop, terminal, invite };
 }
 
+/** What the runner answers about a desktop that runs. */
+const SESSION: Record<string, unknown> = {
+  "desktop.session.status": { running: true, startedAt: "2026-10-24T10:00:00.000Z", streams: 0 },
+  "desktop.session.start": {
+    display: 20,
+    width: 1280,
+    height: 800,
+    startedAt: "2026-10-24T10:00:00.000Z",
+    started: false,
+  },
+  "desktop.session.stop": { stopped: true },
+};
+
 /**
  * A runner on real sockets: its machine socket says hello; each `stream.open`
- * dials a data socket, says hello and answers once it got `stream.ready`.
+ * dials a data socket, says hello and answers once it got `stream.ready`; a
+ * desktop's own requests get the answers of one that runs.
  */
 async function connectRunner(token: string) {
   const ws = new WebSocket(`${base()}/api/machines/connect`);
+  const requests: string[] = [];
   const opened: Record<string, unknown>[] = [];
   const data: { socket: WebSocket; ready: boolean; got: (string | ArrayBuffer)[]; closed: number | null }[] = [];
   const welcome = new Promise<void>((resolve, reject) => {
@@ -93,6 +108,10 @@ async function connectRunner(token: string) {
       const frame = JSON.parse(String(e.data)) as Record<string, unknown>;
       if (frame.type === "welcome") resolve();
       if (frame.type === "ping") ws.send(JSON.stringify({ type: "pong", at: frame.at }));
+      if (frame.type === "request") requests.push(String(frame.op));
+      if (frame.type === "request" && String(frame.op) in SESSION) {
+        ws.send(JSON.stringify({ type: "result", id: frame.id, ok: true, data: SESSION[String(frame.op)] }));
+      }
       if (frame.type !== "request" || frame.op !== "stream.open") return;
       opened.push(frame);
       const socket = new WebSocket(`${base()}/api/machines/stream`);
@@ -116,7 +135,7 @@ async function connectRunner(token: string) {
   });
   ws.send(JSON.stringify({ type: "hello", token, ...RUNNER }));
   await welcome;
-  return { ws, opened, data };
+  return { ws, requests, opened, data };
 }
 
 /** A person's stream socket in the web app: what it got and how it closed. */
@@ -331,4 +350,46 @@ test("the runner's own stream code through the server: a watcher's RFB handshake
     xvnc.close();
     removeDirs([dir]);
   }
+});
+
+test("the desktop's REST: its state for who may watch it, Ligar and Desligar, take over through the screen's routes", async () => {
+  const { owner, org, machine, invite } = await seeded();
+  const runner = await connectRunner(machine.token);
+  const api = (path: string, init?: Parameters<Browser>[1]) =>
+    owner(`/api/app/organizations/${org.orgId}/agents/${org.agentId}${path}`, init);
+  expect(await (await api("/desktop")).json()).toMatchObject({
+    available: true,
+    reason: null,
+    running: true,
+    startedAt: "2026-10-24T10:00:00.000Z",
+    controllerUserId: null,
+    handoff: null,
+    viewers: 0,
+    canControl: true,
+    canStart: true,
+    terminal: { available: true, reason: null, allowed: true },
+  });
+  expect((await api("/desktop/start", { json: {} })).status).toBe(204);
+  const taken = (await (await api("/desktop/takeover", { json: {} })).json()) as {
+    id: string;
+    controllerUserId: string;
+  };
+  expect(taken).toMatchObject({ screen: "desktop", status: "active" });
+  expect(await (await api("/desktop")).json()).toMatchObject({
+    controllerUserId: taken.controllerUserId,
+    handoff: { id: taken.id, screen: "desktop" },
+  });
+  expect((await api("/desktop/stop", { json: {} })).status).toBe(204);
+  expect(runner.requests).toEqual(
+    expect.arrayContaining(["desktop.session.status", "desktop.session.start", "desktop.session.stop"]),
+  );
+
+  // A member the agent's work doesn't involve sees nothing of it.
+  const ana = await invite("ana@example.com", "member");
+  const hers = (path: string, init?: Parameters<Browser>[1]) =>
+    ana(`/api/app/organizations/${org.orgId}/agents/${org.agentId}${path}`, init);
+  expect((await hers("/desktop")).status).toBe(403);
+  expect((await hers("/desktop/start", { json: {} })).status).toBe(403);
+  expect((await hers("/desktop/stop", { json: {} })).status).toBe(403);
+  runner.ws.close();
 });

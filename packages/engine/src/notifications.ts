@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { PubSub, ScreenKind } from "@agenteschat/adapters";
 import {
   and,
   type Database,
@@ -89,6 +89,8 @@ export interface NotificationSource {
   machineId?: string;
   /** An agent's browser handoff (ADR 0040). */
   handoffId?: string;
+  /** Which of the agent's screens it is on, when not its browser (ADR 0056). */
+  screen?: ScreenKind;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
   label?: string;
 }

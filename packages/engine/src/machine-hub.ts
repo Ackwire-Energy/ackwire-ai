@@ -403,6 +403,9 @@ export function createMachineHub(deps: MachineHubDeps) {
       await closeConn(old);
     }
     const now = new Date();
+    // In single-user mode the agents' own code runs as the runner's user and can send any hello: system mode
+    // is believed only from a computer's first hello, and from one that has said so ever since.
+    const system = frame.mode === "system" && (machine.lastSeenAt === null || machine.executors?.mode === "system");
     await db
       .update(machines)
       .set({
@@ -418,7 +421,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         execAllowed: frame.exec,
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
         // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
-        // the same for the agents' desktops and the terminal (ADR 0056).
+        // the same for the agents' desktops and the terminal, and whether each agent is its own OS user (ADR 0056).
         ...(frame.executors || frame.browser || frame.desktop || frame.terminal
           ? {
               executors: {
@@ -426,6 +429,7 @@ export function createMachineHub(deps: MachineHubDeps) {
                 ...(frame.browser ? { browser: frame.browser } : {}),
                 ...(frame.desktop ? { desktop: frame.desktop } : {}),
                 ...(frame.terminal ? { terminal: frame.terminal } : {}),
+                ...(system ? { mode: "system" as const } : {}),
                 detectedAt: now.toISOString(),
               },
             }

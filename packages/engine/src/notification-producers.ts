@@ -720,15 +720,17 @@ export async function browserHandoffRecipient(
  * An agent needs a person in its browser (`browser_ask_person`): in the
  * "Waiting for you" of whoever asked for the work and of the agent's
  * responsible person, with a push. Either may open it; the first in control
- * does it, the other sees who is helping.
+ * does it, the other sees who is helping. `to`: exactly who instead (a
+ * desktop's request goes only to who may drive its computer).
  */
 export async function notifyBrowserHandoff(
   deps: NotificationDeps,
   h: typeof schema.browserHandoffs.$inferSelect,
   where: { channelId: string; threadId: string | null },
+  to?: string[],
 ) {
   // Who asked for the work and the agent's responsible person (once when it's the same person).
-  const userIds = [...new Set([h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
+  const userIds = [...new Set(to ?? [h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
     (id): id is string => !!id,
   );
   if (userIds.length === 0) return;
@@ -750,6 +752,7 @@ export async function notifyBrowserHandoff(
       ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
       handoffId: h.id,
+      ...(h.screen !== "browser" ? { screen: h.screen } : {}),
     },
     latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });

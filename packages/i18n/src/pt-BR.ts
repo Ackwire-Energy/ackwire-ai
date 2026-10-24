@@ -7233,6 +7233,7 @@ export const ptBR = {
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
+      desktop_handoff: "Preciso de ajuda no meu computador.",
       file_saved: "Arquivo salvo.",
       issue_work_start: "Pode fazer a tarefa #{{number}}.",
       issue_taken: "Peguei a tarefa #{{number}}.",
@@ -7512,6 +7513,11 @@ export const ptBR = {
       label: "Fechar o navegador",
       description: "Fecha o navegador do agente; os logins continuam salvos.",
     },
+    desktop_ask_person: {
+      label: "Pedir ajuda na tela do computador",
+      description:
+        "Pede para uma pessoa fazer algo na tela do agente (como entrar num aplicativo) e espera ela terminar.",
+    },
   },
   /** The agent browser (ADR 0040): the agent's page, the computer's page, the chat card, the live view. */
   browser: {
@@ -7769,6 +7775,13 @@ export const ptBR = {
         browser_close: "Fechou o navegador",
         other: "Usou o navegador",
       },
+    },
+  },
+  /** The agent's desktop (ADR 0056): watching it, taking control, its terminal. */
+  desktop: {
+    control: {
+      notice:
+        "Enquanto você está no controle, programas que rodam neste computador podem ver a tela e o que você digita.",
     },
   },
 };

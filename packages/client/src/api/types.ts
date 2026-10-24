@@ -3550,6 +3550,8 @@ export interface NotificationSource {
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
+  /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0056: `desktop`). */
+  screen?: ScreenKind;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }

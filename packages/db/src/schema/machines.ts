@@ -30,6 +30,8 @@ export interface MachineExecutors {
   desktop?: { available: boolean; reason?: string; width?: number; height?: number };
   /** `hello.terminal` (ADR 0056): whether people can open a terminal there; absent = not reported. */
   terminal?: { available: boolean; reason?: string };
+  /** `hello.mode` (ADR 0056 §10): each agent works as its own OS user; absent = all as the runner's user. */
+  mode?: "system";
   detectedAt?: string;
 }
 

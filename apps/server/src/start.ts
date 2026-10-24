@@ -148,6 +148,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     browserLive: engine.browserLive,
+    desktops: engine.desktops,
     log,
   });
 
@@ -171,6 +172,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         context: engine.context,
         sandbox: engine.sandbox,
         browserLive: engine.browserLive,
+        streams: engine.streams,
         talker: engine.talker,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: appleTokenRevoker(config),

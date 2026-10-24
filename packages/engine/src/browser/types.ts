@@ -66,6 +66,15 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
   browser_close: { label: "Close the browser", description: "Closes the agent's browser; logins stay saved." },
 };
 
+/** The desktop's own tools under `desktop:use` (ADR 0056); desktop computer use adds its own. */
+export const DESKTOP_TOOL_INFO = {
+  desktop_ask_person: {
+    label: "Ask for help on the desktop",
+    description:
+      "Asks a person to do something on the agent's desktop (like signing in to an app) and waits until they're done.",
+  },
+};
+
 /** How a handoff ended, as the agent reads it when it resumes (ADR 0040 §6). */
 export interface BrowserHandoffResult {
   result: "done" | "failed" | "expired" | "cancelled";

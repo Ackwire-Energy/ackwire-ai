@@ -46,6 +46,8 @@ test('people drive the desktop only while the agent may use it, and "all tools" 
 test("a desktop handoff never holds the browser: one open handoff per screen", async () => {
   await start([BROWSER_SCOPE, DESKTOP_SCOPE]);
   const bia = await addMember(f.db, f.org.id, "admin", "bia");
+  // Each agent its own OS user: admins may drive the computer too, so Bia could take the desktop.
+  await f.db.update(schema.machines).set({ executors: { mode: "system" } });
   const desktop = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, null, "desktop");
   expect(desktop).toMatchObject({ screen: "desktop", status: "active", controllerUserId: f.owner.id });
   expect(await openHandoffOf(f.db, f.org.id, f.agent.id)).toBeNull();

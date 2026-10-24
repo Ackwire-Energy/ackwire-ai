@@ -1,4 +1,11 @@
-import type { AgentScope, BrowserHandoffInfo, MachineReplies, PubSub, ScreenKind } from "@agenteschat/adapters";
+import {
+  type AgentScope,
+  type BrowserHandoffInfo,
+  type MachineReplies,
+  type PubSub,
+  SCREEN_KINDS,
+  type ScreenKind,
+} from "@agenteschat/adapters";
 import {
   and,
   type Database,
@@ -19,6 +26,7 @@ import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, Valida
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { formatDuration } from "../machine-tasks";
+import { computerDrivers, drivesComputer, getMachine, requireComputerDriver, servesDesktops } from "../machines";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
 import {
@@ -33,9 +41,16 @@ import { bodyCode, runWhere } from "../run-tools";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { agentBrowserStatus, browserUnavailableText } from "./status";
-import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserHandoffResult, type BrowserPage, DESKTOP_SCOPE } from "./types";
+import {
+  BROWSER_SCOPE,
+  BROWSER_TOOL_INFO,
+  type BrowserHandoffResult,
+  type BrowserPage,
+  DESKTOP_SCOPE,
+  DESKTOP_TOOL_INFO,
+} from "./types";
 
-const { browserHandoffs, agentRuns, agents, messages, users } = schema;
+const { browserHandoffs, agentRuns, agents, machines, messages, users } = schema;
 
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
@@ -52,6 +67,7 @@ export const CONTROL_GRACE_MS = 2 * 60_000;
 /** While the person in control watches, their grace is pushed at most this often (one write, not one per frame). */
 const CONTROL_TOUCH_EVERY_MS = 30_000;
 export const ASK_PERSON_TOOL = "browser_ask_person";
+export const DESKTOP_ASK_PERSON_TOOL = "desktop_ask_person";
 
 /** What a handoff needs of each screen. */
 interface Screen {
@@ -59,35 +75,53 @@ interface Screen {
   what: string;
   thing: string;
   read: string;
+  /** Where a person helps: "in your browser". */
+  on: string;
   /** People may drive the screen only while the agent may use this tool itself. */
   tool: { name: string; scope: string };
   /** The computer it runs on while no open handoff holds one. */
   machine(agent: { machineId: string | null; browserMachineId: string | null }): string | null;
   /** "Parar" on the computer. */
   stop(hub: MachineCaller, machineId: string, agent: AgentScope): Promise<unknown>;
+  /** Who may take control of it, besides who may watch it (throws). */
+  mayControl?(db: Database, userId: string, orgId: string, agentId: string): Promise<unknown>;
+  /** The agent's request for a person: its tool, and its card (the app translates `code`). */
+  ask: { tool: string; card: string; code: string };
 }
 const SCREENS: Record<ScreenKind, Screen> = {
   browser: {
     what: "browser",
     thing: "page",
     read: "browser_read",
+    on: "in your browser",
     tool: { name: "browser_open", scope: BROWSER_SCOPE },
     // The one its browser tools last used: a mission's or its own, whichever run used it.
     machine: (agent) => agent.browserMachineId ?? agent.machineId,
     stop: (hub, machineId, agent) =>
       hub.call<"browser.stop">(machineId, { op: "browser.stop", agent }, { timeoutMs: 30_000 }),
+    ask: { tool: ASK_PERSON_TOOL, card: "Help needed in the browser", code: "browser_handoff" },
   },
   desktop: {
     what: "desktop",
     thing: "screen",
     read: "desktop_read",
+    on: "on your desktop",
     tool: { name: "desktop_do", scope: DESKTOP_SCOPE },
     machine: (agent) => agent.machineId,
-    stop: async () => {
-      throw new ValidationError("This agent has no desktop to stop");
-    },
+    stop: (hub, machineId, agent) =>
+      hub.call<"desktop.session.stop">(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 30_000 }),
+    // A desktop in control has a terminal: who may run commands as its OS user (ADR 0056 §4).
+    mayControl: requireComputerDriver,
+    ask: { tool: DESKTOP_ASK_PERSON_TOOL, card: "Help needed on the desktop", code: "desktop_handoff" },
   },
 };
+
+/**
+ * The screen showing the same window as another one: an agent whose Chrome runs on its desktop (ADR 0056 §7)
+ * has one window on both. An open handoff on either then blocks a take over of the other and the agent's
+ * tools on both, and hides both views.
+ */
+const SAME_WINDOW: Partial<Record<ScreenKind, ScreenKind>> = { browser: "desktop", desktop: "browser" };
 
 /**
  * Server-side topic of handoff changes (never sent to clients): every
@@ -297,7 +331,8 @@ async function handoffFacts(db: Executor, row: BrowserHandoffRow): Promise<Hando
  * the agent's responsible person, the person a handoff was asked of, and the
  * person behind the work (who asked for the run waiting on it, or for one of
  * the agent's runs going on now). Not everyone who can read a channel: the
- * screen shows all of the agent's work, DMs included.
+ * screen shows all of the agent's work, DMs included. A desktop also to whoever
+ * may drive its computer (`drivesComputer`): they can see all of it anyway.
  */
 export async function requireBrowserAccess(
   db: Database,
@@ -338,7 +373,59 @@ export async function requireBrowserAccess(
   for (const runId of runs) {
     if ((await humanBehindRun({ db }, orgId, runId)) === userId) return access;
   }
+  if (screen === "desktop" && agent.machineId) {
+    const machine = await getMachine(db, orgId, agent.machineId);
+    if (machine && drivesComputer(machine, { userId, admin, owner: false })) return access;
+  }
   throw new ForbiddenError(`You can't use this agent's ${SCREENS[screen].what}`);
+}
+
+/**
+ * Whether the agent's Chrome runs on its desktop (ADR 0056 §7), so both screens show one window: it may use
+ * its desktop, its browser runs on its own computer, and that computer serves desktops.
+ */
+export async function browserOnDesktop(db: Executor, orgId: string, agentId: string) {
+  const [row] = await db
+    .select({ agent: agents, machine: machines })
+    .from(agents)
+    .innerJoin(machines, and(eq(machines.id, agents.machineId), isNull(machines.deletedAt)))
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+  if (!row || (row.agent.browserMachineId ?? row.machine.id) !== row.machine.id) return false;
+  return servesDesktops(row.machine) && (await agentUsesScreen(db, orgId, agentId, "desktop"));
+}
+
+/** The open handoff of the agent's other screen that shows the same window as `screen`, if any. */
+export async function openElsewhere(db: Executor, orgId: string, agentId: string, screen: ScreenKind) {
+  const other = SAME_WINDOW[screen];
+  const open = other ? await openHandoffOf(db, orgId, agentId, other) : null;
+  return open && (await browserOnDesktop(db, orgId, agentId)) ? open : null;
+}
+
+/** The handoff that holds `screen`: its own, else the one of the screen showing the same window. */
+export async function openHandoffOn(db: Executor, orgId: string, agentId: string, screen: ScreenKind) {
+  return (await openHandoffOf(db, orgId, agentId, screen)) ?? (await openElsewhere(db, orgId, agentId, screen));
+}
+
+/**
+ * Inside the transaction that opens a handoff of one of the agent's screens: one opens at a time per agent
+ * (a lock), and none while the screen showing the same window has one.
+ */
+async function claimScreens(tx: Executor, orgId: string, agentId: string, screen: ScreenKind) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`agent-screens:${agentId}`}))`);
+  const open = await openElsewhere(tx, orgId, agentId, screen);
+  if (open) throw new SameWindowError(open);
+}
+
+/** The screen showing the same window has an open handoff: this one can't start. */
+class SameWindowError extends ConflictError {
+  constructor(readonly open: BrowserHandoffRow) {
+    super(
+      open.status === "active"
+        ? `Someone is using the agent's ${SCREENS[open.screen].what}, which shows the same window: wait for them to hand it back`
+        : `The agent is waiting for help with its ${SCREENS[open.screen].what}, which shows the same window: answer it there`,
+      "handoff.same_window",
+    );
+  }
 }
 
 /**
@@ -535,14 +622,137 @@ export function createBrowserHandoffToolSource(
   deps: { pubsub?: PubSub; machines?: { hub: MachineCaller } } = {},
 ): ToolSource {
   const hub = deps.machines?.hub;
-  /** The same computer and checks as the other browser tools: the mission's in a mission thread, else the agent's. */
-  const statusOf = async (ctx: ToolContext) =>
-    agentBrowserStatus(ctx.db, hub, ctx.orgId, ctx.agentId, (await missionOfRun(ctx))?.machineId ?? null);
-  const tool: ToolDefinition = {
-    name: ASK_PERSON_TOOL,
-    description:
-      "Ask a person to do something in your browser that you can't (sign in, type a code sent to their phone, solve a captcha) and wait until they're done. Write what to do in one short sentence in the language the people use. Before asking, try what you can yourself (a password you were given through request_secret goes in with browser_type_secret). End your turn after calling it: you are woken with the result, then read the page again and check.",
-    scope: BROWSER_SCOPE,
+  /** The computer a request goes to, or why it can't be asked there. */
+  type Place = { machineId: string; name: string; online: boolean } | { unavailable: string };
+  const places: Record<ScreenKind, (ctx: ToolContext) => Promise<Place>> = {
+    // The same computer and checks as the other browser tools: the mission's in a mission thread, else the agent's.
+    async browser(ctx) {
+      const missionMachine = (await missionOfRun(ctx))?.machineId ?? null;
+      const s = await agentBrowserStatus(ctx.db, hub, ctx.orgId, ctx.agentId, missionMachine);
+      return s.available
+        ? { machineId: s.machineId, name: s.machineName, online: s.online }
+        : { unavailable: browserUnavailableText(s) };
+    },
+    async desktop(ctx) {
+      const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+      const s = agent?.machineId && hub ? await hub.status(agent.machineId) : null;
+      if (!s || s.orgId !== ctx.orgId) {
+        return { unavailable: "Your desktop only runs on a connected computer, and you don't use one. Say so." };
+      }
+      if (!servesDesktops(s)) {
+        return {
+          unavailable: `The desktop isn't on or ready on the computer ${s.name}. Only the person at that computer can turn it on; tell the people.`,
+        };
+      }
+      return { machineId: s.id, name: s.name, online: s.online };
+    },
+  };
+
+  async function ask(screen: ScreenKind, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+    const s = SCREENS[screen];
+    const instructions = String(input.instructions ?? "").trim();
+    if (!instructions) return { content: "Say what the person should do.", isError: true };
+    const minutes =
+      typeof input.timeout_minutes === "number"
+        ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
+        : HANDOFF_TIMEOUT_DEFAULT_MINUTES;
+    const place = await places[screen](ctx);
+    if ("unavailable" in place) return { content: place.unavailable, isError: true };
+    if (!place.online) {
+      return {
+        content: `Your computer ${place.name} is offline, so no one can use your ${s.what} now. Say so in your reply.`,
+        isError: true,
+      };
+    }
+    const [run] = await ctx.db
+      .select()
+      .from(agentRuns)
+      .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
+    if (!run) return { content: "This call can't wait for a person here.", isError: true };
+    const open = await openHandoffOn(ctx.db, ctx.orgId, ctx.agentId, screen);
+    if (open) {
+      return {
+        content:
+          open.kind === "takeover"
+            ? `A person is using your ${SCREENS[open.screen].what} right now. Wait for them to hand it back before asking.`
+            : `You already asked a person for help ${SCREENS[open.screen].on}; wait for that answer.`,
+        isError: true,
+      };
+    }
+    const where = runWhere(run);
+    // A desktop goes only to who may drive its computer (ADR 0056 §4); a browser to who asked for the work.
+    const drivers = screen === "desktop" ? await computerDrivers(ctx.db, ctx.orgId, ctx.agentId) : null;
+    if (drivers?.length === 0) {
+      return {
+        content: "No one in this workspace may take control of your desktop. Say what you need in your reply instead.",
+        isError: true,
+      };
+    }
+    const recipient = drivers
+      ? drivers.length === 1
+        ? (drivers[0] ?? null)
+        : null
+      : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+    const busy = {
+      content: `A person is using your ${s.what}, or was just asked to; wait for that before asking.`,
+      isError: true,
+    };
+    let created: { card: Awaited<ReturnType<typeof insertMessage>>; row: BrowserHandoffRow };
+    try {
+      created = await ctx.db.transaction(async (tx) => {
+        await claimScreens(tx, run.orgId, run.agentId, screen);
+        const card = await insertMessage(tx, {
+          orgId: run.orgId,
+          channelId: where.channelId,
+          threadId: where.threadId,
+          author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+          body: `${s.ask.card}: ${instructions}`,
+          meta: bodyCode(s.ask.code, { instructions }),
+        });
+        // The card's id is the handoff's: the card is found and kept in sync by it.
+        const [row] = await tx
+          .insert(browserHandoffs)
+          .values({
+            id: card.id,
+            orgId: run.orgId,
+            agentId: run.agentId,
+            runId: run.id,
+            machineId: place.machineId,
+            screen,
+            kind: "ask",
+            instructions,
+            requestedForUserId: recipient,
+            expiresAt: new Date(Date.now() + minutes * 60_000),
+          })
+          .returning();
+        if (!row) throw new Error("handoff not created");
+        await syncCard(tx, row);
+        card.meta = { ...card.meta, browserHandoff: handoffView(row) };
+        return { card, row };
+      });
+    } catch (error) {
+      // Someone took over (or another run asked) between the check and the insert: one open handoff per screen.
+      if (isUniqueViolation(error) || error instanceof SameWindowError) return busy;
+      throw error;
+    }
+    if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(created.card));
+    await notifyBrowserHandoff(
+      { db: ctx.db, pubsub: deps.pubsub },
+      created.row,
+      { channelId: where.channelId, threadId: where.threadId },
+      drivers ?? undefined,
+    ).catch(() => {});
+    return {
+      content: `Asked for help (if nobody opens it within ${minutes} min you'll be told). End your turn now; you'll be woken with the result.`,
+      // The run waits on this handoff and resumes with the result (`resumeRunWithResult`).
+      data: { pause: { kind: "input", id: created.row.id }, handoffId: created.row.id },
+    };
+  }
+
+  const tool = (screen: ScreenKind, scope: string, label: string, description: string): ToolDefinition => ({
+    name: SCREENS[screen].ask.tool,
+    description,
+    scope,
     inputSchema: {
       type: "object",
       properties: {
@@ -558,102 +768,37 @@ export function createBrowserHandoffToolSource(
       additionalProperties: false,
     },
     describe: (input) => ({
-      title: BROWSER_TOOL_INFO.browser_ask_person.label,
+      title: label,
       detail: typeof input.instructions === "string" ? input.instructions : undefined,
     }),
-    async execute(input, ctx): Promise<ToolOutput> {
-      const instructions = String(input.instructions ?? "").trim();
-      if (!instructions) return { content: "Say what the person should do.", isError: true };
-      const minutes =
-        typeof input.timeout_minutes === "number"
-          ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
-          : HANDOFF_TIMEOUT_DEFAULT_MINUTES;
-      const status = await statusOf(ctx);
-      if (!status.available) return { content: browserUnavailableText(status), isError: true };
-      if (!status.online) {
-        return {
-          content: `Your computer ${status.machineName} is offline, so no one can use your browser now. Say so in your reply.`,
-          isError: true,
-        };
-      }
-      const machineId = status.machineId;
-      const [run] = await ctx.db
-        .select()
-        .from(agentRuns)
-        .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
-      if (!run) return { content: "This call can't wait for a person here.", isError: true };
-      const open = await openHandoffOf(ctx.db, ctx.orgId, ctx.agentId);
-      if (open) {
-        return {
-          content:
-            open.kind === "takeover"
-              ? "A person is using your browser right now. Wait for them to hand it back before asking."
-              : "You already asked a person for help in your browser; wait for that answer.",
-          isError: true,
-        };
-      }
-      const where = runWhere(run);
-      const recipient = await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
-      const busy = {
-        content: "A person is using your browser, or was just asked to; wait for that before asking.",
-        isError: true,
-      };
-      let created: { card: Awaited<ReturnType<typeof insertMessage>>; row: BrowserHandoffRow };
-      try {
-        created = await ctx.db.transaction(async (tx) => {
-          const card = await insertMessage(tx, {
-            orgId: run.orgId,
-            channelId: where.channelId,
-            threadId: where.threadId,
-            author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-            body: `Help needed in the browser: ${instructions}`,
-            meta: bodyCode("browser_handoff", { instructions }),
-          });
-          // The card's id is the handoff's: the card is found and kept in sync by it.
-          const [row] = await tx
-            .insert(browserHandoffs)
-            .values({
-              id: card.id,
-              orgId: run.orgId,
-              agentId: run.agentId,
-              runId: run.id,
-              machineId,
-              kind: "ask",
-              instructions,
-              requestedForUserId: recipient,
-              expiresAt: new Date(Date.now() + minutes * 60_000),
-            })
-            .returning();
-          if (!row) throw new Error("handoff not created");
-          await syncCard(tx, row);
-          card.meta = { ...card.meta, browserHandoff: handoffView(row) };
-          return { card, row };
-        });
-      } catch (error) {
-        // Someone took over (or another run asked) between the check and the insert: one open handoff per browser.
-        if (isUniqueViolation(error)) return busy;
-        throw error;
-      }
-      if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(created.card));
-      await notifyBrowserHandoff({ db: ctx.db, pubsub: deps.pubsub }, created.row, {
-        channelId: where.channelId,
-        threadId: where.threadId,
-      }).catch(() => {});
-      return {
-        content: `Asked for help (if nobody opens it within ${minutes} min you'll be told). End your turn now; you'll be woken with the result.`,
-        // The run waits on this handoff and resumes with the result (`resumeRunWithResult`).
-        data: { pause: { kind: "input", id: created.row.id }, handoffId: created.row.id },
-      };
-    },
+    execute: (input, ctx) => ask(screen, input, ctx),
+  });
+  const tools: Record<ScreenKind, ToolDefinition> = {
+    browser: tool(
+      "browser",
+      BROWSER_SCOPE,
+      BROWSER_TOOL_INFO.browser_ask_person.label,
+      "Ask a person to do something in your browser that you can't (sign in, type a code sent to their phone, solve a captcha) and wait until they're done. Write what to do in one short sentence in the language the people use. Before asking, try what you can yourself (a password you were given through request_secret goes in with browser_type_secret). End your turn after calling it: you are woken with the result, then read the page again and check.",
+    ),
+    desktop: tool(
+      "desktop",
+      DESKTOP_SCOPE,
+      DESKTOP_TOOL_INFO.desktop_ask_person.label,
+      "Ask a person to do something on your desktop that you can't (sign in to an app, type a code sent to their phone, answer a prompt only a person should) and wait until they're done. Only people who may use your computer as you are asked. Write what to do in one short sentence in the language the people use. End your turn after calling it: you are woken with the result, then look at the screen again and check.",
+    ),
   };
   return {
     name: "browser-handoff",
-    // Offered with the other browser tools: only when the agent's computer serves its browser.
+    // Offered with the screen's other tools: only when the agent may use it and its computer serves it.
     async tools(ctx) {
       if (!hub) return [];
       const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      if (!isAllowed(toolAccess(granted, tool))) return [];
-      return (await statusOf(ctx)).available ? [tool] : [];
+      const offered: ToolDefinition[] = [];
+      for (const screen of SCREEN_KINDS) {
+        const t = tools[screen];
+        if (isAllowed(toolAccess(granted, t)) && !("unavailable" in (await places[screen](ctx)))) offered.push(t);
+      }
+      return offered;
     },
   };
 }
@@ -703,6 +848,7 @@ async function settle(deps: HandoffDeps, row: BrowserHandoffRow) {
 export async function claimHandoff(deps: HandoffDeps, actorId: string, orgId: string, handoffId: string) {
   const current = await loadHandoff(deps.db, orgId, handoffId);
   await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current, current.screen);
+  await SCREENS[current.screen].mayControl?.(deps.db, actorId, orgId, current.agentId);
   if (!OPEN.includes(current.status)) throw new ConflictError("This is already over");
   if (current.status === "active" && current.controllerUserId === actorId) return handoffView(current);
   const now = Date.now();
@@ -804,13 +950,15 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
 }
 
 /**
- * A person watching takes over one of the agent's screens. An open handoff of
- * that screen is claimed instead (one person in control at a time); otherwise
- * a `takeover` starts, and the agent's tools of that screen wait until it is
- * handed back (`waitIfPersonInControl`). `runId`: the run whose card it was
- * taken from (the agent's, still going): the take over is bound to it at once,
- * so its card keeps a place in that conversation. A run that already ended
- * binds nothing (the next run that needs the screen waits on it).
+ * A person watching takes over one of the agent's screens (a desktop: only who
+ * may drive its computer). An open handoff of that screen is claimed instead
+ * (one person in control at a time); otherwise a `takeover` starts, unless the
+ * screen showing the same window has one open (`ConflictError`), and the
+ * agent's tools of both wait until it is handed back (`waitIfPersonInControl`).
+ * `runId`: the run whose card it was taken from (the agent's, still going): the
+ * take over is bound to it at once, so its card keeps a place in that
+ * conversation. A run that already ended binds nothing (the next run that
+ * needs the screen waits on it).
  */
 export async function startTakeover(
   deps: HandoffDeps,
@@ -822,6 +970,7 @@ export async function startTakeover(
 ) {
   await requireBrowserAccess(deps.db, actorId, orgId, agentId, undefined, screen);
   await requireAgentBrowserSwitch(deps.db, orgId, agentId, screen);
+  await SCREENS[screen].mayControl?.(deps.db, actorId, orgId, agentId);
   let boundRun: string | null = null;
   if (runId) {
     const [run] = await deps.db
@@ -838,20 +987,24 @@ export async function startTakeover(
   const now = Date.now();
   let row: BrowserHandoffRow | undefined;
   try {
-    [row] = await deps.db
-      .insert(browserHandoffs)
-      .values({
-        orgId,
-        agentId,
-        runId: boundRun,
-        machineId,
-        screen,
-        kind: "takeover",
-        status: "active",
-        controllerUserId: actorId,
-        expiresAt: new Date(now + CONTROL_GRACE_MS),
-      })
-      .returning();
+    row = await deps.db.transaction(async (tx) => {
+      await claimScreens(tx, orgId, agentId, screen);
+      const [created] = await tx
+        .insert(browserHandoffs)
+        .values({
+          orgId,
+          agentId,
+          runId: boundRun,
+          machineId,
+          screen,
+          kind: "takeover",
+          status: "active",
+          controllerUserId: actorId,
+          expiresAt: new Date(now + CONTROL_GRACE_MS),
+        })
+        .returning();
+      return created;
+    });
   } catch (error) {
     // Opened meanwhile (another person, or the agent asked): that one is claimed instead, or it says who has it.
     if (!isUniqueViolation(error)) throw error;
@@ -866,8 +1019,8 @@ export async function startTakeover(
 }
 
 /**
- * Before an agent acts in its browser: a person in control, or asked to take
- * it, makes the call wait (the run pauses on that handoff and resumes when
+ * Before an agent acts on one of its screens: a person in control of it (or of
+ * the screen showing the same window), or asked to take it, makes the call wait (the run pauses on that handoff and resumes when
  * it ends); another run of the agent is refused while the run the handoff
  * belongs to still goes on. A handoff whose run ended (done, failed,
  * canceled) while it stayed open (a person kept control, or the run read a
@@ -881,9 +1034,9 @@ export async function waitIfPersonInControl(
   pubsub?: PubSub,
   screen: ScreenKind = "browser",
 ): Promise<ToolOutput | null> {
-  const open = await openHandoffOf(db, ctx.orgId, ctx.agentId, screen);
+  const open = await openHandoffOn(db, ctx.orgId, ctx.agentId, screen);
   if (!open) return null;
-  const busy = `A person has control of your ${SCREENS[screen].what}, or has been asked to take it.`;
+  const busy = `A person has control of your ${SCREENS[open.screen].what}, or has been asked to take it.`;
   if (open.runId !== ctx.runId) {
     const from = open.runId;
     if (from && (await runIsLive(db, ctx.orgId, from))) {
@@ -1160,7 +1313,7 @@ export function webAddress(typed: string): string | null {
 const OPEN_PAGE_SECONDS = 60;
 
 /** Whether the agent itself may use one of its screens (`browser:use`, `desktop:use`): people see and drive it only then. */
-export async function agentUsesScreen(db: Database, orgId: string, agentId: string, screen: ScreenKind = "browser") {
+export async function agentUsesScreen(db: Executor, orgId: string, agentId: string, screen: ScreenKind = "browser") {
   return isAllowed(toolAccess(await grantedScopeKeys(db, orgId, agentId), SCREENS[screen].tool));
 }
 

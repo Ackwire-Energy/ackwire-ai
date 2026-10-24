@@ -11,13 +11,14 @@ import {
   requireBrowserAccess,
   startTakeover,
   stopAgentBrowser,
+  stopDesktop,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
 const tags = ["Agent browser"];
 
-const BrowserHandoff = z
+export const BrowserHandoff = z
   .object({
     id: z.uuid(),
     agentId: z.uuid(),
@@ -42,7 +43,8 @@ const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 /** What "Parar" does to each screen, for the API docs. */
 const STOP_SUMMARY: Record<ScreenKind, string> = {
   browser: "Close the agent's browser now (its logins stay); its next browser call opens a fresh one",
-  desktop: "Stop the agent's desktop now",
+  desktop:
+    "Stop the agent's desktop now, with what runs on it (admins, the agent's owner, whoever may drive its computer)",
 };
 
 /**
@@ -125,15 +127,10 @@ export function browserRoutes(deps: AppDeps) {
       }),
       async (c) => {
         const { orgId, agentId } = c.req.valid("param");
-        await stopAgentBrowser(
-          db,
-          deps.extras?.sandbox?.machines?.hub,
-          c.get("user").id,
-          orgId,
-          agentId,
-          adapters.pubsub,
-          screen,
-        );
+        const hub = deps.extras?.sandbox?.machines?.hub;
+        const userId = c.get("user").id;
+        if (screen === "desktop") await stopDesktop({ db, hub, pubsub: adapters.pubsub }, userId, orgId, agentId);
+        else await stopAgentBrowser(db, hub, userId, orgId, agentId, adapters.pubsub, screen);
         return c.body(null, 204);
       },
     );

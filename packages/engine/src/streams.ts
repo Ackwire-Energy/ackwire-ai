@@ -68,6 +68,8 @@ export interface StreamBrokerDeps {
   hub: Pick<MachineHub, "call">;
   /** Whether the person may open it and on which computer; `refused` is the viewer's close code. */
   authorize(input: StreamInput): Promise<StreamTarget>;
+  /** Every `accessRecheckMs` while it is open: whether the person may still have it (null), else its close. */
+  recheck?(stream: Stream): Promise<{ refused: number; reason: string } | null>;
   /** A stream that got its data socket ended (the audit). */
   onClosed?(stream: Stream): unknown;
   /** Tests: shorter timeouts, smaller caps. */
@@ -83,6 +85,7 @@ interface OpenStream extends Stream {
   second: { start: number; bytes: number };
   timer?: ReturnType<typeof setTimeout>;
   pinger?: ReturnType<typeof setInterval>;
+  checker?: ReturnType<typeof setInterval>;
 }
 
 /**
@@ -115,6 +118,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     s.closed = true;
     clearTimeout(s.timer);
     clearInterval(s.pinger);
+    clearInterval(s.checker);
     quietly(() => s.viewer.close(code, reason));
     const runner = s.runner;
     if (runner) quietly(() => runner.close(code, reason));
@@ -214,6 +218,18 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
       quietly(() => s.viewer.ping?.());
       quietly(() => link.socket.ping?.());
     }, limits.pingMs);
+    const recheck = deps.recheck;
+    if (recheck) {
+      // Access can end while it's open (removed from the org, someone else took control…).
+      s.checker = setInterval(() => {
+        void recheck(s).then(
+          (lost) => {
+            if (lost) close(s, lost.refused, lost.reason);
+          },
+          (error) => deps.log?.warn("stream recheck failed", { agentId: s.agentId, error: String(error) }),
+        );
+      }, limits.accessRecheckMs);
+    }
     quietly(() => link.socket.send(JSON.stringify({ type: "stream.ready" })));
     const queue = s.queue;
     s.queue = [];
@@ -336,6 +352,12 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
         n++;
       }
       return n;
+    },
+
+    /** Whether a stream `match` picks is open here (still being checked, opening or ready). */
+    some(match: (stream: Stream) => boolean) {
+      for (const s of streams.values()) if (match(s)) return true;
+      return false;
     },
 
     /** An agent's streams of a kind sent to its computer (ready or still opening). */

@@ -38,6 +38,12 @@ describe("hello", () => {
     expect(frame).toMatchObject({ type: "hello", protocol: DESKTOP_PROTOCOL });
     expect(frame).not.toHaveProperty("desktop");
     expect(frame).not.toHaveProperty("terminal");
+    expect(frame).not.toHaveProperty("mode");
+  });
+
+  test("system mode only as `system`: anything else is single-user", () => {
+    expect(hello({ mode: "system" })).toMatchObject({ mode: "system" });
+    for (const mode of ["user", "System", true, 1]) expect(hello({ mode })).not.toHaveProperty("mode");
   });
 
   test("desktop and terminal availability, reasons cut, a size only when both sides are sane", () => {

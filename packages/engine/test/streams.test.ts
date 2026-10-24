@@ -22,11 +22,11 @@ import {
   type StreamBroker,
   type StreamBrokerDeps,
   type StreamInput,
-  type StreamSocket,
   startTakeover,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
+import { type FakeSocket, fakeSocket, until } from "./stream-fixtures";
 
 let f: Fixture;
 let broker: StreamBroker | undefined;
@@ -39,36 +39,6 @@ afterEach(async () => {
 const WATCH: StreamRequest = { kind: "desktop", mode: "watch" };
 const CONTROL: StreamRequest = { kind: "desktop", mode: "control" };
 const TERMINAL: StreamRequest = { kind: "terminal", cols: 80, rows: 24 };
-
-/** An in-memory socket: what was sent to it, how it was closed, its backlog. */
-function fakeSocket() {
-  const s = {
-    sent: [] as (string | Uint8Array)[],
-    closed: null as { code?: number; reason?: string } | null,
-    backlog: 0,
-    socket: undefined as unknown as StreamSocket,
-  };
-  s.socket = {
-    send: (data) => {
-      s.sent.push(data);
-    },
-    close: (code, reason) => {
-      s.closed ??= { code, reason };
-    },
-    buffered: () => s.backlog,
-    ping() {},
-  };
-  return s;
-}
-type FakeSocket = ReturnType<typeof fakeSocket>;
-
-async function until(done: () => boolean | Promise<boolean>, what = "condition") {
-  for (let i = 0; i < 400; i++) {
-    if (await done()) return;
-    await Bun.sleep(5);
-  }
-  throw new Error(`timed out waiting for ${what}`);
-}
 
 const paired = () => pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Box" });
 type Paired = Awaited<ReturnType<typeof paired>>;

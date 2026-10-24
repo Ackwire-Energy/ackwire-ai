@@ -305,6 +305,8 @@ export const STREAM_LIMITS = {
   terminalMaxMs: 12 * 3_600_000,
   /** Streams a person may open in a minute. */
   opensPerMinute: 30,
+  /** The server checks this often that whoever has an open stream may still have it. */
+  accessRecheckMs: 30_000,
   /** A terminal's size, inclusive. */
   cols: [20, 400],
   rows: [5, 200],
@@ -910,6 +912,11 @@ export interface RunnerInfo {
   desktop?: RunnerDesktopInfo;
   /** Protocol 18: whether people can open a terminal here. */
   terminal?: RunnerTerminalInfo;
+  /**
+   * Protocol 18: `system` when each agent works as its own OS user (ADR 0056 §10); absent, every agent
+   * works as the runner's own user. Who may control a desktop or open a terminal follows it (§4).
+   */
+  mode?: "system";
 }
 
 export interface FileEntry {
@@ -1531,6 +1538,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(Array.isArray(f.accounts) ? { accounts: parseAccounts(f.accounts) } : {}),
         ...(isObject(f.desktop) ? { desktop: parseDesktopInfo(f.desktop) } : {}),
         ...(isObject(f.terminal) ? { terminal: parseAvailability(f.terminal) } : {}),
+        ...(f.mode === "system" ? { mode: "system" as const } : {}),
       };
     }
     case "browser.frame": {
