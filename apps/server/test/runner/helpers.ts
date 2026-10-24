@@ -96,6 +96,14 @@ export interface VncLogin {
   got: Buffer;
 }
 
+/** A viewer's message size from its first bytes (RFB 3.8); a type it doesn't know takes what came; null: too few yet. */
+function clientMessageSize(b: Buffer): number | null {
+  if (b.length === 0) return null;
+  if (b[0] === 2) return b.length < 4 ? null : 4 + 4 * b.readUInt16BE(2);
+  if (b[0] === 6) return b.length < 8 ? null : 8 + b.readUInt32BE(4);
+  return ({ 0: 20, 3: 10, 4: 8, 5: 6 } as Record<number, number>)[b[0] as number] ?? b.length;
+}
+
 /**
  * An Xvnc on a Unix socket in `dir`: RFB 3.8, VncAuth with `VNC_PASSWORDS`,
  * then a ServerInit of 1280×800 "Dev". A PointerEvent moves the desktop's
@@ -119,7 +127,7 @@ export async function fakeXvnc(dir: string) {
     };
     socket.on("error", () => undefined);
     socket.write("RFB 003.008\n");
-    socket.on("data", (chunk) => {
+    socket.on("data", (chunk: Buffer) => {
       buf = Buffer.concat([buf, chunk]);
       for (;;) {
         if (step === "version") {
@@ -146,12 +154,15 @@ export async function fakeXvnc(dir: string) {
           socket.write(Buffer.concat([Buffer.from([5, 0, 3, 32]), pixelFormat, u32(3), Buffer.from("Dev")]));
           step = "messages";
         } else {
-          login.got = Buffer.concat([login.got, buf]);
-          if (buf[0] === 5 && buf.length >= 6 && login.password === "full") {
-            desktop.pointer = [buf.readUInt16BE(2), buf.readUInt16BE(4)];
+          const size = clientMessageSize(buf);
+          if (size === null || buf.length < size) return;
+          const message = take(size) as Buffer;
+          login.got = Buffer.concat([login.got, message]);
+          if (message[0] === 5 && login.password === "full") {
+            desktop.pointer = [message.readUInt16BE(2), message.readUInt16BE(4)];
           }
-          buf = Buffer.alloc(0);
-          return;
+          // A FramebufferUpdateRequest: an update of no rectangles.
+          if (message[0] === 3) socket.write(Uint8Array.of(0, 0, 0, 0));
         }
       }
     });

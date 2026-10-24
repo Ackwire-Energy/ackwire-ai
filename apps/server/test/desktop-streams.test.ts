@@ -7,6 +7,7 @@ import { RunnerConnection } from "../runner/connection";
 import type { DesktopSessions } from "../runner/desktop-session";
 import { DataSockets } from "../runner/streams";
 import { type SpawnPty, Terminals } from "../runner/terminal";
+import { checkDesktop, signInForDesktop } from "../scripts/smoke-desktop";
 import {
   type Browser,
   browser,
@@ -255,6 +256,32 @@ test("after the upgrade, refusals are close codes: a member who may not watch, a
 const bytesOf = (viewer: ReturnType<typeof openViewer>) =>
   Buffer.concat(viewer.got.filter((f): f is ArrayBuffer => typeof f !== "string").map((f) => Buffer.from(f)));
 
+/** The runner's own connection and stream code on real sockets, its desktop a fake Xvnc and its shells `spawn`. */
+function runnerOn(token: string, dir: string, vncSocket: string, spawn: SpawnPty) {
+  const http = `http://127.0.0.1:${server.port}`;
+  const runner = new RunnerConnection({
+    url: connectUrl(http),
+    token,
+    info: RUNNER as RunnerInfo,
+    context: {
+      workspaceReal: dir,
+      exec: true,
+      token,
+      access: () => ACCESS as RunnerAccess,
+      desktops: desktopOn(vncSocket).desktops as unknown as DesktopSessions,
+      terminals: new Terminals({
+        user: async () => ({ prefix: [], env: { PATH: "/usr/bin:/bin" }, cwd: dir }),
+        log: () => undefined,
+        spawn,
+        system: { platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 1000 },
+      }),
+      streams: new DataSockets({ url: connectUrl(http, "stream"), token }),
+    },
+  });
+  void runner.run();
+  return runner;
+}
+
 test("the runner's own stream code through the server: a watcher's RFB handshake to the desktop, a terminal's bytes and exit", async () => {
   const { owner, machine, desktop, terminal } = await seeded();
   const dir = tempDir("streams-e2e-");
@@ -285,27 +312,7 @@ test("the runner's own stream code through the server: a watcher's RFB handshake
       exited,
     };
   };
-  const http = `http://127.0.0.1:${server.port}`;
-  const runner = new RunnerConnection({
-    url: connectUrl(http),
-    token: machine.token,
-    info: RUNNER as RunnerInfo,
-    context: {
-      workspaceReal: dir,
-      exec: true,
-      token: machine.token,
-      access: () => ACCESS as RunnerAccess,
-      desktops: desktopOn(xvnc.socketPath).desktops as unknown as DesktopSessions,
-      terminals: new Terminals({
-        user: async () => ({ prefix: [], env: { PATH: "/usr/bin:/bin" }, cwd: dir }),
-        log: () => undefined,
-        spawn,
-        system: { platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 1000 },
-      }),
-      streams: new DataSockets({ url: connectUrl(http, "stream"), token: machine.token }),
-    },
-  });
-  void runner.run();
+  const runner = runnerOn(machine.token, dir, xvnc.socketPath, spawn);
   try {
     await until(() => runner.online, "the runner");
 
@@ -345,6 +352,61 @@ test("the runner's own stream code through the server: a watcher's RFB handshake
     await until(() => term.closed !== null, "the end");
     expect(term.got.filter((f) => typeof f === "string")).toEqual(['{"type":"exit","code":0}']);
     expect(term.closed?.code).toBe(STREAM_CLOSE.normal);
+  } finally {
+    runner.stop();
+    xvnc.close();
+    removeDirs([dir]);
+  }
+});
+
+test("bun run smoke --desktop-agent: signed in as who paired the computer, one framebuffer update, the terminal's user, never root", async () => {
+  const { machine } = await seeded();
+  const dir = tempDir("smoke-desktop-");
+  const xvnc = await fakeXvnc(dir);
+  let user = "dwrun";
+  // A shell whose prompt comes first, which echoes what it is typed and answers the smoke's line as `user`.
+  const spawn: SpawnPty = (_argv, opts) => {
+    let settle: (code: number | null) => void = () => undefined;
+    const exited = new Promise<number | null>((resolve) => {
+      settle = resolve;
+    });
+    opts.data(Buffer.from("$ "));
+    return {
+      write: (data) => {
+        const line = Buffer.from(data).toString();
+        if (line.includes("id -un")) opts.data(Buffer.from(`${line}\nSMOKEUSER=${user}\r\n$ `));
+        if (line.startsWith("exit")) settle(0);
+      },
+      resize: () => undefined,
+      hangup: () => settle(null),
+      kill: () => settle(null),
+      exited,
+    };
+  };
+  const runner = runnerOn(machine.token, dir, xvnc.socketPath, spawn);
+  try {
+    await until(() => runner.online, "the runner");
+    const where = { db: t.db, auth: t.auth, base: `http://127.0.0.1:${server.port}`, origin: ORIGIN };
+    const sessions = async () => (await t.db.select().from(schema.sessions)).length;
+    const before = await sessions();
+    const session = await signInForDesktop(where, "@dev");
+    expect(await sessions()).toBe(before + 1);
+    expect(session).toMatchObject({ handle: "dev", person: "owner" });
+    const lines: string[] = [];
+    await checkDesktop(session, (line) => lines.push(line));
+    expect(lines).toEqual([
+      expect.stringContaining('desktop: RFB 003.008, security None, 1280×800 "Dev"'),
+      expect.stringContaining("terminal: as dwrun"),
+    ]);
+    // The watcher's login, and the whole screen asked for (FramebufferUpdateRequest, not incremental).
+    expect(xvnc.logins[0]).toMatchObject({ password: "view", shared: 1 });
+    expect([...(xvnc.logins[0]?.got ?? [])].slice(-10)).toEqual([3, 0, 0, 0, 0, 0, 5, 0, 3, 32]);
+
+    user = "root";
+    await expect(checkDesktop(session, () => undefined)).rejects.toThrow("@dev's terminal runs as root");
+    await session.signOut();
+    expect(await sessions()).toBe(before);
+    await expect(signInForDesktop(where, "nobody")).rejects.toThrow("No agent nobody");
   } finally {
     runner.stop();
     xvnc.close();

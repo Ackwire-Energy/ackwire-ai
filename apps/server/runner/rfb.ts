@@ -49,7 +49,7 @@ export function vncAuthResponse(password: string, challenge: Uint8Array): Buffer
  * Exact byte counts out of chunks as they come (the handshakes). Once the
  * source failed, what it sent before is still read; a read past it fails.
  */
-class ByteReader {
+export class ByteReader {
   private buf = Buffer.alloc(0);
   private waiting: { n: number; resolve(b: Buffer): void; reject(e: Error): void } | null = null;
   private error: Error | null = null;
