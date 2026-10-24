@@ -104,6 +104,21 @@ describe("the desktop as screen text", () => {
     }
   });
 
+  test("two windows with one title: the panel's buttons for them stay plain; each window's own line stands for it", () => {
+    const snap = fixture("menu");
+    const thunar = thunarWindow(snap);
+    // A second window titled like Thunar's (two terminals in one folder are the usual case).
+    const terminal = snap.windows.find((w) => w.title.startsWith("Terminal")) as HelperWindow;
+    terminal.title = thunar.title;
+    const l = look(snap);
+    const buttons = Object.values(l.targets).filter((t) => t.role === "button" && t.name === thunar.title);
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]?.xid).toBeUndefined();
+    expect(l.snapshot).not.toContain(`button "${thunar.title}" [window`);
+    const windows = Object.values(l.targets).filter((t) => t.role === "window" && t.name === thunar.title);
+    expect(windows.map((w) => w.xid).sort()).toEqual([thunar.xid, terminal.xid].sort());
+  });
+
   test("a window title or a terminal line shaped like an element can't make or move a ref", () => {
     // A page titles itself; a command prints a line.
     const dialog = fixture("dialog");

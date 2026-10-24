@@ -392,8 +392,10 @@ export function desktopLook(snap: HelperSnapshot, refOf: DesktopRefs, options: D
       if (best) topsOf.set(best.xid, [...(topsOf.get(best.xid) ?? []), { tree, top }]);
     }
   }
-  const titled = new Map<string, HelperWindow>();
-  for (const w of appWindows) if (w.title && !titled.has(w.title)) titled.set(w.title, w);
+  // A panel's button stands for the window with its title. Two windows with one title (two terminals in
+  // one folder) leave their buttons plain: the panel knows which is which, the title doesn't.
+  const titled = new Map<string, HelperWindow | null>();
+  for (const w of appWindows) if (w.title) titled.set(w.title, titled.has(w.title) ? null : w);
 
   /** The window an element is drawn in: a menu's items may be in a popup of their app, above the menu's window. */
   const drawnIn = (point: Point, ctx: Context): HelperWindow => {
@@ -451,7 +453,7 @@ export function desktopLook(snap: HelperSnapshot, refOf: DesktopRefs, options: D
     if (role === null) return children;
 
     const name = nameOf(n.name);
-    const window = ctx.inDock && n.role === "toggle button" ? titled.get(n.name) : undefined;
+    const window = ctx.inDock && n.role === "toggle button" ? (titled.get(n.name) ?? undefined) : undefined;
     const element = ELEMENTS.has(role) || (role === "menu" && !!name) || n.ifaces.includes("EditableText");
     if (!visible) {
       if (children.length === 0) return [];
