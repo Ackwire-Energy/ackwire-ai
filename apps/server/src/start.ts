@@ -171,6 +171,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         sandbox: engine.sandbox,
         browserLive: engine.browserLive,
         talker: engine.talker,
+        router: engine.router,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: appleTokenRevoker(config),
       },

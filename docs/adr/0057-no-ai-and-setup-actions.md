@@ -30,8 +30,9 @@ This changes one behavior: a signed-out or missing command-line tool used to mak
 
 ### 2. A run that can't think fails right away
 
-- The check runs right after the agent's row is read, before the Automático judge, the tool-group judge (ADR 0043) and the "thinking" event. The run fails with `no_ai`, before any model call or context.
-- Its agent posts one no-AI card: `bodyCode: "no_ai"`, `meta.noAi = { agentId, forUserId, reason, intent, provider?, runId }`.
+- The check runs right after the agent's row is read, before the Automático judge, the tool-group judge (ADR 0043) and the run's `running` event. The run fails with `no_ai`, before any model call or context.
+- A run already under way that meets a signed-out or missing command-line tool, with nothing to fall back on, fails the same way instead of waiting.
+- Its agent posts one no-AI card: `bodyCode: "no_ai"`, `meta.noAi = { agentId, forUserId, reason, intent, provider?, autoOpen?, runId }`, and `message.handled` carries `reason: "no_ai"`.
   - At most one per agent and conversation every 6 hours, or one per conversation when the whole organization has no AI.
   - The card doesn't start the router, like other notices.
 - Background runs (routines) post nothing. They fail with `no_ai`, and Rotinas says the agent has no AI connected.
@@ -40,8 +41,8 @@ This changes one behavior: a signed-out or missing command-line tool used to mak
 ### 3. Messages nobody mentioned
 
 - The organization-level check runs in the `message.posted` job before `routeMessage`, whatever the router. Jev only scores, and never throws `MissingCredentialError`.
-- With no AI, the `no_ai` routing decision is stored, the router isn't called, and `message.routed` carries `reason: "no_ai"`.
-- An organization whose only AI is a plan, with no Jev, has nothing to route with. Its messages say to mention an agent, not that nobody will answer: mentioned agents do answer.
+- With no AI, the `no_ai` routing decision is stored, the router isn't called, and `message.routed` carries `reason: "no_ai"` with the intent (§4).
+- An organization whose only AI is a plan, with no Jev, has nothing to route with. Its messages say to mention an agent (`reason: "mention_needed"`), not that nobody will answer: mentioned agents do answer.
 
 ### 4. What the person wants (Jev, optional)
 
@@ -49,7 +50,7 @@ This changes one behavior: a signed-out or missing command-line tool used to mak
   - an intent: `claude`, `chatgpt`, `api_key`, `any` or `task`;
   - a provider from the catalog, or none.
 - Mentioning a product, asking a price, cancelling a subscription, or using a product for a task is `task`.
-- The Connect dialog opens by itself only at a probability of 0.9 or more, never for `any`, and only for the message's author, once, in a visible window. Below that, the card offers the suggested step as its button. At 0.6, questions about prices, a cancellation and a prompt injection opened dialogs nobody asked for.
+- A step is suggested from a probability of 0.6. The Connect dialog opens by itself only at 0.9 or more and never for `any` (the server marks it `autoOpen`), and only for the message's author, once, in a visible window. Below that, the card offers the suggested step as its button. At 0.6, questions about prices, a cancellation and a prompt injection opened dialogs nobody asked for; with prices, cancelling and using a product for a task as `task`, Jev put the injection at 0.61.
 - Without Jev, or when it fails or takes more than 2 seconds, the intent is `task`: the Connect button only, with no guessing from keywords.
 - Jev's answer only picks a dialog step; it grants nothing. Its usage is recorded as router usage.
 
@@ -65,9 +66,10 @@ This changes one behavior: a signed-out or missing command-line tool used to mak
 **"Responder agora"** is `POST /api/app/organizations/{orgId}/messages/{id}/answer-now`, with the card's id or the person's message id:
 
 - While there is still no AI: 409 `ai.still_missing`, and the card keeps its button.
-- When a failed `no_ai` run exists for that message and agent: in one transaction, the run is locked and deleted (it did nothing, and its steps cascade), and a run starts again on the person's own message (`startOrJoinRun`). The requester, the authority (ADR 0053) and the context are the normal ones, and `(trigger_message_id, agent_id)` stays unique. Audited as `run.answered_after_connect`.
+- The card stands for its conversation: its agent's newest run there. The person's message: the runs it started.
+- When that run failed with `no_ai`: in one transaction, the run is deleted (it did nothing, and its steps cascade), and a run starts again on the person's own message (`startOrJoinRun`). The requester, the authority (ADR 0053) and the context are the normal ones, and `(trigger_message_id, agent_id)` stays unique. Audited as `run.answered_after_connect`.
 - Otherwise, when a `no_ai` routing decision exists: it's deleted and `routeMessage` is called directly. Enqueueing `message.posted` again would do nothing, because its dedupe key already exists in the outbox.
-- A second call starts nothing new.
+- A second call starts nothing new: it returns the runs that answer the message.
 - Who may press it: the person who asked, the agent's owner or an admin (the same people as Continuar). It's rate limited like other changes.
 - A connection made from the card answers by itself. One made anywhere else leaves "Responder agora" on the card.
 

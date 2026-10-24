@@ -47,9 +47,11 @@ import {
   createWorkspaceToolSource,
   type GitProxyDeps,
   hubBrainLink,
+  type JobDeps,
   type Judge,
   type MailDeps,
   type McpConnect,
+  messageRouter,
   missionTurnPermissions,
   notifyOwnerOnBudget,
   prepareAgentCode,
@@ -333,7 +335,7 @@ export function buildEngine(o: EngineOptions) {
         prepare: prepareCode,
       }),
   };
-  const handlers = createJobHandlers({
+  const jobDeps: JobDeps = {
     db,
     gateway,
     pubsub: adapters.pubsub,
@@ -367,7 +369,8 @@ export function buildEngine(o: EngineOptions) {
         ? { jev: { apiKey: config.TYPESAFE_API_KEY, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
         : {}),
     },
-  });
+  };
+  const handlers = createJobHandlers(jobDeps);
   // Mail accounts, inbound mail and polling (routes and workers).
   const mail: MailDeps = {
     db,
@@ -381,6 +384,8 @@ export function buildEngine(o: EngineOptions) {
     tools,
     context,
     handlers,
+    /** The same router as `message.posted`'s, for "Responder agora" (null: routing is off). */
+    router: messageRouter(jobDeps),
     connectorDeps,
     storage,
     artifacts,

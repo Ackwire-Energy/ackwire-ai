@@ -22,7 +22,7 @@ import {
 } from "@agenteschat/providers";
 import { type Agent, getAgent } from "./agents";
 import { caches } from "./cache";
-import { decryptCredential } from "./credentials";
+import { decryptCredential, usableCredentialRow } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
@@ -491,17 +491,27 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   return {
     /**
      * Whether the agent's model brain can be called at all: its model is in
-     * the catalog, its provider is registered and a key resolves (its own,
-     * the org's default, or the platform's). Used by the computer brains'
-     * fallback (ADR 0032 §5 "Fallback, by what exists"); no call is made.
+     * the catalog, its provider is registered and a key would resolve (its own,
+     * the org's default, or the platform's), in `resolveKey`'s order. Used by the
+     * computer brains' fallback (ADR 0032 §5 "Fallback, by what exists") and the
+     * AI status (`ai-status.ts`). No call is made and no key is decrypted: a page
+     * load must not unwrap every key (a network call per key with a KMS wrapper).
      */
     async hasModelCredential(agent: Pick<Agent, "orgId" | "model" | "credentialId">): Promise<boolean> {
       const info = MODEL_CATALOG[agent.model];
       if (!info || !deps.providers[info.provider]) return false;
-      return resolveKey(agent.orgId, info.provider, agent.credentialId).then(
-        () => true,
-        () => false,
-      );
+      const usable = async (id: string) => (await usableCredentialRow(db, agent.orgId, id))?.provider === info.provider;
+      try {
+        if (agent.credentialId) return await usable(agent.credentialId);
+        const defaultId = await orgDefaultCredentialId(agent.orgId, info.provider);
+        if (defaultId && (await usable(defaultId))) return true;
+        const platform = deps.platformCredentials;
+        return platform.available
+          ? await platform.available(agent.orgId, info.provider)
+          : (await platform.resolve(agent.orgId, info.provider)) !== null;
+      } catch {
+        return false;
+      }
     },
 
     /** An agent's model call (runs). Streams deltas through `onDelta`. */

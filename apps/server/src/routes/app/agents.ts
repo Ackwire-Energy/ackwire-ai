@@ -19,7 +19,9 @@ import {
   listCredentials,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
+  orgAiStatus,
   publishMachineAgentsChanged,
+  requirePermission,
   revokeCredential,
   setAgentAppearance,
   setAgentAudience,
@@ -31,6 +33,7 @@ import { MODEL_CATALOG, nanoUsdToUsd, usdToNanoUsd } from "@agenteschat/provider
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
+  aiStatusDeps,
   body,
   createAppRouter,
   errors,
@@ -258,6 +261,39 @@ export function agentRoutes(deps: AppDeps) {
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
       return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id))) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/ai-status",
+      tags,
+      security,
+      summary: "Whether each agent has an AI to think with, and whether the organization has any",
+      description:
+        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. Computed on each request; no key is read.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            any: z.boolean(),
+            agents: z.array(
+              z.object({
+                agentId: z.uuid(),
+                state: z.enum(["ready", "no_ai", "waiting"]),
+                reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "read");
+      return c.json(await orgAiStatus(aiStatusDeps(deps), orgId), 200);
     },
   );
 

@@ -158,6 +158,17 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "plan_limit",
 ]);
 
+/**
+ * Unavailable codes that mean the computer brain has nothing to think with (no computer, its command-line
+ * tool missing or signed out), not "later": nothing signals a sign-in, so a wait for them would never end.
+ */
+export const NO_AI_CODES: ReadonlySet<string> = new Set([
+  "no_computer",
+  "cli_missing",
+  "not_logged_in",
+  "codex_missing",
+]);
+
 /** What the engine runs a turn with. */
 export interface BrainPlan {
   kind: BrainKind;
@@ -196,7 +207,7 @@ export function brainModelFor(
  * not to a mission that thinks with another brain, nor on the mission's
  * computer when it is another one. A removed account is no account.
  */
-async function brainAccountFor(
+export async function brainAccountFor(
   db: Executor,
   agent: Pick<Agent, "orgId" | "brain" | "brainAccountId" | "machineId">,
   kind: BrainKind,

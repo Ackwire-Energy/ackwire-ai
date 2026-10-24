@@ -43,7 +43,7 @@ export function runErrorDetail(error: string | null | undefined): {
   errorParams?: Record<string, string>;
 } | null {
   if (!error) return null;
-  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived"];
+  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived", "no_ai"];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error.startsWith("provider_error:")) {
     return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };
