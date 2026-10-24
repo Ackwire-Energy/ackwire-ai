@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   ACCESS_LIMITS,
+  isAccountId,
   type MachineAgent,
   type RunnerAccess,
   type RunnerFolderGrant,
@@ -395,7 +396,8 @@ export class AccessRequests {
 
 // ── Agents (from the server's `agents` frame) ───────────────────────────────
 
-export const AGENTS_FILE = "agents.json";
+/** Not `agents.json`: in a system home that file lists the agents' own OS users (`agent-users.ts`). */
+export const AGENTS_FILE = "machine-agents.json";
 
 /** The last `agents` frame, kept so the CLI can resolve `--agent <handle>` and the app shows them offline. */
 export function readAgents(home: string): MachineAgent[] {
@@ -438,6 +440,7 @@ export function parseAgents(v: unknown): MachineAgent[] {
       handle: str(o.handle, 64),
       name: str(o.name, 100) || str(o.handle, 64),
       ...(lookOut && Object.keys(lookOut).length ? { look: lookOut } : {}),
+      ...(isAccountId(o.account) ? { account: o.account } : {}),
     });
   }
   return out;

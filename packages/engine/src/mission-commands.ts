@@ -88,7 +88,12 @@ function scopeOf(value: unknown): CommandScope | null {
   const abs = (p: unknown): p is string => typeof p === "string" && p.startsWith("/") && p.length < 1000;
   if (!abs(v.cwd)) return null;
   const folders = Array.isArray(v.folders) ? v.folders.filter(abs).slice(0, 4) : [];
-  return { cwd: v.cwd, folders: folders.length ? folders : [v.cwd], ...(abs(v.home) ? { home: v.home } : {}) };
+  return {
+    cwd: v.cwd,
+    folders: folders.length ? folders : [v.cwd],
+    ...(abs(v.home) ? { home: v.home } : {}),
+    ...(abs(v.runnerHome) ? { runnerHome: v.runnerHome } : {}),
+  };
 }
 const NO_SCOPE: CommandScope = { cwd: "/nonexistent", folders: [] };
 

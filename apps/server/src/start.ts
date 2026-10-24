@@ -35,19 +35,22 @@ import {
   MigrationMismatchError,
 } from "@agenteschat/db";
 import {
+  adoptRestoredOperatorEvents,
   createLocalKeyWrapper,
   drainLocalRuns,
   enableCaches,
+  enableOperatorEvents,
   isBlockedAddress,
   resolveHostDns,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
-import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
+import { createModelProviders } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { createLogger, type Logger } from "./logger";
+import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
 import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
@@ -122,15 +125,24 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
   const base = { config, db: database.db, edition, version };
-  const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
-    anthropic: createAnthropicProvider(),
-    openai: createOpenAIProvider(),
-  });
+  const { adapters, modelProviders, overridden } = await resolveAdapters(
+    modules,
+    base,
+    defaults,
+    createModelProviders(),
+  );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   const ctx: ModuleContext = { ...base, adapters };
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
+  // The operator API's events feed records only while that API is on (ADR 0056).
+  if (config.OPERATOR_API_TOKEN) {
+    enableOperatorEvents();
+    // Before the API serves a page: a caller restarting after a restore must find these rows first.
+    const adopted = await adoptRestoredOperatorEvents(database.db);
+    if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
+  }
   const engine = buildEngine({
     db: database.db,
     config,
@@ -204,6 +216,17 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
+  const operator = serveOperatorApi({
+    db: database.db,
+    config,
+    version,
+    log,
+    pubsub: adapters.pubsub,
+    hub: engine.machineHub,
+  });
+  if (operator) {
+    log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
+  }
 
   for (const module of modules) await module.onStart?.(ctx);
 
@@ -216,6 +239,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
     void server.stop();
+    void operator?.stop();
     // Runners reconnect to the next instance, and people's desktops and terminals open again there.
     await engine.machineHub.stop();
     engine.streams.stop();

@@ -25,8 +25,8 @@ export type AgentDesktopUseStatus =
     };
 
 /**
- * Whether the agent may use its desktop on its own computer (ADR 0057 §3): a
- * connected machine on protocol 19 or later, its desktop and commands
+ * Whether the agent may use its desktop on its own computer (ADR 0060 §3): a
+ * connected machine on protocol 21 or later, its desktop and commands
  * switches on (driving a desktop runs commands) and its runner able to serve
  * it (`hello.desktopUse`: Linux, the agents' desktops, each agent its own OS
  * user, the packages). Offline machines still count: the call says it's

@@ -6,7 +6,7 @@ import type { ScreenKind } from "@agenteschat/adapters";
  * [ref=e3]`, as `agent-browser`'s snapshot writes it), and what changed
  * between two looks. Surface-agnostic: the browser fills it from its
  * snapshot; a desktop surface fills it from the OS accessibility tree
- * (ADR 0057), and everything built on it (targets in words, checks, plans)
+ * (ADR 0060), and everything built on it (targets in words, checks, plans)
  * works the same.
  */
 

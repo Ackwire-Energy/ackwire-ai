@@ -27,6 +27,7 @@ import {
   renderPush,
   requireComputerDriver,
   type StreamBroker,
+  setOrgStanding,
   startDesktop,
   startTakeover,
   stopDesktop,
@@ -235,6 +236,53 @@ describe("one person in control of the desktop", () => {
       controllerUserId: bia.id,
     });
     await expect(requireComputerDriver(f.db, caio.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("system mode, the agent on its owner's plan: its user holds that sign-in, so only the owner drives it", async () => {
+    const { machine, open, systemMode } = await start();
+    await systemMode();
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const accountId = crypto.randomUUID();
+    await f.db.insert(schema.machineAccounts).values({
+      id: accountId,
+      orgId: f.org.id,
+      machineId: machine.machineId,
+      kind: "claude_code",
+      label: "Claude Max",
+      status: "active",
+      createdBy: f.owner.id,
+    });
+    const onPlan = (plan: boolean) =>
+      f.db
+        .update(schema.agents)
+        .set(plan ? { brain: "claude_code", brainAccountId: accountId } : { brain: "model", brainAccountId: null })
+        .where(eq(schema.agents.id, f.agent.id));
+    await onPlan(true);
+    await expect(requireComputerDriver(f.db, bia.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(startTakeover(deps(), bia.id, f.org.id, f.agent.id, null, "desktop")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    expect((await open(bia.id, TERMINAL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    expect((await open(f.owner.id, TERMINAL)).closed).toBeNull();
+    // Watching shows no shell: the admin still watches.
+    expect((await open(bia.id, WATCH)).closed).toBeNull();
+    // Back on the API, no sign-in is lent to its user: admins drive it again.
+    await onPlan(false);
+    expect((await requireComputerDriver(f.db, bia.id, f.org.id, f.agent.id)).id).toBe(machine.machineId);
+  });
+
+  test("a suspended workspace: its views and terminals close at the next check and none opens; on hold they don't", async () => {
+    const { open } = await start({ recheckMs: 30 });
+    const watching = await open(f.owner.id, WATCH);
+    const shell = await open(f.owner.id, TERMINAL);
+    expect([watching.closed, shell.closed]).toEqual([null, null]);
+    await setOrgStanding(deps(), f.org.id, { state: "suspended", reason: null, notice: "silent" });
+    await until(() => watching.closed !== null && shell.closed !== null, "the recheck");
+    expect([watching.closed?.code, shell.closed?.code]).toEqual([STREAM_CLOSE.forbidden, STREAM_CLOSE.forbidden]);
+    expect((await open(f.owner.id, WATCH)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    // On hold only the agents stop: people still watch what runs.
+    await setOrgStanding(deps(), f.org.id, { state: "hold", reason: null, notice: "silent" });
+    expect((await open(f.owner.id, WATCH)).closed).toBeNull();
   });
 
   test("access is checked again while a stream is open; the controller's stream keeps their control alive", async () => {

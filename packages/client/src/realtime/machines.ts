@@ -90,6 +90,7 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined || accounts) {
     void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
     void qc.invalidateQueries({ predicate: (q) => isAgentBrainKey(q.queryKey, orgId) });
+    void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
   }
   switch (e.type) {
     case "machine.status": {

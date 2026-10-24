@@ -65,6 +65,7 @@ import {
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  standingJudge,
   streamClosed,
   type ToolSource,
   withJudgeFallback,
@@ -161,6 +162,8 @@ export function buildEngine(o: EngineOptions) {
         )
       : llmJudge;
   }
+  // Nothing is judged for a workspace on hold or suspended: Jev bills the server, not the workspace.
+  context.judge = standingJudge(db, context.judge);
   // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
   const talker = createTalker({
     db,
@@ -273,7 +276,7 @@ export function buildEngine(o: EngineOptions) {
         judge: context.judge,
         vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
       }),
-      // The agent's own desktop (ADR 0057): `desktop:use` with Run code, when its computer serves desktop use.
+      // The agent's own desktop (ADR 0060): `desktop:use` with Run code, when its computer serves desktop use.
       createDesktopToolSource({
         machines: { hub: machineHub },
         pubsub: adapters.pubsub,
@@ -297,7 +300,7 @@ export function buildEngine(o: EngineOptions) {
   // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
   const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
   machineHub.setBrowserHooks(browserLive.hubHooks);
-  // Agents' desktops and terminals (ADR 0056): each person's stream paired with the runner's data socket for it,
+  // Agents' desktops and terminals (ADR 0058): each person's stream paired with the runner's data socket for it,
   // its access checked again while open; control changing hands closes the views it hides.
   const streams = createStreamBroker({
     db,

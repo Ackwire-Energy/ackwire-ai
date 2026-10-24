@@ -119,7 +119,7 @@ export async function fakeXvnc(dir: string) {
     };
     socket.on("error", () => undefined);
     socket.write("RFB 003.008\n");
-    socket.on("data", (chunk) => {
+    socket.on("data", (chunk: Buffer) => {
       buf = Buffer.concat([buf, chunk]);
       for (;;) {
         if (step === "version") {

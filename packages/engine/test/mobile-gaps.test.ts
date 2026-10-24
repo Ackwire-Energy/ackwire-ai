@@ -50,8 +50,15 @@ const general = async (userId: string) => {
 async function withBia() {
   const bia = await addMember(f.db, f.org.id, "member", "bia");
   await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await nextMillisecond();
   return bia;
 }
+
+/**
+ * PGlite's clock counts whole milliseconds, so a message posted in the same millisecond as a join or a
+ * read ties with it and isn't unread; waiting for the next one keeps what a test posts next after it.
+ */
+const nextMillisecond = () => Bun.sleep(2);
 
 const threadReplies = async (userId: string) =>
   f.db
@@ -71,6 +78,7 @@ describe("channel list: unread and last message", () => {
     expect(before.unreadCount).toBe(2);
     expect(before.lastMessage).toMatchObject({ authorType: "person", authorId: bia.id, authorName: "bia" });
     await markChannelRead(f.db, bia.id, f.org.id, f.general.id);
+    await nextMillisecond();
     expect((await general(bia.id)).unreadCount).toBe(0);
     const last = await post(f.owner.id, f.general.id, `**Deploy** ${"y".repeat(300)}`);
     const after = await general(bia.id);
@@ -101,6 +109,7 @@ describe("channel list: unread and last message", () => {
     const root = await post(f.owner.id, f.general.id, "Release checklist");
     const mine = await post(bia.id, f.general.id, "My question");
     await markChannelRead(f.db, bia.id, f.org.id, f.general.id);
+    await nextMillisecond();
 
     await post(f.owner.id, f.general.id, "reply in ana's thread", root.id);
     expect((await general(bia.id)).unreadCount).toBe(0);

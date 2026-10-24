@@ -116,6 +116,21 @@ test("a box for another request, secret or target doesn't open; nothing is store
   expect(await errorCode(() => sent.deliver())).toBe("not_found");
 });
 
+test("names that steer an AI CLI's sign-in or requests are never kept nor put in the env", async () => {
+  const { call, give } = setup();
+  const names = ["ANTHROPIC_BASE_URL", "CLAUDE_CONFIG_DIR", "HTTPS_PROXY", "NODE_OPTIONS", "OPENCODE_API_KEY"];
+  for (const [i, name] of names.entries()) {
+    const sent = await give(dev, `req-001${i}-rrrr`, name, { kind: "env" });
+    expect(await errorCode(() => sent.deliver())).toBe("bad_request");
+  }
+  const ok = await give(dev, "req-0019-rrrr", "GITHUB_TOKEN", { kind: "env" });
+  expect(await ok.deliver()).toEqual({ size: VALUE.length });
+  const env = (await call({ agent: dev, ...exec('test -n "$GITHUB_TOKEN" && echo "[$HTTPS_PROXY]"') })) as {
+    stdout: string;
+  };
+  expect(env.stdout.trim()).toBe("[]");
+});
+
 test("the log line names the action, never the value", () => {
   const line = describeRequest({
     agent: dev,

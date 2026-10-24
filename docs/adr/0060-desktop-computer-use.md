@@ -1,16 +1,16 @@
-# 0057. Desktop computer use: the screen layer on the agent's desktop
+# 0060. Desktop computer use: the screen layer on the agent's desktop
 
 - Status: Proposed
 - Date: 2026-10-24
-- Builds on: ADR 0054 (the screen layer: plans, targets in words, checks), ADR 0056 (a desktop per agent, the `desktop` handoff, the switches, `desktop:use` only with `sandbox:run`), ADR 0027 (secrets and redaction), ADR 0040 (the agent browser)
+- Builds on: ADR 0054 (the screen layer: plans, targets in words, checks), ADR 0058 (a desktop per agent, the `desktop` handoff, the switches, `desktop:use` only with `sandbox:run`), ADR 0027 (secrets and redaction), ADR 0040 (the agent browser)
 - Supersedes, for the agent's desktop on a connected Linux computer: ADR 0031 §1 (one `computer_*` tool family under `computer:use`), §1a (`agents.screen`) and §6 (the virtual desktop's tools). None of them was built.
 - Changes ADR 0054 for the browser too (§5, §8): a box taller than half the screenshot or wider than 80% of it is refused; words that can't be undone are never taken at a bare point; more words count as costly; an unsure check is judged once more with an image when the judge sees images
 - Code: `packages/engine/src/screen/*` (desktop verbs, `ScreenSurface.kind`, `capture(region)` and `regions`, the close-up, `dismiss: false`); then the desktop surface and tools, and the runner's `desktop.ts`, `desktop-tree.ts` and `desktop-helper.py`
-- Protocol: 19 (`DESKTOP_USE_PROTOCOL`), the next after ADR 0056's 18
+- Protocol: 21 (`DESKTOP_USE_PROTOCOL`), after ADR 0058's 18 and ADR 0059's 19 and 20
 
 ## Context
 
-Agents need to work in apps that have no API or MCP: sign in, click and type in a native app, an OS or file dialog, a program with no web version. ADR 0056 gives each agent a desktop that people watch and control. ADR 0054 built a screen layer (look → find → act → check) over a `ScreenSurface`, with the browser as its first surface and the desktop left for later.
+Agents need to work in apps that have no API or MCP: sign in, click and type in a native app, an OS or file dialog, a program with no web version. ADR 0058 gives each agent a desktop that people watch and control. ADR 0054 built a screen layer (look → find → act → check) over a `ScreenSurface`, with the browser as its first surface and the desktop left for later.
 
 Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and it reaches any site, outside the browser's site allowlist. The reverse holds too: code the agent runs has the display's cookie and can drive the screen. So desktop use is gated like running commands, not like the browser.
 
@@ -52,7 +52,7 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 
 ### 2. Tools and verbs
 
-- `desktop_do` (a plan of up to 15 steps), `desktop_read` (a look, or `find`), `desktop_screenshot` (a JPEG saved in the agent's folder through `desktop.capture` and the existing `write`, for brains that read images themselves), and ADR 0056's `desktop_ask_person`.
+- `desktop_do` (a plan of up to 15 steps), `desktop_read` (a look, or `find`), `desktop_screenshot` (a JPEG saved in the agent's folder through `desktop.capture` and the existing `write`, for brains that read images themselves), and ADR 0058's `desktop_ask_person`.
 - The browser's verbs, plus:
   - `focus`: a window. Only window lines and the panel's window buttons are offered, never another element in their place.
   - `double_click` and `right_click`.
@@ -63,7 +63,7 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 
 ### 3. Desktop use is running commands
 
-- Its tools use ADR 0056's `desktop:use` and are offered, and allowed on each call, only with `sandbox:run`, the org's sandbox setting on, and the machine's `commands` and `desktop` switches on. No new scope and no migration. Routines follow ADR 0056 §8.
+- Its tools use ADR 0058's `desktop:use` and are offered, and allowed on each call, only with `sandbox:run`, the org's sandbox setting on, and the machine's `commands` and `desktop` switches on. No new scope and no migration. Routines follow ADR 0058 §8.
 - `hello.desktopUse` is available only when the agent runs as its own OS user (system mode), different from the runner's and from every other agent's. A desktop as the runner's user would put a terminal in reach of every agent's delivered secrets and the machine's token, on a machine that self-hosters share across workspaces. The helper runs as the process that serves the agent (its worker, as that user), and the runner checks the rule on every request too; a runner where every agent works as the runner's own user reports it unavailable, with the reason.
 - The runner also needs the machine's `desktop` and `commands` switches on for every desktop use request.
 - Mac and Windows runners have none: the reason says it needs a Linux machine with the agents' desktops.
@@ -101,7 +101,7 @@ The browser closes a covering banner once (ADR 0054 §5). On a desktop what cove
 - A desktop that just started has nothing to act on until its session is up: its first look waits for the panel's elements (seconds, at most 20 s after the start).
 - Input goes through xdotool; windows are focused by their id, not by pixels, and closed with their keys (the title bar's × is only on the image). A panel's button stands for a window only when no other window has its title.
 - Text: a field with `EditableText` is set with `SetTextContents` and read back. Other text goes as keys, at least 12 ms apart, when it is ASCII, and through the clipboard when it isn't. A read-back that doesn't match fails the step ("the text didn't come out as written"). The helper runs with `LC_ALL=C.UTF-8`. At most 4,000 characters a step.
-- Targets that would end the session (Log Out, Shut Down, Restart, Suspend, Lock, Switch User, and their pt-BR names) are refused inside the session's and the panel's own apps, with `bad_request` (`not_allowed` stays for a switch that is off). This is a convenience: the real guard is the session's own config (no logout actions or shortcuts) and ADR 0056's supervisor.
+- Targets that would end the session (Log Out, Shut Down, Restart, Suspend, Lock, Switch User, and their pt-BR names) are refused inside the session's and the panel's own apps, with `bad_request` (`not_allowed` stays for a switch that is off). This is a convenience: the real guard is the session's own config (no logout actions or shortcuts) and ADR 0058's supervisor.
 
 ### 8. Checks
 
@@ -132,13 +132,13 @@ DesktopAction:
 DESKTOP_LIMITS: text 4,000 characters, key 64, path 1,024, pause 10 s
 ```
 
-Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` and `stale ref: e12 moved since the last look` (the target is found again once), `covered by window e14` (§6), `the text didn't come out as written`, a refused session ending as `bad_request`, and `desktop_unavailable` when the session or the helper is gone (ADR 0056's supervisor starts the session again, the runner the helper).
+Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` and `stale ref: e12 moved since the last look` (the target is found again once), `covered by window e14` (§6), `the text didn't come out as written`, a refused session ending as `bad_request`, and `desktop_unavailable` when the session or the helper is gone (ADR 0058's supervisor starts the session again, the runner the helper).
 
 ### 11. Safety and its limits
 
 - Screen text reaches the model only inside the untrusted block; reports name elements by role and number.
 - The judge only points. Costly picks need 0.85, nothing on the screen grants anything, and approvals are the agent's to ask for, as before.
-- X11 doesn't isolate programs on one display, and `ptrace` is open within one user: code the agent runs can read its desktop's screen and keys and the helper's memory. Typing a delivered secret into a native app is therefore not offered; logins go through ADR 0056's take control, and the session stays in the agent's home.
+- X11 doesn't isolate programs on one display, and `ptrace` is open within one user: code the agent runs can read its desktop's screen and keys and the helper's memory. Typing a delivered secret into a native app is therefore not offered; logins go through ADR 0058's take control, and the session stays in the agent's home.
 - Every Jev call is recorded with `org_id` and `agent_id`.
 - Each step goes on the message the run posts next (`meta.desktop.steps`, as the browser's `meta.browser`): the tool it stands for (`desktop_click`, `desktop_open`…), the app an `open` started in the agent's words, when, and whether it failed; never what was typed or read. The chat shows it in the browser's card, with the app in place of the site and no link.
 - Each app and file a plan opens is in the org's audit log (`desktop.app_opened` with its desktop entry, `desktop.file_opened` with its path; the agent as actor, the computer as target), for whoever watches what agents run.

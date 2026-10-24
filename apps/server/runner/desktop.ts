@@ -1,4 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import type { EventEmitter } from "node:events";
 import { realpath } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
@@ -49,7 +50,7 @@ import { isAbsoluteRequest, resolveInRoots, resolveInWorkspace } from "./paths";
 import { KeyedQueue } from "./queue";
 
 /**
- * Desktop use (ADR 0057): the agent drives its own desktop (ADR 0056)
+ * Desktop use (ADR 0060): the agent drives its own desktop (ADR 0058)
  * through a helper (`desktop-helper.py`), one per agent, started on its first
  * use and stopped after `DESKTOP_IDLE_MS` without one.
  *
@@ -231,14 +232,14 @@ export function xKey(input: string): string | null {
   return [...MODIFIER_ORDER.filter((m) => mods.has(m)), name].join("+");
 }
 
-/** System mode: the uid each agent works as, and the runner's own (ADR 0056 §10). */
+/** System mode: the uid each agent works as, and the runner's own (ADR 0058 §10). */
 export interface AgentUids {
   runner: number;
   agents: ReadonlyMap<string, number>;
 }
 
 /**
- * Why an agent can't use its desktop here, or null when it can (ADR 0057 §3). The helper runs as `own`, this
+ * Why an agent can't use its desktop here, or null when it can (ADR 0060 §3). The helper runs as `own`, this
  * process's uid, so this process must be the agent's own user: neither the runner's nor any other agent's. A
  * desktop has a terminal, and whoever drives it reads everything its user can; the runner's user holds every
  * agent's delivered secrets and the computer's token. `agentId` null: whether this process could serve any.
@@ -451,12 +452,13 @@ class Helper {
       this.stderr = (this.stderr + d.toString("utf8")).slice(-2000);
     });
     this.child.stdin.on("error", () => undefined);
-    this.child.once("error", (err) => {
+    const events = this.child as unknown as EventEmitter;
+    events.once("error", (err: Error) => {
       this.exited = true;
       const why = `it couldn't start (${err.message})`;
       this.finish(new RunnerError("desktop_unavailable", `The desktop helper ${why}`), why);
     });
-    this.child.once("exit", (code, signal) => {
+    events.once("exit", (code: number | null, signal: NodeJS.Signals | null) => {
       this.exited = true;
       const last = this.stderr.trim().split("\n").pop()?.slice(0, 200) ?? "";
       const why = `it exited (${signal ?? `code ${code}`})${last ? `: ${last}` : ""}`;
@@ -534,7 +536,7 @@ class Helper {
   }
 }
 
-/** Each agent's use of its own desktop (ADR 0057): `desktop.look`, `desktop.act`, `desktop.capture`, `desktop.apps`. */
+/** Each agent's use of its own desktop (ADR 0060): `desktop.look`, `desktop.act`, `desktop.capture`, `desktop.apps`. */
 export class DesktopManager {
   private readonly uses = new Map<string, Use>();
   private readonly queue = new KeyedQueue();

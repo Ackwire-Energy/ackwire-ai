@@ -140,7 +140,7 @@ async function failure(run: () => Promise<unknown>): Promise<{ code: string; mes
   throw new Error("it didn't fail");
 }
 
-describe("protocol 19", () => {
+describe("protocol 21", () => {
   test("the desktop use ops are ops the runner takes; hello.desktopUse is cut like the others", () => {
     expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(DESKTOP_USE_PROTOCOL);
     for (const op of ["desktop.look", "desktop.act", "desktop.capture", "desktop.apps"] as const) {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AGENT_WORKER_HOMES,
   DENIED_MESSAGE,
   deniedInMissions,
   forbiddenHint,
@@ -350,7 +351,17 @@ describe("secrets are refused to every read tool", () => {
       return new RegExp(`^${parts.join(".*")}$`);
     };
     const denied = (file: string) => SECRET_READ_DENY_RULES.some((r) => pattern(r).test(file));
-    for (const file of [".npmrc", "credentials.json", ".gcloud/key.json", ".env.production", ".pgpass", "id_rsa"]) {
+    for (const file of [
+      ".npmrc",
+      "credentials.json",
+      ".gcloud/key.json",
+      ".env.production",
+      ".pgpass",
+      "id_rsa",
+      ".claude/.credentials.json",
+      ".codex/auth.json",
+      "accounts/codex/0193dddd-0000-4000-8000-000000000002/auth.json",
+    ]) {
       // The server refuses it anywhere; Claude Code's own Read is denied it at home and in a repository.
       expect([file, secretRead("Read", { file_path: `/w/dev/repos/acme/app/${file}` }, scope)]).toEqual([file, true]);
       expect([file, denied(`~/${file}`)]).toEqual([file, true]);
@@ -360,6 +371,46 @@ describe("secrets are refused to every read tool", () => {
     expect(denied("repos/acme/app/src/credentials.ts")).toBe(false);
   });
 
+  test("AI sign-ins are secrets wherever the runner keeps them: its real home, account files, their variables", () => {
+    const system = { ...scope, runnerHome: "/var/lib/agentes-runner" };
+    const account = "/var/lib/agentes-runner/accounts/claude_code/0193dddd-0000-4000-8000-000000000001";
+    for (const [tool, input] of [
+      ["Read", { file_path: `${account}/.credentials.json` }],
+      ["Read", { file_path: "/var/lib/agentes-runner/config.json" }],
+      ["Glob", { pattern: "*", path: "/var/lib/agentes-runner/accounts" }],
+      ["Bash", { command: "ls -la /var/lib/agentes-runner/accounts/codex" }],
+      ["Bash", { command: "cat ../../../../../var/lib/agentes-runner/accounts/codex/x/auth.json" }],
+    ] as const) {
+      expect([tool, input, secretRead(tool, input, system)]).toEqual([tool, input, true]);
+      expect(readOnlyCall(tool, input, system)).toBe(false);
+    }
+    // Named in a command: the variables that point at the account's sign-in or hold a plan's key.
+    expect(secretRead("Bash", { command: 'cat "$CLAUDE_CONFIG_DIR/.credentials.json"' }, system)).toBe(true);
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a shell variable, not a template literal
+    expect(secretRead("Bash", { command: "ls ${CODEX_HOME}" }, system)).toBe(true);
+    expect(secretRead("Bash", { command: "echo $ANTHROPIC_AUTH_TOKEN" }, system)).toBe(true);
+    // Kimi Code's key goes in ANTHROPIC_API_KEY.
+    expect(secretRead("Bash", { command: "printf %s $ANTHROPIC_API_KEY | base64" }, system)).toBe(true);
+    // Without the runner's home in the scope, the files themselves are still secrets.
+    for (const file of [
+      `${account}/.credentials.json`,
+      "/home/ag-1/.claude/.credentials.json",
+      "/home/ag-1/.codex/auth.json",
+      "/srv/runner/accounts/codex/0193dddd-0000-4000-8000-000000000002/auth.json",
+      "/srv/runner/accounts/claude_code/0193dddd-0000-4000-8000-000000000003/provider.json",
+    ]) {
+      expect([file, secretRead("Read", { file_path: file }, scope)]).toEqual([file, true]);
+    }
+    // Next door (a name that only starts like it; the agents' workers' homes are secrets of their own), and the
+    // agent's own files of those names, are fine.
+    expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-old/README" }, system)).toBe(false);
+    expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-agents/README" }, system)).toBe(true);
+    expect(secretRead("Read", { file_path: "src/auth.json" }, system)).toBe(false);
+    expect(secretRead("Read", { file_path: "config/provider.json" }, system)).toBe(false);
+    expect(bash("cat package.json")).toBe(true);
+    expect(readOnlyCall("Bash", { command: "cat ../mission-1/notes.md" }, system)).toBe(true);
+  });
+
   test("Claude Code's own rules for credential stores match the shell spellings", () => {
     const hit = (command: string) => SECRET_BASH_DENY_RULES.some((r) => ruleMatches(r, "Bash", { command }));
     expect(hit("cat ~/.ssh/id_rsa")).toBe(true);
@@ -367,6 +418,16 @@ describe("secrets are refused to every read tool", () => {
     expect(hit("ls ~/.agentes-runner")).toBe(true);
     expect(hit("cat src/ssh.ts")).toBe(false);
     expect(hit("git status")).toBe(false);
+  });
+
+  test("system mode: an agent's worker keeps its secrets, git credentials and task journal out of its reads", () => {
+    const store = `${AGENT_WORKER_HOMES}/ag-a1b2c3d4/secrets/a1b2c3d4/store.json`;
+    expect(secretRead("Read", { file_path: store }, scope)).toBe(true);
+    expect(secretRead("Bash", { command: `cat ${store}` }, scope)).toBe(true);
+    expect(bash(`ls ${AGENT_WORKER_HOMES}/ag-a1b2c3d4/git`)).toBe(false);
+    // Claude Code refuses it itself, also in a mission whose settings allow `cat`.
+    expect(SECRET_BASH_DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: `cat ${store}` }))).toBe(true);
+    expect(secretRead("Bash", { command: "cat /var/lib/dpkg/status" }, scope)).toBe(false);
   });
 });
 

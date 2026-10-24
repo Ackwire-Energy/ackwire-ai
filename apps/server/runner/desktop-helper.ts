@@ -1,7 +1,7 @@
 import HELPER_SOURCE from "./desktop-helper.py" with { type: "text" };
 
 /**
- * The desktop helper (ADR 0057 §9): `desktop-helper.py`, one per agent
+ * The desktop helper (ADR 0060 §9): `desktop-helper.py`, one per agent
  * desktop, run as the agent's OS user. It reads the desktop's accessibility
  * tree (AT-SPI), sends input (xdotool) and takes screenshots (scrot), and
  * speaks JSON lines: one request per line on its stdin, one reply per line on

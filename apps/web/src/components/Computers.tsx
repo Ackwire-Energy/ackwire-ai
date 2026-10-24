@@ -1,6 +1,6 @@
 import { useAgents, useMachines, useSandboxSettings } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, ComputerPortrait, Icon, Popover } from "@agenteschat/ui";
+import { Button, ComputerPortrait, Icon, Popover, ProviderLogo } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentComputersCard, CloudComputerCard } from "@/components/AgentComputer";
@@ -104,7 +104,8 @@ function ComputerKinds() {
         <ul className="computers-kind__points">
           {POINTS.map((p) => (
             <li key={p}>
-              <Icon name="check" size={14} />
+              {/* The point that names Claude Code carries its mark. */}
+              {p === "point3" ? <ProviderLogo id="claude_code" size="xs" /> : <Icon name="check" size={14} />}
               {t(`computers.kinds.mine.${p}`)}
             </li>
           ))}

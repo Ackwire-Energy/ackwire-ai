@@ -7,7 +7,7 @@ import { allowedOrigins } from "../routes/app/context";
 import { personUpgrade, UUID } from "./ws";
 
 /**
- * Agents' desktops and terminals (ADR 0056 §11), relayed by the engine's
+ * Agents' desktops and terminals (ADR 0058 §11), relayed by the engine's
  * stream broker:
  *
  * - `GET /api/desktop?orgId&agentId&mode=watch|control` (raw RFB, binary) and

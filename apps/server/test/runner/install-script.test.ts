@@ -1,7 +1,13 @@
-import { expect, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { installScript, shQuote } from "../../runner/install-script";
 import { launchdPlist, systemdUnit, windowsTaskCommand } from "../../runner/service";
+import { removeDirs, tempDir } from "./helpers";
+
+const dirs: string[] = [];
+afterEach(() => removeDirs(dirs));
 
 test("shQuote survives single quotes", () => {
   expect(shQuote("plain")).toBe("'plain'");
@@ -28,6 +34,37 @@ test("the install script quotes the server URL and is valid sh", () => {
     expect(check.stderr).toBe("");
     expect(check.status).toBe(0);
   }
+});
+
+test.skipIf(process.platform === "win32")("--enroll-file reaches pair, also in a home already connected", () => {
+  const dir = tempDir("install-");
+  dirs.push(dir);
+  const site = path.join(dir, "site");
+  const calls = path.join(dir, "calls");
+  mkdirSync(path.join(site, "runner"), { recursive: true });
+  // Stands in for the runner: notes the arguments of each run.
+  writeFileSync(
+    path.join(site, "runner", "agentes-runner.mjs"),
+    `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(calls)}, process.argv.slice(2).join(" ") + "\\n");\n`,
+  );
+  const home = path.join(dir, "home");
+  mkdirSync(home);
+  writeFileSync(path.join(home, "config.json"), '{ "token": "agm_x" }\n');
+  const install = (...args: string[]) =>
+    spawnSync("sh", ["-s", "--", ...args, "--no-service"], {
+      input: installScript(`file://${site}`),
+      env: { ...process.env, AGENTES_RUNNER_HOME: home },
+      encoding: "utf8",
+    });
+
+  expect(install().status).toBe(0);
+  expect(existsSync(calls)).toBe(false);
+  const run = install("--enroll-file", "/run/agentes/enroll-code", "--dir", "/srv/work");
+  expect(run.stderr).toBe("");
+  expect(run.status).toBe(0);
+  expect(readFileSync(calls, "utf8")).toBe(
+    `pair --server file://${site} --enroll-file /run/agentes/enroll-code --dir /srv/work\n`,
+  );
 });
 
 test("service files: systemd unit, launchd plist and the Windows task command", () => {

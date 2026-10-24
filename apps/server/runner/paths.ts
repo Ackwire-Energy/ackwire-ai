@@ -158,13 +158,19 @@ export function resolveForAgent(workspaceReal: string, grants: string[] | undefi
   return resolveInWorkspace(workspaceReal, input);
 }
 
-/** `<handle>-<first 8 of id>`: readable, and the id part survives a rename. */
-export function agentFolderName(agent: AgentScope): { name: string; suffix: string } {
-  const id = String(agent.id ?? "")
+/** The first 8 letters and digits of an agent's id, lower case: what names on the machine keep across renames. */
+export function agentId8(id: unknown): string {
+  const id8 = String(id ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
     .slice(0, 8);
-  if (id.length < 8) throw new RunnerError("bad_request", "The agent id is not valid");
+  if (id8.length < 8) throw new RunnerError("bad_request", "The agent id is not valid");
+  return id8;
+}
+
+/** `<handle>-<first 8 of id>`: readable, and the id part survives a rename. */
+export function agentFolderName(agent: AgentScope): { name: string; suffix: string } {
+  const id = agentId8(agent.id);
   const handle = String(agent.handle ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, "-")

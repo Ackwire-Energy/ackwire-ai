@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, writeSync } from "node:fs";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
+import { systemLauncher } from "../../runner/agent-users";
 import {
   DESKTOP_IDLE_MS,
   DesktopSessions,
@@ -11,6 +12,7 @@ import {
   type DesktopUser,
   defaultMaxDesktops,
   runnerUser,
+  systemDesktopUser,
   vncPasswordFile,
 } from "../../runner/desktop-session";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
@@ -324,6 +326,19 @@ test("system mode: every process as the agent, and the password file root's (rea
 
   expect(await t.desktops.stop(dev)).toEqual({ stopped: true });
   expect(existsSync(passwd)).toBe(false);
+});
+
+test("system mode's desktop user: the agent's launcher and home; the cookie and the socket in ~/.agentes/desktop", () => {
+  const launcher = systemLauncher({ id: dev.id, user: "ag-01a142cb", uid: 21001 }, true);
+  expect(systemDesktopUser(launcher, { uid: 21001, gid: 21004 })).toEqual({
+    prefix: launcher.prefix,
+    env: launcher.env,
+    home: "/home/ag-01a142cb",
+    dir: "/home/ag-01a142cb/.agentes/desktop",
+    ids: { uid: 21001, gid: 21004 },
+  });
+  expect(launcher.prefix.at(-2)).toBe("ag-01a142cb");
+  expect(launcher.env.HOME).toBe("/home/ag-01a142cb");
 });
 
 test("slots: an agent keeps its display; one held by another process is skipped, a stale lock is cleared", async () => {

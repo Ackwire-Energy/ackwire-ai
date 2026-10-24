@@ -17,7 +17,7 @@ export interface DataListener {
 }
 
 /**
- * One stream's data socket (ADR 0056 §11) once the server answered
+ * One stream's data socket (ADR 0058 §11) once the server answered
  * `stream.ready`: binary frames are the stream's bytes, text frames its
  * control frames.
  */

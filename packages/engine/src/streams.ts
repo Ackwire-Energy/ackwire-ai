@@ -89,7 +89,7 @@ interface OpenStream extends Stream {
 }
 
 /**
- * Desktop and terminal streams on this server (ADR 0056 §2): a person's viewer
+ * Desktop and terminal streams on this server (ADR 0058 §2): a person's viewer
  * socket paired with the one data socket the runner dials for it, bytes
  * relayed as they come, never parsed or kept. `open` asks `authorize` (who,
  * which computer), checks the caps, then sends `stream.open` with a fresh

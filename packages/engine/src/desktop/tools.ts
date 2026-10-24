@@ -230,7 +230,7 @@ async function auditOpened(ctx: ToolContext, machineId: string, opened: DesktopA
 }
 
 /**
- * The agent's own desktop as tools (ADR 0057): `desktop_do` (plans on the
+ * The agent's own desktop as tools (ADR 0060): `desktop_do` (plans on the
  * screen layer, ADR 0054), `desktop_read` and `desktop_screenshot`, under
  * `desktop:use`; `desktop_ask_person` is the handoff's own source. Driving a
  * desktop runs commands as the agent, on any site, so the tools are offered,

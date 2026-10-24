@@ -1626,10 +1626,6 @@ a.mi-pr:hover {
   height: 16px;
   flex: none;
 }
-.mi-exec__icon {
-  flex: none;
-  color: var(--ink2);
-}
 
 /* A mission's card in place of its thread's start marker (threads proposed before the link card). */
 .mi-linkrow {

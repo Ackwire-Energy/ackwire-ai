@@ -1,14 +1,17 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
+import type { MachineHub } from "./machine-hub";
+import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
 import { can, getMembership } from "./organizations";
 import { closeRoutineRun } from "./routine-ledger";
-import { releaseInbox } from "./run-inbox";
+import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
+import { standingErrorDetail } from "./standing";
 
 const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels } = schema;
 
@@ -258,10 +261,10 @@ export async function stopRun(
         );
       await recordAudit(tx, {
         orgId,
-        actor: actor.type === "person" ? actor : { type: "system", id: "consultations" },
+        actor: actor.type === "person" ? actor : { type: "system", id: null },
         action: "run.canceled",
         target: { type: "agent_run", id: run.id },
-        details: { agentId: run.agentId, from: status },
+        details: { agentId: run.agentId, from: status, ...(actor.type === "system" ? { reason: actor.reason } : {}) },
       });
       return moved;
     });
@@ -315,11 +318,43 @@ export async function stopRun(
     if (channelKind === "forum") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, orgId, run.channelId, run.id).catch(() => {});
     }
-    // Nobody executes it: what was sent to it and not read gets a run of its own now.
-    await releaseInbox(db, deps.pubsub, run, {
-      reason: "canceled",
-      ...(options.stopMessageId ? { exclude: [options.stopMessageId] } : {}),
-    }).catch(() => null);
+    // Nobody executes it: what was sent to it and not read gets a run of its own now, unless its workspace
+    // stopped it (that run would only fail too).
+    if (!standingErrorDetail(error)) {
+      await releaseInbox(db, deps.pubsub, run, {
+        reason: "canceled",
+        ...(options.stopMessageId ? { exclude: [options.stopMessageId] } : {}),
+      }).catch(() => null);
+    }
   }
   return { id: run.id, status: run.status, previousStatus: previous };
+}
+
+/**
+ * Ends what a suspended workspace's agents still have going: every run not finished stops with `reason`
+ * (its `standingText`) and hands nothing on, and its computers stop its tasks.
+ */
+export async function stopOrgWork(
+  deps: { db: Database; pubsub?: PubSub; hub?: Pick<MachineHub, "call"> },
+  orgId: string,
+  reason: string,
+) {
+  const live = await deps.db
+    .select({ run: agentRuns, channelKind: channels.kind })
+    .from(agentRuns)
+    .leftJoin(channels, eq(channels.id, agentRuns.channelId))
+    .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES])));
+  for (const { run, channelKind } of live) {
+    await stopRun(deps, orgId, run, channelKind, { type: "system", reason }).catch(() => null);
+    // A routine's run: its ledger says why (`stopRun` closes it only for a person).
+    if (run.background) {
+      await closeRoutineRun(deps, run, { status: "canceled", code: "org_suspended" }).catch(() => null);
+    }
+  }
+  const { hub } = deps;
+  // A computer that doesn't answer soon can't hold up the caller: its tasks end here instead.
+  const call: TaskCall | undefined = hub
+    ? (machineId, request) => hub.call(machineId, request, { timeoutMs: 15_000 })
+    : undefined;
+  await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system");
 }

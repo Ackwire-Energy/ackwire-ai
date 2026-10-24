@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 19;
+export const MACHINE_PROTOCOL_VERSION = 21;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -150,7 +150,7 @@ export const BRAIN_PROFILES_PROTOCOL = 16;
  */
 export const BROWSER_FAST_PROTOCOL = 17;
 /**
- * From this protocol on (ADR 0056): the agent's desktop and a terminal on its
+ * From this protocol on (ADR 0058): the agent's desktop and a terminal on its
  * computer. `hello.desktop` and `hello.terminal` say whether the runner can
  * serve them; the person turns them on on the machine (`access.tools.desktop`,
  * `access.tools.terminal`). `desktop.session.*` starts, stops and reports an
@@ -160,21 +160,11 @@ export const BROWSER_FAST_PROTOCOL = 17;
  * never sends these to an older runner.
  */
 export const DESKTOP_PROTOCOL = 18;
-/**
- * From this protocol on (ADR 0057): the agent uses its own desktop.
- * `desktop.look` reads what it shows as screen text, `desktop.act` does one
- * action, waits for the screen to settle and looks again, `desktop.capture`
- * returns a JPEG with the look's elements boxed, `desktop.apps` lists the apps
- * it can start. `hello.desktopUse` says whether the runner serves it: only
- * where each agent works as its own OS user. The server never sends these to
- * an older runner.
- */
-export const DESKTOP_USE_PROTOCOL = 19;
 
 /** Every agent desktop's size: viewers scale it, they never resize it. */
 export const DESKTOP_SIZE = { width: 1280, height: 800 } as const;
 
-/** Protocol 19: the largest parts of a `desktop.act`. */
+/** Protocol 21: the largest parts of a `desktop.act`. */
 export const DESKTOP_LIMITS = {
   /** Characters typed or filled in one action. */
   text: 4000,
@@ -185,10 +175,10 @@ export const DESKTOP_LIMITS = {
   pauseMs: 10_000,
 } as const;
 
-/** Protocol 19: where a desktop action lands: an element of the last look, or a point on the screen (pixels). */
+/** Protocol 21: where a desktop action lands: an element of the last look, or a point on the screen (pixels). */
 export type DesktopPoint = { ref: string } | { x: number; y: number };
 
-/** Protocol 19: one action on the agent's desktop. */
+/** Protocol 21: one action on the agent's desktop. */
 export type DesktopAction =
   | { kind: "click" | "double_click" | "right_click" | "hover" | "focus" | "check" | "uncheck"; at: DesktopPoint }
   | { kind: "drag"; from: DesktopPoint; to: DesktopPoint }
@@ -208,7 +198,7 @@ export type DesktopAction =
   | { kind: "open_file"; path: string }
   | { kind: "pause"; ms: number };
 
-/** Protocol 19: a part of the screen, in pixels. */
+/** Protocol 21: a part of the screen, in pixels. */
 export interface DesktopRegion {
   x: number;
   y: number;
@@ -216,7 +206,7 @@ export interface DesktopRegion {
   height: number;
 }
 
-/** Protocol 19: the agent's desktop as screen text (lines `observeSnapshot` reads), its refs, app and window. */
+/** Protocol 21: the agent's desktop as screen text (lines `observeSnapshot` reads), its refs, app and window. */
 export interface DesktopLookReply {
   snapshot: string;
   refs: Record<string, { role: string; name: string }>;
@@ -227,12 +217,44 @@ export interface DesktopLookReply {
   screen: { width: number; height: number };
 }
 
-/** Protocol 19: the attribute of the agent browser's window in a look (one line: `browser_do` drives it). */
+/** Protocol 21: the attribute of the agent browser's window in a look (one line: `browser_do` drives it). */
 export const DESKTOP_AGENT_BROWSER = "agent browser: use browser_do";
 
 /** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
 export const SCREEN_KINDS = ["browser", "desktop"] as const;
 export type ScreenKind = (typeof SCREEN_KINDS)[number];
+/**
+ * From this protocol on: plan usage, read by the CLIs without touching any
+ * token. Accounts carry `usage` (`RunnerAccountInfo.usage`); `hello` and
+ * `accounts.changed` carry the computer's own sign-ins' (`ownUsage`). It comes
+ * from the turns (`rate_limit_event`, Codex's `account/rateLimits/updated`)
+ * and from probes `list` asks for (`fresh`). The server never sends `fresh`
+ * to an older runner.
+ */
+export const PLAN_USAGE_PROTOCOL = 19;
+/**
+ * From this protocol on: coding plans as key accounts on Claude Code (ADR
+ * 0059). `begin` with `provider` (a plan of `@agenteschat/providers/plans`)
+ * starts no CLI: the runner makes the folder and a key the browser seals the
+ * plan's key to, and `code` hands it over (kept in the folder,
+ * `provider.json`, mode 600). Turns in that folder think through the
+ * endpoint the runner's own copy of the plans names. Accounts say their
+ * `provider` and the key's last 4 (`keyHint`); a key its maker refused reads
+ * as signed out. In system mode `agents` names each agent's `account`, whose
+ * folder belongs to that agent's user only while it thinks with it. The
+ * server never sends `provider` to an older runner.
+ */
+export const PLAN_KEYS_PROTOCOL = 20;
+/**
+ * From this protocol on (ADR 0060): the agent uses its own desktop.
+ * `desktop.look` reads what it shows as screen text, `desktop.act` does one
+ * action, waits for the screen to settle and looks again, `desktop.capture`
+ * returns a JPEG with the look's elements boxed, `desktop.apps` lists the apps
+ * it can start. `hello.desktopUse` says whether the runner serves it: only
+ * where each agent works as its own OS user. The server never sends these to
+ * an older runner.
+ */
+export const DESKTOP_USE_PROTOCOL = 21;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -257,7 +279,48 @@ export interface RunnerAccountInfo {
   email?: string;
   /** `pro`, `max`, `team`, `plus`… as the CLI says. */
   plan?: string;
+  /** Protocol 19: the plan's usage limits, as last seen. */
+  usage?: PlanUsage;
+  /** Protocol 20: a key account's coding plan (`zai`, `kimi`…); absent for the CLI's own sign-in. */
+  provider?: string;
+  /** Protocol 20: the last 4 characters of a key account's key. */
+  keyHint?: string;
 }
+
+/** A plan's usage window: how much of it is used (0–100) and when it resets. */
+export interface PlanWindow {
+  kind: PlanWindowKind;
+  /** `other`: what the provider calls it ("Extra usage", a model's name). */
+  label?: string;
+  usedPercent: number;
+  resetsAt?: string;
+}
+export type PlanWindowKind = "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+export const PLAN_WINDOW_KINDS: readonly PlanWindowKind[] = [
+  "five_hour",
+  "seven_day",
+  "seven_day_opus",
+  "seven_day_sonnet",
+  "monthly",
+  "other",
+];
+
+/** Protocol 19: a plan's usage limits as the CLI or the provider said them (`at`), during a turn or by a probe. */
+export interface PlanUsage {
+  windows: PlanWindow[];
+  /** The plan refused a request for its limit (cleared when it allows one again). */
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
+}
+
+/** The computer's own sign-ins' usage (protocol 19), by brain. */
+export type OwnPlanUsage = Partial<Record<AccountKind, PlanUsage>>;
+
+/** `list.fresh` ids for the computer's own sign-ins (the rest are account ids). */
+export const OWN_USAGE_ID: Record<AccountKind, string> = { claude_code: "own:claude_code", codex: "own:codex" };
+
+export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
 
 /** Where a sign-in is: waiting for the person, done (signed in), failed or expired (folder removed). */
 export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
@@ -271,19 +334,40 @@ export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
  * expires after `ACCOUNT_LOGIN_TTL_MS`.
  */
 export type AccountRequest =
-  /** `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure. */
-  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean }
+  /**
+   * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
+   * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
+   * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
+   */
+  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string; provider?: string }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
-  | { action: "list" }
+  /**
+   * Protocol 19: `fresh`, accounts (ids, or `OWN_USAGE_ID`s) whose usage to look up now: the runner
+   * answers at once, probes in the background and sends `accounts.changed` when it knows more.
+   */
+  | { action: "list"; fresh?: string[] }
   | { action: "remove"; kind: AccountKind; accountId: string };
 
 export const ACCOUNT_LOGIN_TTL_MS = 15 * 60_000;
+/** A coding plan's id as the wire carries it (the runner and the server check it against their plans). */
+export const isPlanProviderWord = (v: unknown): v is string =>
+  typeof v === "string" && /^[a-z][a-z0-9_-]{0,19}$/.test(v);
+
 /** Accounts per machine: the runner adds no more, and a list this long is never taken as complete by the server. */
 export const MAX_MACHINE_ACCOUNTS = 100;
 /** The AAD that binds a sealed Claude sign-in code to its sign-in and organization. */
 export const accountCodeAad = (loginId: string, orgId: string) => `${loginId}|${orgId}|account`;
+
+/**
+ * An email a sign-in may name as its account: letters, digits and `._+-` only, never first in either part.
+ * On Windows the CLI starts through the shell, so an address with `&`, `%`, `"` or `(` would run commands.
+ */
+export const isLoginEmail = (v: unknown): v is string =>
+  typeof v === "string" &&
+  v.length <= 254 &&
+  /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}@[A-Za-z0-9][A-Za-z0-9-]*(\.[A-Za-z0-9][A-Za-z0-9-]*)+$/.test(v);
 
 /** The `agent-browser` release the runner and the desktop app ship (ADR 0040 §2). */
 export const AGENT_BROWSER_VERSION = "0.39.1";
@@ -347,7 +431,7 @@ export interface RunnerTerminalInfo {
   reason?: string;
 }
 
-/** `hello.desktopUse` (protocol 19): whether agents can use their desktops here; `reason` says what is missing. */
+/** `hello.desktopUse` (protocol 21): whether agents can use their desktops here; `reason` says what is missing. */
 export type RunnerDesktopUseInfo = RunnerTerminalInfo;
 
 /** Desktop and terminal streams (protocol 18): sizes, rates, caps and timeouts. */
@@ -907,6 +991,8 @@ export interface MachineAgent {
   handle: string;
   name: string;
   look?: { color?: string; eyes?: string; accessory?: string };
+  /** Protocol 20: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
+  account?: string;
 }
 
 /** The pause state (protocol 9). `until` null: paused until the owner resumes. */
@@ -924,9 +1010,9 @@ export interface RunnerTools {
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
   browser?: boolean;
-  /** Protocol 18: the agents' desktops: they use them, people watch and take control (ADR 0056). Absent = off. */
+  /** Protocol 18: the agents' desktops: they use them, people watch and take control (ADR 0058). Absent = off. */
   desktop?: boolean;
-  /** Protocol 18: terminals people open as an agent (ADR 0056). Absent = off. */
+  /** Protocol 18: terminals people open as an agent (ADR 0058). Absent = off. */
   terminal?: boolean;
 }
 
@@ -977,17 +1063,19 @@ export interface RunnerInfo {
   browser?: RunnerBrowserInfo;
   /** Protocol 13: the accounts on the machine (ADR 0041). */
   accounts?: RunnerAccountInfo[];
-  /** Protocol 18: whether the agents' desktops can run here (ADR 0056). */
+  /** Protocol 18: whether the agents' desktops can run here (ADR 0058). */
   desktop?: RunnerDesktopInfo;
   /** Protocol 18: whether people can open a terminal here. */
   terminal?: RunnerTerminalInfo;
-  /** Protocol 19: whether agents can use their own desktops here (ADR 0057). */
+  /** Protocol 21: whether agents can use their own desktops here (ADR 0060). */
   desktopUse?: RunnerDesktopUseInfo;
   /**
-   * Protocol 18: `system` when each agent works as its own OS user (ADR 0056 §10); absent, every agent
+   * Protocol 18: `system` when each agent works as its own OS user (ADR 0058 §10); absent, every agent
    * works as the runner's own user. Who may control a desktop or open a terminal follows it (§4).
    */
   mode?: "system";
+  /** Protocol 19: the usage of the computer's own sign-ins (no account folder). */
+  ownUsage?: OwnPlanUsage;
 }
 
 export interface FileEntry {
@@ -1103,13 +1191,13 @@ export type MachineRequest = (
   | { op: "desktop.session.status" }
   /** Protocol 18: answered once the data socket for `streamId` got `stream.ready`. */
   | ({ op: "stream.open" } & StreamOpenRequest)
-  /** Protocol 19: what the agent's desktop shows now (it starts when it isn't running). */
+  /** Protocol 21: what the agent's desktop shows now (it starts when it isn't running). */
   | { op: "desktop.look" }
-  /** Protocol 19: one action on the agent's desktop; with `settle`, the screen settles and the answer has a look. */
+  /** Protocol 21: one action on the agent's desktop; with `settle`, the screen settles and the answer has a look. */
   | { op: "desktop.act"; action: DesktopAction; settle: boolean }
-  /** Protocol 19: a JPEG of the screen, or of a region of it at its own size. */
+  /** Protocol 21: a JPEG of the screen, or of a region of it at its own size. */
   | { op: "desktop.capture"; region?: DesktopRegion }
-  /** Protocol 19: the apps the agent can start. */
+  /** Protocol 21: the apps the agent can start. */
   | { op: "desktop.apps" }
 ) & { agent?: AgentScope };
 
@@ -1296,7 +1384,7 @@ export type MachineErrorCode =
    */
   | "browser_closed"
   /**
-   * Protocol 18: desktops can't run on this computer at all; the message says what is missing. Protocol 19:
+   * Protocol 18: desktops can't run on this computer at all; the message says what is missing. Protocol 21:
    * desktop use can't run here either, or the agent's desktop went away mid-use (it starts again on the next one).
    */
   | "desktop_unavailable"
@@ -1383,8 +1471,11 @@ export type RunnerFrame =
   | { type: "runner.state"; paused: RunnerPause }
   /** Protocol 10: what the machine allows changed (the person granted, removed, or turned a tool on or off). */
   | { type: "access.changed"; access: RunnerAccess }
-  /** Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in done, a status changed). */
-  | { type: "accounts.changed"; accounts: RunnerAccountInfo[] }
+  /**
+   * Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in
+   * done, a status changed). Protocol 19: or their usage did (`ownUsage`: the computer's own sign-ins').
+   */
+  | { type: "accounts.changed"; accounts: RunnerAccountInfo[]; ownUsage?: OwnPlanUsage }
   /**
    * Protocol 10: the person answered an `access.request` on the machine (or it
    * expired). `granted` also comes with an `access.changed`.
@@ -1497,13 +1588,66 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
     if (!isObject(a) || !isAccountId(a.id) || !isAccountKind(a.kind)) continue;
     const email = isString(a.email) && a.email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(a.email) ? a.email : undefined;
     const plan = isString(a.plan) && /^[\w.-]{1,40}$/.test(a.plan) ? a.plan : undefined;
+    const usage = parsePlanUsage(a.usage);
+    const provider = isPlanProviderWord(a.provider) ? a.provider : undefined;
+    const keyHint = isString(a.keyHint) && /^[\x21-\x7e]{1,4}$/.test(a.keyHint) ? a.keyHint : undefined;
     out.push({
       id: a.id,
       kind: a.kind,
       loggedIn: a.loggedIn === true,
       ...(email ? { email } : {}),
       ...(plan ? { plan } : {}),
+      ...(usage ? { usage } : {}),
+      ...(provider ? { provider } : {}),
+      ...(keyHint ? { keyHint } : {}),
     });
+  }
+  return out;
+}
+
+const isoOf = (v: unknown) =>
+  isString(v) && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined;
+
+/** A usage snapshot (protocol 19), checked: known window kinds only, percentages 0–100, short labels. */
+export function parsePlanUsage(v: unknown): PlanUsage | undefined {
+  if (!isObject(v) || !Array.isArray(v.windows)) return undefined;
+  const at = isoOf(v.at);
+  if (!at) return undefined;
+  const windows: PlanWindow[] = [];
+  for (const w of v.windows.slice(0, PLAN_USAGE_LIMITS.windows)) {
+    const kind = isObject(w) ? PLAN_WINDOW_KINDS.find((k) => k === w.kind) : undefined;
+    const used = isObject(w) ? finite(w.usedPercent) : undefined;
+    if (!isObject(w) || !kind || used === undefined) continue;
+    const label = isString(w.label)
+      ? w.label
+          .replace(/\p{Cc}/gu, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, PLAN_USAGE_LIMITS.label)
+      : "";
+    const resetsAt = isoOf(w.resetsAt);
+    windows.push({
+      kind,
+      ...(label ? { label } : {}),
+      usedPercent: Math.round(Math.min(100, Math.max(0, used))),
+      ...(resetsAt ? { resetsAt } : {}),
+    });
+  }
+  return {
+    windows,
+    ...(v.limited === true ? { limited: true } : {}),
+    source: v.source === "probe" ? "probe" : "turn",
+    at,
+  };
+}
+
+/** `ownUsage` (protocol 19): one snapshot per brain at most. */
+export function parseOwnUsage(v: unknown): OwnPlanUsage | undefined {
+  if (!isObject(v)) return undefined;
+  const out: OwnPlanUsage = {};
+  for (const kind of ACCOUNT_KINDS) {
+    const usage = parsePlanUsage(v[kind]);
+    if (usage) out[kind] = usage;
   }
   return out;
 }
@@ -1643,6 +1787,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(isObject(f.terminal) ? { terminal: parseAvailability(f.terminal) } : {}),
         ...(isObject(f.desktopUse) ? { desktopUse: parseAvailability(f.desktopUse) } : {}),
         ...(f.mode === "system" ? { mode: "system" as const } : {}),
+        ...(isObject(f.ownUsage) ? { ownUsage: parseOwnUsage(f.ownUsage) } : {}),
       };
     }
     case "browser.frame": {
@@ -1689,8 +1834,11 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const access = parseAccess(f.access);
       return access ? { type: "access.changed", access } : null;
     }
-    case "accounts.changed":
-      return Array.isArray(f.accounts) ? { type: "accounts.changed", accounts: parseAccounts(f.accounts) } : null;
+    case "accounts.changed": {
+      if (!Array.isArray(f.accounts)) return null;
+      const ownUsage = parseOwnUsage(f.ownUsage);
+      return { type: "accounts.changed", accounts: parseAccounts(f.accounts), ...(ownUsage ? { ownUsage } : {}) };
+    }
     case "access.decided": {
       if (!isString(f.requestId)) return null;
       const decision = (["granted", "denied", "expired"] as const).find((d) => d === f.decision);
@@ -2264,7 +2412,7 @@ const smallJson = (raw: string, max: number): unknown => {
   }
 };
 
-/** `hello.terminal` (protocol 18), `hello.desktopUse` (19) and the part `hello.desktop` shares with them, cut. */
+/** `hello.terminal` (protocol 18), `hello.desktopUse` (21) and the part `hello.desktop` shares with them, cut. */
 export function parseAvailability(v: Record<string, unknown>): RunnerTerminalInfo {
   const reason = cut(v.reason, BROWSER_LIMITS.message);
   return { available: v.available === true, ...(reason !== undefined ? { reason } : {}) };

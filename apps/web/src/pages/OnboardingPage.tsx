@@ -10,7 +10,14 @@ import {
   type OnboardingStepId,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
-import { AUTO, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@agenteschat/client/lib/providers";
+import {
+  AUTO,
+  keyLooksValid,
+  PROVIDERS,
+  type ProviderId,
+  providerLabel,
+  providerOf,
+} from "@agenteschat/client/lib/providers";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
@@ -28,6 +35,7 @@ import {
   Logo,
   normalizeAppearance,
   OptionCard,
+  ProviderLogo,
   Select,
   Spinner,
   Textarea,
@@ -42,6 +50,7 @@ import { PlanTermsDialog } from "@/components/AgentBrain";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
+import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton } from "@/components/ThisMac";
@@ -365,18 +374,16 @@ export function OnboardingPage() {
       // Imported: one apply after the presets (a handle a preset took gets the next free one).
       const crewSoFar = await applyImported(list, key === "platform" ? "anthropic" : key);
       // The connected computer chosen a step before: every agent works there, and thinks with its
-      // Claude Code when that was picked (the person confirmed the plan warning).
+      // Claude Code when that was picked (each then answers only the person, as they were told).
       if (computer !== "machine" || !machine) return;
       const all = [...PRESETS.flatMap((p) => (ids[p] ? [ids[p]] : [])), ...crewSoFar.map((c) => c.id)];
       for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
       if (brain !== "claude_code") return;
       let failed = false;
       for (const agentId of all) {
-        await api.agents
-          .setBrain(created.orgId, agentId, { brain: "claude_code", fallback: true, acceptPlanTerms: true })
-          .catch(() => {
-            failed = true;
-          });
+        await api.agents.setBrain(created.orgId, agentId, { brain: "claude_code", fallback: true }).catch(() => {
+          failed = true;
+        });
       }
       if (failed) toast.show(t("onboarding.brain.failed", { computer: machine.name }), "error");
     },
@@ -842,6 +849,7 @@ export function OnboardingPage() {
                       pressed={brain === "claude_code"}
                       onClick={() => brain !== "claude_code" && setAskingTerms(true)}
                     >
+                      <ProviderLogo id="claude_code" size="sm" />
                       <span className="ac-option__text">
                         <span className="ac-option__title">
                           {t("onboarding.brain.claudeCode", { computer: machine.name })}
@@ -874,7 +882,8 @@ export function OnboardingPage() {
               {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
               <div className="grid-options grid-options--sm" role="group" aria-label={t("onboarding.provider")}>
                 {PROVIDERS.map((p) => (
-                  <OptionCard key={p.id} pressed={key === p.id} onClick={() => setKey(p.id)}>
+                  <OptionCard key={p.id} className="onb__provider" pressed={key === p.id} onClick={() => setKey(p.id)}>
+                    <ProviderLogo id={p.id} size="sm" />
                     <span className="ac-option__title">{p.label}</span>
                   </OptionCard>
                 ))}
@@ -892,12 +901,15 @@ export function OnboardingPage() {
                   <Field
                     label={t("onboarding.keyFor", { provider: providerLabel(key) })}
                     id="key-value"
-                    error={keyTouched && !keyOk ? t(`onboarding.keyInvalid.${key}`) : undefined}
+                    error={
+                      keyTouched && !keyOk ? <KeyMismatch provider={key} apiKey={apiKey} onPick={setKey} /> : undefined
+                    }
+                    help={<KeySite provider={key} />}
                   >
                     <Input
                       className="onb__big"
                       type="password"
-                      placeholder={PROVIDERS.find((p) => p.id === key)?.placeholder}
+                      placeholder={providerOf(key)?.placeholder}
                       autoComplete="off"
                       autoFocus
                       value={apiKey}
@@ -905,16 +917,18 @@ export function OnboardingPage() {
                       onBlur={() => setKeyTouched(apiKey.trim().length > 0)}
                     />
                   </Field>
-                  <div>
-                    <Button variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
-                      <Icon
-                        name="chevronDown"
-                        size={16}
-                        style={advanced ? { transform: "rotate(180deg)" } : undefined}
-                      />
-                      {t("onboarding.advanced")}
-                    </Button>
-                  </div>
+                  {(key === "anthropic" || key === "openai") && (
+                    <div>
+                      <Button variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
+                        <Icon
+                          name="chevronDown"
+                          size={16}
+                          style={advanced ? { transform: "rotate(180deg)" } : undefined}
+                        />
+                        {t("onboarding.advanced")}
+                      </Button>
+                    </div>
+                  )}
                   {advanced && key === "anthropic" && (
                     <Field
                       label={t("onboarding.anthropicWorkspace")}

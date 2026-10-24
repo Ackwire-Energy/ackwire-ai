@@ -8,13 +8,15 @@ import {
   STREAM_CLOSE,
   STREAM_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
+import type { Launcher } from "./agent-users";
 import { type DesktopSystem, NOT_AS_ROOT, runnerEnv } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { hasBunTerminal, runtimeName } from "./launch";
+import { agentFolderName } from "./paths";
 import type { DataSocket } from "./streams";
 
 /**
- * Terminals people open on an agent's computer (ADR 0056 §6): the login
+ * Terminals people open on an agent's computer (ADR 0058 §6): the login
  * shell of the agent's OS user in a PTY (`Bun.Terminal`), in the agent's
  * folder, with none of the agent's secrets in its environment. Its bytes go
  * both ways over the stream's data socket; a resize comes as a control frame,
@@ -51,6 +53,21 @@ export const runnerTerminalUser = (agentFolder: string): TerminalUser => ({
   env: { ...runnerEnv(os.homedir()), LANG: process.env.LANG || "C.UTF-8" },
   cwd: agentFolder,
 });
+
+/**
+ * System mode: the agent's own OS user through its launcher, in the agent's folder in its home once its
+ * worker made it, else in its home. Root changes only into the home, which root made where the agent can't
+ * replace it; the agent can swap its folder for a link at any moment, even between a check and the spawn,
+ * so the agent's own user changes into it. Root never makes that folder (it would be root's).
+ */
+export function systemTerminalUser(launcher: Launcher, agent: AgentScope): TerminalUser {
+  const folder = path.join(launcher.home, agentFolderName(agent).name);
+  return {
+    prefix: [...launcher.prefix, "/bin/sh", "-c", 'cd "$1" 2>/dev/null; shift; exec "$@"', "sh", folder],
+    env: launcher.env,
+    cwd: launcher.home,
+  };
+}
 
 export interface PtyOptions {
   cwd: string;

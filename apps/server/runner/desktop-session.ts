@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createCipheriv, randomBytes, randomInt } from "node:crypto";
+import type { EventEmitter } from "node:events";
 import {
   chmodSync,
   chownSync,
@@ -22,6 +23,7 @@ import {
   type MachineReplies,
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
+import type { Launcher } from "./agent-users";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
@@ -31,7 +33,7 @@ import { agentFolderName } from "./paths";
 import { KeyedQueue } from "./queue";
 
 /**
- * The agents' desktops (ADR 0056 §1): per agent, one Xtigervnc (the X server
+ * The agents' desktops (ADR 0058 §1): per agent, one Xtigervnc (the X server
  * and the VNC server in one process) and an XFCE session, on Linux.
  *
  * - Xvnc listens on a Unix socket only (0600, its user's): a loopback port can
@@ -200,6 +202,14 @@ export function runnerUser(runnerHome: string, agentFolder: string, agent: Agent
   return { prefix: [], env: runnerEnv(home), home, dir: path.join(runnerHome, "desktop", id8(agent)) };
 }
 
+/**
+ * System mode: the agent's own OS user runs its desktop, through its launcher, with its own home as HOME and
+ * its cookie and socket in `~/.agentes/desktop`; the password file is root's, readable by the agent's group.
+ */
+export function systemDesktopUser(launcher: Launcher, ids: { uid: number; gid: number }): DesktopUser {
+  return { ...launcher, dir: path.join(launcher.home, ".agentes", "desktop"), ids };
+}
+
 /** A process a desktop started. */
 export interface DesktopProcess {
   /** 0 when it couldn't start. */
@@ -245,9 +255,10 @@ function spawnProcess(argv: string[], opts: DesktopSpawnOptions): DesktopProcess
     stdio: [opts.input === undefined ? "ignore" : "pipe", out, out],
     detached: opts.detached === true,
   });
+  const events = child as unknown as EventEmitter;
   const exited = new Promise<number | null>((resolve) => {
-    child.once("exit", (code) => resolve(code));
-    child.once("error", () => resolve(null));
+    events.once("exit", (code: number | null) => resolve(code));
+    events.once("error", () => resolve(null));
   });
   if (child.stdin) {
     child.stdin.on("error", () => undefined);
@@ -346,7 +357,7 @@ function parseSaved(v: unknown): Saved | null {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** The agents' desktops on this computer: started, used, watched, stopped (ADR 0056 §1). */
+/** The agents' desktops on this computer: started, used, watched, stopped (ADR 0058 §1). */
 export class DesktopSessions {
   private readonly desktops = new Map<string, Desktop>();
   /** Each agent's starts, stops and restarts, one after another. */
@@ -425,7 +436,7 @@ export class DesktopSessions {
     return { display, socket, xauthority, home, passwords };
   }
 
-  /** The agent's desktop while it runs, where its Chrome goes (ADR 0056 §7): its display and cookie. */
+  /** The agent's desktop while it runs, where its Chrome goes (ADR 0058 §7): its display and cookie. */
   running(agentId: string): { display: number; xauthority: string } | null {
     const d = this.desktops.get(agentId);
     return d && !d.ending && this.alive(d) ? { display: d.display, xauthority: d.xauthority } : null;

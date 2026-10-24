@@ -62,6 +62,10 @@ export const NOTIFICATION_KINDS = [
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
   "browser_handoff",
+  /** The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8). */
+  "org_standing",
+  /** The workspace's own computer is ready (owners, ADR 0056 §10). */
+  "computer_ready",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -89,7 +93,7 @@ export interface NotificationSource {
   machineId?: string;
   /** An agent's browser handoff (ADR 0040). */
   handoffId?: string;
-  /** Which of the agent's screens it is on, when not its browser (ADR 0056). */
+  /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
   label?: string;

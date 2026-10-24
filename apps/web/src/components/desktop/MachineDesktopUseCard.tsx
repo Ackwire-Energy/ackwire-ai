@@ -9,7 +9,7 @@ import "../browser/browser.css";
 const TURN_ON = "agentes-runner tools enable desktop && agentes-runner tools enable commands";
 
 /**
- * Apps on the agents' desktops, on a computer's page (ADR 0057): whether agents can use apps on their own
+ * Apps on the agents' desktops, on a computer's page (ADR 0060): whether agents can use apps on their own
  * desktops there; when not, on Linux the computer's own words on what is missing (each agent its own user,
  * packages) with the command in them, elsewhere that it takes a Linux computer; or the two switches to turn on.
  */

@@ -6,6 +6,7 @@ import {
   createMemoryPubSub,
   createMemoryRateLimiter,
   createPostgresPubSub,
+  isReservedSecretName,
   PayloadTooLargeError,
   type PgNotifier,
   type PubSub,
@@ -134,4 +135,20 @@ test("postgres pub/sub: publish doesn't wait for the database; a tick's events g
   await pubsub.close?.();
   expect(statements).toHaveLength(1);
   expect(got).toEqual([1, 2, 3]);
+});
+
+test("secret names that would steer an AI CLI's sign-in or requests are reserved", () => {
+  for (const name of ["ANTHROPIC_BASE_URL", "CLAUDE_CONFIG_DIR", "OPENAI_API_KEY", "CODEX_HOME", "OPENCODE_API_KEY"])
+    expect(isReservedSecretName(name)).toBe(true);
+  for (const name of [
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "NODE_OPTIONS",
+    "SSL_CERT_FILE",
+    "LD_PRELOAD",
+    "DYLD_INSERT_LIBRARIES",
+  ])
+    expect(isReservedSecretName(name)).toBe(true);
+  for (const name of ["GITHUB_TOKEN", "NPM_TOKEN", "STRIPE_PASSWORD", "PROXY_HOST", "MY_CLAUDE"])
+    expect(isReservedSecretName(name)).toBe(false);
 });

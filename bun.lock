@@ -171,6 +171,9 @@
     "packages/client": {
       "name": "@agenteschat/client",
       "version": "0.0.0",
+      "dependencies": {
+        "@agenteschat/providers": "workspace:*",
+      },
       "devDependencies": {
         "@tanstack/react-query": "^5.104.1",
         "@types/react": "^19.2.18",

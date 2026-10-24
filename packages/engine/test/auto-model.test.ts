@@ -320,6 +320,24 @@ describe("a run of an agent on Automático", () => {
     expect(f.openaiProvider.calls[0]?.request).toMatchObject({ model: "gpt-6-luna", effort: "high" });
   });
 
+  test("a workspace whose only key is DeepSeek's: an agent without a key of its own picks from DeepSeek's line", async () => {
+    f = await setup({ judge: judgeAnswers({ current: "large" }), reply: () => ({ chunks: ["ok"] }) });
+    await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+    await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "deepseek",
+      label: "ds",
+      apiKey: "sk-deepseek-test-1234567890",
+      makeDefault: true,
+    });
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: AUTO_MODEL, credentialId: null });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls[0]).toMatchObject({
+      apiKey: "sk-deepseek-test-1234567890",
+      request: { model: "deepseek-v4-pro", effort: "high" },
+    });
+  });
+
   test("an agent without auto never asks the judge about its model", async () => {
     f = await setup({ judge: judgeAnswers({ current: "large" }), reply: () => ({ chunks: ["ok"] }) });
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });

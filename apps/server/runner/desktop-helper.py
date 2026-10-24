@@ -1,5 +1,5 @@
 """
-The desktop helper (ADR 0057 section 9): what an agent's desktop shows, read from its accessibility
+The desktop helper (ADR 0060 section 9): what an agent's desktop shows, read from its accessibility
 tree (AT-SPI over D-Bus), input through xdotool and screenshots through scrot, as the agent's own OS
 user.
 

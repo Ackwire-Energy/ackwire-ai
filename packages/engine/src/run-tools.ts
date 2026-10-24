@@ -115,7 +115,7 @@ export interface ToolSideEffects {
   deniedRepo?: string;
   /** Its browser calls since the last post, for the card of where it browsed (`meta.browser`). */
   browser?: BrowserTrailStep[];
-  /** Its desktop calls since the last post (`meta.desktop`, ADR 0057), the same shape: the app an open started. */
+  /** Its desktop calls since the last post (`meta.desktop`, ADR 0060), the same shape: the app an open started. */
   desktop?: BrowserTrailStep[];
 }
 

@@ -11,7 +11,7 @@ import {
 } from "./desktop-helper";
 
 /**
- * The agent's desktop as screen text (ADR 0057 §4): a helper snapshot (the
+ * The agent's desktop as screen text (ADR 0060 §4): a helper snapshot (the
  * windows from XQueryTree, each app's accessibility tree) as lines like
  * `agent-browser`'s, which the engine's `observeSnapshot` reads:
  *
