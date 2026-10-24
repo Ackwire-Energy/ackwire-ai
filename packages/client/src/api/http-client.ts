@@ -461,6 +461,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: input,
           })
         ).authorizeUrl,
+      completeOAuth: (orgId, input) =>
+        request<{ connectionId: string; connector: string }>(`${org(orgId)}/connectors/oauth/complete`, {
+          json: input,
+        }),
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
     },

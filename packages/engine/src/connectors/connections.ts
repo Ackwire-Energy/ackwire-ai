@@ -9,6 +9,7 @@ import { requirePermission } from "../organizations";
 import { CONNECTOR_CATALOG, type ConnectorDefinition } from "./catalog";
 import { beginMcpOAuth, storeCustomConnection } from "./custom";
 import { clientCredentials, getOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
+import { oauthReturnTo } from "./oauth-return";
 
 const { connectorConnections, oauthStates, agentScopes } = schema;
 
@@ -282,7 +283,7 @@ export async function startOAuth(
     if (native) return { authorizeUrl: native, state: "" };
     throw new ValidationError(`OAuth for ${def.label} is not configured on this server`);
   }
-  const returnTo = options.returnTo?.startsWith("/") && !options.returnTo.startsWith("//") ? options.returnTo : "/";
+  const returnTo = oauthReturnTo(options.returnTo);
   const state = randomToken(32);
   const verifier = randomToken(48);
   const challenge = base64url(createHash("sha256").update(verifier).digest());
@@ -346,6 +347,30 @@ async function tokenRequest(
     );
   }
   return body;
+}
+
+/**
+ * What a state stands for, without using it up: who started it, in which organization, and where it lands.
+ * Null when it is unknown, used or expired. The callback reads it to know whether the phone app started
+ * the authorization (the app then finishes it with its own session).
+ */
+export async function peekOAuthState(
+  deps: Pick<ConnectorDeps, "db" | "now">,
+  state: string,
+): Promise<{ orgId: string; userId: string; returnTo: string } | null> {
+  const at = deps.now?.() ?? new Date();
+  const [row] = await deps.db
+    .select({
+      orgId: oauthStates.orgId,
+      userId: oauthStates.userId,
+      returnTo: oauthStates.returnTo,
+      usedAt: oauthStates.usedAt,
+      expiresAt: oauthStates.expiresAt,
+    })
+    .from(oauthStates)
+    .where(eq(oauthStates.stateHash, sha256(state)));
+  if (!row || row.usedAt || row.expiresAt <= at) return null;
+  return { orgId: row.orgId, userId: row.userId, returnTo: row.returnTo };
 }
 
 /**

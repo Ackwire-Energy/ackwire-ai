@@ -28,6 +28,7 @@ import {
 } from "./connections";
 import type { McpConnect, McpTool } from "./mcp";
 import { authServerMetadata, ensureOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
+import { oauthReturnTo } from "./oauth-return";
 import { presetForServer } from "./presets";
 
 const { connectorConnections, customTools, oauthStates, agentScopes, agents } = schema;
@@ -462,7 +463,7 @@ export async function beginMcpOAuth(
   if (!wrapper) throw new Error("no key wrapper");
   const id = crypto.randomUUID();
   const sealed = await sealSecret(wrapper, verifier, stateAad(orgId, id));
-  const returnTo = input.returnTo?.startsWith("/") && !input.returnTo.startsWith("//") ? input.returnTo : "/";
+  const returnTo = oauthReturnTo(input.returnTo);
   await deps.db.insert(oauthStates).values({
     id,
     orgId,
