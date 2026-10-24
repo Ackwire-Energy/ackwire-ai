@@ -64,6 +64,7 @@ import {
   writeConfig,
 } from "./config";
 import { type ConnectionOutcome, type Dial, RunnerConnection } from "./connection";
+import { DesktopSessions, runnerUser } from "./desktop-session";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
@@ -273,6 +274,8 @@ export class RunnerDaemon implements RequestObserver {
   private readonly now: () => number;
   /** The computer brains' accounts (ADR 0041): machine-wide, kept across pairings and sessions. */
   readonly accounts: AccountManager;
+  /** The agents' desktops (ADR 0056): they outlive sessions and this process. */
+  readonly desktops: DesktopSessions;
 
   constructor(private readonly opts: DaemonOptions) {
     this.activity = new ActivityLog(opts.home);
@@ -294,6 +297,15 @@ export class RunnerDaemon implements RequestObserver {
         if (accounts) this.send({ type: "accounts.changed", accounts });
       },
     });
+    this.desktops = new DesktopSessions({
+      home: opts.home,
+      log: opts.log,
+      user: async (agent) => {
+        const workspace = this.session?.workspaceReal;
+        if (!workspace) throw new RunnerError("internal", "This runner isn't connected to a workspace");
+        return runnerUser(opts.home, await agentWorkspace(workspace, agent), agent);
+      },
+    });
   }
 
   get home() {
@@ -312,6 +324,7 @@ export class RunnerDaemon implements RequestObserver {
     this.booted = true;
     this.agents = readAgents(this.opts.home);
     this.logo = readCachedLogo(this.opts.home);
+    this.desktops.restore();
     let stored: StoredConfig | null = null;
     try {
       stored = readStoredConfig(this.opts.home);
@@ -352,6 +365,7 @@ export class RunnerDaemon implements RequestObserver {
     this.stopped = true;
     this.stopWatch?.();
     for (const t of this.timers) clearInterval(t);
+    this.desktops.close();
     if (this.resumeTimer) clearTimeout(this.resumeTimer);
     this.pairing?.abort();
     this.pairing = null;
@@ -444,10 +458,11 @@ export class RunnerDaemon implements RequestObserver {
         this.record({ kind: "access", summary, result: "ok" });
       }
       this.resolveSatisfied(nextAccess);
-      // The browser switch went off: the agents' browsers close now, not at their next command.
+      // The browser (or desktop) switch went off: the agents' browsers (or desktops) close now, not when next used.
       if (prevAccess.tools.browser === true && nextAccess.tools.browser !== true) {
         void this.session?.browser.closeAll();
       }
+      if (prevAccess.tools.desktop === true && nextAccess.tools.desktop !== true) void this.desktops.stopAll();
     }
 
     if (this.session && paired) {
@@ -633,6 +648,7 @@ export class RunnerDaemon implements RequestObserver {
       },
       browser,
       accounts: this.accounts,
+      desktops: this.desktops,
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
     // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
@@ -642,7 +658,12 @@ export class RunnerDaemon implements RequestObserver {
       token: config.token,
       info: () => {
         const accounts = this.accounts.snapshot();
-        return { ...this.info(workspaceReal), browser: browser.info(), ...(accounts ? { accounts } : {}) };
+        return {
+          ...this.info(workspaceReal),
+          browser: browser.info(),
+          desktop: this.desktops.info(),
+          ...(accounts ? { accounts } : {}),
+        };
       },
       executors: () => this.helloExecutors(),
       context,

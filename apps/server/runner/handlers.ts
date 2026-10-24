@@ -19,6 +19,7 @@ import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
 import type { BrowserManager } from "./browser";
+import type { DesktopSessions } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
@@ -46,6 +47,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "browser.batch",
   "browser.capture",
   "browser.stream.start",
+  "desktop.session.start",
 ]);
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -105,6 +107,8 @@ export interface HandlerContext {
   browser?: BrowserManager;
   /** Protocol 13: the computer brains' accounts (ADR 0041); without it the runner refuses `account`. */
   accounts?: AccountManager;
+  /** Protocol 18: the agents' desktops (ADR 0056); without it the runner refuses `desktop.session.*`. */
+  desktops?: DesktopSessions;
 }
 
 export interface RequestScope {
@@ -295,6 +299,9 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   if (req.op === "account") return handleAccount(ctx, req);
   // Protocol 15: messages for a turn already running (never new work: a paused computer still takes them).
   if (req.op === "brain.steer") return doBrainSteer(ctx, req);
+  if (req.op === "desktop.session.start" || req.op === "desktop.session.stop" || req.op === "desktop.session.status") {
+    return handleDesktop(ctx, req);
+  }
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
@@ -367,6 +374,28 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       });
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
+  }
+}
+
+/**
+ * Protocol 18: the agent's desktop (ADR 0056). Starting it needs the
+ * machine's desktop switch; stopping it and asking about it always go.
+ */
+function handleDesktop(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "desktop.session.start" | "desktop.session.stop" | "desktop.session.status" }>,
+) {
+  const desktops = ctx.desktops;
+  if (!desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
+  if (!req.agent) throw new RunnerError("bad_request", "A desktop belongs to an agent");
+  switch (req.op) {
+    case "desktop.session.stop":
+      return desktops.stop(req.agent);
+    case "desktop.session.status":
+      return desktops.status(req.agent);
+    case "desktop.session.start":
+      requireTool(ctx, "desktop");
+      return desktops.ensure(req.agent);
   }
 }
 
