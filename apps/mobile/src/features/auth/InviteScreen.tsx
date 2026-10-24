@@ -91,7 +91,8 @@ export function InviteScreen({ token }: { token: string }) {
       gate.choose(orgId);
       router.replace("/");
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 403 ? t("mobile.invite.wrongAccount", { email: invitation.email }) : t("mobile.invite.failed"));
+      const wrong = e instanceof ApiError && e.status === 403;
+      setError(wrong ? t("mobile.invite.wrongAccount", { email: invitation.email }) : t("mobile.invite.failed"));
     } finally {
       setJoining(false);
     }

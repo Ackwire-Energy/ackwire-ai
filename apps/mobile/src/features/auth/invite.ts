@@ -28,6 +28,4 @@ export async function loadPendingInvite(): Promise<string | null> {
 /** The header sign-up requests carry while an invitation waits. */
 export const inviteHeaders = (): Record<string, string> => (pending ? { "x-invite-token": pending } : {});
 
-/** A token from a link: what the server issues (url-safe), nothing else. */
-export const isInviteToken = (value: unknown): value is string =>
-  typeof value === "string" && /^[A-Za-z0-9_-]{16,200}$/.test(value);
+export { isInviteToken } from "./links";
