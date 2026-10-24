@@ -314,6 +314,15 @@ export function LandingPage() {
             <nav className="lp-footer__legal">
               <a href="/terms">{legalDocument("terms", "en").title}</a>
               <a href="/privacy">{legalDocument("privacy", "en").title}</a>
+              <a
+                href="https://x.com/agentes_chat"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("landing.footerX")}
+                title={t("landing.footerX")}
+              >
+                𝕏
+              </a>
             </nav>
           </div>
         </footer>
