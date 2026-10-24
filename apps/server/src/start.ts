@@ -204,7 +204,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
-  const operator = serveOperatorApi({ db: database.db, config, version, log });
+  const operator = serveOperatorApi({ db: database.db, config, version, log, pubsub: adapters.pubsub });
   if (operator) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
   }

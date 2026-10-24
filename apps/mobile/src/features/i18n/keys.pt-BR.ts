@@ -672,6 +672,8 @@ export const featureKeysPtBR = {
       reaction_other: "{{names}} reagiram",
       browser_handoff_one: "{{names}} precisa de você no navegador",
       browser_handoff_other: "{{names}} precisam de você no navegador",
+      org_standing_one: "O status do workspace mudou",
+      org_standing_other: "O status do workspace mudou",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",

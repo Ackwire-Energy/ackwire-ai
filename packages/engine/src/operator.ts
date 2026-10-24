@@ -1,6 +1,7 @@
 import { and, asc, type Database, desc, eq, gt, inArray, or, schema, sql } from "@agenteschat/db";
 import { z } from "zod";
 import { decodeCursor, encodeCursor } from "./cursor";
+import { OPERATOR_STANDING_COLUMNS, type StandingState } from "./standing";
 
 /**
  * Reads of the operator API (ADR 0056): who and what is in a workspace, never what anyone wrote there,
@@ -30,6 +31,7 @@ export interface OperatorOrgQuery {
   /** An org id, part of its name, or part of a member's email; any case. */
   q?: string;
   createdAfter?: Date;
+  standing?: StandingState;
   limit: number;
   /** `next` of the previous page. */
   cursor?: string;
@@ -44,12 +46,14 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
       id: organizations.id,
       name: organizations.name,
       createdAt: createdAtMs,
+      standing: organizations.standing,
       members: memberCount,
       agents: agentCount,
     })
     .from(organizations)
     .where(
       and(
+        query.standing ? eq(organizations.standing, query.standing) : undefined,
         q
           ? or(
               z.uuid().safeParse(q).success ? eq(organizations.id, q) : undefined,
@@ -79,6 +83,7 @@ export async function operatorOrg(db: Database, orgId: string) {
       id: organizations.id,
       name: organizations.name,
       createdAt: organizations.createdAt,
+      standing: OPERATOR_STANDING_COLUMNS,
       counts: {
         members: memberCount,
         agents: agentCount,

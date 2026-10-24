@@ -4,6 +4,7 @@ import { apiError, errorResponse } from "../http/errors";
 import { iso, json, OrgParams } from "../routes/app/context";
 import { Role } from "../routes/app/schemas";
 import type { OperatorDeps } from "./app";
+import { Standing, StandingState, standingJson } from "./standing";
 
 const tags = ["Operator"];
 const errors = {
@@ -19,6 +20,7 @@ const OrgSummary = z
     id: z.uuid(),
     name: z.string(),
     createdAt: z.string(),
+    standing: StandingState,
     members: z.number().int(),
     agents: z.number().int().openapi({ description: "Not archived." }),
   })
@@ -38,6 +40,7 @@ const OrgQuery = z.object({
     .optional()
     .openapi({ description: "An org id, part of its name, or part of a member's email; any case." }),
   createdAfter: z.iso.datetime({ offset: true }).optional(),
+  standing: StandingState.optional().openapi({ description: "Only the workspaces in this standing." }),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().max(200).optional(),
 });
@@ -47,6 +50,7 @@ const Org = z
     id: z.uuid(),
     name: z.string(),
     createdAt: z.string(),
+    standing: Standing,
     admins: z
       .array(
         z.object({
@@ -146,6 +150,7 @@ export function registerOperatorOrgs(api: OpenAPIHono, { db, version }: Operator
         {
           ...org,
           createdAt: org.createdAt.toISOString(),
+          standing: standingJson(org.standing),
           admins: org.admins.map((a) => ({
             ...a,
             createdAt: a.createdAt.toISOString(),

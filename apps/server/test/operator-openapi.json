@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, the events feed and review blocks, for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, workspace standing, the events feed and review blocks, for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -93,6 +93,9 @@
           "createdAt": {
             "type": "string"
           },
+          "standing": {
+            "$ref": "#/components/schemas/OperatorStandingState"
+          },
           "members": {
             "type": "integer"
           },
@@ -101,7 +104,12 @@
             "description": "Not archived."
           }
         },
-        "required": ["id", "name", "createdAt", "members", "agents"]
+        "required": ["id", "name", "createdAt", "standing", "members", "agents"]
+      },
+      "OperatorStandingState": {
+        "type": "string",
+        "enum": ["active", "hold", "suspended"],
+        "description": "`active`; `hold`: its agents stop (no model, computer, routine or invitation), people still read and write; `suspended`: the workspace refuses everything to everyone."
       },
       "OperatorOrg": {
         "type": "object",
@@ -115,6 +123,9 @@
           },
           "createdAt": {
             "type": "string"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/OperatorStanding"
           },
           "admins": {
             "type": "array",
@@ -172,7 +183,35 @@
             "required": ["members", "agents", "channels", "machines", "invitations"]
           }
         },
-        "required": ["id", "name", "createdAt", "admins", "counts"]
+        "required": ["id", "name", "createdAt", "standing", "admins", "counts"]
+      },
+      "OperatorStanding": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/OperatorStandingState"
+          },
+          "reason": {
+            "type": ["string", "null"]
+          },
+          "note": {
+            "type": ["string", "null"],
+            "description": "The operator's own note: never shown to the workspace."
+          },
+          "notice": {
+            "$ref": "#/components/schemas/OperatorStandingNotice"
+          },
+          "changedAt": {
+            "type": ["string", "null"],
+            "description": "When `state` last changed; null: never."
+          }
+        },
+        "required": ["state", "reason", "note", "notice", "changedAt"]
+      },
+      "OperatorStandingNotice": {
+        "type": "string",
+        "enum": ["shown", "silent"],
+        "description": "`shown`: the workspace is told the reason, the change goes into its audit log and a new state notifies its owners and admins. `silent`: it is told only that it is paused, and nothing is written where it can read it."
       },
       "Role": {
         "type": "string",
@@ -373,6 +412,22 @@
           },
           {
             "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OperatorStandingState"
+                },
+                {
+                  "description": "Only the workspaces in this standing."
+                }
+              ]
+            },
+            "required": false,
+            "description": "Only the workspaces in this standing.",
+            "name": "standing",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "minimum": 1,
               "maximum": 200,
@@ -508,6 +563,95 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OperatorUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/standing": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Hold, suspend or restore a workspace",
+        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "$ref": "#/components/schemas/OperatorStandingState"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "Shown to the workspace with the notice `shown`."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "notice": {
+                    "$ref": "#/components/schemas/OperatorStandingNotice"
+                  }
+                },
+                "required": ["state", "reason", "notice"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorStanding"
                 }
               }
             }

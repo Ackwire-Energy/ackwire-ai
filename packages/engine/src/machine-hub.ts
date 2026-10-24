@@ -52,6 +52,7 @@ import {
   publishMachineUpdated,
 } from "./machines";
 import { enqueue } from "./outbox";
+import { assertCanWork, standingRefusal } from "./standing";
 
 const { machines, machineRpc } = schema;
 
@@ -216,8 +217,9 @@ type RpcReply = { ok: true; data: unknown } | { ok: false; error: { code: string
 
 /**
  * Requests that start something new on the machine: refused while it is
- * paused (ADR 0036 §6). Following running work (a task's output, canceling
- * it), cleaning up and reducing access still go through.
+ * paused (ADR 0036 §6) or its workspace isn't active (`standing.ts`).
+ * Following running work (a task's output, canceling it), cleaning up and
+ * reducing access still go through.
  */
 export function isNewWork(request: MachineRequest) {
   switch (request.op) {
@@ -334,11 +336,14 @@ export function createMachineHub(deps: MachineHubDeps) {
     return true;
   };
 
-  /** Starts a task through this socket (resuming one after an interruption). */
+  /** Starts a task through this socket (resuming one after an interruption); not in a paused workspace. */
   const localStarter =
     (conn: MachineConnection): LocalTaskStarter =>
     (input) => {
-      const call: TaskCall = async (_machineId, request) => callLocal(conn, await withAgentName(conn.orgId, request));
+      const call: TaskCall = async (_machineId, request) => {
+        if (conn.orgId) await assertCanWork(db, conn.orgId);
+        return callLocal(conn, await withAgentName(conn.orgId, request));
+      };
       return startMachineTask({ db, pubsub, call }, input);
     };
 
@@ -524,16 +529,24 @@ export function createMachineHub(deps: MachineHubDeps) {
     return agent ? { ...request, agent: { ...scope, name: agent.name } } : request;
   }
 
+  /** Bridge calls of work already on the machine stop with its workspace (`standing.ts`). */
+  async function refused(conn: MachineConnection) {
+    const refusal = conn.orgId ? await standingRefusal(db, conn.orgId) : null;
+    return refusal ? { ok: false as const, error: { code: refusal.code, message: refusal.message } } : null;
+  }
+
   /** `mcp.call` (protocol 5): run by the missions hook, answered with `mcp.result`; never blocks other frames. */
   function mcpCall(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.call" }>) {
     const machineId = conn.machineId as string;
-    const run = hooks.mcp
-      ? hooks.mcp(machineId, frame)
-      : Promise.resolve({
-          ok: false as const,
-          error: { code: "mission.unavailable", message: "Missions are not available on this server." },
-        });
-    void run
+    const run = async () =>
+      (await refused(conn)) ??
+      (hooks.mcp
+        ? hooks.mcp(machineId, frame)
+        : {
+            ok: false as const,
+            error: { code: "mission.unavailable", message: "Missions are not available on this server." },
+          });
+    void run()
       .catch((error: unknown) => ({
         ok: false as const,
         error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
@@ -551,13 +564,15 @@ export function createMachineHub(deps: MachineHubDeps) {
   /** `mcp.list` (protocol 8): answered with `mcp.tools`; never blocks other frames. */
   function mcpList(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.list" }>) {
     const machineId = conn.machineId as string;
-    const run = hooks.mcpList
-      ? hooks.mcpList(machineId, frame)
-      : Promise.resolve({
-          ok: false as const,
-          error: { code: "bridge.unavailable", message: "Tools are not available on this server." },
-        });
-    void run
+    const run = async () =>
+      (await refused(conn)) ??
+      (hooks.mcpList
+        ? hooks.mcpList(machineId, frame)
+        : {
+            ok: false as const,
+            error: { code: "bridge.unavailable", message: "Tools are not available on this server." },
+          });
+    void run()
       .catch((error: unknown) => ({
         ok: false as const,
         error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
@@ -961,10 +976,14 @@ export function createMachineHub(deps: MachineHubDeps) {
     ): Promise<MachineReplies[Op]> {
       const conn = local.get(machineId);
       if (conn) {
-        // Paused (ADR 0036 §6): nothing new starts; the row says until when, in whose time zone.
-        if (isNewWork(request) && pauseActive(conn.pause)) {
-          const row = await getMachineById(db, machineId);
-          if (row) await assertNotPaused(db, row);
+        if (isNewWork(request)) {
+          // A workspace on hold or suspended starts nothing (`standing.ts`).
+          if (conn.orgId) await assertCanWork(db, conn.orgId);
+          // Paused (ADR 0036 §6): nothing new starts; the row says until when, in whose time zone.
+          if (pauseActive(conn.pause)) {
+            const row = await getMachineById(db, machineId);
+            if (row) await assertNotPaused(db, row);
+          }
         }
         return callLocal(conn, await withAgentName(conn.orgId, request), options);
       }
@@ -973,7 +992,10 @@ export function createMachineHub(deps: MachineHubDeps) {
       if (!machineOnline(row) || !row.connectedReplica || row.connectedReplica === replicaId) {
         throw new MachineOfflineError(row.name);
       }
-      if (isNewWork(request)) await assertNotPaused(db, row);
+      if (isNewWork(request)) {
+        await assertCanWork(db, row.orgId);
+        await assertNotPaused(db, row);
+      }
       const named = await withAgentName(row.orgId, request);
       return callRemote({ ...row, connectedReplica: row.connectedReplica }, named, options);
     },

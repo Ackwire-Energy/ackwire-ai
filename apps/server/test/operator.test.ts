@@ -3,7 +3,7 @@ import { testConfig } from "@agenteschat/config";
 import { schema, sql } from "@agenteschat/db";
 import { createLogger } from "../src/logger";
 import { createOperatorApp, type OperatorDeps, serveOperatorApi } from "../src/operator/app";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 const TOKEN = "operator-test-token-".padEnd(48, "x");
 const BEARER = `Bearer ${TOKEN}`;
@@ -12,16 +12,25 @@ let t: TestServer;
 let deps: OperatorDeps;
 /** A request to the operator API with this `Authorization` header (null: none). */
 let op: (path: string, authorization?: string | null) => Promise<Response>;
+/** A PUT of JSON to the operator API. */
+let put: (path: string, json: unknown) => Promise<Response>;
 let acme: { orgId: string; ownerId: string };
+let owner: Browser;
 
 beforeAll(async () => {
   t = await createTestServer({ env: { OPERATOR_API_TOKEN: TOKEN } });
-  deps = { db: t.db, config: t.config, version: "test", log: createLogger("error") };
+  deps = { db: t.db, config: t.config, version: "test", log: createLogger("error"), pubsub: t.adapters.pubsub };
   const app = createOperatorApp(deps, TOKEN);
   op = async (path, authorization = BEARER) =>
     app.request(`/api/operator/v1${path}`, { headers: authorization === null ? {} : { authorization } });
+  put = async (path, json) =>
+    app.request(`/api/operator/v1${path}`, {
+      method: "PUT",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      body: JSON.stringify(json),
+    });
 
-  const owner = browser(t);
+  owner = browser(t);
   await signUp(owner, "owner@acme.test");
   const { orgId } = await seedOrg(owner);
   const [user] = await t.db.select({ id: schema.users.id }).from(schema.users);
@@ -46,7 +55,7 @@ async function body<T = Record<string, unknown>>(res: Response) {
 }
 
 type Page = {
-  orgs: { id: string; name: string; createdAt: string; members: number; agents: number }[];
+  orgs: { id: string; name: string; createdAt: string; standing: string; members: number; agents: number }[];
   next: string | null;
 };
 
@@ -104,7 +113,9 @@ test("org search: by id, part of the name or of a member's email, any case; no w
   expect(await names("_")).toEqual([]);
 
   const { orgs } = await body<Page>(await op(`/orgs?q=${acme.orgId}`));
-  expect(orgs).toEqual([{ id: acme.orgId, name: "Acme", createdAt: expect.any(String), members: 1, agents: 1 }]);
+  expect(orgs).toEqual([
+    { id: acme.orgId, name: "Acme", createdAt: expect.any(String), standing: "active", members: 1, agents: 1 },
+  ]);
 
   const after = encodeURIComponent("2026-01-02T12:00:00Z");
   const recent = await body<Page>(await op(`/orgs?q=paging&createdAfter=${after}`));
@@ -159,6 +170,7 @@ test("org detail: owners and admins, and counts of what is in it", async () => {
     id: orgId,
     name: "Acme",
     createdAt: expect.any(String),
+    standing: { state: "active", reason: null, note: null, notice: "shown", changedAt: null },
     admins: [
       {
         userId: acme.ownerId,
@@ -216,6 +228,65 @@ test("user detail: workspaces and at most the 10 newest sessions", async () => {
   expect(user.sessions.at(-1)?.ip).toBe("198.51.100.2");
 
   expect((await op("/users/nobody")).status).toBe(404);
+});
+
+test("standing: hold, suspend and restore a workspace; the app API enforces it", async () => {
+  const { orgId } = acme;
+  const app = (path: string, init?: Parameters<Browser>[1]) => owner(`/api/app/organizations/${orgId}${path}`, init);
+  const invite = () => app("/invitations", { json: { email: "new-hire@acme.test", role: "member" } });
+  const error = async (res: Response) => ((await res.json()) as { error: Record<string, unknown> }).error;
+
+  for (const bad of [
+    { state: "paused", reason: "x", notice: "shown" },
+    { state: "hold", reason: "", notice: "shown" },
+    { state: "hold", reason: "x".repeat(65), notice: "shown" },
+    { state: "hold", reason: "x", notice: "loud" },
+    { state: "hold", reason: "x" },
+    { state: "hold", reason: "x", notice: "shown", note: "x".repeat(2001) },
+  ]) {
+    expect({ bad, status: (await put(`/orgs/${orgId}/standing`, bad)).status }).toEqual({ bad, status: 400 });
+  }
+  const unknown = await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/standing", {
+    state: "hold",
+    reason: "x",
+    notice: "shown",
+  });
+  expect(unknown.status).toBe(404);
+
+  const held = await body(
+    await put(`/orgs/${orgId}/standing`, { state: "hold", reason: "Unpaid invoice", note: "card", notice: "shown" }),
+  );
+  expect(held).toEqual({
+    state: "hold",
+    reason: "Unpaid invoice",
+    note: "card",
+    notice: "shown",
+    changedAt: expect.any(String),
+  });
+  expect((await body<{ standing: unknown }>(await op(`/orgs/${orgId}`))).standing).toEqual(held);
+  const onHold = await body<Page>(await op("/orgs?standing=hold"));
+  expect(onHold.orgs.map((o) => [o.name, o.standing])).toEqual([["Acme", "hold"]]);
+  // People still use it; nothing new goes out.
+  expect((await app("/members")).status).toBe(200);
+  const refused = await invite();
+  expect(refused.status).toBe(403);
+  expect(await error(refused)).toEqual({
+    code: "org.paused",
+    message: "This workspace is on hold: Unpaid invoice",
+    params: { reason: "Unpaid invoice" },
+  });
+
+  await body(await put(`/orgs/${orgId}/standing`, { state: "suspended", reason: "Phishing", notice: "silent" }));
+  const locked = await app("/members");
+  expect(locked.status).toBe(403);
+  expect(await error(locked)).toEqual({ code: "org.suspended", message: "This workspace is unavailable for now." });
+
+  const restored = await body(
+    await put(`/orgs/${orgId}/standing`, { state: "active", reason: "Cleared", notice: "shown" }),
+  );
+  expect(restored).toMatchObject({ state: "active", reason: "Cleared", note: null });
+  expect((await app("/members")).status).toBe(200);
+  expect((await invite()).status).toBe(201);
 });
 
 test("no answer carries a secret or a field named like one", async () => {

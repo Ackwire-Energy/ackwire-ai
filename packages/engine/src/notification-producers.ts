@@ -677,6 +677,15 @@ export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
 }
 
+/** The organization's owners and admins. */
+const adminsOf = async (deps: NotificationDeps, orgId: string) =>
+  (
+    await deps.db
+      .select({ userId: organizationMembers.userId })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, ["owner", "admin"])))
+  ).map((a) => a.userId);
+
 // ── Connected computers ───────────────────────────────────────────────────────
 
 /**
@@ -689,18 +698,35 @@ export async function notifyMachineConnected(
   machine: { id: string; orgId: string; name: string; hostname: string },
   actorId: string,
 ) {
-  const admins = await deps.db
-    .select({ userId: organizationMembers.userId })
-    .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, machine.orgId), inArray(organizationMembers.role, ["owner", "admin"])));
   await notify(deps, {
     orgId: machine.orgId,
-    userIds: admins.map((a) => a.userId),
+    userIds: await adminsOf(deps, machine.orgId),
     kind: "machine_connected",
     groupKey: `machine_connected:${machine.id}`,
     actor: person(actorId),
     source: { machineId: machine.id, label: machine.name },
     latest: { title: machine.name, ...(machine.hostname ? { text: notificationSnippet(machine.hostname) } : {}) },
+  });
+}
+
+// ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
+
+/**
+ * The people who run this server held, suspended or restored the workspace, with the notice shown: its
+ * owners and admins hear it, with the reason (`latest.text`). One row per change.
+ */
+export async function notifyOrgStanding(
+  deps: NotificationDeps,
+  orgId: string,
+  standing: { state: string; reason: string | null; changedAt: Date | null },
+) {
+  await notify(deps, {
+    orgId,
+    userIds: await adminsOf(deps, orgId),
+    kind: "org_standing",
+    groupKey: `org_standing:${orgId}:${standing.changedAt?.getTime() ?? 0}`,
+    source: {},
+    latest: { statusTo: standing.state, ...(standing.reason ? { text: notificationSnippet(standing.reason) } : {}) },
   });
 }
 

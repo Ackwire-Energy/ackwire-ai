@@ -7,6 +7,7 @@ import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { OrgPausedError, STANDING_COLUMNS } from "./standing";
 
 const { channels, channelMembers, agents, organizationMembers, organizations } = schema;
 
@@ -197,6 +198,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     .select({
       role: organizationMembers.role,
       orgName: organizations.name,
+      standing: STANDING_COLUMNS,
       channel: channels,
       memberId: channelMembers.id,
     })
@@ -209,11 +211,12 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     )
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId)));
   if (!row) throw new ForbiddenError("You are not a member of this organization");
+  if (row.standing.state === "suspended") throw new OrgPausedError(row.standing);
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
   // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.
   if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
-  const membership: Membership = { orgId, orgName: row.orgName, role: row.role };
+  const membership: Membership = { orgId, orgName: row.orgName, role: row.role, standing: row.standing };
   return { channel, membership };
 }
 

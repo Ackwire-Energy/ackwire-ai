@@ -160,6 +160,7 @@ export * from "./secret-helper";
 export * from "./secrets";
 export * from "./skill-tools";
 export * from "./skills";
+export * from "./standing";
 export * from "./storage";
 export * from "./talker";
 export * from "./team";

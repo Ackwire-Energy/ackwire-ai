@@ -3522,7 +3522,9 @@ export type NotificationKind =
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
-  | "browser_handoff";
+  | "browser_handoff"
+  /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
+  | "org_standing";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {

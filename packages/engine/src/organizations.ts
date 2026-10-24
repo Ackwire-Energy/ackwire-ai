@@ -1,11 +1,12 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
+import { assertCanWork, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
 
 const {
   organizations,
@@ -62,6 +63,8 @@ export interface Membership {
   role: MemberRole;
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
+  /** The workspace's standing (`standing.ts`; getMembership). */
+  standing?: WorkspaceStanding;
 }
 
 export async function listMemberships(db: Database, userId: string): Promise<Membership[]> {
@@ -80,23 +83,48 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
 
 export async function getMembership(db: Database, userId: string, orgId: string): Promise<Membership | null> {
   const [row] = await db
-    .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
+    .select({
+      orgId: organizations.id,
+      orgName: organizations.name,
+      role: organizationMembers.role,
+      standing: STANDING_COLUMNS,
+    })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId)));
   return row ?? null;
 }
 
-/** Throws ForbiddenError unless the user is a member with `permission`. Returns the membership. */
+/**
+ * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` for anyone in a
+ * suspended workspace. Returns the membership.
+ */
 export async function requirePermission(db: Database, userId: string, orgId: string, permission: Permission) {
   const membership = await getMembership(db, userId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
   if (!can(membership.role, permission)) throw new ForbiddenError();
   return membership;
 }
 
-/** Creates an organization owned by `userId`, with a `general` channel. */
+/** Invitations go out only from an active workspace (`standing.ts`). */
+function assertInviting(membership: Membership) {
+  if (membership.standing && membership.standing.state !== "active") throw new OrgPausedError(membership.standing);
+}
+
+/**
+ * Creates an organization owned by `userId`, with a `general` channel. Refused while they are in a
+ * workspace on hold or suspended: they don't carry on in a new one (`org.create_refused`, the same words
+ * whatever the notice).
+ */
 export async function createOrganization(db: Database, userId: string, input: { name: string; context?: string }) {
+  const [paused] = await db
+    .select({ id: organizations.id })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
+    .limit(1);
+  if (paused) throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
   return db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)
@@ -529,6 +557,7 @@ export async function createInvitation(
   now = new Date(),
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  assertInviting(actor);
   if (input.role === "owner" && !can(actor.role, "manage_owners"))
     throw new ForbiddenError("Only owners can invite owners");
   const email = input.email.trim().toLowerCase();
@@ -596,7 +625,7 @@ export async function revokeInvitation(db: Database, actorId: string, orgId: str
  * endpoint as email invitations.
  */
 export async function createInviteLink(db: Database, actorId: string, orgId: string, now = new Date()) {
-  await requirePermission(db, actorId, orgId, "manage_members");
+  assertInviting(await requirePermission(db, actorId, orgId, "manage_members"));
   const token = randomToken(32);
   const [link] = await db
     .insert(organizationInviteLinks)
@@ -667,6 +696,8 @@ export async function acceptInvitation(
       if (!link || link.revokedAt || link.expiresAt <= now) {
         throw new ConflictError("This invitation is invalid or has expired");
       }
+      // Nobody joins a workspace on hold or suspended.
+      await assertCanWork(tx, link.orgId);
       await joinOrganization(tx, link.orgId, user.id, link.role);
       await tx
         .update(organizationInviteLinks)
@@ -682,6 +713,7 @@ export async function acceptInvitation(
         `This invitation was sent to ${invitation.email}. Sign in with that address to accept it.`,
       );
     }
+    await assertCanWork(tx, invitation.orgId);
     await joinOrganization(tx, invitation.orgId, user.id, invitation.role);
     await tx
       .update(organizationInvitations)
@@ -773,6 +805,7 @@ export async function resendInvitation(
   now = new Date(),
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  assertInviting(actor);
   const [existing] = await db
     .select()
     .from(organizationInvitations)

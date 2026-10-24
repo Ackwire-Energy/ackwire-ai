@@ -62,6 +62,8 @@ export const NOTIFICATION_KINDS = [
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
   "browser_handoff",
+  /** The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8). */
+  "org_standing",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

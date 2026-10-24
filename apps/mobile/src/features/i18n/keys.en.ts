@@ -668,6 +668,8 @@ export const featureKeysEn: FeatureTranslations = {
       reaction_other: "{{names}} reacted",
       browser_handoff_one: "{{names}} needs you in the browser",
       browser_handoff_other: "{{names}} need you in the browser",
+      org_standing_one: "The workspace's status changed",
+      org_standing_other: "The workspace's status changed",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",

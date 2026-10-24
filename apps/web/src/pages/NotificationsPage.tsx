@@ -274,6 +274,9 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("browserHandoff", { name });
     case "reaction":
       return k("reaction", { names, count });
+    case "org_standing":
+      if (n.latest.statusTo === "suspended") return t("standing.notification.suspended");
+      return n.latest.statusTo === "active" ? t("standing.notification.active") : t("standing.notification.hold");
   }
 }
 

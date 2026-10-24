@@ -448,7 +448,8 @@ doesn't publish it, and containers on the same Docker network reach it as `http:
 With the token set, the server also keeps 90 days of events for it to read (`GET /events`: sign-ups
 with their email, sign-ins with their IP address and browser, workspaces, invitations, agents, emails
 sent and runs finished, as metadata), and `GET /review/...` shows what one run or task did, with
-credentials masked; every such read is recorded as an event.
+credentials masked; every such read is recorded as an event. `PUT /orgs/{orgId}/standing` puts a
+workspace on hold (its agents stop) or suspends it (nobody can use it), and brings it back.
 
 </details>
 

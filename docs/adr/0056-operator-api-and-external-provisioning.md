@@ -35,8 +35,8 @@ The app API (`/api/app/*`) is the wrong door for them: it acts as one person (co
 | Method, path | Answer |
 | --- | --- |
 | `GET /health` | `{ ok, version }` |
-| `GET /orgs?q&createdAfter&limit&cursor` | `{ orgs: [{ id, name, createdAt, members, agents }], next }`, newest first, in keyset pages of up to 200. `q` is an org id, part of the name or part of a member's email, in any case, matched literally |
-| `GET /orgs/{orgId}` | `id, name, createdAt`; owners and admins (`userId, email, name, role, createdAt, lastSeenAt`); counts of members, agents, channels, connected computers and pending invitations |
+| `GET /orgs?q&createdAfter&standing&limit&cursor` | `{ orgs: [{ id, name, createdAt, standing, members, agents }], next }`, newest first, in keyset pages of up to 200. `q` is an org id, part of the name or part of a member's email, in any case, matched literally; `standing` keeps only the workspaces in that state (§8) |
+| `GET /orgs/{orgId}` | `id, name, createdAt`; its standing (§8); owners and admins (`userId, email, name, role, createdAt, lastSeenAt`); counts of members, agents, channels, connected computers and pending invitations |
 | `GET /users/{userId}` | `id, email, name, emailVerified, createdAt`; the workspaces with role; the 10 newest sessions on record (`ip, userAgent, createdAt`) |
 
 The reads live in `packages/engine/src/operator.ts` and pick every field by name. Answers name people and workspaces and say how much is in them, nothing more: never messages, files, prompts or the workspace's context, and never a credential, token or password hash. The review blocks of §6 are the one door to content, and every read of one is recorded.
@@ -80,10 +80,22 @@ The reads live in `packages/engine/src/operator.ts` and pick every field by name
 
 The server never calls the operator's services. What it has for them waits in Postgres until they ask (the events feed above), and what they decide comes back through this API:
 
-- standing: a workspace `active`, on `hold` or `suspended`, an agent held, an account blocked; set here and enforced by the server at its existing choke points (model gateway, computer calls, permission checks, invitations, sign-in);
+- standing: a workspace `active`, on `hold` or `suspended` (§8), an agent held, an account blocked; set here and enforced by the server at its existing choke points (model gateway, computer calls, permission checks, invitations, sign-in);
 - external provisioning (`MACHINE_PROVISIONING=external`): each workspace without a ready computer is a request the provisioner lists. It reports progress, and asks for a single-use enrollment code that the computer redeems through the device-code flow of ADR 0025, so the computer's own token never passes through the provisioner.
 
 Nothing is lost while those services are down, and the server needs no delivery, retry or signing code. These endpoints join this API under the same token and the same contract test.
+
+### 8. Workspace standing
+
+`PUT /orgs/{orgId}/standing` with `{ state: active | hold | suspended, reason (64 characters at most), note? (2000), notice: shown | silent }` answers `{ state, reason, note, notice, changedAt }`. It is enforced where work starts, in `packages/engine/src/standing.ts`, never by a caller remembering to check:
+
+- **`hold`: the agents stop.** The Model Gateway refuses every call. The machine hub refuses new work, and the bridge calls (`mcp.call`, `mcp.list`) of work already on a computer. A run that starts fails at once and says so, before any judge or model call, and leaves no new run for the messages it had taken. A routine's slot is skipped (`org_paused`) and the routine keeps its schedule. The router and the judge ask nothing: Jev bills the server, not the workspace. No invitation is sent, resent or accepted. People still read and write.
+- **`suspended`: the workspace is closed.** All of the above, and every permission check (`requirePermission`, channel access) refuses with `org.suspended` (403).
+- Someone in a workspace that isn't active can't create another one (`org.create_refused`), so the work doesn't carry on elsewhere.
+- **`shown`**: the workspace reads the reason ("This workspace is on hold: …", error `params.reason`), the change goes into its audit log (actor `system`), and a new state notifies its owners and admins (`org_standing`). **`silent`**: it reads only "Agents in this workspace are paused for now." or "This workspace is unavailable for now.", and gets no reason, audit row or notification: someone abusing it learns nothing about what was seen. The note never leaves this API.
+- Members hear `org.standing` (`state`, and `reason` when shown) on the workspace's realtime topic. Setting what is already set tells nobody again.
+- Each process caches a workspace's standing for 5 seconds: a change applies at once in the process that made it and within 5 seconds in the others.
+- What it doesn't stop: work already running on a computer (a background task, a computer brain's turn) goes on until its next model, computer or bridge call. Cutting that off at once is up to the operator's own controls on the computer.
 
 ## Consequences
 

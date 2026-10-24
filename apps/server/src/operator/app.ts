@@ -1,3 +1,4 @@
+import type { PubSub } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import { safeEqual } from "@agenteschat/engine";
@@ -6,6 +7,7 @@ import { apiError, domainErrorResponse, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
 import { registerOperatorEvents } from "./events";
 import { registerOperatorOrgs } from "./orgs";
+import { registerOperatorStanding } from "./standing";
 
 /** Versioned because its caller deploys apart from this server (ADR 0056 §3). */
 export const OPERATOR_API_PREFIX = "/api/operator/v1";
@@ -15,6 +17,8 @@ export interface OperatorDeps {
   config: Config;
   version: string;
   log: Logger;
+  /** Tells a workspace's members and admins of a change of standing (absent: nobody hears it live). */
+  pubsub?: PubSub;
 }
 
 /**
@@ -37,6 +41,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
     await next();
   });
   registerOperatorOrgs(api, deps);
+  registerOperatorStanding(api, deps);
   registerOperatorEvents(api, deps);
   api.doc31("/openapi.json", {
     openapi: "3.1.0",
@@ -44,7 +49,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, the events feed and review blocks, for the people who run this instance (ADR 0056).",
+        "Workspace and account lookups, workspace standing, the events feed and review blocks, for the people who run this instance (ADR 0056).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],
