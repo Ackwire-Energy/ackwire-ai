@@ -1,6 +1,7 @@
 import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
+  useAiAccounts,
   useConnections,
   useCredentials,
   useInvitations,
@@ -49,6 +50,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ImportExportSection } from "@/components/ImportFlow";
@@ -142,7 +144,12 @@ export function SettingsPage({
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}
-        {current === "keys" && <KeysSection />}
+        {current === "keys" && (
+          <>
+            <AiAccountsSection />
+            <KeysSection />
+          </>
+        )}
         {current === "storage" && <StorageSection />}
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
@@ -351,7 +358,9 @@ function SettingsTiles() {
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, shown("skills"));
   const machines = useMachines(org.id, shown("computers"));
-  const credentials = useCredentials(org.id, shown("keys"));
+  const managesKeys = can(role, "manage_credentials");
+  const credentials = useCredentials(org.id, managesKeys);
+  const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
   const platform = usePlatformKey(org.id);
   const storage = useStorage(org.id, shown("storage"));
 
@@ -389,13 +398,17 @@ function SettingsTiles() {
     usage:
       overview.data &&
       t("settings.tileState.usage", { percent: formatPercent(i18n.language, overview.data.budgetUsedPercent) }),
-    keys:
-      credentials.data &&
-      (keys.length > 0
-        ? t("settings.tileState.keys", { count: keys.length })
-        : platform.data
-          ? t("settings.tileState.platformKey")
-          : t("settings.tileState.noKeys")),
+    keys: managesKeys
+      ? credentials.data &&
+        (keys.length > 0
+          ? t("settings.tileState.keys", { count: keys.length })
+          : platform.data
+            ? t("settings.tileState.platformKey")
+            : t("settings.tileState.noKeys"))
+      : plans.data &&
+        (plans.data.accounts.length > 0
+          ? t("settings.tileState.plans", { count: plans.data.accounts.length })
+          : t("settings.tileState.noPlans")),
     storage: storage.data && t(storage.data.kind === "s3" ? "storage.s3" : "storage.agentes"),
   };
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };

@@ -4,9 +4,11 @@ import {
   type BrainEffort,
   isBrainEffort,
   type OwnPlanUsage,
+  PLAN_KEYS_PROTOCOL,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { planAliases, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
@@ -76,8 +78,18 @@ export const codexModels = (): BrainModelOption[] =>
     .filter(([, m]) => m.provider === "openai")
     .map(([id, m]) => ({ value: id, label: m.label, modelId: id, ...(m.recommended ? { recommended: true } : {}) }));
 
-/** The model choices of a brain (none for the model brain: it uses the agent's model). */
-export function brainModelOptions(kind: BrainKind): BrainModelOption[] {
+/**
+ * The model choices of a brain (none for the model brain: it uses the agent's model). Claude Code on a
+ * coding plan keeps its aliases, named after what the plan runs for each.
+ */
+export function brainModelOptions(kind: BrainKind, provider?: string | null): BrainModelOption[] {
+  const plan = kind === "claude_code" ? planOf(provider) : undefined;
+  if (plan) {
+    return planAliases(plan).map((value) => {
+      const m = planModel(plan, value);
+      return { value, label: m.label, modelId: m.id, ...(value === "sonnet" ? { recommended: true } : {}) };
+    });
+  }
   if (kind === "claude_code") return [...CLAUDE_CODE_MODELS];
   if (kind === "codex") return codexModels();
   return [];
@@ -745,11 +757,19 @@ export interface AgentBrainSummary {
   kind: BrainKind;
   model: string | null;
   computer?: string;
+  /** A key account's coding plan (`zai`…): its maker's model thinks, through Claude Code. */
+  provider?: string;
 }
 
-/** The label of a computer brain's model ("opus" → "Opus"; a typed Codex model as is). */
-export function brainModelLabel(kind: BrainKind, model: string | null | undefined): string | null {
+/** The label of a computer brain's model ("opus" → "Opus", "GLM-5.3" on a plan; a typed Codex model as is). */
+export function brainModelLabel(
+  kind: BrainKind,
+  model: string | null | undefined,
+  provider?: string | null,
+): string | null {
   if (kind === "model") return null;
+  const plan = kind === "claude_code" ? planOf(provider) : undefined;
+  if (plan) return planModel(plan, isAutoModel(model) ? null : model).label;
   const value = model ?? defaultBrainModel(kind);
   if (!value) return null;
   return brainModelOptions(kind).find((o) => o.value === value)?.label ?? value;
@@ -766,12 +786,30 @@ export async function agentBrainSummaries(
     brainModel: string | null;
     machineId: string | null;
     ownerUserId: string | null;
+    brainAccountId?: string | null;
   }[],
 ): Promise<Map<string, AgentBrainSummary>> {
   const out = new Map<string, AgentBrainSummary>();
   const computerIds = [
     ...new Set(agents.filter((a) => brainOf(a.brain) !== "model" && a.machineId).map((a) => a.machineId as string)),
   ];
+  const accountIds = [
+    ...new Set(
+      agents
+        .filter((a) => brainOf(a.brain) === "claude_code" && a.brainAccountId)
+        .map((a) => a.brainAccountId as string),
+    ),
+  ];
+  const plans = new Map(
+    accountIds.length
+      ? (
+          await db
+            .select({ id: schema.machineAccounts.id, provider: schema.machineAccounts.provider })
+            .from(schema.machineAccounts)
+            .where(and(eq(schema.machineAccounts.orgId, orgId), inArray(schema.machineAccounts.id, accountIds)))
+        ).flatMap((r) => (r.provider ? [[r.id, r.provider] as const] : []))
+      : [],
+  );
   const [membership, machines] = await Promise.all([
     computerIds.length ? getMembership(db, viewerId, orgId) : Promise.resolve(null),
     computerIds.length
@@ -786,11 +824,69 @@ export async function agentBrainSummaries(
   for (const a of agents) {
     const kind = brainOf(a.brain);
     const computer = a.machineId && (manages || a.ownerUserId === viewerId) ? names.get(a.machineId) : undefined;
+    const provider = kind === "claude_code" && a.brainAccountId ? plans.get(a.brainAccountId) : undefined;
     out.set(a.id, {
       kind,
-      model: brainModelLabel(kind, a.brainModel),
+      model: brainModelLabel(kind, a.brainModel, provider),
       ...(kind !== "model" && computer ? { computer } : {}),
+      ...(provider ? { provider } : {}),
     });
   }
   return out;
+}
+
+// ── Contas de IA ────────────────────────────────────────────────────────────
+
+/** A computer of the organization as the AI accounts page needs it. */
+export interface AiComputer {
+  machineId: string;
+  name: string;
+  online: boolean;
+  /** The caller connected it. */
+  mine: boolean;
+  /** The caller adds accounts there (they connected it, or nobody did), on a runner that knows accounts. */
+  canAdd: boolean;
+  /** Its runner takes coding plans' keys (protocol 19). */
+  keys: boolean;
+  /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
+  brains: { claude_code: boolean; codex: boolean };
+}
+
+export interface AiAccountsView {
+  /** The caller's own accounts, on every computer, each with where it is. */
+  accounts: (MachineAccountView & { machineId: string; computer: string })[];
+  computers: AiComputer[];
+}
+
+/** `GET …/ai-accounts` (any member): the caller's plans and keys on the computers, and where they can add one. */
+export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: string): Promise<AiAccountsView> {
+  await requirePermission(deps.db, userId, orgId, "read");
+  const rows = await deps.db
+    .select()
+    .from(schema.machines)
+    .where(and(eq(schema.machines.orgId, orgId), isNull(schema.machines.deletedAt)))
+    .orderBy(schema.machines.createdAt);
+  const accounts = await Promise.all(
+    rows.map(async (m) =>
+      (await listMachineAccounts(deps, orgId, m.id, userId))
+        .filter((a) => a.mine)
+        .map((a) => ({ ...a, machineId: m.id, computer: m.name })),
+    ),
+  );
+  return {
+    accounts: accounts.flat(),
+    computers: rows.map((m) => {
+      const options = brainOptions(m);
+      const can = (kind: BrainKind) => options.some((o) => o.kind === kind && o.available);
+      return {
+        machineId: m.id,
+        name: m.name,
+        online: machineOnline(m),
+        mine: m.pairedByUserId === userId,
+        canAdd: mayAddAccounts(m, userId) && m.protocol >= ACCOUNTS_PROTOCOL,
+        keys: m.protocol >= PLAN_KEYS_PROTOCOL,
+        brains: { claude_code: can("claude_code"), codex: can("codex") },
+      };
+    }),
+  };
 }

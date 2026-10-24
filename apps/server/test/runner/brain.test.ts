@@ -15,6 +15,7 @@ import {
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
 import {
+  accountSettingsEnv,
   BRAIN_BUILTIN_TOOLS,
   BrainManager,
   type BrainManagerOptions,
@@ -24,6 +25,7 @@ import {
   claudeBrainArgs,
   claudeCapabilities,
   fallbackModelFor,
+  planAlias,
   STEER_CAPABILITY,
   STEER_NOW_CAPABILITY,
   steerSupport,
@@ -772,6 +774,128 @@ test.if(posix)(
     }
   },
 );
+
+test.if(posix)(
+  "a coding plan's key: endpoint and model aliases pinned in the runner's own --settings, the key only in the env, never sent back",
+  async () => {
+    const stray = {
+      ANTHROPIC_API_KEY: "sk-ant-stray",
+      ANTHROPIC_BASE_URL: "https://elsewhere.test",
+      HTTPS_PROXY: "http://proxy.local:3128",
+    };
+    Object.assign(process.env, stray);
+    try {
+      const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
+      const KIMI = "sk-kimi-0123456789abcdefABCDEF";
+      const zai = tempDir("plan-zai-");
+      const kimi = tempDir("plan-kimi-");
+      const signedIn = tempDir("claude-account-");
+      dirs.push(zai, kimi, signedIn);
+      writeFileSync(path.join(zai, "provider.json"), JSON.stringify({ provider: "zai", key: KEY }), { mode: 0o600 });
+      writeFileSync(path.join(kimi, "provider.json"), JSON.stringify({ provider: "kimi", key: KIMI }), { mode: 0o600 });
+      const KIMI_ACCOUNT = "0193ffff-0000-7000-8000-000000000002";
+      const SIGNED_IN = "0193ffff-0000-7000-8000-000000000003";
+      const folders: Record<string, string> = { [ACCOUNT]: zai, [KIMI_ACCOUNT]: kimi, [SIGNED_IN]: signedIn };
+      const { spawns, turn } = setup({
+        accounts: { accountDir: (kind, id) => (kind === "claude_code" ? (folders[id] ?? null) : null) },
+      });
+      type Run = {
+        args: string[];
+        configDir: string | null;
+        apiKey: string | null;
+        authToken: string | null;
+        settingsEnv: Record<string, string> | null;
+      };
+      const runs = () => spawns() as unknown as Run[];
+      const flag = (run: Run | undefined, name: string) => run?.args[run.args.indexOf(name) + 1];
+
+      const r = await turn(1, "ECHOKEY", { account: ACCOUNT, model: "opus" });
+      expect(r.final).toMatchObject({ type: "done" });
+      const glm = runs()[0];
+      expect(glm?.configDir).toBe(zai);
+      // The plan's token variable only: no stray key, and the key in no file the CLI reads.
+      expect(glm?.apiKey).toBeNull();
+      expect(glm?.authToken).toBe(KEY);
+      expect(glm?.settingsEnv).toEqual({
+        ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic",
+        CLAUDE_CODE_USE_BEDROCK: "",
+        CLAUDE_CODE_USE_VERTEX: "",
+        CLAUDE_CODE_USE_FOUNDRY: "",
+        HTTPS_PROXY: "http://proxy.local:3128",
+        https_proxy: "",
+        HTTP_PROXY: "",
+        http_proxy: "",
+        ALL_PROXY: "",
+        all_proxy: "",
+        NO_PROXY: "",
+        no_proxy: "",
+        NODE_EXTRA_CA_CERTS: "",
+        SSL_CERT_FILE: "",
+        SSL_CERT_DIR: "",
+        NODE_TLS_REJECT_UNAUTHORIZED: "",
+        ANTHROPIC_DEFAULT_OPUS_MODEL: "glm-5.3[1m]",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-5.3[1m]",
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-5.3-flash[1m]",
+        CLAUDE_CODE_SUBAGENT_MODEL: "glm-5.3[1m]",
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+        API_TIMEOUT_MS: "3000000",
+      });
+      // The agent keeps its alias (the plan names the model), with no fallback model.
+      expect(flag(glm, "--model")).toBe("opus");
+      expect(glm?.args).not.toContain("--fallback-model");
+      expect(glm?.args).toContain("--settings");
+      // What the CLI printed with the key comes back redacted.
+      const sent = JSON.stringify([r.final, ...r.events]);
+      expect(sent).not.toContain(KEY);
+      expect(sent).toContain("[secret:ANTHROPIC_AUTH_TOKEN]");
+
+      // Its endpoint refuses the key: the turn ends at once (the CLI would retry for minutes), as signed out.
+      const started = Date.now();
+      const refused = await turn(9, "KEY401", {
+        account: ACCOUNT,
+        model: "opus",
+        session: { id: SESSION(9), resume: false },
+      });
+      expect(refused.final).toMatchObject({ type: "error", code: "not_logged_in", retryable: true });
+      expect(Date.now() - started).toBeLessThan(10_000);
+
+      // A model that isn't an alias runs as sonnet; Kimi Code reads its key from ANTHROPIC_API_KEY.
+      await turn(2, "hi", {
+        account: KIMI_ACCOUNT,
+        model: "claude-opus-5-5",
+        session: { id: SESSION(2), resume: false },
+      });
+      const k = runs()[2];
+      expect(flag(k, "--model")).toBe("sonnet");
+      expect(k?.apiKey).toBe(KIMI);
+      expect(k?.authToken).toBeNull();
+      expect(k?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.kimi.ai/coding/");
+      expect(k?.settingsEnv?.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("kimi-for-coding");
+
+      // A sign-in account pins Anthropic's own endpoint; the computer's own sign-in is left as the person set it.
+      await turn(3, "hi", { account: SIGNED_IN, model: "opus", session: { id: SESSION(3), resume: false } });
+      const own = runs()[3];
+      expect(own?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+      expect(own?.settingsEnv?.ANTHROPIC_DEFAULT_SONNET_MODEL).toBeUndefined();
+      expect(flag(own, "--fallback-model")).toBe("sonnet");
+      await turn(4, "hi", { session: { id: SESSION(4), resume: false } });
+      expect(runs()[4]?.settingsEnv).toBeNull();
+      expect(runs()[4]?.apiKey).toBe("sk-ant-stray");
+    } finally {
+      for (const k of Object.keys(stray)) delete process.env[k];
+    }
+  },
+);
+
+test("plan aliases and the pinned env without a plan", () => {
+  expect(planAlias("haiku")).toBe("haiku");
+  for (const other of [undefined, "auto", "claude-opus-5-5", "glm-5.3"]) expect(planAlias(other)).toBe("sonnet");
+  const env = accountSettingsEnv(undefined, "opus", { HTTP_PROXY: "http://p:1", PATH: "/bin" });
+  expect(env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+  expect(env.HTTP_PROXY).toBe("http://p:1");
+  expect(env.PATH).toBeUndefined();
+  expect(Object.keys(env).some((k) => k.startsWith("ANTHROPIC_DEFAULT_"))).toBe(false);
+});
 
 test.if(posix)("an account that isn't on the computer is account_missing, never another account", async () => {
   const { spawns, turn } = setup({ accounts: { accountDir: () => null } });

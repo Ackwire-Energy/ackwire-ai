@@ -259,7 +259,14 @@ export async function publishMachineUpdated(
 /** The agents of the org pointed at this machine, as its `agents` frame lists them (protocol 9). */
 export async function machineAgents(db: Database, orgId: string, machineId: string): Promise<MachineAgent[]> {
   const rows = await db
-    .select({ id: agents.id, handle: agents.handle, name: agents.name, appearance: agents.appearance })
+    .select({
+      id: agents.id,
+      handle: agents.handle,
+      name: agents.name,
+      appearance: agents.appearance,
+      brain: agents.brain,
+      account: agents.brainAccountId,
+    })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machineId), isNull(agents.archivedAt)))
     .orderBy(agents.createdAt);
@@ -270,6 +277,8 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
     ...(a.appearance
       ? { look: { color: a.appearance.color, eyes: a.appearance.eyes, accessory: a.appearance.accessory } }
       : {}),
+    // System mode keeps an account's folder with this agent's user only while it thinks with it.
+    ...(a.account && a.brain !== "model" ? { account: a.account } : {}),
   }));
 }
 

@@ -384,8 +384,11 @@ export function agentRoutes(deps: AppDeps) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
-      // Its computer shows its name and look (the desktop app, ADR 0036).
-      if (agent.machineId && (input.name !== undefined || appearance !== undefined)) {
+      // Its computer shows its name and look (the desktop app, ADR 0036), and a new owner may take its plan away.
+      if (
+        agent.machineId &&
+        (input.name !== undefined || appearance !== undefined || input.ownerUserId !== undefined)
+      ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
       const [seesCost, brains] = await Promise.all([
@@ -493,7 +496,10 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      return c.json(await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json")), 200);
+      const view = await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json"));
+      // Its computer hears which account each agent thinks with (system mode lends the folders by it).
+      if (view.computer) await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      return c.json(view, 200);
     },
   );
 

@@ -74,8 +74,9 @@ describe("provider marks where a provider is named", () => {
     expect(brainLine().querySelector(".ac-brand")?.getAttribute("aria-hidden")).toBe("true");
     cleanup();
 
+    // A coding plan names its maker's model; who doesn't see the computer reads whose plan it is.
     await open(`dm/agent/${ADA_ID}`, withBrain({ kind: "claude_code", model: "GLM-5.3", provider: "zai" }));
-    expect(brainLine().textContent).toBe("Claude Code · GLM-5.3");
+    expect(brainLine().textContent).toBe("GLM-5.3 pelo Claude Code · plano de João");
     expect(marks(brainLine())).toEqual(["zai"]);
     cleanup();
 

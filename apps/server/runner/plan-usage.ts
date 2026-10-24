@@ -7,6 +7,7 @@ import {
   type PlanWindow,
   type PlanWindowKind,
 } from "@agenteschat/adapters/machine-protocol";
+import { type PlanId, planOf } from "@agenteschat/providers/plans";
 import { killTree } from "./exec";
 import { resolveCommand } from "./executors";
 
@@ -233,15 +234,12 @@ function opencodeWindows(body: unknown): PlanWindow[] {
   return out;
 }
 
-/** The coding plans whose provider says their usage to a key (`auth`: a bearer token or the raw key). */
-export const PLAN_KEY_USAGE = new Map<
-  string,
-  { url: string; auth: "bearer" | "raw"; windows: (body: unknown) => PlanWindow[] }
->([
-  ["zai", { url: "https://api.z.ai/api/monitor/usage/quota/limit", auth: "raw", windows: zaiWindows }],
-  ["kimi", { url: "https://api.kimi.com/coding/v1/usages", auth: "bearer", windows: kimiWindows }],
-  ["opencode", { url: "https://opencode.ai/zen/go/v1/usage", auth: "bearer", windows: opencodeWindows }],
-]);
+/** How each coding plan's usage endpoint (`plans.ts` `usage`) answers, as windows. */
+const PLAN_KEY_WINDOWS: Partial<Record<PlanId, (body: unknown) => PlanWindow[]>> = {
+  zai: zaiWindows,
+  kimi: kimiWindows,
+  opencode: opencodeWindows,
+};
 
 /**
  * A coding plan's usage from its provider: the snapshot; `"backoff"` when it
@@ -253,8 +251,9 @@ export async function fetchPlanKeyUsage(
   key: string,
   opts: { fetch?: typeof fetch; now?: number; timeoutMs?: number } = {},
 ): Promise<PlanUsage | "backoff" | null> {
-  const endpoint = PLAN_KEY_USAGE.get(provider);
-  if (!endpoint || !key || /[\r\n]/.test(key)) return null;
+  const endpoint = planOf(provider)?.usage;
+  const windows = endpoint ? PLAN_KEY_WINDOWS[provider as PlanId] : undefined;
+  if (!endpoint || !windows || !key || /[\r\n]/.test(key)) return null;
   try {
     const res = await (opts.fetch ?? fetch)(endpoint.url, {
       headers: { Authorization: endpoint.auth === "bearer" ? `Bearer ${key}` : key, Accept: "application/json" },
@@ -263,7 +262,7 @@ export async function fetchPlanKeyUsage(
     });
     if (res.status === 429) return "backoff";
     if (!res.ok) return null;
-    return snapshot(endpoint.windows(await res.json()), "probe", opts.now ?? Date.now());
+    return snapshot(windows(await res.json()), "probe", opts.now ?? Date.now());
   } catch {
     return null;
   }

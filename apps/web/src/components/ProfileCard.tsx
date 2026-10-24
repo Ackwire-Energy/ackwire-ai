@@ -194,7 +194,8 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const model = isAuto(agent.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
-  const thinks = agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model) : null;
+  const thinks =
+    agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model, owner?.split(" ")[0]) : null;
   return (
     <div className="profile-card__body">
       <div className="profile-card__head">

@@ -276,6 +276,58 @@ test("the computer's own ops stay in the supervisor; an agent's go to its worker
   expect(ana.of("request")).toHaveLength(2);
 });
 
+test("a brain turn's account goes to its agent's user before the turn reaches the worker; root marks what it refused", async () => {
+  const lends: [string, string, number][] = [];
+  const refused: string[] = [];
+  const t = setup({
+    lend: async (kind, id, uid) => {
+      lends.push([kind, id, uid]);
+    },
+  });
+  t.ctx.accounts = {
+    refused: async (_kind: string, id: string) => {
+      refused.push(id);
+    },
+    invalidate: () => {},
+    refresh: async () => [],
+  } as unknown as AccountManager;
+  t.sup.boot();
+  t.sup.attach();
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+  const turn = (account?: string) =>
+    ({
+      op: "brain.turn",
+      kind: "claude_code",
+      runId: "run-00000001",
+      session: { id: "0193aaaa-0000-7000-8000-000000000001", resume: false },
+      prompt: "hi",
+      ...(account ? { account } : {}),
+      agent: BIA,
+    }) as MachineRequest;
+  const run = handleRequest(t.ctx, turn(ACCOUNT), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  expect(lends).toEqual([["claude_code", ACCOUNT, 21001]]);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const q = await requestOn(bia);
+  const final = { type: "error", code: "not_logged_in", message: "Invalid API key", retryable: true };
+  bia.send({ type: "result", id: q.id, ok: true, data: { runId: "run-00000001", final } });
+  expect(await run).toEqual({ runId: "run-00000001", final });
+  await waitFor(() => refused.length === 1);
+  expect(refused).toEqual([ACCOUNT]);
+  // Without an account nothing is lent.
+  const plain = handleRequest(t.ctx, turn(), scope().scope);
+  const q2 = await requestOn(bia, 2);
+  bia.send({
+    type: "result",
+    id: q2.id,
+    ok: true,
+    data: { runId: "run-00000001", final: { type: "done", text: "ok" } },
+  });
+  await plain;
+  expect(lends).toHaveLength(1);
+});
+
 test("a cancel reaches only the worker that runs that request", async () => {
   const t = setup();
   t.sup.boot();

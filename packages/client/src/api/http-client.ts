@@ -20,6 +20,7 @@ import type {
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiAccounts,
   AppNotification,
   Approval,
   Artifact,
@@ -61,6 +62,7 @@ import type {
   IssueColumn,
   Machine,
   MachineAccess,
+  MachineAccount,
   MachineOutages,
   MachineTask,
   MailAccount,
@@ -558,9 +560,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
-      beginAccountLogin: (orgId, machineId, kind, accountId) =>
+      beginAccountLogin: (orgId, machineId, kind, options = {}) =>
         request<AccountLoginStart>(`${org(orgId)}/machines/${enc(machineId)}/account-logins`, {
-          json: { kind, ...(accountId ? { accountId } : {}) },
+          json: {
+            kind,
+            ...(options.accountId ? { accountId: options.accountId } : {}),
+            ...(options.email ? { email: options.email } : {}),
+            ...(options.provider ? { provider: options.provider } : {}),
+          },
         }),
       sendAccountCode: (orgId, machineId, loginId, box) =>
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}/code`, {
@@ -573,6 +580,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           method: "DELETE",
         }),
       refreshAccountUsage: (orgId) => request<void>(`${org(orgId)}/ai-accounts/refresh`, { json: {} }),
+      aiAccounts: (orgId) => request<AiAccounts>(`${org(orgId)}/ai-accounts`),
+      renameAccount: (orgId, machineId, accountId, label) =>
+        request<MachineAccount>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, {
+          method: "PATCH",
+          json: { label },
+        }),
+      removeAccount: (orgId, machineId, accountId) =>
+        request<void>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, { method: "DELETE" }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

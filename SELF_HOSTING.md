@@ -501,7 +501,7 @@ load extra CA certificates.
 <details>
 <summary><b>AI: plans and keys</b></summary>
 
-**API keys.** Each organization adds its own provider keys in **Settings → API keys**. They are
+**API keys.** Each organization adds its own provider keys in **Settings → AI accounts**. They are
 stored encrypted with a key derived from `AGENTES_SECRET`, never sent back to a browser, and every
 model call goes through the server, which records its usage and cost per agent.
 
@@ -513,6 +513,17 @@ name, email, plan, status and usage (how much of each limit is used, and when it
 there says it). The code pasted when signing in from a browser is encrypted there to a
 key made on the computer and relayed without being stored, so the server can't read it. A personal
 plan is meant for its owner: answering other people with it may go against the provider's terms.
+
+**Coding plans.** A GLM Coding Plan, Kimi Code, MiniMax or OpenCode Go key thinks through Claude Code
+on that computer, in its own account folder: the key is encrypted in the browser to the computer and
+kept only in the folder (`provider.json`, mode 600); the server keeps its last 4 characters. Where a
+turn's requests go comes from the runner's own list of plans, not from anything a project can set.
+Each person adds them in **Settings → AI accounts**.
+
+**Who can reach an account.** With every agent running as the runner's own user (the default
+install), any agent on that computer could reach every account folder there; the runner keeps them
+out of what agents read, but the OS doesn't. With `install.sh --system` each agent is its own user,
+and an account folder belongs to the user of the agent that thinks with it, only while it does.
 
 **Backups.** Leave `<runner home>/accounts`, and the CLIs' own `~/.claude` and `~/.codex`, out of the
 computer's backups: they hold sign-ins. The server's database never has them.

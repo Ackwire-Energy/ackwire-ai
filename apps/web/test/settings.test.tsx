@@ -221,7 +221,7 @@ describe("Configurações da organização", () => {
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
   });
 
-  test("members see settings read-only, without keys or usage", async () => {
+  test("members see settings read-only, without the workspace's keys or usage (their own plans, yes)", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
@@ -232,14 +232,18 @@ describe("Configurações da organização", () => {
       within(nav)
         .getAllByRole("link")
         .map((l) => l.textContent),
-    ).toEqual(["Geral", "Membros e convites", "Conectores", "Computadores"]);
+    ).toEqual(["Geral", "Membros e convites", "Conectores", "Computadores", "Contas de IA"]);
     cleanup();
     await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();
     cleanup();
-    // A section they can't open falls back to Geral.
+    // Contas de IA: their own plans, never the workspace's keys.
     await go(state, "settings/keys");
+    expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
+    cleanup();
+    // A section they can't open falls back to Geral.
+    await go(state, "settings/usage");
     expect(screen().queryByRole("region", { name: "Uso deste mês" })).toBeNull();
   });
 });

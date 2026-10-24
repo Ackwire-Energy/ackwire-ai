@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { accountCodeAad, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret } from "@agenteschat/adapters/secret-box";
@@ -7,6 +7,7 @@ import {
   AccountManager,
   type AccountManagerOptions,
   accountEnv,
+  lentAccounts,
   parseClaudeLoginUrl,
   parseClaudeStatus,
   parseCodexLogin,
@@ -376,6 +377,184 @@ test.if(posix)("list is cached: a second look doesn't run the CLIs again", async
   m.invalidate();
   await m.list();
   expect(runs().length).toBe(n + 1);
+});
+
+// ── Coding plans' keys (protocol 19) ─────────────────────────────────────────
+
+const GLM_KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
+
+test.if(posix)(
+  "a plan's key: begin makes the folder and a key pair (no CLI), the sealed key is kept (600) and listed; refused, signed out",
+  async () => {
+    const lines: string[] = [];
+    const { m, root, runs, changes } = setup({ log: (l) => lines.push(l) });
+    const id = LOGIN(40);
+    const begun = await m.begin("claude_code", id, false, undefined, "zai");
+    expect(begun.url).toBeUndefined();
+    expect(typeof begun.publicKey).toBe("string");
+    const dir = path.join(root, "claude_code", id);
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
+    expect(m.status(id)).toEqual({ state: "waiting" });
+    expect(m.accountDir("claude_code", id)).toBeNull();
+    expect(await m.list()).toEqual([]);
+
+    // Not a key: refused, and the error never repeats what was pasted.
+    const wrong = await sealed(begun.publicKey as string, id, "my password 1234");
+    const err = await m.code(id, wrong.aad, wrong.box).catch((e: Error & { code?: string }) => e);
+    expect(err).toMatchObject({ code: "bad_request" });
+    expect((err as Error).message).not.toContain("password");
+    expect(m.status(id).state).toBe("waiting");
+
+    const { aad, box } = await sealed(begun.publicKey as string, id, `  ${GLM_KEY}\n`);
+    const before = changes();
+    await m.code(id, aad, box);
+    const account = { id, kind: "claude_code" as const, loggedIn: true, provider: "zai", keyHint: "MnOp" };
+    expect(m.status(id)).toEqual({ state: "done", account });
+    expect(changes()).toBeGreaterThan(before);
+    const file = path.join(dir, "provider.json");
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ provider: "zai", key: GLM_KEY });
+    expect(existsSync(path.join(dir, ".signing-in"))).toBe(false);
+    expect(m.accountDir("claude_code", id)).toBe(dir);
+    // Signed in without asking any CLI.
+    m.invalidate();
+    expect(await m.list()).toEqual([account]);
+    expect(runs()).toHaveLength(0);
+
+    // Its endpoint refused the key in a turn: signed out until another key comes.
+    await m.refused("claude_code", id);
+    m.invalidate();
+    expect(await m.list()).toEqual([{ ...account, loggedIn: false }]);
+    const again = await m.begin("claude_code", id, true, undefined, "zai");
+    const next = await sealed(again.publicKey as string, id, `${GLM_KEY}9`);
+    await m.code(id, next.aad, next.box);
+    m.invalidate();
+    expect(await m.list()).toEqual([{ ...account, keyHint: "nOp9" }]);
+
+    // Removed: nothing to sign out of, the folder goes.
+    expect(await m.remove("claude_code", id)).toBe(true);
+    expect(existsSync(dir)).toBe(false);
+    expect(runs()).toHaveLength(0);
+    // The key never reached a log line.
+    expect(lines.join("\n")).not.toContain("0123456789abcdef");
+    expect(lines.join("\n")).not.toContain("AbCdEf");
+
+    // Only Claude Code takes a plan, and only one this computer knows.
+    expect(await errorCode(() => m.begin("claude_code", LOGIN(41), false, undefined, "nope"))).toBe("bad_request");
+    expect(await errorCode(() => m.begin("codex", LOGIN(42), false, undefined, "zai"))).toBe("bad_request");
+    expect(await errorCode(() => m.begin("claude_code", LOGIN(43), false, "a@b.co", "zai"))).toBe("bad_request");
+    // OpenCode Go's keys start with oc_sk_.
+    const oc = await m.begin("claude_code", LOGIN(44), false, undefined, "opencode");
+    const notOc = await sealed(oc.publicKey as string, LOGIN(44), GLM_KEY);
+    expect(await errorCode(() => m.code(LOGIN(44), notOc.aad, notOc.box))).toBe("bad_request");
+  },
+);
+
+test.if(posix)("a key sign-in nobody finishes expires and leaves no folder", async () => {
+  const { m, root } = setup({ ttlMs: 300 });
+  const id = LOGIN(45);
+  await m.begin("claude_code", id, false, undefined, "minimax");
+  await waitFor(() => m.status(id).state === "expired", 3000);
+  await waitFor(() => !existsSync(path.join(root, "claude_code", id)));
+});
+
+// ── System mode: folders lent to agents' users ───────────────────────────────
+
+test.if(posix)(
+  "system mode: a folder goes to the agent's user bottom-up and back to root top-down, never through a link, and root runs no CLI there again",
+  async () => {
+    const calls: [string, number, number][] = [];
+    const chown = async (file: string, uid: number, gid: number) => {
+      calls.push([file, uid, gid]);
+    };
+    const { m, root, runs } = setup({ lending: { chown } });
+    const id = LOGIN(50);
+    const dir = path.join(root, "claude_code", id);
+    mkdirSync(path.join(dir, "projects", "p1"), { recursive: true });
+    writeFileSync(path.join(dir, "signed-in"), "");
+    writeFileSync(path.join(dir, "projects", "p1", "s.jsonl"), "{}");
+    // A file with another name elsewhere and a link out: neither is handed over.
+    const outside = path.join(root, "..", "outside.txt");
+    writeFileSync(outside, "mine");
+    linkSync(outside, path.join(dir, "hardlink"));
+    symlinkSync(outside, path.join(dir, "symlink"));
+
+    expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
+    const order = (file: string) => calls.findIndex((c) => c[0] === file);
+    // Bottom-up, the top last; the uid only (the group stays root's).
+    expect(calls.at(-1)).toEqual([dir, 21001, -1]);
+    expect(order(path.join(dir, "projects", "p1", "s.jsonl"))).toBeLessThan(order(path.join(dir, "projects", "p1")));
+    expect(order(path.join(dir, "projects", "p1"))).toBeLessThan(order(path.join(dir, "projects")));
+    expect(calls.find((c) => c[0] === path.join(dir, "symlink"))).toEqual([path.join(dir, "symlink"), 21001, -1]);
+    expect(order(path.join(dir, "hardlink"))).toBe(-1);
+    expect(existsSync(path.join(dir, "hardlink"))).toBe(false);
+    expect(readFileSync(outside, "utf8")).toBe("mine");
+    // Its user passes through to it and lists nothing else.
+    expect(statSync(path.join(root, "claude_code")).mode & 0o777).toBe(0o711);
+    expect(statSync(root).mode & 0o777).toBe(0o711);
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
+
+    // The same user again: nothing to do.
+    calls.length = 0;
+    expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
+    expect(calls).toHaveLength(0);
+    // Its status is what its turns say: root never runs the CLI on what the agent's user could write.
+    const ran = runs().length;
+    m.invalidate();
+    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: true }]);
+    await m.refused("claude_code", id);
+    m.invalidate();
+    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false }]);
+    m.probeUsage([id]);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(runs().length).toBe(ran);
+
+    // Another agent: back to root top-down (each folder root's before it is read), then to the other user.
+    calls.length = 0;
+    expect(await m.lendTo("claude_code", id, 21002)).toBe(true);
+    expect(calls[0]).toEqual([dir, 0, 0]);
+    const back = calls.findIndex((c) => c[1] === 21002);
+    expect(order(path.join(dir, "projects"))).toBeLessThan(order(path.join(dir, "projects", "p1")));
+    expect(calls.slice(0, back).every((c) => c[1] === 0 && c[2] === 0)).toBe(true);
+    expect(calls.at(-1)).toEqual([dir, 21002, -1]);
+
+    // The agents frame still says so: it stays; once it doesn't, it is root's at once.
+    calls.length = 0;
+    await m.keepLent(new Map([[id, 21002]]));
+    expect(calls).toHaveLength(0);
+    await m.keepLent(new Map([[id, 21003]]));
+    expect(calls[0]).toEqual([dir, 0, 0]);
+    expect(calls.every((c) => c[1] === 0)).toBe(true);
+
+    // Signing in again starts it over, as root's; removing it signs nothing out as root.
+    expect(await m.lendTo("claude_code", id, 21002)).toBe(true);
+    expect(await m.remove("claude_code", id)).toBe(true);
+    expect(runs().some((r) => r.args === "auth logout")).toBe(false);
+    expect(existsSync(dir)).toBe(false);
+    expect(existsSync(path.join(root, "claude_code", `${id}.lent`))).toBe(false);
+  },
+);
+
+test.if(posix)("system mode: a sign-in in progress is lent to nobody; without lending nothing is", async () => {
+  const chown = async () => {};
+  const { m } = setup({ lending: { chown } });
+  await m.begin("claude_code", LOGIN(51));
+  expect(await m.lendTo("claude_code", LOGIN(51), 21001)).toBe(false);
+  expect(await m.lendTo("claude_code", LOGIN(52), 21001)).toBe(false);
+  const plain = setup();
+  mkdirSync(path.join(plain.root, "claude_code", LOGIN(53)), { recursive: true });
+  expect(await plain.m.lendTo("claude_code", LOGIN(53), 21001)).toBe(false);
+});
+
+test.if(posix)("a worker finds only the folders its user can open", () => {
+  const root = tempDir("lent-");
+  dirs.push(root);
+  const mine = path.join(root, "claude_code", LOGIN(54));
+  mkdirSync(mine, { recursive: true });
+  const lent = lentAccounts(root);
+  expect(lent.accountDir("claude_code", LOGIN(54))).toBe(mine);
+  expect(lent.accountDir("codex", LOGIN(54))).toBeNull();
+  expect(lent.accountDir("claude_code", "../x")).toBeNull();
 });
 
 // ── The `account` op ─────────────────────────────────────────────────────────

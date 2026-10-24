@@ -1,3 +1,4 @@
+import { isReservedSecretName } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { ComputerHandle } from "./sandbox";
@@ -91,6 +92,12 @@ export function requestSecretTool(opts: {
           };
         }
         const name = str(input.name);
+        if (isReservedSecretName(name)) {
+          return {
+            content: `${name} is reserved: it would change where an AI sign-in or its requests go. Pick another name.`,
+            isError: true,
+          };
+        }
         const file = !opts.browserOnly && input.target === "file";
         const path = file ? (opts.toolPath?.(str(input.path)) ?? "") : "";
         if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {

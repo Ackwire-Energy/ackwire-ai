@@ -3,6 +3,7 @@ import {
   beginAccountLogin,
   cancelAccountLogin,
   getMachineAccounts,
+  listAiAccounts,
   refreshAiAccounts,
   removeMachineAccount,
   renameMachineAccount,
@@ -35,7 +36,10 @@ const AccountLogin = z
   .object({
     loginId: z.uuid(),
     kind: AccountKind,
-    url: z.string().openapi({ description: "The provider's page: Claude's sign-in, or Codex's device page." }),
+    url: z.string().openapi({
+      description: "The provider's page: Claude's sign-in, Codex's device page, or where a coding plan's key is made.",
+    }),
+    provider: z.string().optional().openapi({ description: "A coding plan's key account: the plan." }),
     publicKey: z.string().optional().openapi({
       description:
         "Claude Code: the computer's key for this sign-in (raw P-256, base64). The browser seals the pasted code to it (AAD `loginId|orgId|account`).",
@@ -135,6 +139,10 @@ export function machineAccountRoutes(deps: AppDeps) {
               description:
                 "Claude Code: which account to sign in to (the CLI's login hint). Letters, digits and `._+-` only (`account.invalid_email`).",
             }),
+            provider: z.string().max(20).optional().openapi({
+              description:
+                "A coding plan on Claude Code (`zai`, `kimi`, `minimax`, `opencode`): a key account. The key is sent next like a code, sealed to the computer (`account.invalid_plan`; a runner without plans' keys: `account.runner_old`).",
+            }),
           }),
         ),
       },
@@ -142,8 +150,17 @@ export function machineAccountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, machineId } = c.req.valid("param");
-      const { kind, accountId, email } = c.req.valid("json");
-      const login = await beginAccountLogin(withHub(), c.get("user").id, orgId, machineId, kind, accountId, email);
+      const { kind, accountId, email, provider } = c.req.valid("json");
+      const login = await beginAccountLogin(
+        withHub(),
+        c.get("user").id,
+        orgId,
+        machineId,
+        kind,
+        accountId,
+        email,
+        provider,
+      );
       return c.json(login, 201);
     },
   );
@@ -154,7 +171,8 @@ export function machineAccountRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}/code",
       tags,
       security,
-      summary: "Hand the Claude code, sealed in the browser to the computer's key, to the waiting sign-in",
+      summary:
+        "Hand the Claude code (or a coding plan's key), sealed in the browser to the computer's key, to the waiting sign-in",
       description:
         "Only the person who started the sign-in. We relay it to the computer in memory and keep nothing of it.",
       request: { params: LoginParams, body: body(z.object({ box: SecretBox })) },
@@ -198,6 +216,47 @@ export function machineAccountRoutes(deps: AppDeps) {
       await cancelAccountLogin(withHub(), c.get("user").id, orgId, machineId, loginId);
       return c.body(null, 204);
     },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/ai-accounts",
+      tags,
+      security,
+      summary: "The caller's AI accounts on the organization's computers, and where they can add one (any member)",
+      description:
+        "Their plans and keys, each with its computer (emails and key hints are the caller's own). Changes come as `machine.updated` org events with `accounts: true`.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z
+            .object({
+              accounts: z.array(MachineAccount.extend({ machineId: z.uuid(), computer: z.string() })),
+              computers: z.array(
+                z.object({
+                  machineId: z.uuid(),
+                  name: z.string(),
+                  online: z.boolean(),
+                  mine: z.boolean().openapi({ description: "The caller connected it." }),
+                  canAdd: z.boolean().openapi({
+                    description:
+                      "The caller adds accounts there (they connected it, or nobody did) and its runner knows accounts.",
+                  }),
+                  keys: z.boolean().openapi({ description: "Its runner takes coding plans' keys (protocol 19)." }),
+                  brains: z.object({ claude_code: z.boolean(), codex: z.boolean() }).openapi({
+                    description:
+                      "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
+                  }),
+                }),
+              ),
+            })
+            .openapi("AiAccounts"),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await listAiAccounts({ db }, c.get("user").id, c.req.valid("param").orgId), 200),
   );
 
   app.openapi(

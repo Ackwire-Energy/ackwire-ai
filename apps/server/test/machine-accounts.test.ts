@@ -149,6 +149,8 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
         mine: true,
         usedBy: [],
         usage: null,
+        provider: null,
+        keyHint: null,
       },
     ],
     canManage: true,
@@ -327,6 +329,7 @@ test("the OpenAPI document lists the account routes", async () => {
     "/app/organizations/{orgId}/machines/{machineId}/account-logins",
     "/app/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}",
     "/app/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}/code",
+    "/app/organizations/{orgId}/ai-accounts",
     "/app/organizations/{orgId}/ai-accounts/refresh",
   ]) {
     expect(Object.keys(doc.paths)).toContain(path);
@@ -349,4 +352,23 @@ test("refreshing plan usage: 202, the computer is asked to look the caller's acc
   await runner.changed([{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true, usage } as RunnerAccountInfo]);
   const listed = (await (await api(`/machines/${mac.machineId}/accounts`)).json()) as { accounts: Account[] };
   expect(listed.accounts[0]).toMatchObject({ id: OLD_ACCOUNT, ownerId, usage });
+});
+
+test("Contas de IA: the caller's own accounts with their computer, and where they can add one; an unknown plan is refused", async () => {
+  const { api } = await workspace();
+  const mac = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
+  const runner = fakeRunner();
+  await runner.hello(mac.token, [{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true }]);
+  const res = await api("/ai-accounts");
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    accounts: (Account & { machineId: string; computer: string })[];
+    computers: { machineId: string; name: string; canAdd: boolean; keys: boolean }[];
+  };
+  expect(body.accounts).toMatchObject([{ id: OLD_ACCOUNT, machineId: mac.machineId, computer: "mac", provider: null }]);
+  expect(body.computers).toMatchObject([{ machineId: mac.machineId, name: "mac", canAdd: true, keys: true }]);
+  const bad = await api(`/machines/${mac.machineId}/account-logins`, {
+    json: { kind: "claude_code", provider: "nope" },
+  });
+  expect(bad.status).toBe(400);
 });

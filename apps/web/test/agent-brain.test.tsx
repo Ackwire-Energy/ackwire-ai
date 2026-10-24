@@ -191,6 +191,8 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     mine: true,
     usedBy: [],
     usage: null,
+    provider: null,
+    keyHint: null,
   };
   /** Ada thinks with Claude Code on the MacBook, which has the given accounts. */
   async function onMac(patch: Partial<AgentBrain> = {}) {
@@ -344,27 +346,74 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(screen().getByRole("option", { name: /^Entrar de novo/ })).toBeTruthy();
   });
 
-  test("Adicionar conta: Claude's own page, the code goes to the computer; Voltar stops the sign-in", async () => {
+  test("Adicionar conta: the account to sign in to goes with the click, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
     const { state, api } = await onMac();
-    const d = await brainDialog();
-    await pick(d, "Conta do Claude", /^Adicionar conta/);
-    await settle(6);
-    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
-    const login = fakeMachinesOf.get(api)?.lastLogin();
-    expect(login?.kind).toBe("claude_code");
-    expect(within(block).getByRole("link", { name: "Entrar com Claude" }).getAttribute("href")).toBe(
-      "https://claude.ai/oauth/authorize?code=true",
-    );
-    expect(block.textContent).toContain("O agentes.chat nunca vê a senha nem o acesso.");
-    expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
-    await click(within(block).getByRole("button", { name: "Voltar" }));
-    await settle(4);
-    expect(state.calls.find((c) => c.method === "machines.cancelAccountLogin")?.args).toEqual([
-      ORG_ID,
-      "machine_1",
-      login?.loginId,
-    ]);
-    expect(within(d).getByRole("combobox", { name: "Conta do Claude" })).toBeTruthy();
+    const opened: string[] = [];
+    const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
+    const realOpen = window.open;
+    window.open = ((url?: string | URL) => {
+      opened.push(String(url));
+      return popup;
+    }) as unknown as typeof window.open;
+    let clip = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText: async () => clip, writeText: async () => {} },
+    });
+    try {
+      const d = await brainDialog();
+      await pick(d, "Conta do Claude", /^Adicionar conta/);
+      await settle(6);
+      const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+      // Nothing runs on the computer before the person goes on.
+      expect(fakeMachinesOf.get(api)?.lastLogin()).toBeUndefined();
+      expect(block.textContent).toContain("O agentes.chat nunca vê a senha nem o acesso.");
+      fireEvent.change(within(block).getByRole("textbox", { name: "Qual conta? (opcional)" }), {
+        target: { value: "walt@acme.com" },
+      });
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+      expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+        ORG_ID,
+        "machine_1",
+        "claude_code",
+        { email: "walt@acme.com" },
+      ]);
+      // The window opened on the click itself went to Claude's page, cut off from the app.
+      expect(opened).toEqual(["about:blank"]);
+      expect(popup.opener).toBeNull();
+      expect(popup.location.href).toBe("https://claude.ai/oauth/authorize?code=true&state=st4te");
+      expect(within(block).getByRole("link", { name: "Abrir de novo" }).getAttribute("href")).toBe(
+        "https://claude.ai/oauth/authorize?code=true&state=st4te",
+      );
+      const login = fakeMachinesOf.get(api)?.lastLogin();
+      expect(login?.kind).toBe("claude_code");
+      // Something else on the clipboard (a password) waits for a tap.
+      clip = "hunter2-password";
+      await click(within(block).getByRole("button", { name: "Colar" }));
+      await settle(4);
+      expect(fakeMachinesOf.get(api)?.lastLogin()?.box).toBeNull();
+      expect((within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement).value).toBe(
+        "hunter2-password",
+      );
+      // This sign-in's code (`…#<state>`) goes at once, sealed: the raw code is in no call.
+      clip = "c0de-from-claude#st4te";
+      await click(within(block).getByRole("button", { name: "Colar" }));
+      await settle(6);
+      expect(fakeMachinesOf.get(api)?.lastLogin()?.box).not.toBeNull();
+      expect(JSON.stringify(state.calls)).not.toContain("c0de-from-claude");
+      expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
+      await click(within(block).getByRole("button", { name: "Voltar" }));
+      await settle(4);
+      expect(state.calls.find((c) => c.method === "machines.cancelAccountLogin")?.args).toEqual([
+        ORG_ID,
+        "machine_1",
+        login?.loginId,
+      ]);
+      expect(within(d).getByRole("combobox", { name: "Conta do Claude" })).toBeTruthy();
+    } finally {
+      window.open = realOpen;
+    }
   });
 
   test("Adicionar conta (Codex): the code to type there; once the computer signs in, the account is chosen", async () => {

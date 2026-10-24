@@ -61,7 +61,7 @@ export function DmPage({ target }: { target: DmTarget }) {
       ? t("brain.auto.label")
       : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   // Who thinks: a computer brain ("Claude Code · Sonnet no mac") instead of the API model.
-  const thinks = agent ? brainLine(t, agent.brain, model) : null;
+  const thinks = agent ? brainLine(t, agent.brain, model, owner?.name.split(" ")[0]) : null;
   const role = agent ? agent.role || `@${agent.handle}` : "";
   const header = (
     <header className="channel__header">

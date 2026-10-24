@@ -9,6 +9,7 @@ import {
   type OwnPlanUsage,
   openSecret,
   orgTopic,
+  PLAN_KEYS_PROTOCOL,
   PLAN_USAGE_PROTOCOL,
   type PlanUsage,
   type RunnerAccountInfo,
@@ -26,6 +27,7 @@ import {
   ForbiddenError,
   getAgentBrain,
   getMachineAccounts,
+  listAiAccounts,
   listMachineAccounts,
   type MachineHub,
   MachineOfflineError,
@@ -329,6 +331,8 @@ test("signing in: the person who connected the computer; the code is sealed to i
       mine: true,
       usedBy: [],
       usage: null,
+      provider: null,
+      keyHint: null,
     },
   });
   // Polled again: the same account, added once.
@@ -352,6 +356,141 @@ test("signing in: the person who connected the computer; the code is sealed to i
   expect(await getMachineAccounts({ db: f.db }, member.id, f.org.id, machineId).catch((e) => e)).toBeInstanceOf(
     ForbiddenError,
   );
+});
+
+/** A runner that keeps plans' keys: a key pair per sign-in, `done` once the key arrived (its last 4 said). */
+function keyRunner(machineId: string, protocol = PLAN_KEYS_PROTOCOL) {
+  const keys = new Map<string, string>();
+  const got = new Map<string, string>();
+  return {
+    got,
+    ...fakeHub(
+      machineId,
+      async (req) => {
+        if (req.action === "begin") {
+          const pair = await generateSecretKeyPair();
+          keys.set(req.loginId, pair.privateKey);
+          return { publicKey: pair.publicKey };
+        }
+        if (req.action === "code") {
+          got.set(req.loginId, await openSecret(keys.get(req.loginId) ?? "", req.box, req.aad));
+          return {};
+        }
+        if (req.action === "status") {
+          const key = got.get(req.loginId);
+          return key
+            ? {
+                state: "done",
+                account: {
+                  id: req.loginId,
+                  kind: "claude_code",
+                  loggedIn: true,
+                  provider: "zai",
+                  keyHint: key.slice(-4),
+                },
+              }
+            : { state: "waiting" };
+        }
+        return {};
+      },
+      { protocol },
+    ),
+  };
+}
+
+test("a coding plan's key: no sign-in page but the plan's key page, the key sealed to the computer, its last 4 only to its owner", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(PLAN_KEYS_PROTOCOL);
+  const runner = keyRunner(machineId);
+  const add = async (key: string) => {
+    const login = await beginAccountLogin(
+      runner.deps,
+      f.owner.id,
+      f.org.id,
+      machineId,
+      "claude_code",
+      undefined,
+      undefined,
+      "zai",
+    );
+    const box = await sealSecret(login.publicKey ?? "", key, accountCodeAad(login.loginId, f.org.id));
+    await sendAccountLoginCode(runner.deps, f.owner.id, f.org.id, machineId, login.loginId, box);
+    return { login, status: await accountLoginStatus(runner.deps, f.owner.id, f.org.id, machineId, login.loginId) };
+  };
+  const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
+  const { login, status } = await add(KEY);
+  expect(login).toMatchObject({ kind: "claude_code", provider: "zai", url: "https://z.ai/manage-apikey/apikey-list" });
+  expect(runner.calls[0]).toEqual({
+    op: "account",
+    action: "begin",
+    kind: "claude_code",
+    loginId: login.loginId,
+    provider: "zai",
+  });
+  // The runner got the key; the server keeps only its name, plan and last 4.
+  expect(runner.got.get(login.loginId)).toBe(KEY);
+  expect(status.account).toMatchObject({ label: "GLM Coding", provider: "zai", keyHint: "MnOp", status: "active" });
+  const row = await accountRow(login.loginId);
+  expect(row).toMatchObject({ provider: "zai", keyHint: "MnOp", email: null });
+  expect(JSON.stringify(row)).not.toContain("0123456789abcdef");
+
+  // The same key again: refused, and the new one goes.
+  const again = await add(KEY);
+  expect(again.status).toMatchObject({ state: "failed", duplicate: { label: "GLM Coding" } });
+  const second = await add(`${KEY.slice(0, -4)}WxYz`);
+  expect(second.status.account).toMatchObject({ label: "GLM Coding 2", keyHint: "WxYz" });
+
+  // Others see the plan, never its key's last 4.
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const seen = await listMachineAccounts({ db: f.db }, f.org.id, machineId, bia.id);
+  expect(seen.map((a) => [a.provider, a.keyHint])).toEqual([
+    ["zai", null],
+    ["zai", null],
+  ]);
+  // The AI accounts page: the caller's own, with where each is; the computers they can add to.
+  const page = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
+  expect(page.accounts.map((a) => [a.label, a.computer, a.keyHint])).toEqual([
+    ["GLM Coding", "mac", "MnOp"],
+    ["GLM Coding 2", "mac", "WxYz"],
+  ]);
+  expect(page.computers).toEqual([
+    {
+      machineId,
+      name: "mac",
+      online: expect.any(Boolean),
+      mine: true,
+      canAdd: true,
+      keys: true,
+      brains: { claude_code: expect.any(Boolean), codex: expect.any(Boolean) },
+    },
+  ]);
+  expect((await listAiAccounts({ db: f.db }, bia.id, f.org.id)).accounts).toEqual([]);
+
+  // Only plans we know; a runner that doesn't keep keys is too old for one.
+  const unknown = await beginAccountLogin(
+    runner.deps,
+    f.owner.id,
+    f.org.id,
+    machineId,
+    "claude_code",
+    undefined,
+    undefined,
+    "nope",
+  ).catch((e) => e);
+  expect(unknown).toBeInstanceOf(ValidationError);
+  const old = keyRunner(machineId, PLAN_USAGE_PROTOCOL);
+  const refused = await beginAccountLogin(
+    old.deps,
+    f.owner.id,
+    f.org.id,
+    machineId,
+    "claude_code",
+    undefined,
+    undefined,
+    "zai",
+  ).catch((e) => e);
+  expect(refused).toMatchObject({ code: "account.runner_old" });
+  expect(old.calls).toEqual([]);
 });
 
 test("a sign-in needs the computer online, a runner that knows accounts and a provider page on https", async () => {

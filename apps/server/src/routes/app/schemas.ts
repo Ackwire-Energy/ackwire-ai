@@ -122,6 +122,9 @@ export const Agent = z
           .nullable()
           .openapi({ description: "A computer brain's model label (Sonnet); null = the agent's model." }),
         computer: z.string().optional().openapi({ description: "Its computer's name (admins and the agent's owner)." }),
+        provider: z.string().optional().openapi({
+          description: "A coding plan it thinks with through Claude Code (`zai`, `kimi`…): its maker's model.",
+        }),
       })
       .optional()
       .openapi({ description: "Who thinks for it (ADR 0032), to show next to its name." }),
@@ -413,6 +416,10 @@ export const MachineAccount = z
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
     usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it (one at most)." }),
     usage: PlanUsage.nullable().openapi({ description: "Its plan's usage limits; null: not known yet." }),
+    provider: z.string().nullable().openapi({
+      description: "A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in.",
+    }),
+    keyHint: z.string().nullable().openapi({ description: "The last 4 of a key account's key; only for its owner." }),
   })
   .openapi("MachineAccount", {
     description:

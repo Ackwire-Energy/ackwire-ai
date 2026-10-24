@@ -13,6 +13,8 @@ import {
 } from "../src";
 import {
   brainModelId,
+  brainModelLabel,
+  brainModelOptions,
   brainOf,
   brainOptions,
   defaultBrainModel,
@@ -35,6 +37,22 @@ const mac = (patch: Record<string, unknown> = {}) => ({
 });
 
 describe("brain settings", () => {
+  test("a coding plan keeps Claude Code's aliases, named after the plan's models", () => {
+    expect(brainModelOptions("claude_code", "zai")).toEqual([
+      { value: "sonnet", label: "GLM-5.3", modelId: "glm-5.3[1m]", recommended: true },
+      { value: "haiku", label: "GLM-5.3 Flash", modelId: "glm-5.3-flash[1m]" },
+    ]);
+    expect(brainModelOptions("claude_code", "kimi").map((o) => o.value)).toEqual(["opus", "sonnet"]);
+    // Anything else is Claude's own aliases; Codex has no plans.
+    expect(brainModelOptions("claude_code", "nope").map((o) => o.label)).toEqual(["Opus", "Sonnet", "Haiku"]);
+    expect(brainModelOptions("codex", "zai").every((o) => o.modelId?.startsWith("gpt"))).toBe(true);
+    // An alias the plan leaves out, or "Automático", is its main model; the value stays an alias.
+    expect(brainModelLabel("claude_code", "opus", "zai")).toBe("GLM-5.3");
+    expect(brainModelLabel("claude_code", "auto", "minimax")).toBe("MiniMax M3.1 Flash");
+    expect(brainModelLabel("claude_code", "opus")).toBe("Opus");
+    expect(normalizeBrainModel("claude_code", "haiku")).toBe("haiku");
+  });
+
   test("stored values read back; executors map to brains", () => {
     expect(brainOf("claude_code")).toBe("claude_code");
     expect(brainOf("robot")).toBe("model");

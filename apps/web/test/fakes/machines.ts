@@ -15,12 +15,16 @@
  * - `POST   …/account-logins/{loginId}/code` `{ box }` → 204; `GET …/account-logins/{loginId}` → `{ state, account? }`
  * - `DELETE …/account-logins/{loginId}` → 204
  * - `POST   …/ai-accounts/refresh` → 202 (the usage arrives later as `machine.updated`; nothing here)
+ * - `GET    …/ai-accounts` → what `setAiAccounts()` set (none by default); `PATCH`/`DELETE …/accounts/{id}`
+ *   rename or drop one of them
+ * - `POST   …/account-logins` `{ kind, provider }` → a coding plan's key: no sign-in page but the plan's own
  * Sign-ins wait until a test calls `endLogin()`.
  * Tests add machines with `pair()`, codes with `addDevice()`, a release with `setRelease()`, outages with
  * `setOutages()` and the move's answer with `setMoveResult()`. No machines, codes, release or outages by default.
  */
 import type {
   AccountLoginStatus,
+  AiAccounts,
   ApiClient,
   DesktopRelease,
   DeviceRequest,
@@ -31,6 +35,7 @@ import type {
   SecretBox,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { clone, type MockContext, MockNotFoundError } from "./context";
 
 export interface FakeMachines {
@@ -56,6 +61,8 @@ export interface FakeMachines {
   lastLogin(): { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean } | undefined;
   /** The computer finished (or gave up on) a sign-in. */
   endLogin(loginId: string, status: AccountLoginStatus): void;
+  /** What "Contas de IA" lists. */
+  setAiAccounts(view: AiAccounts): void;
 }
 
 let seq = 0;
@@ -69,6 +76,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   let outages: MachineOutages = { outages: [], targets: [] };
   let moveResult: MoveAgentsResult | null = null;
   type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
+  let ai: AiAccounts = { accounts: [], computers: [] };
   const logins: Login[] = [];
   const loginStatus = new Map<string, AccountLoginStatus>();
   const login = (loginId: string) => {
@@ -177,8 +185,8 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.moveAgents", orgId, machineId, input);
         return clone(moveResult ?? { moved: input.agentIds, skipped: [], resumed: 0, stillWaiting: 0 });
       },
-      beginAccountLogin: async (orgId, machineId, kind) => {
-        log("machines.beginAccountLogin", orgId, machineId, kind);
+      beginAccountLogin: async (orgId, machineId, kind, options = {}) => {
+        log("machines.beginAccountLogin", orgId, machineId, kind, ...(Object.keys(options).length ? [options] : []));
         const loginId = `login_${logins.length + 1}`;
         logins.push({ loginId, kind, box: null, cancelled: false });
         const expiresAt = new Date(ctx.now().getTime() + 15 * 60_000).toISOString();
@@ -189,7 +197,17 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         const eph = (await crypto.subtle.generateKey(curve, true, ["deriveBits"])) as CryptoKeyPair;
         const raw = new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey));
         const publicKey = btoa(String.fromCharCode(...raw));
-        return { loginId, kind, url: "https://claude.ai/oauth/authorize?code=true", publicKey, expiresAt };
+        const plan = planOf(options.provider);
+        if (plan && isPlanId(options.provider)) {
+          return { loginId, kind, url: plan.site, provider: options.provider, publicKey, expiresAt };
+        }
+        return {
+          loginId,
+          kind,
+          url: "https://claude.ai/oauth/authorize?code=true&state=st4te",
+          publicKey,
+          expiresAt,
+        };
       },
       sendAccountCode: async (orgId, machineId, loginId, box) => {
         log("machines.sendAccountCode", orgId, machineId, loginId);
@@ -208,6 +226,22 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       },
       refreshAccountUsage: async (orgId) => {
         log("machines.refreshAccountUsage", orgId);
+      },
+      // Read whenever an accounts screen renders: not logged.
+      aiAccounts: async () => clone(ai),
+      renameAccount: async (orgId, machineId, accountId, label) => {
+        log("machines.renameAccount", orgId, machineId, accountId, label);
+        // One listed, or one a sign-in here just finished.
+        const a =
+          ai.accounts.find((x) => x.id === accountId) ??
+          [...loginStatus.values()].find((st) => st.account?.id === accountId)?.account;
+        if (!a) throw new MockNotFoundError("Conta não encontrada.");
+        a.label = label;
+        return clone(a);
+      },
+      removeAccount: async (orgId, machineId, accountId) => {
+        log("machines.removeAccount", orgId, machineId, accountId);
+        ai = { ...ai, accounts: ai.accounts.filter((x) => x.id !== accountId) };
       },
     },
     pair,
@@ -233,6 +267,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     },
     endLogin: (loginId, status) => {
       loginStatus.set(loginId, status);
+    },
+    setAiAccounts: (view) => {
+      ai = clone(view);
     },
     addDevice: (userCode, input = {}) => {
       const now = ctx.now();

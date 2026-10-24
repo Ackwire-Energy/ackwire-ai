@@ -3182,6 +3182,30 @@ export interface MachineAccount {
   usedBy: string[];
   /** Its plan's usage limits; null: not known yet. */
   usage: PlanUsage | null;
+  /** A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in. */
+  provider: string | null;
+  /** The last 4 of a key account's key (its owner only). */
+  keyHint: string | null;
+}
+
+/** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */
+export interface AiAccounts {
+  accounts: (MachineAccount & { machineId: string; computer: string })[];
+  computers: AiComputer[];
+}
+
+export interface AiComputer {
+  machineId: string;
+  name: string;
+  online: boolean;
+  /** The viewer connected it. */
+  mine: boolean;
+  /** The viewer adds accounts there (they connected it, or nobody did), on a runner that knows accounts. */
+  canAdd: boolean;
+  /** Its runner takes coding plans' keys. */
+  keys: boolean;
+  /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
+  brains: { claude_code: boolean; codex: boolean };
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */
@@ -3221,8 +3245,10 @@ export interface AgentBrainInput {
 export interface AccountLoginStart {
   loginId: string;
   kind: MachineAccountKind;
-  /** The provider's own page (Claude's sign-in, or the device page for Codex). */
+  /** The provider's own page (Claude's sign-in, the device page for Codex, or where a plan's key is made). */
   url: string;
+  /** A coding plan's key account. */
+  provider?: string;
   /** Claude Code: the computer's one-time key the pasted code is sealed to. */
   publicKey?: string;
   /** Codex: the one-time code to type on the device page. */

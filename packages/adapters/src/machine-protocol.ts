@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 18;
+export const MACHINE_PROTOCOL_VERSION = 19;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -158,6 +158,19 @@ export const BROWSER_FAST_PROTOCOL = 17;
  * to an older runner.
  */
 export const PLAN_USAGE_PROTOCOL = 18;
+/**
+ * From this protocol on: coding plans as key accounts on Claude Code (ADR
+ * 0056). `begin` with `provider` (a plan of `@agenteschat/providers/plans`)
+ * starts no CLI: the runner makes the folder and a key the browser seals the
+ * plan's key to, and `code` hands it over (kept in the folder,
+ * `provider.json`, mode 600). Turns in that folder think through the
+ * endpoint the runner's own copy of the plans names. Accounts say their
+ * `provider` and the key's last 4 (`keyHint`); a key its maker refused reads
+ * as signed out. In system mode `agents` names each agent's `account`, whose
+ * folder belongs to that agent's user only while it thinks with it. The
+ * server never sends `provider` to an older runner.
+ */
+export const PLAN_KEYS_PROTOCOL = 19;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -184,6 +197,10 @@ export interface RunnerAccountInfo {
   plan?: string;
   /** Protocol 18: the plan's usage limits, as last seen. */
   usage?: PlanUsage;
+  /** Protocol 19: a key account's coding plan (`zai`, `kimi`…); absent for the CLI's own sign-in. */
+  provider?: string;
+  /** Protocol 19: the last 4 characters of a key account's key. */
+  keyHint?: string;
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */
@@ -236,9 +253,9 @@ export type AccountRequest =
   /**
    * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
-   * an older runner leaves it out.
+   * an older runner leaves it out. Protocol 19, `provider`: a coding plan's key account (Claude Code), no CLI.
    */
-  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string }
+  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string; provider?: string }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
@@ -250,6 +267,10 @@ export type AccountRequest =
   | { action: "remove"; kind: AccountKind; accountId: string };
 
 export const ACCOUNT_LOGIN_TTL_MS = 15 * 60_000;
+/** A coding plan's id as the wire carries it (the runner and the server check it against their plans). */
+export const isPlanProviderWord = (v: unknown): v is string =>
+  typeof v === "string" && /^[a-z][a-z0-9_-]{0,19}$/.test(v);
+
 /** Accounts per machine: the runner adds no more, and a list this long is never taken as complete by the server. */
 export const MAX_MACHINE_ACCOUNTS = 100;
 /** The AAD that binds a sealed Claude sign-in code to its sign-in and organization. */
@@ -772,6 +793,8 @@ export interface MachineAgent {
   handle: string;
   name: string;
   look?: { color?: string; eyes?: string; accessory?: string };
+  /** Protocol 19: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
+  account?: string;
 }
 
 /** The pause state (protocol 9). `until` null: paused until the owner resumes. */
@@ -1294,6 +1317,8 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
     const email = isString(a.email) && a.email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(a.email) ? a.email : undefined;
     const plan = isString(a.plan) && /^[\w.-]{1,40}$/.test(a.plan) ? a.plan : undefined;
     const usage = parsePlanUsage(a.usage);
+    const provider = isPlanProviderWord(a.provider) ? a.provider : undefined;
+    const keyHint = isString(a.keyHint) && /^[\x21-\x7e]{1,4}$/.test(a.keyHint) ? a.keyHint : undefined;
     out.push({
       id: a.id,
       kind: a.kind,
@@ -1301,6 +1326,8 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
       ...(email ? { email } : {}),
       ...(plan ? { plan } : {}),
       ...(usage ? { usage } : {}),
+      ...(provider ? { provider } : {}),
+      ...(keyHint ? { keyHint } : {}),
     });
   }
   return out;

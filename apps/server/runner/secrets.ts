@@ -1,7 +1,13 @@
 import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentScope, MachineReplies, SecretRequest } from "@agenteschat/adapters/machine-protocol";
-import { generateSecretKeyPair, openSecret, redactSecrets, SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import {
+  generateSecretKeyPair,
+  isReservedSecretName,
+  openSecret,
+  redactSecrets,
+  SECRET_NAME,
+} from "@agenteschat/adapters/secret-box";
 import { errnoCode, RunnerError } from "./errors";
 import { agentFolderName, resolveInWorkspace } from "./paths";
 
@@ -94,7 +100,9 @@ export async function handleSecret(
       return { publicKey: pair.publicKey };
     }
     case "deliver": {
-      if (!SECRET_NAME.test(String(req.name))) throw new RunnerError("bad_request", "Invalid secret name");
+      if (!SECRET_NAME.test(String(req.name)) || isReservedSecretName(String(req.name))) {
+        throw new RunnerError("bad_request", "Invalid secret name");
+      }
       const target: Stored["target"] =
         req.target?.kind === "file" ? { kind: "file", path: String(req.target.path) } : { kind: "env" };
       checkAad(req.aad, req.requestId, req.name, target);
@@ -156,7 +164,8 @@ export async function agentSecrets(root: string | undefined, agent: AgentScope |
   const secrets = await readStore(dirOf(root, agent)).catch(() => []);
   if (secrets.length === 0) return null;
   const env: Record<string, string> = {};
-  for (const s of secrets) if (s.target.kind === "env") env[s.name] = s.value;
+  // One kept before its name was reserved still never reaches the env.
+  for (const s of secrets) if (s.target.kind === "env" && !isReservedSecretName(s.name)) env[s.name] = s.value;
   return {
     env,
     files: secrets.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])),

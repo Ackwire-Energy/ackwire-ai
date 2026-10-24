@@ -12,6 +12,7 @@ import {
   type MachineReplies,
   OWN_USAGE_ID,
   type OwnPlanUsage,
+  PLAN_KEYS_PROTOCOL,
   PLAN_USAGE_PROTOCOL,
   type PlanUsage,
   type PubSub,
@@ -19,6 +20,7 @@ import {
   type RunnerAccountInfo,
 } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
+import { isPlanId, type PlanId, planOf } from "@agenteschat/providers/plans";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -55,6 +57,10 @@ const { machineAccounts, agents, machines, users } = schema;
  * turns or when someone looks (`refreshAiAccounts`), is stored with the row
  * (the computer's own sign-ins' in `machines.executors.ownUsage`); pages hear
  * of it only when they would show something else (`usageMoved`).
+ *
+ * Key accounts (protocol 19): a coding plan on Claude Code (`provider`, a plan
+ * of `@agenteschat/providers/plans`). The key goes sealed from the browser to
+ * the computer and stays there; we keep its last 4 as the runner says them.
  */
 
 export type MachineAccountRow = typeof machineAccounts.$inferSelect;
@@ -80,6 +86,10 @@ export interface MachineAccountView {
   usedBy: string[];
   /** The plan's usage limits as last reported (protocol 18); null: not known yet. */
   usage: PlanUsage | null;
+  /** A key account's coding plan (`zai`, `kimi`…); null: the CLI's own sign-in. */
+  provider: string | null;
+  /** The last 4 of a key account's key, for its owner's eyes only. */
+  keyHint: string | null;
 }
 
 /** An account on a computer, by what the runner needs to remove it. */
@@ -106,12 +116,17 @@ const kindOf = (row: Pick<MachineAccountRow, "kind">): AccountKind =>
 
 /**
  * What a new account is called until its owner names it: the maker and the
- * plan ("Claude Max", "ChatGPT Plus"), numbered among the names its owner
- * already has ("Claude Team 2"); never the email (others see the name).
+ * plan ("Claude Max", "ChatGPT Plus", "GLM Coding"), numbered among the names
+ * its owner already has ("Claude Team 2"); never the email (others see the name).
  */
-export function defaultAccountLabel(kind: AccountKind, plan?: string | null, taken: readonly string[] = []) {
+export function defaultAccountLabel(
+  kind: AccountKind,
+  plan?: string | null,
+  taken: readonly string[] = [],
+  provider?: string | null,
+) {
   const word = plan && /^[\w.-]{1,20}$/.test(plan) ? ` ${plan[0]?.toUpperCase()}${plan.slice(1)}` : "";
-  const base = `${kind === "codex" ? "ChatGPT" : "Claude"}${word}`;
+  const base = planOf(provider)?.label ?? `${kind === "codex" ? "ChatGPT" : "Claude"}${word}`;
   if (!taken.includes(base)) return base;
   for (let n = 2; ; n++) if (!taken.includes(`${base} ${n}`)) return `${base} ${n}`;
 }
@@ -153,6 +168,8 @@ function accountView(
     mine,
     usedBy,
     usage: row.usage ?? null,
+    provider: row.provider,
+    keyHint: mine ? row.keyHint : null,
   };
 }
 
@@ -297,12 +314,24 @@ async function removeOnComputer(
   }
 }
 
-/** The account another of its owner's on this computer already is (same CLI, provider and email). */
+/**
+ * The account another of its owner's on this computer already is: the same CLI, plan and email, or for a
+ * key account the same key's last 4 (the key never leaves the computer).
+ */
 async function duplicateOf(
   db: Executor,
   row: Pick<MachineAccountRow, "orgId" | "machineId" | "id" | "kind" | "createdBy" | "provider">,
-  email: string,
+  same: { email?: string | null; keyHint?: string | null },
 ) {
+  // ponytail: a key account is told apart by its last 4 only; a fingerprint from the runner if two keys ever share them.
+  const match = row.provider
+    ? same.keyHint
+      ? eq(machineAccounts.keyHint, same.keyHint)
+      : null
+    : same.email
+      ? sql`lower(${machineAccounts.email}) = ${same.email.toLowerCase()}`
+      : null;
+  if (!match) return null;
   const [other] = await db
     .select()
     .from(machineAccounts)
@@ -315,7 +344,7 @@ async function duplicateOf(
         row.createdBy ? eq(machineAccounts.createdBy, row.createdBy) : isNull(machineAccounts.createdBy),
         row.provider ? eq(machineAccounts.provider, row.provider) : isNull(machineAccounts.provider),
         inArray(machineAccounts.status, LISTED),
-        sql`lower(${machineAccounts.email}) = ${email.toLowerCase()}`,
+        match,
       ),
     )
     .limit(1);
@@ -355,19 +384,20 @@ async function settleAccount(
   if (!row || row.machineId !== machine.id || row.kind !== info.kind)
     return { row: null, released: [], changed: false };
   if (row.status === "removing") {
-    const duplicate = row.email ? await duplicateOf(db, row, row.email) : null;
+    const duplicate = await duplicateOf(db, row, row);
     return { row, ...(duplicate ? { duplicate } : {}), released: [], changed: false };
   }
   // A signed-out CLI may not say its email or plan any more: keep what we knew.
   const email = info.email ?? row.email;
   const plan = info.plan ?? row.plan;
+  const keyHint = info.keyHint ?? row.keyHint;
   const status: MachineAccountStatus = info.loggedIn ? "active" : "signed_out";
   const signingIn = row.status === "signing_in";
-  const duplicate = dedupe && email ? await duplicateOf(db, row, email) : null;
+  const duplicate = dedupe ? await duplicateOf(db, row, { email, keyHint }) : null;
   if (duplicate) {
     const [gone] = await db
       .update(machineAccounts)
-      .set({ status: "removing", email, plan, updatedAt: now })
+      .set({ status: "removing", email, plan, keyHint, updatedAt: now })
       .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
       .returning();
     const released = await releaseAgents(db, orgId, [row.id], now);
@@ -376,10 +406,11 @@ async function settleAccount(
   // The runner says it when it knows it; one that just started doesn't yet (the last stays).
   const usage = info.usage ? { usage: info.usage } : {};
   if (signingIn) {
-    const label = defaultAccountLabel(kindOf(row), plan, await takenLabels(db, orgId, row.createdBy, row.id));
+    const taken = await takenLabels(db, orgId, row.createdBy, row.id);
+    const label = defaultAccountLabel(kindOf(row), plan, taken, row.provider);
     const [done] = await db
       .update(machineAccounts)
-      .set({ email, plan, status, label, ...usage, updatedAt: now })
+      .set({ email, plan, keyHint, status, label, ...usage, updatedAt: now })
       .where(
         and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id), eq(machineAccounts.status, "signing_in")),
       )
@@ -391,15 +422,15 @@ async function settleAccount(
       actor: { type: "person", id: row.createdBy },
       action: "account.added",
       target: { type: "machine_account", id: row.id },
-      details: { machineId: machine.id, kind: row.kind, plan },
+      details: { machineId: machine.id, kind: row.kind, plan, ...(row.provider ? { provider: row.provider } : {}) },
     });
     return { row: done, released: [], changed: true };
   }
-  const same = email === row.email && plan === row.plan && status === row.status;
+  const same = email === row.email && plan === row.plan && keyHint === row.keyHint && status === row.status;
   if (same && !info.usage) return { row, released: [], changed: false };
   const [fresh] = await db
     .update(machineAccounts)
-    .set({ email, plan, status, ...usage, updatedAt: now })
+    .set({ email, plan, keyHint, status, ...usage, updatedAt: now })
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
     .returning();
   return { row: fresh ?? row, released: [], changed: !same || usageMoved(row.usage, info.usage) };
@@ -478,8 +509,9 @@ export async function syncMachineAccounts(
       if (!elsewhere) {
         // Signed in on the computer itself (the desktop app): its pairer's.
         const owner = machine.pairedByUserId;
-        const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider: null };
-        if (a.email && (await duplicateOf(tx, candidate, a.email))) {
+        const provider = isPlanId(a.provider) ? a.provider : null;
+        const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider };
+        if (await duplicateOf(tx, candidate, a)) {
           remove.push({ kind: a.kind, id: a.id });
           continue;
         }
@@ -487,9 +519,10 @@ export async function syncMachineAccounts(
           .insert(machineAccounts)
           .values({
             ...candidate,
-            label: defaultAccountLabel(a.kind, a.plan, await takenLabels(tx, orgId, owner, a.id)),
+            label: defaultAccountLabel(a.kind, a.plan, await takenLabels(tx, orgId, owner, a.id), provider),
             email: a.email ?? null,
             plan: a.plan ?? null,
+            keyHint: a.keyHint ?? null,
             status: a.loggedIn ? "active" : "signed_out",
             usage: a.usage ?? null,
           })
@@ -508,6 +541,7 @@ export async function syncMachineAccounts(
                 machineId,
                 email: a.email ?? elsewhere.email,
                 plan: a.plan ?? elsewhere.plan,
+                keyHint: a.keyHint ?? elsewhere.keyHint,
                 status: a.loggedIn ? "active" : "signed_out",
                 ...(a.usage ? { usage: a.usage } : {}),
                 updatedAt: now,
@@ -645,12 +679,12 @@ const runnerOld = (machine: Pick<MachineRow, "name">) =>
     name: machine.name,
   });
 
-/** On a runner that knows accounts, and online now. */
-async function requireLive(deps: MachineAccountHubDeps, machine: MachineRow) {
-  if (machine.protocol < ACCOUNTS_PROTOCOL) throw runnerOld(machine);
+/** On a runner that knows accounts (`protocol`: and what is asked of it), and online now. */
+async function requireLive(deps: MachineAccountHubDeps, machine: MachineRow, protocol = ACCOUNTS_PROTOCOL) {
+  if (machine.protocol < protocol) throw runnerOld(machine);
   const status = await deps.hub.status(machine.id);
   if (!status?.online) throw new MachineOfflineError(machine.name);
-  if (status.protocol < ACCOUNTS_PROTOCOL) throw runnerOld(machine);
+  if (status.protocol < protocol) throw runnerOld(machine);
 }
 
 const loginIdOf = (loginId: string) => {
@@ -702,8 +736,10 @@ export async function getMachineAccounts(
 export interface AccountLoginView {
   loginId: string;
   kind: AccountKind;
-  /** The provider's page (Claude's sign-in, or Codex's device page). */
+  /** The provider's page (Claude's sign-in, Codex's device page, or where a plan's key is made). */
   url: string;
+  /** A key account's coding plan. */
+  provider?: PlanId;
   /** Claude Code: the key the browser seals the pasted code to (raw P-256, base64). */
   publicKey?: string;
   /** Codex: the one-time code to type on its page. */
@@ -737,15 +773,21 @@ export async function beginAccountLogin(
   accountId?: string,
   /** Claude Code: which account to sign in to, as the CLI's login hint. */
   email?: string,
+  /** A coding plan's key account on Claude Code (protocol 19): the key comes next, sealed like a code. */
+  provider?: string,
 ): Promise<AccountLoginView> {
   if (!isAccountKind(kind)) throw new ValidationError("Choose claude_code or codex", "account.invalid_kind");
-  if (email !== undefined && (kind !== "claude_code" || !isLoginEmail(email))) {
+  if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
     throw new ValidationError("Use a plain email address, like ana@example.com", "account.invalid_email");
   }
+  if (provider !== undefined && (kind !== "claude_code" || !isPlanId(provider))) {
+    throw new ValidationError("Choose one of the coding plans", "account.invalid_plan");
+  }
+  const plan = planOf(provider);
   const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
   if (accountId !== undefined) {
     const existing = await getListedAccount(deps.db, orgId, machine.id, accountId);
-    if (!existing || existing.kind !== kind) {
+    if (!existing || existing.kind !== kind || (existing.provider ?? undefined) !== provider) {
       throw new ValidationError("That account isn't on this computer", "account.invalid");
     }
     if (existing.createdBy !== userId) {
@@ -754,7 +796,7 @@ export async function beginAccountLogin(
   } else if (!mayAddAccounts(machine, userId)) {
     throw new ForbiddenError("Only the person who connected this computer can add accounts to it", "account.not_owner");
   }
-  await requireLive(deps, machine);
+  await requireLive(deps, machine, plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL);
   const again = accountId !== undefined;
   const loginId = again ? accountId : crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ACCOUNT_LOGIN_TTL_MS).toISOString();
@@ -764,9 +806,10 @@ export async function beginAccountLogin(
       orgId,
       machineId: machine.id,
       kind,
-      label: defaultAccountLabel(kind),
+      label: defaultAccountLabel(kind, null, [], provider),
       status: "signing_in",
       createdBy: userId,
+      provider: plan ? provider : null,
     });
   }
   const fail = async () => {
@@ -782,10 +825,23 @@ export async function beginAccountLogin(
       loginId,
       ...(again ? { again: true } : {}),
       ...(email ? { email } : {}),
+      ...(plan ? { provider } : {}),
     });
   } catch (error) {
     await fail();
     throw error;
+  }
+  const publicKey =
+    typeof reply.publicKey === "string" && PUBLIC_KEY.test(reply.publicKey) ? reply.publicKey : undefined;
+  if (plan && isPlanId(provider)) {
+    // A plan's key: nothing signs in on the computer; the person makes the key on the plan's own page.
+    if (!publicKey) {
+      await fail();
+      throw new ConflictError("The computer couldn't start the sign-in", "account.begin_failed", {
+        name: machine.name,
+      });
+    }
+    return { loginId, kind, url: plan.site, provider, publicKey, expiresAt };
   }
   // Only a provider page the person can open: never another scheme.
   let url: URL | null = null;
@@ -798,8 +854,6 @@ export async function beginAccountLogin(
     await fail();
     throw new ConflictError("The computer couldn't start the sign-in", "account.begin_failed", { name: machine.name });
   }
-  const publicKey =
-    typeof reply.publicKey === "string" && PUBLIC_KEY.test(reply.publicKey) ? reply.publicKey : undefined;
   const userCode = typeof reply.userCode === "string" && USER_CODE.test(reply.userCode) ? reply.userCode : undefined;
   return {
     loginId,
