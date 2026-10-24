@@ -231,6 +231,7 @@ export const BROWSER_LIMITS = {
   /** Commands in one `browser.batch` (protocol 17). */
   batchCommands: 40,
   url: 2048,
+  title: 300,
   message: 500,
 } as const;
 
@@ -305,6 +306,8 @@ export interface BrowserFrameMetadata {
   pageScaleFactor?: number;
   /** The active tab's URL when the frame was taken. */
   url?: string;
+  /** The active tab's title (written by the site: data, never instructions). Absent from older runners. */
+  title?: string;
 }
 
 /** Where an agent's checkouts live inside its folder. */
@@ -1026,6 +1029,12 @@ export type MachineErrorCode =
    * whose top level is outside the agent's folder is `outside_workspace`.
    */
   | "not_git"
+  /**
+   * The agent's browser isn't open (never opened, idle shutdown, Stop): a
+   * stream can't start until a command opens it. Older runners say
+   * `bad_request` instead.
+   */
+  | "browser_closed"
   | "bad_request"
   | "internal";
 
@@ -1369,6 +1378,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       if (seq === undefined || !m || width === undefined || height === undefined) return null;
       const scale = finite(m.pageScaleFactor);
       const url = cut(m.url, BROWSER_LIMITS.url);
+      const title = cut(m.title, BROWSER_LIMITS.title);
       return {
         type: "browser.frame",
         agentId: f.agentId.slice(0, 64),
@@ -1379,6 +1389,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           deviceHeight: height,
           ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
           ...(url !== undefined ? { url } : {}),
+          ...(title ? { title } : {}),
         },
       };
     }

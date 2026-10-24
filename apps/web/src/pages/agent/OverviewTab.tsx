@@ -18,6 +18,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
+import { BrowserNow } from "./BrowserNow";
 import { CardHead, useAgentEdit } from "./context";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
@@ -60,6 +61,7 @@ export function OverviewTab() {
       <ReadOnlyNote />
       <div className="agp-cols">
         <div className="agp-col">
+          <BrowserNow />
           {(approvals > 0 || pending.length > 0) && (
             <div className="agp-attns">
               {approvals > 0 && (

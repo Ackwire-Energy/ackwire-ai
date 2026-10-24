@@ -12,6 +12,7 @@ import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { agentBrainLine } from "@/components/AgentBrain";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { AgentBrowserButton } from "@/components/browser/AgentBrowser";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -87,6 +88,7 @@ export function DmPage({ target }: { target: DmTarget }) {
         )}
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
+      {agent && <AgentBrowserButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
     </header>
   );

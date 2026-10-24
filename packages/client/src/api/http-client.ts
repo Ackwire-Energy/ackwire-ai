@@ -256,8 +256,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       handoff: (orgId, handoffId) => request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}`),
       takeControl: (orgId, handoffId) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/control`, { json: {} }),
-      done: (orgId, handoffId) =>
-        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/done`, { json: {} }),
+      done: (orgId, handoffId, note) =>
+        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/done`, {
+          json: note ? { note } : {},
+        }),
       failed: (orgId, handoffId, note) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/failed`, {
           json: note ? { note } : {},
@@ -268,6 +270,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/browser/takeover`, {
           json: runId ? { runId } : {},
         }),
+      open: (orgId, agentId, url) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
     },
     reminders: {

@@ -3,9 +3,11 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import path from "node:path";
 import {
   AGENT_BROWSER_VERSION,
+  BROWSER_LIMITS,
   BROWSER_PROTOCOL,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
+  parseRunnerFrame,
   parseServerFrame,
   type RunnerAccess,
   type RunnerFrame,
@@ -32,7 +34,7 @@ import {
 } from "../../runner/browser";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
-import { errorCode, removeDirs, tempDir } from "./helpers";
+import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
@@ -685,7 +687,7 @@ test.if(posix)(
 
 test.if(posix)("the stream relays frames with the page's URL, changes mode, and ends with a frame", async () => {
   const t = setup();
-  expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("bad_request");
+  expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_closed");
   await t.act("open", ["https://shop.example.com"]);
   expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
   const socket = t.sockets[0] as FakeSocket;
@@ -714,6 +716,80 @@ test.if(posix)("the stream relays frames with the page's URL, changes mode, and 
   expect(socket.closed).toBe(true);
   expect(t.frames.at(-1)).toEqual({ type: "browser.stream.ended", agentId: dev.id, reason: "stopped" });
   expect(await t.manager.streamStop(dev)).toEqual({ stopped: false });
+});
+
+test.if(posix)("a stream can't start on a closed browser, never opened or closed since: browser_closed", async () => {
+  const t = setup();
+  expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_closed");
+  await t.act("open", ["https://shop.example.com"]);
+  await t.act("close");
+  expect(await errorCode(() => t.manager.streamStart(dev, "control"))).toBe("browser_closed");
+  expect(t.sockets).toHaveLength(0);
+  // Opening a page (the agent, or a person in control) starts it again, and it streams.
+  await t.act("open", ["https://shop.example.com"]);
+  expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+  await t.manager.streamStop(dev);
+});
+
+test.if(posix)(
+  "an idle page shows at once: a stream with no frame sends one screenshot, with the tab's address and title",
+  async () => {
+    const t = setup({ firstFrameMs: 5 });
+    await t.act("open", ["https://shop.example.com"]);
+    await t.manager.streamStart(dev, "watch");
+    const socket = t.sockets[0] as FakeSocket;
+    // What the stream says on connect: the page's size, then the tabs (the active one's title).
+    socket.push({ type: "status", connected: true, viewportWidth: 1280, viewportHeight: 720 });
+    socket.push({
+      type: "tabs",
+      tabs: [
+        { url: "https://x.example/", title: "X", active: false },
+        { url: "https://shop.example.com/", title: "Loja", active: true },
+      ],
+    });
+    await waitFor(() => t.frames.some((f) => f.type === "browser.frame"));
+    expect(t.frames[0]).toEqual({
+      type: "browser.frame",
+      agentId: dev.id,
+      seq: 0,
+      data: expect.stringMatching(/^\/9j\//), // the JPEG the fake writes (FF D8 FF)
+      metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/", title: "Loja" },
+    });
+    const shot = t.logged().find((c) => c.args.includes("screenshot"));
+    expect(shot?.args.slice(-6)).toEqual([
+      "screenshot",
+      path.join(t.home, "browser", "agent-01a142cb-frame.jpg"),
+      "--screenshot-format",
+      "jpeg",
+      "--screenshot-quality",
+      "70",
+    ]);
+    expect(existsSync(path.join(t.home, "browser", "agent-01a142cb-frame.jpg"))).toBe(false);
+    // Another page: frames carry its address; its title comes with the next tab list.
+    socket.push({ type: "url", url: "https://shop.example.com/cart" });
+    socket.push({ type: "frame", seq: 3, data: "/9j/B", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+    expect(t.frames.at(-1)).toEqual({
+      type: "browser.frame",
+      agentId: dev.id,
+      seq: 3,
+      data: "/9j/B",
+      metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/cart" },
+    });
+    await t.manager.streamStop(dev);
+  },
+);
+
+test.if(posix)("a page that repaints by itself gets no screenshot", async () => {
+  const t = setup({ firstFrameMs: 5 });
+  await t.act("open", ["https://shop.example.com"]);
+  await t.manager.streamStart(dev, "watch");
+  const socket = t.sockets[0] as FakeSocket;
+  socket.push({ type: "status", connected: true, viewportWidth: 1280, viewportHeight: 720 });
+  socket.push({ type: "frame", seq: 1, data: "/9j/A", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+  await Bun.sleep(40);
+  expect(t.logged().some((c) => c.args.includes("screenshot"))).toBe(false);
+  expect(t.frames.filter((f) => f.type === "browser.frame")).toHaveLength(1);
+  await t.manager.streamStop(dev);
 });
 
 test.if(posix)("two starts at once open one socket; a stop sent meanwhile closes it", async () => {
@@ -947,6 +1023,20 @@ test.if(posix)("a paused computer starts no browser work", async () => {
   };
   expect(await errorCode(() => handleRequest(ctx, req, scope))).toBe("paused");
   expect(t.logged()).toHaveLength(0);
+});
+
+test("a frame reaches the server with the page's address and title, the title cut to its limit", () => {
+  const frame = (metadata: Record<string, unknown>) =>
+    parseRunnerFrame(JSON.stringify({ type: "browser.frame", agentId: dev.id, seq: 1, data: "/9j/A", metadata }));
+  const size = { deviceWidth: 1280, deviceHeight: 720 };
+  expect(frame({ ...size, url: "https://shop.example.com/", title: "Loja" })).toMatchObject({
+    metadata: { ...size, url: "https://shop.example.com/", title: "Loja" },
+  });
+  const long = frame({ ...size, title: "x".repeat(BROWSER_LIMITS.title + 50) });
+  expect(long?.type === "browser.frame" && long.metadata.title?.length).toBe(BROWSER_LIMITS.title);
+  // An older runner sends none; an empty one isn't kept.
+  const none = frame({ ...size, title: "" });
+  expect(none?.type === "browser.frame" && "title" in none.metadata).toBe(false);
 });
 
 // ── For the desktop app's tray ───────────────────────────────────────────────

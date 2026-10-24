@@ -61,18 +61,22 @@ describe("Assumir: the card stays the control while the agent waits (NavegadorNo
       },
     });
     await settle(4);
-    // Still there, still mine, open: one card (not two), Pronto in its header.
+    // Still there, still mine, open: one card (not two), Devolver in its header (a take over, not a request).
     expect(cards()).toHaveLength(1);
     const card = cards()[0] as HTMLElement;
     expect(card.classList.contains("is-control")).toBe(true);
     expect(card.classList.contains("is-open")).toBe(true);
-    expect(within(card).getByRole("button", { name: "Pronto" })).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Pronto" })).toBeNull();
     expect(card.closest("article")?.textContent).toContain("Uma pessoa pegou o controle");
 
-    // Pronto hands back: the card goes with the take over.
-    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
+    // Devolver asks for an optional word to the agent, then hands back: the card goes with the take over.
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
+    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
+    await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
     await settle(3);
-    expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
+    const done = state.calls.find((c) => c.method === "browser.done");
+    expect(done?.args.at(-1)).toBe("Entrei com a conta de teste");
     expect(cards()).toHaveLength(0);
   });
 
@@ -89,7 +93,7 @@ describe("Assumir: the card stays the control while the agent waits (NavegadorNo
     await settle(3);
     expect(cards()).toHaveLength(1);
     expect(cards()[0]?.classList.contains("is-control")).toBe(true);
-    expect(within(cards()[0] as HTMLElement).getByRole("button", { name: "Pronto" })).toBeTruthy();
+    expect(within(cards()[0] as HTMLElement).getByRole("button", { name: "Devolver" })).toBeTruthy();
   });
 
   test("someone else holding it: Assumir says another person is helping", async () => {

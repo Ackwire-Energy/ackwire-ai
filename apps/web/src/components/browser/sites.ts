@@ -7,3 +7,24 @@ export function cleanSite(input: string): string {
   const m = /^(?:[a-z]+:\/\/)?([^/?#\s]+)/.exec(s);
   return (m?.[1] ?? s).replace(/:\d+$/, "");
 }
+
+/** A page with nothing on it yet (`about:blank`): the person in control gets the address bar at once. */
+export const isBlankPage = (url: string | null | undefined) => Boolean(url && /^about:/i.test(url));
+
+/** Why opening a site in the agent's browser was refused (`POST …/browser/open`), as the i18n key that says it. */
+export function openRefusalKey(code: string | undefined) {
+  switch (code) {
+    case "browser.not_allowed":
+      return "browser.inCard.goNotAllowed";
+    case "browser.bad_address":
+      return "browser.inCard.goBadAddress";
+    case "browser.open_failed":
+      return "browser.inCard.goFailed";
+    case "browser.not_in_control":
+      return "browser.live.notInControl";
+    case "machine.offline":
+      return "browser.inCard.offline";
+    default:
+      return "browser.live.actionFailed";
+  }
+}

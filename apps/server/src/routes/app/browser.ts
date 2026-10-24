@@ -6,6 +6,7 @@ import {
   type HandoffDeps,
   handoffView,
   openHandoffOf,
+  openPageInControl,
   requireBrowserAccess,
   startTakeover,
   stopAgentBrowser,
@@ -106,12 +107,17 @@ export function browserRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Done (or hand back a take over): the agent reads the page again and goes on",
-      request: { params: HandoffParams },
+      description: "`note`: what the person wants the agent to know; it reads it as their own words.",
+      request: { params: HandoffParams, body: body(z.object({ note: z.string().max(1000).optional() })) },
       responses: { 200: json(BrowserHandoff), ...errors },
     }),
     async (c) => {
       const { orgId, handoffId } = c.req.valid("param");
-      return c.json(await finishHandoff(handoffDeps, c.get("user").id, orgId, handoffId, { result: "done" }), 200);
+      const { note } = c.req.valid("json");
+      return c.json(
+        await finishHandoff(handoffDeps, c.get("user").id, orgId, handoffId, { result: "done", note }),
+        200,
+      );
     },
   );
 
@@ -167,6 +173,26 @@ export function browserRoutes(deps: AppDeps) {
       const { orgId, agentId } = c.req.valid("param");
       const { runId } = c.req.valid("json");
       return c.json(await startTakeover(handoffDeps, c.get("user").id, orgId, agentId, runId ?? null), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/browser/open",
+      tags,
+      security,
+      summary: "Open a site in the agent's browser (the person in control); a closed browser opens",
+      description:
+        "Only the person in control (409 `browser.not_in_control` otherwise), and only while the agent may use its browser (`browser:use`) and its computer serves it (403 otherwise). `url`: http(s), a bare host gets https (anything else is 400 `browser.bad_address`). A site outside the agent's list is 403 `browser.not_allowed`; a page that fails to load is 400 `browser.open_failed`.",
+      request: { params: AgentParams, body: body(z.object({ url: z.string().min(1).max(2048) })) },
+      responses: { 204: { description: "Opened" }, ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const { url } = c.req.valid("json");
+      await openPageInControl(handoffDeps, deps.extras?.sandbox?.machines?.hub, c.get("user").id, orgId, agentId, url);
+      return c.body(null, 204);
     },
   );
 

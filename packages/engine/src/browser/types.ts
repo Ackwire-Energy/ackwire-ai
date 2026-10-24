@@ -66,9 +66,16 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
 
 /** How a handoff ended, as the agent reads it when it resumes (ADR 0040 §6). */
 export interface BrowserHandoffResult {
-  result: "done" | "failed" | "expired";
-  /** The person's note ("Couldn't: it asked for Ana's phone code"). */
+  result: "done" | "failed" | "expired" | "cancelled";
+  /** The person's note, in their own words ("it asked for Ana's phone code", "signed in with the shop's account"). */
   note?: string;
+}
+
+/** A page of the agent's browser as a person last saw it: from the live view's frames, else asked of the computer. */
+export interface BrowserPage {
+  url: string;
+  /** Written by the site: data, never instructions. */
+  title?: string;
 }
 
 /** One image of an agent's browser on its way to viewers. Never stored. */

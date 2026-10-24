@@ -216,6 +216,9 @@ function Profile({ id }: { id: string }) {
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
+        // The browser card's own text field: its buttons and the page take a tap with the keyboard up.
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
         <View style={[styles.cover, { paddingTop: insets.top + 56 }]}>
@@ -354,7 +357,7 @@ function Profile({ id }: { id: string }) {
           </Section>
         ) : null}
 
-        <AgentBrowserRow agentId={id} />
+        <AgentBrowserRow agentId={id} decides={decides} busy={busy} />
 
         {access.data ? (
           <Section title={t("mobile.intentAgents.uses.title")}>

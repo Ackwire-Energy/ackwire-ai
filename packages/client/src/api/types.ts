@@ -3746,7 +3746,7 @@ export interface BrowserHandoff {
   requestedForUserId: string | null;
   /** Who is in control now (null: nobody yet). */
   controllerUserId: string | null;
-  /** "Não consegui": the person's reason. */
+  /** What the person told the agent when it ended ("Não consegui"'s reason, or a note on "Pronto"/"Devolver"). */
   note: string | null;
   /** While nobody has opened it: when it expires. Null once someone is in control (no deadline then). */
   expiresAt: string | null;

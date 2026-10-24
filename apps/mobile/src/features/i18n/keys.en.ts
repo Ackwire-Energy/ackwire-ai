@@ -1153,6 +1153,7 @@ export const featureKeysEn: FeatureTranslations = {
       watchOnly: "{{name}} is in control. You're only watching.",
       takeOver: "Take over",
       done: "Done",
+      handBack: "Hand back",
       couldnt: "Couldn't do it",
       typeHere: "Type here",
       typeMarked: "Type into the marked field",
@@ -1165,6 +1166,9 @@ export const featureKeysEn: FeatureTranslations = {
       page: "The browser's page. Tap to click.",
       graceF: "If you leave, {{name}} waits 2 min.",
       graceM: "If you leave, {{name}} waits 2 min.",
+      closedHelpF: "It opens when {{name}} browses again. Logins stay saved.",
+      closedHelpM: "It opens when {{name}} browses again. Logins stay saved.",
+      hidden: "{{name}} is in control · screen hidden",
       key: {
         Tab: "Tab",
         Enter: "Enter",
@@ -1184,12 +1188,20 @@ export const featureKeysEn: FeatureTranslations = {
         endedM: "{{name}}'s browser closed.",
         forbiddenF: "You can't see this browser.",
         forbiddenM: "You can't see this browser.",
+        closedF: "{{name}}'s browser is closed.",
+        closedM: "{{name}}'s browser is closed.",
       },
     },
     profile: {
       title: "Browser",
       waitingF: "{{name}} needs you",
       waitingM: "{{name}} needs you",
+    },
+    done: {
+      title: "Anything to add?",
+      introF: "Optional. {{name}} reads it before going on.",
+      introM: "Optional. {{name}} reads it before going on.",
+      placeholder: "E.g. I signed in with the test account",
     },
     failed: {
       title: "What happened?",
