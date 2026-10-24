@@ -22,6 +22,7 @@ import type {
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiAccounts,
   ApiRule,
   AppNotification,
   Approval,
@@ -82,6 +83,7 @@ import type {
   Machine,
   MachineAccess,
   MachineAccessReduce,
+  MachineAccount,
   MachineAccountKind,
   MachineOutages,
   MachineTask,
@@ -426,19 +428,29 @@ export interface ApiClient {
     outages(orgId: string): Promise<MachineOutages>;
     /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
     moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
-    /** ADR 0041 §2: the computer starts the provider's own sign-in (its owner only). */
-    /** `accountId`: sign in again to that (signed out) account instead of adding a new one. */
+    /**
+     * ADR 0041 §2: the computer starts the provider's own sign-in. `accountId`: sign in again to that account
+     * of the viewer's; `email` (Claude): which account, as the CLI's hint; `provider`: a coding plan's key.
+     */
     beginAccountLogin(
       orgId: string,
       machineId: string,
       kind: MachineAccountKind,
-      accountId?: string,
+      options?: { accountId?: string; email?: string; provider?: string },
     ): Promise<AccountLoginStart>;
-    /** Claude Code: the code Claude showed, sealed in the browser to the computer's key (`sealSecret`). */
+    /** Claude Code: the code Claude showed (or a plan's key), sealed in the browser to the computer's key (`sealSecret`). */
     sendAccountCode(orgId: string, machineId: string, loginId: string, box: SecretBox): Promise<void>;
     accountLogin(orgId: string, machineId: string, loginId: string): Promise<AccountLoginStatus>;
     /** Gives up on a sign-in (Voltar, the dialog closed): the computer stops it. */
     cancelAccountLogin(orgId: string, machineId: string, loginId: string): Promise<void>;
+    /** An accounts screen opened: the viewer's plans look their usage up again (it arrives as `machine.updated`). */
+    refreshAccountUsage(orgId: string): Promise<void>;
+    /** "Contas de IA": the viewer's accounts on every computer, and where they can add one. */
+    aiAccounts(orgId: string): Promise<AiAccounts>;
+    /** Its owner names it (1 to 40 characters). */
+    renameAccount(orgId: string, machineId: string, accountId: string, label: string): Promise<MachineAccount>;
+    /** Its owner (or whoever connected the computer) disconnects it; the computer signs it out and deletes it. */
+    removeAccount(orgId: string, machineId: string, accountId: string): Promise<void>;
   };
   skills: {
     /** The org library. */

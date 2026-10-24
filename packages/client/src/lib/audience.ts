@@ -15,6 +15,18 @@ export const modeOf = (agent: Agent): AudienceMode => agent.audience?.mode ?? ag
 /** Whether I can talk to it (the server's `canTalk`; absent = yes). */
 export const canTalk = (agent: Agent | undefined) => agent?.canTalk !== false;
 
+/** Whether `to` lets someone talk to the agent whom `from` didn't; its owner always can (same rule as the backend). */
+export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
+  if (to.mode === "owner" || from.mode === "everyone") return false;
+  if (to.mode === "everyone") return true;
+  const before = new Set(from.mode === "people" ? from.userIds : []);
+  return to.userIds.some((id) => id !== ownerUserId && !before.has(id));
+}
+
+/** Someone besides its owner can talk to the agent. */
+export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
+  audienceWidens({ mode: "owner", userIds: [] }, a, ownerUserId);
+
 /** Only the agent's owner and admins change who talks to it (same rule as the backend). */
 export const canEditAudience = (role: Role | undefined, agent: Agent, myUserId: string) =>
   can(role, "manage_agents") || (agent.ownerUserId != null && agent.ownerUserId === myUserId);

@@ -1,6 +1,7 @@
 import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
+  useAiAccounts,
   useConnections,
   useCredentials,
   useInvitations,
@@ -23,6 +24,7 @@ import {
   PROVIDERS,
   type ProviderId,
   providerLabel,
+  providerOf,
 } from "@agenteschat/client/lib/providers";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
@@ -39,6 +41,7 @@ import {
   Input,
   List,
   Meter,
+  ProviderLogo,
   Select,
   Textarea,
 } from "@agenteschat/ui";
@@ -47,6 +50,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ImportExportSection } from "@/components/ImportFlow";
@@ -54,6 +58,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
+import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
@@ -139,7 +144,12 @@ export function SettingsPage({
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}
-        {current === "keys" && <KeysSection />}
+        {current === "keys" && (
+          <>
+            <AiAccountsSection />
+            <KeysSection />
+          </>
+        )}
         {current === "storage" && <StorageSection />}
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
@@ -348,7 +358,9 @@ function SettingsTiles() {
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, shown("skills"));
   const machines = useMachines(org.id, shown("computers"));
-  const credentials = useCredentials(org.id, shown("keys"));
+  const managesKeys = can(role, "manage_credentials");
+  const credentials = useCredentials(org.id, managesKeys);
+  const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
   const platform = usePlatformKey(org.id);
   const storage = useStorage(org.id, shown("storage"));
 
@@ -386,13 +398,17 @@ function SettingsTiles() {
     usage:
       overview.data &&
       t("settings.tileState.usage", { percent: formatPercent(i18n.language, overview.data.budgetUsedPercent) }),
-    keys:
-      credentials.data &&
-      (keys.length > 0
-        ? t("settings.tileState.keys", { count: keys.length })
-        : platform.data
-          ? t("settings.tileState.platformKey")
-          : t("settings.tileState.noKeys")),
+    keys: managesKeys
+      ? credentials.data &&
+        (keys.length > 0
+          ? t("settings.tileState.keys", { count: keys.length })
+          : platform.data
+            ? t("settings.tileState.platformKey")
+            : t("settings.tileState.noKeys"))
+      : plans.data &&
+        (plans.data.accounts.length > 0
+          ? t("settings.tileState.plans", { count: plans.data.accounts.length })
+          : t("settings.tileState.noPlans")),
     storage: storage.data && t(storage.data.kind === "s3" ? "storage.s3" : "storage.agentes"),
   };
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
@@ -471,6 +487,7 @@ function KeysSection() {
             const isDefault = settings.data?.defaultCredentialId === c.id;
             return (
               <div key={c.id} className="ac-list__row">
+                <ProviderLogo id={c.provider} size="sm" />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>{c.label}</span>
                   <span className="small muted">
@@ -577,7 +594,12 @@ function KeyDialog({
     setTouched(false);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
-  const error = touched && !valid ? t(`onboarding.keyInvalid.${provider}`) : undefined;
+  const error =
+    !touched || valid ? undefined : mode === "add" ? (
+      <KeyMismatch provider={provider} apiKey={apiKey} onPick={setProvider} />
+    ) : (
+      t(`onboarding.keyInvalid.${provider}`)
+    );
   const pending = add.isPending || rotate.isPending;
   return (
     <Dialog
@@ -622,7 +644,17 @@ function KeyDialog({
               <Select
                 value={provider}
                 onValueChange={setProvider}
-                options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+                options={PROVIDERS.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                  leading: <ProviderLogo id={p.id} size="xs" />,
+                }))}
+                renderValue={(o) => (
+                  <span className="row">
+                    {o.leading}
+                    {o.label}
+                  </span>
+                )}
               />
             </Field>
           )}
@@ -635,11 +667,20 @@ function KeyDialog({
               />
             </Field>
           )}
-          <Field label={t("settings.keyValue")} id="key-value-set" error={error} help={t("connectors.apiKeyHelp")}>
+          <Field
+            label={t("settings.keyValue")}
+            id="key-value-set"
+            error={error}
+            help={
+              <>
+                <KeySite provider={provider} /> {t("connectors.apiKeyHelp")}
+              </>
+            }
+          >
             <Input
               type="password"
               autoComplete="off"
-              placeholder={PROVIDERS.find((p) => p.id === provider)?.placeholder}
+              placeholder={providerOf(provider)?.placeholder}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />

@@ -11,6 +11,7 @@ import {
   type MachineOs,
   type MachineReplies,
   type MachineRequest,
+  OWN_USAGE_ID,
   type RunnerAccess,
   type RunnerFrame,
   type RunnerInfo,
@@ -44,7 +45,7 @@ import {
   TOOL_NAMES,
   writeAgents,
 } from "./access";
-import { AccountManager } from "./accounts";
+import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
 import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } from "./agent-users";
 import { BrainManager } from "./brain";
@@ -251,6 +252,8 @@ export interface DaemonOptions {
   pairSleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** Tests (system mode): how agents' users are found and their workers started. */
   workers?: Pick<SupervisorOptions, "user" | "start">;
+  /** Tests (system mode): where the account folders are, and how one is handed to an agent's user. */
+  systemAccounts?: { root: string; chown: (file: string, uid: number, gid: number) => Promise<void> };
 }
 
 export class RunnerDaemon implements RequestObserver {
@@ -306,16 +309,25 @@ export class RunnerDaemon implements RequestObserver {
     this.self = opts.self ?? { command: selfCommand(proc), compiled: isCompiled(proc) };
     const exec = opts.executors ?? cachedExecutors();
     this.executors = () => exec() ?? {};
+    // System mode is set at install and kept through pairings: account folders are lent to agents' users.
+    let system = false;
+    try {
+      system = readStoredConfig(opts.home)?.mode === "system";
+    } catch {
+      // an unreadable config starts unpaired
+    }
+    const lent = system ? (opts.systemAccounts ?? { root: SYSTEM_ACCOUNTS_ROOT, chown: lchownTree }) : null;
     this.accounts = new AccountManager({
-      root: path.join(opts.home, "accounts"),
+      root: lent?.root ?? path.join(opts.home, "accounts"),
+      ...(lent ? { lending: { chown: lent.chown } } : {}),
       orgId: () => this.config?.orgId,
       log: opts.log,
       ...(opts.accountCommands ? { commands: opts.accountCommands } : {}),
       onChange: () => {
         this.queueStatus();
-        // The server learns at once (a sign-in or removal from the desktop app, a status that changed).
+        // The server learns at once (a sign-in or removal from the desktop app, a status or usage that changed).
         const accounts = this.accounts.snapshot();
-        if (accounts) this.send({ type: "accounts.changed", accounts });
+        if (accounts) this.send({ type: "accounts.changed", accounts, ...this.ownUsage() });
       },
     });
     const daemon = this;
@@ -663,6 +675,7 @@ export class RunnerDaemon implements RequestObserver {
     const brains = new BrainManager({
       root: path.join(home, "brains"),
       mcp: mcpCommand,
+      runnerHome: home,
       idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
       maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
       accounts: this.accounts,
@@ -674,6 +687,8 @@ export class RunnerDaemon implements RequestObserver {
       runs: codexRuns,
       idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
       maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
+      onRateLimits: (account, rateLimits) =>
+        this.accounts.noteCodexRateLimits(account ?? OWN_USAGE_ID.codex, rateLimits),
       log,
     });
     const mcp = new McpBridge({
@@ -711,6 +726,7 @@ export class RunnerDaemon implements RequestObserver {
         home,
         user: agentUser,
         start: launchWorker(this.self.command),
+        lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
         token: config.token,
@@ -760,6 +776,7 @@ export class RunnerDaemon implements RequestObserver {
           desktop: this.desktops.info(),
           terminal: this.terminals.info(),
           ...(accounts ? { accounts } : {}),
+          ...this.ownUsage(),
           // Who may control a desktop or open a terminal follows it (ADR 0058 §4).
           ...(agentUser ? { mode: "system" as const } : {}),
         };
@@ -858,6 +875,12 @@ export class RunnerDaemon implements RequestObserver {
     };
   }
 
+  /** The computer's own sign-ins' usage, when anything is known (`hello`, `accounts.changed`). */
+  private ownUsage(): Pick<RunnerInfo, "ownUsage"> {
+    const own = this.accounts.ownUsage();
+    return Object.keys(own).length > 0 ? { ownUsage: own } : {};
+  }
+
   /** The coding CLIs for `hello`: the ones installed (whether each may run is `access.tools`). */
   private helloExecutors(): NonNullable<RunnerInfo["executors"]> {
     const found = this.executors();
@@ -943,6 +966,16 @@ export class RunnerDaemon implements RequestObserver {
 
   private setAgents(raw: unknown) {
     const list = parseAgents(raw);
+    // System mode: an account folder stays with an agent's user only while that agent thinks with it.
+    if (this.stored?.mode === "system") {
+      const uids = new Map(readAgentUsers(this.opts.home).map((u) => [u.id, u.uid]));
+      const lent = new Map<string, number>();
+      for (const a of list) {
+        const uid = uids.get(a.id);
+        if (a.account && uid) lent.set(a.account, uid);
+      }
+      void this.accounts.keepLent(lent).catch(() => undefined);
+    }
     if (JSON.stringify(list) === JSON.stringify(this.agents)) return;
     this.agents = list;
     try {

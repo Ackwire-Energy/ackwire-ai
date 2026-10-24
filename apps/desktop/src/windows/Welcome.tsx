@@ -16,7 +16,18 @@ import {
   type ServerProblem,
   serverHost,
 } from "@agenteschat/client/lib/server";
-import { Button, Chip, glowTones, Icon, Input, PixelSky, PixelSpinner, type SkyOptions, Switch } from "@agenteschat/ui";
+import {
+  Button,
+  Chip,
+  glowTones,
+  Icon,
+  Input,
+  PixelSky,
+  PixelSpinner,
+  ProviderLogo,
+  type SkyOptions,
+  Switch,
+} from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
@@ -522,7 +533,7 @@ export function Welcome() {
         <div className="dk-picklist dk-picklist--tools">
           <ToolRow
             id="claude"
-            icon="executorClaude"
+            mark="claude_code"
             name={t("desktop.tools.claudeName")}
             desc={executors.claude ? t("desktop.tools.claudeDesc") : t("desktop.tools.notInstalled")}
             found={!!executors.claude}
@@ -531,7 +542,7 @@ export function Welcome() {
           />
           <ToolRow
             id="codex"
-            icon="executorCodex"
+            mark="codex"
             name={t("desktop.tools.codexName")}
             desc={executors.codex ? t("desktop.tools.codexDesc") : t("desktop.tools.notInstalled")}
             found={!!executors.codex}
@@ -540,7 +551,7 @@ export function Welcome() {
           />
           <ToolRow
             id="commands"
-            icon="code"
+            mark="code"
             name={t("desktop.tools.commandsName")}
             desc={t("desktop.tools.commandsDesc")}
             on={tools.commands}
@@ -634,7 +645,7 @@ export function Welcome() {
 
 function ToolRow({
   id,
-  icon,
+  mark,
   name,
   desc,
   found,
@@ -643,7 +654,8 @@ function ToolRow({
   warning,
 }: {
   id: string;
-  icon: "executorClaude" | "executorCodex" | "code";
+  /** Claude Code and Codex by their makers' marks; Comandos by its icon. */
+  mark: "claude_code" | "codex" | "code";
   name: string;
   desc: string;
   /** Claude Code / Codex: whether it is installed here (absent for Comandos). */
@@ -656,9 +668,13 @@ function ToolRow({
   const missing = found === false;
   return (
     <div className="dk-tl">
-      <span className="dk-logo">
-        <Icon name={icon} size={16} />
-      </span>
+      {mark === "code" ? (
+        <span className="dk-logo">
+          <Icon name="code" size={16} />
+        </span>
+      ) : (
+        <ProviderLogo id={mark} size="sm" off={missing} />
+      )}
       <span className="dk-tl__text">
         <label htmlFor={`tool-${id}`}>
           <b>

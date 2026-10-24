@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   ACCESS_LIMITS,
+  isAccountId,
   type MachineAgent,
   type RunnerAccess,
   type RunnerFolderGrant,
@@ -439,6 +440,7 @@ export function parseAgents(v: unknown): MachineAgent[] {
       handle: str(o.handle, 64),
       name: str(o.name, 100) || str(o.handle, 64),
       ...(lookOut && Object.keys(lookOut).length ? { look: lookOut } : {}),
+      ...(isAccountId(o.account) ? { account: o.account } : {}),
     });
   }
   return out;

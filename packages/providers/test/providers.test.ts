@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { costNanoUsd, isKnownModel, MODEL_CATALOG, PROVIDERS, usdToNanoUsd } from "../src";
+import {
+  cheapModelOf,
+  costNanoUsd,
+  isKnownModel,
+  MODEL_CATALOG,
+  MODEL_TIERS,
+  modelForTier,
+  PROVIDER_IDS,
+  PROVIDERS,
+  usdToNanoUsd,
+} from "../src";
 import { createFakeProvider } from "../src/fake";
 
 const usage = (inputTokens: number, outputTokens: number, cacheReadTokens = 0, cacheWriteTokens = 0) => ({
@@ -37,13 +47,53 @@ describe("pricing", () => {
     expect(costNanoUsd("gpt-6-luna", usage(272_001, 1000, 0, 10))).toBe(272_001 * 200 + 1000 * 750 + 10 * 250);
   });
 
-  test("one recommended model per provider: Sonnet 5.5 and GPT-6.1 Sol", () => {
+  test("every model's provider exists, and each provider has one recommended model", () => {
+    for (const m of Object.values(MODEL_CATALOG)) expect(PROVIDER_IDS).toContain(m.provider);
     const recommended = Object.keys(PROVIDERS).map((provider) =>
       Object.entries(MODEL_CATALOG)
         .filter(([, m]) => m.provider === provider && m.recommended)
         .map(([id]) => id),
     );
-    expect(recommended).toEqual([["claude-sonnet-5-5"], ["gpt-6.1-sol"]]);
+    expect(recommended).toEqual([
+      ["claude-sonnet-5-5"],
+      ["gpt-6.1-sol"],
+      ["deepseek-flash"],
+      ["kimi-k3.1-pro"],
+      ["glm-5.3"],
+      ["MiniMax-M3"],
+    ]);
+  });
+
+  test("DeepSeek (its peak rates), Kimi, GLM and MiniMax at their published USD per million tokens", () => {
+    // Input, output, cache read, cache write.
+    const perMTok = (model: string) =>
+      [usage(1e6, 0), usage(0, 1e6), usage(0, 0, 1e6), usage(0, 0, 0, 1e6)].map((u) => costNanoUsd(model, u) / 1e9);
+    expect(perMTok("deepseek-flash")).toEqual([0.3, 1.2, 0.006, 0.3]);
+    expect(perMTok("deepseek-v4-pro")).toEqual([1.32, 3.96, 0.044, 1.32]);
+    expect(perMTok("kimi-k3.1-pro")).toEqual([2, 10, 0.2, 2]);
+    expect(perMTok("kimi-k3")).toEqual([3, 15, 0.3, 3]);
+    expect(perMTok("glm-5.3")).toEqual([1.4, 4.4, 0.26, 1.4]);
+    expect(perMTok("glm-5.3-flash")).toEqual([0.15, 0.5, 0.03, 0.15]);
+    expect(perMTok("MiniMax-M3.1-Flash")).toEqual([0.15, 0.6, 0.015, 0.15]);
+    // MiniMax M3: $0.30 / $1.20 / $0.06 up to 512K prompt tokens, double above.
+    expect(costNanoUsd("MiniMax-M3", usage(500_000, 1000, 12_000))).toBe(500_000 * 300 + 1000 * 1200 + 12_000 * 60);
+    expect(costNanoUsd("MiniMax-M3", usage(500_000, 1000, 12_001))).toBe(500_000 * 600 + 1000 * 2400 + 12_001 * 120);
+  });
+
+  test("system tasks use a provider's cheap model, else its recommended one; Automático's tiers per line", () => {
+    expect(PROVIDER_IDS.map((p) => cheapModelOf(p))).toEqual([
+      "claude-haiku-5-5",
+      "gpt-6-luna",
+      "deepseek-flash",
+      "kimi-k3.1-pro",
+      "glm-5.3-flash",
+      "MiniMax-M3.1-Flash",
+    ]);
+    const line = (provider: string) => MODEL_TIERS.map((tier) => modelForTier(provider, tier));
+    expect(line("deepseek")).toEqual(["deepseek-flash", "deepseek-flash", "deepseek-v4-pro"]);
+    expect(line("moonshot")).toEqual(["kimi-k3.1-pro", "kimi-k3.1-pro", "kimi-k3.1-pro"]);
+    expect(line("zai")).toEqual(["glm-5.3-flash", "glm-5.3", "glm-5.3"]);
+    expect(line("minimax")).toEqual(["MiniMax-M3.1-Flash", "MiniMax-M3", "MiniMax-M3"]);
   });
 
   test("costs are exact integers", () => {

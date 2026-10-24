@@ -11,8 +11,8 @@ own machine). The setup writes it for you. Sign-in cookies, the only browser ori
 anything, and every link the app sends come from it. Opened at any other address, sign-in fails with
 "Invalid origin" and saving fails with `bad_origin`.
 
-The server needs no model key of its own. Each organization adds its Anthropic or OpenAI keys in
-**Settings → API keys**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+The server needs no model key of its own. Each organization adds its own keys (Anthropic, OpenAI,
+DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → API keys**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -418,8 +418,8 @@ ones a self-hosted instance usually touches:
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 
-**Model keys.** Each organization adds its own Anthropic or OpenAI keys in **Settings → API keys**,
-and each agent uses one of them. Usage and cost are recorded per agent.
+**Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
+MiniMax) in **Settings → API keys**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Sign-up.** The first account is always allowed. After it, with `ALLOW_SIGNUP=false` (the default),
 only invited people get in: invited by email from **Settings → Members and invitations**, or through
@@ -470,7 +470,7 @@ organization chooses, it talks to a third party only when you turn that service 
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
-| Anthropic, OpenAI | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| Anthropic, OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
 | TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory). Without it, the organization's own model does this. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
@@ -516,6 +516,41 @@ computer, and `agentes-runner folders allow <path>` shares a folder besides the 
 Use HTTPS with a certificate from a public authority (Tailscale and the Caddy profile get one). Over
 plain http the computer's token travels unencrypted, and the runner's background service doesn't
 load extra CA certificates.
+
+</details>
+
+<details>
+<summary><b>AI: plans and keys</b></summary>
+
+**API keys.** Each organization adds its own provider keys in **Settings → AI accounts**. They are
+stored encrypted with a key derived from `AGENTES_SECRET`, never sent back to a browser, and every
+model call goes through the server, which records its usage and cost per agent.
+
+**Plans.** An agent can think with a Claude or ChatGPT subscription instead of a key, on a connected
+computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder
+on that computer, `<runner home>/accounts/<kind>/<id>` (`~/.agentes-runner/accounts/…` for a runner
+installed with the command), and its sign-in never leaves it. The server keeps only the account's
+name, email, plan, status and usage (how much of each limit is used, and when it resets, as the CLI
+there says it). The code pasted when signing in from a browser is encrypted there to a
+key made on the computer and relayed without being stored, so the server can't read it. A personal
+plan is meant for its owner: answering other people with it may go against the provider's terms.
+
+**Coding plans.** A GLM Coding Plan, Kimi Code, MiniMax or OpenCode Go key thinks through Claude Code
+on that computer, in its own account folder: the key is encrypted in the browser to the computer and
+kept only in the folder (`provider.json`, mode 600); the server keeps its last 4 characters. Where a
+turn's requests go comes from the runner's own list of plans, not from anything a project can set.
+Each person adds them in **Settings → AI accounts**.
+
+**Who can reach an account.** With every agent running as the runner's own user (the default
+install), any agent on that computer could reach every account folder there; the runner keeps them
+out of what agents read, but the OS doesn't. With `install.sh --system` each agent is its own user,
+and an account folder belongs to the user of the agent that thinks with it, only while it does.
+Taking control of an agent's desktop or opening its terminal is a shell as that user: in the default
+install only the person who paired the computer can, and with `--system` admins and the agent's
+owner can, but only its owner while the agent thinks with their plan.
+
+**Backups.** Leave `<runner home>/accounts`, and the CLIs' own `~/.claude` and `~/.codex`, out of the
+computer's backups: they hold sign-ins. The server's database never has them.
 
 </details>
 

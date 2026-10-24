@@ -17,6 +17,22 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
+ * A plan's usage limits as the runner last reported them (protocol 19): the
+ * same shape as `PlanUsage` in the machine protocol.
+ */
+export interface MachinePlanUsage {
+  windows: {
+    kind: "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+    label?: string;
+    usedPercent: number;
+    resetsAt?: string;
+  }[];
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
+}
+
+/**
  * What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7), its browser (protocol 12),
  * its desktops and its terminal (protocol 18).
  */
@@ -32,6 +48,8 @@ export interface MachineExecutors {
   terminal?: { available: boolean; reason?: string };
   /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
   mode?: "system";
+  /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
+  ownUsage?: { claude_code?: MachinePlanUsage; codex?: MachinePlanUsage };
   detectedAt?: string;
 }
 
@@ -150,12 +168,13 @@ export const machineProvisioning = pgTable("machine_provisioning", {
 });
 
 /**
- * Accounts of the computer brains on a machine (ADR 0041): a folder on the
- * computer (`<runner home>/accounts/<kind>/<id>`) where Claude Code or Codex
- * keeps its own sign-in. Nothing secret here: what the CLI's status command
- * says (email, plan) and whether it is still signed in. `id` is the folder's
- * name (made by the server, or by the desktop app's runner), so it is unique
- * per organization; the runner's `hello.accounts` keeps the rows in sync.
+ * Accounts of the computer brains on a machine (ADR 0041, ADR 0059): a folder
+ * on the computer (`<runner home>/accounts/<kind>/<id>`) where Claude Code or
+ * Codex keeps its own sign-in. Nothing secret here: what the CLI's status
+ * command says (email, plan) and whether it is still signed in. `id` is the
+ * folder's name (made by the server when a sign-in starts, or by the desktop
+ * app's runner), so it is unique per organization; the runner's
+ * `hello.accounts` keeps the rows in sync.
  */
 export const machineAccounts = pgTable(
   "machine_accounts",
@@ -172,10 +191,27 @@ export const machineAccounts = pgTable(
     email: text(),
     /** `pro`, `max`, `team`, `plus`… as the CLI says. */
     plan: text(),
-    /** `active` or `signed_out` (the CLI refused the sign-in, or said it isn't signed in). */
+    /**
+     * `active`, `signed_out` (the CLI refused the sign-in, or said it isn't
+     * signed in), `signing_in` (started from the app, not finished yet: not an
+     * account until the runner reports it) or `removing` (disconnected: the
+     * runner signs it out and deletes its folder, even if that waits for the
+     * computer to come back, then the row goes).
+     */
     status: text().notNull().default("active"),
-    /** Who added it from the app; null when the runner reported it first (the desktop app). */
+    /**
+     * Whose account it is: who started its sign-in, bound when it starts. One
+     * the runner reported first (the desktop app) is its pairer's. Null: nobody's.
+     */
     createdBy: text().references(() => users.id, { onDelete: "set null" }),
+    /** A coding plan's provider for an account that signs in with a key; null: the CLI's own sign-in. */
+    provider: text(),
+    /** The last 4 characters of a plan key, as the runner reports them. */
+    keyHint: text(),
+    /** The Claude Team or Enterprise organization of the seat, as the CLI reports it. */
+    orgName: text(),
+    /** The plan's usage limits, as the runner last reported them. */
+    usage: jsonb().$type<MachinePlanUsage>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp({ withTimezone: true }),

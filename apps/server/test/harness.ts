@@ -25,6 +25,7 @@ import {
   type ResolveHost,
   type ToolSource,
 } from "@agenteschat/engine";
+import { PROVIDER_IDS } from "@agenteschat/providers";
 import { createFakeEmbeddings, createFakeProvider } from "@agenteschat/providers/testing";
 import { createApp } from "../src/app";
 import { type AppleTokenRevoker, createAuth } from "../src/auth";
@@ -111,7 +112,7 @@ export async function createTestServer(
     db,
     config,
     adapters,
-    modelProviders: { anthropic: provider, openai: provider },
+    modelProviders: Object.fromEntries(PROVIDER_IDS.map((id) => [id, provider])),
     toolSources: options.toolSources,
     mcpConnect: options.mcpConnect,
     http: options.http,

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { userTopic } from "@agenteschat/adapters";
+import { BRAIN_PROTOCOL, userTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
+  audienceOf,
   canTalkTo,
   createAgent,
   createOrganization,
@@ -18,9 +19,11 @@ import {
   type RouterStrategy,
   routeMessage,
   setAgentAudience,
+  setAgentBrain,
   ValidationError,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -215,5 +218,63 @@ describe("who can talk to the agent", () => {
       .where(eq(schema.routineRuns.id, run?.id ?? ""));
     expect(done).toMatchObject({ status: "skipped", code: "audience" });
     expect((await f.db.select().from(schema.messages)).some((m) => m.meta.routineBrief !== undefined)).toBe(false);
+  });
+
+  test("on a personal plan only its owner widens it, accepting the terms the first time; admins narrow", async () => {
+    const { bia } = await world();
+    const caio = await addMember(f.db, f.org.id, "admin", "caio");
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", audienceMode: "owner" })
+      .where(eq(schema.agents.id, f.agent.id));
+    const everyone = { mode: "everyone" as const, userIds: [] };
+    const some = { mode: "people" as const, userIds: [bia.id] };
+    const widen = (actor: string, to: typeof everyone | typeof some, acceptPlanTerms?: boolean) =>
+      setAgentAudience(f.db, actor, f.org.id, f.agent.id, to, { acceptPlanTerms }).catch((e) => e);
+    expect(await widen(caio.id, everyone, true)).toMatchObject({ code: "audience.plan_owner_only" });
+    const unconfirmed = await widen(f.owner.id, some);
+    expect(unconfirmed).toBeInstanceOf(ValidationError);
+    expect(unconfirmed.code).toBe("audience.plan_terms_required");
+    expect(audienceOf(await widen(f.owner.id, some, true))).toEqual(some);
+    const [accepted] = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "agent.audience_changed");
+    expect(accepted?.details).toMatchObject({ acceptedPlanTerms: true, to: some });
+    // Shared already: its owner adds people without being asked again; an admin can't, but narrows.
+    expect((await widen(f.owner.id, everyone)).audienceMode).toBe("everyone");
+    expect((await widen(caio.id, some)).audienceMode).toBe("people");
+    expect(await widen(caio.id, everyone)).toBeInstanceOf(ForbiddenError);
+    // On the API nothing of this applies.
+    await f.db.update(schema.agents).set({ brain: "model" }).where(eq(schema.agents.id, f.agent.id));
+    expect((await widen(caio.id, everyone)).audienceMode).toBe("everyone");
+  });
+
+  test("an agent that thinks with its owner's plan: a DM from anyone else gets the notice and starts no run", async () => {
+    const { bia } = await world();
+    const dm = await openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id }); // before the plan
+    const { machineId } = await pairMachine(deps(), f.owner.id, f.org.id, {
+      name: "mac",
+      protocol: BRAIN_PROTOCOL,
+      exec: true,
+    });
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { claude: { version: "2.1.304", loggedIn: true }, detectedAt: new Date().toISOString() } })
+      .where(eq(schema.machines.id, machineId));
+    await f.db.update(schema.agents).set({ machineId }).where(eq(schema.agents.id, f.agent.id));
+    await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { brain: "claude_code" });
+    const sent = await postPersonMessage(deps(), bia.id, f.org.id, dm.id, { body: "oi" });
+    expect(sent.notices).toEqual([
+      {
+        agentId: f.agent.id,
+        text: "Dev only replies to ana.",
+        code: "audience.only",
+        params: { agentId: f.agent.id, agentName: "Dev", userIds: [f.owner.id], names: ["ana"] },
+      },
+    ]);
+    await drainOutbox(f.db, f.handlers);
+    expect(await runsOf(sent.id)).toEqual([]);
+    const cara = await addMember(f.db, f.org.id, "member", "cara");
+    await expect(openDm(f.db, cara.id, f.org.id, { agentId: f.agent.id })).rejects.toMatchObject({
+      code: "audience.only",
+    });
   });
 });

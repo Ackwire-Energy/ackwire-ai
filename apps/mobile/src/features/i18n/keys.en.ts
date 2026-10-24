@@ -1026,6 +1026,7 @@ export const featureKeysEn: FeatureTranslations = {
       saved: "Memory corrected",
       forgotten: "Forgotten",
     },
+    thinks: "Thinks with",
     uses: {
       title: "What it can use",
       level: { read: "Read", write: "Read and write", some: "Partly" },

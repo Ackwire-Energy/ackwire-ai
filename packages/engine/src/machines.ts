@@ -177,18 +177,22 @@ export const servesDesktops = (m: {
   executors?: MachineRow["executors"] | null;
 }) => m.protocol >= DESKTOP_PROTOCOL && m.access?.tools.desktop === true && m.executors?.desktop?.available === true;
 
+/** The account whose folder system mode lends to the agent's OS user (ADR 0059 §8): the one it thinks with. */
+const lentAccount = (a: { brain: string; account: string | null }) => (a.brain !== "model" ? a.account : null);
+
 /**
  * Whether a person may run commands as the OS user an agent's desktop and terminal run as (ADR 0058 §4): what
  * controlling the desktop or opening the terminal gives. In system mode each agent is its own user: the org's
- * admins and the agent's owner. Otherwise every agent is the runner's own user, which holds every agent's
- * folder, the computer's sign-ins and its token: only the person who paired the computer, and nobody on one
- * nobody paired.
+ * admins and the agent's owner, and only its owner while that user holds the owner's sign-in (`signIn`, ADR
+ * 0059 §8). Otherwise every agent is the runner's own user, which holds every agent's folder, the computer's
+ * sign-ins and its token: only the person who paired the computer, and nobody on one nobody paired.
  */
 export function drivesComputer(
   machine: Pick<MachineRow, "pairedByUserId" | "executors">,
   person: { userId: string; admin: boolean; owner: boolean },
+  signIn = false,
 ) {
-  if (machine.executors?.mode === "system") return person.admin || person.owner;
+  if (machine.executors?.mode === "system") return person.owner || (person.admin && !signIn);
   return machine.pairedByUserId === person.userId;
 }
 
@@ -202,18 +206,26 @@ export async function requireComputerDriver(
   const membership = await getMembership(db, userId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
   const [agent] = await db
-    .select({ machineId: agents.machineId, owner: agents.ownerUserId })
+    .select({
+      machineId: agents.machineId,
+      owner: agents.ownerUserId,
+      brain: agents.brain,
+      account: agents.brainAccountId,
+    })
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
   const machine = agent.machineId ? await getMachine(db, orgId, agent.machineId) : null;
   if (!machine) throw new NotFoundError("This agent has no computer");
   const person = { userId, admin: can(membership.role, "manage_agents"), owner: agent.owner === userId };
-  if (!drivesComputer(machine, person)) {
+  const signIn = lentAccount(agent) !== null;
+  if (!drivesComputer(machine, person, signIn)) {
     throw new ForbiddenError(
-      machine.executors?.mode === "system"
-        ? "Only admins and the agent's owner can use its computer as the agent"
-        : "Only the person who connected this computer can use it as the agent",
+      machine.executors?.mode !== "system"
+        ? "Only the person who connected this computer can use it as the agent"
+        : signIn
+          ? "Only the agent's owner can use its computer as the agent while it thinks with their plan"
+          : "Only admins and the agent's owner can use its computer as the agent",
     );
   }
   return machine;
@@ -225,11 +237,17 @@ export async function requireComputerDriver(
  */
 export async function computerDrivers(db: Database, orgId: string, agentId: string): Promise<string[]> {
   const [agent] = await db
-    .select({ machineId: agents.machineId, owner: agents.ownerUserId })
+    .select({
+      machineId: agents.machineId,
+      owner: agents.ownerUserId,
+      brain: agents.brain,
+      account: agents.brainAccountId,
+    })
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   const machine = agent?.machineId ? await getMachine(db, orgId, agent.machineId) : null;
   if (!agent || !machine) return [];
+  const signIn = lentAccount(agent) !== null;
   const named = [agent.owner, machine.pairedByUserId].filter((id): id is string => !!id);
   const admins = inArray(organizationMembers.role, ["owner", "admin"]);
   const members = await db
@@ -244,11 +262,11 @@ export async function computerDrivers(db: Database, orgId: string, agentId: stri
     .orderBy(organizationMembers.createdAt);
   const drivers = members
     .filter((m) =>
-      drivesComputer(machine, {
-        userId: m.userId,
-        admin: can(m.role, "manage_agents"),
-        owner: m.userId === agent.owner,
-      }),
+      drivesComputer(
+        machine,
+        { userId: m.userId, admin: can(m.role, "manage_agents"), owner: m.userId === agent.owner },
+        signIn,
+      ),
     )
     .map((m) => m.userId);
   return agent.owner && drivers.includes(agent.owner) ? [agent.owner] : drivers;
@@ -348,18 +366,30 @@ export async function publishMachineUpdated(
 /** The agents of the org pointed at this machine, as its `agents` frame lists them (protocol 9). */
 export async function machineAgents(db: Database, orgId: string, machineId: string): Promise<MachineAgent[]> {
   const rows = await db
-    .select({ id: agents.id, handle: agents.handle, name: agents.name, appearance: agents.appearance })
+    .select({
+      id: agents.id,
+      handle: agents.handle,
+      name: agents.name,
+      appearance: agents.appearance,
+      brain: agents.brain,
+      account: agents.brainAccountId,
+    })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machineId), isNull(agents.archivedAt)))
     .orderBy(agents.createdAt);
-  return rows.map((a) => ({
-    id: a.id,
-    handle: a.handle,
-    name: a.name,
-    ...(a.appearance
-      ? { look: { color: a.appearance.color, eyes: a.appearance.eyes, accessory: a.appearance.accessory } }
-      : {}),
-  }));
+  return rows.map((a) => {
+    const account = lentAccount(a);
+    return {
+      id: a.id,
+      handle: a.handle,
+      name: a.name,
+      ...(a.appearance
+        ? { look: { color: a.appearance.color, eyes: a.appearance.eyes, accessory: a.appearance.accessory } }
+        : {}),
+      // System mode keeps an account's folder with this agent's user only while it thinks with it.
+      ...(account ? { account } : {}),
+    };
+  });
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   useMemoryAction,
   useUsage,
 } from "@agenteschat/client";
+import { brainLine } from "@agenteschat/client/lib/brain";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -25,6 +26,7 @@ import {
   Icon,
   type IconName,
   PixelOrbit,
+  ProviderLogo,
   Row,
   Section,
   Sky,
@@ -126,6 +128,8 @@ function Profile({ id }: { id: string }) {
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
+  // A computer brain: its maker's mark and line ("Claude Code · Sonnet no MacBook"; where only for its owner and admins).
+  const thinks = agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "") : null;
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,
@@ -358,6 +362,17 @@ function Profile({ id }: { id: string }) {
         ) : null}
 
         <AgentBrowserRow agentId={id} decides={decides} busy={busy} />
+
+        {thinks ? (
+          <Section title={t("mobile.intentAgents.thinks")}>
+            <Card>
+              <Row
+                leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
+                title={thinks.text}
+              />
+            </Card>
+          </Section>
+        ) : null}
 
         {access.data ? (
           <Section title={t("mobile.intentAgents.uses.title")}>

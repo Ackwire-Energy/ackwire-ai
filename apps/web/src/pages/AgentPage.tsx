@@ -13,6 +13,8 @@ import {
   useUpdateAgent,
 } from "@agenteschat/client";
 import { type Level, levelsOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
+import { answersOthers } from "@agenteschat/client/lib/audience";
+import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -402,11 +404,19 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     if (fields.has("key")) put("key", "credentialId", draft.key === DEFAULT_KEY ? null : (draft.key ?? null));
     if (fields.has("budget")) put("budget", "monthlyBudgetUsd", budgetValue(draft.budget) ?? null);
     if (fields.has("owner")) put("owner", "ownerUserId", draft.owner === NO_OWNER ? null : draft.owner);
-    if (fields.has("audience"))
+    if (fields.has("audience")) {
       put("audience", "audience", {
         mode: draft.audience.mode,
         userIds: draft.audience.mode === "people" ? draft.audience.userIds : [],
       });
+      // Its owner accepted the plan's terms in the dialog before the draft could let anyone else in (SettingsTab).
+      if (
+        engineOfBrain(agent.brain?.kind) !== "agent" &&
+        !answersOthers(saved.audience, agent.ownerUserId) &&
+        answersOthers(draft.audience, agent.ownerUserId)
+      )
+        patch.acceptPlanTerms = true;
+    }
     if (fields.has("look")) put("look", "appearance", normalizeAppearance(draft.look));
     if (patchFields.length > 0) {
       try {

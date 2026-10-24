@@ -110,6 +110,10 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
+/* A provider by its mark and name: one line, centered on the mark. */
+.onb__provider {
+  align-items: center;
+}
 .grid-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
@@ -331,9 +335,15 @@ p {
   color: var(--success);
 }
 .waitcard p {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   margin: 0;
   font-size: 13.5px;
   color: var(--ink-muted);
+}
+.waitcard p > .ac-brand {
+  margin-top: 2px;
 }
 .waitcard__acts {
   display: flex;
@@ -783,7 +793,9 @@ p {
   gap: 6px;
   vertical-align: top;
 }
-.profile-card__brain > .ac-icon {
+.profile-card__brain > .ac-icon,
+.profile-card__brain > .ac-brand,
+.channel__brain > .ac-brand {
   flex: none;
   margin-top: 2px;
 }
@@ -5861,6 +5873,9 @@ a.machine-row__name:hover {
   margin-top: 3px;
   color: var(--ok);
 }
+.computers-kind__points .ac-brand {
+  margin-top: 3px;
+}
 .computers-kind__head {
   display: flex;
   align-items: center;
@@ -6928,6 +6943,9 @@ a.machine-row__name:hover {
   font-size: 15px;
 }
 .newag__model-prov {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
   color: var(--faint);
   font-size: 12px;
@@ -7548,6 +7566,18 @@ a.machine-row__name:hover {
 .agp-brainoff span {
   color: var(--muted);
   font-size: 12.5px;
+}
+/* "Só responde a você", under the account: what it means now, the switch at the end. */
+.agp-brainshare {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+/* At the plan's limit: the owner's free accounts, one click each, and "Conectar outra conta". */
+.agp-planoffer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 /* "Adicionar conta": the provider's own sign-in, in numbered steps. */
 .agp-addacct {
@@ -9392,4 +9422,38 @@ html[data-menu-overlay] .shell {
   align-items: center;
   gap: 6px;
   margin: 12px 0 0;
+}
+
+/* Contas de IA: the connect choices (one that no computer of the person's can take says why) and the rows. */
+.ai-connect__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ai-connect__choices legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+.ai-connect__choices .ac-option {
+  align-items: center;
+}
+.ai-connect__choices .ac-option:disabled {
+  cursor: default;
+  opacity: 0.6;
+  box-shadow: none;
+}
+.ai-accounts__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ai-accounts__row .ac-planmeter {
+  margin-top: 4px;
+  max-width: 320px;
 }

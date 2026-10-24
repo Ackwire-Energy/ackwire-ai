@@ -39,6 +39,7 @@ import {
   Menu,
   MenuItem,
   MenuSeparator,
+  ProviderLogo,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -720,6 +721,13 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
           const name = t(`machines.access.tool.${tool}`);
           return (
             <div key={tool} className="ac-list__row machine-tool" data-tool={tool}>
+              {tool === "commands" ? (
+                <span className="newag__ib">
+                  <Icon name="code" size={16} />
+                </span>
+              ) : (
+                <ProviderLogo id={tool} size="sm" off={!on} />
+              )}
               <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <span className="machine-folder__name">{name}</span>
                 <span className="small muted">{t(`machines.access.toolText.${tool}`)}</span>

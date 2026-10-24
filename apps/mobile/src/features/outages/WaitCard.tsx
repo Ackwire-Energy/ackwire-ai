@@ -3,7 +3,7 @@ import { brainUnavailableOf, waitCardState } from "@agenteschat/client/lib/machi
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Icon, Text } from "@/ui";
+import { Button, Icon, ProviderLogo, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { waitCardText } from "./logic";
 import { openSwitchComputer } from "./OutageNotice";
@@ -24,7 +24,7 @@ function useBrainWait(m: Pick<Message, "meta" | "author">) {
   const name = machines.data?.find((x) => x.id === info.machineId)?.name ?? null;
   const text = waitCardText(t, state, info.brain, name);
   if (!text) return null;
-  return { ...text, machineId: info.machineId };
+  return { ...text, machineId: info.machineId, brain: info.brain };
 }
 
 /**
@@ -52,9 +52,13 @@ function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>>
           {card.title}
         </Text>
       </View>
-      <Text variant="small" tone="muted" importantForAccessibility="no">
-        {card.body}
-      </Text>
+      <View style={styles.body}>
+        {/* Waiting, the line names the brain that runs there. */}
+        {card.done ? null : <ProviderLogo id={card.brain} size="xs" />}
+        <Text variant="small" tone="muted" importantForAccessibility="no" style={styles.grow}>
+          {card.body}
+        </Text>
+      </View>
       {card.done ? null : (
         <View style={styles.acts}>
           <Button
@@ -73,5 +77,7 @@ const styles = StyleSheet.create({
   card: { gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16, marginTop: 4, maxWidth: 520 },
   top: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { flex: 1, minWidth: 0, fontWeight: "600" },
+  body: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  grow: { flex: 1, minWidth: 0 },
   acts: { flexDirection: "row" },
 });

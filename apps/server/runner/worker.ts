@@ -8,6 +8,7 @@ import {
   parseAccess,
   parsePause,
 } from "@agenteschat/adapters/machine-protocol";
+import { lentAccounts } from "./accounts";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
@@ -201,7 +202,15 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     idleMs: state.limits.brainIdleMinutes * 60_000,
     maxProcesses: state.limits.brainMaxProcesses,
   });
-  const brains = new BrainManager({ root: path.join(home, "brains"), mcp: mcpCommand, ...brainLimits(), log });
+  // The account folders root lends to this agent's user for its turns (`AccountManager.lendTo`).
+  const accounts = lentAccounts();
+  const brains = new BrainManager({
+    root: path.join(home, "brains"),
+    mcp: mcpCommand,
+    accounts,
+    ...brainLimits(),
+    log,
+  });
   const codexRuns = new Map<string, McpTaskInfo>();
   const codexApp = new CodexAppServers({ runs: codexRuns, ...brainLimits(), log });
   const mcp = new McpBridge({
@@ -232,7 +241,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     gitDir: path.join(home, "git"),
     tasks,
     brains,
-    codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
+    codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp, accounts },
     paused: () => state.paused.paused,
     access: () => state.access,
     browser,

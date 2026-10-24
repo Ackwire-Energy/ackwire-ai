@@ -359,14 +359,24 @@ textarea.ac-input {
   filter: grayscale(1);
   opacity: 0.5;
 }
-/* BrainLogo: the maker's official mark on a tile. Claude's orange is the brand's. */
+/* ProviderLogo: a maker's official mark in its brand color (`--brand`, set from brand/marks.ts) on a tile tinted
+   with it; one-color marks and an unknown maker's initial sit on a neutral tile, in ink. */
 .ac-brand {
-  display: grid;
+  display: inline-grid;
   place-items: center;
   flex: none;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--raised));
   box-shadow:
     inset 0 0 0 1px var(--line),
     var(--top);
+}
+.ac-brand--mono {
+  color: var(--ink);
+  background: var(--raised);
+}
+.ac-brand svg {
+  fill: currentColor;
 }
 .ac-brand--tile {
   width: 48px;
@@ -386,23 +396,35 @@ textarea.ac-input {
   width: 16px;
   height: 16px;
 }
-.ac-brand--claude {
-  background: #f5ede6;
+/* Beside text: the bare mark; a one-color one takes the text's color. */
+.ac-brand--xs {
+  width: 14px;
+  height: 14px;
+  background: none;
+  box-shadow: none;
 }
-.ac-brand--claude svg {
-  fill: #d97757;
+.ac-brand--xs.ac-brand--mono {
+  color: inherit;
 }
-.ac-brand--openai {
-  background: #fff;
+.ac-brand--xs svg {
+  width: 14px;
+  height: 14px;
 }
-.ac-brand--openai svg {
-  fill: var(--ink);
+.ac-brand--xs:has(.ac-brand__initial) {
+  border-radius: 4px;
+  background: var(--sunken);
 }
-[data-theme="dark"] .ac-brand--claude {
-  background: #3a2a22;
+.ac-brand__initial {
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-muted);
 }
-[data-theme="dark"] .ac-brand--openai {
-  background: #0e0e0d;
+.ac-brand--sm .ac-brand__initial {
+  font-size: 13px;
+}
+.ac-brand--xs .ac-brand__initial {
+  font-size: 9px;
 }
 .ac-brand--off {
   filter: grayscale(1);
@@ -1661,6 +1683,53 @@ textarea.ac-input {
   height: 100%;
   background: var(--ink);
   border-radius: var(--radius-full);
+}
+
+/* Plan usage: a bar per window (ink, like every meter); the state in words above */
+.ac-planmeter {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.ac-planmeter__state {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--attention);
+}
+.ac-planmeter__windows {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ac-planmeter__window {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 13px;
+}
+.ac-planmeter__window .ac-meter {
+  grid-column: 1 / -1;
+  height: 6px;
+}
+.ac-planmeter__pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+.ac-planmeter__reset,
+.ac-planmeter__at {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.ac-planmeter--compact {
+  gap: 4px;
+}
+.ac-planmeter--compact .ac-planmeter__window {
+  font-size: 12px;
 }
 
 /* Cards and sections */
