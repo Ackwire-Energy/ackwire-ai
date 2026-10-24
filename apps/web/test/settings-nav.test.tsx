@@ -88,6 +88,7 @@ describe("finding the settings", () => {
       ["storage", "Armazenamento"],
       ["computers", "Computadores"],
       ["usage", "Orçamento e uso"],
+      ["import", "Importar e exportar"],
     ];
     for (const [id, heading] of sections) {
       await go(`settings/${id}`);

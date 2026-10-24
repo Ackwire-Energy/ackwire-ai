@@ -14,7 +14,8 @@ export type SettingsSection =
   | "keys"
   | "storage"
   | "computers"
-  | "usage";
+  | "usage"
+  | "import";
 
 export type SettingsGroup = "org" | "agents" | "costs";
 
@@ -35,6 +36,7 @@ export const SETTINGS_SECTIONS: {
   { id: "usage", icon: "wallet", group: "costs", allowed: (r) => can(r, "view_usage") },
   { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "manage_credentials") },
   { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
+  { id: "import", icon: "archiveBox", group: "costs", allowed: (r) => can(r, "manage_agents") },
 ];
 
 export const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];

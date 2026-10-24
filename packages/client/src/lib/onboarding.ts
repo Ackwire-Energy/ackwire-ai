@@ -3,8 +3,8 @@ import { isEmail } from "./text";
 
 /**
  * The onboarding's steps, in order (docs/design/telas/OnboardingV2.html).
- * "import" brings agents from OpenMausBot / OpenBot (lib/agent-import.ts);
- * they arrive chosen in "agents". "computer" comes before "agents": with a
+ * "import" reads another product's export (apps/web/src/lib/import); its
+ * agents arrive chosen in "agents". "computer" comes before "agents": with a
  * computer connected, the model step can also pick its Claude Code.
  */
 export const ONBOARDING_STEPS = [

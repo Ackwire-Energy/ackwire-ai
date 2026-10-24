@@ -49,6 +49,7 @@ import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
+import { ImportExportSection } from "@/components/ImportFlow";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -142,6 +143,7 @@ export function SettingsPage({
         {current === "storage" && <StorageSection />}
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
+        {current === "import" && <ImportExportSection />}
       </div>
     </div>
   );

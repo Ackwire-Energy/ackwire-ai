@@ -52,6 +52,7 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
+  ImportPlan,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -362,7 +363,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       importFromGithub: (orgId, url) =>
-        request<{ files: { path: string; text: string }[] }>(`${org(orgId)}/agent-imports/github`, { json: { url } }),
+        request<{ files: { path: string; text: string }[]; skipped?: string[] }>(`${org(orgId)}/agent-imports/github`, {
+          json: { url },
+        }),
       detail: (orgId, agentId) => request<AgentDetail>(`${org(orgId)}/agents/${enc(agentId)}`),
       channels: async (orgId, agentId) =>
         (await request<{ channels: AgentChannel[] }>(`${org(orgId)}/agents/${enc(agentId)}/channels`)).channels,
@@ -395,6 +398,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         const res = await nullOn(403, () => request<{ usage: AgentUsage[] }>(`${org(orgId)}/usage`));
         return res ? res.usage : null;
       },
+    },
+    imports: {
+      apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
+      exportUrl: (orgId) => `${base}${org(orgId)}/export`,
     },
     chat: {
       channels: async (orgId) => (await request<{ channels: Channel[] }>(`${org(orgId)}/channels`)).channels,

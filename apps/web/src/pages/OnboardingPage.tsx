@@ -1,4 +1,4 @@
-import type { Machine, Role } from "@agenteschat/client";
+import type { Machine, Model, Role } from "@agenteschat/client";
 import { keys, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -26,6 +26,7 @@ import {
   type IconName,
   Input,
   Logo,
+  normalizeAppearance,
   OptionCard,
   Select,
   Spinner,
@@ -38,8 +39,8 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { PlanTermsDialog } from "@/components/AgentBrain";
+import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
-import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImport";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
@@ -47,15 +48,9 @@ import { OpenPrefsButton } from "@/components/ThisMac";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
-import {
-  IMPORT_MAX_BYTES,
-  ImportError,
-  type ImportResult,
-  importedModel,
-  parseImport,
-  uniqueHandle,
-} from "@/lib/agent-import";
 import { inDesktopApp, thisMac } from "@/lib/desktop";
+import { importedModel } from "@/lib/import";
+import { choosable, itemId } from "@/lib/import-flow";
 import { importVault } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
 import "./onboarding.css";
@@ -96,7 +91,7 @@ interface CrewMember {
   appearance: AgentAppearance;
   initials?: string;
 }
-/** An imported agent once created: its source key (per file), id and handle. */
+/** An imported agent once created: its id (also its `key`: a source key can repeat a preset's) and handle. */
 interface ImportedCrew extends CrewMember {
   id: string;
   handle: string;
@@ -165,10 +160,8 @@ export function OnboardingPage() {
   // An Obsidian vault for the wiki: read in step 2, imported when it continues.
   const vault = useVaultReader([]);
   const [vaultPages, setVaultPages] = useState<number | null>(null);
-  // Import (OpenMausBot / OpenBot): the parsed file, the agents to bring, the ones created.
-  const [importFrom, setImportFrom] = useState<ImportChoice>(null);
-  const [imported, setImported] = useState<ImportResult | null>(null);
-  const [importPick, setImportPick] = useState<Set<string>>(new Set());
+  // Import: read and planned in its step, applied with the agents (their model depends on the key chosen there).
+  const flow = useImportFlow(created?.orgId ?? null);
   const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>([]);
   // Agents and key: first who joins, then (when nothing else thinks for them) the key.
   const [chosen, setChosen] = useState<Set<Preset>>(new Set(PRESETS));
@@ -204,11 +197,12 @@ export function OnboardingPage() {
     desc: t(`onboarding.presets.${p}.desc`),
   });
   const createdPresets = PRESETS.filter((p) => agentIds[p]);
-  /** The import in use (none after picking another source). */
-  const active = imported && importFrom === imported.source ? imported : null;
-  /** An imported agent's identity across files: the source, the files and its key. */
-  const importKey = (key: string) => `${active?.source}:${active?.files.join(",")}:${key}`;
-  const pickedImports = active ? active.agents.filter((a) => importPick.has(a.key)) : [];
+  /** The imported agents to choose in "Agentes e chave": the ones the plan creates or updates. */
+  const importAgents = (flow.planned?.items ?? []).flatMap((i) => {
+    const agent = i.kind === "agent" && choosable(i) ? flow.planned?.bundle.agents.find((a) => a.key === i.key) : null;
+    return agent ? [{ id: itemId(i), agent, handle: i.renamedTo ?? agent.handle }] : [];
+  });
+  const pickedImports = importAgents.filter((x) => flow.pick.has(x.id)).map((x) => x.agent);
   const chosenCount = chosen.size + pickedImports.length;
   /** Who joins besides the guide (it is "already here" in the copy). */
   const joining = chosenCount - (chosen.has(GUIDE) ? 1 : 0);
@@ -285,43 +279,36 @@ export function OnboardingPage() {
     onError: (e) => toast.show(errorText(t, e), "error"),
   });
 
-  const readImport = useMutation({
-    mutationFn: async (input: { files: File[] } | { url: string }) => {
-      if (!created || importFrom === null || importFrom === "none") return null;
-      const source = importFrom;
-      const files =
-        "files" in input
-          ? await Promise.all(
-              input.files.map(async (f) => {
-                if (f.size > IMPORT_MAX_BYTES) throw new ImportError("tooLarge");
-                return { name: f.webkitRelativePath || f.name, text: await f.text() };
-              }),
-            )
-          : (await api.agents.importFromGithub(created.orgId, input.url)).files.map((f) => ({
-              name: f.path,
-              text: f.text,
-            }));
-      const list = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
-      return parseImport(source, files, { models: list.models.map((m) => m.id) });
-    },
-    meta: { silent: true },
-    onSuccess: (result) => {
-      if (!result) return;
-      setImported(result);
-      setImportPick(new Set(result.agents.map((a) => a.key)));
-    },
-  });
-  const importError = readImport.isError
-    ? readImport.error instanceof ImportError
-      ? t(`onboarding.import.errors.${readImport.error.code}`)
-      : readImport.variables && "url" in readImport.variables
-        ? t("onboarding.import.errors.link")
-        : t("onboarding.import.errors.read")
-    : null;
-  const resetImport = () => {
-    setImported(null);
-    setImportPick(new Set());
-    readImport.reset();
+  /**
+   * The import picked in its step, in one apply: each agent keeps its own
+   * model when the chosen key runs it, else starts on "Automático"; the agents
+   * it brings join #general.
+   */
+  const applyImported = async (list: { models: Model[] }, provider: string) => {
+    const crewSoFar = [...importedCrew];
+    const bundle = flow.planned?.bundle;
+    if (!created || !bundle) return crewSoFar;
+    const runnable = list.models.filter((m) => m.provider === provider).map((m) => m.id);
+    const items = await flow.apply((b) => ({
+      ...b,
+      agents: b.agents.map((a) => ({ ...a, model: importedModel(a, runnable, AUTO) ?? null })),
+    }));
+    // The report waits for the last step.
+    flow.focus.current = null;
+    for (const item of items) {
+      const agent = bundle.agents.find((a) => a.key === item.key);
+      if (item.kind !== "agent" || !item.targetId || !agent || crewSoFar.some((c) => c.id === item.targetId)) continue;
+      await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: item.targetId });
+      crewSoFar.push({
+        key: item.targetId,
+        id: item.targetId,
+        handle: item.renamedTo ?? agent.handle,
+        name: agent.name,
+        appearance: normalizeAppearance(agent.appearance),
+      });
+      setImportedCrew([...crewSoFar]);
+    }
+    return crewSoFar;
   };
 
   // The workspace default budget, shown (and changed) next to the key.
@@ -375,31 +362,8 @@ export function OnboardingPage() {
         ids[p] = agent.id;
         setAgentIds({ ...ids });
       }
-      // Imported agents: their own name, role and instructions; their model when it's in the catalog, else Automático.
-      const crewSoFar = [...importedCrew];
-      const used = new Set([
-        ...PRESETS.filter((p) => ids[p]).map((p) => handleFrom(presetInfo(p).name)),
-        ...crewSoFar.map((c) => c.handle),
-      ]);
-      const modelIds = list.models.map((m) => m.id);
-      for (const a of pickedImports) {
-        const key = importKey(a.key);
-        if (crewSoFar.some((c) => c.key === key)) continue;
-        const handle = uniqueHandle(a.handle, used);
-        used.add(handle);
-        const agent = await api.agents.create(created.orgId, {
-          name: a.name,
-          handle,
-          role: a.role || undefined,
-          instructions: a.instructions || undefined,
-          model: importedModel(a, modelIds, AUTO),
-          credentialId: null,
-          appearance: a.appearance,
-        });
-        await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
-        crewSoFar.push({ key, id: agent.id, handle, name: a.name, appearance: a.appearance });
-        setImportedCrew([...crewSoFar]);
-      }
+      // Imported: one apply after the presets (a handle a preset took gets the next free one).
+      const crewSoFar = await applyImported(list, key === "platform" ? "anthropic" : key);
       // The connected computer chosen a step before: every agent works there, and thinks with its
       // Claude Code when that was picked (the person confirmed the plan warning).
       if (computer !== "machine" || !machine) return;
@@ -501,8 +465,8 @@ export function OnboardingPage() {
       setMachine(null);
       setBrain("model");
     } else if (step.id === "import") {
-      setImportFrom(null);
-      resetImport();
+      flow.reset();
+      flow.setCard(null);
     }
     setDone((d) => new Set(d).add(step.id));
     guide.cheer();
@@ -513,7 +477,7 @@ export function OnboardingPage() {
     saveWorkspace.isPending ||
     saveContext.isPending ||
     saveAgents.isPending ||
-    readImport.isPending ||
+    flow.busy !== null ||
     saveComputer.isPending ||
     sendInvites.isPending ||
     finish.isPending;
@@ -521,7 +485,7 @@ export function OnboardingPage() {
   const blocked =
     (step.id === "workspace" && !org.trim()) ||
     (step.id === "agents" && agentsPhase === "key" && (!keyOk || !budgetOk)) ||
-    (step.id === "import" && !active) ||
+    (step.id === "import" && !flow.planned) ||
     (step.id === "computer" && (computer === null || (computer === "machine" && !machine)));
 
   // What the rail shows under each done step.
@@ -560,7 +524,7 @@ export function OnboardingPage() {
         ? { title: t("onboarding.keyStep.title"), lead: t("onboarding.keyStep.lead") }
         : {
             title:
-              step.id === "agents" && active?.agents.length
+              step.id === "agents" && importAgents.length
                 ? t("onboarding.agents.importedTitle")
                 : t(`onboarding.${step.id}.title`),
             lead:
@@ -773,30 +737,9 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {step.id === "import" && (
+          {step.id === "import" && created && (
             <div className="onb__answer">
-              <OnboardingImport
-                source={importFrom}
-                onSource={(s) => {
-                  setImportFrom(s);
-                  if (s !== imported?.source) readImport.reset();
-                }}
-                result={imported}
-                picked={importPick}
-                onPick={(key, on) =>
-                  setImportPick((p) => {
-                    const next = new Set(p);
-                    if (on) next.add(key);
-                    else next.delete(key);
-                    return next;
-                  })
-                }
-                reading={readImport.isPending}
-                error={importError}
-                onFiles={(files) => readImport.mutate({ files })}
-                onLink={(url) => readImport.mutate({ url })}
-                onReset={resetImport}
-              />
+              <ImportFlow flow={flow} orgId={created.orgId} />
             </div>
           )}
 
@@ -833,27 +776,20 @@ export function OnboardingPage() {
 
           {step.id === "agents" && agentsPhase === "pick" && (
             <div className="onb__answer">
-              {active && active.agents.length > 0 && (
+              {importAgents.length > 0 && (
                 // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
                 <div className="grid-options" role="group" aria-label={t("onboarding.agents.importedLabel")}>
-                  {active.agents.map((a) => (
+                  {importAgents.map(({ id, agent: a, handle }) => (
                     <OptionCard
-                      key={a.key}
+                      key={id}
                       agent
-                      pressed={importPick.has(a.key)}
-                      onClick={() =>
-                        setImportPick((p) => {
-                          const next = new Set(p);
-                          if (next.has(a.key)) next.delete(a.key);
-                          else next.add(a.key);
-                          return next;
-                        })
-                      }
+                      pressed={flow.pick.has(id)}
+                      onClick={() => flow.toggle([id], !flow.pick.has(id))}
                     >
-                      <AgentAvatar name={a.name} appearance={a.appearance} />
+                      <AgentAvatar name={a.name} appearance={normalizeAppearance(a.appearance)} />
                       <span className="ac-option__text">
                         <span className="ac-option__title">{a.role ? `${a.name} · ${a.role}` : a.name}</span>
-                        {a.description && <span className="ac-option__desc">{a.description}</span>}
+                        <span className="ac-option__desc">@{handle}</span>
                       </span>
                     </OptionCard>
                   ))}
@@ -1037,6 +973,18 @@ export function OnboardingPage() {
               invites={sent.size}
               wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
             />
+          )}
+          {step.id === "done" && created && flow.report && (
+            <Card as="div">
+              <ImportReport
+                flow={flow}
+                orgId={created.orgId}
+                onRetry={async () => {
+                  const list = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
+                  await applyImported(list, key === "platform" ? "anthropic" : key);
+                }}
+              />
+            </Card>
           )}
 
           <div className="onb__actions">
