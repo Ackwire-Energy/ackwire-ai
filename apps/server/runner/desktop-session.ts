@@ -316,6 +316,8 @@ export interface DesktopSessionsOptions {
   now?: () => number;
   /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): not idle then. */
   inUse?: (agentId: string) => boolean;
+  /** A viewer of the agent's desktop came or went (`status().streams`). */
+  onViewers?: (agentId: string) => void;
 }
 
 /** What `<runner home>/desktop/<id8>.json` keeps of a running desktop. */
@@ -446,12 +448,14 @@ export class DesktopSessions {
     if (!d) return null;
     d.streams++;
     d.lastUsed = this.now();
+    this.opts.onViewers?.(agentId);
     let held = true;
     return () => {
       if (!held) return;
       held = false;
       d.streams--;
       d.lastUsed = this.now();
+      this.opts.onViewers?.(agentId);
     };
   }
 

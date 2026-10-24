@@ -76,6 +76,8 @@ import { agentFolderName, isInside } from "./paths";
  *   command that may start one (same profile, same page), never while someone
  *   watches it or a person's turn is open. While it is in use there, its
  *   desktop doesn't stop as idle; while its desktop is watched, it is in use.
+ *   In system mode this runs in the agent's worker, as the agent's own user,
+ *   on the desktop root starts for it (`WorkerLink.desktop`).
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -682,8 +684,8 @@ export interface BrowserManagerOptions {
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
   startChrome?: (exe: string, args: string[], profile: string, env?: Record<string, string>) => Promise<OwnChrome>;
-  /** The agents' desktops (ADR 0058 §7): without them every Chrome is headless. */
-  desktops?: Pick<DesktopSessions, "ensure" | "session" | "status">;
+  /** The agents' desktops (ADR 0058 §7; a worker's are root's): without them every Chrome is headless. */
+  desktops?: Pick<DesktopSessions, "ensure" | "status"> & { session(agentId: string): ChromeDisplay | null };
   /** Tests: whether a pid left in `chromes.json` is still that Chrome (default: asks the system). */
   isOurChrome?: (pid: number, profile: string) => Promise<boolean>;
   /** What `states()` returns may have changed (the desktop app's tray shows it). */

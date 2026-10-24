@@ -14,6 +14,7 @@ import { type HandlerContext, handleRequest, type RequestScope } from "../../run
 import { readLines } from "../../runner/lines";
 import type { FetchLike } from "../../runner/push";
 import {
+  BROWSER_LEASE_MS,
   Supervisor,
   type SupervisorOptions,
   WORKER_TASKS_FILE,
@@ -218,6 +219,20 @@ const execDone = { exitCode: 0, stdout: "", stderr: "", timedOut: false };
 const taskStart = (agent: typeof ANA, taskId: string) =>
   ({ op: "task.start", taskId, executor: "shell", command: "sleep 1", agent }) as MachineRequest;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const browserOpen = (
+  agent: typeof ANA,
+  desktop: boolean,
+  command = "open",
+  args = ["https://shop.example/cart"],
+): Extract<MachineRequest, { op: "browser.act" }> => ({
+  op: "browser.act",
+  command,
+  args,
+  timeoutSeconds: 30,
+  agent,
+  ...(desktop ? { desktop } : {}),
+});
+const BROWSER_REFUSED = "No browser command of this agent on its desktop is running";
 
 test("the computer's own ops stay in the supervisor; an agent's go to its worker, started on its first request", async () => {
   const t = setup();
@@ -691,8 +706,8 @@ test("push: the worker's bytes go out from here with the machine token, only to 
   expect(await errorCode(() => odd)).toBe("upload_failed");
 });
 
-test("a worker gets its agent's desktop from root only while it serves a desktop use request the server sent", async () => {
-  const asked: AgentScope[] = [];
+test("a worker gets its agent's desktop from root only while it serves a request the server sent that uses it", async () => {
+  const asked: [AgentScope, string][] = [];
   const desktop: WorkerDesktop = {
     display: 21,
     width: 1280,
@@ -703,18 +718,18 @@ test("a worker gets its agent's desktop from root only while it serves a desktop
     home: "/home/ag-a1b2c3d4",
   };
   const t = setup({
-    desktop: async (agent) => {
-      asked.push(agent);
+    desktop: async (agent, use) => {
+      asked.push([agent, use]);
       return desktop;
     },
   });
   t.sup.boot();
   t.sup.attach();
   const answers = (w: FakeWorker) => w.of("desktop.ensured");
-  const refused = (ensureId: string) => ({
+  const refused = (ensureId: string, message = "No desktop use request of this agent is running") => ({
     type: "desktop.ensured",
     ensureId,
-    error: { code: "not_allowed", message: "No desktop use request of this agent is running" },
+    error: { code: "not_allowed", message },
   });
 
   // During another request, the agent's own code (as the worker's user) asking gets nothing.
@@ -723,8 +738,10 @@ test("a worker gets its agent's desktop from root only while it serves a desktop
   const ana = t.last(ANA.id);
   ana.hello();
   const q = await requestOn(ana);
-  ana.send({ type: "desktop.ensure", ensureId: "1" });
-  await waitFor(() => answers(ana).length === 1);
+  ana.send({ type: "desktop.ensure", ensureId: "1", use: "desktop" });
+  ana.send({ type: "desktop.ensure", ensureId: "1b", use: "browser" });
+  await waitFor(() => answers(ana).length === 2);
+  expect(answers(ana)[1]).toEqual(refused("1b", BROWSER_REFUSED));
   expect(answers(ana)[0]).toEqual(refused("1"));
   ana.send({ type: "result", id: q.id, ok: true, data: execDone });
   await run;
@@ -733,10 +750,10 @@ test("a worker gets its agent's desktop from root only while it serves a desktop
   const look = handleRequest(t.ctx, { op: "desktop.look", agent: ANA }, scope().scope);
   const q2 = await requestOn(ana, 2);
   expect(q2).toEqual({ op: "desktop.look", agent: ANA, type: "request", id: q2.id });
-  ana.send({ type: "desktop.ensure", ensureId: "2" });
-  await waitFor(() => answers(ana).length === 2);
-  expect(answers(ana)[1]).toEqual({ type: "desktop.ensured", ensureId: "2", desktop });
-  expect(asked).toEqual([ANA]);
+  ana.send({ type: "desktop.ensure", ensureId: "2", use: "desktop" });
+  await waitFor(() => answers(ana).length === 3);
+  expect(answers(ana)[2]).toEqual({ type: "desktop.ensured", ensureId: "2", desktop });
+  expect(asked).toEqual([[ANA, "desktop"]]);
 
   // Another agent's worker asking meanwhile gets nothing: the request isn't its own.
   const read = handleRequest(t.ctx, { op: "read", path: "a.md", maxBytes: 10, agent: BIA }, scope().scope);
@@ -744,7 +761,7 @@ test("a worker gets its agent's desktop from root only while it serves a desktop
   const bia = t.last(BIA.id);
   bia.hello();
   const q3 = await requestOn(bia);
-  bia.send({ type: "desktop.ensure", ensureId: "1" });
+  bia.send({ type: "desktop.ensure", ensureId: "1", use: "desktop" });
   await waitFor(() => answers(bia).length === 1);
   expect(answers(bia)[0]).toEqual(refused("1"));
   expect(asked).toHaveLength(1);
@@ -760,6 +777,28 @@ test("a worker gets its agent's desktop from root only while it serves a desktop
   };
   ana.send({ type: "result", id: q2.id, ok: true, data: reply });
   expect(await look).toEqual(reply);
+
+  // Its Chrome on its desktop: only during a browser command the server put there, and only for that.
+  const plain = handleRequest(t.ctx, browserOpen(ANA, false), scope().scope);
+  const q5 = await requestOn(ana, 3);
+  ana.send({ type: "desktop.ensure", ensureId: "3", use: "browser" });
+  await waitFor(() => answers(ana).length === 4);
+  expect(answers(ana)[3]).toEqual(refused("3", BROWSER_REFUSED));
+  ana.send({ type: "result", id: q5.id, ok: true, data: { success: true, data: null } });
+  await plain;
+  const there = handleRequest(t.ctx, browserOpen(ANA, true), scope().scope);
+  const q6 = await requestOn(ana, 4);
+  ana.send({ type: "desktop.ensure", ensureId: "4", use: "desktop" });
+  ana.send({ type: "desktop.ensure", ensureId: "5", use: "browser" });
+  await waitFor(() => answers(ana).length === 6);
+  expect(answers(ana)[4]).toEqual(refused("4"));
+  expect(answers(ana)[5]).toEqual({ type: "desktop.ensured", ensureId: "5", desktop });
+  expect(asked).toEqual([
+    [ANA, "desktop"],
+    [ANA, "browser"],
+  ]);
+  ana.send({ type: "result", id: q6.id, ok: true, data: { success: true, data: null } });
+  await there;
   // Root says why it couldn't, in the machine protocol's words.
   const t2 = setup({
     desktop: async () => {
@@ -773,7 +812,7 @@ test("a worker gets its agent's desktop from root only while it serves a desktop
   const ana2 = t2.last(ANA.id);
   ana2.hello();
   const q4 = await requestOn(ana2);
-  ana2.send({ type: "desktop.ensure", ensureId: "9" });
+  ana2.send({ type: "desktop.ensure", ensureId: "9", use: "desktop" });
   await waitFor(() => answers(ana2).length === 1);
   expect(answers(ana2)[0]).toEqual({
     type: "desktop.ensured",
@@ -782,6 +821,47 @@ test("a worker gets its agent's desktop from root only while it serves a desktop
   });
   ana2.send({ type: "result", id: q4.id, ok: false, error: { code: "desktop_unavailable", message: "no" } });
   expect(await errorCode(() => look2)).toBe("desktop_unavailable");
+});
+
+test("a worker's word that its Chrome is in use on the desktop holds a while; it learns who watches that desktop", async () => {
+  const clock = { now: 1_000_000 };
+  const viewers: Record<string, number> = {};
+  const t = setup({ now: () => clock.now, desktopViewers: (agentId) => viewers[agentId] ?? 0 });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  // Before its hello nothing it says counts.
+  ana.send({ type: "browser.desktop" });
+  ana.hello();
+  await requestOn(ana);
+  expect(t.sup.onDesktopInUse(ANA.id)).toBe(false);
+  ana.send({ type: "browser.desktop" });
+  await waitFor(() => t.sup.onDesktopInUse(ANA.id));
+  expect(t.sup.onDesktopInUse(BIA.id)).toBe(false);
+  clock.now += BROWSER_LEASE_MS - 1;
+  expect(t.sup.onDesktopInUse(ANA.id)).toBe(true);
+  clock.now += 1;
+  expect(t.sup.onDesktopInUse(ANA.id)).toBe(false);
+
+  // Someone opens its desktop: only its own worker hears of it.
+  viewers[ANA.id] = 2;
+  viewers[BIA.id] = 1;
+  t.sup.stateChanged();
+  await waitFor(() => ana.of("worker.state").length === 2);
+  expect(ana.of("worker.state")[1]).toEqual({ type: "worker.state", ...STATE, desktopViewers: 2 });
+  viewers[ANA.id] = 0;
+  t.sup.stateChanged();
+  await waitFor(() => ana.of("worker.state").length === 3);
+  expect(ana.of("worker.state")[2]).toEqual({ type: "worker.state", ...STATE });
+
+  // A worker that stops takes its word with it.
+  ana.send({ type: "browser.desktop" });
+  await waitFor(() => t.sup.onDesktopInUse(ANA.id));
+  ana.crash();
+  expect(await errorCode(() => run)).toBe("internal");
+  expect(t.sup.onDesktopInUse(ANA.id)).toBe(false);
 });
 
 /** A real worker (`runWorker`) on the other end of in-memory pipes; `at`: the homes of an earlier supervisor (a restart). */
@@ -946,6 +1026,110 @@ test.if(posix)(
 );
 
 test.if(posix)(
+  "a real worker runs its agent's Chrome headed on the desktop root started for it, and root keeps that desktop",
+  async () => {
+    const dir = tempDir("worker-browser-");
+    dirs.push(dir);
+    const agentHome = path.join(dir, "agent");
+    mkdirSync(agentHome, { recursive: true });
+    process.env.FAKE_AB_LOG = path.join(dir, "ab.log");
+    process.env.FAKE_AB_STATE = path.join(dir, "ab-state.json");
+    const chromes: { args: string[]; env?: Record<string, string>; killed: boolean }[] = [];
+    const asked: [string, string][] = [];
+    let viewers = 0;
+    let refusal: string | null = null;
+    const xauthority = path.join(dir, "Xauthority");
+    const clock = { now: 1_000_000 };
+    const t = setup({
+      start: (user) => {
+        const stdin = new PassThrough();
+        const stdout = new PassThrough();
+        const done = runWorker({
+          agentId: user.id,
+          home: path.join(dir, "worker"),
+          dir: agentHome,
+          input: stdin,
+          output: stdout,
+          log: () => {},
+          self: { command: [process.execPath, "/nonexistent/agentes-runner.mjs"], compiled: false },
+          browser: {
+            command: [process.execPath, path.join(import.meta.dir, "fake-agent-browser.mjs")],
+            chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
+            isOurChrome: async () => false,
+            async startChrome(_exe, args, _profile, env) {
+              const c = { args, env, killed: false };
+              chromes.push(c);
+              let quit = () => {};
+              const exited = new Promise<void>((resolve) => {
+                quit = resolve;
+              });
+              const kill = () => {
+                c.killed = true;
+                quit();
+              };
+              return { pid: 50_000 + chromes.length, port: 9400 + chromes.length, exited, kill };
+            },
+          },
+        });
+        workerRuns.push(done);
+        return { stdin, stdout, exited: done, kill: () => stdin.end() };
+      },
+      desktop: async (agent, use) => {
+        asked.push([agent.id, use]);
+        if (refusal) throw new RunnerError("not_allowed", refusal);
+        const startedAt = new Date(1000).toISOString();
+        return { display: 21, width: 1280, height: 900, startedAt, started: true, xauthority, home: agentHome };
+      },
+      desktopViewers: () => viewers,
+      now: () => clock.now,
+    });
+    t.setState({ ...STATE, access: { ...STATE.access, tools: { ...STATE.access.tools, desktop: true } } });
+    t.sup.boot();
+    t.sup.attach();
+    const act = (command: string, desktop: boolean) =>
+      handleRequest(t.ctx, browserOpen(ANA, desktop, command, ["@e1"]), scope().scope);
+    const headed = (c?: { args: string[] }) => !!c && !c.args.includes("--headless=new");
+
+    // Where the server didn't put it on the desktop: headless, and root is never asked.
+    expect(await handleRequest(t.ctx, browserOpen(ANA, false), scope().scope)).toMatchObject({ success: true });
+    expect(asked).toEqual([]);
+    expect(headed(chromes[0])).toBe(false);
+    // The next command the server puts there moves it: as this worker's user, on root's display, same page.
+    expect(await act("click", true)).toMatchObject({ success: true });
+    expect(asked).toEqual([[ANA.id, "browser"]]);
+    expect(chromes).toHaveLength(2);
+    expect(chromes[0]?.killed).toBe(true);
+    expect(headed(chromes[1])).toBe(true);
+    expect(chromes[1]?.args).toContain("--start-maximized");
+    expect(chromes[1]?.args.at(-1)).toBe("https://shop.example/cart");
+    expect(chromes[1]?.env).toMatchObject({ DISPLAY: ":21", XAUTHORITY: xauthority });
+    // In use there: root doesn't stop that desktop as idle.
+    await waitFor(() => t.sup.onDesktopInUse(ANA.id));
+
+    // Someone on that desktop: the worker hears it before its next request, and never moves Chrome off under them.
+    viewers = 1;
+    t.sup.stateChanged();
+    expect(await act("click", false)).toMatchObject({ success: true });
+    expect(chromes).toHaveLength(2);
+    viewers = 0;
+    t.sup.stateChanged();
+    expect(await act("click", false)).toMatchObject({ success: true });
+    expect(chromes).toHaveLength(3);
+    expect(headed(chromes[2])).toBe(false);
+    // Off the desktop, the worker stops saying so and root's word runs out.
+    clock.now += BROWSER_LEASE_MS;
+    expect(t.sup.onDesktopInUse(ANA.id)).toBe(false);
+
+    // Root refuses (a switch off there): the browser goes on headless, and isn't moved at every command.
+    refusal = "The browser on the agent's desktop needs this computer's desktop and browser switches on";
+    expect(await act("click", true)).toMatchObject({ success: true });
+    expect(await act("click", true)).toMatchObject({ success: true });
+    expect(asked).toHaveLength(2);
+    expect(chromes).toHaveLength(3);
+  },
+);
+
+test.if(posix)(
   "a real task keeps running through a restart of the supervisor, and the next worker reports its end",
   async () => {
     const t = realWorkers();
@@ -1030,7 +1214,7 @@ test.if(posix)(
         exec: true,
         mode: "system",
         agentUidRange: [21000, 21099],
-        access: { folders: [], tools: { claude: false, codex: false, commands: true } },
+        access: { folders: [], tools: { claude: false, codex: false, commands: true, desktop: true } },
       },
       home,
     );
@@ -1102,6 +1286,23 @@ test.if(posix)(
       await waitFor(() => s.sent.some((f) => f.id === "d1"));
       expect(s.sent.find((f) => f.id === "d1")).toMatchObject({ ok: true, data: { running: false, streams: 0 } });
       expect(ana.of("request")).toHaveLength(1);
+      // Root starts the agent's desktop for its worker behind the switches each use needs: its Chrome there the
+      // browser's (off here), desktop use the commands' (on: past it, this test computer runs no desktops).
+      s.frame({ type: "request", id: "b1", ...browserOpen(ANA, true) });
+      const b1 = await requestOn(ana, 2);
+      ana.send({ type: "desktop.ensure", ensureId: "1", use: "browser" });
+      await waitFor(() => ana.of("desktop.ensured").length === 1);
+      expect(ana.of("desktop.ensured")[0]).toMatchObject({
+        error: { code: "not_allowed", message: expect.stringContaining("desktop and browser switches") },
+      });
+      ana.send({ type: "result", id: b1.id, ok: true, data: { success: true, data: null } });
+      s.frame({ type: "request", id: "l1", op: "desktop.look", agent: ANA });
+      const l1 = await requestOn(ana, 3);
+      ana.send({ type: "desktop.ensure", ensureId: "2", use: "desktop" });
+      await waitFor(() => ana.of("desktop.ensured").length === 2);
+      expect(ana.of("desktop.ensured")[1]?.error).not.toMatchObject({ code: "not_allowed" });
+      ana.send({ type: "result", id: l1.id, ok: false, error: { code: "desktop_unavailable", message: "no" } });
+      await waitFor(() => s.sent.some((f) => f.id === "l1"));
       // Its task's end goes up; the server's ack comes back down to it.
       ana.send({ type: "task.done", taskId: "task-ana-0001", exitCode: 0, seconds: 3 });
       await waitFor(() => s.of("task.done").length === 1);
@@ -1114,7 +1315,7 @@ test.if(posix)(
       s.frame({ type: "request", id: "r2", ...exec(ANA, "id -un") });
       await waitFor(() => s.sent.some((f) => f.id === "r2"));
       expect(s.sent.find((f) => f.id === "r2")).toMatchObject({ ok: false, error: { code: "paused" } });
-      expect(ana.of("request")).toHaveLength(1);
+      expect(ana.of("request")).toHaveLength(3);
     } finally {
       await daemon.stop();
     }

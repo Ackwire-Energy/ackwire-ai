@@ -417,7 +417,9 @@ test("restore: a desktop left running is taken back only when its pid is still t
 });
 
 test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer or a use keeps it", async () => {
-  const t = setup();
+  // Each viewer that comes or goes is told (system mode: the agent's worker learns it).
+  const viewers: number[] = [];
+  const t = setup({ onViewers: (agentId) => viewers.push(t.desktops.status({ id: agentId }).streams) });
   await t.desktops.ensure(dev);
   const release = t.desktops.hold(dev.id);
   expect(t.desktops.status(dev).streams).toBe(1);
@@ -428,6 +430,7 @@ test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer
   release?.();
   release?.();
   expect(t.desktops.status(dev).streams).toBe(0);
+  expect(viewers).toEqual([1, 0]);
   t.clock.now += DESKTOP_IDLE_MS - 1;
   await t.desktops.ensure(dev);
   t.clock.now += DESKTOP_IDLE_MS - 1;

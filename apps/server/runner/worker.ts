@@ -11,7 +11,7 @@ import {
 import { lentAccounts } from "./accounts";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
-import { BrowserManager } from "./browser";
+import { BrowserManager, type BrowserManagerOptions } from "./browser";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
@@ -23,7 +23,14 @@ import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { agentSecrets, secretValue } from "./secrets";
-import { UPLOAD_CHUNK_BYTES, type WorkerDesktop, type WorkerLinkFrame, type WorkerState } from "./supervisor";
+import {
+  BROWSER_LEASE_MS,
+  UPLOAD_CHUNK_BYTES,
+  type WorkerDesktop,
+  type WorkerDesktopUse,
+  type WorkerLinkFrame,
+  type WorkerState,
+} from "./supervisor";
 import { TaskManager } from "./tasks";
 
 /**
@@ -51,6 +58,8 @@ export interface WorkerOptions {
   self?: { command: string[]; compiled: boolean };
   /** Tests: the computer desktop use sees, and how its helper starts. */
   desktop?: Pick<DesktopManagerOptions, "system" | "command">;
+  /** Tests: how `agent-browser` and Chrome start. */
+  browser?: Pick<BrowserManagerOptions, "command" | "chrome" | "startChrome" | "isOurChrome">;
 }
 
 /** Until the supervisor says otherwise, nothing is allowed. */
@@ -65,7 +74,8 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
   const access = parseAccess(f.access);
   const paused = parsePause(f.paused);
   const limits = { ...DEFAULT_LIMITS, ...(f.limits as Partial<WorkerState["limits"]>) };
-  return access && paused ? { access, paused, limits } : null;
+  const viewers = Number.isSafeInteger(f.desktopViewers) ? Math.max(0, f.desktopViewers as number) : 0;
+  return access && paused ? { access, paused, limits, desktopViewers: viewers } : null;
 }
 
 /**
@@ -157,9 +167,9 @@ export class WorkerLink {
 
   /**
    * The agent's desktop (root's, ADR 0058 §10), started when it isn't running: the supervisor answers only
-   * while this worker serves a desktop use request.
+   * while this worker serves a request that uses it that way.
    */
-  desktop(): Promise<WorkerDesktop> {
+  desktop(use: WorkerDesktopUse): Promise<WorkerDesktop> {
     const ensureId = String(++this.nextEnsure);
     return new Promise((resolve, reject) => {
       this.desktops.set(ensureId, (reply) => {
@@ -167,8 +177,13 @@ export class WorkerLink {
         if (reply.desktop) resolve(reply.desktop);
         else reject(new RunnerError(reply.error?.code ?? "internal", reply.error?.message ?? "No desktop"));
       });
-      this.write(JSON.stringify({ type: "desktop.ensure", ensureId } satisfies WorkerLinkFrame));
+      this.write(JSON.stringify({ type: "desktop.ensure", ensureId, use } satisfies WorkerLinkFrame));
     });
+  }
+
+  /** Its agent's Chrome is in use on the agent's desktop: root doesn't stop that desktop as idle for a while. */
+  browserOnDesktop() {
+    this.write(JSON.stringify({ type: "browser.desktop" } satisfies WorkerLinkFrame));
   }
 
   /**
@@ -260,24 +275,39 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     .catch((err: unknown) => log(`mission tools unavailable: ${err instanceof Error ? err.message : String(err)}`));
   const link = new WorkerLink(o.input, o.output);
   let live: RunnerConnection | null = null;
+  // The desktop is root's: this worker's helper and Chrome run on it as the agent's own user, where root says.
+  let desktop: WorkerDesktop | null = null;
+  const ensureDesktop = (use: WorkerDesktopUse) => async () => {
+    desktop = await link.desktop(use);
+    return desktop;
+  };
+  // Root doesn't stop the desktop as idle while the agent's Chrome on it is in use: said after each change and
+  // renewed well within the lease.
+  const lease = () => {
+    if (browser.onDesktopInUse(o.agentId)) link.browserOnDesktop();
+  };
   const browser = new BrowserManager({
     home,
     log,
     send: (frame) => live?.send(frame) ?? false,
     secret: (agent, name) => secretValue(secretsDir, agent, name),
+    desktops: {
+      ensure: ensureDesktop("browser"),
+      session: () => desktop,
+      status: () => ({ running: desktop !== null, streams: state.desktopViewers ?? 0 }),
+    },
+    onChange: () => queueMicrotask(lease),
+    ...o.browser,
   });
+  const leases = setInterval(lease, BROWSER_LEASE_MS / 3);
+  leases.unref?.();
   void browser.closeAll();
-  // The helper runs as this worker's user, the agent's own; the desktop and where it runs come from root.
-  let desktop: WorkerDesktop | null = null;
   const own = process.getuid?.() ?? null;
   const desktopUse = new DesktopManager({
     desktops: {
       // Root's hello says whether the computer can; a worker reports nothing.
       info: () => ({ available: true }),
-      ensure: async () => {
-        desktop = await link.desktop();
-        return desktop;
-      },
+      ensure: ensureDesktop("desktop"),
       session: () => desktop,
     },
     uids: () => (own === null ? null : { runner: 0, agents: new Map([[o.agentId, own]]) }),
@@ -346,6 +376,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   link.onEnd = () => connection.stop();
   log(`agentes-runner ${RUNNER_VERSION}: worker of agent ${o.agentId} (folder ${workspaceReal})`);
   await connection.run();
+  clearInterval(leases);
   desktopUse.stopAll();
   tasks.close();
   brains.close();
