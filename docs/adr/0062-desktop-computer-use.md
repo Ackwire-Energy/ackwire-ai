@@ -35,6 +35,7 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 | Apps' caches | at-spi2-core 2.56's apps answer `GetItems` only once some client listens for an event; until then the method doesn't exist |
 | The runner's `desktop-check` on Xtigervnc at 1280×800 | a desktop's first look 4–5 s after it starts (its session coming up: the panel's window shows about half a second before its elements answer); then a look with the panel only 138 ms; an action checked, done, settled and looked at 0.55–0.9 s (the Applications menu opened 566 ms); launching the terminal, waiting for its window, 1.3 s; a screenshot 59 ms, a close-up 37 ms; a pt-BR line with capitals and `Ç` typed into the terminal exactly; the panel's Log Out refused |
 | `eval:desktop:micro` on three scenes recorded on Xtigervnc at 1280×800 (the helper's JPEGs and the runner's looks; close-ups cut from them at q70), 3 trials | Box on 13 small targets: first pass 22/39, with the close-up 35/39; the close-up misses are the title bars' × (2–8 px left of or below it), so the agent's guidance says to close windows with their keys. 4 large targets 12/12 first pass; 4 absent targets said absent 12/12. Choice over the tree 14/14 (p50 199 ms). Checks: 5/7 on the text, 7/7 with the image; a check only the image can answer (a terminal behind another window) fails on the text with p 0.15, so the image re-check, which only follows an unsure answer, never sees it |
+| The close-up enlarged: the same scenes, 4 trials, two runs; and 20 other small targets on them (12 the tree has, 8 only on the image), 2 trials | With the native 480×300 close-up: 42/52 and 44/52. On a title bar its box covered the × and the button beside it, or sat on that button (the dialog's ^, the window's maximize); on the menu it sat a row off ("the Settings submenu" on Web Browser or Accessories). The 240×150 around the first box enlarged twice, sent at 480×300: 52/52 in both runs, each of the 13 targets 8 of 8; the 20 others 38/40 (30/40 with the native close-up; both put "the maximize button" on minimize). Large 16/16, absent 16/16, Choice 14/14. Jev's p50 167 ms with the same calls (one more for a small target); enlarging (`Bun.Image`, lanczos3, JPEG q70) 3 ms. Jev refuses an image under 280 px a side, so the smaller region can't go as it is. A 480×300 region enlarged to 960×600 missed the window's × at the screen's edge (0/2); naming icons in the close-up's prompt didn't help (22/26) |
 
 ### Alternatives considered
 
@@ -84,7 +85,7 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 Ref → exact name → target memory → the judge's Choice over the tree's elements → Jev's Box on a screenshot. On the image:
 
 - A box taller than half of it or wider than 80% of it isn't one control: nothing is found. This applies to the browser too.
-- On a surface that takes regions, a first box no larger than 15% of each side is boxed again on a 480×300 close-up at the screen's native size, centered on it and kept inside the screen. The close-up's answer is taken when the judge says it's there (≥ 0.6) and it is one control; otherwise nothing is found, since the first box was most likely on a neighbor. A close-up that can't be taken leaves the first answer.
+- On a surface that takes regions, a first box no larger than 15% of each side is boxed again on a close-up: the 240×150 screen pixels around it, kept inside the screen, enlarged twice (480×300) by the server before the judge sees them. At native size Jev's box on a control of about 14 px lands on its neighbor, and Jev refuses images under 280 px a side, so the region is enlarged rather than sent as it is. The close-up's answer is taken when the judge says it's there (≥ 0.6) and it is one control; otherwise nothing is found, since the first box was most likely on a neighbor. A close-up that can't be taken or enlarged leaves the first answer.
 - The point lands on the smallest marked element (the tree's boxes) that contains it, so the action is as exact as a ref.
 - Words that can't be undone are never acted on at a bare point; the plan stops and says so. This applies to the browser too.
 - Screens up to 1568 px a side go at native size, the 1280×900 desktop included; a larger one is downscaled for the first Box only.
@@ -161,7 +162,7 @@ No new server env vars: availability comes from the machine and the scope, and J
 ## Consequences
 
 - An agent works in any desktop app in one or two turns of its model, with the browser's targets, checks and reports.
-- A small target costs a second Box (about 250–300 ms); a step takes about 0.6–1.2 s.
+- A small target costs a second Box (about 170–300 ms, plus 3 ms to enlarge the close-up); a step takes about 0.6–1.2 s.
 - The browser changes a little: oversized boxes and costly bare points are refused, more words are costly, and an unsure check gets one look at the image when the judge sees images.
 - Desktop use needs Linux, system mode and a few distro packages; Mac and Windows runners keep the browser only.
 - Secrets typed into native apps wait; X11's lack of isolation is a stated limit, not something this fixes.
