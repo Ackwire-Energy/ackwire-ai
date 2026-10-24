@@ -6,9 +6,10 @@ export function shQuote(value: string): string {
 }
 
 /**
- * The Bun a system-mode runner runs on: the one the repo builds and tests
- * with (`packageManager` in package.json, kept equal by a test). Screens and
- * terminals need Bun 1.3.5 or newer.
+ * The Bun a system-mode runner runs on, and any runner whose computer has no
+ * Bun with `Bun.Terminal` (1.3.5 or newer), which screens and terminals
+ * need: the one the repo builds and tests with (`packageManager` in
+ * package.json, kept equal by a test).
  */
 export const RUNNER_BUN_VERSION = "1.4.4";
 /** SHA-256 (hex) of each `bun-<target>.zip` of `RUNNER_BUN_VERSION`, checked before it is installed. */
@@ -16,6 +17,8 @@ export const RUNNER_BUN_SHA256 = {
   "linux-x64": "bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c",
   "linux-x64-baseline": "e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76",
   "linux-aarch64": "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e",
+  "darwin-x64-baseline": "d4a155adfbfd09155eb3ba05c9e3a544f39297d7a68616d3c7759f67ab5c47dc",
+  "darwin-aarch64": "c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510",
 } as const;
 
 /**
@@ -48,13 +51,20 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  *
  *   curl -fsSL <publicUrl>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service]
  *
- * Finds Node.js 22+ (or Bun), downloads the runner bundle from
+ * Picks the runtime, downloads the runner bundle from
  * `<publicUrl>/runner/agentes-runner.mjs`, writes a launcher in
  * `~/.agentes-runner/bin`, connects this computer with a device code
  * (`agentes-runner pair` prints a code and a link and waits for someone to
  * confirm it on the site, ADR 0036 §5) and installs the service. A home
  * that is already connected keeps its connection (running it again updates
  * the runner).
+ *
+ * The runtime is a Bun with `Bun.Terminal`, which the agents' screens and
+ * terminals need (ADR 0058): the computer's own, else `RUNNER_BUN_VERSION`
+ * fetched into `~/.agentes-runner/runtime` and checked against
+ * `RUNNER_BUN_SHA256`. Only when that can't be had (another platform, no
+ * unzip, no download) Node.js 22+ or an older Bun, and it says what that
+ * runner lacks.
  *
  * `--system` (Linux, root) installs the runner for the whole computer, each
  * agent as its own OS user: the pinned Bun and the bundle in
@@ -181,39 +191,56 @@ unpack() {
     unzip -q -o "$1" -d "$2"
   elif command -v python3 >/dev/null 2>&1; then
     python3 -m zipfile -e "$1" "$2"
-  elif command -v apt-get >/dev/null 2>&1; then
+  elif [ "$(id -u)" -eq 0 ] && command -v apt-get >/dev/null 2>&1; then
     apt_install unzip && unzip -q -o "$1" -d "$2"
   else
-    die "unzip is needed to unpack Bun; install it and run this again"
+    return 1
   fi
 }
 
-# The pinned Bun in $SYSTEM_DIR/bin, checked against its SHA-256; never one from the PATH, which root would then run.
-get_bun() {
-  case "$(uname -m)" in
-    x86_64|amd64)
+# A Bun with Bun.Terminal (1.3.5 or newer): the agents' screens and the terminal need it.
+has_terminal() { [ -x "$1" ] && "$1" -e 'process.exit("Terminal" in Bun ? 0 : 1)' >/dev/null 2>&1; }
+
+# The pinned Bun at $1, kept when it is there at that version, checked against its SHA-256 before it is
+# installed. Fails with WHY set where there's no pinned build or it can't be fetched or run here.
+fetch_bun() {
+  WHY=""
+  if [ "$("$1" --version 2>/dev/null || true)" = "$BUN_VERSION" ]; then return 0; fi
+  case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64|Linux-amd64)
       BUN_TARGET=linux-x64
       # Bun's default x64 build needs AVX2.
       grep -qw avx2 /proc/cpuinfo 2>/dev/null || BUN_TARGET=linux-x64-baseline ;;
-    aarch64|arm64) BUN_TARGET=linux-aarch64 ;;
-    *) die "--system runs on x86_64 or arm64 Linux, not $(uname -m)" ;;
+    Linux-aarch64|Linux-arm64) BUN_TARGET=linux-aarch64 ;;
+    Darwin-x86_64) BUN_TARGET=darwin-x64-baseline ;;
+    Darwin-arm64) BUN_TARGET=darwin-aarch64 ;;
+    *) WHY="there is no build of it for $(uname -s) on $(uname -m)"; return 1 ;;
   esac
   case "$BUN_TARGET" in
 ${shaCases}
   esac
-  RUNTIME="$SYSTEM_DIR/bin/bun"
-  if [ "$("$RUNTIME" --version 2>/dev/null || true)" = "$BUN_VERSION" ]; then return 0; fi
   say "Downloading Bun $BUN_VERSION ..."
-  WORK=$(mktemp -d)
-  trap 'rm -rf "$WORK"' EXIT
-  download "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/bun-$BUN_TARGET.zip" "$WORK/bun.zip" ||
-    die "downloading Bun failed"
-  [ "$(sha256 "$WORK/bun.zip")" = "$BUN_SHA256" ] ||
-    die "the Bun download didn't match its checksum; it was not installed"
-  unpack "$WORK/bun.zip" "$WORK"
-  install -m 755 "$WORK/bun-$BUN_TARGET/bun" "$RUNTIME.new"
-  [ "$("$RUNTIME.new" --version 2>/dev/null || true)" = "$BUN_VERSION" ] || die "Bun $BUN_VERSION doesn't run on this computer"
-  mv -f "$RUNTIME.new" "$RUNTIME"
+  WORK=$(mktemp -d) || { WHY="no temporary folder for it"; return 1; }
+  if ! download "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/bun-$BUN_TARGET.zip" "$WORK/bun.zip"; then
+    WHY="the download failed"
+  elif [ "$(sha256 "$WORK/bun.zip")" != "$BUN_SHA256" ]; then
+    WHY="the download didn't match its checksum, so it was not installed"
+  elif ! unpack "$WORK/bun.zip" "$WORK"; then
+    WHY="unpacking it needs unzip or python3"
+  elif cp "$WORK/bun-$BUN_TARGET/bun" "$1.new" && chmod 755 "$1.new" &&
+    [ "$("$1.new" --version 2>/dev/null || true)" = "$BUN_VERSION" ]; then
+    mv -f "$1.new" "$1"
+  else
+    WHY="it doesn't run on this computer"
+  fi
+  rm -rf "$WORK" "$1.new"
+  [ -z "$WHY" ]
+}
+
+# The pinned Bun in $SYSTEM_DIR/bin; never one from the PATH, which root would then run.
+get_bun() {
+  RUNTIME="$SYSTEM_DIR/bin/bun"
+  fetch_bun "$RUNTIME" || die "no Bun $BUN_VERSION for the runner: $WHY"
 }
 
 install_system() {
@@ -256,26 +283,38 @@ install_user() {
   if [ -f "$RUNNER_HOME/config.json" ] && grep -q '"managedBy": *"desktop"' "$RUNNER_HOME/config.json" 2>/dev/null; then
     die "this computer is connected by the agentes app; manage it there (or set AGENTES_RUNNER_HOME to another folder)"
   fi
+  mkdir -p "$RUNNER_HOME/bin" "$RUNNER_HOME/runtime"
+  chmod 700 "$RUNNER_HOME"
 
-  # Node.js 22+ or Bun.
+  # This computer's Bun when it has Bun.Terminal, else the pinned one; Node.js 22+ (or an older Bun)
+  # only when there is neither, since a runner there gets no screens and no terminal.
   RUNTIME=""
-  if command -v node >/dev/null 2>&1; then
-    NODE_MAJOR=$(node -v 2>/dev/null | sed 's/^v//; s/\\..*//')
-    case "$NODE_MAJOR" in ''|*[!0-9]*) NODE_MAJOR=0 ;; esac
-    if [ "$NODE_MAJOR" -ge 22 ]; then RUNTIME=$(command -v node); fi
-  fi
-  if [ -z "$RUNTIME" ] && command -v bun >/dev/null 2>&1; then RUNTIME=$(command -v bun); fi
-  if [ -z "$RUNTIME" ] && [ -x "$HOME/.bun/bin/bun" ]; then RUNTIME="$HOME/.bun/bin/bun"; fi
+  for CANDIDATE in "$(command -v bun 2>/dev/null || true)" "$HOME/.bun/bin/bun"; do
+    if [ -n "$CANDIDATE" ] && has_terminal "$CANDIDATE"; then RUNTIME=$CANDIDATE; break; fi
+  done
   if [ -z "$RUNTIME" ]; then
-    say "The runner needs Node.js 22 or newer (or Bun). Install one, then run this again:"
+    if fetch_bun "$RUNNER_HOME/runtime/bun"; then RUNTIME="$RUNNER_HOME/runtime/bun"; else say "No Bun $BUN_VERSION: $WHY."; fi
+  fi
+  if [ -z "$RUNTIME" ]; then
+    if command -v node >/dev/null 2>&1; then
+      NODE_MAJOR=$(node -v 2>/dev/null | sed 's/^v//; s/\\..*//')
+      case "$NODE_MAJOR" in ''|*[!0-9]*) NODE_MAJOR=0 ;; esac
+      if [ "$NODE_MAJOR" -ge 22 ]; then RUNTIME=$(command -v node); fi
+    fi
+    if [ -z "$RUNTIME" ] && command -v bun >/dev/null 2>&1; then RUNTIME=$(command -v bun); fi
+    if [ -z "$RUNTIME" ] && [ -x "$HOME/.bun/bin/bun" ]; then RUNTIME="$HOME/.bun/bin/bun"; fi
+    if [ -n "$RUNTIME" ]; then
+      say "The runner runs on $RUNTIME, so agents get no screens and no terminal on this computer: those need Bun 1.3.5 or newer."
+    fi
+  fi
+  if [ -z "$RUNTIME" ]; then
+    say "The runner needs Bun 1.3.5 or newer, or Node.js 22 or newer. Install one, then run this again:"
+    say "  Bun:    curl -fsSL https://bun.sh/install | bash"
     say "  macOS:  brew install node"
     say "  Linux:  https://nodejs.org/en/download (or: curl -fsSL https://fnm.vercel.app/install | bash && fnm install 22)"
-    say "  Bun:    curl -fsSL https://bun.sh/install | bash"
     exit 1
   fi
 
-  mkdir -p "$RUNNER_HOME/bin"
-  chmod 700 "$RUNNER_HOME"
   get_runner
   connect
 

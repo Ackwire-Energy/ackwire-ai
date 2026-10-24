@@ -340,6 +340,7 @@ export class RunnerDaemon implements RequestObserver {
       home: opts.home,
       log: opts.log,
       user: (agent) => this.desktopUser(agent),
+      inUse: (agentId) => this.session?.browser.onDesktopInUse(agentId) ?? false,
       get agentUsers() {
         return daemon.session?.agentUser != null;
       },

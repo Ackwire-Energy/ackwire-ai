@@ -2,6 +2,7 @@ import type { Machine, MachineAccessReduce, MachineOs, MachinePause, MachineTool
 import {
   useAgents,
   useDesktopLatest,
+  useDesktopStatus,
   useMachineAction,
   useMachines,
   useReduceMachineAccess,
@@ -9,6 +10,7 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { daysBetween, formatShortDate, formatTime, joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   computerKind,
   computerState,
@@ -792,6 +794,27 @@ function GrantCard({ machine: m }: { machine: Machine }) {
   );
 }
 
+/** "Tela ao vivo" beside an agent whose desktop runs on this computer (ADR 0058): its panel on the agent's page. */
+function DesktopLink({ agentId, name }: { agentId: string; name: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const status = useDesktopStatus(org.id, agentId);
+  if (!status.data?.running) return null;
+  return (
+    <Button asChild size="sm" variant="ghost" className="machine-page__screen">
+      <Link
+        to="/org/$orgId/agents/$agentId"
+        params={{ orgId: org.id, agentId }}
+        search={{ desktop: 1 }}
+        aria-label={t("desktop.machine.seeLabel", agentGrammar(t, name))}
+      >
+        <Icon name="computer" />
+        {t("desktop.machine.see")}
+      </Link>
+    </Button>
+  );
+}
+
 /**
  * One connected computer: its state (online, paused), the folders it allows and which
  * agents use each, its tools. The site only shows and reduces; the admins and
@@ -877,27 +900,29 @@ export function MachinePage({ machineId }: { machineId: string }) {
                 // What this agent may use here, beyond its own folder (only who may see the access knows).
                 const folders = m.access?.folders.filter((f) => f.agents.includes(a.id)).map((f) => folderName(f.path));
                 return (
-                  <Link
-                    key={a.id}
-                    to="/org/$orgId/agents/$agentId"
-                    params={{ orgId: org.id, agentId: a.id }}
-                    className="machine-page__agent"
-                  >
-                    <AgentAvatar agentId={a.id} size="md" name={a.name} />
-                    <span className="list-col" style={{ minWidth: 0, flex: 1 }}>
-                      <span className="machine-page__agent-name">
-                        {a.name} <span className="muted">@{a.handle}</span>
-                      </span>
-                      {folders && (
-                        <span className="small muted">
-                          {folders.length > 0
-                            ? t("machines.page.agentFolders", { folders: joinNames(folders, t("newAgent.and")) })
-                            : t("machines.page.agentOwnFolder")}
+                  <div key={a.id} className="machine-page__agent-row">
+                    <Link
+                      to="/org/$orgId/agents/$agentId"
+                      params={{ orgId: org.id, agentId: a.id }}
+                      className="machine-page__agent"
+                    >
+                      <AgentAvatar agentId={a.id} size="md" name={a.name} />
+                      <span className="list-col" style={{ minWidth: 0, flex: 1 }}>
+                        <span className="machine-page__agent-name">
+                          {a.name} <span className="muted">@{a.handle}</span>
                         </span>
-                      )}
-                    </span>
-                    <Icon name="chevronRight" />
-                  </Link>
+                        {folders && (
+                          <span className="small muted">
+                            {folders.length > 0
+                              ? t("machines.page.agentFolders", { folders: joinNames(folders, t("newAgent.and")) })
+                              : t("machines.page.agentOwnFolder")}
+                          </span>
+                        )}
+                      </span>
+                      <Icon name="chevronRight" />
+                    </Link>
+                    {m.online && m.access?.tools.desktop !== false && <DesktopLink agentId={a.id} name={a.name} />}
+                  </div>
                 );
               })}
             </div>

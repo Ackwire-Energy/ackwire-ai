@@ -87,7 +87,7 @@ Ref → exact name → target memory → the judge's Choice over the tree's elem
 - On a surface that takes regions, a first box no larger than 15% of each side is boxed again on a 480×300 close-up at the screen's native size, centered on it and kept inside the screen. The close-up's answer is taken when the judge says it's there (≥ 0.6) and it is one control; otherwise nothing is found, since the first box was most likely on a neighbor. A close-up that can't be taken leaves the first answer.
 - The point lands on the smallest marked element (the tree's boxes) that contains it, so the action is as exact as a ref.
 - Words that can't be undone are never acted on at a bare point; the plan stops and says so. This applies to the browser too.
-- Screens up to 1568 px a side go at native size, the 1280×800 desktop included; a larger one is downscaled for the first Box only.
+- Screens up to 1568 px a side go at native size, the 1280×900 desktop included; a larger one is downscaled for the first Box only.
 
 The costly words that need a 0.85 pick gain what a desktop throws away, for the browser too: trash, discard, don't save, close without saving, overwrite, replace, empty, uninstall, format, and in pt-BR lixeira, descartar, não salvar, sair or fechar sem salvar, sobrescrever, substituir, esvaziar, desinstalar, formatar.
 

@@ -55,20 +55,28 @@ const defaultTimers: Timers = {
 export const BACKOFF_MS = [500, 1000, 2000, 5000, 10_000];
 const OPEN = 1;
 
-/**
- * The socket URL for an organization. `base` is the page's location (web) or
- * the server's origin, e.g. "https://agentes.chat" (phone app).
- */
-export function realtimeUrl(base: string | { protocol: string; host: string }, orgId: string) {
+/** Where the server is: the page's location (web) or the server's origin, e.g. "https://agentes.chat" (phone app). */
+export type SocketBase = string | { protocol: string; host: string };
+
+/** A WebSocket address on the server: `path` with `params` as its query. */
+export function socketUrl(base: SocketBase, path: string, params: Record<string, string | number>) {
   const origin = typeof base === "string" ? originOf(base) : base;
   const protocol = origin.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${origin.host}/api/ws?orgId=${encodeURIComponent(orgId)}`;
+  const query = Object.entries(params)
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    .join("&");
+  return `${protocol}//${origin.host}${path}?${query}`;
+}
+
+/** The socket URL for an organization. */
+export function realtimeUrl(base: SocketBase, orgId: string) {
+  return socketUrl(base, "/api/ws", { orgId });
 }
 
 /** "https://agentes.chat/x" → { protocol: "https:", host: "agentes.chat" } (no `URL`: React Native's is partial). */
 function originOf(base: string): { protocol: string; host: string } {
   const m = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]+)/i.exec(base.trim());
-  if (!m) throw new Error(`realtimeUrl: not an absolute URL: ${base}`);
+  if (!m) throw new Error(`socketUrl: not an absolute URL: ${base}`);
   return { protocol: (m[1] as string).toLowerCase(), host: m[2] as string };
 }
 

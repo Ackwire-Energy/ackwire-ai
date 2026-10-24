@@ -1,14 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
-import type { MachineRequest } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { DESKTOP_PROTOCOL, type MachineRequest } from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   agentBrowserStatus,
   agentFolderPath,
+  BROWSER_SCOPE,
   BROWSER_TOOLS,
   browserErrorText,
   cleanBrowserDomains,
   createBrowserToolSource,
   createFakeJudge,
+  DESKTOP_SCOPE,
   getAgentBrowser,
   grantScopes,
   type Judge,
@@ -456,6 +458,67 @@ test("a browser closed after a person had it is never a dead end: opening a page
   b.s.reply = { success: true, data: { url: "https://shop.example/" } };
   expect((await b.call("browser_open", { url: "https://shop.example/" })).isError).toBeUndefined();
   expect((await b.call("browser_click", { target: "e1" })).isError).toBeUndefined();
+});
+
+test("an agent whose Chrome belongs on its desktop says so on every command that may start it", async () => {
+  const b = await browserSetup();
+  b.s.status = { protocol: DESKTOP_PROTOCOL };
+  b.s.respond = (r) =>
+    r.op === "browser.batch" ? { answers: r.commands.map(() => ok()) } : page('- button "Save" [ref=e1]');
+  await grantScopes(
+    f.db,
+    f.org.id,
+    f.agent.id,
+    [BROWSER_SCOPE, DESKTOP_SCOPE].map((scope) => ({ connectionId: null, scope })),
+  );
+  const commands = () => b.calls.filter((c) => c.op === "browser.act" || c.op === "browser.batch");
+  const desktop = { browser: { available: true }, desktop: { available: true } };
+  const serve = (on: boolean) =>
+    f.db
+      .update(schema.machines)
+      .set({
+        protocol: DESKTOP_PROTOCOL,
+        executors: desktop,
+        access: { folders: [], tools: { claude: false, codex: false, commands: true, browser: true, desktop: on } },
+      })
+      .where(eq(schema.machines.id, b.machineId));
+
+  // A computer that doesn't serve desktops: headless.
+  await b.call("browser_click", { target: "e1" });
+  expect(commands().length).toBeGreaterThan(0);
+  expect(commands().some((c) => "desktop" in c)).toBe(false);
+
+  await serve(true);
+  let n = commands().length;
+  await b.call("browser_click", { target: "e1" });
+  await b.call("browser_open", { url: "https://shop.example/" });
+  expect(commands().slice(n).length).toBeGreaterThan(1);
+  expect(
+    commands()
+      .slice(n)
+      .every((c) => "desktop" in c && c.desktop === true),
+  ).toBe(true);
+
+  // Its desktop switch off on that computer, or no desktop:use: headless again.
+  await serve(false);
+  n = commands().length;
+  await b.call("browser_click", { target: "e1" });
+  expect(
+    commands()
+      .slice(n)
+      .some((c) => "desktop" in c),
+  ).toBe(false);
+  await serve(true);
+  await f.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, f.agent.id), eq(schema.agentScopes.scope, DESKTOP_SCOPE)));
+  n = commands().length;
+  await b.call("browser_click", { target: "e1" });
+  expect(
+    commands()
+      .slice(n)
+      .some((c) => "desktop" in c),
+  ).toBe(false);
 });
 
 test("the computer the browser runs on is remembered for the live view, take over and Stop", async () => {

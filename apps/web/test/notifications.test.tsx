@@ -360,3 +360,25 @@ describe("a new computer connected (ADR 0036, admins)", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
   });
 });
+
+describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
+  test("in its browser, or on its computer when the request is on its desktop", async () => {
+    const ask = (id: string, screen?: "desktop") =>
+      notification({
+        id,
+        kind: "browser_handoff",
+        waiting: true,
+        actors: [{ type: "agent", id: ADA_ID }],
+        source: { channelId: ENG_ID, handoffId: `h-${id}`, ...(screen ? { screen } : {}) },
+        latest: { text: "Entrar no painel" },
+        updatedAt: ago(2),
+      });
+    await go(seedState({ notifications: [ask("n-browser"), ask("n-desktop", "desktop")] }));
+    const row = (id: string) => (document.querySelector(`[data-n="${id}"]`) as HTMLElement).textContent;
+    expect(row("n-browser")).toContain("Ada precisa de você no navegador");
+    expect(row("n-browser")).toContain("Navegador");
+    expect(row("n-desktop")).toContain("Ada precisa de você no computador");
+    expect(row("n-desktop")).toContain("Computador");
+    expect(row("n-desktop")).not.toContain("Navegador");
+  });
+});

@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   type AgentScope,
   type FileEntry,
+  isDesktopKeyboard,
   isStreamId,
   isTerminalSize,
   MAX_INLINE_FILE_BYTES,
@@ -546,7 +547,8 @@ async function handleStream(
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
     if (req.mode !== "watch" && req.mode !== "control") throw new RunnerError("bad_request", "watch or control");
-    await openDesktopStream(ctx.desktops, agent, req.mode, dial);
+    const keyboard = req.mode === "control" && isDesktopKeyboard(req.keyboard) ? req.keyboard : undefined;
+    await openDesktopStream(ctx.desktops, agent, req.mode, dial, keyboard);
   } else if (req.kind === "terminal") {
     requireTool(ctx, "terminal");
     if (!ctx.terminals) throw new RunnerError("terminal_unavailable", "This runner opens no terminals");
@@ -558,6 +560,9 @@ async function handleStream(
   }
   return { opened: true };
 }
+
+/** Protocol 18: the agent's Chrome goes on its desktop only while the machine's desktop switch is on too. */
+const onDesktop = (ctx: HandlerContext, req: { desktop?: unknown }) => req.desktop === true && toolOn(ctx, "desktop");
 
 /**
  * Protocol 12: the agent's browser (ADR 0040); `browser.batch` and
@@ -592,10 +597,10 @@ async function handleBrowser(
       return browser.streamStop(req.agent);
     case "browser.act":
       requireTool(ctx, "browser");
-      return browser.act(req.agent, ctx.workspaceReal, req, scope.signal);
+      return browser.act(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
     case "browser.batch":
       requireTool(ctx, "browser");
-      return browser.batch(req.agent, ctx.workspaceReal, req, scope.signal);
+      return browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
     case "browser.capture":
       requireTool(ctx, "browser");
       return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);

@@ -41,7 +41,7 @@ import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, Runn
 import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
-import { runningCompiled, thisRunner } from "./launch";
+import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
@@ -85,6 +85,7 @@ Usage:
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
+      The connection, the service, and whether the agents' desktops and the terminal can run here.
   agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...]
       Folders agents may use besides their own (an agent's handle, as on the site).
   agentes-runner tools [list | enable <tool> | disable <tool>]
@@ -465,7 +466,37 @@ function status(): number {
   );
   const service = serviceStatus(undefined, stored?.mode === "system");
   console.log(service ? `Service: ${service}` : "Service: not installed");
+  printDesktopAndTerminal(home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
   return 0;
+}
+
+/**
+ * `status`: whether the agents' desktops and the terminal can run here (what `hello` tells the server), and
+ * their switches. In system mode root runs them as each agent's own user, so being root is no reason.
+ */
+function printDesktopAndTerminal(home: string, tools: RunnerTools | undefined, agentUsers: boolean) {
+  const log = () => undefined;
+  const infos = [
+    [
+      "desktop",
+      "Desktops",
+      new DesktopSessions({ home, log, user: async (a) => runnerUser(home, home, a), agentUsers }).info(),
+    ],
+    ["terminal", "Terminal", new Terminals({ log, user: async () => runnerTerminalUser(home), agentUsers }).info()],
+  ] as const;
+  for (const [tool, label, info] of infos) {
+    const state = !info.available
+      ? `unavailable: ${info.reason}`
+      : tools?.[tool]
+        ? "on"
+        : `off (agentes-runner tools enable ${tool})`;
+    console.log(`${label}: ${state}`);
+  }
+  if (!hasBunTerminal() && !runningCompiled() && process.platform !== "win32") {
+    console.log(
+      "The install command from Settings > Computers, run again, puts the runner on Bun 1.3.5 or newer (this computer stays connected).",
+    );
+  }
 }
 
 /** For `folders` and `tools`: the paired config, or a message. */

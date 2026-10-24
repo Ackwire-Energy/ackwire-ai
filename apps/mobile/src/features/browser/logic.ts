@@ -3,6 +3,7 @@ import {
   BROWSER_TOOL_SCOPE,
   type BrowserHandoff,
   type BrowserLiveUnavailable,
+  handoffScreen,
 } from "@agenteschat/client";
 
 /**
@@ -11,10 +12,18 @@ import {
  * `browser/*`). Pure, so it is unit-tested.
  */
 
-/** What the card shows: waiting for someone, me in control, someone else helping, or how it ended. */
-export type CardState = "waiting" | "mine" | "helping" | "done" | "failed" | "expired" | "cancelled";
+/**
+ * What the card shows: waiting for someone, me in control, someone else helping, or how it ended;
+ * `computer`: an open request on the agent's desktop, which the phone can't show (ADR 0058), so it is
+ * never taken here.
+ */
+export type CardState = "waiting" | "mine" | "helping" | "computer" | "done" | "failed" | "expired" | "cancelled";
 
-export function cardStateOf(h: Pick<BrowserHandoff, "status" | "controllerUserId">, meId: string | null): CardState {
+export function cardStateOf(
+  h: Pick<BrowserHandoff, "status" | "controllerUserId" | "screen">,
+  meId: string | null,
+): CardState {
+  if ((h.status === "pending" || h.status === "active") && handoffScreen(h) === "desktop") return "computer";
   if (h.status === "pending") return "waiting";
   if (h.status === "active") return h.controllerUserId && h.controllerUserId === meId ? "mine" : "helping";
   return h.status;

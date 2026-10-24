@@ -23,12 +23,14 @@ import {
   textEvent,
   useAgentBrowserHandoff,
   useBrowserHandoffMutations,
+  useDesktopStatus,
   useMachines,
   wheelEvent,
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, FilterToggle, Icon, type IconName, Input, PixelSpinner, SkyStrip, Textarea } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import {
   type KeyboardEvent,
@@ -232,19 +234,24 @@ export function useHeldTakeover(agentId: string, runId: string, enabled = true):
 
 const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
 
-/** What covers the page instead of it: a state said plainly, with a spinner only while something is on its way. */
-function Cover({
+/**
+ * What covers the page (or the agent's desktop) instead of it: a state said plainly, with a spinner only
+ * while something is on its way; `action`: what the person can do about it.
+ */
+export function Cover({
   icon,
   spinner,
   color,
   text,
   help,
+  action,
 }: {
   icon?: IconName;
   spinner?: boolean;
   color: ReturnType<typeof colorOf>;
   text: ReactNode;
   help?: ReactNode;
+  action?: ReactNode;
 }) {
   return (
     <div className="brw-dim">
@@ -254,6 +261,7 @@ function Cover({
           {text}
         </span>
         {help && <small>{help}</small>}
+        {action}
       </span>
     </div>
   );
@@ -350,6 +358,9 @@ export function BrowserCard({
   const actions = useBrowserHandoffMutations(org.id);
   const machines = useMachines(org.id);
   const imgRef = useRef<HTMLImageElement>(null);
+  // The agent's desktop runs (its Chrome shows there): "Ver a tela inteira" opens it on the agent's page.
+  const desktop = useDesktopStatus(org.id, agentId, { enabled: open });
+  const onDesktop = desktop.data?.available === true && desktop.data.running;
 
   const handoff = newest(
     live.status?.handoff ?? null,
@@ -870,6 +881,14 @@ export function BrowserCard({
           )}
           <span className="brw-ac__acts">
             {inControl ? controlActs : watchActs}
+            {onDesktop && !full && (
+              <Button asChild size="sm" variant="ghost">
+                <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId }} search={{ desktop: 1 }}>
+                  <Icon name="computer" />
+                  {t("desktop.seeWhole")}
+                </Link>
+              </Button>
+            )}
             {!blocker && (
               <Button
                 size="sm"
