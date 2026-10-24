@@ -98,7 +98,7 @@ const AgentPlanUsage = z
   .openapi("AgentPlanUsage");
 
 /**
- * The usage views (ADR 0062): every plan account by computer with the API per
+ * The usage views (ADR 0063): every plan account by computer with the API per
  * agent, and an agent's month by account. Any member; money only with
  * `view_usage`, an account's email only for its owner.
  */

@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import type { MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
+import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
 import type { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser } from "../../runner/agent-users";
 import { writeConfig } from "../../runner/config";
@@ -17,6 +17,7 @@ import {
   Supervisor,
   type SupervisorOptions,
   WORKER_TASKS_FILE,
+  type WorkerDesktop,
   type WorkerProcess,
   type WorkerState,
   workerCommand,
@@ -690,6 +691,99 @@ test("push: the worker's bytes go out from here with the machine token, only to 
   expect(await errorCode(() => odd)).toBe("upload_failed");
 });
 
+test("a worker gets its agent's desktop from root only while it serves a desktop use request the server sent", async () => {
+  const asked: AgentScope[] = [];
+  const desktop: WorkerDesktop = {
+    display: 21,
+    width: 1280,
+    height: 800,
+    startedAt: new Date(1000).toISOString(),
+    started: true,
+    xauthority: "/home/ag-a1b2c3d4/.agentes/desktop/Xauthority",
+    home: "/home/ag-a1b2c3d4",
+  };
+  const t = setup({
+    desktop: async (agent) => {
+      asked.push(agent);
+      return desktop;
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const answers = (w: FakeWorker) => w.of("desktop.ensured");
+  const refused = (ensureId: string) => ({
+    type: "desktop.ensured",
+    ensureId,
+    error: { code: "not_allowed", message: "No desktop use request of this agent is running" },
+  });
+
+  // During another request, the agent's own code (as the worker's user) asking gets nothing.
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  ana.send({ type: "desktop.ensure", ensureId: "1" });
+  await waitFor(() => answers(ana).length === 1);
+  expect(answers(ana)[0]).toEqual(refused("1"));
+  ana.send({ type: "result", id: q.id, ok: true, data: execDone });
+  await run;
+
+  // Desktop use is the worker's: the request goes to it, and while it runs root starts the desktop for it.
+  const look = handleRequest(t.ctx, { op: "desktop.look", agent: ANA }, scope().scope);
+  const q2 = await requestOn(ana, 2);
+  expect(q2).toEqual({ op: "desktop.look", agent: ANA, type: "request", id: q2.id });
+  ana.send({ type: "desktop.ensure", ensureId: "2" });
+  await waitFor(() => answers(ana).length === 2);
+  expect(answers(ana)[1]).toEqual({ type: "desktop.ensured", ensureId: "2", desktop });
+  expect(asked).toEqual([ANA]);
+
+  // Another agent's worker asking meanwhile gets nothing: the request isn't its own.
+  const read = handleRequest(t.ctx, { op: "read", path: "a.md", maxBytes: 10, agent: BIA }, scope().scope);
+  await waitFor(() => t.workers.length === 2);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const q3 = await requestOn(bia);
+  bia.send({ type: "desktop.ensure", ensureId: "1" });
+  await waitFor(() => answers(bia).length === 1);
+  expect(answers(bia)[0]).toEqual(refused("1"));
+  expect(asked).toHaveLength(1);
+  bia.send({ type: "result", id: q3.id, ok: false, error: { code: "not_found", message: "No such file" } });
+  await errorCode(() => read);
+
+  const reply = {
+    snapshot: "",
+    refs: {},
+    address: "desktop://thunar/main",
+    title: "",
+    screen: { width: 1280, height: 800 },
+  };
+  ana.send({ type: "result", id: q2.id, ok: true, data: reply });
+  expect(await look).toEqual(reply);
+  // Root says why it couldn't, in the machine protocol's words.
+  const t2 = setup({
+    desktop: async () => {
+      throw new RunnerError("desktop_unavailable", "Install the agents' desktops");
+    },
+  });
+  t2.sup.boot();
+  t2.sup.attach();
+  const look2 = handleRequest(t2.ctx, { op: "desktop.look", agent: ANA }, scope().scope);
+  await waitFor(() => t2.workers.length === 1);
+  const ana2 = t2.last(ANA.id);
+  ana2.hello();
+  const q4 = await requestOn(ana2);
+  ana2.send({ type: "desktop.ensure", ensureId: "9" });
+  await waitFor(() => answers(ana2).length === 1);
+  expect(answers(ana2)[0]).toEqual({
+    type: "desktop.ensured",
+    ensureId: "9",
+    error: { code: "desktop_unavailable", message: "Install the agents' desktops" },
+  });
+  ana2.send({ type: "result", id: q4.id, ok: false, error: { code: "desktop_unavailable", message: "no" } });
+  expect(await errorCode(() => look2)).toBe("desktop_unavailable");
+});
+
 /** A real worker (`runWorker`) on the other end of in-memory pipes; `at`: the homes of an earlier supervisor (a restart). */
 function realWorkers(over: Partial<SupervisorOptions> = {}, at?: { home: string; agentHome: string; ownHome: string }) {
   const agentHome = at?.agentHome ?? tempDir("agent-home-");
@@ -769,6 +863,85 @@ test.if(posix)(
     };
     expect(again.stdout).toBe("back\n");
     expect(t.started).toHaveLength(1);
+  },
+);
+
+test.if(posix)(
+  "a real worker drives its agent's desktop through its helper, as its own user, with the desktop root started",
+  async () => {
+    const dir = tempDir("worker-desktop-");
+    dirs.push(dir);
+    const agentHome = path.join(dir, "agent");
+    const ownHome = path.join(dir, "worker");
+    mkdirSync(agentHome, { recursive: true });
+    const logFile = path.join(dir, "helper.log");
+    const stateFile = path.join(dir, "state.json");
+    const snapshot = JSON.parse(
+      readFileSync(path.join(import.meta.dir, "fixtures", "desktop", "menu.json"), "utf8"),
+    ) as unknown;
+    writeFileSync(stateFile, JSON.stringify({ snapshot }));
+    const uid = process.getuid?.() ?? 1000;
+    const asked: AgentScope[] = [];
+    const xauthority = path.join(dir, "Xauthority");
+    const t = setup({
+      start: (user) => {
+        const stdin = new PassThrough();
+        const stdout = new PassThrough();
+        const done = runWorker({
+          agentId: user.id,
+          home: ownHome,
+          dir: agentHome,
+          input: stdin,
+          output: stdout,
+          log: () => {},
+          self: { command: [process.execPath, "/nonexistent/agentes-runner.mjs"], compiled: false },
+          desktop: {
+            system: { platform: "linux", uid, which: (c) => `/usr/bin/${c}` },
+            command: [process.execPath, path.join(import.meta.dir, "fake-desktop-helper.mjs"), logFile, stateFile],
+          },
+        });
+        workerRuns.push(done);
+        return { stdin, stdout, exited: done, kill: () => stdin.end() };
+      },
+      desktop: async (agent) => {
+        asked.push(agent);
+        return {
+          display: 21,
+          width: 1280,
+          height: 800,
+          startedAt: new Date(1000).toISOString(),
+          started: asked.length === 1,
+          xauthority,
+          home: agentHome,
+        };
+      },
+    });
+    const on = { ...STATE, access: { ...STATE.access, tools: { ...STATE.access.tools, desktop: true } } };
+    t.setState(on);
+    t.sup.boot();
+    t.sup.attach();
+    const look = (await handleRequest(t.ctx, { op: "desktop.look", agent: ANA }, scope().scope)) as {
+      snapshot: string;
+      address: string;
+    };
+    expect(look.address).toBe("desktop://thunar/main");
+    expect(look.snapshot).toContain('- menu "Applications"');
+    expect(asked).toEqual([ANA]);
+    const started = (
+      JSON.parse(readFileSync(logFile, "utf8").split("\n")[0] as string) as {
+        start: { env: Record<string, string>; cwd: string };
+      }
+    ).start;
+    expect([started.env.DISPLAY, started.env.XAUTHORITY, started.env.HOME]).toEqual([":21", xauthority, agentHome]);
+    expect(realpathSync(started.cwd)).toBe(realpathSync(agentHome));
+
+    // The desktop switch off: the worker refuses before asking root for anything.
+    t.setState(STATE);
+    t.sup.stateChanged();
+    expect(await errorCode(() => handleRequest(t.ctx, { op: "desktop.look", agent: ANA }, scope().scope))).toBe(
+      "not_allowed",
+    );
+    expect(asked).toHaveLength(1);
   },
 );
 

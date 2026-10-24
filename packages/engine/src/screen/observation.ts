@@ -1,12 +1,17 @@
+import type { ScreenKind } from "@agenteschat/adapters";
+
 /**
  * What an agent sees on a screen (ADR 0054): the page or window as text, one
  * line per node with a ref for each element it can act on (`button "Save"
  * [ref=e3]`, as `agent-browser`'s snapshot writes it), and what changed
  * between two looks. Surface-agnostic: the browser fills it from its
- * snapshot today; a desktop surface can fill it from the OS accessibility
- * tree later, and everything built on it (targets in words, checks, plans)
+ * snapshot; a desktop surface fills it from the OS accessibility tree
+ * (ADR 0062), and everything built on it (targets in words, checks, plans)
  * works the same.
  */
+
+/** What a screen shows, in the words plans and reports use. */
+export const SCREEN_NOUN: Record<ScreenKind, string> = { browser: "page", desktop: "screen" };
 
 /** One element the agent can act on. */
 export interface ScreenElement {
@@ -24,6 +29,8 @@ export interface ScreenElement {
 
 export interface ScreenObservation {
   url: string | null;
+  /** The window's title, on a desktop (screen text). */
+  title?: string;
   /** The screen as text, one node per line (indentation is nesting). */
   lines: string[];
   elements: ScreenElement[];
@@ -31,14 +38,24 @@ export interface ScreenObservation {
   at: number;
 }
 
-/** A still image of the screen (JPEG), with the size of the page in CSS pixels it shows. */
+/** A rectangle in the surface's pixels: CSS pixels of a page, screen pixels of a desktop. */
+export interface ScreenRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A still image of the screen (JPEG), with the size of what it shows in the surface's pixels. */
 export interface ScreenImage {
   data: string;
   width: number;
   height: number;
-  /** The page's size in CSS pixels (points on the image map onto it). */
+  /** The size of what it shows (points on the image map onto it). */
   viewport: { width: number; height: number };
-  /** Elements drawn on it with their number and box (CSS pixels), when it was annotated. */
+  /** A close-up of part of the screen: where its top left corner is (the whole screen when absent). */
+  origin?: { x: number; y: number };
+  /** Elements drawn on it with their number and box, when it was annotated. */
   marks?: ScreenMark[];
 }
 
@@ -47,12 +64,18 @@ export interface ScreenMark {
   number: number;
   role: string;
   name?: string;
-  box: { x: number; y: number; width: number; height: number };
+  box: ScreenRegion;
 }
 
-const REF = /\bref=(e\d+)\b/;
-const ROLE = /^-\s+([A-Za-z][\w-]*)/;
-const NAME = /"((?:[^"\\]|\\.)*)"/;
+/**
+ * A line's head: its role, its quoted name and the attribute brackets right
+ * after them (`button "Save" [focused, ref=e3]`, `heading "Title" [ref=e1]
+ * [level=1]`). A ref is read there only, as an attribute of its own: a name
+ * or a text that says `ref=e9` (a page's title, a terminal's output) can't
+ * pass for an element.
+ */
+const HEAD = /^-\s+([A-Za-z][\w-]*)(?:\s+"((?:[^"\\]|\\.)*)")?((?:\s*\[[^\]]*\])*)/;
+const REF_ATTR = /(?:^|[[,])\s*ref=(e\d+)\s*(?=[,\]])/;
 /** Containers worth naming as an element's place ("the Delete in the row for invoice 42"). */
 const PLACES = new Set([
   "dialog",
@@ -81,6 +104,7 @@ const PLACES = new Set([
   "heading",
   "Iframe",
   "iframe",
+  "window",
 ]);
 
 /** A table row has no name of its own in the snapshot: its cells say which row it is. */
@@ -88,6 +112,17 @@ const ROWS = new Set(["row"]);
 const CELLS = new Set(["cell", "gridcell", "rowheader", "columnheader"]);
 
 const unquote = (s: string) => s.replace(/\\(.)/g, "$1");
+
+/** A line's role, name and ref (see `HEAD`). */
+function headOf(body: string): { role: string; name: string | null; ref: string | null } {
+  const m = HEAD.exec(body);
+  if (!m) return { role: "", name: null, ref: null };
+  return {
+    role: m[1] as string,
+    name: m[2] !== undefined ? unquote(m[2]) : null,
+    ref: REF_ATTR.exec(m[3] ?? "")?.[1] ?? null,
+  };
+}
 
 /** `e7`, `@e7` or `[ref=e7]` → `e7`; anything else → null. */
 export function screenRef(target: string): string | null {
@@ -110,6 +145,7 @@ interface Node {
 export function observeSnapshot(input: {
   text: string;
   url?: string | null;
+  title?: string | null;
   refs?: unknown;
   at?: number;
 }): ScreenObservation {
@@ -130,14 +166,7 @@ export function observeSnapshot(input: {
     const body = line.trim();
     while (open.length > 0 && (open[open.length - 1] as { depth: number }).depth >= depth) open.pop();
     const parent = open.length > 0 ? (open[open.length - 1] as { index: number }).index : -1;
-    const quoted = NAME.exec(body)?.[1];
-    nodes.push({
-      role: ROLE.exec(body)?.[1] ?? "",
-      name: quoted !== undefined ? unquote(quoted) : null,
-      ref: REF.exec(body)?.[1] ?? null,
-      line: body,
-      parent,
-    });
+    nodes.push({ ...headOf(body), line: body, parent });
     children.push([]);
     if (parent >= 0) (children[parent] as number[]).push(index);
     open.push({ depth, index });
@@ -184,7 +213,13 @@ export function observeSnapshot(input: {
     const name = typeof meta?.name === "string" ? meta.name : "";
     elements.push({ ref, role, name, line: `${role} "${name}" [ref=${ref}]`, context: [], index: lines.length });
   }
-  return { url: input.url ?? null, lines, elements, at: input.at ?? Date.now() };
+  return {
+    url: input.url ?? null,
+    ...(input.title ? { title: input.title } : {}),
+    lines,
+    elements,
+    at: input.at ?? Date.now(),
+  };
 }
 
 /** How an element reads to a judge: its line plus where it sits. */
@@ -193,6 +228,31 @@ export function describeElement(e: ScreenElement, max = 220): string {
   const where = e.context.length > 0 ? ` — in ${e.context.join(" › ")}` : "";
   const text = `${own}${where}`;
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+/** A look this recent is the screen as it is: a plan's first target can be found on it. */
+export const FRESH_LOOK_MS = 8000;
+/** A look this recent is still what the agent knows of the screen: a plan's changes are counted from it. */
+export const KNOWN_LOOK_MS = 10 * 60_000;
+
+/** The last look at each agent's screen, by key, for the newest `max` keys: what its plans start from. */
+export function createLookMemory(now: () => number = Date.now, max = 1000) {
+  const looks = new Map<string, ScreenObservation>();
+  return {
+    remember(key: string, o: ScreenObservation) {
+      looks.delete(key);
+      looks.set(key, o);
+      if (looks.size > max) looks.delete(looks.keys().next().value as string);
+    },
+    /** The last look, when it is younger than `ms`. */
+    within(key: string, ms: number) {
+      const o = looks.get(key);
+      return o && now() - o.at < ms ? o : null;
+    },
+    forget(key: string) {
+      looks.delete(key);
+    },
+  };
 }
 
 /** The address without its fragment: two looks at the same document. */
@@ -255,7 +315,7 @@ export function screenDigest(o: ScreenObservation): string {
   return `${documentOf(o.url) ?? ""}#${(h >>> 0).toString(36)}:${o.lines.length}`;
 }
 
-const STRUCTURE = new Set(["heading", "dialog", "alertdialog", "alert", "status", "tab", "Iframe", "iframe"]);
+const STRUCTURE = new Set(["heading", "dialog", "alertdialog", "alert", "status", "tab", "Iframe", "iframe", "window"]);
 
 /**
  * What the agent can act on, for its first look at a page: elements with a
@@ -263,7 +323,10 @@ const STRUCTURE = new Set(["heading", "dialog", "alertdialog", "alert", "status"
  * characters (the rest counted).
  */
 export function screenOverview(o: ScreenObservation, max = 6000): { text: string; omitted: number } {
-  const keep = o.lines.filter((l) => REF.test(l) || STRUCTURE.has(ROLE.exec(l.trim())?.[1] ?? ""));
+  const keep = o.lines.filter((l) => {
+    const head = headOf(l.trim());
+    return head.ref !== null || STRUCTURE.has(head.role);
+  });
   return clipLines(keep, max);
 }
 

@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { keys } from "../src/api/keys";
 import {
   allowFolderCommand,
+  commandInReason,
   computerKind,
   computerState,
   downloadHref,
@@ -37,6 +38,12 @@ describe("connected computers helpers (ADR 0036)", () => {
       "agentes-runner folders allow '/Users/you/Meus Projetos'",
     );
     expect(shellQuote("it's")).toBe("'it'\\''s'");
+    // What a runner says is missing: the command in it, to copy.
+    expect(commandInReason("Install what desktop use needs: `sudo apt install xdotool` (missing: xdotool)")).toBe(
+      "sudo apt install xdotool",
+    );
+    expect(commandInReason("Desktop use runs on Linux computers only")).toBeNull();
+    expect(commandInReason(null)).toBeNull();
   });
 
   test("folders: the name, and the ones an agent may use", () => {

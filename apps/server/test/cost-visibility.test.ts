@@ -42,7 +42,7 @@ test("members never receive money: only percentages and tokens", async () => {
     "/settings",
     `/channels/${w.channelId}/messages`,
     "/routines",
-    // The usage views: everyone, without money (ADR 0062).
+    // The usage views: everyone, without money (ADR 0063).
     "/usage/plans",
     `/agents/${w.agentId}/usage`,
   ]) {

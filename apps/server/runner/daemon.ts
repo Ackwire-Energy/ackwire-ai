@@ -68,6 +68,7 @@ import {
   writeConfig,
 } from "./config";
 import { type ConnectionOutcome, type Dial, RunnerConnection } from "./connection";
+import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
@@ -81,7 +82,7 @@ import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspa
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
 import { DataSockets } from "./streams";
-import { launchWorker, Supervisor, type SupervisorOptions, type WorkerState } from "./supervisor";
+import { launchWorker, Supervisor, type SupervisorOptions, type WorkerDesktop, type WorkerState } from "./supervisor";
 import { type SettledTask, TaskManager } from "./tasks";
 import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalUser } from "./terminal";
 
@@ -219,6 +220,8 @@ interface Session {
   browser: BrowserManager;
   /** Desktop and terminal streams (ADR 0058): they end with the session. */
   streams: DataSockets;
+  /** The agents' use of their desktops (ADR 0062): its helpers end with the session, the desktops don't. */
+  desktopUse: DesktopManager;
   connection: RunnerConnection;
   /** System mode: the agents' workers, where all their work runs. */
   supervisor: Supervisor | null;
@@ -300,6 +303,8 @@ export class RunnerDaemon implements RequestObserver {
   readonly desktops: DesktopSessions;
   /** Terminals people open as an agent (ADR 0058 §6). */
   readonly terminals: Terminals;
+  /** The refs each agent's desktop use gave out, across sessions: a number never comes back for another element. */
+  private readonly desktopRefsGiven = new Map<string, { last: number }>();
 
   constructor(private readonly opts: DaemonOptions) {
     this.activity = new ActivityLog(opts.home);
@@ -355,6 +360,21 @@ export class RunnerDaemon implements RequestObserver {
     if (!agentUser) return runnerUser(this.opts.home, await this.agentFolder(agent), agent);
     const u = agentUser(agent);
     return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
+  }
+
+  /**
+   * System mode: the agent's desktop for its worker's desktop use (the worker asks only while serving such a
+   * request), behind the same switches the worker checks.
+   */
+  private async workerDesktop(agent: AgentScope): Promise<WorkerDesktop> {
+    const { tools } = this.access();
+    if (tools.desktop !== true || !tools.commands) {
+      throw new RunnerError("not_allowed", "Desktop use needs this computer's desktop and commands switches on");
+    }
+    const started = await this.desktops.ensure(agent);
+    const s = this.desktops.session(agent.id);
+    if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
+    return { ...started, xauthority: s.xauthority, home: s.home };
   }
 
   /** As whom a terminal on the agent's computer runs, like its desktop. */
@@ -527,6 +547,9 @@ export class RunnerDaemon implements RequestObserver {
       }
       if (prevAccess.tools.desktop === true && nextAccess.tools.desktop !== true) void this.desktops.stopAll();
       if (prevAccess.tools.terminal === true && nextAccess.tools.terminal !== true) this.terminals.closeAll();
+      // Desktop use needs both: its helpers stop with either.
+      const use = (a: RunnerAccess) => a.tools.desktop === true && a.tools.commands;
+      if (use(prevAccess) && !use(nextAccess)) this.session?.desktopUse.stopAll();
     }
 
     if (this.session && paired) {
@@ -713,6 +736,16 @@ export class RunnerDaemon implements RequestObserver {
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
+    // Single-user: every agent works as this runner's own user, so no `uids` and desktop use stays off (ADR 0062
+    // §3). System mode: each agent's worker serves it as the agent's own user.
+    const desktopUse = new DesktopManager({
+      desktops: this.desktops,
+      workers: config.mode === "system",
+      secrets: (agent) => agentSecrets(secretsDir, agent),
+      browserPid: (agentId) => browser.chromePid(agentId),
+      numbered: this.desktopRefsGiven,
+      log,
+    });
     const streams = new DataSockets({ url: connectUrl(config.server, "stream"), token: config.token });
     let supervisor: Supervisor | null = null;
     let agentUser: Session["agentUser"] = null;
@@ -731,6 +764,7 @@ export class RunnerDaemon implements RequestObserver {
         user: agentUser,
         start: launchWorker(this.self.command),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
+        desktop: (agent) => this.workerDesktop(agent),
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
         token: config.token,
@@ -766,6 +800,7 @@ export class RunnerDaemon implements RequestObserver {
       desktops: this.desktops,
       terminals: this.terminals,
       streams,
+      desktopUse,
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
     // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
@@ -780,6 +815,7 @@ export class RunnerDaemon implements RequestObserver {
           browser: browser.info(),
           desktop: this.desktops.info(),
           terminal: this.terminals.info(),
+          desktopUse: desktopUse.info(),
           ...(accounts ? { accounts } : {}),
           ...this.ownUsage(),
           // Who may control a desktop or open a terminal follows it (ADR 0058 §4).
@@ -820,6 +856,7 @@ export class RunnerDaemon implements RequestObserver {
       mcp,
       browser,
       streams,
+      desktopUse,
       connection,
       supervisor,
       agentUser,
@@ -835,6 +872,7 @@ export class RunnerDaemon implements RequestObserver {
   private async closeSession(s: Session) {
     s.connection.stop();
     s.streams.closeAll();
+    s.desktopUse.stopAll();
     await s.supervisor?.close();
     s.tasks.close();
     s.brains.close();

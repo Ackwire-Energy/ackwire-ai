@@ -14,7 +14,7 @@ import { accountName, brandOf, noWindowsText, partedUsage, planMeterText } from 
 import "./plan-usage.css";
 
 /*
- * The usage views (ADR 0062): an account's head, shared with the agent's
+ * The usage views (ADR 0063): an account's head, shared with the agent's
  * "Uso" tab, and Configurações › Uso: the plan accounts by computer, each
  * window with every agent's estimated part, then the API per agent. Money
  * only where the server sent it (`view_usage`).

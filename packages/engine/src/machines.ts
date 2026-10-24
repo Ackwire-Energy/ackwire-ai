@@ -328,6 +328,10 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
             reason: m.executors.browser.reason ?? null,
           }
         : null,
+      /** Whether agents can use their desktops there (protocol 21, ADR 0062); null when its runner doesn't say. */
+      desktopUse: m.executors?.desktopUse
+        ? { available: m.executors.desktopUse.available, reason: m.executors.desktopUse.reason ?? null }
+        : null,
       /** This person may rename, delete or reduce its access. */
       canManage: admin || mine,
       createdAt: m.createdAt.toISOString(),

@@ -732,7 +732,7 @@ export function KeyDialog({
 }
 
 /**
- * Uso (ADR 0062): the plan accounts by computer and the API per agent for everyone (money only for
+ * Uso (ADR 0063): the plan accounts by computer and the API per agent for everyone (money only for
  * admins), then the API's spend by kind and the default budget (admins).
  */
 function UsageSection() {

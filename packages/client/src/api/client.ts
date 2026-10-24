@@ -243,12 +243,12 @@ export interface ApiClient {
     /** New link (the old one stops working), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
-    /** Every plan account by computer and the API per agent, this month (ADR 0062). */
+    /** Every plan account by computer and the API per agent, this month (ADR 0063). */
     planUsage(orgId: string): Promise<OrgPlanUsage>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
-    /** Its month by account and day, and the account it thinks with now (ADR 0062). */
+    /** Its month by account and day, and the account it thinks with now (ADR 0063). */
     planUsage(orgId: string, agentId: string): Promise<AgentPlanUsage>;
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;

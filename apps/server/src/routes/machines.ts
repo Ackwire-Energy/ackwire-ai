@@ -118,6 +118,16 @@ export const Machine = z
         description:
           "Whether the agent browser can run there (protocol 12, ADR 0040); null when its runner doesn't report it. Turned on by the person at the computer (`access.tools.browser`).",
       }),
+    desktopUse: z
+      .object({
+        available: z.boolean(),
+        reason: z.string().nullable().openapi({ description: "Why it can't, from the runner (what to install)." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Whether agents can use their own desktops there (protocol 21, ADR 0062): only where each agent works as its own OS user. Null when its runner doesn't report it.",
+      }),
     canManage: z.boolean().openapi({ description: "This person may rename, delete or reduce its access." }),
     createdAt: z.string(),
   })

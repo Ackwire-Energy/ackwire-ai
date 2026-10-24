@@ -13,18 +13,22 @@ import { MachineOfflineError, MachinePausedError } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { getSandboxSettings, SANDBOX_SCOPE, withConnectedMachine } from "../sandbox";
 import {
+  actsBeforeOpening,
+  createLookMemory,
   createTargetCache,
+  FRESH_LOOK_MS,
   findInPage,
   formatPlanReport,
+  KNOWN_LOOK_MS,
   MAX_WAIT_MS,
   type PlanReport,
   resolveTarget,
   runPlan,
   type ScreenImage,
-  type ScreenObservation,
   type ScreenStep,
   type ScreenVerb,
   screenRef,
+  screenStepOf,
   type TargetCache,
 } from "../screen";
 import { requestSecretTool } from "../secret-request-tool";
@@ -218,28 +222,6 @@ function judgeImage(shot: MachineReplies["browser.capture"]): ScreenImage | null
   return { data: shot.data, width, height, viewport: shot.viewport, marks: shot.marks };
 }
 
-/** Steps that act on what the agent last saw: after a person changed the page, they wait for a fresh look. */
-const ON_THE_PAGE = new Set<ScreenVerb>([
-  "click",
-  "hover",
-  "fill",
-  "select",
-  "check",
-  "uncheck",
-  "press",
-  "scroll",
-  "type_secret",
-]);
-
-/** A plan acts on the page before it opens one (so it relies on what the agent saw). */
-const actsBeforeOpening = (steps: ScreenStep[]) => {
-  for (const s of steps) {
-    if (s.do === "open") return false;
-    if (ON_THE_PAGE.has(s.do)) return true;
-  }
-  return false;
-};
-
 /** The chat's trail of where it browsed (`meta.browser.steps`): each step as the tool it stands for. */
 const TRAIL_TOOL: Record<ScreenVerb, BrowserToolName> = {
   open: "browser_open",
@@ -255,6 +237,12 @@ const TRAIL_TOOL: Record<ScreenVerb, BrowserToolName> = {
   wait: "browser_wait",
   back: "browser_back",
   read: "browser_read",
+  // Desktop verbs: `browser_do` takes none of them (`VERBS`).
+  focus: "browser_click",
+  double_click: "browser_click",
+  right_click: "browser_click",
+  drag: "browser_click",
+  type: "browser_fill",
 };
 
 function trailOf(report: PlanReport) {
@@ -270,13 +258,6 @@ function trailOf(report: PlanReport) {
       };
     });
 }
-
-/** The page the agent last saw, per agent: what changes are counted from, and the first target found on. */
-const SEEN_MAX = 1000;
-/** A look this recent is the page as it is (the first target of a call can be found on it). */
-const FRESH_MS = 8000;
-/** A look this recent is still what the agent knows of the page (changes are counted from it). */
-const KNOWN_MS = 10 * 60_000;
 
 /** A CSS selector rather than words (`#avatar`, `.dropzone input`, `input[type=file]`). */
 const CSS_SELECTOR = /^[\w-]*(?:[#.][\w-]+|\[[^\]]+\])/;
@@ -350,18 +331,9 @@ const STEP_SCHEMA: JsonSchema = {
 
 /** A `browser_do` step from the model's input (unknown fields dropped). */
 function stepOf(v: unknown): ScreenStep | null {
-  if (!v || typeof v !== "object") return null;
-  const s = v as Record<string, unknown>;
-  if (typeof s.do !== "string" || !(VERBS as readonly string[]).includes(s.do)) return null;
-  const out: ScreenStep = { do: s.do as ScreenVerb };
-  for (const k of ["target", "url", "text", "value", "key", "secret", "until", "find", "expect"] as const) {
-    if (typeof s[k] === "string") out[k] = s[k] as string;
-  }
-  if (s.direction === "up" || s.direction === "down" || s.direction === "left" || s.direction === "right") {
-    out.direction = s.direction;
-  }
-  if (typeof s.pixels === "number") out.pixels = s.pixels;
-  if (typeof s.seconds === "number") out.seconds = s.seconds;
+  const out = screenStepOf(v, VERBS);
+  // The browser scrolls the page: a scroll's target (scrolling over an element, on a desktop) isn't looked for.
+  if (out?.do === "scroll") delete out.target;
   return out;
 }
 
@@ -390,17 +362,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
   const judge = deps.judge ?? NO_JUDGE;
   const targets = deps.targets ?? createTargetCache();
   const now = deps.now ?? Date.now;
-  const seen = new Map<string, ScreenObservation>();
+  /** The page each agent last saw: what changes are counted from, and the first target found on. */
+  const seen = createLookMemory(now);
   const seenKey = (ctx: ToolContext) => `${ctx.orgId}:${ctx.agentId}`;
-  const remember = (key: string, o: ScreenObservation) => {
-    seen.delete(key);
-    seen.set(key, o);
-    if (seen.size > SEEN_MAX) seen.delete(seen.keys().next().value as string);
-  };
-  const seenWithin = (key: string, ms: number) => {
-    const o = seen.get(key);
-    return o && now() - o.at < ms ? o : null;
-  };
 
   async function machineOf(ctx: ToolContext) {
     const mission = await missionOfRun(ctx);
@@ -553,7 +517,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         surface: browserSurface({
           link: linked.link,
           secretSite: (name) => sites.get(name) ?? null,
-          onLook: (o) => remember(key, o),
+          onLook: (o) => seen.remember(key, o),
         }),
         cache: targets,
         scope: key,
@@ -571,8 +535,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
           }
           return null;
         },
-        last: seenWithin(key, FRESH_MS),
-        before: seenWithin(key, KNOWN_MS),
+        last: seen.within(key, FRESH_LOOK_MS),
+        before: seen.within(key, KNOWN_LOOK_MS),
         vision: deps.vision === true && linked.status.protocol >= BROWSER_FAST_PROTOCOL,
         now,
       },
@@ -620,13 +584,13 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     if (given) return `@${given}`;
     if (CSS_SELECTOR.test(target.trim())) return target.trim();
     const key = seenKey(ctx);
-    let page = seenWithin(key, FRESH_MS);
+    let page = seen.within(key, FRESH_LOOK_MS);
     if (!page) {
       const r = await link.act(LOOK);
       if (!r.ok) return { error: r.text };
       page = observationOf(r.data);
       if (!page) return { error: "The browser didn't return the page." };
-      remember(key, page);
+      seen.remember(key, page);
     }
     const found = await resolveTarget({
       judge,
@@ -839,7 +803,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         if (!r.ok) return { content: r.text, isError: true };
         const url = urlOf(r.data);
         const page = whole ? observationOf(r.data) : null;
-        if (page) remember(seenKey(ctx), page);
+        if (page) seen.remember(seenKey(ctx), page);
         const head = url ? `Page: ${url}\n` : "";
         if (question && page && deps.judge) {
           const found = await findInPage({
@@ -1065,7 +1029,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       `${BROWSER_TOOL_INFO.browser_close.description} It also closes by itself after a while unused.`,
       { type: "object", properties: {}, additionalProperties: false },
       (_input, ctx) => {
-        seen.delete(seenKey(ctx));
+        seen.forget(seenKey(ctx));
         return run(
           ctx,
           { command: "close", args: [], timeoutSeconds: COMMAND_SECONDS },

@@ -845,7 +845,7 @@ export const useUsageReport = (orgId: string, enabled = true) => {
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
 };
 
-/** Configurações › Uso: every plan account by computer and the API per agent (ADR 0062). */
+/** Configurações › Uso: every plan account by computer and the API per agent (ADR 0063). */
 export const usePlanUsage = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.planUsage(orgId), queryFn: () => api.orgs.planUsage(orgId) });

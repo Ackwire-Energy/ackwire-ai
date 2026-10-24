@@ -64,7 +64,7 @@ const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOStri
 /** Real-time based (a plan window that reset reads as empty again): the usage views' windows. */
 const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
 
-/** The MacBook's own Claude Code sign-in, shared by Ada and Atlas (the usage views, ADR 0062). */
+/** The MacBook's own Claude Code sign-in, shared by Ada and Atlas (the usage views, ADR 0063). */
 function fakePlanAccount(money: boolean): PlanAccountUsage {
   const machineId = "00000000-0000-4000-8000-0000000000d1";
   return {

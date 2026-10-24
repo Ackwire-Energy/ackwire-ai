@@ -40,6 +40,7 @@ import {
 import { TOKEN_REFUSED_EXIT } from "./connection";
 import { runControl } from "./control";
 import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
+import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
 import { HostComputer, readTokenFile, runnerChild } from "./host";
@@ -103,8 +104,9 @@ Usage:
       Turns claude (Claude Code), codex (Codex) or commands on or off on this computer.
   agentes-runner desktop-check --agent <handle>
       Checks an agent's desktop and terminal here (Linux): starts its desktop, logs in to it as the
-      person in control and as a watcher (who can't move the pointer), opens a terminal as the
-      agent, then stops what it started. Stop the runner first.
+      person in control and as a watcher (who can't move the pointer), reads it and acts on it the
+      way the agent does (with how long each takes), opens a terminal as the agent, then stops what
+      it started. Stop the runner first.
   agentes-runner app --home <dir>
       The desktop app's runner (a JSON-lines protocol on stdin/stdout; not for people).
   agentes-runner mcp --task <taskId> | --run <runId>
@@ -794,10 +796,12 @@ async function desktopCheck(p: Parsed): Promise<number> {
     if (stored?.mode === "system") {
       const u = new AgentUsers({ home, range: stored.agentUidRange ?? DEFAULT_AGENT_UID_RANGE }).ensure(agent);
       const launcher = systemLauncher(u);
-      const desktop = await checkDesktop(home, agent, {
-        user: async () => systemDesktopUser(launcher, { uid: u.uid, gid: agentGid(u.user) }),
-        agentUsers: true,
-      });
+      const desktop = await checkDesktop(
+        home,
+        agent,
+        { user: async () => systemDesktopUser(launcher, { uid: u.uid, gid: agentGid(u.user) }), agentUsers: true },
+        { prefix: launcher.prefix, uid: u.uid },
+      );
       const terminal = await checkTerminal(agent, {
         user: async () => systemTerminalUser(launcher, agent),
         agentUsers: true,
@@ -821,6 +825,7 @@ async function checkDesktop(
   home: string,
   agent: AgentScope,
   as: Pick<DesktopSessionsOptions, "user" | "agentUsers">,
+  launcher?: { prefix: string[]; uid: number },
 ): Promise<boolean> {
   const desktops = new DesktopSessions({ home, log: (line) => console.log(`     ${line}`), ...as });
   desktops.restore();
@@ -869,7 +874,7 @@ async function checkDesktop(
       if (after !== "100,120") throw new Error(`a watcher moved the pointer (to ${after})`);
       console.log("ok   view-only: a watcher's pointer is ignored, the controller's moves it");
     }
-    return true;
+    return await checkDesktopUse(desktops, agent, launcher);
   } catch (err) {
     console.log(`FAIL desktop: ${errorText(err)}`);
     return false;
@@ -880,6 +885,73 @@ async function checkDesktop(
       console.log("ok   desktop: stopped");
     }
     desktops.close();
+  }
+}
+
+/**
+ * Desktop use on that desktop through the runner's own code (ADR 0062), with how long each part takes: a
+ * look, an action that settles and looks again, a screenshot and a close-up, the apps. It runs as this
+ * command's user, the person at this computer, or in system mode as the agent's own (`launcher`); whether
+ * agents may use their desktops here is said first.
+ */
+async function checkDesktopUse(
+  desktops: DesktopSessions,
+  agent: AgentScope,
+  launcher?: { prefix: string[]; uid: number },
+): Promise<boolean> {
+  const forAgents = new DesktopManager({ desktops, workers: launcher !== undefined, log: () => undefined }).info();
+  console.log(
+    forAgents.available
+      ? "ok   desktop use: agents can use their desktops here"
+      : `--   desktop use: agents can't use their desktops here: ${forAgents.reason}`,
+  );
+  const uid = launcher?.uid ?? process.getuid?.() ?? null;
+  const use = new DesktopManager({
+    desktops,
+    log: (line) => console.log(`     ${line}`),
+    // The person at this computer drives the desktop this check started, as its own user (or the agent's).
+    uids: () => (uid === null ? null : { runner: -1, agents: new Map([[agent.id, uid]]) }),
+    ...(launcher ? { launcher } : {}),
+  });
+  try {
+    let t0 = performance.now();
+    const first = await use.look(agent);
+    const elements = Object.keys(first.refs);
+    console.log(
+      `ok   desktop use: a look in ${since(t0)} with the helper starting (${first.snapshot.split("\n").length} lines, ${elements.length} elements, ${first.address})`,
+    );
+    t0 = performance.now();
+    await use.look(agent);
+    console.log(`ok   desktop use: a look in ${since(t0)}`);
+    const ref = elements[0];
+    if (ref) {
+      t0 = performance.now();
+      const acted = await use.act(agent, { kind: "hover", at: { ref } }, true, { folder: process.cwd() });
+      console.log(
+        `ok   desktop use: a hover on ${ref} (${first.refs[ref]?.role}), settled${acted.settled === false ? " at the cap" : ""} and looked at, in ${since(t0)}`,
+      );
+    } else console.log("--   desktop use: nothing on the screen to act on");
+    t0 = performance.now();
+    const shot = await use.capture(agent, null);
+    console.log(
+      `ok   desktop use: a screenshot in ${since(t0)} (${shot.width}×${shot.height}, ${Math.round((shot.data.length * 3) / 4 / 1024)} KB, ${shot.marks.length} elements marked)`,
+    );
+    t0 = performance.now();
+    const close = await use.capture(agent, { x: 400, y: 250, width: 480, height: 300 });
+    console.log(`ok   desktop use: a close-up in ${since(t0)} (${close.width}×${close.height})`);
+    const { apps } = await use.apps(agent);
+    console.log(
+      `ok   desktop use: ${apps.length} apps to start (${apps
+        .slice(0, 5)
+        .map((a) => a.name)
+        .join(", ")})`,
+    );
+    return true;
+  } catch (err) {
+    console.log(`FAIL desktop use: ${errorText(err)}`);
+    return false;
+  } finally {
+    use.stopAll();
   }
 }
 

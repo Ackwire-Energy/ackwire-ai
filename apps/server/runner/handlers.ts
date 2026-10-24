@@ -23,6 +23,7 @@ import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
 import type { BrowserManager } from "./browser";
+import type { DesktopManager } from "./desktop";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
@@ -60,6 +61,10 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "browser.capture",
   "browser.stream.start",
   "desktop.session.start",
+  "desktop.look",
+  "desktop.act",
+  "desktop.capture",
+  "desktop.apps",
 ]);
 
 /**
@@ -100,6 +105,11 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.session.stop": "machine",
   "desktop.session.status": "machine",
   "stream.open": "machine",
+  // The helper runs as the agent's own user, in its worker; the worker asks the supervisor for the desktop.
+  "desktop.look": "agent",
+  "desktop.act": "agent",
+  "desktop.capture": "agent",
+  "desktop.apps": "agent",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -173,6 +183,8 @@ export interface HandlerContext {
   terminals?: Terminals;
   /** Protocol 18: where `stream.open` dials its data socket; without it the runner refuses streams. */
   streams?: DataSockets;
+  /** Protocol 21: the agents' use of their own desktops (ADR 0062); without it the runner refuses `desktop.look`… */
+  desktopUse?: DesktopManager;
 }
 
 export interface RequestScope {
@@ -407,6 +419,14 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   ) {
     return handleBrowser(ctx, req, scope);
   }
+  if (
+    req.op === "desktop.look" ||
+    req.op === "desktop.act" ||
+    req.op === "desktop.capture" ||
+    req.op === "desktop.apps"
+  ) {
+    return handleDesktopUse(ctx, req);
+  }
   const secrets = await agentSecrets(ctx.secretsDir, req.agent);
   switch (req.op) {
     case "brain.turn":
@@ -482,6 +502,32 @@ function handleDesktop(
     case "desktop.session.start":
       requireTool(ctx, "desktop");
       return desktops.ensure(req.agent);
+  }
+}
+
+/**
+ * Protocol 21: the agent uses its own desktop (ADR 0062). That runs commands
+ * as the agent (its desktop has a terminal), so it needs the machine's
+ * desktop switch and its commands switch.
+ */
+function handleDesktopUse(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "desktop.look" | "desktop.act" | "desktop.capture" | "desktop.apps" }>,
+) {
+  const desktop = ctx.desktopUse;
+  if (!desktop) throw new RunnerError("desktop_unavailable", "This runner doesn't serve desktop use");
+  if (!req.agent) throw new RunnerError("bad_request", "A desktop belongs to an agent");
+  requireTool(ctx, "desktop");
+  requireTool(ctx, "commands");
+  switch (req.op) {
+    case "desktop.look":
+      return desktop.look(req.agent);
+    case "desktop.act":
+      return desktop.act(req.agent, req.action, req.settle === true, { folder: ctx.workspaceReal, grants: ctx.grants });
+    case "desktop.capture":
+      return desktop.capture(req.agent, req.region);
+    case "desktop.apps":
+      return desktop.apps(req.agent);
   }
 }
 
@@ -862,6 +908,16 @@ function describeOp(req: MachineRequest): string {
       return req.kind === "terminal"
         ? `stream.open terminal ${String(req.cols)}×${String(req.rows)}`
         : `stream.open desktop (${String(req.mode)})`;
+    case "desktop.act": {
+      // The kind and where it lands, its key, app or path; never typed text.
+      const a: Record<string, unknown> = isRecordLike(req.action) ? req.action : {};
+      const at = (v: unknown) => (isRecordLike(v) ? String(v.ref ?? `${String(v.x)},${String(v.y)}`).slice(0, 20) : "");
+      const what = a.kind === "drag" ? `${at(a.from)} → ${at(a.to)}` : String(a.key ?? a.app ?? a.path ?? at(a.at));
+      const text = typeof a.text === "string" ? ` (${a.text.length} characters)` : "";
+      return `desktop.act ${String(a.kind).slice(0, 20)}${what ? ` ${what.slice(0, 120)}` : ""}${text}`;
+    }
+    case "desktop.capture":
+      return `desktop.capture${req.region ? " (a region)" : ""}`;
     case "access.reduce":
       return `access.reduce${req.removeFolder ? ` folder ${String(req.removeFolder.path ?? "")}` : ""}${req.disableTool ? ` tool ${String(req.disableTool)}` : ""}`;
     default:
@@ -916,12 +972,15 @@ export class RequestRunner {
     }
     const controller = new AbortController();
     this.inflight.set(id, controller);
-    // A browser command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
+    // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
     const timed =
       req.op === "browser.act" ||
       req.op === "browser.batch" ||
       req.op === "browser.capture" ||
-      req.op === "browser.input";
+      req.op === "browser.input" ||
+      req.op === "desktop.look" ||
+      req.op === "desktop.act" ||
+      req.op === "desktop.capture";
     const startedAt = Date.now();
     if (!timed) this.log(describeRequest(req));
     this.observe(() => this.observer?.started(id, req));

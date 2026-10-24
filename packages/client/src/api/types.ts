@@ -2047,6 +2047,11 @@ export interface Machine {
   access?: MachineAccess | null;
   /** ADR 0040 (protocol 12): whether the agent browser can run there; null or absent when its runner doesn't say. */
   browser?: MachineBrowser | null;
+  /**
+   * ADR 0062 (protocol 21): whether agents can use their own desktops there (only where each agent is its own OS
+   * user); `reason`, in the runner's words, says what is missing. Null or absent when its runner doesn't say.
+   */
+  desktopUse?: { available: boolean; reason: string | null } | null;
 }
 
 /** Whether the organization uses the server's own computer (`GET …/machines/host`). */
@@ -4085,7 +4090,7 @@ export interface DesktopStatus {
   terminal: { available: boolean; reason: string | null; allowed: boolean };
 }
 
-/** A plan window with each agent's estimated part of it (the usage views, ADR 0062). */
+/** A plan window with each agent's estimated part of it (the usage views, ADR 0063). */
 export interface PlanWindowParts extends PlanWindow {
   /**
    * The window's percent × each agent's API-priced share of the account's use since it started, biggest

@@ -15,7 +15,7 @@ import { agentBudgetsThisMonth, budgetPercent, canViewCost, monthStartUtc } from
 const { usageRecords, agents, machines, machineAccounts, users } = schema;
 
 /*
- * The usage views (ADR 0062): Configurações › Uso (every plan account by
+ * The usage views (ADR 0063): Configurações › Uso (every plan account by
  * computer, then the API per agent) and an agent's "Uso" tab (its month by
  * account and day, the account it thinks with now). The windows are what the
  * runner last said about each account (`machine_accounts.usage`, and

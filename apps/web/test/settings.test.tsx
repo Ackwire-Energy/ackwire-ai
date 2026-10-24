@@ -199,7 +199,7 @@ describe("Configurações da organização", () => {
       router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "usage" } }),
     );
     await settle(4);
-    // The plan accounts by computer, each window with every agent's part, then the API per agent (ADR 0062).
+    // The plan accounts by computer, each window with every agent's part, then the API per agent (ADR 0063).
     const plans = screen().getByRole("region", { name: "Contas dos planos" });
     expect(plans.textContent).toContain("MacBook");
     expect(plans.textContent).toContain("Conta deste MacBookMax");

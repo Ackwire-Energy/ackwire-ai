@@ -118,7 +118,7 @@ describe("agent page: its files", () => {
   });
 });
 
-describe("agent page: its usage (ADR 0062)", () => {
+describe("agent page: its usage (ADR 0063)", () => {
   test("Uso: the month by account, the account it thinks with now with its part, and by account", async () => {
     await go("?tab=usage");
     const month = screen().getByRole("region", { name: "Uso da Ada" });

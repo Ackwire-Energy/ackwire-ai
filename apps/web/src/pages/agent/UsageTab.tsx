@@ -19,7 +19,7 @@ import { brandOf, noWindowsText, partedUsage, planMeterText, usageSourceName, us
 import { CardHead, useAgentEdit } from "./context";
 
 /*
- * Uso (ADR 0062): one sentence with the month by account, the month day by
+ * Uso (ADR 0063): one sentence with the month by account, the month day by
  * day colored by account, the account it thinks with now with its windows
  * (its part in full ink) and the month by account. Money only where the
  * server sent it (`view_usage`).

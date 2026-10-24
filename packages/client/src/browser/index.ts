@@ -21,6 +21,8 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 
 /** The scope that lets an agent use its browser (not covered by "all tools"). */
 export const BROWSER_TOOL_SCOPE = "browser:use";
+/** The scope that lets an agent use apps on its desktop (it also needs Run code). */
+export const DESKTOP_TOOL_SCOPE = "desktop:use";
 
 /** The request on an agent's chat card (`meta.browserHandoff`), checked. */
 export function browserHandoffOf(meta: unknown): BrowserHandoff | null {
@@ -61,9 +63,12 @@ export function handoffFuse(h: Pick<BrowserHandoff, "createdAt" | "expiresAt">, 
   return Math.min(1, Math.max(0, (end - now) / (end - start)));
 }
 
+/** A tool of one of the agent's screens: its browser (`browser_open`, …) or its desktop (`desktop_do`, …). */
+export const isScreenTool = (tool: string | null | undefined, screen: ScreenKind) =>
+  Boolean(tool?.replace(/^mcp__agentes__/, "").startsWith(`${screen}_`));
+
 /** A tool of the agent browser (`browser_open`, `browser_click`, …). */
-export const isBrowserTool = (tool: string | null | undefined) =>
-  Boolean(tool?.replace(/^mcp__agentes__/, "").startsWith("browser_"));
+export const isBrowserTool = (tool: string | null | undefined) => isScreenTool(tool, "browser");
 
 /**
  * The agent is in its browser now: its current tool, or its latest call, is a browser tool

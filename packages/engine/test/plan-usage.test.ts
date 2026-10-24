@@ -7,7 +7,7 @@ import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
- * The usage views (ADR 0062): plan tokens say which account they spent; an
+ * The usage views (ADR 0063): plan tokens say which account they spent; an
  * agent's part of a window is its API-priced share of the account's use
  * since the window started, times the account's percent. Everyone sees tokens
  * and percentages; the email only the account's owner; money only admins.
