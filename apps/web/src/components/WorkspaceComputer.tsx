@@ -35,8 +35,8 @@ import { STORAGE_KEYS, storage } from "@/lib/storage";
  */
 
 /** This workspace's computer on its way, or null where people connect their own (`pair`). */
-export function useSetupView(orgId: string, pollMs: number | false = false): SetupView | null {
-  return setupView(useComputerSetup(orgId, true, pollMs).data);
+export function useSetupView(orgId: string): SetupView | null {
+  return setupView(useComputerSetup(orgId).data);
 }
 
 const PHASE_ICON: Record<SetupView["phase"], IconName> = {
