@@ -91,7 +91,7 @@ export interface ConnectionOptions {
   dial?: Dial;
   log?: (line: string) => void;
   random?: () => number;
-  /** Tests: run requests with a fake. */
+  /** Runs requests instead of `handleRequest` (tests: a fake; a worker: only its own agent's). */
   handler?: typeof handleRequest;
   /**
    * Background tasks (protocol 4): `hello` carries their journal, each

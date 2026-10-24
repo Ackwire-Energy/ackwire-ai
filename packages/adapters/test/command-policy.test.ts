@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AGENT_WORKER_HOMES,
   DENIED_MESSAGE,
   deniedInMissions,
   forbiddenHint,
@@ -367,6 +368,16 @@ describe("secrets are refused to every read tool", () => {
     expect(hit("ls ~/.agentes-runner")).toBe(true);
     expect(hit("cat src/ssh.ts")).toBe(false);
     expect(hit("git status")).toBe(false);
+  });
+
+  test("system mode: an agent's worker keeps its secrets, git credentials and task journal out of its reads", () => {
+    const store = `${AGENT_WORKER_HOMES}/ag-a1b2c3d4/secrets/a1b2c3d4/store.json`;
+    expect(secretRead("Read", { file_path: store }, scope)).toBe(true);
+    expect(secretRead("Bash", { command: `cat ${store}` }, scope)).toBe(true);
+    expect(bash(`ls ${AGENT_WORKER_HOMES}/ag-a1b2c3d4/git`)).toBe(false);
+    // Claude Code refuses it itself, also in a mission whose settings allow `cat`.
+    expect(SECRET_BASH_DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: `cat ${store}` }))).toBe(true);
+    expect(secretRead("Bash", { command: "cat /var/lib/dpkg/status" }, scope)).toBe(false);
   });
 });
 
