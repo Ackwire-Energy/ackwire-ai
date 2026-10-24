@@ -66,16 +66,32 @@ const WORKER_BACKLOG_MAX = 64 * 1024 * 1024;
 export const UPLOAD_CHUNK_BYTES = 1024 * 1024;
 /** A task the server never acknowledged is forgotten after this long. */
 const TASK_OWNER_KEEP_MS = 8 * 24 * 3600_000;
+/**
+ * A worker's word that its agent's Chrome is in use on the agent's desktop holds this long; the worker renews
+ * it three times as often while it is.
+ */
+export const BROWSER_LEASE_MS = 90_000;
 
 /** What a worker must know about its computer, sent after each hello and when it changes. */
 export interface WorkerState {
   access: RunnerAccess;
   paused: RunnerPause;
   limits: { maxConcurrentTasks: number; taskMaxSeconds: number; brainIdleMinutes: number; brainMaxProcesses: number };
+  /** People watching or controlling its agent's desktop (root's): its Chrome there isn't idle meanwhile. */
+  desktopViewers?: number;
 }
 
-/** The agent's desktop as its worker drives it (desktop use): where it runs, never its VNC passwords. */
+/** The agent's desktop as its worker uses it (desktop use, its Chrome): where it runs, never its VNC passwords. */
 export type WorkerDesktop = MachineReplies["desktop.session.start"] & { xauthority: string; home: string };
+
+/** What a worker asks for its agent's desktop for: desktop use, or its Chrome there (ADR 0058 §7). */
+export type WorkerDesktopUse = "desktop" | "browser";
+
+/** What a request the server sent may use its agent's desktop for; null when it may not. */
+function desktopUseOf(req: MachineRequest): WorkerDesktopUse | null {
+  if (DESKTOP_USE_OPS.has(req.op)) return "desktop";
+  return (req.op === "browser.act" || req.op === "browser.batch") && req.desktop === true ? "browser" : null;
+}
 
 /** The link's own frames, besides the machine protocol's. */
 export type WorkerLinkFrame =
@@ -90,14 +106,16 @@ export type WorkerLinkFrame =
   /** From the worker: every piece was sent; upload them. */
   | { type: "upload.end"; uploadId: string; contentType: string; name: string; sha256: string }
   /** From the worker: its agent's desktop, started when it isn't running (root's, ADR 0058 §10). */
-  | { type: "desktop.ensure"; ensureId: string }
+  | { type: "desktop.ensure"; ensureId: string; use: WorkerDesktopUse }
   /** To the worker: where its agent's desktop runs, or why it can't. */
   | {
       type: "desktop.ensured";
       ensureId: string;
       desktop?: WorkerDesktop;
       error?: { code: MachineErrorCode; message: string };
-    };
+    }
+  /** From the worker: its agent's Chrome is in use on the agent's desktop (`BROWSER_LEASE_MS`). */
+  | { type: "browser.desktop" };
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
@@ -131,8 +149,12 @@ export interface SupervisorOptions {
   guard?: { start(): void; stop(): void };
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
   lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
-  /** Desktop use: the agent's desktop for its worker (`DesktopSessions`); without it a worker gets none. */
-  desktop?: (agent: AgentScope) => Promise<WorkerDesktop>;
+  /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
+  desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
+  /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */
+  desktopViewers?: (agentId: string) => number;
+  /** Tests: the clock of the browser's lease. */
+  now?: () => number;
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -163,6 +185,8 @@ interface Worker {
   waiters: Set<{ resolve(): void; reject(err: RunnerError): void }>;
   /** Requests sent to it, by the id this side gave them. */
   inflight: Map<string, Inflight>;
+  /** When it last said its agent's Chrome is in use on the agent's desktop. */
+  browserLeaseAt: number;
 }
 
 export class Supervisor {
@@ -300,9 +324,18 @@ export class Supervisor {
     if (w && this.online) this.send(w, frame);
   }
 
-  /** The computer's pause, access or limits may have changed. */
+  /** The computer's pause, access or limits, or who watches an agent's desktop, may have changed. */
   stateChanged() {
     for (const w of this.workers.values()) this.sendState(w);
+  }
+
+  /**
+   * Whether the agent's Chrome is in use on its desktop, as its worker last said: the desktop doesn't stop as
+   * idle under it. The agent's own code could say so too, which keeps only its own desktop, inside its slice.
+   */
+  onDesktopInUse(agentId: string): boolean {
+    const w = this.workers.get(agentId);
+    return !!w?.proc && (this.opts.now ?? Date.now)() - w.browserLeaseAt < BROWSER_LEASE_MS;
   }
 
   /** The session is over: workers' stdin closes (they finish and exit), and the ones still there after `graceMs` are killed. */
@@ -344,6 +377,7 @@ export class Supervisor {
         timer: null,
         waiters: new Set(),
         inflight: new Map(),
+        browserLeaseAt: 0,
       };
       this.workers.set(user.id, w);
     }
@@ -440,6 +474,7 @@ export class Supervisor {
     if (proc && w.proc !== proc) return;
     w.proc = null;
     w.ready = false;
+    w.browserLeaseAt = 0;
     this.endSession(w, "The agent's worker stopped on this computer; try again");
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
@@ -470,12 +505,18 @@ export class Supervisor {
     if (handoff) this.send(w, handoff);
   }
 
-  /** The worker sees only its own agent's folders. */
+  /** The worker sees only its own agent's folders, and who watches its own agent's desktop. */
   private sendState(w: Worker) {
     if (!w.ready) return;
     const s = this.opts.state();
     const folders = s.access.folders.filter((f) => f.agents.includes(w.user.id));
-    const frame: WorkerLinkFrame = { type: "worker.state", ...s, access: { ...s.access, folders } };
+    const viewers = this.opts.desktopViewers?.(w.user.id) ?? 0;
+    const frame: WorkerLinkFrame = {
+      type: "worker.state",
+      ...s,
+      access: { ...s.access, folders },
+      ...(viewers > 0 ? { desktopViewers: viewers } : {}),
+    };
     const line = JSON.stringify(frame);
     if (line === w.state) return;
     w.state = line;
@@ -600,7 +641,14 @@ export class Supervisor {
     } catch {
       return;
     }
-    if (f?.type === "desktop.ensure") return this.ensureDesktop(w, typeof f.ensureId === "string" ? f.ensureId : "");
+    if (f?.type === "desktop.ensure") {
+      const use = f.use === "browser" ? "browser" : "desktop";
+      return this.ensureDesktop(w, typeof f.ensureId === "string" ? f.ensureId : "", use);
+    }
+    if (f?.type === "browser.desktop") {
+      w.browserLeaseAt = (this.opts.now ?? Date.now)();
+      return;
+    }
     if (f?.type !== "upload.chunk" && f?.type !== "upload.end") return;
     const uploadId = typeof f.uploadId === "string" ? f.uploadId : "";
     const e = [...w.inflight.values()].find((x) => x.req.op === "push" && x.req.uploadId === uploadId);
@@ -637,18 +685,23 @@ export class Supervisor {
   }
 
   /**
-   * The worker's agent's desktop, only while it serves a desktop use request the server sent it: the agent's
-   * own code runs as the worker's user and could ask at any other time.
+   * The worker's agent's desktop, only while it serves a request the server sent it that uses the desktop that
+   * way (desktop use, or a browser command the server put on the desktop): the agent's own code runs as the
+   * worker's user and could ask at any other time.
    */
-  private ensureDesktop(w: Worker, ensureId: string) {
+  private ensureDesktop(w: Worker, ensureId: string, use: WorkerDesktopUse) {
     const reply = (r: { desktop: WorkerDesktop } | { error: { code: MachineErrorCode; message: string } }) =>
       this.send(w, { type: "desktop.ensured", ensureId, ...r });
-    const agent = [...w.inflight.values()].find((e) => DESKTOP_USE_OPS.has(e.req.op))?.req.agent;
+    const agent = [...w.inflight.values()].find((e) => desktopUseOf(e.req) === use)?.req.agent;
     if (!agent || !this.opts.desktop) {
-      reply({ error: { code: "not_allowed", message: "No desktop use request of this agent is running" } });
+      const message =
+        use === "desktop"
+          ? "No desktop use request of this agent is running"
+          : "No browser command of this agent on its desktop is running";
+      reply({ error: { code: "not_allowed", message } });
       return;
     }
-    this.opts.desktop(agent).then(
+    this.opts.desktop(agent, use).then(
       (desktop) => reply({ desktop }),
       (err: unknown) => reply({ error: toMachineError(err) }),
     );

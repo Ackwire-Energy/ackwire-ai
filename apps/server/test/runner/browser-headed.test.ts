@@ -61,6 +61,8 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const log: string[] = [];
   const chromes: FakeChrome[] = [];
   const desk = fakeDesktops(log);
+  /** Headed starts still to fail, as a Chrome does when its display goes away under it. */
+  const fails = { headed: 0 };
   let clock = 1_000_000;
   const manager = new BrowserManager({
     home,
@@ -74,6 +76,11 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
     now: () => clock,
     idleMs: 60_000,
     async startChrome(_exe, args, _profile, env): Promise<OwnChrome> {
+      if (fails.headed > 0 && !args.includes("--headless=new")) {
+        fails.headed--;
+        log.push("chrome failed");
+        throw new Error("Chrome closed while starting (another Chrome may be using this profile)");
+      }
       const c: FakeChrome = { args, env, killed: false };
       chromes.push(c);
       log.push("chrome");
@@ -113,7 +120,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const tick = (ms: number) => {
     clock += ms;
   };
-  return { ws, home, manager, log, chromes, desk, act, pids, tick };
+  return { ws, home, manager, log, chromes, desk, fails, act, pids, tick };
 }
 
 const last = (t: { chromes: FakeChrome[] }) => t.chromes.at(-1) as FakeChrome;
@@ -256,6 +263,25 @@ test.if(posix)(
     t.tick(5 * 60_000);
     await t.act("click", ["@e1"], true);
     expect(t.log).toEqual(["desktop dev", "chrome", "desktop dev", "chrome"]);
+    expect(headed(last(t))).toBe(true);
+  },
+);
+
+test.if(posix)(
+  "a Chrome whose desktop goes away while it starts there runs headless, the desktop tried later",
+  async () => {
+    const t = setup();
+    t.fails.headed = 1;
+    expect(await t.act("open", ["https://shop.example/"], true)).toMatchObject({ success: true });
+    expect(t.log).toEqual(["desktop dev", "chrome failed", "chrome"]);
+    expect(headed(last(t))).toBe(false);
+    expect(t.pids()).toEqual([expect.objectContaining({ pid: 40_001 })]);
+    expect(t.pids()[0].display).toBeUndefined();
+    await t.act("click", ["@e1"], true);
+    expect(t.chromes).toHaveLength(1);
+    t.tick(5 * 60_000);
+    await t.act("click", ["@e1"], true);
+    expect(t.log).toEqual(["desktop dev", "chrome failed", "chrome", "desktop dev", "chrome"]);
     expect(headed(last(t))).toBe(true);
   },
 );

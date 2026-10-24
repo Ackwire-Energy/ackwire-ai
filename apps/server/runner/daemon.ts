@@ -82,7 +82,14 @@ import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspa
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
 import { DataSockets } from "./streams";
-import { launchWorker, Supervisor, type SupervisorOptions, type WorkerDesktop, type WorkerState } from "./supervisor";
+import {
+  launchWorker,
+  Supervisor,
+  type SupervisorOptions,
+  type WorkerDesktop,
+  type WorkerDesktopUse,
+  type WorkerState,
+} from "./supervisor";
 import { type SettledTask, TaskManager } from "./tasks";
 import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalUser } from "./terminal";
 
@@ -340,7 +347,9 @@ export class RunnerDaemon implements RequestObserver {
       home: opts.home,
       log: opts.log,
       user: (agent) => this.desktopUser(agent),
-      inUse: (agentId) => this.session?.browser.onDesktopInUse(agentId) ?? false,
+      // System mode: the agents' Chromes are their workers'.
+      inUse: (agentId) => (this.session?.supervisor ?? this.session?.browser)?.onDesktopInUse(agentId) ?? false,
+      onViewers: () => this.session?.supervisor?.stateChanged(),
       get agentUsers() {
         return daemon.session?.agentUser != null;
       },
@@ -363,13 +372,19 @@ export class RunnerDaemon implements RequestObserver {
   }
 
   /**
-   * System mode: the agent's desktop for its worker's desktop use (the worker asks only while serving such a
-   * request), behind the same switches the worker checks.
+   * System mode: the agent's desktop for its worker, which asks only while serving a request that uses it,
+   * behind the same switches the worker checks: desktop use needs the commands switch, its Chrome there the
+   * browser's.
    */
-  private async workerDesktop(agent: AgentScope): Promise<WorkerDesktop> {
+  private async workerDesktop(agent: AgentScope, use: WorkerDesktopUse): Promise<WorkerDesktop> {
     const { tools } = this.access();
-    if (tools.desktop !== true || !tools.commands) {
-      throw new RunnerError("not_allowed", "Desktop use needs this computer's desktop and commands switches on");
+    if (tools.desktop !== true || tools[use === "desktop" ? "commands" : "browser"] !== true) {
+      throw new RunnerError(
+        "not_allowed",
+        use === "desktop"
+          ? "Desktop use needs this computer's desktop and commands switches on"
+          : "The browser on the agent's desktop needs this computer's desktop and browser switches on",
+      );
     }
     const started = await this.desktops.ensure(agent);
     const s = this.desktops.session(agent.id);
@@ -764,7 +779,8 @@ export class RunnerDaemon implements RequestObserver {
         user: agentUser,
         start: launchWorker(this.self.command),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
-        desktop: (agent) => this.workerDesktop(agent),
+        desktop: (agent, use) => this.workerDesktop(agent, use),
+        desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
         token: config.token,

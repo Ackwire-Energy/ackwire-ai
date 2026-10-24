@@ -76,6 +76,8 @@ import { agentFolderName, isInside } from "./paths";
  *   command that may start one (same profile, same page), never while someone
  *   watches it or a person's turn is open. While it is in use there, its
  *   desktop doesn't stop as idle; while its desktop is watched, it is in use.
+ *   In system mode this runs in the agent's worker, as the agent's own user,
+ *   on the desktop root starts for it (`WorkerLink.desktop`).
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -530,6 +532,9 @@ export async function launchChrome(
     await new Promise((r) => setTimeout(r, 100));
   }
   kill();
+  // Gone before anyone starts another Chrome on this profile (the headless retry of a headed start that hung):
+  // one still running would hold the profile.
+  await exited;
   throw new Error("Chrome didn't open its debugging port in time");
 }
 
@@ -682,8 +687,8 @@ export interface BrowserManagerOptions {
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
   startChrome?: (exe: string, args: string[], profile: string, env?: Record<string, string>) => Promise<OwnChrome>;
-  /** The agents' desktops (ADR 0058 §7): without them every Chrome is headless. */
-  desktops?: Pick<DesktopSessions, "ensure" | "session" | "status">;
+  /** The agents' desktops (ADR 0058 §7; a worker's are root's): without them every Chrome is headless. */
+  desktops?: Pick<DesktopSessions, "ensure" | "status"> & { session(agentId: string): ChromeDisplay | null };
   /** Tests: whether a pid left in `chromes.json` is still that Chrome (default: asks the system). */
   isOurChrome?: (pid: number, profile: string) => Promise<boolean>;
   /** What `states()` returns may have changed (the desktop app's tray shows it). */
@@ -891,6 +896,8 @@ export class BrowserManager {
   private ready: Promise<string> | null = null;
   private failure: { reason: string; at: number } | null = null;
   private closed = false;
+  /** Every `closeAll` still running; a new session starts only after them. */
+  private closing: Promise<void> = Promise.resolve();
   /** `<runner home>/browser/chromes.json`: the Chromes this runner home started (pid and profile). */
   private readonly pidFile: string;
   /** Writes to the pid file, one at a time. */
@@ -1283,6 +1290,9 @@ export class BrowserManager {
 
   /** The agent's session (created on first use, within the per-machine cap). */
   private async session(agent: AgentScope, folder: string): Promise<Session> {
+    // A runner or worker that just started closes what an earlier run left: its `close --all` would let go of a
+    // session opened meanwhile, and a leftover Chrome still holds the profile until it is killed.
+    await this.closing;
     if (this.closed) throw new RunnerError("browser_unavailable", "The runner is stopping");
     const agentId = String(agent.id ?? "");
     const existing = this.sessions.get(agentId);
@@ -1354,18 +1364,31 @@ export class BrowserManager {
       const exe = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
       const start = this.opts.startChrome ?? launchChrome;
-      const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), where !== null, page);
-      if (where) useOwnFrame(profile);
+      const launch = async (on: ChromeDisplay | null) => {
+        if (on) useOwnFrame(profile);
+        const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), on !== null, page);
+        const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
+        if (on) started.display = on.display;
+        return started;
+      };
       let chrome: OwnChrome;
       try {
-        chrome = await start(exe, args, profile, where ? chromeEnv(where) : undefined);
+        chrome = await launch(where).catch((err: unknown) => {
+          if (!where) throw err;
+          // A headed start failed (its desktop went away or hung under it): headless for now, like a desktop that
+          // can't start.
+          session.desktopFailedAt = this.now();
+          this.opts.log(
+            `the browser of ${agent.handle} runs headless: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return launch(null);
+        });
       } catch (err) {
         throw new RunnerError(
           "internal",
           `Couldn't start the agent's browser: ${err instanceof Error ? err.message : String(err)}`.slice(0, 400),
         );
       }
-      if (where) chrome.display = where.display;
       session.chrome = chrome;
       session.aliveAt = null;
       await this.rememberChrome(chrome.pid, profile, chrome.display);
@@ -1812,16 +1835,20 @@ export class BrowserManager {
     for (const s of sessions) this.endStream(s, "closed");
     this.sessions.clear();
     this.changed();
-    const command = this.presentCommand();
-    if (command) {
-      // The daemons let go first (and any Chrome an older runner had `agent-browser` launch closes).
-      await this.spawn(command, ["--namespace", this.namespace, "--json", "close", "--all"], {
-        timeoutMs: QUICK_TIMEOUT_MS,
-        cwd: this.opts.home,
-      }).catch(() => undefined);
-    }
-    await Promise.all(sessions.map((s) => this.stopChrome(s).catch(() => undefined)));
-    await this.killLeftovers().catch(() => undefined);
+    const run = (async () => {
+      const command = this.presentCommand();
+      if (command) {
+        // The daemons let go first (and any Chrome an older runner had `agent-browser` launch closes).
+        await this.spawn(command, ["--namespace", this.namespace, "--json", "close", "--all"], {
+          timeoutMs: QUICK_TIMEOUT_MS,
+          cwd: this.opts.home,
+        }).catch(() => undefined);
+      }
+      await Promise.all(sessions.map((s) => this.stopChrome(s).catch(() => undefined)));
+      await this.killLeftovers().catch(() => undefined);
+    })();
+    this.closing = Promise.all([this.closing, run.catch(() => undefined)]).then(() => undefined);
+    await run;
   }
 
   /** The runner stops: streams end, browsers close, nothing new starts. */
