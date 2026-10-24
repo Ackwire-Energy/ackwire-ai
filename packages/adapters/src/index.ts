@@ -27,6 +27,7 @@ export * from "./presence";
 export * from "./pubsub";
 export * from "./push";
 export * from "./rate-limiter";
+export * from "./redact";
 export * from "./s3";
 export * from "./s3-fake";
 export * from "./sandbox";

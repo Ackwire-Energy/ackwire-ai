@@ -33,7 +33,7 @@ const { agents, browserHandoffs } = schema;
 const refused = (code: number, reason: string) => ({ refused: code, reason });
 
 /**
- * Who may watch an agent's desktop (ADR 0056 §4): the browser's rule on the `desktop` screen, and whoever
+ * Who may watch an agent's desktop (ADR 0058 §4): the browser's rule on the `desktop` screen, and whoever
  * may drive its computer (`requireBrowserAccess`).
  */
 export const requireDesktopAccess = (db: Database, userId: string, orgId: string, agentId: string) =>
@@ -171,7 +171,7 @@ export async function streamClosed(db: Database, s: Stream) {
   await auditStream(db, s);
 }
 
-/** A stream that ran, in the org's audit log (ADR 0056 §12): who, which agent and computer, how long, how many bytes. */
+/** A stream that ran, in the org's audit log (ADR 0058 §12): who, which agent and computer, how long, how many bytes. */
 export async function auditStream(db: Database, s: Stream) {
   const action =
     s.request.kind === "terminal"
@@ -329,7 +329,7 @@ export interface DesktopControlDeps {
 }
 
 /**
- * The desktops' side of handoffs on this server (ADR 0056 §5). When control
+ * The desktops' side of handoffs on this server (ADR 0058 §5). When control
  * of an agent's desktop, or of the browser showing the same window, changes
  * hands (on any server), the streams here that may no longer show it close:
  * everyone else's while someone is in control (4409), and a control stream

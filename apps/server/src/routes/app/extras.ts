@@ -42,7 +42,7 @@ export interface AppExtras {
   desktopFetch?: typeof fetch;
   /** The agent browser's live view (ADR 0040): handoff changes switch its stream; absent = handoffs only. */
   browserLive?: BrowserLive;
-  /** Agents' desktop and terminal streams on this server (ADR 0056): who watches; absent = none counted. */
+  /** Agents' desktop and terminal streams on this server (ADR 0058): who watches; absent = none counted. */
   streams?: StreamBroker;
   /** Agents' conversation layer: fast replies while their task works or waits; absent = none. */
   talker?: Talker;

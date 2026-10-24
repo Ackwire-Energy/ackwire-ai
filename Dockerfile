@@ -1,6 +1,6 @@
 # agentes.chat image: API, WebSocket, workers and the web app in one Bun process.
 # Self-hosting runs it with docker-compose.yml; agentes.chat Cloud runs the same image.
-FROM oven/bun:1.3.1
+FROM oven/bun:1.4.4
 WORKDIR /app
 # A named volume mounted on an empty image directory takes its owner: FILES_DIR in docker-compose.yml.
 RUN install -d -o bun -g bun /data/files

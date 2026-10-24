@@ -1,8 +1,8 @@
-# 0056. The agent's computer as a desktop people watch and control, and a terminal
+# 0058. The agent's computer as a desktop people watch and control, and a terminal
 
 - Status: Accepted (2026-10-24)
 - Date: 2026-10-24
-- Builds on: ADR 0025 (connected computers), ADR 0030 (isolation), ADR 0031 (computer use), ADR 0036 (switches on the machine), ADR 0040 (the agent browser and its handoffs), ADR 0054 (the screen layer computer use reuses)
+- Builds on: ADR 0025 (connected computers), ADR 0030 (isolation), ADR 0031 (computer use), ADR 0036 (switches on the machine), ADR 0040 (the agent browser and its handoffs), ADR 0054 (the screen layer computer use reuses), ADR 0057 (system mode: each agent its own OS user)
 - Changes: ADR 0031 §6 (on a connected Linux computer the virtual display is an Xtigervnc desktop per agent, §1) and §8 (a person drives a desktop over RFB, not frames and injected input, §5); ADR 0031 §10 and ADR 0030 level 3 (system mode gives each agent its own OS user, §10)
 - Protocol: 18 (`DESKTOP_PROTOCOL` in `packages/adapters/src/machine-protocol.ts`)
 
@@ -96,7 +96,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 
 - One built-in scope, `desktop:use`: outside "all tools" (`NOT_IN_ALL`), on by default for new agents (`DEFAULT_AGENT_SCOPES`), revocable by admins and the agent's owner. Desktop computer use (the agent's own tools on this desktop) uses it and adds no scope of its own.
 - Driving a desktop runs commands as the agent's user, on any site (a terminal window, "Open Terminal Here"). So the desktop's tools are offered, and allowed on each call, only while the agent also has `sandbox:run`, the org's sandbox setting allows it, and the machine has both its `commands` and its `desktop` switches on.
-- Migration 0092 grants `desktop:use` to the live agents that already have both `browser:use` and `sandbox:run`, and to no other.
+- Migration 0096 grants `desktop:use` to the live agents that already have both `browser:use` and `sandbox:run`, and to no other.
 - Routines (ADR 0053): its own internal area, `desktop`, allowed in routines that act and refused in read-only routines and unattended runs. `desktop_ask_person` speaks in the run's own conversation, like `browser_ask_person`.
 
 ### 9. Switches and availability
@@ -108,7 +108,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 ### 10. OS users: single-user and system mode
 
 - **Single-user** (the self-host default): the runner's OS user runs every agent, its desktop and terminal included (ADR 0030 level 1); the docs say so.
-- **System mode** (`install.sh --system` on Linux; the Cloud): a root supervisor and one unprivileged worker per agent, as the agent's own user `ag-<id8>` (uid 20000–29999 by default), in `agents-<uid>.slice` with memory, task and CPU limits sized for a desktop, a headed Chrome and one CLI (about 1.5 GB).
+- **System mode** (`install.sh --system` on Linux; the Cloud; ADR 0057): a root supervisor and one unprivileged worker per agent, as the agent's own user `ag-<id8>` (uid 20000–29999 by default), in `agents-<uid>.slice` with memory, task and CPU limits sized for a desktop, a headed Chrome and one CLI (about 1.5 GB).
   - Everything done for an agent runs as that user: commands, tasks, brains, files, its browser, its desktop, its terminal. The supervisor runs no agent code: until a worker serves an agent's requests, the root runner refuses them. Workers start on an agent's first request.
   - The runner is updated by its installer, never by itself.
   - Chrome's debugging port and `agent-browser`'s stream port have no authentication of their own: an nftables table, `inet agentes_runner`, lets only the owning agent's uid and root reach them, through port and uid sets the supervisor fills after checking who listens.
@@ -158,7 +158,7 @@ Handoff rows record control. `audit_log` rows `desktop.watched`, `desktop.contro
 3. The runner's data sockets and RFB proxy; the terminal.
 4. Taking control and the desktop's REST; the agent's browser on its desktop.
 5. The web panels; the self-host docs.
-6. System mode: the install and its service, agent users and the launcher, per-agent workers, the loopback guard.
+6. System mode (ADR 0057): the install and its service, agent users and the launcher, per-agent workers, the loopback guard.
 7. End to end on a real Linux machine, in single-user and in system mode.
 
 ## Consequences

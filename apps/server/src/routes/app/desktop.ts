@@ -32,7 +32,7 @@ const DesktopStatus = z
   .openapi("DesktopStatus");
 
 /**
- * An agent's desktop (ADR 0056): its state and "Ligar". The live screen and
+ * An agent's desktop (ADR 0058): its state and "Ligar". The live screen and
  * the terminal are WebSockets (`/api/desktop`, `/api/terminal`); taking control,
  * handing back and "Desligar" are the screens' routes (`…/desktop/takeover`,
  * `…/desktop/stop`, `browser/handoffs/{id}/…`).

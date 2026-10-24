@@ -395,7 +395,8 @@ export class AccessRequests {
 
 // ── Agents (from the server's `agents` frame) ───────────────────────────────
 
-export const AGENTS_FILE = "agents.json";
+/** Not `agents.json`: in a system home that file lists the agents' own OS users (`agent-users.ts`). */
+export const AGENTS_FILE = "machine-agents.json";
 
 /** The last `agents` frame, kept so the CLI can resolve `--agent <handle>` and the app shows them offline. */
 export function readAgents(home: string): MachineAgent[] {

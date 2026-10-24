@@ -62,7 +62,7 @@ function* packageDirs(nodeModules: string): Generator<string> {
 }
 
 if (import.meta.main) {
-  // An isolated install (Bun 1.3.1, the packageManager version CI uses, installs workspaces that way)
+  // An isolated install (`linker = "isolated"` in bunfig.toml)
   // keeps each package in node_modules/.bun/<name>@<version>/node_modules and links it everywhere else.
   const roots = [
     "node_modules",

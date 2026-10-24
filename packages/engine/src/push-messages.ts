@@ -61,6 +61,8 @@ interface Strings {
   routineStalledTitle: string;
   routineStalledBody: (computer: string) => string;
   machineConnectedTitle: string;
+  computerReadyTitle: string;
+  computerReadyBody: string;
   browserHandoffTitle: (actor: string) => string;
   browserHandoffBody: string;
   desktopHandoffTitle: (actor: string) => string;
@@ -90,6 +92,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     routineStalledTitle: "Uma rotina está esperando o computador",
     routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
     machineConnectedTitle: "Um computador novo entrou na organização",
+    computerReadyTitle: "O computador do seu workspace está pronto",
+    computerReadyBody: "Seus agentes já podem usar.",
     browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
     browserHandoffBody: "Toque para abrir a tela.",
     desktopHandoffTitle: (a) => `${a} precisa de você no computador`,
@@ -117,6 +121,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     routineStalledTitle: "A routine is waiting for its computer",
     routineStalledBody: (c) => `It runs when ${c} is back.`,
     machineConnectedTitle: "A new computer joined the organization",
+    computerReadyTitle: "Your workspace's computer is ready",
+    computerReadyBody: "Your agents can use it now.",
     browserHandoffTitle: (a) => `${a} needs you in the browser`,
     browserHandoffBody: "Tap to open the screen.",
     desktopHandoffTitle: (a) => `${a} needs you on the computer`,
@@ -172,6 +178,8 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "machine_connected":
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
       return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);
+    case "computer_ready":
+      return out(s.computerReadyTitle, s.computerReadyBody);
     case "browser_handoff":
       // What the agent asked for, in its words ("Entrar no Stripe com a conta de teste"). A desktop doesn't
       // open on the phone: its body says where it does.

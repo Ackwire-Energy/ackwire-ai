@@ -343,7 +343,7 @@ export const CHROME_ARGS = [
 
 /**
  * Headless at the desktops' size, or a window filling the agent's desktop
- * (ADR 0056 §7), always on X11 (the desktop's), where `--test-type` hides the
+ * (ADR 0058 §7), always on X11 (the desktop's), where `--test-type` hides the
  * bar the automation flag shows.
  */
 const SCREEN_ARGS = {
@@ -638,7 +638,7 @@ export interface BrowserManagerOptions {
   /** What `states()` returns may have changed (the desktop app's tray shows it). */
   onChange?: () => void;
   /**
-   * The agents' desktops (ADR 0056 §7): while an agent's desktop runs, its Chrome starts in a window there,
+   * The agents' desktops (ADR 0058 §7): while an agent's desktop runs, its Chrome starts in a window there,
    * so people watching the desktop see the browser too, and using that browser keeps the desktop up.
    */
   desktops?: Pick<DesktopSessions, "running" | "touch">;
@@ -1269,7 +1269,7 @@ export class BrowserManager {
   /**
    * The agent's Chrome, started when it isn't running: Chrome for Testing with
    * our flags and the agent's profile; its pid goes in `chromes.json`. While
-   * the agent's desktop runs, in a window there (ADR 0056 §7). A headless one
+   * the agent's desktop runs, in a window there (ADR 0058 §7). A headless one
    * moves to a desktop that started since on the agent's next `open`
    * (`opening`), unless a person watches it or a request holds it: a new
    * Chrome loses the open tabs (the profile, and its logins, stay).

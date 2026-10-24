@@ -14,7 +14,7 @@ import { hasBunTerminal, runtimeName } from "./launch";
 import type { DataSocket } from "./streams";
 
 /**
- * Terminals people open on an agent's computer (ADR 0056 §6): the login
+ * Terminals people open on an agent's computer (ADR 0058 §6): the login
  * shell of the agent's OS user in a PTY (`Bun.Terminal`), in the agent's
  * folder, with none of the agent's secrets in its environment. Its bytes go
  * both ways over the stream's data socket; a resize comes as a control frame,

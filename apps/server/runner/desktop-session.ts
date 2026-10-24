@@ -30,7 +30,7 @@ import { tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
 
 /**
- * The agents' desktops (ADR 0056 §1): per agent, one Xtigervnc (the X server
+ * The agents' desktops (ADR 0058 §1): per agent, one Xtigervnc (the X server
  * and the VNC server in one process) and an XFCE session, on Linux.
  *
  * - Xvnc listens on a Unix socket only (0600, its user's): a loopback port can
@@ -345,7 +345,7 @@ function parseSaved(v: unknown): Saved | null {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** The agents' desktops on this computer: started, used, watched, stopped (ADR 0056 §1). */
+/** The agents' desktops on this computer: started, used, watched, stopped (ADR 0058 §1). */
 export class DesktopSessions {
   private readonly desktops = new Map<string, Desktop>();
   /** Each agent's starts, stops and restarts, one after another. */
@@ -424,7 +424,7 @@ export class DesktopSessions {
     return { display, socket, xauthority, home, passwords };
   }
 
-  /** The agent's desktop while it runs, where its Chrome goes (ADR 0056 §7): its display and cookie. */
+  /** The agent's desktop while it runs, where its Chrome goes (ADR 0058 §7): its display and cookie. */
   running(agentId: string): { display: number; xauthority: string } | null {
     const d = this.desktops.get(agentId);
     return d && !d.ending && this.alive(d) ? { display: d.display, xauthority: d.xauthority } : null;

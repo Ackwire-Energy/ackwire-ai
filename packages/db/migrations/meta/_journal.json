@@ -642,15 +642,43 @@
     {
       "idx": 91,
       "version": "7",
-      "when": 1792812169494,
-      "tag": "0091_handoff_screen",
+      "when": 1792813616839,
+      "tag": "0091_operator_events",
       "breakpoints": true
     },
     {
       "idx": 92,
       "version": "7",
-      "when": 1792814223544,
-      "tag": "0092_desktop_scope",
+      "when": 1792816161896,
+      "tag": "0092_org_standing",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1792818524301,
+      "tag": "0093_user_block_agent_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792820665374,
+      "tag": "0094_managed_machines",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792842956318,
+      "tag": "0095_handoff_screen",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792842961842,
+      "tag": "0096_desktop_scope",
       "breakpoints": true
     }
   ]
