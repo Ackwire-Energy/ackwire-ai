@@ -7237,7 +7237,7 @@ export const ptBR = {
       sharedWith: "divide com {{names}}",
       part: "Parte {{of}} {{name}}: ≈ {{percent}}",
       estimate:
-        "A parte {{of}} {{name}} é o trecho escuro de cada barra. O {{brand}} só diz quanto a conta inteira usou; a parte de cada agente é uma estimativa, pelo que cada um gastou.",
+        "A parte {{of}} {{name}} é o trecho mais forte de cada barra. O {{brand}} só diz quanto a conta inteira usou; a parte de cada agente é uma estimativa, pelo que cada um gastou.",
       byAccount: "Por conta, este mês",
       until: "até {{date}}",
       nowTag: "agora",

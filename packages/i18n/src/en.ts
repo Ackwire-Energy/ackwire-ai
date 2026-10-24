@@ -7212,7 +7212,7 @@ export const en: Translations = {
       sharedWith: "shared with {{names}}",
       part: "{{name}}'s part: ≈ {{percent}}",
       estimate:
-        "{{name}}'s part is the dark stretch of each bar. {{brand}} only tells how much the whole account used; each agent's part is an estimate, from what each one spent.",
+        "{{name}}'s part is the stronger stretch of each bar. {{brand}} only tells how much the whole account used; each agent's part is an estimate, from what each one spent.",
       byAccount: "By account, this month",
       until: "until {{date}}",
       nowTag: "now",
