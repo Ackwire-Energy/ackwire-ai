@@ -15,8 +15,14 @@ import { renderApp, renderPage, screen, settle } from "./render";
 class DesktopSocket {
   binaryType = "blob";
   closed = false;
+  /** A microtask after it was made: what the computer sends first may arrive from then on. */
+  late = false;
   private onClose: ((e: { code: number; reason: string }) => void)[] = [];
-  constructor(readonly url: string) {}
+  constructor(readonly url: string) {
+    queueMicrotask(() => {
+      this.late = true;
+    });
+  }
   addEventListener(type: string, fn: (e: { code: number; reason: string }) => void) {
     if (type === "close") this.onClose.push(fn);
   }
@@ -41,12 +47,15 @@ class FakeRfb {
   background = "";
   pasted: string[] = [];
   keys: [number, string | null, boolean | undefined][] = [];
+  /** It took its socket in the tick the socket was made, before anything could arrive on it. */
+  readonly onTime: boolean;
   private listeners = new Map<string, ((e: Event) => void)[]>();
   constructor(
     readonly el: HTMLElement,
     readonly ws: DesktopSocket,
     readonly options?: { shared?: boolean },
   ) {
+    this.onTime = !ws.late;
     FakeRfb.all.push(this);
   }
   addEventListener(type: string, fn: (e: Event) => void) {
@@ -151,6 +160,8 @@ describe("the agent's desktop panel", () => {
     expect(ws?.url).toBe(`ws://localhost:3000/api/desktop?orgId=${ORG_ID}&agentId=${ADA_ID}&mode=watch`);
     expect(ws?.binaryType).toBe("arraybuffer");
     expect(rfb().ws).toBe(ws as DesktopSocket);
+    // The computer speaks first: bytes that reach the socket before noVNC listens are lost.
+    expect(rfb().onTime).toBe(true);
     expect(rfb().options).toEqual({ shared: true });
     expect(rfb()).toMatchObject({
       viewOnly: true,

@@ -129,36 +129,40 @@ export function DesktopView({
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let ws: WebSocket | null = null;
     let rfb: RFB | null = null;
-    const ws = createSocket(
-      desktopSocketUrl(window.location, {
-        orgId: org.id,
-        agentId,
-        mode,
-        ...(controlKeyboard ? { keyboard: controlKeyboard } : {}),
-      }),
-    ) as unknown as WebSocket;
-    ws.binaryType = "arraybuffer";
-    // noVNC takes the socket's `on*` handlers: the close code comes through a listener of our own.
-    ws.addEventListener("close", (e: CloseEvent) => {
-      closed = true;
-      rfbRef.current = null;
-      if (cancelled) return;
-      setCopied(null);
-      const next = desktopCloseState(e.code, e.reason);
-      setView(next.state);
-      // What changed shows at once (someone took control, it was turned off); a state that blocks it stops the retry.
-      void refetch();
-      if (next.retry === "never") return setGaveUp(true);
-      // "now" still waits a moment: the new state (control handed back) usually changes the mode first.
-      const delay = next.retry === "now" ? 250 : desktopRetryMs(attempts.current);
-      attempts.current++;
-      timer = setTimeout(() => setRound((r) => r + 1), delay);
-    });
     void import("@novnc/novnc").then(
       ({ default: Rfb }) => {
-        if (cancelled || closed) return;
-        rfb = new Rfb(el, ws, { shared: true });
+        if (cancelled) return;
+        // The socket opens only once noVNC can take it in the same tick: the computer speaks first, and bytes
+        // that reach a socket before noVNC listens are lost, leaving both sides waiting until the computer gives up.
+        const socket = createSocket(
+          desktopSocketUrl(window.location, {
+            orgId: org.id,
+            agentId,
+            mode,
+            ...(controlKeyboard ? { keyboard: controlKeyboard } : {}),
+          }),
+        ) as unknown as WebSocket;
+        ws = socket;
+        socket.binaryType = "arraybuffer";
+        // noVNC takes the socket's `on*` handlers: the close code comes through a listener of our own.
+        socket.addEventListener("close", (e: CloseEvent) => {
+          closed = true;
+          rfbRef.current = null;
+          if (cancelled) return;
+          setCopied(null);
+          const next = desktopCloseState(e.code, e.reason);
+          setView(next.state);
+          // What changed shows at once (someone took control, it was turned off); a state that blocks it stops the retry.
+          void refetch();
+          if (next.retry === "never") return setGaveUp(true);
+          // "now" still waits a moment: the new state (control handed back) usually changes the mode first.
+          const delay = next.retry === "now" ? 250 : desktopRetryMs(attempts.current);
+          attempts.current++;
+          timer = setTimeout(() => setRound((r) => r + 1), delay);
+        });
+        rfb = new Rfb(el, socket, { shared: true });
         rfb.viewOnly = !inControl;
         rfb.qualityLevel = inControl ? 6 : 3;
         rfb.compressionLevel = 2;
@@ -176,7 +180,6 @@ export function DesktopView({
       () => {
         if (cancelled) return;
         cancelled = true;
-        ws.close();
         setView("ended");
         setGaveUp(true);
       },
@@ -187,7 +190,7 @@ export function DesktopView({
       rfbRef.current = null;
       if (closed) return;
       if (rfb) rfb.disconnect();
-      else ws.close();
+      else ws?.close();
     };
   }, [connect, mode, controlKeyboard, round, org.id, agentId, createSocket, refetch, inControl]);
 
