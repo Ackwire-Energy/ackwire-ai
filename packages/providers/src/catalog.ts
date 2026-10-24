@@ -281,18 +281,31 @@ export function catalogModelOf(model: string | null | undefined): string | null 
   return base && isKnownModel(base) ? base : null;
 }
 
+const tokensCost = (p: TokenPrices, u: ModelUsage) =>
+  u.inputTokens * p.input +
+  u.outputTokens * p.output +
+  u.cacheReadTokens * p.cacheRead +
+  u.cacheWriteTokens * p.cacheWrite;
+
 /** Cost of one call in nano-USD. Throws for models outside the catalog (we never make a call we can't price). */
 export function costNanoUsd(model: string, usage: ModelUsage): number {
   const info = MODEL_CATALOG[model];
   if (!info) throw new Error(`unknown model ${model}`);
   const prompt = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
-  const p = info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
-  return (
-    usage.inputTokens * p.input +
-    usage.outputTokens * p.output +
-    usage.cacheReadTokens * p.cacheRead +
-    usage.cacheWriteTokens * p.cacheWrite
+  return tokensCost(
+    info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices,
+    usage,
   );
+}
+
+/**
+ * Many calls' tokens added up, at the base prices: a sum's prompt says nothing about any one call's, so it
+ * never crosses a long-context threshold. Throws for models outside the catalog.
+ */
+export function summedCostNanoUsd(model: string, usage: ModelUsage): number {
+  const info = MODEL_CATALOG[model];
+  if (!info) throw new Error(`unknown model ${model}`);
+  return tokensCost(info.prices, usage);
 }
 
 /**

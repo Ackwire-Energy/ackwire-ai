@@ -6,7 +6,7 @@ import {
   type PlanWindowKind,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { catalogModelOf, costNanoUsd, nanoUsdToUsd } from "@agenteschat/providers";
+import { catalogModelOf, nanoUsdToUsd, summedCostNanoUsd } from "@agenteschat/providers";
 import { NotFoundError } from "./errors";
 import { LISTED_ACCOUNT_STATUSES } from "./machine-accounts";
 import { requirePermission } from "./organizations";
@@ -47,7 +47,7 @@ const WINDOW_MODEL: Partial<Record<PlanWindowKind, string>> = { seven_day_opus: 
 
 export interface PlanWindowParts extends PlanWindow {
   /** Each agent's estimated part of `usedPercent`, biggest first; null for a window of unknown length (no estimate). */
-  agents: { agentId: string; percent: number }[] | null;
+  agents: { agentId: string; name: string; percent: number }[] | null;
 }
 
 export interface PlanAccountInfo {
@@ -89,11 +89,11 @@ interface Counts {
 }
 const tokensOf = (u: Counts) => u.input + u.output + u.cacheRead + u.cacheWrite;
 
-/** What these tokens would cost through the API, in nano-USD; null for a model the catalog doesn't price. */
+/** What these tokens (an hour's or a day's) would cost through the API, in nano-USD; null for a model without a price. */
 function apiNano(model: string | null, u: Counts): number | null {
   const id = catalogModelOf(model);
   return id
-    ? costNanoUsd(id, {
+    ? summedCostNanoUsd(id, {
         inputTokens: u.input,
         outputTokens: u.output,
         cacheReadTokens: u.cacheRead,
@@ -345,24 +345,40 @@ function windowStart(w: PlanWindow, now: number): number | null {
 }
 
 /** Each agent's part of a window: its percent × the agent's API-priced share of the account's use since it started. */
-function partsOf(w: PlanWindow, key: string, hourly: UsageRow[], now: number): PlanWindowParts["agents"] {
+function partsOf(ctx: Context, w: PlanWindow, key: string, hourly: UsageRow[], now: number): PlanWindowParts["agents"] {
   const start = windowStart(w, now);
   if (start === null) return null;
   // A window that already reset is empty again: its parts are the next window's to tell.
   if (w.usedPercent <= 0 || (w.resetsAt && Date.parse(w.resetsAt) <= now)) return [];
   const from = new Date(start).toISOString().slice(0, 13);
   const only = WINDOW_MODEL[w.kind];
+  const rows = hourly
+    .filter((r) => r.key === key && r.bucket >= from && (!only || r.model?.includes(only)))
+    .map((r) => ({ agentId: r.agentId, tokens: tokensOf(r), nano: apiNano(r.model, r) }));
+  // A model without a price (Codex with no model chosen is stored as `codex`) weighs its tokens at the window's
+  // average priced rate: a price is thousands of nano-USD per token, so a bare token count would weigh nothing.
+  let pricedNano = 0;
+  let pricedTokens = 0;
+  for (const r of rows) {
+    if (r.nano === null) continue;
+    pricedNano += r.nano;
+    pricedTokens += r.tokens;
+  }
+  const rate = pricedTokens > 0 ? pricedNano / pricedTokens : 1;
   const weights = new Map<string, number>();
   let total = 0;
-  for (const r of hourly) {
-    if (r.key !== key || r.bucket < from || (only && !r.model?.includes(only))) continue;
-    // A model without a price weighs its tokens (1 nano-USD each), so it still counts.
-    const weight = apiNano(r.model, r) ?? tokensOf(r);
+  for (const r of rows) {
+    const weight = r.nano ?? r.tokens * rate;
     weights.set(r.agentId, (weights.get(r.agentId) ?? 0) + weight);
     total += weight;
   }
   return [...weights]
-    .map(([agentId, weight]) => ({ agentId, percent: Math.round(((w.usedPercent * weight) / total) * 10) / 10 }))
+    .map(([agentId, weight]) => ({
+      agentId,
+      // Archived agents too: their use still counts, and the app no longer lists them.
+      name: ctx.agents.get(agentId)?.name ?? "",
+      percent: Math.round(((w.usedPercent * weight) / total) * 10) / 10,
+    }))
     .filter((p) => p.percent > 0)
     .sort((a, b) => b.percent - a.percent);
 }
@@ -400,7 +416,10 @@ function accountUsage(
   return {
     ...info,
     usage: usage
-      ? { ...usage, windows: usage.windows.map((w) => ({ ...w, agents: partsOf(w, info.key, hourly, now.getTime()) })) }
+      ? {
+          ...usage,
+          windows: usage.windows.map((w) => ({ ...w, agents: partsOf(ctx, w, info.key, hourly, now.getTime()) })),
+        }
       : null,
     agents: list,
     monthTokens: list.reduce((s, a) => s + a.tokens, 0),

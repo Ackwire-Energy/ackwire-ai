@@ -181,8 +181,8 @@ test("the agent's month: by account and day, the account it uses now, its own si
   // Now: Pessoal with its windows; Dev is the only one that spent it in this window.
   expect(usage.current?.accountId).toBe(PESSOAL);
   expect(usage.current?.usage?.windows.map((w) => [w.kind, w.agents])).toEqual([
-    ["five_hour", [{ agentId: f.agent.id, percent: 60 }]],
-    ["seven_day", [{ agentId: f.agent.id, percent: 30 }]],
+    ["five_hour", [{ agentId: f.agent.id, name: "Dev", percent: 60 }]],
+    ["seven_day", [{ agentId: f.agent.id, name: "Dev", percent: 30 }]],
   ]);
 
   const bia = await addMember(f.db, f.org.id, "member", "Bia");
@@ -218,7 +218,7 @@ test("parts: a model's own week counts that model, a reset or unknown window has
   expect(own?.plan).toBe("pro");
   expect(own?.usage?.windows.map((w) => [w.kind, w.agents])).toEqual([
     // Only Atlas used Opus on it this week.
-    ["seven_day_opus", [{ agentId: atlas.id, percent: 40 }]],
+    ["seven_day_opus", [{ agentId: atlas.id, name: "Atlas", percent: 40 }]],
     ["five_hour", []],
     // A provider's own window has no known length: no estimate.
     ["other", null],
@@ -233,4 +233,30 @@ test("parts: a model's own week counts that model, a reset or unknown window has
   expect(removed).toMatchObject({ type: "plan", kind: "claude_code", account: null, removed: true, tokens: 2_000 });
   expect(dev.current?.accountId).toBeNull();
   expect((await orgPlanUsage(f.db, f.owner.id, f.org.id)).accounts.some((a) => a.accountId === PESSOAL)).toBe(false);
+});
+
+test("parts: use from before a window started stays out of it; a model without a price weighs like the priced ones", async () => {
+  const { atlas, spend } = await scene();
+  // Pessoal: 60% of the 5 hours that started 3 hours ago, 30% of the week.
+  await spend(f.agent.id, PESSOAL, "claude-sonnet-5-5", 10_000);
+  // A turn whose CLI didn't name its model is stored under the brain's name, which has no price.
+  await spend(atlas.id, PESSOAL, "claude_code", 10_000);
+  const earlier = await spend(atlas.id, PESSOAL, "claude-sonnet-5-5", 50_000);
+  await f.db
+    .update(schema.usageRecords)
+    .set({ createdAt: new Date(Date.now() - 4 * 3_600_000) })
+    .where(eq(schema.usageRecords.id, earlier ?? ""));
+
+  const pessoal = (await orgPlanUsage(f.db, f.owner.id, f.org.id)).accounts.find((a) => a.accountId === PESSOAL);
+  const parts = (kind: string) =>
+    pessoal?.usage?.windows.find((w) => w.kind === kind)?.agents?.map((a) => [a.name, a.percent]);
+  expect(parts("five_hour")?.sort()).toEqual([
+    ["Atlas", 30],
+    ["Dev", 30],
+  ]);
+  // The week holds the earlier turn too: Atlas weighs 60k tokens of Sonnet, Dev 10k.
+  expect(parts("seven_day")).toEqual([
+    ["Atlas", 25.7],
+    ["Dev", 4.3],
+  ]);
 });

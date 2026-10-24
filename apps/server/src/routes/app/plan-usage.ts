@@ -29,7 +29,7 @@ const PlanAccountUsage = PlanAccountInfo.extend({
     windows: z.array(
       PlanWindow.extend({
         agents: z
-          .array(z.object({ agentId: z.uuid(), percent: z.number() }))
+          .array(z.object({ agentId: z.uuid(), name: z.string(), percent: z.number() }))
           .nullable()
           .openapi({
             description:

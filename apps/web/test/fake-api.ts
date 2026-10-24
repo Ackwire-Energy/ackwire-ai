@@ -82,14 +82,19 @@ function fakePlanAccount(money: boolean): PlanAccountUsage {
     signedOut: false,
     usage: {
       windows: [
-        { kind: "five_hour", usedPercent: 62, resetsAt: hoursFromNow(2), agents: [{ agentId: ADA_ID, percent: 62 }] },
+        {
+          kind: "five_hour",
+          usedPercent: 62,
+          resetsAt: hoursFromNow(2),
+          agents: [{ agentId: ADA_ID, name: "Ada", percent: 62 }],
+        },
         {
           kind: "seven_day",
           usedPercent: 41,
           resetsAt: hoursFromNow(72),
           agents: [
-            { agentId: ADA_ID, percent: 30 },
-            { agentId: ATLAS_ID, percent: 11 },
+            { agentId: ADA_ID, name: "Ada", percent: 30 },
+            { agentId: ATLAS_ID, name: "Atlas", percent: 11 },
           ],
         },
       ],

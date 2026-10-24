@@ -133,7 +133,7 @@ function Month({ data, tones }: { data: AgentPlanUsage; tones: Map<string, CSSPr
 function Now({ data }: { data: AgentPlanUsage }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const { agent, g, can, openWork } = useAgentEdit();
+  const { agent, g } = useAgentEdit();
   const dir = useDirectory(org.id);
   const current = data.current;
   if (!current) return null;
@@ -143,19 +143,7 @@ function Now({ data }: { data: AgentPlanUsage }) {
     .map((a) => dir.agentById.get(a.agentId)?.name ?? a.name);
   return (
     <Card as="section" className="agp-card" aria-labelledby="agent-usage-now">
-      <CardHead
-        id="agent-usage-now"
-        icon="clock"
-        title={t("usageViews.agent.now")}
-        action={
-          can("brain") ? (
-            <button type="button" className="agp-more" onClick={() => openWork("brain")}>
-              {t("usageViews.agent.switch")}
-              <Icon name="arrowRight" size={14} />
-            </button>
-          ) : undefined
-        }
-      />
+      <CardHead id="agent-usage-now" icon="clock" title={t("usageViews.agent.now")} />
       <AccountHead
         account={current}
         extra={

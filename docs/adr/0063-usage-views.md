@@ -16,12 +16,12 @@ ADR 0059 shows each plan account's limits where the account is chosen: the windo
 
 ### 2. An agent's part of a window is an estimate, and says so
 
-Providers only give the whole account's percentage. An agent's part of a window = the window's percentage × the agent's share of what the account spent since the window started (`resetsAt` minus the window's length: 5 hours, a week, 30 days for a month). Each row weighs what it would cost through the API (catalog prices, so Opus weighs more than Haiku); a model without a price weighs its tokens. A model's own week (`seven_day_opus`, `seven_day_sonnet`) counts only that model. A provider's own window (`other`) has no known length, so it has no estimate. The screens draw an agent's part in full ink inside the account's bar and say in one line that it is an estimate.
+Providers only give the whole account's percentage. An agent's part of a window = the window's percentage × the agent's share of what the account spent since the window started (`resetsAt` minus the window's length: 5 hours, a week, 30 days for a month). Each row weighs what it would cost through the API (catalog prices, so Opus weighs more than Haiku; summed tokens at the base prices, since a sum crosses no long-context threshold); a model without a price (Codex with no model chosen) weighs its tokens at the window's average priced rate, or one each when nothing in the window has a price. A model's own week (`seven_day_opus`, `seven_day_sonnet`) counts only that model. A provider's own window (`other`) has no known length, so it has no estimate. The screens draw an agent's part in full ink inside the account's bar and say in one line that it is an estimate.
 
 ### 3. Two views
 
 - **Configurações › Uso**, for every member: the plan accounts grouped by computer (the accounts added there, and a computer's own sign-in that agents used this month or think with now), each with its windows, every agent's part and the month's tokens; then the API per agent against its budget. Admins also keep the API's spend by kind and the default budget.
-- **Agent → "Uso"**: one sentence with the month by account, the month day by day colored by account, the account it thinks with now (its windows with this agent's part, who shares it, and "Trocar conta" for whoever may change its brain), and the month by account.
+- **Agent → "Uso"**: one sentence with the month by account, the month day by day colored by account, the account it thinks with now (its windows with this agent's part, and who shares it), and the month by account. The tab informs: changing the account stays in "Quem pensa".
 
 `GET …/usage/plans` and `GET …/agents/{agentId}/usage` serve them. Opening either asks the viewer's own computers for fresh windows, as the accounts screens do (`POST …/ai-accounts/refresh`), and an account's change refreshes both views.
 
@@ -33,7 +33,7 @@ Everyone in the workspace sees tokens, percentages, windows and an account's nam
 
 - Positive: one place answers who spent what, where, for plans and the API together, and an agent's page tells which account carried its month.
 - Positive: no new storage for limits and no protocol change: the windows are the ones ADR 0059 already keeps.
-- Negative: an agent's part is an estimate; the account's own use outside agents (its owner on the same plan) counts as nobody's, and a window's part rounds to the hour it started.
+- Negative: an agent's part is an estimate. The parts always add up to the window's percentage, so use of the account outside agents (its owner in their own terminal) is split among the agents as if it were theirs; and a window's part rounds to the hour it started.
 - Negative: plan usage from before the new columns shows as one source per brain, without its account.
 
 ## Alternatives considered

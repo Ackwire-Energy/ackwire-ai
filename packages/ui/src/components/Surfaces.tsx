@@ -174,7 +174,7 @@ export function Meter({
     >
       {/* Anything above zero keeps a visible sliver, so 0.9% doesn't read as empty. */}
       <div className="ac-meter__bar" style={exact > 0 ? { width: `${pct}%`, minWidth: 6 } : { width: 0 }} />
-      {partPct !== null && partPct > 0 && (
+      {partPct !== null && part !== undefined && part > 0 && (
         <div className="ac-meter__part" style={{ width: `${partPct}%`, minWidth: 6 }} />
       )}
       {marks?.map((m) => (

@@ -7208,7 +7208,6 @@ export const en: Translations = {
       equivalent: "At API prices, that would be ≈ {{amount}}.",
       daysLabel: "Tokens per day in {{month}}",
       now: "Now",
-      switch: "Change account",
       sharedWith: "shared with {{names}}",
       part: "{{name}}'s part: ≈ {{percent}}",
       estimate:
@@ -7218,7 +7217,7 @@ export const en: Translations = {
       nowTag: "now",
       api: "API",
       apiMain: "{{name}} thinks through the API",
-      apiFallback: "When the plan couldn't answer",
+      apiFallback: "Outside the plan: quick decisions, and when the plan couldn't answer",
       removed: "Removed account",
       removedSub: "No longer on any computer",
       old: "{{brand}}, from before accounts",

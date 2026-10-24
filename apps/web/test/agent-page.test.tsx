@@ -134,7 +134,8 @@ describe("agent page: its usage (ADR 0063)", () => {
     expect(week.querySelector(".ac-meter__part")?.getAttribute("style")).toContain("width: 30%");
     expect(now.textContent).toContain("Parte da Ada: ≈ 30%");
     expect(now.textContent).toContain("é uma estimativa");
-    expect(within(now).getByRole("button", { name: "Trocar conta" })).toBeTruthy();
+    // It informs: changing the account is "Quem pensa"'s.
+    expect(within(now).queryByRole("button")).toBeNull();
     const sources = screen().getByRole("region", { name: "Por conta, este mês" });
     expect(sources.textContent).toContain("≈ US$ 76,00 pela API");
     expect(sources.textContent).toContain("US$ 0,80 pagos");
@@ -145,7 +146,6 @@ describe("agent page: its usage (ADR 0063)", () => {
     const month = screen().getByRole("region", { name: "Uso da Ada" });
     expect(month.textContent).toContain("97% na conta deste MacBook");
     expect(screen().getByRole("region", { name: "Por conta, este mês" }).textContent).toContain("2% do orçamento");
-    expect(screen().queryByRole("button", { name: "Trocar conta" })).toBeNull();
     const shown = ["Uso da Ada", "Agora", "Por conta, este mês"].map(
       (name) => screen().getByRole("region", { name }).textContent,
     );

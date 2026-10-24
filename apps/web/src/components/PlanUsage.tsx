@@ -106,8 +106,7 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const nameOf = (id: string) =>
-    dir.agentById.get(id)?.name ?? account.agents.find((a) => a.agentId === id)?.name ?? "";
+  const nameOf = (a: { agentId: string; name: string }) => dir.agentById.get(a.agentId)?.name ?? a.name;
   return (
     <div className="plan-block">
       <AccountHead account={account} />
@@ -115,9 +114,7 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
         <PlanMeter
           usage={partedUsage(account.usage, (parts) =>
             parts
-              .map((p) =>
-                t("usageViews.part", { name: nameOf(p.agentId), percent: formatPercent(i18n.language, p.percent) }),
-              )
+              .map((p) => t("usageViews.part", { name: nameOf(p), percent: formatPercent(i18n.language, p.percent) }))
               .join(" · "),
           )}
           text={planMeterText(t, i18n.language)}
@@ -136,8 +133,8 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
                 params={{ orgId: org.id, agentId: a.agentId }}
                 search={{ tab: "usage" }}
               >
-                <AgentAvatar agentId={a.agentId} size="xs" name={nameOf(a.agentId)} />
-                <b>{nameOf(a.agentId)}</b>
+                <AgentAvatar agentId={a.agentId} size="xs" name={nameOf(a)} />
+                <b>{nameOf(a)}</b>
                 {a.tokens > 0 ? formatTokensShort(t, i18n.language, a.tokens) : t("usageViews.usesNow")}
               </Link>
             ))}

@@ -4096,7 +4096,7 @@ export interface PlanWindowParts extends PlanWindow {
    * The window's percent × each agent's API-priced share of the account's use since it started, biggest
    * first; null for a window of unknown length (no estimate).
    */
-  agents: { agentId: string; percent: number }[] | null;
+  agents: { agentId: string; name: string; percent: number }[] | null;
 }
 
 /** A plan account as the usage views name it. */

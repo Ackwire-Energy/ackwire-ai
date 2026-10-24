@@ -7233,7 +7233,6 @@ export const ptBR = {
       equivalent: "Pelo preço da API, seria ≈ {{amount}}.",
       daysLabel: "Tokens por dia em {{month}}",
       now: "Agora",
-      switch: "Trocar conta",
       sharedWith: "divide com {{names}}",
       part: "Parte {{of}} {{name}}: ≈ {{percent}}",
       estimate:
@@ -7243,7 +7242,7 @@ export const ptBR = {
       nowTag: "agora",
       api: "API",
       apiMain: "{{The}} {{name}} pensa pela API",
-      apiFallback: "Quando o plano não pôde responder",
+      apiFallback: "Fora do plano: decisões rápidas e quando o plano não pôde responder",
       removed: "Conta removida",
       removedSub: "Não está mais em nenhum computador",
       old: "{{brand}}, de antes das contas",
