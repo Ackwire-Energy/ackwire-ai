@@ -41,6 +41,7 @@ import {
   type Point,
   quote,
   screenText,
+  windowKey,
 } from "./desktop-tree";
 import { RunnerError } from "./errors";
 import { readLines } from "./lines";
@@ -96,7 +97,7 @@ const WHEEL_PIXELS = 60;
 const WHEEL_MAX = 50;
 const APPS_MAX = 500;
 const JPEG_QUALITY = 70;
-const REF = /^e\d{1,6}$/;
+const REF = /^e\d{1,9}$/;
 const APP_ID = /^[A-Za-z0-9_.+-]+\.desktop$/;
 const PACKAGE = /^[a-z0-9][a-z0-9.+-]{0,40}$/;
 /** What a list opened by `select` offers. */
@@ -265,6 +266,11 @@ export interface DesktopManagerOptions {
   secrets?: (agent: AgentScope) => Promise<DesktopLookOptions["secrets"]>;
   /** The agent browser's Chrome while it runs: its window is one line in a look, and its tree isn't read. */
   browserPid?: (agentId: string) => number | null;
+  /**
+   * How many refs each agent was given (`desktopRefs`), from whoever outlives this manager (the daemon,
+   * across connections): numbers never come back for other elements. Default: this manager's own.
+   */
+  numbered?: Map<string, { last: number }>;
   log: (line: string) => void;
   /** Tests: the computer. */
   system?: Pick<DesktopSystem, "platform" | "uid" | "which">;
@@ -538,11 +544,13 @@ export class DesktopManager {
   private readonly sys: Pick<DesktopSystem, "platform" | "uid" | "which">;
   private readonly now: () => number;
   private readonly requestMs: number;
+  private readonly numbered: Map<string, { last: number }>;
 
   constructor(private readonly opts: DesktopManagerOptions) {
     this.sys = opts.system ?? hostSystem();
     this.now = opts.now ?? Date.now;
     this.requestMs = opts.requestMs ?? REQUEST_MS;
+    this.numbered = opts.numbered ?? new Map();
   }
 
   /** `hello.desktopUse`: whether agents can use their desktops here, and what is missing when they can't. */
@@ -672,13 +680,18 @@ export class DesktopManager {
       use.xauthority !== s.xauthority
     ) {
       if (use) this.stop(use);
+      let numbered = this.numbered.get(agent.id);
+      if (!numbered) {
+        numbered = { last: 0 };
+        this.numbered.set(agent.id, numbered);
+      }
       use = {
         agent,
         display: s.display,
         xauthority: s.xauthority,
         home: s.home,
         since,
-        refs: desktopRefs(),
+        refs: desktopRefs(numbered),
         last: null,
         helper: null,
         lastUsed: 0,
@@ -851,7 +864,6 @@ export class DesktopManager {
     }
     const boxes = fresh.boxes as Record<string, HelperBox | null>;
     const windows = fresh.windows as HelperWindow[];
-    const secrets = (await this.opts.secrets?.(use.agent)) ?? null;
     return wanted.map((w): Spot => {
       const { ref, target: t } = w;
       if (!ref || !t) return w;
@@ -873,10 +885,7 @@ export class DesktopManager {
       const center = centerOf(t.box);
       if (!contains(intersect(own.box, screen), center)) throw staleRef(ref);
       const cover = coveringWindow(windows, own, center);
-      if (cover) {
-        const name = screenText(cover.title || cover.class[1], secrets).slice(0, 80);
-        throw bad(`covered by window ${quote(name)}`);
-      }
+      if (cover) throw bad(`covered by ${this.coverName(use, cover)}`);
       return { ref, target: t, point: [Math.round(center[0]), Math.round(center[1])] };
     });
   }
@@ -900,6 +909,18 @@ export class DesktopManager {
     }
     const pick = await this.spot(use, { ref: option[0] }, "click");
     return [{ click: pick.point }];
+  }
+
+  /**
+   * What covers a target, as the plan says it: a window by the number its line has in a look, never its
+   * title, since this reaches the agent outside the untrusted screen text and a title is screen text (a
+   * web page sets its window's).
+   */
+  private coverName(use: Use, w: HelperWindow): string {
+    if (w.override) return "a menu or popup";
+    if (w.types.includes("dock")) return "the panel";
+    if (w.pid !== null && w.pid === this.opts.browserPid?.(use.agent.id)) return "your browser's window";
+    return `window ${use.refs(windowKey(w.xid))}`;
   }
 
   /** The active window's center (a scroll with no element), else the screen's. */

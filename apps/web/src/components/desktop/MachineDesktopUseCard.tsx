@@ -10,15 +10,18 @@ const TURN_ON = "agentes-runner tools enable desktop && agentes-runner tools ena
 
 /**
  * Apps on the agents' desktops, on a computer's page (ADR 0057): whether agents can use apps on their own
- * desktops there; when not, the computer's own words on what is missing (a Linux computer, each agent its
- * own user, packages) with the command in them, or the two switches to turn on.
+ * desktops there; when not, on Linux the computer's own words on what is missing (each agent its own user,
+ * packages) with the command in them, elsewhere that it takes a Linux computer; or the two switches to turn on.
  */
 export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
   const use = m.desktopUse;
   if (!use) return null;
   const off = use.available && !(m.access?.tools.desktop && m.access.tools.commands);
-  const command = use.available ? null : commandInReason(use.reason);
+  // A Mac or Windows has nothing to install for it: said in the app's words, not the runner's English.
+  const linux = m.os === "linux";
+  const reason = use.available ? null : linux ? use.reason : t("desktop.use.linuxOnly");
+  const command = linux ? commandInReason(reason) : null;
   return (
     <Card aria-labelledby="sec-machine-desktop-use">
       <CardHeader
@@ -47,11 +50,11 @@ export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
           </div>
         </div>
       )}
-      {!use.available && use.reason && (
+      {reason && (
         <div className="brw-note">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {use.reason}
+            {reason}
             {command && <CommandBlock command={command} />}
           </div>
         </div>

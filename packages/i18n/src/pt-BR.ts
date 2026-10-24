@@ -7836,6 +7836,7 @@ export const ptBR = {
       off: "Desligado",
       unavailable: "Indisponível",
       offHelp: "Ligue a tela e os comandos neste computador:",
+      linuxOnly: "Os agentes só usam apps na própria tela em computadores Linux.",
       agent: "{{The}} {{name}} ainda não consegue usar apps na própria tela no {{computer}}.",
     },
   },

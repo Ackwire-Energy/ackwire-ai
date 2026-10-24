@@ -285,6 +285,8 @@ export class RunnerDaemon implements RequestObserver {
   readonly desktops: DesktopSessions;
   /** Terminals people open as an agent (ADR 0056 §6). */
   readonly terminals: Terminals;
+  /** The refs each agent's desktop use gave out, across sessions: a number never comes back for another element. */
+  private readonly desktopRefsGiven = new Map<string, { last: number }>();
 
   constructor(private readonly opts: DaemonOptions) {
     this.activity = new ActivityLog(opts.home);
@@ -655,6 +657,7 @@ export class RunnerDaemon implements RequestObserver {
       desktops: this.desktops,
       secrets: (agent) => agentSecrets(secretsDir, agent),
       browserPid: (agentId) => browser.chromePid(agentId),
+      numbered: this.desktopRefsGiven,
       log,
     });
     const streams = new DataSockets({ url: connectUrl(config.server, "stream"), token: config.token });

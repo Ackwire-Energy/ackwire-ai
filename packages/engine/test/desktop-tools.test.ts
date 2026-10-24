@@ -260,11 +260,15 @@ test("the computer's refusals in the agent's words", async () => {
   d.s.error = null;
   // A step's own failure stays in the runner's words (the plan reads them).
   d.s.respond = (r) => {
-    if (r.op === "desktop.act") throw new MachineRequestError("bad_request", 'covered by window "Save changes?"');
+    if (r.op === "desktop.act") throw new MachineRequestError("bad_request", "covered by window e40");
     return undefined;
   };
+  const sent = d.since();
   const covered = await d.call("desktop_do", { steps: [{ do: "click", target: "e25" }] });
-  expect(covered.content).toContain('covered by window "Save changes?": nothing was done');
+  expect(covered.content).toContain("covered by window e40: nothing was done");
+  // It looks again, so the answer shows what covers the target, as untrusted screen text.
+  expect(sent().map((c) => c.op)).toEqual(["desktop.act", "desktop.look"]);
+  expect(covered.content).toContain('<external_data source="desktop screen">');
 });
 
 test("a person in control holds the desktop; after they hand it back, the agent reads it before acting", async () => {

@@ -229,13 +229,21 @@ export interface DesktopLookOptions {
 /** A desktop's refs: an element keeps its ref across looks, and a ref never names another element. */
 export type DesktopRefs = (key: string) => string;
 
-export function desktopRefs(): DesktopRefs {
+/** The key a window's own line has in `DesktopRefs` (an element's is its bus and path). */
+export const windowKey = (xid: number) => `x${xid}`;
+
+/**
+ * The refs of one desktop session. `numbered` counts every ref the agent was given: a session that
+ * starts again (its elements' keys may come back for other elements) numbers after them, so a number
+ * the agent kept from before is stale, never another element.
+ */
+export function desktopRefs(numbered = { last: 0 }): DesktopRefs {
   // ponytail: holds every element the desktop session showed; prune keys unseen for many looks if sessions grow huge.
   const known = new Map<string, string>();
   return (key) => {
     let ref = known.get(key);
     if (!ref) {
-      ref = `e${known.size + 1}`;
+      ref = `e${++numbered.last}`;
       known.set(key, ref);
     }
     return ref;
@@ -567,7 +575,7 @@ export function desktopLook(snap: HelperSnapshot, refOf: DesktopRefs, options: D
       name,
       attrs: w.active ? ["active"] : [],
       target: {
-        key: `x${w.xid}`,
+        key: windowKey(w.xid),
         box: intersect(w.box, screen),
         extents: w.box,
         xid: w.xid,

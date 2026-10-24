@@ -92,11 +92,11 @@ The costly words that need a 0.85 pick gain what a desktop throws away, for the 
 
 ### 6. A dialog in the way is never closed on a guess
 
-The browser closes a covering banner once (ADR 0054 §5). On a desktop what covers is usually a real dialog ("Save changes before closing?") whose buttons throw work away, and the dismiss pool would include the panel and other windows. Desktop plans run with `dismiss: false`: the plan stops and names what covers the target.
+The browser closes a covering banner once (ADR 0054 §5). On a desktop what covers is usually a real dialog ("Save changes before closing?") whose buttons throw work away, and the dismiss pool would include the panel and other windows. Desktop plans run with `dismiss: false`: the plan stops, names what covers the target, and looks again so its report shows it. A window is named by the number its line has in a look (`covered by window e14`), never by its title: the stop reason reaches the agent outside the untrusted screen text, and a title is screen text (a web page sets its window's). The agent's browser, a menu or popup and the panel are named as such.
 
 ### 7. Acting and settling, in one round trip
 
-- `desktop.act` does the action, waits for the screen to settle and looks again, in one runner op, like `browser.batch`. Right before it acts, the runner asks for the element's box and the window stack again: an element that is gone or moved since the look is a stale ref (the plan finds it again on a new look), one under another window is `covered by window "…"`, and an action on a desktop that started again since the look is stale too.
+- `desktop.act` does the action, waits for the screen to settle and looks again, in one runner op, like `browser.batch`. Right before it acts, the runner asks for the element's box and the window stack again: an element that is gone or moved since the look is a stale ref (the plan finds it again on a new look), one under another window is `covered by window e14` (§6), and an action on a desktop that started again since the look is stale too. A desktop that starts again numbers its elements after every ref the agent was given before, also across the runner's reconnections: a number kept from before is stale, never another element.
 - Settling by XDamage: changed rectangles arrive as events; 32 px tiles that were already changing in the 150 ms before the action (clocks, animations) are ignored; quiet after 120 ms, up to 400 ms for a late first change, 2 s at most. Starting an app or opening a file first waits for a new window or a change of the active one, up to about 10 s. A double click doesn't: it mostly opens a folder in place, where no window comes and the step would always wait the whole time; a step that starts an app that way says what it waits for with `expect`.
 - A desktop that just started has nothing to act on until its session is up: its first look waits for the panel's elements (seconds, at most 20 s after the start).
 - Input goes through xdotool or XTEST; windows are focused and closed by their id, not by pixels.
@@ -132,7 +132,7 @@ DesktopAction:
 DESKTOP_LIMITS: text 4,000 characters, key 64, path 1,024, pause 10 s
 ```
 
-Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` and `stale ref: e12 moved since the last look` (the target is found again once), `covered by window "…"` (§6), `the text didn't come out as written`, a refused session ending as `bad_request`, and `desktop_unavailable` when the session or the helper is gone (ADR 0056's supervisor starts the session again, the runner the helper).
+Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` and `stale ref: e12 moved since the last look` (the target is found again once), `covered by window e14` (§6), `the text didn't come out as written`, a refused session ending as `bad_request`, and `desktop_unavailable` when the session or the helper is gone (ADR 0056's supervisor starts the session again, the runner the helper).
 
 ### 11. Safety and its limits
 

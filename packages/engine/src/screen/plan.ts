@@ -584,8 +584,12 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
     describe(found);
     let out = await perform(found);
     if (!out.ok && COVERED.test(out.error)) {
-      // On a desktop, what covers it may be asking to save or discard work: never closed on a guess.
-      if (deps.dismiss === false) throw new Stop(`${out.error}: nothing was done; deal with what covers it first`);
+      // On a desktop, what covers it may be asking to save or discard work: never closed on a guess. The
+      // report shows the screen as it is now, so what covers it (named only by its number) is in it.
+      if (deps.dismiss === false) {
+        screen = (await deps.surface.observe().catch(() => null)) ?? screen;
+        throw new Stop(`${out.error}: nothing was done; deal with what covers it first`);
+      }
       // Something covers it (a cookie banner, a dialog): close it once, then the step again.
       if (!dismissedOnce) {
         dismissedOnce = true;

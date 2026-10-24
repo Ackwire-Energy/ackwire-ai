@@ -96,8 +96,10 @@ describe("whether agents can use apps on their desktops", () => {
       "sudo apt install --no-install-recommends python3-gi",
     );
 
+    // Nothing to install on a Mac: the app's own words, not the computer's English.
     await page(mac);
-    expect(card().textContent).toContain("runs on Linux computers");
+    expect(card().textContent).toContain("Os agentes só usam apps na própria tela em computadores Linux.");
+    expect(card().textContent).not.toContain("runs on Linux computers");
     expect(card().querySelector(".machine-command")).toBeNull();
 
     await page(off);

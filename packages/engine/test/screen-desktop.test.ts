@@ -161,19 +161,28 @@ describe("a desktop's plan and report", () => {
     const judge = createFakeJudge((kind) =>
       kind === "screen_dismiss" ? { choice: "e40", probabilities: { e40: 0.95 } } : undefined,
     );
-    const surface = fakeScreen(
-      `${THUNAR}\n- dialog "Save changes to report.odt?" [ref=e39]\n  - button "Don't Save" [ref=e40]\n  - button "Save" [ref=e41]`,
-    );
-    surface.fail('covered by window "Save changes to report.odt?"');
+    const surface = fakeScreen(THUNAR);
+    // The dialog comes up as the click is sent, after the look the target was found on.
+    const dialog = `${THUNAR}\n- dialog "Save changes to report.odt?" [ref=e39]\n  - button "Don't Save" [ref=e40]\n  - button "Save" [ref=e41]`;
+    const perform = surface.perform.bind(surface);
+    surface.perform = (action, o) => {
+      surface.show(dialog);
+      return perform(action, o);
+    };
+    surface.fail("covered by window e39");
     const report = await runPlan({ judge, ...ids, surface, scope: "a", dismiss: false }, [
       { do: "click", target: "Back" },
       { do: "click", target: "Documents" },
     ]);
     expect(report.stopped).toMatchObject({ index: 0 });
-    expect(report.stopped?.reason).toContain('covered by window "Save changes to report.odt?"');
+    expect(report.stopped?.reason).toContain("covered by window e39");
     expect(acted(surface.actions)).toEqual([{ kind: "click", at: { ref: "e25" } }]);
     expect(judge.calls.filter((c) => c.kind === "screen_dismiss")).toHaveLength(0);
-    expect(formatPlanReport(report).summary).toContain("deal with what covers it first");
+    const formatted = formatPlanReport(report);
+    expect(formatted.summary).toContain("deal with what covers it first");
+    // The screen as it is then goes with the report (the dialog's title only there, as screen text).
+    expect(formatted.summary).not.toContain("Save changes");
+    expect(formatted.screen).toContain('dialog "Save changes to report.odt?" [ref=e39]');
   });
 
   test("an element in a window reads with its window, and a window without a number stays in the overview", () => {

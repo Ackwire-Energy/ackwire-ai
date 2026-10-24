@@ -7813,6 +7813,7 @@ export const en: Translations = {
       off: "Off",
       unavailable: "Not available",
       offHelp: "Turn on the desktop and commands on this computer:",
+      linuxOnly: "Agents use apps on their own desktops only on Linux computers.",
       agent: "{{name}} can't use apps on its desktop on {{computer}} yet.",
     },
   },
