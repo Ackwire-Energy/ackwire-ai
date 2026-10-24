@@ -1,15 +1,16 @@
-# agentes.chat: the app and Postgres with pgvector. In an empty directory:
-#   curl -fsSLO https://raw.githubusercontent.com/agentes-chat/agentes-chat/main/docker-compose.yml
-#   (umask 077 && printf 'AGENTES_SECRET=%s\nPOSTGRES_PASSWORD=%s\nPUBLIC_URL=http://localhost:3000\n' "$(openssl rand -base64 48)" "$(openssl rand -hex 24)" > .env)
-#   docker compose up -d
-# Then open PUBLIC_URL (on a server, through an SSH tunnel) and sign up: the first account owns the
-# instance. The rest: SELF_HOSTING.md.
+# agentes.chat: the app and Postgres with pgvector. To set it up, in an empty directory:
+#   npx @agenteschat/setup
+# By hand, and everything else: SELF_HOSTING.md.
+#
+# How people reach it, by COMPOSE_PROFILES in .env:
+#   tailscale  private HTTPS on your tailnet at https://<TS_HOSTNAME>.<tailnet>.ts.net, no domain and no
+#              open port (the setup's default; TS_AUTHKEY joins it to the tailnet on the first start)
+#   https      a public DOMAIN with a Let's Encrypt certificate (Caddy), on ports 80 and 443
+#   neither    http://localhost:3000 on this machine only
 #
 # Upgrade: download this file again (settings live in .env, never here), then docker compose pull
 # && docker compose up -d (migrations run on boot). To hold a version, set AGENTES_IMAGE in .env to
 # a version tag or an @sha256 digest.
-# HTTPS with automatic certificates, once the owner account exists: DOMAIN=chat.example.com,
-# PUBLIC_URL=https://chat.example.com and COMPOSE_PROFILES=https in .env.
 services:
   postgres:
     # pgvector: the first migration creates the vector extension.
@@ -55,6 +56,41 @@ services:
     tmpfs:
       - /tmp
 
+  tailscale:
+    image: tailscale/tailscale:v1.102.5@sha256:c507f3a2a6ab1cabd8d809b98edeb41edbd5c3fb6ad9632ffd098b4c7d0b4065
+    profiles: ["tailscale"]
+    # Joins the tailnet as TS_HOSTNAME and serves HTTPS with Tailscale's certificate, proxied to the app
+    # (WebSockets included), with X-Forwarded-For set to the client alone. Userspace networking: no
+    # /dev/net/tun, no NET_ADMIN, nothing published on this machine.
+    environment:
+      TS_AUTHKEY: "${TS_AUTHKEY:-}"
+      TS_HOSTNAME: "${TS_HOSTNAME:-agentes}"
+      TS_EXTRA_ARGS: "${TS_EXTRA_ARGS:-}"
+      TS_STATE_DIR: /var/lib/tailscale
+      # The key logs in once; after that the node logs in from its state in the volume.
+      TS_AUTH_ONCE: "true"
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: "127.0.0.1:9002"
+    configs:
+      - source: tailscale-serve-${TAILSCALE_FUNNEL:-false}
+        target: /config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    restart: unless-stopped
+    healthcheck:
+      # 200 once the node has a tailnet address.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9002/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   caddy:
     image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     profiles: ["https"]
@@ -75,7 +111,27 @@ services:
     cap_add:
       - NET_BIND_SERVICE
 
+configs:
+  # Tailscale's serve config. The container fills in TS_CERT_DOMAIN, its ts.net name ($$ keeps it from
+  # Compose). TAILSCALE_FUNNEL in .env picks one: true opens it to the internet (SELF_HOSTING.md). Two
+  # configs rather than the variable inside the JSON: any other value then fails at docker compose up,
+  # where invalid JSON would make the container exit at every start.
+  tailscale-serve-false:
+    content: |
+      {
+        "TCP": { "443": { "HTTPS": true } },
+        "Web": { "$${TS_CERT_DOMAIN}:443": { "Handlers": { "/": { "Proxy": "http://agentes:3000" } } } }
+      }
+  tailscale-serve-true:
+    content: |
+      {
+        "TCP": { "443": { "HTTPS": true } },
+        "Web": { "$${TS_CERT_DOMAIN}:443": { "Handlers": { "/": { "Proxy": "http://agentes:3000" } } } },
+        "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": true }
+      }
+
 volumes:
   pgdata:
   files:
   caddy-data:
+  tailscale-state:

@@ -17,5 +17,6 @@ USER bun
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=120s \
   CMD ["bun", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-# ENTRYPOINT, not CMD, so `docker compose run --rm agentes migrate` reaches main.ts as argv.
-ENTRYPOINT ["bun", "apps/server/src/main.ts"]
+# ENTRYPOINT, not CMD, so `docker compose run --rm agentes migrate` reaches main.ts as argv. An
+# absolute path: `docker run -w /work … setup` runs it from the directory being set up.
+ENTRYPOINT ["bun", "/app/apps/server/src/main.ts"]

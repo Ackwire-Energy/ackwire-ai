@@ -178,7 +178,8 @@ jobs:
           - shard: 2
             paths: >-
               packages/engine/test/[!a-m]*.test.ts packages/adapters packages/config packages/db
-              packages/modules packages/providers packages/client packages/i18n packages/tokens apps/server
+              packages/modules packages/providers packages/client packages/i18n packages/tokens packages/setup
+              apps/server
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - *setup-bun
