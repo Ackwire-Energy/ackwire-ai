@@ -1,0 +1,225 @@
+/* The usage views (PlanUsage.tsx, pages/agent/UsageTab.tsx). Flat: hairlines, no wells. */
+
+.plan-acct {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.plan-acct__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.plan-acct__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+.plan-acct__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 6px 6px 6px 2px;
+  background: var(--plate);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--muted);
+}
+.plan-acct__chip--out {
+  color: var(--warn);
+}
+.plan-acct__sub {
+  font-size: 13.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Configurações › Uso: the accounts by computer. */
+.plan-machines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plan-machine__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.plan-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 0;
+}
+.plan-block + .plan-block {
+  border-top: 1px solid var(--line);
+}
+.plan-block__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.plan-block__month {
+  white-space: nowrap;
+}
+.plan-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.plan-legend__agent,
+.plan-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.plan-legend__agent b,
+.plan-legend__item b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.plan-legend__agent:hover b {
+  text-decoration: underline;
+}
+
+/* The API per agent. */
+.plan-api {
+  display: flex;
+  flex-direction: column;
+}
+.plan-api__row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 150px) minmax(0, 1fr) 170px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  color: inherit;
+  text-decoration: none;
+}
+.plan-api__row + .plan-api__row {
+  border-top: 1px solid var(--line);
+}
+.plan-api__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.plan-api__name b {
+  font-weight: 600;
+}
+.plan-api__name small,
+.plan-api__value small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.plan-api__value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 14px;
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The agent's "Uso" tab. */
+.plan-sentence {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.plan-axis {
+  display: grid;
+  grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr));
+  gap: 3px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.plan-axis span {
+  text-align: center;
+}
+.plan-sources {
+  display: flex;
+  flex-direction: column;
+}
+.plan-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px 120px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+}
+.plan-source + .plan-source {
+  border-top: 1px solid var(--line);
+}
+.plan-source__key {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 4px;
+  color: var(--agent);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.plan-source__n {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.plan-source__n b {
+  font-size: 15px;
+}
+.plan-source__n small {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .plan-api__row {
+    grid-template-columns: 28px minmax(0, 1fr) 120px;
+  }
+  .plan-api__meter {
+    display: none;
+  }
+  .plan-source {
+    grid-template-columns: minmax(0, 1fr) 100px;
+  }
+  .plan-source > .ac-meter {
+    display: none;
+  }
+}

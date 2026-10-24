@@ -33,7 +33,8 @@ export const SETTINGS_SECTIONS: {
   { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
   // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
   { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
-  { id: "usage", icon: "wallet", group: "costs", allowed: (r) => can(r, "view_usage") },
+  // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
+  { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "read") },
   { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },

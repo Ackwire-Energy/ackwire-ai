@@ -8,3 +8,6 @@ export const planModelOptions = (plan: CodingPlan) =>
 
 /** The plan of an account (its `provider`), or none for the CLI's own sign-in. */
 export const accountPlan = (account: { provider: string | null } | null | undefined) => planOf(account?.provider);
+
+/** The plan as the CLI says it (`team`, `max`), as a name ("Team"). */
+export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);

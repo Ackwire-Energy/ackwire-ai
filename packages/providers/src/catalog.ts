@@ -275,18 +275,37 @@ export const contextWindowOf = (model: string) => MODEL_CATALOG[model]?.contextW
 
 export const isKnownModel = (model: string) => Object.hasOwn(MODEL_CATALOG, model);
 
+/** The catalog id of a model a CLI named (`claude-opus-5-5[1m]`, a dated `…-20261001`); null when it has no price. */
+export function catalogModelOf(model: string | null | undefined): string | null {
+  const base = model?.replace(/\[[^\]]*\]$/, "").replace(/-\d{8}$/, "");
+  return base && isKnownModel(base) ? base : null;
+}
+
+const tokensCost = (p: TokenPrices, u: ModelUsage) =>
+  u.inputTokens * p.input +
+  u.outputTokens * p.output +
+  u.cacheReadTokens * p.cacheRead +
+  u.cacheWriteTokens * p.cacheWrite;
+
 /** Cost of one call in nano-USD. Throws for models outside the catalog (we never make a call we can't price). */
 export function costNanoUsd(model: string, usage: ModelUsage): number {
   const info = MODEL_CATALOG[model];
   if (!info) throw new Error(`unknown model ${model}`);
   const prompt = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
-  const p = info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
-  return (
-    usage.inputTokens * p.input +
-    usage.outputTokens * p.output +
-    usage.cacheReadTokens * p.cacheRead +
-    usage.cacheWriteTokens * p.cacheWrite
+  return tokensCost(
+    info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices,
+    usage,
   );
+}
+
+/**
+ * Many calls' tokens added up, at the base prices: a sum's prompt says nothing about any one call's, so it
+ * never crosses a long-context threshold. Throws for models outside the catalog.
+ */
+export function summedCostNanoUsd(model: string, usage: ModelUsage): number {
+  const info = MODEL_CATALOG[model];
+  if (!info) throw new Error(`unknown model ${model}`);
+  return tokensCost(info.prices, usage);
 }
 
 /**

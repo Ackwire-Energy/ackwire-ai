@@ -91,6 +91,7 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
     void qc.invalidateQueries({ predicate: (q) => isAgentBrainKey(q.queryKey, orgId) });
     void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
+    void qc.invalidateQueries({ queryKey: keys.planUsage(orgId) });
   }
   switch (e.type) {
     case "machine.status": {

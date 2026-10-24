@@ -394,16 +394,16 @@ export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("Br
 
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
+export const PlanWindow = z.object({
+  kind: z.enum(["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"]),
+  label: z.string().optional().openapi({ description: "`other`: the provider's name for it." }),
+  usedPercent: z.number().openapi({ description: "0–100." }),
+  resetsAt: z.string().optional(),
+});
+
 export const PlanUsage = z
   .object({
-    windows: z.array(
-      z.object({
-        kind: z.enum(["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"]),
-        label: z.string().optional().openapi({ description: "`other`: the provider's name for it." }),
-        usedPercent: z.number().openapi({ description: "0–100." }),
-        resetsAt: z.string().optional(),
-      }),
-    ),
+    windows: z.array(PlanWindow),
     limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
     source: z.enum(["turn", "probe"]),
     at: z.string().openapi({ description: "When the computer learned it." }),
