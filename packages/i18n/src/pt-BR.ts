@@ -4169,6 +4169,7 @@ export const ptBR = {
       email: "Qual conta? (opcional)",
       emailHelp: "O email da conta do Claude que vai pensar. Vazio: você escolhe na página do Claude.",
       emailInvalid: "Use um email simples, como ana@exemplo.com.",
+      emailPlaceholder: "ana@exemplo.com",
       titleKey: "Conectar {{plan}}",
       keyStep: "Crie a chave do seu plano",
       keySite: "Fica em {{site}}. Copie a chave inteira.",

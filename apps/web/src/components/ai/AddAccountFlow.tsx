@@ -395,7 +395,7 @@ function AddAccountFlow({
                 value={email}
                 autoComplete="email"
                 spellCheck={false}
-                placeholder="ana@exemplo.com"
+                placeholder={t("aiAccounts.add.emailPlaceholder")}
                 aria-label={t("aiAccounts.add.email")}
                 disabled={starting}
                 onChange={(e) => {

@@ -4158,6 +4158,7 @@ export const en: Translations = {
       email: "Which account? (optional)",
       emailHelp: "The email of the Claude account that will think. Empty: you choose on Claude's page.",
       emailInvalid: "Use a plain email, like ana@example.com.",
+      emailPlaceholder: "ana@example.com",
       titleKey: "Connect {{plan}}",
       keyStep: "Create your plan's key",
       keySite: "It's at {{site}}. Copy the whole key.",
