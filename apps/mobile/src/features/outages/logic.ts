@@ -1,3 +1,4 @@
+import { managedTitle } from "@agenteschat/client/lib/computer";
 import {
   agentWaitingPhrase,
   type ComputerBrain,
@@ -33,6 +34,8 @@ export interface MachineOutage {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: MachineOutageAgent[];
   waitingRuns: number;
@@ -96,6 +99,14 @@ export function sheetDesc(t: TFunction, o: OutageLike, agentIds: ReadonlySet<str
   });
 }
 
+/**
+ * The workspace's own computer as people call it ("Computador da Acme", its system never shown); any other
+ * computer as it is. For outages and the sheet's targets alike.
+ */
+export function named<T extends { name: string | null; managed?: boolean }>(t: TFunction, c: T, orgName: string): T {
+  return c.managed ? { ...c, name: managedTitle(t, c.name, orgName) } : c;
+}
+
 /** The icon of a target or a computer: by its platform, the cloud one for the cloud. */
 export function computerIcon(platform: string | null | undefined, cloud = false) {
   const kind = computerKind(platform, cloud);
@@ -125,6 +136,8 @@ export function targetText(t: TFunction, x: TargetOption) {
   }
   if (x.kind === "cloud")
     return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.cloudDesc") };
+  // The workspace's own computer: always on, a user of its own for each agent.
+  if (x.managed) return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.managedDesc") };
   const brains = x.brains.map((b) => BRAIN_NAME[b]).join(t("mobile.outage.sheet.and"));
   return {
     title,

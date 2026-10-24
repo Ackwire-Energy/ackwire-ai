@@ -1084,6 +1084,7 @@ export const featureKeysEn: FeatureTranslations = {
       cloud: "Cloud computer",
       cloudTag: "Always on",
       cloudDesc: "Without your computer's folders; the repository comes from GitHub",
+      managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
       and: " and ",
       none: "No other computer can take these agents right now. Connect one on the website.",

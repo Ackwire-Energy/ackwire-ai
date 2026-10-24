@@ -243,6 +243,12 @@ test("standing: hold, suspend and restore a workspace; the app API enforces it",
   const app = (path: string, init?: Parameters<Browser>[1]) => owner(`/api/app/organizations/${orgId}${path}`, init);
   const invite = () => app("/invitations", { json: { email: "new-hire@acme.test", role: "member" } });
   const error = async (res: Response) => ((await res.json()) as { error: Record<string, unknown> }).error;
+  // What its people are told (the banner, the suspended screen): never the note, the reason only when shown.
+  const told = async () =>
+    (
+      await body<{ organizations: { id: string; standing?: unknown }[] }>(await owner("/api/app/me"))
+    ).organizations.find((o) => o.id === orgId)?.standing;
+  expect(await told()).toEqual({ state: "active", reason: null });
 
   for (const bad of [
     { state: "paused", reason: "x", notice: "shown" },
@@ -274,6 +280,7 @@ test("standing: hold, suspend and restore a workspace; the app API enforces it",
   expect((await body<{ standing: unknown }>(await op(`/orgs/${orgId}`))).standing).toEqual(held);
   const onHold = await body<Page>(await op("/orgs?standing=hold"));
   expect(onHold.orgs.map((o) => [o.name, o.standing])).toEqual([["Acme", "hold"]]);
+  expect(await told()).toEqual({ state: "hold", reason: "Unpaid invoice" });
   // People still use it; nothing new goes out.
   expect((await app("/members")).status).toBe(200);
   const refused = await invite();
@@ -285,6 +292,8 @@ test("standing: hold, suspend and restore a workspace; the app API enforces it",
   });
 
   await body(await put(`/orgs/${orgId}/standing`, { state: "suspended", reason: "Phishing", notice: "silent" }));
+  // Silent: its people learn it is closed, not why; `/me` still lists it, for its screen.
+  expect(await told()).toEqual({ state: "suspended", reason: null });
   const locked = await app("/members");
   expect(locked.status).toBe(403);
   expect(await error(locked)).toEqual({ code: "org.suspended", message: "This workspace is unavailable for now." });

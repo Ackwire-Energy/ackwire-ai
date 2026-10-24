@@ -63,7 +63,7 @@ export interface Membership {
   role: MemberRole;
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
-  /** The workspace's standing (`standing.ts`; getMembership). */
+  /** The workspace's standing (`standing.ts`). */
   standing?: WorkspaceStanding;
 }
 
@@ -74,6 +74,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       orgName: organizations.name,
       role: organizationMembers.role,
       orgLogo: organizations.logo,
+      standing: STANDING_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))

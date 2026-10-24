@@ -59,7 +59,9 @@ describe("sign-up policy (self-host)", () => {
     const token = url.split("/invite/")[1];
     expect((await ana(`/api/app/invitations/${token}/accept`, { json: {} })).status).toBe(200);
     const me = (await (await ana("/api/app/me")).json()) as { organizations: { id: string; role: string }[] };
-    expect(me.organizations).toEqual([{ id: orgId, name: "Acme", role: "member", logo: null }] as never);
+    expect(me.organizations).toEqual([
+      { id: orgId, name: "Acme", role: "member", logo: null, standing: { state: "active", reason: null } },
+    ] as never);
   });
 });
 

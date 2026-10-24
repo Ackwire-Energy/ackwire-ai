@@ -1,5 +1,5 @@
 import { useMachines } from "@agenteschat/client";
-import { computerKind } from "@agenteschat/client/lib/machines";
+import { machineKind } from "@agenteschat/client/lib/machines";
 import { COMPUTER_GRID } from "@agenteschat/ui/computer/portrait";
 import { Canvas, createPicture, PaintStyle, Picture, Skia, type SkPaint } from "@shopify/react-native-skia";
 import { memo, useEffect, useMemo, useState } from "react";
@@ -108,10 +108,10 @@ export function ComputerIcon({ kind, size = 16, color }: { kind: ComputerKind; s
 
 /**
  * Which portrait a machine gets, from the org's computers (the lists that name a machine carry only its
- * id, name and whether it's online). Linux, the server, until the list arrives.
+ * id, name and whether it's online): the workspace's own computer is the cloud one. Linux, the server, until
+ * the list arrives.
  */
 export function useComputerKind(orgId: string, machineId: string | null | undefined): ComputerKind {
   const machines = useMachines(orgId, Boolean(machineId));
-  const os = machineId ? machines.data?.find((m) => m.id === machineId)?.os : undefined;
-  return computerKind(os);
+  return machineKind(machineId ? machines.data?.find((m) => m.id === machineId) : undefined);
 }

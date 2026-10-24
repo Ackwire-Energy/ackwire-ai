@@ -7,6 +7,7 @@ import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
 import { NoOrganization } from "@/ui/auth/NoOrganization";
+import { SuspendedWorkspace } from "@/ui/auth/SuspendedWorkspace";
 import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
@@ -55,6 +56,7 @@ function Gate() {
         </Stack.Protected>
       </Stack>
       {ready && signedIn && org.none ? <NoOrganization /> : null}
+      {ready && signedIn && org.state ? <SuspendedWorkspace state={org.state} /> : null}
     </NavigationThemeProvider>
   );
 }

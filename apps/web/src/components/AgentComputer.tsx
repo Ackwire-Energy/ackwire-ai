@@ -23,11 +23,14 @@ import {
   POLL_MS,
   READY_FLASH_MS,
   reached,
+  type SetupView,
+  setupPending,
+  setupPortrait,
 } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { computerKind, computerState, folderName, foldersOfAgent } from "@agenteschat/client/lib/machines";
+import { computerState, folderName, foldersOfAgent, machineKind } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
@@ -62,6 +65,7 @@ import { LoadingCards, LoadingLine } from "@/components/Loading";
 import { MachineChip } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { ReconnectThisMacButton, ThisMacButton, useIsThisMac } from "@/components/ThisMac";
+import { SetupProgress, useSetupView } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
@@ -294,6 +298,8 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
   const { org } = useOrg();
   // In agentes for Mac, offline on this very Mac: reconnect from here (ADR 0036).
   const here = useIsThisMac(org.id, target.machineId);
+  // The workspace's own computer: nobody connected it, nobody turns it on or off.
+  const managed = useMachines(org.id).data?.find((m) => m.id === target.machineId)?.kind === "managed";
   return (
     <span className="stack-4" style={{ gap: 4 }}>
       <span className="row" style={{ gap: 8, alignItems: "center" }}>
@@ -301,11 +307,13 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
         <MachineChip online={target.online} />
       </span>
       <span className="small muted">
-        {target.online
-          ? t("computer.machineHint")
-          : here
-            ? t("machines.thisMac.offline")
-            : t("computer.machineOffline")}
+        {managed
+          ? t("computerSetup.managedHint")
+          : target.online
+            ? t("computer.machineHint")
+            : here
+              ? t("machines.thisMac.offline")
+              : t("computer.machineOffline")}
       </span>
       {!target.online && here && (
         <span>
@@ -379,7 +387,7 @@ function ComputerTargetSelect({
         leading: (
           <span className="newag__ib">
             <ComputerIcon
-              kind={o.value === CLOUD ? "cloud" : computerKind(list.find((m) => m.id === o.value)?.os)}
+              kind={o.value === CLOUD ? "cloud" : machineKind(list.find((m) => m.id === o.value))}
               size={16}
             />
           </span>
@@ -415,9 +423,21 @@ function TargetPortrait({ target, display }: { target: ComputerTarget; display: 
   return (
     <ComputerPortrait
       className="agp-pc__logo"
-      kind={computerKind(m?.os)}
+      kind={machineKind(m)}
       state={m ? computerState(m) : target.online ? "online" : "offline"}
     />
+  );
+}
+
+/** The workspace's own computer on its way, for an agent that gets it once it's ready. */
+function WaitingForComputer({ view, title, agentName }: { view: SetupView; title: string; agentName: string }) {
+  const { t } = useTranslation();
+  return (
+    <span className="stack-4" style={{ gap: 6 }}>
+      <span className="computer-machine__name">{title}</span>
+      <SetupProgress view={view} />
+      <span className="small muted">{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>
+    </span>
   );
 }
 
@@ -441,19 +461,30 @@ export function AgentComputerPanel({
   machineNote?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const life = useComputerLifecycle(agent);
+  const setup = useSetupView(org.id);
   const { pc } = life;
   const g = agentGrammar(t, agent.name);
   if (pc.isLoading) return <LoadingLine width={240} />;
   if (pc.isError || !pc.data) return <p className="small muted">{t("agentPage.computer.unavailable")}</p>;
   const target = targetOf(pc.data);
   const empty = pc.data.status === "none" && !life.busy;
+  // No computer yet where the workspace's own is on its way: that one is the agent's (its first hello gives it).
+  const waiting = target.kind === "cloud" && setupPending(setup) ? setup : null;
+  const workspaceComputer = t("computerSetup.title", { org: org.name });
   return (
     <div className="agp-pc">
       <div className="agp-pc__now">
-        <TargetPortrait target={target} display={life.display} />
+        {waiting ? (
+          <ComputerPortrait className="agp-pc__logo" kind="cloud" state={setupPortrait(waiting, false)} />
+        ) : (
+          <TargetPortrait target={target} display={life.display} />
+        )}
         <span className="agp-pc__text">
-          {target.kind === "machine" ? (
+          {waiting ? (
+            <WaitingForComputer view={waiting} title={workspaceComputer} agentName={agent.name} />
+          ) : target.kind === "machine" ? (
             <MachineTargetView target={target} />
           ) : empty ? (
             <span className="muted">{t("computer.emptyText", g)}</span>
@@ -470,7 +501,7 @@ export function AgentComputerPanel({
             <span className="small muted">{t("sandbox.providerDefault")}</span>
           )}
         </span>
-        {admin && target.kind === "cloud" && (
+        {admin && target.kind === "cloud" && !waiting && (
           <span className="agp-pc__act">
             {empty ? (
               <Button size="sm" variant="primary" onClick={() => life.run("start")}>
@@ -488,7 +519,9 @@ export function AgentComputerPanel({
         {onMachine ? (
           <ComputerTargetSelect target={target} value={machine} onChange={onMachine} admin={admin} />
         ) : (
-          <span className="agp-ro">{target.kind === "machine" ? target.name : t("computer.target.cloud")}</span>
+          <span className="agp-ro">
+            {target.kind === "machine" ? target.name : waiting ? workspaceComputer : t("computer.target.cloud")}
+          </span>
         )}
         {machineNote}
         {onMachine && (
@@ -859,6 +892,7 @@ export function AgentComputersCard() {
   const admin = can(org.role, "configure");
   const agents = useAgents(org.id);
   const machines = useMachines(org.id);
+  const setup = useSetupView(org.id);
   const list = agents.data ?? [];
   return (
     <Card aria-labelledby="sec-agent-computers">
@@ -875,7 +909,13 @@ export function AgentComputersCard() {
       ) : (
         <List aria-label={t("computers.agents.title")}>
           {list.map((a) => (
-            <AgentComputerRow key={a.id} agent={a} admin={admin} machines={machines.data ?? []} />
+            <AgentComputerRow
+              key={a.id}
+              agent={a}
+              admin={admin}
+              machines={machines.data ?? []}
+              pending={setupPending(setup) ? setup : null}
+            />
           ))}
         </List>
       )}
@@ -883,20 +923,36 @@ export function AgentComputersCard() {
   );
 }
 
-function AgentComputerRow({ agent, admin, machines }: { agent: Agent; admin: boolean; machines: Machine[] }) {
+function AgentComputerRow({
+  agent,
+  admin,
+  machines: all,
+  pending,
+}: {
+  agent: Agent;
+  admin: boolean;
+  machines: Machine[];
+  /** The workspace's own computer on its way: "no computer yet" stands for it, its row isn't offered apart. */
+  pending: SetupView | null;
+}) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const toast = useToast();
   const setTarget = useSetComputerTarget(org.id);
+  const machines = pending ? all.filter((m) => m.kind !== "managed") : all;
   const current = machines.find((m) => m.agents.some((a) => a.id === agent.id));
   const value = current?.id ?? CLOUD;
   const choices = machines.filter((m) => admin || m.pairedBy?.id === me.user.id || m.id === value);
   const canPick = (admin || agent.ownerUserId === me.user.id) && choices.length > 0;
-  const kindOf = (id: string) => (id === CLOUD ? "cloud" : computerKind(machines.find((m) => m.id === id)?.os));
-  const nameOf = (id: string) =>
-    id === CLOUD ? t("computer.target.cloud") : (machines.find((m) => m.id === id)?.name ?? id);
+  const kindOf = (id: string) => (id === CLOUD ? "cloud" : machineKind(machines.find((m) => m.id === id)));
+  const cloudName = pending ? t("computerSetup.title", { org: org.name }) : t("computer.target.cloud");
+  const nameOf = (id: string) => (id === CLOUD ? cloudName : (machines.find((m) => m.id === id)?.name ?? id));
   const options: SelectOption[] = [
-    { value: CLOUD, label: t("computer.target.cloud"), description: t("computers.agents.ready") },
+    {
+      value: CLOUD,
+      label: cloudName,
+      description: pending ? t(pending.chipKey) : t("computers.agents.ready"),
+    },
     ...choices.map((m) => ({
       value: m.id,
       label: m.name,
@@ -908,7 +964,7 @@ function AgentComputerRow({ agent, admin, machines }: { agent: Agent; admin: boo
       <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />
       <span className="list-col computers-agent__main">
         <span style={{ fontWeight: 600 }}>{agent.name}</span>
-        {admin && value === CLOUD && <CloudStatus agent={agent} />}
+        {admin && value === CLOUD && !pending && <CloudStatus agent={agent} />}
       </span>
       {canPick ? (
         <Select

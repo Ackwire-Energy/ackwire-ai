@@ -65,12 +65,23 @@ export interface User {
   image: string | null;
 }
 
+/** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */
+export type StandingState = "active" | "hold" | "suspended";
+
+/** What a member is told of the workspace's standing: `reason` only when the people who run the server show it. */
+export interface OrgStanding {
+  state: StandingState;
+  reason: string | null;
+}
+
 export interface OrgSummary {
   id: string;
   name: string;
   role: Role;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
+  /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
+  standing?: OrgStanding;
 }
 
 export interface Me {
@@ -494,6 +505,9 @@ export type ChannelEvent =
       runId: string;
       status: "done" | "failed" | "waiting_approval";
       error?: string;
+      /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
     }
   // ── Chat delivery (packages/engine/src/events.ts) ───────────────────────────
   /**
@@ -2031,6 +2045,8 @@ export interface Machine {
   /** `linux`, `darwin`, `windows` or `other` (`MachineOs`). */
   os: string;
   arch: string;
+  /** `system`: each agent works as its own OS user, in its own folder (ADR 0057). Absent on older servers: `single`. */
+  mode?: "system" | "single";
   runnerVersion: string;
   /** `false`: started with `--no-exec` (files and uploads only). */
   execAllowed: boolean;
@@ -2059,6 +2075,28 @@ export interface HostComputer {
   machineId: string;
   /** false: an admin stopped it in this organization. */
   on: boolean;
+}
+
+/** The provisioner's steps while the workspace's own computer is being prepared (ADR 0056 §10), in order. */
+export type ComputerSetupStep = "reserving" | "starting" | "installing" | "connecting";
+
+/**
+ * `GET …/computer-setup` (every member): `pair` where people connect their own computers (the rest null);
+ * `external` where the workspace gets its own computer, and how far it is. `machine.provisioning` events carry
+ * the same fields but `mode`.
+ */
+export interface ComputerSetup {
+  mode: "external" | "pair";
+  state: "preparing" | "waiting" | "problem" | "ready" | null;
+  /** While `preparing`. */
+  step: ComputerSetupStep | null;
+  /** While `waiting`: `approval` (soon) or `capacity` (taking longer than usual). */
+  reason: "approval" | "capacity" | null;
+  since: string | null;
+  etaSeconds: number | null;
+  specs: { cpus: number; memoryGb: number; diskGb: number } | null;
+  /** The computer itself, once the provisioner made it. */
+  machineId: string | null;
 }
 
 /** The agent browser on a computer, as its runner reports it. Turned on at the computer (`access.tools.browser`). */
@@ -2150,8 +2188,10 @@ export interface OutageAgent {
 export interface MachineOutage {
   machineId: string;
   name: string;
-  /** The machine's `os` (`darwin`, `windows`, `linux`…). */
+  /** The machine's `os` (`darwin`, `windows`, `linux`…); `other` for the workspace's own computer. */
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: OutageAgent[];
   /** Runs parked until the computer (or another one) can take them. */
@@ -2165,6 +2205,8 @@ export type OutageTarget =
       machineId: string;
       name: string;
       platform: string;
+      /** The workspace's own computer (ADR 0056 §10). */
+      managed?: boolean;
       online: boolean;
       brains: ComputerBrain[];
       /** Why it can't take them now, or null. */

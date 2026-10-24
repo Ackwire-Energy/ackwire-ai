@@ -1,5 +1,6 @@
 import type { Machine, Model, Role } from "@agenteschat/client";
-import { keys, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
+import { keys, useComputerSetup, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
+import { type SetupView, setupPortrait, setupView } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind, hostDescKey } from "@agenteschat/client/lib/machines";
@@ -54,6 +55,7 @@ import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton } from "@/components/ThisMac";
+import { SetupFacts, SetupProgress } from "@/components/WorkspaceComputer";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
@@ -393,6 +395,10 @@ export function OnboardingPage() {
 
   const sandbox = useSandboxSettings(created?.orgId ?? "", Boolean(created) && step.id === "computer");
   const cloudAvailable = sandbox.data?.available !== false;
+  // Where the workspace gets its own computer (ADR 0056 §10): no choice to make, only its progress (polled:
+  // no socket is open here).
+  const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), step.id === "computer" ? 5000 : false);
+  const workspaceComputer = setupView(setup.data);
 
   const saveComputer = useMutation({
     mutationFn: async () => {
@@ -499,7 +505,7 @@ export function OnboardingPage() {
     (step.id === "workspace" && !org.trim()) ||
     (step.id === "agents" && agentsPhase === "key" && (!keyOk || !budgetOk)) ||
     (step.id === "import" && !flow.planned) ||
-    (step.id === "computer" && (computer === null || (computer === "machine" && !machine)));
+    (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine)));
 
   // What the rail shows under each done step.
   const railValue: Partial<Record<OnboardingStepId, string>> = {
@@ -511,8 +517,9 @@ export function OnboardingPage() {
           t("newAgent.and"),
         )
       : t("onboarding.railValue.skipped"),
-    computer:
-      computer === "cloud"
+    computer: workspaceComputer
+      ? t("computerSetup.title", { org: orgName })
+      : computer === "cloud"
         ? t("onboarding.done.computerCloud")
         : computer === "host"
           ? t("machines.host.label")
@@ -562,7 +569,7 @@ export function OnboardingPage() {
               ? t("onboarding.actions.invite", { count: toSend.length })
               : t("onboarding.actions.continue");
   // "Pular esta etapa" only on optional steps ("agents" never is, so its key phase needs no exception).
-  const showSkip = step.optional;
+  const showSkip = step.optional && !(step.id === "computer" && workspaceComputer);
   const back = () => {
     if (step.id === "agents" && agentsPhase === "key") setAgentsPhase("pick");
     else go(index - 1);
@@ -758,7 +765,19 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {step.id === "computer" && created && (
+          {step.id === "computer" && created && workspaceComputer && (
+            <div className="onb__answer">
+              <WorkspaceComputerStep view={workspaceComputer} orgName={orgName} />
+            </div>
+          )}
+
+          {step.id === "computer" && created && setup.isLoading && (
+            <div className="onb__answer">
+              <Spinner />
+            </div>
+          )}
+
+          {step.id === "computer" && created && !workspaceComputer && !setup.isLoading && (
             <div className="onb__answer">
               <ComputerStep
                 orgId={created.orgId}
@@ -998,13 +1017,15 @@ export function OnboardingPage() {
               orgName={orgName}
               agents={crew}
               computer={
-                computer === "cloud"
-                  ? "cloud"
-                  : computer === "host"
-                    ? t("machines.host.label")
-                    : computer === "machine"
-                      ? (machine?.name ?? null)
-                      : undefined
+                workspaceComputer
+                  ? t("computerSetup.title", { org: orgName })
+                  : computer === "cloud"
+                    ? "cloud"
+                    : computer === "host"
+                      ? t("machines.host.label")
+                      : computer === "machine"
+                        ? (machine?.name ?? null)
+                        : undefined
               }
               invites={sent.size}
               wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
@@ -1364,6 +1385,30 @@ function ComputerStep({
         </Card>
       )}
     </>
+  );
+}
+
+/** Where the workspace gets its own computer: it is being prepared, live, and the person goes on meanwhile. */
+function WorkspaceComputerStep({ view, orgName }: { view: SetupView; orgName: string }) {
+  const { t } = useTranslation();
+  return (
+    <Card as="div" className="onb__workspace-computer">
+      <div className="row" style={{ gap: 16, alignItems: "center" }}>
+        <ComputerPortrait kind="cloud" state={setupPortrait(view, true)} size={96} />
+        <span className="stack-4" style={{ gap: 4 }}>
+          <b>{t("computerSetup.title", { org: orgName })}</b>
+          <span className="small muted">{t("computerSetup.lead")}</span>
+        </span>
+      </div>
+      <SetupProgress view={view} />
+      <SetupFacts view={view} />
+      {view.phase !== "ready" && (
+        <p className="onb__status">
+          <Icon name="check" />
+          <span>{t("computerSetup.continue")}</span>
+        </p>
+      )}
+    </Card>
   );
 }
 

@@ -87,6 +87,13 @@ export function computerKind(os: string | null | undefined, cloud = false): Comp
   return "linux";
 }
 
+/**
+ * A computer of the list's portrait: the workspace's own computer is drawn as the cloud one (its OS is never
+ * shown); one not in the list (yet), as a server.
+ */
+export const machineKind = (m: Pick<Machine, "os" | "kind"> | undefined): ComputerKind =>
+  computerKind(m?.os, m?.kind === "managed");
+
 /** Paused wins over online (a paused machine is still connected); otherwise online or offline. */
 export function computerState(m: Pick<Machine, "online" | "paused">, now = Date.now()): ComputerState {
   if (isPaused(m, now)) return "paused";

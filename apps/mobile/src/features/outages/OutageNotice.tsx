@@ -1,10 +1,11 @@
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Button, Icon, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
-import { computerIcon, type MachineOutage, noticeText } from "./logic";
+import { computerIcon, type MachineOutage, named, noticeText } from "./logic";
 import { useMachineOutages } from "./queries";
 
 /** Opens "Trocar o computador" for an offline computer (a native form sheet). */
@@ -18,12 +19,14 @@ export const openSwitchComputer = (machineId: string) => router.push(`/switch-co
  * (the endpoint refuses the others); nothing while none is offline.
  */
 export function OutageNotices() {
+  const { t } = useTranslation();
+  const orgName = useOrg().org?.name ?? "";
   const { outages } = useMachineOutages();
   if (outages.length === 0) return null;
   return (
     <View style={styles.list}>
       {outages.map((o) => (
-        <OutageNotice key={o.machineId} outage={o} />
+        <OutageNotice key={o.machineId} outage={named(t, o, orgName)} />
       ))}
     </View>
   );
@@ -42,7 +45,7 @@ function OutageNotice({ outage: o }: { outage: MachineOutage }) {
         accessibilityRole="summary"
         accessibilityLabel={`${t("mobile.outage.a11y")}. ${text.title}. ${text.sub}`}
       >
-        <Icon name={computerIcon(o.platform)} size={22} color={c.amber} />
+        <Icon name={computerIcon(o.platform, o.managed)} size={22} color={c.amber} />
         <View style={styles.tx}>
           <Text variant="callout" tone="ink" style={styles.bold} numberOfLines={2}>
             {text.title}

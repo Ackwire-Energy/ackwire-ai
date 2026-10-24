@@ -25,7 +25,8 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
+import { setupPending, setupPortrait } from "@agenteschat/client/lib/computer";
+import { commandInReason, computerState, machineKind } from "@agenteschat/client/lib/machines";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
@@ -72,6 +73,7 @@ import { cleanSite, SITE } from "@/components/browser/sites";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";
+import { useSetupView } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { limitOffers, planMeterText, planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -161,7 +163,9 @@ function Cell({
  */
 export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const { agent, viewer, saved, can, g } = useAgentEdit();
+  const setup = useSetupView(org.id);
   const models = useModels();
   const work = useWork();
   const view = work.brain.data;
@@ -208,6 +212,8 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       : null;
   const target = work.target;
   const machine = target?.kind === "machine" ? target : null;
+  // No computer yet where the workspace's own is on its way: it works there once it's ready.
+  const waiting = !machine && setupPending(setup) ? setup : null;
   const member = viewer === "member";
   const reason = work.browser.data?.reason;
   const steps =
@@ -223,8 +229,15 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
           {!member && (
             <Cell
               icon={<Icon name={machine ? "computer" : "cloud"} size={16} />}
-              label={t(machine ? "agentPage.work.cell.computer" : "agentPage.work.cell.cloud")}
-              value={machine ? machine.name : t("agentPage.work.cloud")}
+              label={t(machine || waiting ? "agentPage.work.cell.computer" : "agentPage.work.cell.cloud")}
+              value={
+                machine
+                  ? machine.name
+                  : waiting
+                    ? t("computerSetup.title", { org: org.name })
+                    : t("agentPage.work.cloud")
+              }
+              sub={waiting ? t(waiting.chipKey) : null}
               openLabel={t("agentPage.work.open.computer")}
               onOpen={can("machine") ? () => onOpen("computer") : undefined}
             />
@@ -259,6 +272,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         </div>
         {footer && <div className="agp-workcard__foot">{footer}</div>}
       </section>
+      {waiting && !member && <SettingNote icon="waiting">{t("computerSetup.agentWaiting", g)}</SettingNote>}
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
           {t("agentPage.work.offline", { ...g, computer: machine.name })}
@@ -1057,6 +1071,10 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const work = useWork();
   const pickable = usePickable();
   const setTarget = useSetComputerTarget(org.id);
+  const setup = useSetupView(org.id);
+  // The workspace's own computer on its way: "no computer yet" is it, so its row isn't offered apart.
+  const pending = setupPending(setup) ? setup : null;
+  const listed = pending ? pickable.filter((m) => m.kind !== "managed") : pickable;
   const [choice, setChoice] = useState(work.machineId);
   // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (ADR 0036).
   const thisMac = useThisMac(org.id);
@@ -1105,7 +1123,9 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       toast.show(
         chosen
           ? t("agentPage.work.saved.computer", { ...g, computer: chosen.name })
-          : t("agentPage.work.saved.cloud", g),
+          : pending
+            ? t("agentPage.work.saved.computer", { ...g, computer: t("computerSetup.title", { org: org.name }) })
+            : t("agentPage.work.saved.cloud", g),
       );
       onClose();
     } catch {
@@ -1143,14 +1163,14 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
           options={[
             {
               value: CLOUD,
-              leading: <ComputerPortrait kind="cloud" state="online" />,
-              title: t("computer.target.cloud"),
-              description: t("agentPage.work.computer.cloudText"),
+              leading: <ComputerPortrait kind="cloud" state={pending ? setupPortrait(pending, false) : "online"} />,
+              title: pending ? t("computerSetup.title", { org: org.name }) : t("computer.target.cloud"),
+              description: pending ? t(pending.textKey) : t("agentPage.work.computer.cloudText"),
               children: note(CLOUD),
             },
-            ...pickable.map((m) => ({
+            ...listed.map((m) => ({
               value: m.id,
-              leading: <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />,
+              leading: <ComputerPortrait kind={machineKind(m)} state={computerState(m)} />,
               title: m.name,
               description: `${status(m)} · ${offers(m)}`,
               children: note(m.id),

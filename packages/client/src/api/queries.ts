@@ -1935,6 +1935,24 @@ export const useHostComputer = (orgId: string, enabled = true) => {
   });
 };
 
+/**
+ * The workspace's own computer on its way (ADR 0056 §10): `machine.provisioning` events keep it live in the
+ * org shell; `pollMs` where no socket is open (the onboarding).
+ */
+export const useComputerSetup = (orgId: string, enabled = true, pollMs: number | false = false) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.computerSetup(orgId),
+    queryFn: () => api.machines.computerSetup(orgId),
+    enabled: enabled && orgId.length > 0,
+    retry: false,
+    refetchInterval: pollMs,
+    // Events keep it current; a reconnect asks again (what came while offline is gone).
+    staleTime: 5 * 60_000,
+    meta: { quiet: true },
+  });
+};
+
 /** "Usar o computador deste servidor": it comes back in the list and connects at its next sync. */
 export function useHostComputerOn(orgId: string) {
   const api = useApi();
