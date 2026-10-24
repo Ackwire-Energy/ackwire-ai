@@ -112,3 +112,19 @@ test("compact: the tightest window only, no resets, no age", () => {
   expect(container.querySelector(".ac-planmeter__at")).toBeNull();
   expect(container.querySelector(".ac-planmeter__state")?.textContent).toBe("Quase no limite");
 });
+
+test("an agent's part: in full ink inside its window's bar, with its words; none once the window reset", () => {
+  const usage: PlanMeterUsage = {
+    windows: [
+      { kind: "five_hour", usedPercent: 60, resetsAt: at(HOUR), part: 45, note: "Ada ≈ 45%" },
+      { kind: "seven_day", usedPercent: 50, resetsAt: at(-HOUR), part: 20, note: "Ada ≈ 20%" },
+    ],
+    at: at(0),
+  };
+  const { container } = render(<PlanMeter usage={usage} text={text} now={NOW} />);
+  const [hours, week] = [...container.querySelectorAll(".ac-planmeter__window")];
+  expect(hours?.querySelector(".ac-meter--parts .ac-meter__part")?.getAttribute("style")).toContain("width: 45%");
+  expect(hours?.querySelector(".ac-planmeter__note")?.textContent).toBe("Ada ≈ 45%");
+  expect(week?.querySelector(".ac-meter__part")).toBeNull();
+  expect(week?.querySelector(".ac-planmeter__note")).toBeNull();
+});

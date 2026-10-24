@@ -42,11 +42,24 @@ test("members never receive money: only percentages and tokens", async () => {
     "/settings",
     `/channels/${w.channelId}/messages`,
     "/routines",
+    // The usage views: everyone, without money (ADR 0062).
+    "/usage/plans",
+    `/agents/${w.agentId}/usage`,
   ]) {
     const res = await w.member(path);
     expect(res.status).toBe(200);
     expect(await res.text()).not.toMatch(money);
   }
+  type Plans = { money: boolean; api: { agentId: string; tokens: number; budgetPercent: number; costUsd?: number }[] };
+  const plans = (await (await w.member("/usage/plans")).json()) as Plans;
+  expect(plans.money).toBe(false);
+  expect(plans.api[0]?.agentId).toBe(w.agentId);
+  expect(plans.api[0]?.tokens).toBeGreaterThan(0);
+  const admins = (await (await w.owner("/usage/plans")).json()) as Plans;
+  expect(admins.money).toBe(true);
+  expect(admins.api[0]?.costUsd).toBeGreaterThan(0);
+  const dev = (await (await w.member(`/agents/${w.agentId}/usage`)).json()) as { sources: { type: string }[] };
+  expect(dev.sources.map((s) => s.type)).toEqual(["api"]);
   const overview = (await (await w.member("/overview")).json()) as { budgetUsedPercent: number };
   expect(typeof overview.budgetUsedPercent).toBe("number");
   const detail = (await (await w.member(`/agents/${w.agentId}`)).json()) as Record<string, unknown>;

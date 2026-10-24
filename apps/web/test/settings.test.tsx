@@ -199,15 +199,24 @@ describe("Configurações da organização", () => {
       router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "usage" } }),
     );
     await settle(4);
-    const usage = screen().getByRole("region", { name: "Uso deste mês" });
+    // The plan accounts by computer, each window with every agent's part, then the API per agent (ADR 0062).
+    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    expect(plans.textContent).toContain("MacBook");
+    expect(plans.textContent).toContain("Conta deste MacBookMax");
+    expect(plans.textContent).toContain("Claude Code · de Walter");
+    expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
+    expect(plans.textContent).toContain("Ada ≈ 30% · Atlas ≈ 11%");
+    expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$ 92,00 pela API");
+    const api = screen().getByRole("region", { name: "API da organização" });
+    expect(api.textContent).toContain("23% do orçamento");
+    expect(api.textContent).toContain("US$ 11,50 de US$ 50,00 (padrão do workspace)");
+    expect(within(api).getByRole("meter", { name: "Orçamento usado de Atlas" }).getAttribute("aria-valuenow")).toBe(
+      "23",
+    );
+    // Admins also see the API's spend by kind, and the default budget.
+    const usage = screen().getByRole("region", { name: "Gastos da API por tipo" });
     expect(usage.textContent).toContain("Agentes154 chamadasUS$ 15,40");
     expect(usage.textContent).toContain("Roteador80 chamadasUS$ 0,50");
-    // The one place with money: each agent's spend against its budget, and the default budget.
-    const byAgent = screen().getByRole("region", { name: "Por agente" });
-    expect(byAgent.textContent).toContain("US$ 12,30 de US$ 40,00");
-    expect(within(byAgent).getByRole("meter", { name: "Orçamento usado de Ada" }).getAttribute("aria-valuenow")).toBe(
-      "30.8",
-    );
     const fallback = screen().getByRole("region", { name: "Orçamento padrão dos agentes" });
     const field = within(fallback).getByLabelText("Orçamento mensal por agente (US$)") as HTMLInputElement;
     expect(field.value).toBe("50");
@@ -221,7 +230,7 @@ describe("Configurações da organização", () => {
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
   });
 
-  test("members see settings read-only, without the workspace's keys or usage (their own plans, yes)", async () => {
+  test("members see settings read-only, without the workspace's keys or money (their own plans, usage in percentages)", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
@@ -232,7 +241,7 @@ describe("Configurações da organização", () => {
       within(nav)
         .getAllByRole("link")
         .map((l) => l.textContent),
-    ).toEqual(["Geral", "Membros e convites", "Conectores", "Computadores", "Contas de IA"]);
+    ).toEqual(["Geral", "Membros e convites", "Conectores", "Computadores", "Orçamento e uso", "Contas de IA"]);
     cleanup();
     await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();
@@ -242,9 +251,19 @@ describe("Configurações da organização", () => {
     expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
     cleanup();
-    // A section they can't open falls back to Geral.
+    // Orçamento e uso: the plans and the API in tokens and percentages, never money.
     await go(state, "settings/usage");
-    expect(screen().queryByRole("region", { name: "Uso deste mês" })).toBeNull();
+    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    expect(within(plans).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("62");
+    expect(screen().getByRole("region", { name: "API da organização" }).textContent).toContain("23% do orçamento");
+    expect(screen().queryByRole("region", { name: "Gastos da API por tipo" })).toBeNull();
+    expect(screen().queryByRole("region", { name: "Orçamento padrão dos agentes" })).toBeNull();
+    expect(document.body.textContent).not.toContain("US$");
+    cleanup();
+    // A section they can't open falls back to Geral.
+    await go(state, "settings/storage");
+    expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
+    expect(document.querySelector("#sec-storage")).toBeNull();
   });
 });
 

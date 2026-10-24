@@ -845,6 +845,21 @@ export const useUsageReport = (orgId: string, enabled = true) => {
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
 };
 
+/** Configurações › Uso: every plan account by computer and the API per agent (ADR 0062). */
+export const usePlanUsage = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.planUsage(orgId), queryFn: () => api.orgs.planUsage(orgId) });
+};
+
+/** The agent's "Uso" tab: its month by account and day, and the account it thinks with now. */
+export const useAgentPlanUsage = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentPlanUsage(orgId, agentId),
+    queryFn: () => api.agents.planUsage(orgId, agentId),
+  });
+};
+
 export const usePlatformKey = (orgId: string) => {
   const api = useApi();
   return useQuery({

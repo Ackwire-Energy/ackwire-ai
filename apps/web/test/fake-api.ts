@@ -25,6 +25,7 @@ import type {
   Member,
   Memory,
   Message,
+  PlanAccountUsage,
   Proposal,
   ReactionCount,
   Role,
@@ -59,6 +60,50 @@ export const ADA_ID = "00000000-0000-4000-8000-0000000000a1";
 export const ATLAS_ID = "00000000-0000-4000-8000-0000000000a2";
 
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
+
+/** Real-time based (a plan window that reset reads as empty again): the usage views' windows. */
+const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+
+/** The MacBook's own Claude Code sign-in, shared by Ada and Atlas (the usage views, ADR 0062). */
+function fakePlanAccount(money: boolean): PlanAccountUsage {
+  const machineId = "00000000-0000-4000-8000-0000000000d1";
+  return {
+    key: `${machineId}:claude_code:computer`,
+    machineId,
+    machineName: "MacBook",
+    kind: "claude_code",
+    accountId: null,
+    label: null,
+    plan: "max",
+    provider: null,
+    ownerName: "Walter Lima",
+    mine: true,
+    email: null,
+    signedOut: false,
+    usage: {
+      windows: [
+        { kind: "five_hour", usedPercent: 62, resetsAt: hoursFromNow(2), agents: [{ agentId: ADA_ID, percent: 62 }] },
+        {
+          kind: "seven_day",
+          usedPercent: 41,
+          resetsAt: hoursFromNow(72),
+          agents: [
+            { agentId: ADA_ID, percent: 30 },
+            { agentId: ATLAS_ID, percent: 11 },
+          ],
+        },
+      ],
+      source: "turn",
+      at: new Date().toISOString(),
+    },
+    agents: [
+      { agentId: ADA_ID, name: "Ada", tokens: 4_500_000, now: true },
+      { agentId: ATLAS_ID, name: "Atlas", tokens: 600_000, now: false },
+    ],
+    monthTokens: 5_100_000,
+    ...(money ? { equivalentUsd: 92 } : {}),
+  };
+}
 
 export interface FakeState {
   me: Me | null;
@@ -836,6 +881,20 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         }
         return { url: `http://localhost:3000/invite/tok-new-${invitationId}`, expiresAt: inv?.expiresAt ?? "" };
       },
+      planUsage: async () => ({
+        month: new Date().toISOString().slice(0, 7),
+        money: seesCost(),
+        accounts: [fakePlanAccount(seesCost())],
+        api: [
+          {
+            agentId: ATLAS_ID,
+            name: "Atlas",
+            tokens: 1_100_000,
+            budgetPercent: 23,
+            ...(seesCost() ? { costUsd: 11.5, budgetUsd: 50, budgetIsDefault: true } : {}),
+          },
+        ],
+      }),
       usageReport: async () => ({
         since: minutesAgo(60 * 24 * 14),
         defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50,
@@ -859,6 +918,51 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       }),
     },
     agents: {
+      planUsage: async (_orgId, agentId) => {
+        const money = seesCost();
+        const account = fakePlanAccount(money);
+        const { usage: _u, agents: _a, monthTokens: _m, equivalentUsd: _e, ...info } = account;
+        const today = new Date().toISOString().slice(0, 10);
+        const day = Number(today.slice(8, 10));
+        return {
+          month: today.slice(0, 7),
+          money,
+          tokens: 3_900_000,
+          ...(money ? { equivalentUsd: 77 } : {}),
+          sources: [
+            {
+              key: account.key,
+              type: "plan" as const,
+              kind: "claude_code" as const,
+              account: info,
+              removed: false,
+              tokens: 3_800_000,
+              share: 97.4,
+              lastDay: today,
+              now: true,
+              ...(money ? { equivalentUsd: 76 } : {}),
+            },
+            {
+              key: "api",
+              type: "api" as const,
+              kind: null,
+              account: null,
+              removed: false,
+              tokens: 100_000,
+              share: 2.6,
+              lastDay: today,
+              now: false,
+              budgetPercent: 2,
+              ...(money ? { costUsd: 0.8 } : {}),
+            },
+          ],
+          days: Array.from({ length: day }, (_, i) => ({
+            date: `${today.slice(0, 8)}${String(i + 1).padStart(2, "0")}`,
+            tokens: (i + 1 === day ? { [account.key]: 250_000, api: 10_000 } : {}) as Record<string, number>,
+          })),
+          current: agentId === ADA_ID ? account : null,
+        };
+      },
       team: async () => ({
         agents: state.agents.map((a) => ({
           id: a.id,

@@ -8,6 +8,10 @@ export interface PlanMeterWindow {
   label?: string;
   usedPercent: number;
   resetsAt?: string;
+  /** An estimated part of `usedPercent` (one agent's), in full ink over the rest of the bar. */
+  part?: number;
+  /** Words under the bar: whose use it is. */
+  note?: string;
 }
 
 export interface PlanMeterUsage {
@@ -97,12 +101,21 @@ export function PlanMeter({
         <ul className="ac-planmeter__windows">
           {(compact ? rows.slice(0, 1) : rows).map((w, i) => {
             const name = text.window(w);
+            // A window that reset is empty again: its parts were the old window's.
+            const fresh = !passed(w.resetsAt, now);
             return (
               <li key={`${w.kind}:${w.label ?? i}`} className="ac-planmeter__window">
                 <span className="ac-planmeter__name">{name}</span>
                 <span className="ac-planmeter__pct">{w.used}%</span>
-                <Meter value={w.used} max={100} label={name} marks={[PLAN_ALMOST]} />
-                {!compact && w.resetsAt && !passed(w.resetsAt, now) && (
+                <Meter
+                  value={w.used}
+                  max={100}
+                  label={name}
+                  marks={[PLAN_ALMOST]}
+                  {...(w.part !== undefined && fresh ? { part: w.part } : {})}
+                />
+                {!compact && w.note && fresh && <small className="ac-planmeter__note">{w.note}</small>}
+                {!compact && w.resetsAt && fresh && (
                   <small className="ac-planmeter__reset">{text.resets(w.resetsAt)}</small>
                 )}
               </li>

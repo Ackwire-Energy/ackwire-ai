@@ -217,8 +217,17 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
     .select()
     .from(schema.usageRecords)
     .where(eq(schema.usageRecords.runId, run?.id ?? ""));
+  // On the computer's own sign-in: its computer, no account (the usage views, ADR 0062).
   expect(usage).toMatchObject([
-    { provider: "claude_code", billedTo: "plan", costNanoUsd: 0, inputTokens: 40, outputTokens: 9 },
+    {
+      provider: "claude_code",
+      billedTo: "plan",
+      costNanoUsd: 0,
+      inputTokens: 40,
+      outputTokens: 9,
+      machineId,
+      brainAccountId: null,
+    },
   ]);
   // The turn's bridge token died with the run.
   const tokens = await f.db

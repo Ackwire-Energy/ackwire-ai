@@ -275,6 +275,12 @@ export const contextWindowOf = (model: string) => MODEL_CATALOG[model]?.contextW
 
 export const isKnownModel = (model: string) => Object.hasOwn(MODEL_CATALOG, model);
 
+/** The catalog id of a model a CLI named (`claude-opus-5-5[1m]`, a dated `…-20261001`); null when it has no price. */
+export function catalogModelOf(model: string | null | undefined): string | null {
+  const base = model?.replace(/\[[^\]]*\]$/, "").replace(/-\d{8}$/, "");
+  return base && isKnownModel(base) ? base : null;
+}
+
 /** Cost of one call in nano-USD. Throws for models outside the catalog (we never make a call we can't price). */
 export function costNanoUsd(model: string, usage: ModelUsage): number {
   const info = MODEL_CATALOG[model];

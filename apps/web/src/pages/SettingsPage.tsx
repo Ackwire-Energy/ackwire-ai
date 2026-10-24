@@ -50,7 +50,6 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
-import { AgentAvatar } from "@/components/AgentAvatar";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
@@ -58,6 +57,7 @@ import { ImportExportSection } from "@/components/ImportFlow";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { PlanUsageCards } from "@/components/PlanUsage";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
@@ -731,78 +731,49 @@ export function KeyDialog({
   );
 }
 
-/** The one place with money (admins): the default agent budget, this month's spend by kind and per agent. */
+/**
+ * Uso (ADR 0062): the plan accounts by computer and the API per agent for everyone (money only for
+ * admins), then the API's spend by kind and the default budget (admins).
+ */
 function UsageSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const allowed = can(org.role, "view_usage");
   const report = useUsageReport(org.id, allowed);
-  if (!allowed) return null;
   return (
     <>
-      <DefaultBudgetCard />
-      <Card aria-labelledby="sec-usage">
-        <h2 id="sec-usage" className="ac-card__title">
-          {t("settings.usageTitle")}
-        </h2>
-        {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
-        {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
-        {report.data && (
-          <>
-            <span className="small muted">
-              {t("settings.usageTotal", {
-                amount: formatUsd(t, i18n.language, report.data.totalUsd),
-                since: formatShortDate(i18n.language, report.data.since),
-              })}
-            </span>
-            <div>
-              {report.data.byKind.map((k) => (
-                <div key={k.kind} className="connector-row">
-                  <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
-                  <span className="connector-row__granted tabular">{t("settings.usageCalls", { count: k.calls })}</span>
-                  <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </Card>
-      {report.data && report.data.agents.length > 0 && (
-        <Card aria-labelledby="sec-usage-agents">
-          <h2 id="sec-usage-agents" className="ac-card__title">
-            {t("settings.usageAgents")}
+      <PlanUsageCards />
+      {allowed && (
+        <Card aria-labelledby="sec-usage">
+          <h2 id="sec-usage" className="ac-card__title">
+            {t("settings.usageTitle")}
           </h2>
-          <List>
-            {report.data.agents.map((a) => (
-              <Link
-                key={a.agentId}
-                to="/org/$orgId/agents/$agentId"
-                params={{ orgId: org.id, agentId: a.agentId }}
-                className="ac-list__row usage-agent"
-              >
-                <AgentAvatar agentId={a.agentId} size="sm" name={a.name} />
-                <span className="list-col">
-                  <span style={{ fontWeight: 600 }}>{a.name}</span>
-                  <span className="small muted tabular">
-                    {t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
-                      spent: formatUsd(t, i18n.language, a.costUsd),
-                      budget: formatUsd(t, i18n.language, a.monthlyBudgetUsd),
-                    })}
-                  </span>
-                </span>
-                <span className="usage-agent__meter">
-                  <Meter
-                    value={Math.min(100, a.budgetUsedPercent)}
-                    max={100}
-                    label={t("settings.usageAgentMeter", { name: a.name })}
-                  />
-                  <span className="small tabular">{formatPercent(i18n.language, a.budgetUsedPercent)}</span>
-                </span>
-              </Link>
-            ))}
-          </List>
+          {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
+          {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
+          {report.data && (
+            <>
+              <span className="small muted">
+                {t("settings.usageTotal", {
+                  amount: formatUsd(t, i18n.language, report.data.totalUsd),
+                  since: formatShortDate(i18n.language, report.data.since),
+                })}
+              </span>
+              <div>
+                {report.data.byKind.map((k) => (
+                  <div key={k.kind} className="connector-row">
+                    <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
+                    <span className="connector-row__granted tabular">
+                      {t("settings.usageCalls", { count: k.calls })}
+                    </span>
+                    <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </Card>
       )}
+      {allowed && <DefaultBudgetCard />}
     </>
   );
 }

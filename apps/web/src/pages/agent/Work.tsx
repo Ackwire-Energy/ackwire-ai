@@ -32,6 +32,7 @@ import {
   planAliases,
   planModel as planModelOf,
   planModelOptions,
+  planName,
   planOf,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
@@ -464,8 +465,6 @@ type ShownEffort = (typeof EFFORTS)[number];
 /** A stored `xhigh` shows as Alto, no effort (or an automatic one) as Médio (the default). */
 const shownEffort = (e: BrainEffortSetting | null): ShownEffort =>
   e === "xhigh" ? "high" : e === null || isAuto(e) ? "medium" : e;
-/** The plan as the CLI says it (`team`, `max`), as a name ("Team"). */
-const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
 
 function BrainDialog({ onClose }: { onClose: () => void }) {
   const work = useWork();

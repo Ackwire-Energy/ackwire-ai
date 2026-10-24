@@ -1666,6 +1666,9 @@ async function executeRunInner(
                   agentId: run.agentId,
                   runId: run.id,
                   provider: brain.kind,
+                  ...(turnPlan.session?.machineId
+                    ? { machineId: turnPlan.session.machineId, accountId: turnPlan.account?.id ?? null }
+                    : {}),
                   ...(u.model ? { model: u.model } : {}),
                   inputTokens: u.input,
                   outputTokens: u.output,
