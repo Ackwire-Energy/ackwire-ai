@@ -702,6 +702,40 @@ test.if(posix)("a command while the browsers close (a runner that just started) 
   expect(t.logged().map((l) => l.args.at(-1))).toEqual(["--all", "https://a.example/"]);
 });
 
+/** A computer without Chrome for Testing until the fake's `install` ran. */
+function setupWithoutChrome() {
+  const box: { t?: ReturnType<typeof setup> } = {};
+  const installs = () => box.t?.logged().filter((l) => l.args[0] === "install").length ?? 0;
+  box.t = setup({
+    chrome: () => (installs() > 0 ? "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome" : null),
+  });
+  return { t: box.t, installs };
+}
+
+test.if(posix)("an agent's first two commands at once share its new session and one Chrome install", async () => {
+  const { t, installs } = setupWithoutChrome();
+  const folder = await t.folder();
+  const act = (command: string, args: string[]) =>
+    t.manager.act(dev, folder, { op: "browser.act", command, args, timeoutSeconds: 30 });
+  // The person's open and the live view's `get url` right after it, as the app sends them.
+  const [opened, url] = await Promise.all([act("open", ["https://a.example/"]), act("get", ["url"])]);
+  expect(opened).toMatchObject({ success: true });
+  // In the same session's queue, behind the open (a second session has no Chrome: "the browser isn't open").
+  expect(url).toMatchObject({ success: true, data: { url: "https://a.example/" } });
+  expect(installs()).toBe(1);
+  expect(t.chromes).toHaveLength(1);
+});
+
+test.if(posix)("two agents' first commands at once install Chrome once", async () => {
+  const { t, installs } = setupWithoutChrome();
+  const answers = await Promise.all([
+    t.act("open", ["https://a.example/"]),
+    t.act("open", ["https://b.example/"], { agent: ops }),
+  ]);
+  expect(answers).toMatchObject([{ success: true }, { success: true }]);
+  expect(installs()).toBe(1);
+});
+
 // ── Live view ────────────────────────────────────────────────────────────────
 
 test.if(posix)("the stream relays frames with the page's URL, changes mode, and ends with a frame", async () => {
