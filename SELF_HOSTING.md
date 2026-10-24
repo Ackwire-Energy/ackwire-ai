@@ -545,6 +545,9 @@ Each person adds them in **Settings → AI accounts**.
 install), any agent on that computer could reach every account folder there; the runner keeps them
 out of what agents read, but the OS doesn't. With `install.sh --system` each agent is its own user,
 and an account folder belongs to the user of the agent that thinks with it, only while it does.
+Taking control of an agent's desktop or opening its terminal is a shell as that user: in the default
+install only the person who paired the computer can, and with `--system` admins and the agent's
+owner can, but only its owner while the agent thinks with their plan.
 
 **Backups.** Leave `<runner home>/accounts`, and the CLIs' own `~/.claude` and `~/.codex`, out of the
 computer's backups: they hold sign-ins. The server's database never has them.
