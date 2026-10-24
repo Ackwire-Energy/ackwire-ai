@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import type { EventEmitter } from "node:events";
 import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -441,9 +442,10 @@ export function runnerChild(command: string[], print: (line: string) => void): S
         () => print(`[${label}] (a log line too long was left out)`),
       );
     }
+    const events = child as unknown as EventEmitter;
     const exited = new Promise<number | null>((resolve) => {
-      child.once("exit", (code) => resolve(code));
-      child.once("error", () => resolve(null));
+      events.once("exit", (code: number | null) => resolve(code));
+      events.once("error", () => resolve(null));
     });
     return { exited, kill: (signal = "SIGTERM") => void child.kill(signal) };
   };
