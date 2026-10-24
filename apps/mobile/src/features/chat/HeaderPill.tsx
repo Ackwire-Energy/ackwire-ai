@@ -44,7 +44,8 @@ export function HeaderPill({
       accessibilityLabel={label}
       style={[styles.press, { maxWidth: Math.max(160, width - 136) }]}
     >
-      <Glass intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
+      {/* The same Liquid Glass as the bar's own buttons beside it (iOS 26); the blur and a hairline before. */}
+      <Glass liquid intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
         {color ? (
           <Dither
             kind={working ? "pillwork" : "pill"}

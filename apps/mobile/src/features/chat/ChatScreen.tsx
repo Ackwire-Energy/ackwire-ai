@@ -813,7 +813,20 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
   }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
-  const openOptions = () =>
+  // Opening a sheet must not move the conversation: on iOS it jumped to its top when the options opened
+  // (the cause sits between the modal and the list's insets). For a moment after, the list is held where it was.
+  const holdPlace = () => {
+    const from = listRef.current?.getState().scroll;
+    if (from == null) return;
+    const until = Date.now() + 900;
+    const check = () => {
+      const now = listRef.current?.getState().scroll;
+      if (now != null && from - now > 40) listRef.current?.scrollToOffset({ offset: from, animated: false });
+      if (Date.now() < until) requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  };
+  const showOptions = () =>
     info && isThread
       ? sheet.open(
           <ThreadOptions
@@ -835,6 +848,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onPins={openPins}
           />,
         );
+  const openOptions = () => {
+    holdPlace();
+    showOptions();
+  };
   const pill =
     isThread && info ? (
       <HeaderPill
@@ -1042,7 +1059,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      <PushedHeader title={pill ?? title} solid={false} right={right} />
+      {/* A clear bar on every conversation (DM, channel, thread): the band behind it is ours, below, so the
+          system's scroll edge never makes one look different from another. */}
+      <PushedHeader title={pill ?? title} plate={barOver} solid={false} right={right} />
       {pinned ? (
         // The bar is see-through on iOS (the conversation runs under it): the pinned card starts below it.
         <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: barOver ? headerHeight : 0 }]}>
@@ -1111,6 +1130,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             )
           ) : null}
         </KeyboardStickyView>
+        {barOver && !pinned ? (
+          // The conversation fades under the glass header (telas/CabecalhoVidro.html), as it does under the box.
+          <LinearGradient
+            pointerEvents="none"
+            colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}
+            locations={[0, 0.62, 1]}
+            style={[styles.topFade, { height: headerHeight + 28 }]}
+          />
+        ) : null}
         <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
           <View
             ref={composerRef}
@@ -1311,6 +1339,7 @@ function Connection({ status }: { status: ConnectionStatus }) {
 }
 
 const styles = StyleSheet.create({
+  topFade: { position: "absolute", top: 0, left: 0, right: 0 },
   // "Visto": right under my latest message, at the right edge (the receipts' side).
   seen: { alignSelf: "flex-end", marginTop: -4, marginBottom: 4, paddingHorizontal: 16 },
   // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
