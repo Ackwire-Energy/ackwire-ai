@@ -455,7 +455,9 @@ stops), and brings it back; `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one 
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
 far each one is, and asks for a single-use code that the computer connects with
-(`POST /orgs/{orgId}/machines`). Leave it `off` and people connect their own computers.
+(`POST /orgs/{orgId}/machines`): write it to a file only the runner's user can read and run
+`agentes-runner pair --server <url> --enroll-file <file>` there (or pass `--enroll-file` to the installer),
+which removes the file as soon as it is read. Leave it `off` and people connect their own computers.
 
 </details>
 

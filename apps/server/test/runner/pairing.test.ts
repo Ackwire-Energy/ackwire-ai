@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   type DeviceCode,
@@ -7,7 +7,10 @@ import {
   type FetchFn,
   formatUserCode,
   orgSlug,
+  PairingError,
   pollDeviceToken,
+  redeemIssuedCode,
+  takeEnrollCode,
   uniqueWorkspace,
 } from "../../runner/pairing";
 import { removeDirs, tempDir } from "./helpers";
@@ -121,6 +124,109 @@ test("a canceled pairing stops at once", async () => {
   ac.abort();
   await expect(p).rejects.toMatchObject({ code: "canceled" });
 });
+
+/** What `POST /orgs/{orgId}/machines` of the operator API hands a provisioner: 32 random bytes, base64url. */
+const ISSUED = "q3v9mT0aLp8sR2wK5yN7bC1dF4gH6jZ0eU_i-oPqRsA";
+
+test("an issued code: the token on the first poll, with nothing to show and nobody to confirm", async () => {
+  const server = fakeServer([json(200, GRANT)]);
+  const sleeps: number[] = [];
+  const grant = await redeemIssuedCode(SERVER, ISSUED, {
+    fetch: server.fetch,
+    sleep: async (ms) => void sleeps.push(ms),
+  });
+  expect(grant).toEqual(GRANT);
+  expect(server.calls).toEqual([{ url: `${SERVER}/api/machines/device/token`, body: { deviceCode: ISSUED } }]);
+  expect(sleeps).toEqual([2000]);
+});
+
+test("an issued code that expired, was used or was withdrawn says so, never quoting the code", async () => {
+  const sleep = async () => {};
+  const cases = [
+    { answer: { error: "expired_token" }, code: "expired", says: "expired or was already used" },
+    { answer: { error: "access_denied" }, code: "denied", says: "was withdrawn" },
+  ];
+  for (const c of cases) {
+    const err = await redeemIssuedCode(SERVER, ISSUED, { fetch: fakeServer([json(400, c.answer)]).fetch, sleep }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(PairingError);
+    expect(err).toMatchObject({ code: c.code });
+    expect((err as Error).message).toContain(c.says);
+    expect((err as Error).message).not.toContain(ISSUED);
+  }
+});
+
+test("the enrollment file is removed once read, also when it holds no code", () => {
+  const dir = tempDir("enroll-");
+  dirs.push(dir);
+  const file = path.join(dir, "enroll-code");
+  writeFileSync(file, `${ISSUED}\n`, { mode: 0o600 });
+  expect(takeEnrollCode(file)).toBe(ISSUED);
+  expect(existsSync(file)).toBe(false);
+
+  // Another file's contents never go out as a code, nor into the message.
+  writeFileSync(file, '{ "token": "agm_0123456789abcdef0123" }\n');
+  expect(() => takeEnrollCode(file)).toThrow(`${file} doesn't hold an enrollment code`);
+  expect(existsSync(file)).toBe(false);
+  expect(() => takeEnrollCode(file)).toThrow("Couldn't read the enrollment file");
+});
+
+const RUNNER = path.join(import.meta.dir, "../../runner/main.ts");
+
+/** `agentes-runner pair --enroll-file` as a provisioner runs it, against a server that answers `answer`. */
+async function enroll(answer: () => Response) {
+  const dir = tempDir("enroll-");
+  dirs.push(dir);
+  const file = path.join(dir, "enroll-code");
+  writeFileSync(file, ISSUED, { mode: 0o600 });
+  const seen: { path: string; body: unknown }[] = [];
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: async (req) => {
+      seen.push({ path: new URL(req.url).pathname, body: await req.json() });
+      return answer();
+    },
+  });
+  try {
+    const home = path.join(dir, "home");
+    const args = ["pair", "--server", server.url.origin, "--enroll-file", file, "--home", home];
+    const proc = Bun.spawn([process.execPath, RUNNER, ...args, "--dir", path.join(dir, "work")], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exit] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    return { file, seen, exit, output: stdout + stderr, config: path.join(home, "config.json") };
+  } finally {
+    server.stop(true);
+  }
+}
+
+test("pair --enroll-file connects: the token in the config, the code nowhere", async () => {
+  const r = await enroll(() => json(200, GRANT));
+  expect(r.exit).toBe(0);
+  expect(r.seen).toEqual([{ path: "/api/machines/device/token", body: { deviceCode: ISSUED } }]);
+  expect(existsSync(r.file)).toBe(false);
+  const text = readFileSync(r.config, "utf8");
+  expect(JSON.parse(text)).toMatchObject({ token: GRANT.token, machineId: "m1", name: "Notebook", orgId: "o1" });
+  expect(text).not.toContain(ISSUED);
+  expect(r.output).toContain('Connected to Acme as "Notebook"');
+  expect(r.output).not.toContain(ISSUED);
+}, 20_000);
+
+test("pair --enroll-file with an expired code: a clear error, the file gone, nothing written", async () => {
+  const r = await enroll(() => json(400, { error: "expired_token" }));
+  expect(r.exit).toBe(1);
+  expect(r.output).toContain("The enrollment code expired or was already used");
+  expect(r.output).not.toContain(ISSUED);
+  expect(existsSync(r.file)).toBe(false);
+  expect(existsSync(r.config)).toBe(false);
+}, 20_000);
 
 test("the code is shown as K7Q·4ZP; workspaces are named after the organization", () => {
   expect(formatUserCode("K7Q4ZP")).toBe("K7Q·4ZP");
