@@ -1,0 +1,479 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "agentes.chat operator API",
+    "version": "test",
+    "description": "Workspace and account lookups for the people who run this instance (ADR 0056)."
+  },
+  "servers": [
+    {
+      "url": "/api/operator/v1"
+    }
+  ],
+  "security": [
+    {
+      "operator": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "operator": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "This server's `OPERATOR_API_TOKEN`."
+      }
+    },
+    "schemas": {
+      "OperatorHealth": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": ["ok", "version"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "invalid_request",
+                "description": "Stable: the app translates it."
+              },
+              "message": {
+                "type": "string",
+                "example": "name: Required",
+                "description": "English fallback."
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Values for the translated message (names, limits…)."
+              }
+            },
+            "required": ["code", "message"]
+          }
+        },
+        "required": ["error"]
+      },
+      "OperatorOrgPage": {
+        "type": "object",
+        "properties": {
+          "orgs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorOrgSummary"
+            }
+          },
+          "next": {
+            "type": ["string", "null"],
+            "description": "`cursor` for the next page; null on the last one."
+          }
+        },
+        "required": ["orgs", "next"]
+      },
+      "OperatorOrgSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "members": {
+            "type": "integer"
+          },
+          "agents": {
+            "type": "integer",
+            "description": "Not archived."
+          }
+        },
+        "required": ["id", "name", "createdAt", "members", "agents"]
+      },
+      "OperatorOrg": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "admins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "$ref": "#/components/schemas/Role"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the account was created."
+                },
+                "lastSeenAt": {
+                  "type": ["string", "null"],
+                  "description": "Last time they had this workspace open."
+                }
+              },
+              "required": ["userId", "email", "name", "role", "createdAt", "lastSeenAt"]
+            },
+            "description": "Owners and admins, owners first."
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "members": {
+                "type": "integer"
+              },
+              "agents": {
+                "type": "integer",
+                "description": "Not archived."
+              },
+              "channels": {
+                "type": "integer",
+                "description": "Channels and forums, not archived; no direct messages."
+              },
+              "machines": {
+                "type": "integer",
+                "description": "Connected computers."
+              },
+              "invitations": {
+                "type": "integer",
+                "description": "Pending: neither accepted nor expired."
+              }
+            },
+            "required": ["members", "agents", "channels", "machines", "invitations"]
+          }
+        },
+        "required": ["id", "name", "createdAt", "admins", "counts"]
+      },
+      "Role": {
+        "type": "string",
+        "enum": ["owner", "admin", "member"]
+      },
+      "OperatorUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "orgs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orgId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "$ref": "#/components/schemas/Role"
+                },
+                "joinedAt": {
+                  "type": "string"
+                },
+                "lastSeenAt": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["orgId", "name", "role", "joinedAt", "lastSeenAt"]
+            }
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": {
+                  "type": ["string", "null"]
+                },
+                "userAgent": {
+                  "type": ["string", "null"]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": ["ip", "userAgent", "createdAt"]
+            },
+            "description": "Its 10 newest sessions on record, newest first. Signing out deletes a session."
+          }
+        },
+        "required": ["id", "email", "name", "emailVerified", "createdAt", "orgs", "sessions"]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The token works and this server answers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorHealth"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "Find workspaces, newest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 320,
+              "description": "An org id, part of its name, or part of a member's email; any case."
+            },
+            "required": false,
+            "description": "An org id, part of its name, or part of a member's email; any case.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "createdAfter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorOrgPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "One workspace: its owners and admins, and how much is in it",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorOrg"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{userId}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "One account: its workspaces and newest sessions",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

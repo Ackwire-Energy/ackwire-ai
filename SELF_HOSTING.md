@@ -439,6 +439,13 @@ volume. With all four `S3_*` variables set they go to that bucket instead, and w
 Postgres. Choose before the first upload: a file stays in the store it was written to. An
 organization can also keep its files in a bucket of its own (**Settings → Storage**).
 
+**Operator API (optional).** For your own automation: look up any workspace or account on the
+instance. Off unless `OPERATOR_API_TOKEN` is set (at least 32 characters, `openssl rand -base64 48`);
+then a second listener on `OPERATOR_API_PORT` (3001) serves `/api/operator/v1`, called with
+`Authorization: Bearer <token>`, and its OpenAPI document is at `/api/operator/v1/openapi.json`. That
+port reaches every workspace, so never publish it or put it behind your proxy: the compose file
+doesn't publish it, and containers on the same Docker network reach it as `http://agentes:3001`.
+
 </details>
 
 <details>

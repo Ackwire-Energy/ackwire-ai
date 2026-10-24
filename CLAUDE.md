@@ -52,6 +52,7 @@ Run lint, typecheck, tests and boundaries before declaring work done.
 
 - Boot: `apps/server/src/start.ts` (`startServer`: config → DB → migrations → adapters + module overrides → HTTP + WebSocket → workers). Self-host entry: `src/main.ts`.
 - HTTP app: `apps/server/src/app.ts` (`createApp`, testable via `app.request`). Private web-app API: `src/routes/app/*` (`/api/app/*`, `createRoute` from `@hono/zod-openapi`, cookie session + CSRF in `routes/app/context.ts`). OpenAPI at `/api/openapi.json`.
+- Operator API (ADR 0056): its own listener on `OPERATOR_API_PORT`, only with `OPERATOR_API_TOKEN` (bearer), at `/api/operator/v1`: `apps/server/src/operator/*`, reads in `packages/engine/src/operator.ts`. The contract is the committed `apps/server/test/operator-openapi.json` (a test compares it).
 - Auth: `apps/server/src/auth.ts` (Better Auth at `/api/auth/*`). Orgs, roles, invitations, sign-up policy: `packages/engine/src/organizations.ts`.
 - WebSocket: `apps/server/src/realtime/ws.ts` (`/api/ws?orgId=`; subscribe per channel; events in `packages/engine/src/events.ts`).
 - Workers: `apps/server/src/workers.ts`. Job handlers: `packages/engine/src/jobs.ts`; outbox: `outbox.ts`.

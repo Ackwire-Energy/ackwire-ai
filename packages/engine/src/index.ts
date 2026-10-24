@@ -125,6 +125,7 @@ export * from "./missions-engine";
 export * from "./net-guard";
 export * from "./notification-producers";
 export * from "./notifications";
+export * from "./operator";
 export * from "./organizations";
 export * from "./outbox";
 export * from "./pdf";

@@ -1,0 +1,159 @@
+import { and, asc, type Database, desc, eq, gt, inArray, or, schema, sql } from "@agenteschat/db";
+import { z } from "zod";
+import { ValidationError } from "./errors";
+
+/**
+ * Reads of the operator API (ADR 0056): who and what is in a workspace, never what anyone wrote there,
+ * and never a credential, token or password hash. Every field is picked by name for that reason.
+ */
+
+const { organizations, organizationMembers, organizationInvitations, users, sessions, agents, channels, machines } =
+  schema;
+
+const RECENT_SESSIONS = 10;
+
+// In a select list over one table drizzle writes columns without their table, so in a subquery a bare
+// "id" would be the subquery's own: the outer workspace is named in full.
+const ORG_ID = sql.raw(`"organizations"."id"`);
+const memberCount = sql<number>`(select count(*) from ${organizationMembers}
+  where ${organizationMembers.orgId} = ${ORG_ID})`.mapWith(Number);
+const agentCount = sql<number>`(select count(*) from ${agents}
+  where ${agents.orgId} = ${ORG_ID} and ${agents.archivedAt} is null)`.mapWith(Number);
+
+// Cut to milliseconds (what a JS Date and the cursor carry), so paging compares exactly what it returned.
+const createdAtMs = sql<Date>`date_trunc('milliseconds', ${organizations.createdAt})`.mapWith(
+  (v: string | Date) => new Date(v),
+);
+const OrgCursor = z.tuple([z.iso.datetime(), z.uuid()]);
+
+export interface OperatorOrgQuery {
+  /** An org id, part of its name, or part of a member's email; any case. */
+  q?: string;
+  createdAfter?: Date;
+  limit: number;
+  /** `next` of the previous page. */
+  cursor?: string;
+}
+
+/** Workspaces, newest first, in keyset pages: a workspace created while paging never shifts a page. */
+export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
+  let after: [string, string] | null = null;
+  if (query.cursor) {
+    try {
+      after = OrgCursor.parse(JSON.parse(Buffer.from(query.cursor, "base64url").toString()));
+    } catch {
+      throw new ValidationError("Invalid cursor", "invalid_cursor");
+    }
+  }
+  const q = query.q?.trim();
+  const rows = await db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      createdAt: createdAtMs,
+      members: memberCount,
+      agents: agentCount,
+    })
+    .from(organizations)
+    .where(
+      and(
+        q
+          ? or(
+              z.uuid().safeParse(q).success ? eq(organizations.id, q) : undefined,
+              sql`strpos(lower(${organizations.name}), lower(${q}::text)) > 0`,
+              sql`exists (select 1 from ${organizationMembers}
+                join ${users} on ${users.id} = ${organizationMembers.userId}
+                where ${organizationMembers.orgId} = ${organizations.id}
+                  and strpos(lower(${users.email}), lower(${q}::text)) > 0)`,
+            )
+          : undefined,
+        query.createdAfter ? gt(organizations.createdAt, query.createdAfter) : undefined,
+        after ? sql`(${createdAtMs}, ${organizations.id}) < (${after[0]}::timestamptz, ${after[1]}::uuid)` : undefined,
+      ),
+    )
+    .orderBy(desc(createdAtMs), desc(organizations.id))
+    .limit(query.limit + 1);
+  const orgs = rows.slice(0, query.limit);
+  const last = orgs.at(-1);
+  const next =
+    rows.length > query.limit && last
+      ? Buffer.from(JSON.stringify([last.createdAt.toISOString(), last.id])).toString("base64url")
+      : null;
+  return { orgs, next };
+}
+
+/** One workspace: its owners and admins, and how much is in it. Null when there is none with that id. */
+export async function operatorOrg(db: Database, orgId: string) {
+  const [org] = await db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      createdAt: organizations.createdAt,
+      counts: {
+        members: memberCount,
+        agents: agentCount,
+        channels: sql<number>`(select count(*) from ${channels} where ${channels.orgId} = ${ORG_ID}
+          and ${channels.kind} <> 'dm' and ${channels.archivedAt} is null)`.mapWith(Number),
+        machines: sql<number>`(select count(*) from ${machines} where ${machines.orgId} = ${ORG_ID}
+          and ${machines.deletedAt} is null)`.mapWith(Number),
+        invitations: sql<number>`(select count(*) from ${organizationInvitations}
+          where ${organizationInvitations.orgId} = ${ORG_ID}
+            and ${organizationInvitations.acceptedAt} is null and ${organizationInvitations.expiresAt} > now())`.mapWith(
+          Number,
+        ),
+      },
+    })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  if (!org) return null;
+  const admins = await db
+    .select({
+      userId: users.id,
+      email: users.email,
+      name: users.name,
+      role: organizationMembers.role,
+      createdAt: users.createdAt,
+      lastSeenAt: organizationMembers.lastSeenAt,
+    })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, ["owner", "admin"])))
+    .orderBy(asc(organizationMembers.role), asc(organizationMembers.createdAt));
+  return { ...org, admins };
+}
+
+/** One account: its workspaces and its newest sessions on record. Null when there is none with that id. */
+export async function operatorUser(db: Database, userId: string) {
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      emailVerified: users.emailVerified,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!user) return null;
+  const [orgs, recent] = await Promise.all([
+    db
+      .select({
+        orgId: organizations.id,
+        name: organizations.name,
+        role: organizationMembers.role,
+        joinedAt: organizationMembers.createdAt,
+        lastSeenAt: organizationMembers.lastSeenAt,
+      })
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+      .where(eq(organizationMembers.userId, userId))
+      .orderBy(asc(organizationMembers.createdAt)),
+    db
+      .select({ ip: sessions.ipAddress, userAgent: sessions.userAgent, createdAt: sessions.createdAt })
+      .from(sessions)
+      .where(eq(sessions.userId, userId))
+      .orderBy(desc(sessions.createdAt))
+      .limit(RECENT_SESSIONS),
+  ]);
+  return { ...user, orgs, sessions: recent };
+}
