@@ -69,6 +69,7 @@ jobs:
               - ".github/workflows/ci.yml"
             backend:
               - "apps/server/**"
+              - "install.sh"
             web:
               - "apps/web/**"
             mobile:
@@ -126,7 +127,7 @@ jobs:
         run: bun run lint
       - name: Shell scripts
         if: success() || failure()
-        run: shellcheck deploy/*.sh deploy/backup/*.sh
+        run: shellcheck install.sh deploy/*.sh deploy/backup/*.sh
       # No test shard covers scripts/, so the checks' own tests run here. The boundaries check itself runs in
       # the secrets job, which docs-only changes run too.
       - name: Boundaries check's own test
@@ -283,8 +284,9 @@ jobs:
   # The image as self-hosters run it: the docker-compose.yml at the repository root with this
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health
   # probe, the first sign-up (the installation's owner), an organization, a second sign-up refused
-  # (sign-up is closed by default), the web app and the runner download, then an upgrade's steps on
-  # the same volumes, and the backup profile: a dump and its restore. amd64 only, nothing pushed.
+  # (sign-up is closed by default), the web app, the runner download and install.sh at /install,
+  # then an upgrade's steps on the same volumes, and the backup profile: a dump and its restore.
+  # amd64 only, nothing pushed.
   # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
   # would crowd main's out of the repository's cache quota.
   compose:
@@ -344,6 +346,7 @@ jobs:
           grep -q 'id="root"' index.html
           curl -fs "$URL/runner/agentes-runner.mjs" -o runner.mjs
           test "$(head -1 runner.mjs)" = '#!/usr/bin/env node'
+          curl -fs "$URL/install" | cmp - install.sh
           # New containers on the same volumes, migrations first: the organization must still be there.
           docker compose down
           docker compose run --rm agentes migrate
@@ -489,12 +492,35 @@ jobs:
           docker buildx imagetools create "${backup[@]}"
           docker buildx imagetools inspect "$(jq -r '.tags[0]' <<<"$META")"
 
+  # A version tag's GitHub release carries that version's install.sh, from a green run only, so
+  # `…/releases/download/v1.2.3/install.sh` is an installer the tests passed.
+  release-install:
+    name: Release install.sh
+    needs: [changes, check, test-backend, test-web, secrets, compose]
+    if: >-
+      github.ref_type == 'tag' && !cancelled() &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Attach install.sh to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 ||
+            gh release create "$TAG" --verify-tag --title "agentes.chat ${TAG#v}" --generate-notes
+          gh release upload "$TAG" install.sh --clobber
+
   # The one check to require once branch protection is on: red when any job failed or was
   # cancelled; a skipped job is fine (nothing it covers changed).
   done:
     name: CI result
     if: always()
-    needs: [changes, check, test-backend, test-web, secrets, compose, build, publish]
+    needs: [changes, check, test-backend, test-web, secrets, compose, build, publish, release-install]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

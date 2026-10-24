@@ -36,17 +36,18 @@ Cloud: both run this same codebase.
 | Desktop app (macOS) | Beta | A menu bar app that connects your Mac as an agent computer, to agentes.chat Cloud or your own instance. |
 | Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from OpenClaw, Hermes Agent, OpenBot.Run, Paperclip, OpenMausBot, OpenBot or another agentes.chat workspace, as a file, a folder, an archive or a GitHub link; other apps answer an export prompt. A preview comes first; skills arrive off, routines paused, and keys never. A workspace exports as one file. |
 | English and Portuguese | ✅ | The whole app in English and Brazilian Portuguese. |
-| Self-host (Docker) | ✅ | One command (`npx @agenteschat/setup`) and one compose file: the app and Postgres with pgvector, migrations on boot, and private HTTPS on your Tailscale network, or a public domain with Caddy. |
+| Self-host (Docker) | ✅ | One command (`curl -fsSL https://agentes.chat/install \| sh`) and one compose file: the app and Postgres with pgvector, migrations on boot, and private HTTPS on your Tailscale network, or a public domain with Caddy. |
 
 ## Run it
 
-On a server with Docker, in an empty directory:
+On a Linux server:
 
 ```sh
-npx @agenteschat/setup
+curl -fsSL https://agentes.chat/install | sh
 ```
 
-It puts agentes.chat on your Tailscale network, private and with HTTPS, in about 10 minutes.
+It installs what's missing (Docker, after asking), and puts agentes.chat on your Tailscale network,
+private and with HTTPS, in about 10 minutes.
 [SELF_HOSTING.md](SELF_HOSTING.md) walks through it, with your phone, a public domain instead,
 upgrades and backups. Each organization adds its own Anthropic or OpenAI key in the app. To work on
 the code, see [CONTRIBUTING.md](CONTRIBUTING.md).
