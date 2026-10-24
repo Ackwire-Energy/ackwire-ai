@@ -46,7 +46,7 @@ import {
 } from "./access";
 import { AccountManager } from "./accounts";
 import { ActivityLog } from "./activity";
-import { AgentUsers, readAgentUsers } from "./agent-users";
+import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } from "./agent-users";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
@@ -67,7 +67,7 @@ import {
   writeConfig,
 } from "./config";
 import { type ConnectionOutcome, type Dial, RunnerConnection } from "./connection";
-import { DesktopSessions, runnerUser } from "./desktop-session";
+import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
@@ -82,7 +82,7 @@ import { agentSecrets, secretValue } from "./secrets";
 import { DataSockets } from "./streams";
 import { launchWorker, Supervisor, type SupervisorOptions, type WorkerState } from "./supervisor";
 import { type SettledTask, TaskManager } from "./tasks";
-import { runnerTerminalUser, Terminals } from "./terminal";
+import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalUser } from "./terminal";
 
 /**
  * The runner's long-lived core, shared by `agentes-runner start` (terminal,
@@ -221,6 +221,8 @@ interface Session {
   connection: RunnerConnection;
   /** System mode: the agents' workers, where all their work runs. */
   supervisor: Supervisor | null;
+  /** System mode: each agent's OS user, made on its first request. */
+  agentUser: ((agent: AgentScope) => AgentUser) | null;
 }
 
 export interface DaemonOptions {
@@ -316,15 +318,37 @@ export class RunnerDaemon implements RequestObserver {
         if (accounts) this.send({ type: "accounts.changed", accounts });
       },
     });
+    const daemon = this;
     this.desktops = new DesktopSessions({
       home: opts.home,
       log: opts.log,
-      user: async (agent) => runnerUser(opts.home, await this.agentFolder(agent), agent),
+      user: (agent) => this.desktopUser(agent),
+      get agentUsers() {
+        return daemon.session?.agentUser != null;
+      },
     });
     this.terminals = new Terminals({
       log: opts.log,
-      user: async (agent) => runnerTerminalUser(await this.agentFolder(agent)),
+      user: (agent) => this.terminalUser(agent),
+      get agentUsers() {
+        return daemon.session?.agentUser != null;
+      },
     });
+  }
+
+  /** As whom the agent's desktop runs: the runner's own user, or in system mode the agent's own (its launcher). */
+  private async desktopUser(agent: AgentScope): Promise<DesktopUser> {
+    const agentUser = this.session?.agentUser;
+    if (!agentUser) return runnerUser(this.opts.home, await this.agentFolder(agent), agent);
+    const u = agentUser(agent);
+    return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
+  }
+
+  /** As whom a terminal on the agent's computer runs, like its desktop. */
+  private async terminalUser(agent: AgentScope): Promise<TerminalUser> {
+    const agentUser = this.session?.agentUser;
+    if (!agentUser) return runnerTerminalUser(await this.agentFolder(agent));
+    return systemTerminalUser(systemLauncher(agentUser(agent)), agent);
   }
 
   /** The agent's folder in the connected workspace. */
@@ -675,15 +699,17 @@ export class RunnerDaemon implements RequestObserver {
     void browser.closeAll();
     const streams = new DataSockets({ url: connectUrl(config.server, "stream"), token: config.token });
     let supervisor: Supervisor | null = null;
+    let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
+      agentUser = this.opts.workers?.user ?? ((agent) => users.ensure(agent));
       // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor.
       const guard = this.opts.workers
         ? undefined
         : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
       supervisor = new Supervisor({
         home,
-        user: (agent) => users.ensure(agent),
+        user: agentUser,
         start: launchWorker(this.self.command),
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
@@ -734,6 +760,8 @@ export class RunnerDaemon implements RequestObserver {
           desktop: this.desktops.info(),
           terminal: this.terminals.info(),
           ...(accounts ? { accounts } : {}),
+          // Who may control a desktop or open a terminal follows it (ADR 0058 §4).
+          ...(agentUser ? { mode: "system" as const } : {}),
         };
       },
       executors: () => this.helloExecutors(),
@@ -772,6 +800,7 @@ export class RunnerDaemon implements RequestObserver {
       streams,
       connection,
       supervisor,
+      agentUser,
     };
     this.session = session;
     supervisor?.boot();

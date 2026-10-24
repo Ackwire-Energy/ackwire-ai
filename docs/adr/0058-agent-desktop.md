@@ -110,6 +110,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 - **Single-user** (the self-host default): the runner's OS user runs every agent, its desktop and terminal included (ADR 0030 level 1); the docs say so.
 - **System mode** (`install.sh --system` on Linux; the Cloud; ADR 0057): a root supervisor and one unprivileged worker per agent, as the agent's own user `ag-<id8>` (uid 20000–29999 by default), in `agents-<uid>.slice` with memory, task and CPU limits sized for a desktop, a headed Chrome and one CLI (about 1.5 GB).
   - Everything done for an agent runs as that user: commands, tasks, brains, files, its browser, its desktop, its terminal. The supervisor runs no agent code: until a worker serves an agent's requests, the root runner refuses them. Workers start on an agent's first request.
+  - The desktop and the terminal are the supervisor's ops (`desktop.session.*`, `stream.open`), since a stream's data socket needs the machine token, which no worker holds, and the password file is root's: it starts Xtigervnc, the session and the shell through the agent's launcher.
   - The runner is updated by its installer, never by itself.
   - Chrome's debugging port and `agent-browser`'s stream port have no authentication of their own: an nftables table, `inet agentes_runner`, lets only the owning agent's uid and root reach them, through port and uid sets the supervisor fills after checking who listens.
   - Chrome's sandbox needs unprivileged user namespaces (on by default in Debian 13): hardening must keep them.

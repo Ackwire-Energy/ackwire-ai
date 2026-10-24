@@ -20,8 +20,10 @@ import {
   setTool,
   TOOL_NAMES,
 } from "./access";
+import { AgentUsers, agentGid, systemLauncher } from "./agent-users";
 import {
   configPath,
+  DEFAULT_AGENT_UID_RANGE,
   effectiveAccess,
   expandHome,
   normalizeServerUrl,
@@ -36,7 +38,7 @@ import {
 } from "./config";
 import { runControl } from "./control";
 import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
-import { DesktopSessions, runnerUser } from "./desktop-session";
+import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
 import { runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
@@ -56,7 +58,7 @@ import { connectVnc, type VncConnection, vncInit } from "./rfb";
 import { installService, installSystemService, serviceStatus, uninstallService } from "./service";
 import type { DataListener, DataSocket } from "./streams";
 import { runTaskWrapper } from "./tasks";
-import { runnerTerminalUser, Terminals } from "./terminal";
+import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalsOptions } from "./terminal";
 import { runWorker } from "./worker";
 
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
@@ -602,7 +604,8 @@ function tools(p: Parsed): number {
 
 /**
  * `agentes-runner desktop-check --agent <handle>` (ADR 0058): the agent's
- * desktop and terminal on this computer, through the runner's own code. It
+ * desktop and terminal on this computer, through the runner's own code, as
+ * the user the runner would run them as (in system mode the agent's own). It
  * holds the runner's lock: it starts and stops the agent's desktop itself.
  */
 async function desktopCheck(p: Parsed): Promise<number> {
@@ -614,7 +617,8 @@ async function desktopCheck(p: Parsed): Promise<number> {
   }
   const agents = readAgents(home);
   const agent = resolveAgentHandle(agents, handle);
-  const workspace = storedOrNull(home)?.workspace;
+  const stored = storedOrNull(home);
+  const workspace = stored?.workspace;
   if (!agent || !workspace) {
     console.error(unknownAgent(handle, agents));
     return 1;
@@ -625,9 +629,22 @@ async function desktopCheck(p: Parsed): Promise<number> {
     return 1;
   }
   try {
+    if (stored?.mode === "system") {
+      const u = new AgentUsers({ home, range: stored.agentUidRange ?? DEFAULT_AGENT_UID_RANGE }).ensure(agent);
+      const launcher = systemLauncher(u);
+      const desktop = await checkDesktop(home, agent, {
+        user: async () => systemDesktopUser(launcher, { uid: u.uid, gid: agentGid(u.user) }),
+        agentUsers: true,
+      });
+      const terminal = await checkTerminal(agent, {
+        user: async () => systemTerminalUser(launcher, agent),
+        agentUsers: true,
+      });
+      return desktop && terminal ? 0 : 1;
+    }
     const folder = await agentWorkspace(prepareWorkspace(workspace), agent);
-    const desktop = await checkDesktop(home, agent, folder);
-    const terminal = await checkTerminal(agent, folder);
+    const desktop = await checkDesktop(home, agent, { user: async (a) => runnerUser(home, folder, a) });
+    const terminal = await checkTerminal(agent, { user: async () => runnerTerminalUser(folder) });
     return desktop && terminal ? 0 : 1;
   } finally {
     lock.release();
@@ -638,12 +655,12 @@ const since = (t0: number) => `${Math.round(performance.now() - t0)} ms`;
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** Its desktop starts (or runs), both logins work, and a watcher's pointer is ignored; a desktop it started stops. */
-async function checkDesktop(home: string, agent: AgentScope, folder: string): Promise<boolean> {
-  const desktops = new DesktopSessions({
-    home,
-    log: (line) => console.log(`     ${line}`),
-    user: async (a) => runnerUser(home, folder, a),
-  });
+async function checkDesktop(
+  home: string,
+  agent: AgentScope,
+  as: Pick<DesktopSessionsOptions, "user" | "agentUsers">,
+): Promise<boolean> {
+  const desktops = new DesktopSessions({ home, log: (line) => console.log(`     ${line}`), ...as });
   desktops.restore();
   const info = desktops.info();
   if (!info.available) {
@@ -705,8 +722,8 @@ async function checkDesktop(home: string, agent: AgentScope, folder: string): Pr
 }
 
 /** A terminal opens as the agent's OS user in its folder, at its size, and ends with its shell. */
-async function checkTerminal(agent: AgentScope, folder: string): Promise<boolean> {
-  const terminals = new Terminals({ log: () => undefined, user: async () => runnerTerminalUser(folder) });
+async function checkTerminal(agent: AgentScope, as: Pick<TerminalsOptions, "user" | "agentUsers">): Promise<boolean> {
+  const terminals = new Terminals({ log: () => undefined, ...as });
   const info = terminals.info();
   if (!info.available) {
     console.log(`FAIL terminal: ${info.reason}`);

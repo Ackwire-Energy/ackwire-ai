@@ -22,6 +22,7 @@ import {
   type MachineReplies,
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
+import type { Launcher } from "./agent-users";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
@@ -197,6 +198,14 @@ export function runnerEnv(home: string): Record<string, string> {
 export function runnerUser(runnerHome: string, agentFolder: string, agent: AgentScope): DesktopUser {
   const home = path.join(agentFolder, ".agentes", "home");
   return { prefix: [], env: runnerEnv(home), home, dir: path.join(runnerHome, "desktop", id8(agent)) };
+}
+
+/**
+ * System mode: the agent's own OS user runs its desktop, through its launcher, with its own home as HOME and
+ * its cookie and socket in `~/.agentes/desktop`; the password file is root's, readable by the agent's group.
+ */
+export function systemDesktopUser(launcher: Launcher, ids: { uid: number; gid: number }): DesktopUser {
+  return { ...launcher, dir: path.join(launcher.home, ".agentes", "desktop"), ids };
 }
 
 /** A process a desktop started. */

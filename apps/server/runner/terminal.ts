@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, lstatSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -8,9 +8,11 @@ import {
   STREAM_CLOSE,
   STREAM_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
+import type { Launcher } from "./agent-users";
 import { type DesktopSystem, NOT_AS_ROOT, runnerEnv } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { hasBunTerminal, runtimeName } from "./launch";
+import { agentFolderName } from "./paths";
 import type { DataSocket } from "./streams";
 
 /**
@@ -51,6 +53,21 @@ export const runnerTerminalUser = (agentFolder: string): TerminalUser => ({
   env: { ...runnerEnv(os.homedir()), LANG: process.env.LANG || "C.UTF-8" },
   cwd: agentFolder,
 });
+
+/**
+ * System mode: the agent's own OS user through its launcher, in the agent's folder in its home once its
+ * worker made it, else in its home. Root never makes that folder (it would be root's) nor follows a link there.
+ */
+export function systemTerminalUser(launcher: Launcher, agent: AgentScope): TerminalUser {
+  const folder = path.join(launcher.home, agentFolderName(agent).name);
+  let made = false;
+  try {
+    made = lstatSync(folder).isDirectory();
+  } catch {
+    // not made yet
+  }
+  return { prefix: launcher.prefix, env: launcher.env, cwd: made ? folder : launcher.home };
+}
 
 export interface PtyOptions {
   cwd: string;

@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
+import { mkdirSync, symlinkSync } from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { hasBunTerminal } from "../../runner/launch";
 import type { DataSocket } from "../../runner/streams";
@@ -8,6 +10,7 @@ import {
   type PtyOptions,
   runnerTerminalUser,
   type SpawnPty,
+  systemTerminalUser,
   type TerminalLimits,
   Terminals,
   type TerminalUser,
@@ -163,6 +166,24 @@ test("the agent's login shell in its folder, through its launcher, with TERM and
   const t = setup({}, async () => ({ ...USER, prefix }));
   const { shell } = await t.open();
   expect(shell.argv).toEqual([...prefix, "/bin/sh", "-l"]);
+});
+
+test("system mode's terminal: the agent's launcher, in its folder once its worker made it, else its home", () => {
+  const home = tempDir("term-home-");
+  dirs.push(home);
+  const launcher = {
+    prefix: ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"],
+    env: { HOME: home, USER: "ag-01a142cb", PATH: "/usr/bin:/bin", SHELL: "/bin/bash" },
+    home,
+  };
+  expect(systemTerminalUser(launcher, dev)).toEqual({ prefix: launcher.prefix, env: launcher.env, cwd: home });
+  // A link where the folder goes is the agent's own doing: root doesn't follow it.
+  const elsewhere = tempDir("term-elsewhere-");
+  dirs.push(elsewhere);
+  symlinkSync(elsewhere, path.join(home, "dev-01a142cb"));
+  expect(systemTerminalUser(launcher, dev).cwd).toBe(home);
+  mkdirSync(path.join(home, "ops-9f00aa11"));
+  expect(systemTerminalUser(launcher, ops).cwd).toBe(path.join(home, "ops-9f00aa11"));
 });
 
 test("what the shell prints before the data socket is ready waits for it; keys and a resize reach the shell", async () => {
