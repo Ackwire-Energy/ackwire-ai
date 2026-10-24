@@ -382,15 +382,16 @@ export async function requireBrowserAccess(
 
 /**
  * Whether the agent's Chrome runs on its desktop (ADR 0058 §7), so both screens show one window: it may use
- * its desktop, its browser runs on its own computer, and that computer serves desktops.
+ * its desktop, its browser runs on its own computer (`machineId`: the one it is about to run on; by default
+ * the one its browser last used), and that computer serves desktops. Its browser requests say so (`desktop`).
  */
-export async function browserOnDesktop(db: Executor, orgId: string, agentId: string) {
+export async function browserOnDesktop(db: Executor, orgId: string, agentId: string, machineId?: string) {
   const [row] = await db
     .select({ agent: agents, machine: machines })
     .from(agents)
     .innerJoin(machines, and(eq(machines.id, agents.machineId), isNull(machines.deletedAt)))
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
-  if (!row || (row.agent.browserMachineId ?? row.machine.id) !== row.machine.id) return false;
+  if (!row || (machineId ?? row.agent.browserMachineId ?? row.machine.id) !== row.machine.id) return false;
   return servesDesktops(row.machine) && (await agentUsesScreen(db, orgId, agentId, "desktop"));
 }
 
@@ -1355,6 +1356,7 @@ export async function openPageInControl(
   }
   const agent = await getAgentCached(deps.db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
+  const desktop = await browserOnDesktop(deps.db, orgId, agentId, open.machineId);
   let reply: MachineReplies["browser.act"];
   try {
     reply = await hub.call<"browser.act">(
@@ -1367,6 +1369,7 @@ export async function openPageInControl(
         timeoutSeconds: OPEN_PAGE_SECONDS,
         ...(agent.browserAllowedDomains ? { allowedDomains: agent.browserAllowedDomains } : {}),
         link: agentBrowserLink(orgId, agentId),
+        ...(desktop ? { desktop: true } : {}),
       },
       { timeoutMs: (OPEN_PAGE_SECONDS + 30) * 1000 },
     );

@@ -33,7 +33,7 @@ import { toolDetail } from "../tool-detail";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
-import { handedBackSince, markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
+import { browserOnDesktop, handedBackSince, markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
 import { type AgentBrowserStatus, agentBrowserStatus, browserUnavailableText } from "./status";
 import {
   type BrowserLink,
@@ -425,11 +425,13 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       ...(agent?.name ? { name: agent.name } : {}),
     };
     const domains = agent?.browserAllowedDomains ?? null;
+    const desktop = await browserOnDesktop(ctx.db, ctx.orgId, ctx.agentId, status.machineId);
     const common = {
       agent: scope,
       ...(domains ? { allowedDomains: domains } : {}),
       // The computer's tray opens this conversation ("Ver").
       link: `/org/${ctx.orgId}/c/${ctx.channelId}`,
+      ...(desktop ? { desktop: true } : {}),
     };
     const fast = status.protocol >= BROWSER_FAST_PROTOCOL;
     let reached = false;

@@ -36,11 +36,11 @@ People want to see everything an agent does on its computer, not only its browse
 
 ### 1. One desktop per agent: Xtigervnc and XFCE, on demand
 
-- One `Xtigervnc` per agent display (X server and VNC server in one process): `:N -geometry 1280x800 -depth 24 -rfbport -1 -rfbunixpath <session folder>/vnc.sock -rfbunixmode 0600 -SecurityTypes VncAuth -PasswordFile <file> -AlwaysShared -AcceptSetDesktopSize=0 -FrameRate=30 -UseBlacklist=0 -auth <Xauthority> -nolisten tcp -s 0`. Never `-ac` or `-nopw`.
+- One `Xtigervnc` per agent display (X server and VNC server in one process): `:N -geometry 1280x900 -depth 24 -rfbport -1 -rfbunixpath <session folder>/vnc.sock -rfbunixmode 0600 -SecurityTypes VncAuth -PasswordFile <file> -AlwaysShared -AcceptSetDesktopSize=0 -FrameRate=30 -UseBlacklist=0 -auth <Xauthority> -nolisten tcp -s 0`. Never `-ac` or `-nopw`.
 - No TCP listener: a loopback port can be taken first by another agent's process, which would then show a fake screen to the people watching and read what the person in control types.
-- `DESKTOP_SIZE` is 1280×800 (inside the screen layer's image limits, ADR 0054). Viewers scale it and never resize it.
+- `DESKTOP_SIZE` is 1280×900 (inside the screen layer's image limits, ADR 0054): the agent's Chrome, maximized under the panel, shows a page of 1280×786, close to the 1280×800 of the headless Chrome the screen layer was measured on (§7). Viewers scale it and never resize it.
 - An XFCE session (`dbus-launch --exit-with-session xfce4-session`), restarted up to 3 times in 10 minutes. Its own ssh-agent is off (the session's settings, written once into its `HOME`): it daemonizes and would outlive every desktop. The packages go in with `--no-install-recommends` (otherwise a screen locker nobody can unlock, more daemons and eight folders in each home): `tigervnc-standalone-server xauth dbus-x11 xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-settings thunar xfce4-terminal adwaita-icon-theme elementary-xfce-icon-theme fonts-noto-core`.
-- Started on demand: the agent uses its screen, a person presses "Ligar", or a person is asked to help on it. A viewer alone never starts it, nor does the agent's browser. Stopped after 15 minutes without a stream, the agent's use, an open handoff or a viewer of the browser card; the agent's Chrome on it closes with it.
+- Started on demand: the agent uses its screen or its browser, a person presses "Ligar", or a person is asked to help on it. A viewer alone never starts it. Stopped after 15 minutes without a stream, the agent's use, an open handoff or a viewer of the browser card; the agent's Chrome on it closes with it.
 - Desktops per machine: `max(1, floor((RAM − 2 GiB) / 800 MiB))`, 7 on 8 GB. Over it, `desktop_busy`.
 - A runner restart leaves desktops running (`KillMode=process`, `setsid`): the new runner takes them back after checking each pid's command line.
 - The session's `HOME` is `<agent folder>/.agentes/home` in single-user mode (XFCE's files stay out of the agent's work), the agent's own home in system mode.
@@ -87,10 +87,13 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 
 ### 7. The agent's browser on its desktop
 
-- While the agent's desktop runs (only an agent with `desktop:use` gets one, on a computer that serves desktops), the runner starts its Chrome headed on that display (`--start-maximized`; `--test-type` hides the bar the automation flag shows; `DISPLAY` and `XAUTHORITY`); otherwise headless, as before. `agent-browser` still attaches over CDP, on an OS-assigned port. The runner decides at Chrome's launch, so no request carries it, and a mission's computer behaves the same.
-- Using that browser, or a viewer or an open request on it, keeps the desktop up. The desktop stopping closes it; the next command starts it headless.
-- A headless Chrome moves to a desktop that started since on the agent's next `open`: a new Chrome, so the open tabs go while the profile and its logins stay. Never while a handoff is open or someone watches the browser.
-- Its viewport is smaller than headless (1280 × about 660–690 px under the panel and Chrome's own bars): ADR 0054's numbers are measured again headed.
+- For an agent with `desktop:use` whose browser runs on its own computer, when that computer serves desktops, the runner's Chrome runs headed on the agent's display; the desktop starts first. `agent-browser` still attaches over CDP, on an OS-assigned port. On a mission's other computer the browser stays headless: the desktop people watch is the one on the agent's own computer. In system mode it stays headless too: the agent's worker runs its Chrome, and the desktops are the supervisor's (§10), which doesn't hand the worker the agent's display yet.
+- The server says so on each request that may start Chrome (`desktop: true` on `browser.act` and `browser.batch`); the runner follows it only while its own desktop switch is on.
+- The flags: `--start-maximized`; `--test-type=gpu` (`--test-type` hides the bar a headed Chrome shows for the automation flag, and the value `gpu` the one Chrome for Testing shows about being only for automated tests: both take the page's height, and people see them); `--ozone-platform=x11`. Its environment is the runner's on the agent's `DISPLAY` and `XAUTHORITY`, without the runner's own Wayland display and session bus, so nothing it opens lands on the screen of the person running the runner.
+- Chrome draws its own frame only when a window manager runs as it starts, and a desktop that just started gets its window manager a moment later: the runner sets Chrome's own frame in the profile (`browser.custom_chrome_frame`) before a headed start, so the window is the same either way.
+- A Chrome in the other mode (the desktop came or went, the switch or the scope changed) starts again in this one at the next command that may start Chrome, on the same profile and the same page; never while someone watches it (the browser card, or the desktop it is on) or a person's turn is open. A desktop that can't start leaves Chrome headless, tried again after 5 minutes.
+- The two idle stops know each other: a desktop isn't idle while its Chrome is in use (a command within 15 minutes, the browser card's viewers, a person's turn), and a Chrome isn't idle while its desktop is watched (a person may be working in it without a command). Stopping the desktop ends Chrome with it; the next command starts both.
+- Measured (Chrome for Testing 156, 1280×900, XFCE): a page of 1280×786 with `navigator.webdriver` false and no bar, maximized under the panel, its own frame even when started 2 s after a new desktop; the browser card's live view keeps working.
 
 ### 8. The scope: `desktop:use`, always together with `sandbox:run`
 
@@ -103,6 +106,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 
 - Two machine switches, `access.tools.desktop` and `access.tools.terminal`, turned on at the machine (`agentes-runner tools enable desktop terminal`): off by default on a personal computer, on in the Cloud. The server can only turn them off.
 - `hello.desktop` and `hello.terminal` say whether the runner can serve them, and why not: Linux, the runner on Bun 1.3.5 or newer (`Bun.Terminal`), and for the desktop the packages above. A runner on Node says so with the fix. Mac and Windows get no virtual desktop (the browser stays headless with its own live view); a Mac command-line runner on Bun 1.3.5 or newer serves the terminal.
+- The runner's installer runs it on the computer's own Bun when that has `Bun.Terminal`, else on a pinned Bun it downloads and checks against its SHA-256 (Linux and macOS, x64 and arm64); on Node.js 22+ or an older Bun only when that can't be had, saying what that runner lacks. `agentes-runner status` prints both availabilities, with the reasons.
 - A paused computer (ADR 0036 §6) still shows a desktop that runs; starting one, taking control and a terminal are new work and wait for the resume (`isNewWork`).
 
 ### 10. OS users: single-user and system mode
@@ -118,14 +122,14 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 ### 11. Protocol 18
 
 ```ts
-DESKTOP_SIZE = { width: 1280, height: 800 }
+DESKTOP_SIZE = { width: 1280, height: 900 }
 RunnerInfo (hello): desktop?: { available; reason?; width?; height? }; terminal?: { available; reason? }; mode?: "system"
 RunnerTools (switches, absent = off): desktop?: boolean; terminal?: boolean
 MachineRequest (each carries `agent`):
   { op: "desktop.session.start" }    // idempotent: starts it, or only marks it used
   { op: "desktop.session.stop" }
   { op: "desktop.session.status" }
-  { op: "stream.open"; streamId; kind: "desktop"; mode: "watch" | "control" }
+  { op: "stream.open"; streamId; kind: "desktop"; mode: "watch" | "control"; keyboard? }   // control: the person's layout
   { op: "stream.open"; streamId; kind: "terminal"; cols; rows }
 MachineReplies:
   "desktop.session.start": { display; width; height; startedAt; started }
@@ -136,7 +140,7 @@ MachineErrorCode += desktop_unavailable | desktop_off | desktop_busy | terminal_
 ```
 
 - **Data socket** (runner → server): `GET /api/machines/stream` as a WebSocket; a request with an `Origin` is refused. The first text frame, within 10 s: `{"type":"stream.hello","token":"agm_…","streamId":"<43 base64url>"}` (the machine's token, which every runner process that opens streams holds, and the 32 random bytes of `stream.open`). The server answers `{"type":"stream.ready"}` or closes: 4400 not a hello, 4401 a bad token or another machine's stream, 4404 an unknown stream (ended, or served already), 4408 too late. Then binary frames are the bytes and text frames are control (`parseStreamControl`): `{"type":"resize","cols","rows"}` towards the terminal, `{"type":"exit","code"}` back. Both sides ping every 30 s. The runner answers `stream.open` only once it got `stream.ready`; when the data socket closes, the viewer's closes too (1000 when the runner closed it so, else 4503). The runner closes it with 1000 when the stream is over for good (the shell ended, after its `exit` frame; a viewer that broke the RFB handshake), and with another code when the viewer should open it again: 1011 when the desktop went away (the next open learns whether it still runs), 1001 when the runner's connection ended.
-- **Viewer sockets** (web → server): `GET /api/desktop?orgId&agentId&mode=watch|control` and `GET /api/terminal?orgId&agentId&cols&rows`. Before the upgrade, like `/api/ws`: 401 without a session, 403 for a foreign `Origin` or a non-member, 400 for bad parameters. After it, close codes the panel turns into states (`STREAM_CLOSE`): 4400 bad request (a frame too big, too fast, or not the stream's) · 4403 forbidden, or access lost · 4404 no such agent, no computer, or an agent without `desktop:use` · 4408 the computer didn't open the stream in time (retry) · 4409 hidden (someone else is in control) · 4410 control ended, or never this person's (open again as a watcher) · 4429 too many streams, or too many opens · 4502 the computer refused (the reason is the error code, or `machine_paused`, `runner_outdated`, `not_allowed` for a switch that is off, `desktop_unavailable`, `terminal_unavailable`) · 4503 the computer is offline or on another replica (retry) · 1013 too slow · 1001 the server restarts (retry). What a viewer sends before its stream is ready waits for it (up to 1 MB).
+- **Viewer sockets** (web → server): `GET /api/desktop?orgId&agentId&mode=watch|control[&keyboard]` and `GET /api/terminal?orgId&agentId&cols&rows`. Before the upgrade, like `/api/ws`: 401 without a session, 403 for a foreign `Origin` or a non-member, 400 for bad parameters. After it, close codes the panel turns into states (`STREAM_CLOSE`): 4400 bad request (a frame too big, too fast, or not the stream's) · 4403 forbidden, or access lost · 4404 no such agent, no computer, or an agent without `desktop:use` · 4408 the computer didn't open the stream in time (retry) · 4409 hidden (someone else is in control) · 4410 control ended, or never this person's (open again as a watcher) · 4429 too many streams, or too many opens · 4502 the computer refused (the reason is the error code, or `machine_paused`, `runner_outdated`, `not_allowed` for a switch that is off, `desktop_unavailable`, `terminal_unavailable`) · 4503 the computer is offline or on another replica (retry) · 1013 too slow · 1001 the server restarts (retry). What a viewer sends before its stream is ready waits for it (up to 1 MB).
 - **REST** (`/api/app`): `GET …/agents/{agentId}/desktop` (availability, running, who controls, viewers, what this person may do, and the terminal's availability) and `POST …/desktop/start`; the screens' routes `…/desktop/handoff`, `…/desktop/takeover`, `…/desktop/stop`.
 - **Limits** (`STREAM_LIMITS`): 4 viewers per desktop; 3 terminals per agent and 10 per machine; 30 stream opens a minute per person; a viewer's backlog 8 MB and the runner's 4 MB; a viewer's frames up to 1 MB and 512 KB/s; a terminal's size 20–400 × 5–200.
 - **VncAuth** (test vectors): DES-ECB of the 16-byte challenge with the password as the key, each key byte's bits reversed: `password` and `00…0f` give `b866924125c8eebb9debc1db61c538e2`. TigerVNC's password file is each password encrypted with VNC's fixed key, bit-reversed `e84ad660c4721ae0` (`password` → `dbd83cfd727a1458`): the full password first, the view-only one second.
@@ -147,10 +151,12 @@ Handoff rows record control. `audit_log` rows `desktop.watched`, `desktop.contro
 
 ### 13. In the app
 
-- On the agent's page, "Tela" (the live screen; watch, take control, "Devolver") and "Terminal" (admins and the owner), opened by `?desktop=1` and `?terminal=1`; "Ver a tela inteira" on the browser card. noVNC 1.7.0 (ES modules) and `@xterm/xterm` 6.
+- On the agent's page, "Tela" (the live screen; watch, take control, "Devolver") and "Terminal" (only for whoever passes the control rule of §4), opened by `?desktop=1` and `?terminal=1`; "Ver a tela inteira" on the browser card. noVNC 1.7.0 (ES modules) and `@xterm/xterm` 6 with its fit add-on.
+- The terminal fits its panel (its size kept within 20–400 × 5–200) and tells each new size as a `resize`; keys go out as UTF-8 bytes. When the shell ends ("A sessão terminou") or the connection does, it waits for "Abrir de novo": a new socket is a new shell, so it never reopens by itself and a person never types into a shell they didn't see start.
 - Watchers ask quality 3, the person in control 6.
-- "Colar texto" puts the text in the desktop's clipboard and pastes it (Ctrl+Shift+V in a terminal window): typed keysyms lose some accents. The person's own clipboard is never written from the desktop (a "Copiar" button instead).
-- The phone app keeps the browser card and says the screen opens on a computer.
+- The person in control picks their keyboard layout (a guess from the browser's language and, where the browser tells, its keys; kept per browser); the control stream carries it (`keyboard`, one of `DESKTOP_KEYBOARDS`) and the runner sets it with `setxkbmap` as the agent.
+- "Colar texto" puts the text in the desktop's clipboard and presses Shift+Insert: typed keysyms lose some accents. Shift+Insert pastes in every window there, a terminal included (where Ctrl+V doesn't: it reads PRIMARY, which Xvnc sets with the clipboard; checked in xfce4-terminal). The person's own clipboard is never written from the desktop (a "Copiar" button instead).
+- The phone app keeps the browser card. A request on the agent's desktop shows there as one line saying it opens on a computer, and is never taken from the phone (taking it would hold the desktop for someone who can't see it).
 
 ## Order
 

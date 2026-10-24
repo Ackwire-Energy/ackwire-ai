@@ -42,4 +42,6 @@ export const STORAGE_KEYS = {
   outagesDismissed: "agentes.outages.dismissed",
   /** The desktop app's right click: "ours" (default) or "system" (lib/context-menu.ts). */
   menuLook: "agentes.desktop.menu",
+  /** The keyboard layout the person chose for agents' screens they control (`DESKTOP_KEYBOARDS`). */
+  screenKeyboard: "agentes.screen.keyboard",
 } as const;

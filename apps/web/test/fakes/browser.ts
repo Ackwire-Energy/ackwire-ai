@@ -1,17 +1,34 @@
 /**
- * Test fake — the agent browser (ADR 0040), same shapes as the server's
- * `…/agents/{id}/browser` and `…/browser/handoffs/*` routes. Agents start
- * without a browser (their computer is the cloud one); tests put handoffs in
- * `fake.handoffs` and settings in `fake.settings`.
+ * Test fake — the agent browser (ADR 0040) and desktop (ADR 0058), same shapes as the server's
+ * `…/agents/{id}/browser`, `…/agents/{id}/desktop` and `…/browser/handoffs/*` routes. Agents start
+ * without a browser or a desktop (their computer is the cloud one); tests put handoffs in
+ * `fake.handoffs`, settings in `fake.settings` and desktops in `fake.desktops`.
  */
-import type { AgentBrowserSettings, ApiClient, BrowserHandoff } from "@agenteschat/client";
-import { ApiError } from "@agenteschat/client";
+import type { AgentBrowserSettings, ApiClient, BrowserHandoff, DesktopStatus } from "@agenteschat/client";
+import { ApiError, handoffScreen } from "@agenteschat/client";
 
 export interface FakeBrowser {
   client: ApiClient["browser"];
+  desktop: ApiClient["desktop"];
   settings: Map<string, AgentBrowserSettings>;
   handoffs: Map<string, BrowserHandoff>;
+  /** An agent's desktop as the server would see it; its open handoff comes from `handoffs`. */
+  desktops: Map<string, Partial<DesktopStatus>>;
 }
+
+const NO_DESKTOP: DesktopStatus = {
+  available: false,
+  reason: "no_desktop",
+  detail: null,
+  running: false,
+  startedAt: null,
+  controllerUserId: null,
+  handoff: null,
+  viewers: 0,
+  canControl: false,
+  canStart: false,
+  terminal: { available: false, reason: "no_computer", allowed: false },
+};
 
 const NONE: AgentBrowserSettings = {
   allowedDomains: null,
@@ -29,6 +46,11 @@ export function createFakeBrowser(
 ): FakeBrowser {
   const settings = new Map<string, AgentBrowserSettings>();
   const handoffs = new Map<string, BrowserHandoff>();
+  const desktops = new Map<string, Partial<DesktopStatus>>();
+  const openOn = (agentId: string, screen: BrowserHandoff["screen"] = "browser") =>
+    [...handoffs.values()].find(
+      (h) => h.agentId === agentId && handoffScreen(h) === screen && (h.status === "pending" || h.status === "active"),
+    ) ?? null;
   const find = (id: string) => {
     const h = handoffs.get(id);
     if (!h) throw new ApiError(404, "not_found", "Not found");
@@ -53,13 +75,9 @@ export function createFakeBrowser(
       settings.set(agentId, next);
       return next;
     },
-    agentHandoff: async (orgId, agentId) => {
+    agentHandoff: async (orgId, agentId, screen) => {
       log("browser.agentHandoff", orgId, agentId);
-      return (
-        [...handoffs.values()].find(
-          (h) => h.agentId === agentId && (h.status === "pending" || h.status === "active"),
-        ) ?? null
-      );
+      return openOn(agentId, screen);
     },
     handoff: async (_orgId, handoffId) => find(handoffId),
     takeControl: async (orgId, handoffId) => {
@@ -80,13 +98,14 @@ export function createFakeBrowser(
       log("browser.cancel", orgId, handoffId);
       return end(handoffId, "cancelled");
     },
-    takeover: async (orgId, agentId, runId) => {
-      log("browser.takeover", orgId, agentId, ...(runId ? [runId] : []));
+    takeover: async (orgId, agentId, runId, screen) => {
+      log("browser.takeover", orgId, agentId, ...(runId ? [runId] : []), ...(screen ? [screen] : []));
       const h: BrowserHandoff = {
         id: `takeover-${handoffs.size + 1}`,
         agentId,
         runId: runId ?? null,
         machineId: "machine-1",
+        ...(screen && screen !== "browser" ? { screen } : {}),
         kind: "takeover",
         instructions: "",
         status: "active",
@@ -122,9 +141,25 @@ export function createFakeBrowser(
         throw new ApiError(403, "browser.not_allowed", `${host} is outside the sites this agent may use`);
       }
     },
-    stop: async (orgId, agentId) => {
-      log("browser.stop", orgId, agentId);
+    stop: async (orgId, agentId, screen) => {
+      log("browser.stop", orgId, agentId, ...(screen ? [screen] : []));
+      if (screen === "desktop") desktops.set(agentId, { ...desktops.get(agentId), running: false });
     },
   };
-  return { client, settings, handoffs };
+  const desktop: ApiClient["desktop"] = {
+    status: async (orgId, agentId) => {
+      log("desktop.status", orgId, agentId);
+      const open = openOn(agentId, "desktop");
+      return {
+        ...NO_DESKTOP,
+        ...desktops.get(agentId),
+        ...(open ? { handoff: open, controllerUserId: open.status === "active" ? open.controllerUserId : null } : {}),
+      };
+    },
+    start: async (orgId, agentId) => {
+      log("desktop.start", orgId, agentId);
+      desktops.set(agentId, { ...desktops.get(agentId), running: true });
+    },
+  };
+  return { client, desktop, settings, handoffs, desktops };
 }

@@ -53,6 +53,7 @@ import type {
   DatabaseConnectionInput,
   DatabaseTable,
   DesktopRelease,
+  DesktopStatus,
   DeviceRequest,
   DirectMessage,
   DmRead,
@@ -1006,6 +1007,14 @@ export interface ApiClient {
     open(orgId: string, agentId: string, url: string): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay), or stops that screen. */
     stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
+  };
+  /**
+   * The agent's desktop (ADR 0058): its state and "Ligar". The screen itself is a WebSocket
+   * (`desktopSocketUrl`); control, "Devolver" and "Desligar" are the browser's screen routes with `desktop`.
+   */
+  desktop: {
+    status(orgId: string, agentId: string): Promise<DesktopStatus>;
+    start(orgId: string, agentId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

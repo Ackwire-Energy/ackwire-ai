@@ -19,7 +19,9 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   type AgentScope,
+  DESKTOP_KEYBOARDS,
   DESKTOP_SIZE,
+  type DesktopKeyboard,
   type MachineReplies,
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
@@ -46,8 +48,8 @@ import { agentFolderName } from "./paths";
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
  * - Started on demand (`ensure`), stopped after `DESKTOP_IDLE_MS` with no
- *   stream and no use, started again (at most 3 times in 10 minutes) when it
- *   ends by itself.
+ *   stream and no use (the agent's Chrome on it in use counts), started again
+ *   (at most 3 times in 10 minutes) when it ends by itself.
  * - Desktops outlive the runner (their own sessions; the service has
  *   `KillMode=process`): the next runner takes them back from
  *   `<runner home>/desktop/<id8>.json` once the pid there is still that
@@ -311,6 +313,8 @@ export interface DesktopSessionsOptions {
   maxDesktops?: number;
   idleMs?: number;
   now?: () => number;
+  /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): not idle then. */
+  inUse?: (agentId: string) => boolean;
 }
 
 /** What `<runner home>/desktop/<id8>.json` keeps of a running desktop. */
@@ -421,7 +425,7 @@ export class DesktopSessions {
     });
   }
 
-  status(agent: AgentScope): MachineReplies["desktop.session.status"] {
+  status(agent: Pick<AgentScope, "id">): MachineReplies["desktop.session.status"] {
     const d = this.desktops.get(agent.id);
     if (!d || !this.alive(d)) return { running: false, streams: 0 };
     return { running: true, startedAt: iso(d.startedAt), lastUsedAt: iso(d.lastUsed), streams: d.streams };
@@ -433,18 +437,6 @@ export class DesktopSessions {
     if (!d) return null;
     const { display, socket, xauthority, home, passwords } = d;
     return { display, socket, xauthority, home, passwords };
-  }
-
-  /** The agent's desktop while it runs, where its Chrome goes (ADR 0058 §7): its display and cookie. */
-  running(agentId: string): { display: number; xauthority: string } | null {
-    const d = this.desktops.get(agentId);
-    return d && !d.ending && this.alive(d) ? { display: d.display, xauthority: d.xauthority } : null;
-  }
-
-  /** The agent used what runs on its desktop (its browser there): it isn't idle. */
-  touch(agentId: string) {
-    const d = this.desktops.get(agentId);
-    if (d) d.lastUsed = this.now();
   }
 
   /** A viewer on the agent's desktop: it doesn't stop as idle until the returned release is called. */
@@ -465,6 +457,27 @@ export class DesktopSessions {
   /** Every desktop stops (the machine's desktop switch went off). */
   async stopAll() {
     await Promise.all([...this.desktops.values()].map((d) => this.stop(d.agent).catch(() => undefined)));
+  }
+
+  /**
+   * The keyboard layout of the person taking control (ADR 0058 §5), set as the agent with `setxkbmap`.
+   * Best effort: without it, or when it fails, the desktop keeps the layout it had.
+   */
+  async setKeyboard(agent: AgentScope, keyboard: DesktopKeyboard): Promise<void> {
+    const d = this.desktops.get(agent.id);
+    if (!d || !this.alive(d)) return;
+    const user = await this.opts.user(agent);
+    const setxkbmap = this.sys.which("setxkbmap", user.env.PATH);
+    if (!setxkbmap) return;
+    const [layout = "us", variant]: readonly string[] = DESKTOP_KEYBOARDS[keyboard];
+    const argv = [...user.prefix, setxkbmap, "-layout", layout, ...(variant ? ["-variant", variant] : [])];
+    const p = this.sys.spawn(argv, {
+      cwd: d.home,
+      env: { ...user.env, HOME: d.home, DISPLAY: `:${d.display}`, XAUTHORITY: d.xauthority },
+    });
+    void p.exited.then((code) => {
+      if (code !== 0) this.opts.log(`the desktop of ${agent.handle} kept its keyboard: setxkbmap ${keyboard} failed`);
+    });
   }
 
   /**
@@ -495,7 +508,7 @@ export class DesktopSessions {
   /** Desktops that ended by themselves start again; idle ones stop. */
   async sweep() {
     const idleMs = this.opts.idleMs ?? DESKTOP_IDLE_MS;
-    const idle = (d: Desktop) => d.streams === 0 && this.now() - d.lastUsed >= idleMs;
+    const idle = (d: Desktop) => d.streams === 0 && this.now() - d.lastUsed >= idleMs && !this.opts.inUse?.(d.agent.id);
     for (const d of [...this.desktops.values()]) {
       if (!this.alive(d)) {
         this.ended(d);

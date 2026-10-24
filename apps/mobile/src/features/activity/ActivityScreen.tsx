@@ -308,7 +308,8 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
       ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
       : t("mobile.names.two", { first: who.first, second: who.second })
     : who.first;
-  const template = t(`mobile.activity.kind.${n.kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
+  const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
+  const template = t(`mobile.activity.kind.${kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
   const parts = template.split(NAMES);
   const title = parts.join(names);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.

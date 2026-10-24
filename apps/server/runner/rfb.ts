@@ -1,6 +1,11 @@
 import { createCipheriv } from "node:crypto";
 import net from "node:net";
-import { type AgentScope, STREAM_CLOSE, STREAM_LIMITS } from "@agenteschat/adapters/machine-protocol";
+import {
+  type AgentScope,
+  type DesktopKeyboard,
+  STREAM_CLOSE,
+  STREAM_LIMITS,
+} from "@agenteschat/adapters/machine-protocol";
 import type { DesktopSessions } from "./desktop-session";
 import { errnoCode, RunnerError } from "./errors";
 import type { DataSocket } from "./streams";
@@ -44,7 +49,7 @@ export function vncAuthResponse(password: string, challenge: Uint8Array): Buffer
  * Exact byte counts out of chunks as they come (the handshakes). Once the
  * source failed, what it sent before is still read; a read past it fails.
  */
-class ByteReader {
+export class ByteReader {
   private buf = Buffer.alloc(0);
   private waiting: { n: number; resolve(b: Buffer): void; reject(e: Error): void } | null = null;
   private error: Error | null = null;
@@ -254,13 +259,15 @@ export function serveNone(
  * `stream.open` of a desktop: the agent's running desktop logged in with the
  * password of the stream's mode, then its data socket; resolves once both are
  * up, and the bytes go on flowing. The desktop counts the stream as a viewer
- * (it isn't idle) until it ends.
+ * (it isn't idle) until it ends. Control with a `keyboard` gives the desktop
+ * the person's layout first.
  */
 export async function openDesktopStream(
-  desktops: Pick<DesktopSessions, "status" | "session" | "hold">,
+  desktops: Pick<DesktopSessions, "status" | "session" | "hold" | "setKeyboard">,
   agent: AgentScope,
   mode: "watch" | "control",
   dial: () => Promise<DataSocket>,
+  keyboard?: DesktopKeyboard,
 ): Promise<void> {
   const status = desktops.status(agent);
   const session = status.running ? desktops.session(agent.id) : null;
@@ -268,6 +275,7 @@ export async function openDesktopStream(
   if (status.streams >= STREAM_LIMITS.viewersPerDesktop) {
     throw new RunnerError("too_many_streams", "The agent's desktop already has as many viewers as it takes");
   }
+  if (mode === "control" && keyboard) void desktops.setKeyboard(agent, keyboard).catch(() => undefined);
   const release = desktops.hold(agent.id) ?? (() => undefined);
   try {
     const vnc = await connectVnc(session.socket, mode === "control" ? session.passwords.full : session.passwords.view);

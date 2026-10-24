@@ -54,15 +54,14 @@ interface FakeChrome {
   exe: string;
   args: string[];
   profile: string;
-  env?: NodeJS.ProcessEnv;
   port: number;
   killed: boolean;
 }
 
 function fakeChromes() {
   const started: FakeChrome[] = [];
-  const start = async (exe: string, args: string[], profile: string, env?: NodeJS.ProcessEnv): Promise<OwnChrome> => {
-    const c: FakeChrome = { exe, args, profile, env, port: 9300 + started.length, killed: false };
+  const start = async (exe: string, args: string[], profile: string): Promise<OwnChrome> => {
+    const c: FakeChrome = { exe, args, profile, port: 9300 + started.length, killed: false };
     started.push(c);
     let quit = () => {};
     const exited = new Promise<void>((resolve) => {
@@ -349,56 +348,6 @@ test.if(posix)("the runner starts the agent's Chrome itself and every command co
   expect(other[other.indexOf("--cdp") + 1]).toBe(String(t.chromes[1]?.port));
 });
 
-test.if(posix)(
-  "while the agent's desktop runs its Chrome opens in a window there; a headless one moves on the next open",
-  async () => {
-    const screens = new Map<string, { display: number; xauthority: string }>();
-    const touched: string[] = [];
-    const t = setup({
-      desktops: { running: (id) => screens.get(id) ?? null, touch: (id) => void touched.push(id) },
-    });
-    // No desktop running: headless, with the runner's environment.
-    await t.act("open", ["https://a.example"]);
-    const headless = t.chromes[0] as FakeChrome;
-    expect(headless.args).toContain("--headless=new");
-    expect(headless.env).toBeUndefined();
-    expect(touched).toEqual([]);
-
-    // The desktop starts: a click stays on the page; the agent's next open brings the browser to the desktop.
-    screens.set(dev.id, { display: 21, xauthority: "/r/desktop/01a142cb/Xauthority" });
-    await t.act("click", ["@e1"]);
-    expect(t.chromes).toHaveLength(1);
-    // A runner started inside the person's own (Wayland) session keeps the agent's window off it.
-    process.env.WAYLAND_DISPLAY = "wayland-0";
-    try {
-      await t.act("open", ["https://b.example"]);
-    } finally {
-      delete process.env.WAYLAND_DISPLAY;
-    }
-    expect(headless.killed).toBe(true);
-    const headed = t.chromes[1] as FakeChrome;
-    expect(headed.args).toContain("--start-maximized");
-    expect(headed.args).toContain("--test-type");
-    expect(headed.args.some((a) => a.startsWith("--headless") || a.startsWith("--window-size"))).toBe(false);
-    for (const f of CHROME_ARGS) expect(headed.args).toContain(f);
-    expect(headed.args).toContain("--ozone-platform=x11");
-    expect(headed.env).toMatchObject({ DISPLAY: ":21", XAUTHORITY: "/r/desktop/01a142cb/Xauthority" });
-    expect(headed.env?.WAYLAND_DISPLAY).toBeUndefined();
-    expect(headed.profile).toBe(headless.profile);
-    // Using the browser there keeps the desktop up.
-    expect(touched).toContain(dev.id);
-
-    // A request open for a person holds the browser where it is.
-    await t.act("open", ["https://c.example"], { agent: ops });
-    screens.set(ops.id, { display: 22, xauthority: "/r/desktop/9f00aa11/Xauthority" });
-    t.manager.setHandoff(ops.id, { status: "pending" });
-    await t.act("open", ["https://d.example"], { agent: ops });
-    expect(t.chromes).toHaveLength(3);
-    expect(t.chromes[2]?.args).toContain("--headless=new");
-    t.manager.setHandoff(ops.id, null);
-  },
-);
-
 test("a normal Chrome user agent for the platform, and the whole launch line", () => {
   const exe = "/h/.agent-browser/browsers/chrome-155.0.8059.84/chrome-mac-arm64/Google Chrome for Testing";
   expect(chromeUserAgent(exe, "darwin")).toBe(
@@ -407,18 +356,16 @@ test("a normal Chrome user agent for the platform, and the whole launch line", (
   expect(chromeUserAgent(exe, "win32")).toContain("Windows NT 10.0; Win64; x64");
   expect(chromeUserAgent(exe, "linux")).toContain("X11; Linux x86_64");
   expect(chromeUserAgent("/usr/bin/chrome", "linux")).toBeNull();
-  const args = chromeLaunchArgs(exe, "/p", { platform: "darwin", lang: "pt-BR" });
+  const args = chromeLaunchArgs(exe, "/p", "darwin", "pt-BR");
   expect(args).toContain("--lang=pt-BR");
   expect(args).toContain("--user-data-dir=/p");
   // Never the person's keychain (macOS would ask for their password).
   expect(args).toContain("--use-mock-keychain");
-  expect(chromeLaunchArgs(exe, "/p", { platform: "linux", lang: null })).toContain("--password-store=basic");
+  expect(chromeLaunchArgs(exe, "/p", "linux", null)).toContain("--password-store=basic");
   expect(args.at(-1)).toBe("about:blank");
-  expect(
-    chromeLaunchArgs("/usr/bin/chrome", "/p", { platform: "linux", lang: null }).some((a) =>
-      a.startsWith("--user-agent"),
-    ),
-  ).toBe(false);
+  expect(chromeLaunchArgs("/usr/bin/chrome", "/p", "linux", null).some((a) => a.startsWith("--user-agent"))).toBe(
+    false,
+  );
 });
 
 test.if(posix)("flags that reach outside the agent's browser, and unknown commands, are refused", async () => {
