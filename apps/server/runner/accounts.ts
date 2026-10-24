@@ -53,10 +53,10 @@ import {
  * - `list` asks each account's CLI (cached for `ACCOUNTS_TTL_MS`), `remove` signs
  *   out (best effort) and deletes the folder, `accountDir` is what a brain turn
  *   runs with.
- * - Usage (protocol 18, `plan-usage.ts`): what the turns say comes in through
+ * - Usage (protocol 19, `plan-usage.ts`): what the turns say comes in through
  *   `noteRateLimit` / `noteCodexRateLimits`, and `probeUsage` looks it up on
  *   demand; the list carries it, and the computer's own sign-ins' is `ownUsage`.
- * - Key accounts (protocol 19): a coding plan on Claude Code. `begin` with a
+ * - Key accounts (protocol 20): a coding plan on Claude Code. `begin` with a
  *   `provider` makes the folder and the key pair only, `code` opens the plan's
  *   key and keeps it in `provider.json` (600); no CLI ever signs in or out
  *   there. It is signed in until a turn's endpoint refuses the key.
@@ -1053,7 +1053,7 @@ export class AccountManager {
     }
   }
 
-  // ── Usage (protocol 18) ────────────────────────────────────────────────────
+  // ── Usage (protocol 19) ────────────────────────────────────────────────────
 
   private withUsage(list: RunnerAccountInfo[]): RunnerAccountInfo[] {
     return list.map((a) => {

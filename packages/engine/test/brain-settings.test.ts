@@ -118,7 +118,7 @@ describe("brain settings", () => {
 });
 
 /*
- * ADR 0058 §2–3 and §5: a plan thinks only for its owner's agents, one
+ * ADR 0059 §2–3 and §5: a plan thinks only for its owner's agents, one
  * account per agent, and an agent on a plan answers only its owner until the
  * owner lets others in, accepting the provider's terms once.
  */

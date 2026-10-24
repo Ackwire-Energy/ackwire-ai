@@ -67,7 +67,7 @@ const offline = {
 
 /**
  * Accounts of the computer brains on a connected computer (ADR 0041, ADR
- * 0058): an account is the person's who started its sign-in (through the
+ * 0059): an account is the person's who started its sign-in (through the
  * provider's own CLI on the computer). The person who connected the computer
  * adds accounts there, or anyone on a computer nobody connected; only an
  * account's owner sees its email, renames it, continues its sign-in or
@@ -246,7 +246,7 @@ export function machineAccountRoutes(deps: AppDeps) {
                     description:
                       "The caller adds accounts there (they connected it, or nobody did) and its runner knows accounts.",
                   }),
-                  keys: z.boolean().openapi({ description: "Its runner takes coding plans' keys (protocol 19)." }),
+                  keys: z.boolean().openapi({ description: "Its runner takes coding plans' keys (protocol 20)." }),
                   brains: z.object({ claude_code: z.boolean(), codex: z.boolean() }).openapi({
                     description:
                       "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",

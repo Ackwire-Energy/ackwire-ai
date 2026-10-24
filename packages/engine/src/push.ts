@@ -197,6 +197,7 @@ export async function deliverPush(deps: PushDeps, notificationId: string): Promi
       text: latest.text,
       highRisk,
       routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
+      screen: source.screen ?? null,
     }),
     data,
     priority: row.waiting ? "high" : "default",

@@ -69,7 +69,7 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   `account_missing`, never another account), and `effort` is `--effort`.
  *   A change of either starts the process again. Where requests go is pinned
  *   in the runner's own `--settings` (`accountSettingsEnv`), which outranks
- *   the project's settings the agent can write. A key account (protocol 19)
+ *   the project's settings the agent can write. A key account (protocol 20)
  *   thinks through its plan's endpoint: its key in the process env (never in
  *   a file the CLI reads, and redacted from everything sent), its model
  *   aliases mapped to the plan's models, no fallback model.
@@ -200,7 +200,7 @@ export interface ParsedBrainLine {
   task?: ParsedTask;
   /** `system` `init`: a turn starts. */
   turnStart?: boolean;
-  /** A `rate_limit_event`'s `rate_limit_info` (plan usage, protocol 18), whatever its status. */
+  /** A `rate_limit_event`'s `rate_limit_info` (plan usage, protocol 19), whatever its status. */
   rateLimit?: Record<string, unknown>;
   /** Tool results went back to the model (a tool boundary: queued messages and task notices are read there). */
   boundary?: boolean;
@@ -1052,7 +1052,7 @@ export interface BrainManagerOptions {
   claudeHome?: string;
   /**
    * Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`.
-   * Protocol 18: what each turn's `rate_limit_event` says, for its account (or `OWN_USAGE_ID`).
+   * Protocol 19: what each turn's `rate_limit_event` says, for its account (or `OWN_USAGE_ID`).
    */
   accounts?: {
     accountDir(kind: AccountKind, id: string): string | null;
@@ -1111,7 +1111,7 @@ export interface BrainTurnContext {
   grants?: string[];
   /** Set by the manager (ADR 0041): the turn's account folder, its Claude Code home. */
   accountHome?: string;
-  /** Set by the manager (protocol 19): that folder's coding plan and key. */
+  /** Set by the manager (protocol 20): that folder's coding plan and key. */
   planKey?: { provider: PlanId; key: string };
 }
 

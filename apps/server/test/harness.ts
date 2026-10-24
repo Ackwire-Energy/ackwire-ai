@@ -32,6 +32,7 @@ import { type AppleTokenRevoker, createAuth } from "../src/auth";
 import { buildEngine } from "../src/engine";
 import { createLogger } from "../src/logger";
 import { createMachineSockets } from "../src/realtime/machines";
+import { createStreamSockets } from "../src/realtime/streams";
 import { createRealtime, type SocketData } from "../src/realtime/ws";
 
 export const ORIGIN = "http://localhost:3000";
@@ -150,6 +151,7 @@ export async function createTestServer(
         appleRevoke: options.appleRevoke,
         desktopFetch: options.desktopFetch,
         browserLive: engine.browserLive,
+        streams: engine.streams,
       },
     },
     log,
@@ -162,11 +164,13 @@ export async function createTestServer(
     ...adapters,
     machines: createMachineSockets(engine.machineHub),
     browserLive: engine.browserLive,
+    streams: createStreamSockets({ db, auth, config, broker: engine.streams }),
   });
   return {
     db,
     close: async () => {
       await engine.machineHub.stop();
+      engine.streams.stop();
       await close();
     },
     config,
@@ -194,6 +198,20 @@ export function listen(t: TestServer) {
     fetch: (req, srv) => t.realtime.fetch(req, srv, (r) => t.app.fetch(r)),
     websocket: t.realtime.websocket,
   });
+}
+
+/** A WebSocket upgrade's HTTP status, for refused connections (a plain request with the upgrade headers). */
+export async function upgradeStatus(url: string, headers: Record<string, string>) {
+  const res = await fetch(url.replace("ws://", "http://"), {
+    headers: {
+      ...headers,
+      connection: "Upgrade",
+      upgrade: "websocket",
+      "sec-websocket-version": "13",
+      "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+    },
+  });
+  return res.status;
 }
 
 /** Minimal browser over `app.request`: keeps cookies and sends our Origin. */

@@ -476,7 +476,7 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
-    // Their AI accounts on the organization's computers are signed out and removed (ADR 0058 §1).
+    // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
     return releaseMemberAccounts(tx, targetUserId, orgId);
   });
   await announceReleasedAccounts(options.pubsub, released);
@@ -494,7 +494,7 @@ export async function removeMember(
  * (`sole_owner`, with the organizations' names: make someone else an owner
  * first). Organizations where they are the only member go with them, with
  * everything in them. Their AI accounts on computers are signed out and
- * removed, never inherited (ADR 0058 §1). The rest follows the foreign keys:
+ * removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
  * sessions, sign-in methods, memberships, channel memberships, notifications
  * and phones are deleted; messages and records they authored stay without an
  * author (the same as any deleted user). Not for a blocked account: it can't

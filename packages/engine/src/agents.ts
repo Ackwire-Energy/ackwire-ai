@@ -168,7 +168,7 @@ export async function updateAgent(
   await validate(db, orgId, input);
   const owner = input.ownerUserId;
   const before = owner !== undefined ? await getAgent(db, orgId, agentId) : null;
-  // A plan thinks only for its owner's agents (ADR 0058 §3): a new owner who doesn't own it sends the agent back
+  // A plan thinks only for its owner's agents (ADR 0059 §3): a new owner who doesn't own it sends the agent back
   // to the API; one who does decides for themselves whether anyone else talks to it.
   const handover =
     before && before.ownerUserId !== owner && isComputerBrain(before.brain)

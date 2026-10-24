@@ -1,6 +1,6 @@
 /**
  * Coding plans that think through Claude Code on a computer with the key their
- * owner pastes ("key accounts", ADR 0058). Pure data, read by the runner (where
+ * owner pastes ("key accounts", ADR 0059). Pure data, read by the runner (where
  * a turn goes, which variable holds the key, what each model alias runs), the
  * engine and the apps (names, where the key is made, the model choices): it
  * imports nothing. The key travels sealed to the computer and stays there; our

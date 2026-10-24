@@ -25,7 +25,7 @@ import { AddAccount } from "./AddAccountFlow";
 import { ConnectAiDialog } from "./ConnectAiSteps";
 
 /*
- * Configurações › Contas de IA, "Seus planos" (ADR 0058): the viewer's own
+ * Configurações › Contas de IA, "Seus planos" (ADR 0059): the viewer's own
  * accounts on every computer, each with its plan's meter and the agent it
  * thinks for; renamed, signed in again (a new key for a coding plan) or
  * disconnected here. Never blank: with none, one way to connect one.

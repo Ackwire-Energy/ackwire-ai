@@ -1,4 +1,4 @@
-# 0058. AI accounts belong to people: one account per agent, a plan answers its owner, more providers, official marks
+# 0059. AI accounts belong to people: one account per agent, a plan answers its owner, more providers, official marks
 
 - Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first
 - Date: 2026-10-24

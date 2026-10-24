@@ -635,7 +635,7 @@ export interface CodexAppServersOptions {
    * endpoint, as the process's own bridge (its id and local token). Tests: a fake server.
    */
   ask?: (process: { id: string; token: string }, tool: string, args: Record<string, unknown>) => Promise<IpcReply>;
-  /** Protocol 18: Codex's `account/rateLimits/updated` (`rateLimits`), for the process's account (null: its own sign-in). */
+  /** Protocol 19: Codex's `account/rateLimits/updated` (`rateLimits`), for the process's account (null: its own sign-in). */
   onRateLimits?: (account: string | null, rateLimits: unknown) => void;
   log?: (line: string) => void;
 }

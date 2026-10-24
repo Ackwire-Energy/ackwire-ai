@@ -1,7 +1,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { AgentBrowserSettings, BrowserHandoff } from "../api/types";
+import type { AgentBrowserSettings, BrowserHandoff, ScreenKind } from "../api/types";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
 
@@ -34,6 +34,9 @@ export function browserHandoffOf(meta: unknown): BrowserHandoff | null {
 
 /** Still waiting for someone, or someone is in it now. */
 export const isOpenHandoff = (h: Pick<BrowserHandoff, "status">) => h.status === "pending" || h.status === "active";
+
+/** Which screen a handoff is on (servers older than screens name none: the browser). */
+export const handoffScreen = (h: Pick<BrowserHandoff, "screen">): ScreenKind => h.screen ?? "browser";
 
 /** Waiting for someone to open it, not yet expired. */
 export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">, now = Date.now()): boolean {
@@ -128,8 +131,9 @@ export function applyBrowserHandoff(
 ) {
   if (place) noteHandoffPlace(handoff, place.channelId, place.threadId);
   qc.setQueryData(keys.browserHandoff(orgId, handoff.id), handoff);
-  qc.setQueryData<BrowserHandoff | null>(keys.agentBrowserHandoff(orgId, handoff.agentId), (old) =>
-    isOpenHandoff(handoff) ? handoff : old?.id === handoff.id || old === undefined ? null : old,
+  qc.setQueryData<BrowserHandoff | null>(
+    keys.agentBrowserHandoff(orgId, handoff.agentId, handoffScreen(handoff)),
+    (old) => (isOpenHandoff(handoff) ? handoff : old?.id === handoff.id || old === undefined ? null : old),
   );
 }
 
@@ -155,14 +159,20 @@ export function useUpdateAgentBrowserSettings(orgId: string, agentId: string) {
 }
 
 /**
- * The agent's open request or take over (who is in control), if any. `staleTime`: how long a
- * fetched answer is trusted (the realtime event keeps it current meanwhile).
+ * The agent's open request or take over (who is in control) on that screen, if any. `staleTime`:
+ * how long a fetched answer is trusted (the realtime event keeps it current meanwhile).
  */
-export const useAgentBrowserHandoff = (orgId: string, agentId: string, enabled = true, staleTime = 0) => {
+export const useAgentBrowserHandoff = (
+  orgId: string,
+  agentId: string,
+  enabled = true,
+  staleTime = 0,
+  screen: ScreenKind = "browser",
+) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.agentBrowserHandoff(orgId, agentId),
-    queryFn: () => api.browser.agentHandoff(orgId, agentId),
+    queryKey: keys.agentBrowserHandoff(orgId, agentId, screen),
+    queryFn: () => api.browser.agentHandoff(orgId, agentId, screen),
     enabled,
     retry: false,
     staleTime,

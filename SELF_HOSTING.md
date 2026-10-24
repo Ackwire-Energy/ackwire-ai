@@ -260,7 +260,8 @@ of `X-Forwarded-For`, which the app trusts as is, so leave `TRUSTED_PROXIES` emp
 Create the owner account first, as for Caddy above. Keep the app on loopback (the default) and
 point the proxy at `127.0.0.1:3000`. The proxy must:
 
-- upgrade WebSockets on `/api/ws` (browsers) and `/api/machines/connect` (connected computers);
+- upgrade WebSockets on `/api/ws` (browsers), `/api/machines/connect` (connected computers), and
+  `/api/desktop`, `/api/terminal` and `/api/machines/stream` (agents' screens and terminals);
 - accept uploads up to 50 MB, the Drive's limit per file;
 - keep sockets open: the app and its clients exchange a ping at least every 30 s, so a read timeout
   of 60 s (nginx's default) or more works;

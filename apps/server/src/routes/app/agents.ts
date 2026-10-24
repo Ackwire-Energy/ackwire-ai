@@ -475,7 +475,7 @@ export function agentRoutes(deps: AppDeps) {
             fallback: z.boolean().optional(),
             onlyOwner: z.boolean().optional().openapi({
               description:
-                "\"Só responde a você\" (ADR 0058): true, only its owner talks to it; false, on a plan everyone does (only its owner, `audience.plan_owner_only`), on the API whoever did before a plan made it the owner's only. Omitted = keep; switching onto a plan makes it the owner's only.",
+                "\"Só responde a você\" (ADR 0059): true, only its owner talks to it; false, on a plan everyone does (only its owner, `audience.plan_owner_only`), on the API whoever did before a plan made it the owner's only. Omitted = keep; switching onto a plan makes it the owner's only.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               description:

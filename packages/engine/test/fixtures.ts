@@ -191,7 +191,7 @@ export async function setup(
   await db
     .delete(schema.agentScopes)
     .where(
-      sql`${schema.agentScopes.agentId} = ${agent.id} and ${schema.agentScopes.scope} in ('sandbox:run', 'browser:use')`,
+      sql`${schema.agentScopes.agentId} = ${agent.id} and ${schema.agentScopes.scope} in ('sandbox:run', 'browser:use', 'desktop:use')`,
     );
   await addChannelMember(db, owner.id, org.id, general.id, { agentId: agent.id });
 

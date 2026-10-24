@@ -513,7 +513,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
-  // "Só responde a você" (ADR 0058 §5): switched onto a plan, the agent answers only its owner until they say otherwise.
+  // "Só responde a você" (ADR 0059 §5): switched onto a plan, the agent answers only its owner until they say otherwise.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
   const [asking, setAsking] = useState(false);
   const offId = useId();
@@ -697,7 +697,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     {
       value: HERE,
       label: t("agentPage.work.brain.thisComputer", { computer: computerName }),
-      // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0058 §3).
+      // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0059 §3).
       disabled: !view.ownSignIn && view.account !== null,
       description: view.ownSignIn
         ? t("agentPage.work.brain.thisComputerText", { computer: computerName })

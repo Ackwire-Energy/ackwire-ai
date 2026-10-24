@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 const SEATS = new Set(["team", "enterprise"]);
 
 /**
- * "Agora a Ada responde a todos" (ADR 0058 §5): before an agent answers other
+ * "Agora a Ada responde a todos" (ADR 0059 §5): before an agent answers other
  * people on its owner's personal plan, the provider's own words about
  * personal use. Going on is a deliberate choice; keeping it is the easy one.
  */

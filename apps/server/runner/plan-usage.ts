@@ -12,7 +12,7 @@ import { killTree } from "./exec";
 import { resolveCommand } from "./executors";
 
 /**
- * Plan usage (protocol 18), read without touching any token: the CLIs and the
+ * Plan usage (protocol 19), read without touching any token: the CLIs and the
  * providers keep theirs.
  * - Claude Code: each turn's `rate_limit_event`, and on demand `get_usage`, a
  *   control request (no model call) to a short-lived `claude -p` that loads no

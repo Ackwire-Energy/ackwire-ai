@@ -2441,6 +2441,11 @@ export const en: Translations = {
       description:
         "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
     },
+    desktop_use: {
+      label: "Use its desktop",
+      description:
+        "Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.",
+    },
     github_git_read: {
       label: "Clone repositories (git)",
       description:
@@ -5440,6 +5445,7 @@ export const en: Translations = {
       forum: "Forum",
       sandbox: "Run code",
       browser: "Browser",
+      desktop: "Desktop",
     },
     areaText: {
       context: {
@@ -5458,6 +5464,10 @@ export const en: Translations = {
       forum: { write: "Opens topics, reads and posts in the forum." },
       sandbox: { write: "Runs code on the agent's PC; machine time costs money." },
       browser: { write: "Browses websites in its own browser on its connected computer; logins stay per agent." },
+      desktop: {
+        write:
+          "Uses any app on its own desktop on its computer, while people watch or take control. Needs Run code too.",
+      },
     },
   },
   artifacts: {
@@ -7352,6 +7362,7 @@ export const en: Translations = {
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",
       browser_handoff: "I need help in my browser.",
+      desktop_handoff: "I need help on my computer.",
       file_saved: "File saved.",
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
@@ -7632,6 +7643,11 @@ export const en: Translations = {
       label: "Close the browser",
       description: "Closes the agent's browser; logins stay saved.",
     },
+    desktop_ask_person: {
+      label: "Ask for help on the desktop",
+      description:
+        "Asks a person to do something on the agent's desktop (like signing in to an app) and waits until they're done.",
+    },
   },
   browser: {
     title: "Browser",
@@ -7904,6 +7920,12 @@ export const en: Translations = {
     managedNotRemovable: "This is the workspace's own computer: it can't be removed.",
     notification: {
       ready: "Your workspace's computer is ready",
+    },
+  },
+  /** The agent's desktop (ADR 0058): watching it, taking control, its terminal. */
+  desktop: {
+    control: {
+      notice: "While you're in control, programs on the agent's computer can see the screen and what you type.",
     },
   },
 };

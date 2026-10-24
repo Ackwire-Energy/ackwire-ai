@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 19;
+export const MACHINE_PROTOCOL_VERSION = 20;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -150,6 +150,24 @@ export const BRAIN_PROFILES_PROTOCOL = 16;
  */
 export const BROWSER_FAST_PROTOCOL = 17;
 /**
+ * From this protocol on (ADR 0058): the agent's desktop and a terminal on its
+ * computer. `hello.desktop` and `hello.terminal` say whether the runner can
+ * serve them; the person turns them on on the machine (`access.tools.desktop`,
+ * `access.tools.terminal`). `desktop.session.*` starts, stops and reports an
+ * agent's desktop. `stream.open` makes the runner dial one data socket
+ * (`/api/machines/stream`) for one viewer of a desktop (raw RFB) or one
+ * terminal (its bytes), so a busy screen never delays this socket. The server
+ * never sends these to an older runner.
+ */
+export const DESKTOP_PROTOCOL = 18;
+
+/** Every agent desktop's size: viewers scale it, they never resize it. */
+export const DESKTOP_SIZE = { width: 1280, height: 800 } as const;
+
+/** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
+export const SCREEN_KINDS = ["browser", "desktop"] as const;
+export type ScreenKind = (typeof SCREEN_KINDS)[number];
+/**
  * From this protocol on: plan usage, read by the CLIs without touching any
  * token. Accounts carry `usage` (`RunnerAccountInfo.usage`); `hello` and
  * `accounts.changed` carry the computer's own sign-ins' (`ownUsage`). It comes
@@ -157,10 +175,10 @@ export const BROWSER_FAST_PROTOCOL = 17;
  * and from probes `list` asks for (`fresh`). The server never sends `fresh`
  * to an older runner.
  */
-export const PLAN_USAGE_PROTOCOL = 18;
+export const PLAN_USAGE_PROTOCOL = 19;
 /**
  * From this protocol on: coding plans as key accounts on Claude Code (ADR
- * 0058). `begin` with `provider` (a plan of `@agenteschat/providers/plans`)
+ * 0059). `begin` with `provider` (a plan of `@agenteschat/providers/plans`)
  * starts no CLI: the runner makes the folder and a key the browser seals the
  * plan's key to, and `code` hands it over (kept in the folder,
  * `provider.json`, mode 600). Turns in that folder think through the
@@ -170,7 +188,7 @@ export const PLAN_USAGE_PROTOCOL = 18;
  * folder belongs to that agent's user only while it thinks with it. The
  * server never sends `provider` to an older runner.
  */
-export const PLAN_KEYS_PROTOCOL = 19;
+export const PLAN_KEYS_PROTOCOL = 20;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -195,11 +213,11 @@ export interface RunnerAccountInfo {
   email?: string;
   /** `pro`, `max`, `team`, `plus`… as the CLI says. */
   plan?: string;
-  /** Protocol 18: the plan's usage limits, as last seen. */
+  /** Protocol 19: the plan's usage limits, as last seen. */
   usage?: PlanUsage;
-  /** Protocol 19: a key account's coding plan (`zai`, `kimi`…); absent for the CLI's own sign-in. */
+  /** Protocol 20: a key account's coding plan (`zai`, `kimi`…); absent for the CLI's own sign-in. */
   provider?: string;
-  /** Protocol 19: the last 4 characters of a key account's key. */
+  /** Protocol 20: the last 4 characters of a key account's key. */
   keyHint?: string;
 }
 
@@ -221,7 +239,7 @@ export const PLAN_WINDOW_KINDS: readonly PlanWindowKind[] = [
   "other",
 ];
 
-/** Protocol 18: a plan's usage limits as the CLI or the provider said them (`at`), during a turn or by a probe. */
+/** Protocol 19: a plan's usage limits as the CLI or the provider said them (`at`), during a turn or by a probe. */
 export interface PlanUsage {
   windows: PlanWindow[];
   /** The plan refused a request for its limit (cleared when it allows one again). */
@@ -230,7 +248,7 @@ export interface PlanUsage {
   at: string;
 }
 
-/** The computer's own sign-ins' usage (protocol 18), by brain. */
+/** The computer's own sign-ins' usage (protocol 19), by brain. */
 export type OwnPlanUsage = Partial<Record<AccountKind, PlanUsage>>;
 
 /** `list.fresh` ids for the computer's own sign-ins (the rest are account ids). */
@@ -253,14 +271,14 @@ export type AccountRequest =
   /**
    * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
-   * an older runner leaves it out. Protocol 19, `provider`: a coding plan's key account (Claude Code), no CLI.
+   * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
    */
   | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string; provider?: string }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
   /**
-   * Protocol 18: `fresh`, accounts (ids, or `OWN_USAGE_ID`s) whose usage to look up now: the runner
+   * Protocol 19: `fresh`, accounts (ids, or `OWN_USAGE_ID`s) whose usage to look up now: the runner
    * answers at once, probes in the background and sends `accounts.changed` when it knows more.
    */
   | { action: "list"; fresh?: string[] }
@@ -330,6 +348,117 @@ export interface RunnerBrowserInfo {
   /** Why it isn't available, for people ("Chrome's libraries are missing: run …"). */
   reason?: string;
 }
+
+/** `hello.desktop` (protocol 18): whether this machine can run the agents' desktops. */
+export interface RunnerDesktopInfo {
+  available: boolean;
+  /** Why it isn't available, for people (what to install). */
+  reason?: string;
+  /** The desktops' size in pixels (both or neither). */
+  width?: number;
+  height?: number;
+}
+
+/** `hello.terminal` (protocol 18): whether people can open a terminal on this machine. */
+export interface RunnerTerminalInfo {
+  available: boolean;
+  reason?: string;
+}
+
+/** Desktop and terminal streams (protocol 18): sizes, rates, caps and timeouts. */
+export const STREAM_LIMITS = {
+  /** The server waits this long for the runner's data socket after `stream.open`. */
+  openTimeoutMs: 20_000,
+  /** A data socket's `stream.hello` must come this soon. */
+  helloTimeoutMs: 10_000,
+  /** Both sides ping this often: an idle desktop sends nothing, and proxies drop idle sockets. */
+  pingMs: 30_000,
+  /** Bytes queued to a viewer before its stream closes as too slow. */
+  viewerBufferedMax: 8 << 20,
+  /** Bytes queued on the runner's data socket before it stops reading from the desktop. */
+  runnerBufferedMax: 4 << 20,
+  /** Terminal output queued beyond this is dropped, with a marker. */
+  terminalBufferMax: 1 << 20,
+  /** A viewer's frame, and how many bytes a second a viewer may send. */
+  clientFrameMax: 1 << 20,
+  clientBytesPerSecond: 512 << 10,
+  viewersPerDesktop: 4,
+  terminalsPerAgent: 3,
+  terminalsPerMachine: 10,
+  terminalIdleMs: 30 * 60_000,
+  terminalMaxMs: 12 * 3_600_000,
+  /** Streams a person may open in a minute. */
+  opensPerMinute: 30,
+  /** The server checks this often that whoever has an open stream may still have it. */
+  accessRecheckMs: 30_000,
+  /** A terminal's size, inclusive. */
+  cols: [20, 400],
+  rows: [5, 200],
+} as const;
+
+/**
+ * Close codes of desktop and terminal streams (protocol 18): the viewer's
+ * socket (`/api/desktop`, `/api/terminal`) and the runner's data socket
+ * (`/api/machines/stream`). A stream that ends closes both sides.
+ */
+export const STREAM_CLOSE = {
+  normal: 1000,
+  /** The server restarts: open again. */
+  restarting: 1001,
+  internal: 1011,
+  /** A side doesn't keep up: its backlog passed the limit. */
+  tooSlow: 1013,
+  badRequest: 4400,
+  /** Data socket: a bad token, or another machine's stream. */
+  badToken: 4401,
+  /** Viewer: not allowed, or no longer. */
+  forbidden: 4403,
+  /** Viewer: no such agent, or no computer (or desktop) for it. Data socket: no such stream (ended, or served already). */
+  notFound: 4404,
+  /** Data socket: no `stream.hello` in time. Viewer: the computer didn't open the stream in time (retry). */
+  late: 4408,
+  /** Viewer: someone else is in control of the desktop. */
+  hidden: 4409,
+  /** Viewer: control isn't this person's (any more): open again as a watcher. */
+  controlEnded: 4410,
+  /** Viewer: too many streams, or opened too often. */
+  tooMany: 4429,
+  /** Viewer: the computer refused; the reason is its error code (or `machine_paused`, `runner_outdated`). */
+  refused: 4502,
+  /** Viewer: the computer is offline, or its socket is on another server (retry). */
+  unreachable: 4503,
+} as const;
+
+/** What a stream shows: one viewer of the agent's desktop, or one terminal as the agent with its size. */
+export type StreamRequest =
+  | { kind: "desktop"; mode: "watch" | "control" }
+  | { kind: "terminal"; cols: number; rows: number };
+
+/**
+ * `stream.open` (protocol 18): one viewer of the request's agent's desktop
+ * (`watch` logs in with the view-only password, `control` with the full one),
+ * or one terminal as the agent. `streamId` (32 random bytes, base64url) names
+ * the stream on the data socket.
+ */
+export type StreamOpenRequest = StreamRequest & { streamId: string };
+
+/**
+ * A data socket's first frame (runner → server, text): the machine's token
+ * and the stream it serves. The server answers `{"type":"stream.ready"}` or
+ * closes the socket.
+ */
+export interface StreamHello {
+  type: "stream.hello";
+  token: string;
+  streamId: string;
+}
+
+/**
+ * Text frames on a stream once it is ready (binary frames are the bytes): a
+ * terminal's new size (viewer → runner) and how its shell ended (runner →
+ * viewer).
+ */
+export type StreamControl = { type: "resize"; cols: number; rows: number } | { type: "exit"; code: number | null };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -793,7 +922,7 @@ export interface MachineAgent {
   handle: string;
   name: string;
   look?: { color?: string; eyes?: string; accessory?: string };
-  /** Protocol 19: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
+  /** Protocol 20: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
   account?: string;
 }
 
@@ -812,6 +941,10 @@ export interface RunnerTools {
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
   browser?: boolean;
+  /** Protocol 18: the agents' desktops: they use them, people watch and take control (ADR 0058). Absent = off. */
+  desktop?: boolean;
+  /** Protocol 18: terminals people open as an agent (ADR 0058). Absent = off. */
+  terminal?: boolean;
 }
 
 /** A folder allowed on the machine beyond the agents' own folders, and which agents use it (protocol 10). */
@@ -861,7 +994,16 @@ export interface RunnerInfo {
   browser?: RunnerBrowserInfo;
   /** Protocol 13: the accounts on the machine (ADR 0041). */
   accounts?: RunnerAccountInfo[];
-  /** Protocol 18: the usage of the computer's own sign-ins (no account folder). */
+  /** Protocol 18: whether the agents' desktops can run here (ADR 0058). */
+  desktop?: RunnerDesktopInfo;
+  /** Protocol 18: whether people can open a terminal here. */
+  terminal?: RunnerTerminalInfo;
+  /**
+   * Protocol 18: `system` when each agent works as its own OS user (ADR 0058 §10); absent, every agent
+   * works as the runner's own user. Who may control a desktop or open a terminal follows it (§4).
+   */
+  mode?: "system";
+  /** Protocol 19: the usage of the computer's own sign-ins (no account folder). */
   ownUsage?: OwnPlanUsage;
 }
 
@@ -971,6 +1113,13 @@ export type MachineRequest = (
     }
   /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
   | { op: "browser.capture"; allowedDomains?: string[] }
+  /** Protocol 18: starts the agent's desktop; when it runs already, only marks it used (idempotent). */
+  | { op: "desktop.session.start" }
+  /** Protocol 18: ends the agent's desktop, and its browser on it. */
+  | { op: "desktop.session.stop" }
+  | { op: "desktop.session.status" }
+  /** Protocol 18: answered once the data socket for `streamId` got `stream.ready`. */
+  | ({ op: "stream.open" } & StreamOpenRequest)
 ) & { agent?: AgentScope };
 
 /** One command of a `browser.batch` (protocol 17). */
@@ -1009,6 +1158,10 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.input",
   "browser.batch",
   "browser.capture",
+  "desktop.session.start",
+  "desktop.session.stop",
+  "desktop.session.status",
+  "stream.open",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1083,6 +1236,13 @@ export interface MachineReplies {
     marks: BrowserCaptureMark[];
     url?: string;
   };
+  /** `started`: it wasn't running (a fresh desktop: whatever the agent saw on it before is gone). */
+  "desktop.session.start": { display: number; width: number; height: number; startedAt: string; started: boolean };
+  /** `false`: it wasn't running. */
+  "desktop.session.stop": { stopped: boolean };
+  /** `streams`: the agent's open desktop and terminal streams. */
+  "desktop.session.status": { running: boolean; startedAt?: string; lastUsedAt?: string; streams: number };
+  "stream.open": { opened: true };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -1123,6 +1283,15 @@ export type MachineErrorCode =
    * `bad_request` instead.
    */
   | "browser_closed"
+  /** Protocol 18: desktops can't run on this computer at all; the message says what is missing. */
+  | "desktop_unavailable"
+  /** Protocol 18: the agent's desktop isn't running (a viewer never starts it). */
+  | "desktop_off"
+  /** Protocol 18: the computer already runs as many desktops as its memory allows. */
+  | "desktop_busy"
+  | "terminal_unavailable"
+  /** Protocol 18: the agent's (or the computer's) streams of that kind are at their cap. */
+  | "too_many_streams"
   | "bad_request"
   | "internal";
 
@@ -1201,7 +1370,7 @@ export type RunnerFrame =
   | { type: "access.changed"; access: RunnerAccess }
   /**
    * Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in
-   * done, a status changed). Protocol 18: or their usage did (`ownUsage`: the computer's own sign-ins').
+   * done, a status changed). Protocol 19: or their usage did (`ownUsage`: the computer's own sign-ins').
    */
   | { type: "accounts.changed"; accounts: RunnerAccountInfo[]; ownUsage?: OwnPlanUsage }
   /**
@@ -1336,7 +1505,7 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
 const isoOf = (v: unknown) =>
   isString(v) && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined;
 
-/** A usage snapshot (protocol 18), checked: known window kinds only, percentages 0–100, short labels. */
+/** A usage snapshot (protocol 19), checked: known window kinds only, percentages 0–100, short labels. */
 export function parsePlanUsage(v: unknown): PlanUsage | undefined {
   if (!isObject(v) || !Array.isArray(v.windows)) return undefined;
   const at = isoOf(v.at);
@@ -1369,7 +1538,7 @@ export function parsePlanUsage(v: unknown): PlanUsage | undefined {
   };
 }
 
-/** `ownUsage` (protocol 18): one snapshot per brain at most. */
+/** `ownUsage` (protocol 19): one snapshot per brain at most. */
 export function parseOwnUsage(v: unknown): OwnPlanUsage | undefined {
   if (!isObject(v)) return undefined;
   const out: OwnPlanUsage = {};
@@ -1511,6 +1680,9 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(access ? { access } : {}),
         ...(isObject(f.browser) ? { browser: parseBrowserInfo(f.browser) } : {}),
         ...(Array.isArray(f.accounts) ? { accounts: parseAccounts(f.accounts) } : {}),
+        ...(isObject(f.desktop) ? { desktop: parseDesktopInfo(f.desktop) } : {}),
+        ...(isObject(f.terminal) ? { terminal: parseAvailability(f.terminal) } : {}),
+        ...(f.mode === "system" ? { mode: "system" as const } : {}),
         ...(isObject(f.ownUsage) ? { ownUsage: parseOwnUsage(f.ownUsage) } : {}),
       };
     }
@@ -2104,6 +2276,8 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
       codex: t.codex === true,
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
+      ...(t.desktop === true ? { desktop: true } : {}),
+      ...(t.terminal === true ? { terminal: true } : {}),
     },
   };
 }
@@ -2119,6 +2293,59 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
     ...(chrome !== undefined ? { chrome } : {}),
     ...(reason !== undefined ? { reason } : {}),
   };
+}
+
+const inRange = (v: unknown, [min, max]: readonly [number, number]): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
+
+/** A small JSON text frame, parsed; null when it is too long or not JSON. */
+const smallJson = (raw: string, max: number): unknown => {
+  if (raw.length > max) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+/** `hello.terminal` (protocol 18), and the part `hello.desktop` shares with it, cut. */
+export function parseAvailability(v: Record<string, unknown>): RunnerTerminalInfo {
+  const reason = cut(v.reason, BROWSER_LIMITS.message);
+  return { available: v.available === true, ...(reason !== undefined ? { reason } : {}) };
+}
+
+/** `hello.desktop` (protocol 18), cut; a size only when both sides are sane. */
+export function parseDesktopInfo(v: Record<string, unknown>): RunnerDesktopInfo {
+  const size = inRange(v.width, [1, 8192]) && inRange(v.height, [1, 8192]) ? { width: v.width, height: v.height } : {};
+  return { ...parseAvailability(v), ...size };
+}
+
+/** A stream's id as `stream.open` and `stream.hello` carry it: 32 random bytes in base64url. */
+export const isStreamId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{43}$/.test(v);
+
+/** A data socket's `stream.hello` (server side); null when it isn't one. The token is checked by the caller. */
+export function parseStreamHello(raw: string): StreamHello | null {
+  const f = smallJson(raw, 512);
+  if (!isObject(f) || f.type !== "stream.hello" || !isStreamId(f.streamId)) return null;
+  if (!isString(f.token) || !f.token.startsWith(MACHINE_TOKEN_PREFIX) || f.token.length > 200) return null;
+  return { type: "stream.hello", token: f.token, streamId: f.streamId };
+}
+
+/** A terminal's size within `STREAM_LIMITS` (whole columns and rows). */
+export const isTerminalSize = (cols: unknown, rows: unknown) =>
+  inRange(cols, STREAM_LIMITS.cols) && inRange(rows, STREAM_LIMITS.rows);
+
+/** A text frame on a ready stream (either side); null when it isn't one or a size is out of bounds. */
+export function parseStreamControl(raw: string): StreamControl | null {
+  const f = smallJson(raw, 200);
+  if (!isObject(f)) return null;
+  if (f.type === "resize") {
+    return isTerminalSize(f.cols, f.rows) ? { type: "resize", cols: f.cols as number, rows: f.rows as number } : null;
+  }
+  if (f.type === "exit" && (f.code === null || Number.isInteger(f.code))) {
+    return { type: "exit", code: f.code as number | null };
+  }
+  return null;
 }
 
 const BROWSER_MODIFIERS_MAX = 15;

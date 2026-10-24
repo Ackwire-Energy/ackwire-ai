@@ -38,7 +38,7 @@ const { machineAccounts, agents, machines, users } = schema;
 
 /*
  * Accounts of the computer brains on a connected computer (ADR 0041, ADR
- * 0058): a folder on the machine where Claude Code or Codex keeps its own
+ * 0059): a folder on the machine where Claude Code or Codex keeps its own
  * sign-in. We keep metadata only (email, plan, signed in or not); the sign-in
  * itself goes through the provider's CLI on the computer, and a Claude code
  * typed in the browser reaches the runner sealed to the machine's key.
@@ -53,12 +53,12 @@ const { machineAccounts, agents, machines, users } = schema;
  * any member does. Removing leaves a tombstone (`removing`) until the runner
  * has signed the account out and deleted its folder, now or when it is back.
  *
- * Usage (protocol 18): what the runner says about each plan's limits, during
+ * Usage (protocol 19): what the runner says about each plan's limits, during
  * turns or when someone looks (`refreshAiAccounts`), is stored with the row
  * (the computer's own sign-ins' in `machines.executors.ownUsage`); pages hear
  * of it only when they would show something else (`usageMoved`).
  *
- * Key accounts (protocol 19): a coding plan on Claude Code (`provider`, a plan
+ * Key accounts (protocol 20): a coding plan on Claude Code (`provider`, a plan
  * of `@agenteschat/providers/plans`). The key goes sealed from the browser to
  * the computer and stays there; we keep its last 4 as the runner says them.
  */
@@ -84,7 +84,7 @@ export interface MachineAccountView {
   mine: boolean;
   /** Names of the agents that think with it. */
   usedBy: string[];
-  /** The plan's usage limits as last reported (protocol 18); null: not known yet. */
+  /** The plan's usage limits as last reported (protocol 19); null: not known yet. */
   usage: PlanUsage | null;
   /** A key account's coding plan (`zai`, `kimi`…); null: the CLI's own sign-in. */
   provider: string | null;
@@ -238,7 +238,7 @@ async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow
 /**
  * Agents that used these accounts lose them: back to the computer's own
  * sign-in when that is their owner's, else to the API (a plan thinks only for
- * its owner's agents, ADR 0058 §3). Their cache goes with `forgetAgents`.
+ * its owner's agents, ADR 0059 §3). Their cache goes with `forgetAgents`.
  */
 export async function releaseAgents(db: Executor, orgId: string, accountIds: string[], now = new Date()) {
   if (accountIds.length === 0) return [];
@@ -574,7 +574,7 @@ export async function syncMachineAccounts(
 }
 
 /**
- * The computer's own sign-ins' usage (protocol 18, `accounts.changed`), over the last known of each brain;
+ * The computer's own sign-ins' usage (protocol 19, `accounts.changed`), over the last known of each brain;
  * the pages hear it when they would show something else.
  */
 export async function storeOwnUsage(deps: MachineAccountDeps, orgId: string, machineId: string, own: OwnPlanUsage) {
@@ -731,7 +731,7 @@ export async function getMachineAccounts(
   };
 }
 
-// ── Signing in (ADR 0041 §2, ADR 0058 §1) ───────────────────────────────────
+// ── Signing in (ADR 0041 §2, ADR 0059 §1) ───────────────────────────────────
 
 export interface AccountLoginView {
   loginId: string;
@@ -773,7 +773,7 @@ export async function beginAccountLogin(
   accountId?: string,
   /** Claude Code: which account to sign in to, as the CLI's login hint. */
   email?: string,
-  /** A coding plan's key account on Claude Code (protocol 19): the key comes next, sealed like a code. */
+  /** A coding plan's key account on Claude Code (protocol 20): the key comes next, sealed like a code. */
   provider?: string,
 ): Promise<AccountLoginView> {
   if (!isAccountKind(kind)) throw new ValidationError("Choose claude_code or codex", "account.invalid_kind");
@@ -1008,7 +1008,7 @@ export async function renameMachineAccount(
 }
 
 /**
- * Removes an account (ADR 0041 §7, ADR 0058 §1): its owner, the computer's
+ * Removes an account (ADR 0041 §7, ADR 0059 §1): its owner, the computer's
  * pairer, or an admin when the computer or the account has no person. The
  * agents that used it are released now (`releaseAgents`); the runner
  * signs the CLI out there and deletes the folder now, or at its next hello

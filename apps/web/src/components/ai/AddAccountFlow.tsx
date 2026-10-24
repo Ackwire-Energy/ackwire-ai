@@ -13,7 +13,7 @@ import { useOrg } from "@/components/org-context";
 import { openPopup, sendPopup } from "@/lib/popup";
 
 /*
- * "Adicionar conta" (ADR 0041 §2, ADR 0058): the computer starts the
+ * "Adicionar conta" (ADR 0041 §2, ADR 0059): the computer starts the
  * provider's own sign-in and its link opens here, in a window of its own.
  * Claude: the account to sign in to (optional) goes with the click; the code
  * Claude shows comes back by "Colar" (sent by itself only when it is this

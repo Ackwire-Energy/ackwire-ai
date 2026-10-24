@@ -1,5 +1,5 @@
 {
-  "id": "02125684-128d-44d7-a986-b0b7ecc5afb4",
+  "id": "1e45b455-4880-4827-8e90-cf9283f38339",
   "prevId": "bfb4344f-dacc-4f99-ac1f-e6d88f9943ad",
   "version": "7",
   "dialect": "postgresql",
@@ -180,30 +180,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "agents_brain_account_unique": {
-          "name": "agents_brain_account_unique",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "brain_account_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"agents\".\"brain_account_id\" is not null and \"agents\".\"archived_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "agents_org_id_organizations_id_fk": {
           "name": "agents_org_id_organizations_id_fk",
@@ -948,6 +925,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "screen": {
+          "name": "screen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'browser'"
+        },
         "kind": {
           "name": "kind",
           "type": "text",
@@ -1060,6 +1044,12 @@
           "columns": [
             {
               "expression": "agent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "screen",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5494,30 +5484,6 @@
         "created_by": {
           "name": "created_by",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "key_hint": {
-          "name": "key_hint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "org_name": {
-          "name": "org_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "usage": {
-          "name": "usage",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

@@ -54,7 +54,7 @@ export type ToolKind =
   /** A tool this table doesn't know (no scope it reads): only for a person's run. */
   | { kind: "unknown" };
 
-export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser";
+export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser" | "desktop";
 
 export type PolicyTool = Pick<ToolDefinition, "name" | "scope" | "connectionId" | "sensitive">;
 
@@ -91,6 +91,7 @@ const HERE = new Set([
   "suggest_forum_topic",
   "propose_mission",
   "browser_ask_person",
+  "desktop_ask_person",
   "update_thread",
 ]);
 
@@ -138,6 +139,7 @@ const INTERNAL_BY_SCOPE: Readonly<Record<string, InternalArea>> = {
   "wiki:write": "wiki",
   "sandbox:run": "code",
   "browser:use": "browser",
+  "desktop:use": "desktop",
 };
 
 const isReadScope = (scope: string) => /[:.]read$/.test(scope);
@@ -178,6 +180,8 @@ export const REFUSALS = {
   routineReadOnly: "This routine only reads and reports: put what you'd do in hand_off; the people decide.",
   routineBrowserReadOnly:
     "This routine only reads and reports, and the browser can send data out: use your other tools, and say in hand_off what you'd check.",
+  routineDesktopReadOnly:
+    "This routine only reads and reports, and the desktop can run anything on the computer and send data out: use your other tools, and say in hand_off what you'd check.",
   unattendedElsewhere:
     "Nobody asked for this work (a routine's report or another agent started it): you can't post elsewhere, message people, manage routines or reminders, ask or tell other agents, or ask for secrets or permissions. Say it in your reply here; the people decide.",
   unattendedInternal:
@@ -190,6 +194,12 @@ export const REFUSALS = {
   unknownTool:
     "This tool is only for work a person asked for. Say what you'd do (in hand_off for a routine's work, in your reply otherwise); a person asks you to go ahead.",
 } as const;
+
+/** Areas whose refusal in a read-only routine says why they aren't reads. */
+const READ_ONLY_REFUSAL: Partial<Record<InternalArea, string>> = {
+  browser: REFUSALS.routineBrowserReadOnly,
+  desktop: REFUSALS.routineDesktopReadOnly,
+};
 
 /** The table (see the file's comment): what `authority` may do with `tool`. */
 export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDecision {
@@ -220,7 +230,7 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
         );
       case "internal":
         if (authority.brief?.access === "act") return ALLOW;
-        return refuse(what.area === "browser" ? REFUSALS.routineBrowserReadOnly : REFUSALS.routineReadOnly);
+        return refuse(READ_ONLY_REFUSAL[what.area] ?? REFUSALS.routineReadOnly);
       case "external":
         return authority.brief?.access === "act" ? APPROVE : refuse(REFUSALS.routineReadOnly);
       case "unknown":

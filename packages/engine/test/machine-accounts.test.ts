@@ -47,7 +47,7 @@ import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
- * ADR 0041 and ADR 0058: accounts of the computer brains on a connected
+ * ADR 0041 and ADR 0059: accounts of the computer brains on a connected
  * computer. An account is the person's who started its sign-in, bound when
  * it starts; one the desktop app signed in is the pairer's. The runner's
  * hello keeps the rows in sync; only the owner renames an account or picks
@@ -889,7 +889,7 @@ test("a runner older than accounts: the page says accounts aren't supported", as
   });
 });
 
-// ── Plan usage (protocol 18) ────────────────────────────────────────────────
+// ── Plan usage (protocol 19) ────────────────────────────────────────────────
 
 const usage = (used: number, at = "2030-01-01T10:00:00.000Z"): PlanUsage => ({
   windows: [{ kind: "five_hour", usedPercent: used, resetsAt: "2030-01-01T15:00:00.000Z" }],

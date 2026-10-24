@@ -219,20 +219,20 @@ export interface AgentBrainView {
   effort: BrainEffortSetting | null;
   /**
    * The agent's owner's accounts on its computer, both kinds ([] without a computer), and the one it thinks
-   * with; emails only of the caller's own. A plan thinks only for its owner's agents (ADR 0058 §3).
+   * with; emails only of the caller's own. A plan thinks only for its owner's agents (ADR 0059 §3).
    */
   accounts: MachineAccountView[];
   /** The caller may add an account there for this agent: its owner, on a computer where they add accounts. */
   canManageAccounts: boolean;
   /** The computer's runner knows accounts (protocol 13). */
   accountsSupported: boolean;
-  /** "Só responde a você" (ADR 0058 §5): nobody but its owner talks to it. */
+  /** "Só responde a você" (ADR 0059 §5): nobody but its owner talks to it. */
   onlyOwner: boolean;
   /** The caller owns the agent: only they choose its plan and let other people talk to it on a plan. */
   canUsePlans: boolean;
   /** The computer's own sign-in can think for it: the person who connected the computer owns the agent. */
   ownSignIn: boolean;
-  /** The computer's own sign-ins' plan usage, by brain (protocol 18; empty: not known). */
+  /** The computer's own sign-ins' plan usage, by brain (protocol 19; empty: not known). */
   ownUsage: OwnPlanUsage;
 }
 
@@ -364,7 +364,7 @@ export interface AgentBrainInput {
   model?: unknown;
   fallback?: unknown;
   /**
-   * "Só responde a você" (ADR 0058 §5): true, only its owner talks to it;
+   * "Só responde a você" (ADR 0059 §5): true, only its owner talks to it;
    * false, on a plan everyone does, and on the API whoever did before a plan
    * made it its owner's only. Omitted = keep it; a switch onto a plan makes
    * it its owner's only.
@@ -391,7 +391,7 @@ export interface AgentBrainInput {
 
 const EVERYONE: AgentAudience = { mode: "everyone", userIds: [] };
 
-/** Who it answers after this change: a switch onto a plan makes it its owner's only (ADR 0058 §5). */
+/** Who it answers after this change: a switch onto a plan makes it its owner's only (ADR 0059 §5). */
 function nextAudience(
   agent: Agent,
   brain: BrainKind,
@@ -555,7 +555,7 @@ export async function setAgentBrain(
 }
 
 /**
- * The account the agent will run with (ADR 0041 §4, ADR 0058 §1–3): kept
+ * The account the agent will run with (ADR 0041 §4, ADR 0059 §1–3): kept
  * when nothing asks otherwise, cleared when the brain kind changes. A plan
  * thinks only for its owner's agents, so only the agent's owner chooses: one
  * of their own accounts (on the agent's computer, of the brain's kind; one
@@ -846,7 +846,7 @@ export interface AiComputer {
   mine: boolean;
   /** The caller adds accounts there (they connected it, or nobody did), on a runner that knows accounts. */
   canAdd: boolean;
-  /** Its runner takes coding plans' keys (protocol 19). */
+  /** Its runner takes coding plans' keys (protocol 20). */
   keys: boolean;
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };

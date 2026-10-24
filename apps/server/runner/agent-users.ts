@@ -177,3 +177,13 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
     home,
   };
 }
+
+/** The agent user's own group (`useradd --user-group` made it; its id needn't be the uid). */
+export function agentGid(user: string, run: RunCommand = runSync): number {
+  const r = run("id", ["-g", user]);
+  const gid = Number(r.output);
+  if (r.code !== 0 || !/^\d+$/.test(r.output) || gid === 0) {
+    throw new RunnerError("internal", `The group of ${user} isn't known here (${r.code}): ${r.output.slice(0, 200)}`);
+  }
+  return gid;
+}

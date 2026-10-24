@@ -18,6 +18,7 @@ import {
   type HandoffLiveHooks,
   handoffInfo,
   handoffView,
+  openElsewhere,
   openHandoffOf,
   openHandoffsOfMachine,
   requireBrowserAccess,
@@ -42,6 +43,12 @@ const KEEPALIVE_PARALLEL = 5;
 export const STREAM_STOP_DELAY_MS = 10_000;
 /** A person's input is gathered this long and sent to the computer as one batch. */
 export const INPUT_BATCH_MS = 25;
+/**
+ * This live view carries the browser alone: other screens' handoffs never switch its stream, and hide it
+ * only while they show the same window (`shared`). An event naming no screen is the browser's
+ * (`browser.opened`, and servers older than screens).
+ */
+const ofBrowser = (screen: unknown) => (screen ?? "browser") === "browser";
 
 /**
  * One batch of a person's input, smaller: a run of plain mouse moves (no
@@ -104,6 +111,9 @@ export type BrowserLiveMessage =
    * Who is in control and the open handoff, on watch and whenever it changes.
    * `hidden`: someone else is in control, so this viewer gets no frames until
    * they hand it back (what a person types in the agent's browser stays theirs).
+   * The handoff may be of the agent's desktop (`handoff.screen`) when its
+   * browser runs there: one window on both, so control there hides this view
+   * too; it is driven from the desktop, not from here.
    */
   | {
       type: "browser.status";
@@ -157,6 +167,8 @@ interface AgentLive {
   mode: BrowserStreamMode | null;
   controllerUserId: string | null;
   handoff: BrowserHandoffView | null;
+  /** The open handoff of the agent's desktop while its browser runs there (ADR 0058 §5). */
+  shared: BrowserHandoffView | null;
   /** The page of the latest frame (address and title), for what the agent is told after a person's turn. */
   page: BrowserPage | null;
   /**
@@ -172,9 +184,15 @@ interface AgentLive {
   stopTimer: ReturnType<typeof setTimeout> | null;
 }
 
+/** Who is in control of what the view shows: of the browser, else of the desktop showing the same window. */
+const controllerOf = (state: Pick<AgentLive, "controllerUserId" | "shared">) =>
+  state.controllerUserId ?? (state.shared?.status === "active" ? state.shared.controllerUserId : null);
+
 /** While a person is in control only they get the page: nobody else watches what they type there. */
-const hiddenFrom = (state: Pick<AgentLive, "controllerUserId">, userId: string) =>
-  state.controllerUserId !== null && state.controllerUserId !== userId;
+const hiddenFrom = (state: Pick<AgentLive, "controllerUserId" | "shared">, userId: string) => {
+  const controller = controllerOf(state);
+  return controller !== null && controller !== userId;
+};
 
 export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
   hub: Pick<MachineHub, "call" | "isLocal"> & Partial<Pick<MachineHub, "sendBrowserHandoff">>;
@@ -221,8 +239,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     type: "browser.status",
     agentId,
     mode: state.mode ?? "watch",
-    controllerUserId: state.controllerUserId,
-    handoff: state.handoff,
+    controllerUserId: controllerOf(state),
+    handoff: state.handoff ?? state.shared,
     hidden: hiddenFrom(state, userId),
   });
 
@@ -322,22 +340,42 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     } catch {}
   };
 
-  /** The open handoff changed: everyone hears who is in control, and views it no longer hides get the page now. */
-  const handoffChanged = (agentId: string, state: AgentLive, row: BrowserHandoffRow | null) => {
+  /** Control changed: everyone hears who is in control, and views it no longer hides get the page now. */
+  const announce = (agentId: string, state: AgentLive, apply: () => void) => {
     const wasHidden = [...state.viewers].filter((v) => hiddenFrom(state, v.userId));
-    applyHandoff(state, row);
+    apply();
     broadcastStatus(agentId, state);
     for (const v of wasHidden) sendLatest(state, v);
+  };
+
+  const handoffChanged = (agentId: string, state: AgentLive, row: BrowserHandoffRow | null) => {
+    announce(agentId, state, () => applyHandoff(state, row));
     void sync(agentId, state);
   };
+
+  /** Another screen's handoff changed: it hides this view only while it shows the same window (its desktop). */
+  const sharedChanged = async (agentId: string, state: AgentLive) => {
+    const row = await openElsewhere(deps.db, state.orgId, agentId, "browser");
+    if (live.get(agentId) !== state) return;
+    announce(agentId, state, () => {
+      state.shared = row ? handoffView(row) : null;
+    });
+  };
+  const reloadShared = (agentId: string, state: AgentLive) =>
+    void sharedChanged(agentId, state).catch((error) =>
+      deps.log?.warn("shared screen reload failed", { agentId, error: String(error) }),
+    );
 
   const handoffHooks: HandoffLiveHooks = {
     changed(row) {
       const state = live.get(row.agentId);
-      if (state) handoffChanged(row.agentId, state, row);
+      if (!state) return;
+      if (ofBrowser(row.screen)) handoffChanged(row.agentId, state, row);
+      else reloadShared(row.agentId, state);
     },
     /** The latest frame's page while the stream runs here; otherwise the computer is asked for the address. */
     async page(row) {
+      if (!ofBrowser(row.screen)) return null;
       const state = live.get(row.agentId);
       if (state && state.machineId === row.machineId && state.mode !== null && state.page) return state.page;
       const [agent] = await deps.db
@@ -378,7 +416,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
 
   // The computer's desktop app hears every change, from whichever replica made it.
   const unsubscribeComputers = deps.pubsub?.subscribe(BROWSER_HANDOFF_TOPIC, (event) => {
-    if (event.type === "browser.stopped") return;
+    if (event.type === "browser.stopped" || !ofBrowser(event.screen)) return;
     const { machineId, orgId, agentId } = event;
     if (typeof machineId !== "string" || typeof orgId !== "string" || typeof agentId !== "string") return;
     void tellComputer(machineId, orgId, agentId).catch((error) =>
@@ -392,6 +430,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     const agentId = typeof event.agentId === "string" ? event.agentId : null;
     const state = agentId ? live.get(agentId) : undefined;
     if (!agentId || !state || event.orgId !== state.orgId) return;
+    if (!ofBrowser(event.screen)) {
+      if (event.type === "browser.handoff.changed") reloadShared(agentId, state);
+      return;
+    }
     // Someone pressed Parar (here or on another replica): everyone watching here hears who and when.
     if (event.type === "browser.stopped") {
       broadcast(state, {
@@ -520,6 +562,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           mode: null,
           controllerUserId: null,
           handoff: null,
+          shared: null,
           page: null,
           frame: null,
           grace: null,
@@ -530,6 +573,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       }
       const current = state;
       applyHandoff(current, await openHandoffOf(deps.db, orgId, agentId));
+      const shared = await openElsewhere(deps.db, orgId, agentId, "browser");
+      current.shared = shared ? handoffView(shared) : null;
       current.viewers.add(viewer);
       current.unsubscribe.set(
         viewer,
@@ -682,6 +727,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         void openHandoffsOfMachine(deps.db, machineId)
           .then(async (rows) => {
             for (const row of rows) {
+              if (!ofBrowser(row.screen)) continue;
               const info = await handoffInfo(deps.db, row);
               deps.hub.sendBrowserHandoff?.(machineId, row.agentId, info);
             }
@@ -714,7 +760,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         })
         .from(browserHandoffs)
         .innerJoin(agents, eq(agents.id, browserHandoffs.agentId))
-        .where(inArray(browserHandoffs.status, ["pending", "active"]));
+        .where(and(eq(browserHandoffs.screen, "browser"), inArray(browserHandoffs.status, ["pending", "active"])));
       const ids = new Set(open.map((h) => h.id));
       for (const id of touched.keys()) if (!ids.has(id)) touched.delete(id);
       // Only computers held here (each replica pings its own), a few at a time.

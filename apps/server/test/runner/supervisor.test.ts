@@ -904,6 +904,8 @@ test.if(posix)(
       expect(s.of("hello")[0]?.tasks).toEqual([
         { taskId: "task-ana-0001", agentId: ANA.id, status: "running", startedAt },
       ]);
+      // Each agent works as its own user, and hello says so: who may drive an agent's desktop follows it.
+      expect(s.of("hello")[0]?.mode).toBe("system");
       s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
       ana.hello();
       await waitFor(() => ana.of("welcome").length === 1);
@@ -922,6 +924,11 @@ test.if(posix)(
         ok: true,
         data: { ...execDone, stdout: "ag-a1b2c3d4\n" },
       });
+      // The desktops are this root process's own (the data sockets need the machine token): no worker hears of them.
+      s.frame({ type: "request", id: "d1", op: "desktop.session.status", agent: ANA });
+      await waitFor(() => s.sent.some((f) => f.id === "d1"));
+      expect(s.sent.find((f) => f.id === "d1")).toMatchObject({ ok: true, data: { running: false, streams: 0 } });
+      expect(ana.of("request")).toHaveLength(1);
       // Its task's end goes up; the server's ack comes back down to it.
       ana.send({ type: "task.done", taskId: "task-ana-0001", exitCode: 0, seconds: 3 });
       await waitFor(() => s.of("task.done").length === 1);

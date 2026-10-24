@@ -3,6 +3,7 @@
 - Status: Proposed (after missions, ADR 0029, and runner isolation level 1, ADR 0030)
 - Date: 2026-10-16, revised 2026-10-18 (model-agnostic layers, intent tools, simulator, take over, several agents per machine)
 - First slice: ADR 0040 (the agent browser on connected computers, on `agent-browser`), which supersedes §4 and the browser parts of §8, §9 and §14
+- Desktop slice: ADR 0058 (a desktop per agent on connected Linux computers that people watch and control, and a terminal), which supersedes the connected-Linux line of §6, the virtual desktop's part of §8 and the shared OS user of §10 in system mode
 - Extends: ADR 0021 (code sandbox), ADR 0025 (connected computers), ADR 0027 (secrets), ADR 0030 (runner isolation), ADR 0036 (desktop app)
 
 ## Context

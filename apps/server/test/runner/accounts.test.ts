@@ -391,7 +391,7 @@ test.if(posix)("list is cached: a second look doesn't run the CLIs again", async
   expect(runs().length).toBe(n + 1);
 });
 
-// ── Coding plans' keys (protocol 19) ─────────────────────────────────────────
+// ── Coding plans' keys (protocol 20) ─────────────────────────────────────────
 
 const GLM_KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
 

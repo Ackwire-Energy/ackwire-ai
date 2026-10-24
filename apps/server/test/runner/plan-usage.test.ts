@@ -23,7 +23,7 @@ import {
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
 /**
- * Plan usage (protocol 18): what Claude Code's turns and `get_usage` say,
+ * Plan usage (protocol 19): what Claude Code's turns and `get_usage` say,
  * Codex's rate limits, the coding plans' endpoints, and the manager that keeps
  * it (probes at most every few minutes, two at a time, backing off on 429; the
  * turns' news throttled unless a limit line is crossed).

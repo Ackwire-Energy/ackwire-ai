@@ -670,8 +670,22 @@
     {
       "idx": 95,
       "version": "7",
-      "when": 1792842787533,
-      "tag": "0095_ai_accounts_people",
+      "when": 1792842956318,
+      "tag": "0095_handoff_screen",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792842961842,
+      "tag": "0096_desktop_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792848909133,
+      "tag": "0097_ai_accounts_people",
       "breakpoints": true
     }
   ]

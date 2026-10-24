@@ -17,7 +17,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * A plan's usage limits as the runner last reported them (protocol 18): the
+ * A plan's usage limits as the runner last reported them (protocol 19): the
  * same shape as `PlanUsage` in the machine protocol.
  */
 export interface MachinePlanUsage {
@@ -32,14 +32,23 @@ export interface MachinePlanUsage {
   at: string;
 }
 
-/** What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7) and its browser (protocol 12). */
+/**
+ * What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7), its browser (protocol 12),
+ * its desktops and its terminal (protocol 18).
+ */
 export interface MachineExecutors {
   /** `loggedIn`/`authMethod`/`plan`: from `claude auth status` (protocol 8; absent = unknown). */
   claude?: { version: string; loggedIn?: boolean; authMethod?: string; plan?: string };
   codex?: { version: string };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
   browser?: { available: boolean; version?: string; chrome?: string; reason?: string };
-  /** The usage of the computer's own sign-ins (protocol 18), by brain; kept across reconnects. */
+  /** `hello.desktop` (ADR 0058): whether the agents' desktops can run there; absent = not reported. */
+  desktop?: { available: boolean; reason?: string; width?: number; height?: number };
+  /** `hello.terminal` (ADR 0058): whether people can open a terminal there; absent = not reported. */
+  terminal?: { available: boolean; reason?: string };
+  /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
+  mode?: "system";
+  /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */
   ownUsage?: { claude_code?: MachinePlanUsage; codex?: MachinePlanUsage };
   detectedAt?: string;
 }
@@ -51,7 +60,14 @@ export interface MachineExecutors {
  */
 export interface MachineAccess {
   folders: { path: string; agents: string[] }[];
-  tools: { claude: boolean; codex: boolean; commands: boolean; browser?: boolean };
+  tools: {
+    claude: boolean;
+    codex: boolean;
+    commands: boolean;
+    browser?: boolean;
+    desktop?: boolean;
+    terminal?: boolean;
+  };
 }
 
 /**
@@ -152,7 +168,7 @@ export const machineProvisioning = pgTable("machine_provisioning", {
 });
 
 /**
- * Accounts of the computer brains on a machine (ADR 0041, ADR 0058): a folder
+ * Accounts of the computer brains on a machine (ADR 0041, ADR 0059): a folder
  * on the computer (`<runner home>/accounts/<kind>/<id>`) where Claude Code or
  * Codex keeps its own sign-in. Nothing secret here: what the CLI's status
  * command says (email, plan) and whether it is still signed in. `id` is the

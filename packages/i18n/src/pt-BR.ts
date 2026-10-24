@@ -2454,6 +2454,11 @@ export const ptBR = {
       description:
         "Navegar em sites no navegador próprio do agente, no computador conectado (o login fica salvo por agente). Precisa do navegador ligado nesse computador.",
     },
+    desktop_use: {
+      label: "Usar a própria tela",
+      description:
+        "Usar qualquer app na tela própria do agente, no computador dele; as pessoas podem assistir e assumir o controle. Ali ele pode rodar qualquer coisa, então também precisa de Rodar código e da tela ligada nesse computador.",
+    },
     github_git_read: {
       label: "Clonar repositórios (git)",
       description:
@@ -5454,6 +5459,7 @@ export const ptBR = {
       forum: "Fórum",
       sandbox: "Rodar código",
       browser: "Navegador",
+      desktop: "Tela",
     },
     areaText: {
       context: {
@@ -5470,6 +5476,10 @@ export const ptBR = {
       sandbox: { write: "Roda código no PC do agente; custa tempo de máquina." },
       browser: {
         write: "Navega em sites com o próprio navegador no computador conectado; os logins ficam por agente.",
+      },
+      desktop: {
+        write:
+          "Usa qualquer app na própria tela, no computador dele, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
       },
     },
   },
@@ -7373,6 +7383,7 @@ export const ptBR = {
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
+      desktop_handoff: "Preciso de ajuda no meu computador.",
       file_saved: "Arquivo salvo.",
       issue_work_start: "Pode fazer a tarefa #{{number}}.",
       issue_taken: "Peguei a tarefa #{{number}}.",
@@ -7652,6 +7663,11 @@ export const ptBR = {
       label: "Fechar o navegador",
       description: "Fecha o navegador do agente; os logins continuam salvos.",
     },
+    desktop_ask_person: {
+      label: "Pedir ajuda na tela do computador",
+      description:
+        "Pede para uma pessoa fazer algo na tela do agente (como entrar num aplicativo) e espera ela terminar.",
+    },
   },
   /** The agent browser (ADR 0040): the agent's page, the computer's page, the chat card, the live view. */
   browser: {
@@ -7926,6 +7942,13 @@ export const ptBR = {
     managedNotRemovable: "Este é o computador do próprio workspace: ele não pode ser removido.",
     notification: {
       ready: "O computador do seu workspace está pronto",
+    },
+  },
+  /** The agent's desktop (ADR 0058): watching it, taking control, its terminal. */
+  desktop: {
+    control: {
+      notice:
+        "Enquanto você está no controle, os programas do computador do agente podem ver a tela e o que você digita.",
     },
   },
 };

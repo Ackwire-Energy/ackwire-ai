@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { agentFolderName, isInside } from "./paths";
 
@@ -329,18 +330,26 @@ export function findChrome(home: string = os.homedir(), platform: string = proce
 }
 
 /**
- * Chrome flags on every launch: headless, no first-run screens, nothing
- * updating Chrome's files in the background, and none of the automation
- * markers a launched-for-automation Chrome carries (no `--enable-automation`).
+ * Chrome flags on every launch: no first-run screens, nothing updating
+ * Chrome's files in the background, and none of the automation markers a
+ * launched-for-automation Chrome carries (no `--enable-automation`).
  */
 export const CHROME_ARGS = [
-  "--headless=new",
   "--no-first-run",
   "--no-default-browser-check",
   "--disable-blink-features=AutomationControlled",
   "--disable-component-update",
-  "--window-size=1280,800",
 ];
+
+/**
+ * Headless at the desktops' size, or a window filling the agent's desktop
+ * (ADR 0058 §7), always on X11 (the desktop's), where `--test-type` hides the
+ * bar the automation flag shows.
+ */
+const SCREEN_ARGS = {
+  headless: ["--headless=new", "--window-size=1280,800"],
+  headed: ["--start-maximized", "--test-type", "--ozone-platform=x11"],
+};
 
 /**
  * A normal Chrome user agent for this Chrome's version (no "HeadlessChrome"),
@@ -380,16 +389,23 @@ function secretStoreArgs(platform: string): string[] {
   return [];
 }
 
-/** The whole command line for the agent's Chrome: our flags, its own port (0: Chrome picks), its profile. */
+/**
+ * The whole command line for the agent's Chrome: our flags, its own port (0: Chrome picks), its profile;
+ * `headed`: in a window on the agent's desktop.
+ */
 export function chromeLaunchArgs(
   exe: string,
   profile: string,
-  platform: string = process.platform,
-  lang: string | null = osLang(),
+  {
+    platform = process.platform,
+    lang = osLang(),
+    headed = false,
+  }: { platform?: string; lang?: string | null; headed?: boolean } = {},
 ): string[] {
   const ua = chromeUserAgent(exe, platform);
   return [
     ...CHROME_ARGS,
+    ...SCREEN_ARGS[headed ? "headed" : "headless"],
     ...secretStoreArgs(platform),
     "--remote-debugging-port=0",
     `--user-data-dir=${profile}`,
@@ -412,12 +428,18 @@ export interface OwnChrome {
 
 /**
  * Starts Chrome and waits for its debugging port (Chrome writes it to
- * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`).
+ * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`). `env`:
+ * its whole environment (a desktop's display), else the runner's.
  */
-export async function launchChrome(exe: string, args: string[], profile: string): Promise<OwnChrome> {
+export async function launchChrome(
+  exe: string,
+  args: string[],
+  profile: string,
+  env?: NodeJS.ProcessEnv,
+): Promise<OwnChrome> {
   const portFile = path.join(profile, "DevToolsActivePort");
   await rm(portFile, { force: true });
-  const child = spawn(exe, args, { stdio: "ignore", windowsHide: true });
+  const child = spawn(exe, args, { stdio: "ignore", windowsHide: true, ...(env ? { env } : {}) });
   const events = child as unknown as EventEmitter;
   let gone = false;
   const exited = new Promise<void>((resolve) => {
@@ -610,11 +632,16 @@ export interface BrowserManagerOptions {
   /** Tests: how long a new stream waits for Chrome's first frame (`FIRST_FRAME_MS`). */
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
-  startChrome?: (exe: string, args: string[], profile: string) => Promise<OwnChrome>;
+  startChrome?: (exe: string, args: string[], profile: string, env?: NodeJS.ProcessEnv) => Promise<OwnChrome>;
   /** Tests: whether a pid left in `chromes.json` is still that Chrome (default: asks the system). */
   isOurChrome?: (pid: number, profile: string) => Promise<boolean>;
   /** What `states()` returns may have changed (the desktop app's tray shows it). */
   onChange?: () => void;
+  /**
+   * The agents' desktops (ADR 0058 §7): while an agent's desktop runs, its Chrome starts in a window there,
+   * so people watching the desktop see the browser too, and using that browser keeps the desktop up.
+   */
+  desktops?: Pick<DesktopSessions, "running" | "touch">;
 }
 
 interface Stream {
@@ -658,6 +685,8 @@ interface Session {
   chrome?: OwnChrome;
   /** A Chrome being started: a second command waits for it. */
   chromeStarting?: Promise<OwnChrome>;
+  /** The desktop display that Chrome runs in a window on; absent: headless. */
+  display?: number;
   /** For the desktop app: the page's host, what the agent did last, and the conversation it was for. */
   host?: string;
   doing?: ControlBrowserDoing;
@@ -1130,7 +1159,7 @@ export class BrowserManager {
       this.noteAct(session, command, args, answer, link);
       return answer;
     }
-    if (!READS.has(command)) await this.ensureOwnChrome(session);
+    if (!READS.has(command)) await this.ensureOwnChrome(session, command === "open");
     if (READS.has(command)) {
       if (!(await this.browserOpen(session, signal))) {
         return { success: false, data: null, error: "The browser isn't open: open a page first" };
@@ -1239,9 +1268,19 @@ export class BrowserManager {
 
   /**
    * The agent's Chrome, started when it isn't running: Chrome for Testing with
-   * our flags and the agent's profile; its pid goes in `chromes.json`.
+   * our flags and the agent's profile; its pid goes in `chromes.json`. While
+   * the agent's desktop runs, in a window there (ADR 0058 §7). A headless one
+   * moves to a desktop that started since on the agent's next `open`
+   * (`opening`), unless a person watches it or a request holds it: a new
+   * Chrome loses the open tabs (the profile, and its logins, stay).
    */
-  private async ensureOwnChrome(session: Session): Promise<OwnChrome> {
+  private async ensureOwnChrome(session: Session, opening = false): Promise<OwnChrome> {
+    const screen = this.opts.desktops?.running(session.agentId) ?? null;
+    const held = session.stream || session.streamOpening || this.handoffs.has(session.agentId);
+    if (session.chrome && opening && screen && session.display !== screen.display && !held) {
+      await this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS });
+      await this.stopChrome(session);
+    }
     if (session.chrome) return session.chrome;
     if (session.chromeStarting) return session.chromeStarting;
     const profile = path.join(session.folder, ".agentes", "browser");
@@ -1249,9 +1288,12 @@ export class BrowserManager {
       const exe = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
       const start = this.opts.startChrome ?? launchChrome;
+      // A runner started inside the person's own session must not put the agent's window there (Wayland, its bus).
+      const { WAYLAND_DISPLAY: _wayland, DBUS_SESSION_BUS_ADDRESS: _bus, ...own } = process.env;
+      const env = screen ? { ...own, DISPLAY: `:${screen.display}`, XAUTHORITY: screen.xauthority } : undefined;
       let chrome: OwnChrome;
       try {
-        chrome = await start(exe, chromeLaunchArgs(exe, profile), profile);
+        chrome = await start(exe, chromeLaunchArgs(exe, profile, { headed: screen !== null }), profile, env);
       } catch (err) {
         throw new RunnerError(
           "internal",
@@ -1259,13 +1301,15 @@ export class BrowserManager {
         );
       }
       session.chrome = chrome;
+      session.display = screen?.display;
       session.aliveAt = null;
       await this.rememberChrome(chrome.pid, profile);
       void chrome.exited.then(() => {
         void this.forgetChrome(chrome.pid);
         if (session.chrome !== chrome) return;
-        // It closed under us (a crash, the person quit it): the next command starts it again.
+        // It closed under us (a crash, the person quit it, its desktop stopped): the next command starts it again.
         session.chrome = undefined;
+        session.display = undefined;
         session.aliveAt = null;
         this.changed();
       });
@@ -1283,6 +1327,7 @@ export class BrowserManager {
   private async stopChrome(session: Session) {
     const chrome = session.chrome ?? (await session.chromeStarting?.catch(() => undefined));
     session.chrome = undefined;
+    session.display = undefined;
     session.aliveAt = null;
     if (!chrome) return;
     chrome.kill();
@@ -1292,11 +1337,15 @@ export class BrowserManager {
 
   /**
    * Idle browsers close: no command (or frame) for the idle time, nobody
-   * watching, and no help request open for that agent.
+   * watching, and no help request open for that agent. One kept open on its
+   * desktop keeps the desktop up too.
    */
   async sweep() {
     for (const [agentId, s] of this.sessions) {
-      if (s.stream || s.streamOpening || this.handoffs.has(agentId)) continue;
+      if (s.stream || s.streamOpening || this.handoffs.has(agentId)) {
+        if (s.display !== undefined) this.opts.desktops?.touch(agentId);
+        continue;
+      }
       if (this.now() - s.lastUsed < this.idleMs) continue;
       this.sessions.delete(agentId);
       this.changed();
@@ -1422,6 +1471,7 @@ export class BrowserManager {
   ): Promise<BrowserAnswer> {
     const command = this.presentCommand() ?? (await this.ensureReady());
     session.lastUsed = this.now();
+    if (session.display !== undefined) this.opts.desktops?.touch(session.agentId);
     // Never without our Chrome: `agent-browser` would launch its own, with the automation markers.
     const chrome = session.chrome;
     if (!chrome) return { success: false, data: null, error: "The browser isn't open: open a page first" };
