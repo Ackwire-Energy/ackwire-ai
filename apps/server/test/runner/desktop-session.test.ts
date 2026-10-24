@@ -156,7 +156,7 @@ test("how many desktops a computer runs: its memory after a 2 GiB reserve, 800 M
 
 test("info: Linux, the runner on Bun 1.3.5 or newer, and the packages (installed without recommends)", () => {
   const t = setup();
-  expect(t.desktops.info()).toEqual({ available: true, width: 1280, height: 800 });
+  expect(t.desktops.info()).toEqual({ available: true, width: 1280, height: 900 });
   const ask = (system: Partial<DesktopSystem>) =>
     new DesktopSessions({ ...t.opts, system: { ...t.fake.system, ...system } }).info();
   expect(ask({ platform: "darwin" })).toMatchObject({ available: false, reason: expect.stringContaining("Linux") });
@@ -194,7 +194,7 @@ test("a runner running as root starts a desktop only through a launcher that run
 test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and passwords never in an argument", async () => {
   const t = setup();
   const reply = await t.desktops.ensure(dev);
-  expect(reply).toMatchObject({ display: 20, width: 1280, height: 800, started: true });
+  expect(reply).toMatchObject({ display: 20, width: 1280, height: 900, started: true });
   const [prepare] = t.fake.of("sh");
   const [xvnc] = t.fake.of("Xtigervnc");
   const [session] = t.fake.of("dbus-launch");
@@ -217,7 +217,7 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
   expect(flagValue(xvnc.argv, "-PasswordFile")).toBe(path.join(dir, "passwd"));
   expect(flagValue(xvnc.argv, "-auth")).toBe(path.join(dir, "Xauthority"));
   expect(flagValue(xvnc.argv, "-nolisten")).toBe("tcp");
-  expect(flagValue(xvnc.argv, "-geometry")).toBe("1280x800");
+  expect(flagValue(xvnc.argv, "-geometry")).toBe("1280x900");
   expect(flagValue(xvnc.argv, "-desktop")).toBe("Dev");
   for (const flag of ["-AcceptSetDesktopSize=0", "-FrameRate=30", "-UseBlacklist=0", "-AlwaysShared"]) {
     expect(xvnc.argv).toContain(flag);
@@ -328,6 +328,24 @@ test("system mode: every process as the agent, and the password file root's (rea
   expect(existsSync(passwd)).toBe(false);
 });
 
+test("the controller's keyboard: setxkbmap as the agent on its display; a variant only when the layout has one", async () => {
+  const t = setup();
+  await t.desktops.setKeyboard(dev, "br");
+  expect(t.fake.procs).toHaveLength(0);
+  await t.desktops.ensure(dev);
+  await t.desktops.setKeyboard(dev, "us-intl");
+  await t.desktops.setKeyboard(dev, "br");
+  const runs = t.fake.procs.filter((p) => p.argv[0] === "/usr/bin/setxkbmap");
+  expect(runs.map((p) => p.argv.slice(1))).toEqual([
+    ["-layout", "us", "-variant", "intl"],
+    ["-layout", "br"],
+  ]);
+  expect(runs[0]?.opts.env).toMatchObject({
+    DISPLAY: ":20",
+    XAUTHORITY: path.join(t.home, "desktop", "01a142cb", "Xauthority"),
+  });
+});
+
 test("system mode's desktop user: the agent's launcher and home; the cookie and the socket in ~/.agentes/desktop", () => {
   const launcher = systemLauncher({ id: dev.id, user: "ag-01a142cb", uid: 21001 }, true);
   expect(systemDesktopUser(launcher, { uid: 21001, gid: 21004 })).toEqual({
@@ -415,17 +433,10 @@ test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer
   t.clock.now += DESKTOP_IDLE_MS - 1;
   await t.desktops.sweep();
   expect(t.desktops.status(dev).running).toBe(true);
-  // Its browser in use there keeps it too.
-  t.desktops.touch(dev.id);
-  t.clock.now += DESKTOP_IDLE_MS - 1;
-  await t.desktops.sweep();
-  const { display, xauthority } = t.desktops.session(dev.id) ?? { display: 0, xauthority: "" };
-  expect(t.desktops.running(dev.id)).toEqual({ display, xauthority });
 
   t.clock.now += 2;
   await t.desktops.sweep();
   expect(t.desktops.status(dev).running).toBe(false);
-  expect(t.desktops.running(dev.id)).toBeNull();
   const [xvnc] = t.fake.of("Xtigervnc");
   const [session] = t.fake.of("dbus-launch");
   expect(t.fake.kills).toContainEqual([xvnc?.pid ?? 0, "SIGTERM"]);
@@ -435,6 +446,18 @@ test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer
   // Stopped on purpose: no restart.
   await new Promise((r) => setTimeout(r, 10));
   expect(t.fake.of("Xtigervnc")).toHaveLength(1);
+});
+
+test("idle: the agent's Chrome in use on its desktop keeps the desktop", async () => {
+  let chromeInUse = true;
+  const t = setup({ inUse: (agentId) => agentId === dev.id && chromeInUse });
+  await t.desktops.ensure(dev);
+  t.clock.now += DESKTOP_IDLE_MS + 1;
+  await t.desktops.sweep();
+  expect(t.desktops.status(dev).running).toBe(true);
+  chromeInUse = false;
+  await t.desktops.sweep();
+  expect(t.desktops.status(dev).running).toBe(false);
 });
 
 test("supervision: a desktop that ends by itself starts again, 3 times in 10 minutes at most", async () => {

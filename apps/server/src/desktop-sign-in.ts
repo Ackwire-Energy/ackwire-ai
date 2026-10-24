@@ -17,7 +17,7 @@ import { z } from "zod";
  * A handoff needs a fresh sign-in (a session made in the last few minutes),
  * so a link that skips the provider can't hand over an old browser session.
  */
-const HANDOFF_PREFIX = "desktop-handoff:";
+export const HANDOFF_PREFIX = "desktop-handoff:";
 /** How long the window has to pick the session up. */
 const HANDOFF_TTL_MS = 10 * 60_000;
 /** How recent the browser's sign-in must be to hand it over. */

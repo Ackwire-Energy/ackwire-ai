@@ -1,7 +1,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { AgentBrowserSettings, BrowserHandoff, ScreenKind } from "../api/types";
+import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, ScreenKind } from "../api/types";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
 
@@ -135,6 +135,20 @@ export function applyBrowserHandoff(
     keys.agentBrowserHandoff(orgId, handoff.agentId, handoffScreen(handoff)),
     (old) => (isOpenHandoff(handoff) ? handoff : old?.id === handoff.id || old === undefined ? null : old),
   );
+  qc.setQueryData<DesktopStatus>(keys.agentDesktop(orgId, handoff.agentId), (old) =>
+    old ? desktopWithHandoff(old, handoff) : old,
+  );
+}
+
+/**
+ * The desktop's state once a handoff changed: its own handoff, or the one it already named (the browser's,
+ * when its Chrome shows on the desktop; only the server knows that one holds it, so a new one waits for it).
+ */
+export function desktopWithHandoff(status: DesktopStatus, handoff: BrowserHandoff): DesktopStatus {
+  const known = status.handoff?.id === handoff.id;
+  if (!isOpenHandoff(handoff)) return known ? { ...status, handoff: null, controllerUserId: null } : status;
+  if (!known && handoffScreen(handoff) !== "desktop") return status;
+  return { ...status, handoff, controllerUserId: handoff.status === "active" ? handoff.controllerUserId : null };
 }
 
 export const useAgentBrowserSettings = (orgId: string, agentId: string, enabled = true) => {
@@ -189,10 +203,17 @@ export const useBrowserHandoff = (orgId: string, handoffId: string | null | unde
   });
 };
 
-/** "Assumir" from a run's card: the run it is bound to (its card stays in that conversation). */
+/** "Assumir" from a run's card: the run it is bound to (its card stays in that conversation); `screen`: the browser by default. */
 export interface TakeoverInput {
   agentId: string;
   runId?: string;
+  screen?: ScreenKind;
+}
+
+/** "Parar" one of the agent's screens: the browser by default ("Desligar" for its desktop). */
+export interface StopInput {
+  agentId: string;
+  screen?: ScreenKind;
 }
 
 /** "Pronto" or "Devolver" with what the person wants the agent to know (it reads it as their words). */
@@ -246,13 +267,21 @@ export function useBrowserHandoffMutations(orgId: string) {
     }),
     takeover: useMutation({
       mutationFn: (v: string | TakeoverInput) =>
-        typeof v === "string" ? api.browser.takeover(orgId, v) : api.browser.takeover(orgId, v.agentId, v.runId),
+        typeof v === "string"
+          ? api.browser.takeover(orgId, v)
+          : api.browser.takeover(orgId, v.agentId, v.runId, v.screen),
       meta: { silent: true },
       onSuccess: apply,
     }),
     stop: useMutation({
-      mutationFn: (agentId: string) => api.browser.stop(orgId, agentId),
+      mutationFn: (v: string | StopInput) =>
+        typeof v === "string" ? api.browser.stop(orgId, v) : api.browser.stop(orgId, v.agentId, v.screen),
       meta: { silent: true },
+      onSuccess: (_done, v) => {
+        if (typeof v !== "string" && v.screen === "desktop") {
+          void qc.invalidateQueries({ queryKey: keys.agentDesktop(orgId, v.agentId) });
+        }
+      },
     }),
   };
 }

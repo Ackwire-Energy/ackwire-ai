@@ -304,7 +304,13 @@ test.if(posix)("install.sh --runner-sha256: a bundle with another SHA-256 is nev
     spawnSync("sh", ["-s", "--", "--runner-sha256", pin, "--no-service"], {
       input: installScript(`file://${served}`),
       encoding: "utf8",
-      env: { ...process.env, HOME: h, AGENTES_RUNNER_HOME: runnerHome },
+      // The test's own Bun first: it has Bun.Terminal, so the installer fetches none.
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        HOME: h,
+        AGENTES_RUNNER_HOME: runnerHome,
+      },
     });
   const installed = path.join(runnerHome, "agentes-runner.mjs");
 

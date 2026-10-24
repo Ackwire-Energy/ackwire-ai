@@ -48,4 +48,6 @@ export const STORAGE_KEYS = {
   menuLook: "agentes.desktop.menu",
   /** Prefix (`.<message id>`, in `sessionStore`): the Connect dialog already opened by itself for that message. */
   noAiOpened: "agentes.noAi.opened",
+  /** The keyboard layout the person chose for agents' screens they control (`DESKTOP_KEYBOARDS`). */
+  screenKeyboard: "agentes.screen.keyboard",
 } as const;

@@ -4063,3 +4063,24 @@ export interface AgentBrowserSettings {
   detail: string | null;
   machine: { id: string; name: string } | null;
 }
+
+/** `GET …/agents/{id}/desktop` (ADR 0058): the agent's desktop as this person sees it. */
+export interface DesktopStatus {
+  /** Whether it can be shown now, else why (`reason`). */
+  available: boolean;
+  /** `no_desktop`, `no_computer`, `offline`, `other_server`, `runner_outdated`, `not_allowed` (its switch is off), `desktop_unavailable`. */
+  reason: string | null;
+  /** What the computer says it lacks (what to install). */
+  detail: string | null;
+  running: boolean;
+  startedAt: string | null;
+  /** Who is in control (of the desktop, or of the browser showing the same window), and that handoff. */
+  controllerUserId: string | null;
+  handoff: BrowserHandoff | null;
+  viewers: number;
+  /** This person may take control (and open the agent's terminal). */
+  canControl: boolean;
+  /** This person may turn it on ("Ligar") and off ("Desligar"). */
+  canStart: boolean;
+  terminal: { available: boolean; reason: string | null; allowed: boolean };
+}

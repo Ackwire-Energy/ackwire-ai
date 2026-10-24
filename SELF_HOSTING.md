@@ -535,10 +535,14 @@ computers only.
 curl -fsSL https://chat.example.com/api/machines/install.sh | sh
 ```
 
-The computer needs Node.js 22 or newer (or Bun) and must reach `PUBLIC_URL`: it downloads the runner
-from there and sends files back through it. On Tailscale, install Tailscale on it and sign in to the
-same tailnet first. The installer prints a code and a link; open it signed in, confirm, and the
-computer joins your organization. Then it installs a background service
+The computer must reach `PUBLIC_URL`: it downloads the runner from there and sends files back through
+it. On Tailscale, install Tailscale on it and sign in to the same tailnet first. The runner runs on
+Bun 1.3.5 or newer: the computer's own, or one the installer downloads into
+`~/.agentes-runner/runtime` and checks against the SHA-256 in the script before running it (Linux
+and macOS, x64 and arm64). Where it can't (another system, or no `unzip` or `python3` to unpack it),
+it falls back to Node.js 22 or newer and says what that runner lacks: the agents' desktops and the
+terminal. The installer prints a code and a link; open it signed in, confirm, and the computer joins
+your organization. Then it installs a background service
 (a systemd user unit or a launchd agent) where it can; otherwise run
 `~/.agentes-runner/bin/agentes-runner start` and keep it running. Options go after `sh -s --`:
 `--dir <folder>` (where agents work, default `~/agentes`), `--name <name>`, `--no-exec` (files only,
@@ -549,6 +553,40 @@ on first use), and Claude Code or Codex when an agent thinks with a subscription
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
 `agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
+
+**Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
+its browser on it, that people watch live from the agent's page and take control of when it needs a
+hand (to sign in, say); and people can open a terminal there, a shell as the agent. Both need the
+runner on Bun 1.3.5 or newer (the installer's, above), and the desktop needs these packages (Debian
+and Ubuntu names); then turn both on at that computer:
+
+```sh
+sudo apt install --no-install-recommends tigervnc-standalone-server xauth dbus-x11 xfce4-session \
+  xfwm4 xfce4-panel xfdesktop4 xfce4-settings thunar xfce4-terminal adwaita-icon-theme \
+  elementary-xfce-icon-theme fonts-noto-core
+agentes-runner tools enable desktop terminal
+```
+
+Keep `--no-install-recommends`: without it every desktop gets a screen locker nobody can unlock, more
+background services, and a set of empty folders in each agent's home. `agentes-runner status` says
+whether each of the two can run there and, when one can't, what is missing.
+`agentes-runner desktop-check --agent <handle>` starts that agent's desktop, logs in to it and opens a
+terminal, then stops what it started (stop the runner first). Agents use their desktop with the
+**Use its desktop** permission, which new agents have. A desktop takes about 0.2 GB of memory, 0.8 GB
+with the agent's browser on it. It turns on when the agent needs it (or with **Turn on** on its
+page), turns off after 15 minutes unused, and the computer runs as many at once as its memory holds
+after 2 GB for the rest (7 on 8 GB).
+
+Admins, the agent's owner and whoever its current work is for can watch. Taking control and the
+terminal are for the person who connected the computer, since they act as its user: by default every
+agent runs as that one user, its desktop and terminal included, so whoever uses either can read the
+other agents' folders, the sign-ins on that computer and the runner's token, as the agents' commands
+can. Give the runner a user of its own, or a VM. On a Linux server, the installer's `--system` option
+(as root) makes each agent its own user instead.
+
+Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
+shows it live. A Mac connected with the command above opens terminals
+(`agentes-runner tools enable terminal`); the Mac app doesn't have them yet.
 
 Use HTTPS with a certificate from a public authority (Tailscale and the Caddy profile get one). Over
 plain http the computer's token travels unencrypted, and the runner's background service doesn't
@@ -783,8 +821,13 @@ their fixes are in For AI agents, above.
 
 **Messages don't appear live, and the browser's WebSocket closes with code 1006.** A proxy in front
 doesn't pass the upgrade. It needs the `Upgrade` and `Connection` headers for `/api/ws` (and
-`/api/machines/connect` for computers), HTTP/1.1 to the app, and a read timeout of at least 60 s (see
-the nginx section). A 403 "Cross-origin WebSocket refused" is the `PUBLIC_URL` mismatch above.
+`/api/machines/connect` for computers; `/api/desktop`, `/api/terminal` and `/api/machines/stream`
+for the agents' desktops and terminals), HTTP/1.1 to the app, and a read timeout of at least 60 s
+(see the nginx section). A 403 "Cross-origin WebSocket refused" is the `PUBLIC_URL` mismatch above.
+
+**An agent's desktop or terminal "isn't available on this computer".** Run `agentes-runner status` on
+that computer: its `Desktops` and `Terminal` lines say what is missing (the runner on Bun 1.3.5 or
+newer, the packages, or the switch), as in Agent computers above.
 
 **`extension "vector" is not available` at the first start.** The database is a Postgres without
 pgvector. Use the compose file's `pgvector/pgvector` image; on a database of your own, install

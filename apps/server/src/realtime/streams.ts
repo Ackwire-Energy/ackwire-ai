@@ -1,4 +1,4 @@
-import { isTerminalSize, STREAM_CLOSE, type StreamRequest } from "@agenteschat/adapters";
+import { isDesktopKeyboard, isTerminalSize, STREAM_CLOSE, type StreamRequest } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import type { RunnerLink, Stream, StreamBroker, StreamInput, StreamSocket } from "@agenteschat/engine";
@@ -10,7 +10,8 @@ import { personUpgrade, UUID } from "./ws";
  * Agents' desktops and terminals (ADR 0058 §11), relayed by the engine's
  * stream broker:
  *
- * - `GET /api/desktop?orgId&agentId&mode=watch|control` (raw RFB, binary) and
+ * - `GET /api/desktop?orgId&agentId&mode=watch|control[&keyboard]` (raw RFB, binary;
+ *   `keyboard`: the controller's layout, `DESKTOP_KEYBOARDS`) and
  *   `GET /api/terminal?orgId&agentId&cols&rows` (the shell's bytes; text
  *   frames: `resize` out, `exit` in) are a person's sockets, refused before
  *   the upgrade like `/api/ws` (401 without a session, 403 for a foreign
@@ -61,7 +62,10 @@ const upgraded = (ok: boolean) => (ok ? undefined : new Response("WebSocket upgr
 function viewerRequest(path: string, q: URLSearchParams): StreamRequest | null {
   if (path === STREAM_PATHS.desktop) {
     const mode = q.get("mode");
-    return mode === "watch" || mode === "control" ? { kind: "desktop", mode } : null;
+    const keyboard = q.get("keyboard");
+    if (mode === "watch") return { kind: "desktop", mode };
+    if (mode !== "control") return null;
+    return { kind: "desktop", mode, ...(isDesktopKeyboard(keyboard) ? { keyboard } : {}) };
   }
   const cols = Number(q.get("cols"));
   const rows = Number(q.get("rows"));

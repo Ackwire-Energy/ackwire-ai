@@ -65,10 +65,10 @@ export async function renderPage(
     path?: string;
   },
 ) {
-  const services = makeServices(options.api, options.auth);
-  const me = await options.api.account.me();
   const sockets = fakeSockets();
   const createSocket = options.createSocket ?? sockets.factory;
+  const services = makeServices(options.api, options.auth, createSocket);
+  const me = await options.api.account.me();
   const content =
     options.org && me?.organizations[0] ? (
       <OrgProvider org={me.organizations[0]} me={me}>
