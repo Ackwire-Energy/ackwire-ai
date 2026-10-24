@@ -260,9 +260,9 @@ export function OverviewTab() {
           {workInAside && (
             // The card inside is the "Como trabalha" region; this only gives it its quiet heading.
             <div className="agp-aside__work">
-              <h2 className="agp-aside__h" aria-hidden="true">
+              <p className="agp-aside__h" aria-hidden="true">
                 {t("agentPage.work.cell.label")}
-              </h2>
+              </p>
               <WorkCard onOpen={openWork} footer={<Numbers />} />
             </div>
           )}

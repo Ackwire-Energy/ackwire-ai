@@ -131,7 +131,10 @@ export const NEW_CHANNEL_EVENT = "agentes:new-channel";
  * "general" → "Ge"), so the rail still reads which is which.
  */
 export function channelInitials(name: string) {
-  const words = name.split(/[-_.\s]+/).filter(Boolean).map((w) => Array.from(w));
+  const words = name
+    .split(/[-_.\s]+/)
+    .filter(Boolean)
+    .map((w) => Array.from(w));
   const letters = (words.length > 1 ? [words[0]?.[0], words[1]?.[0]] : (words[0] ?? []).slice(0, 2)).join("");
   return letters.charAt(0).toUpperCase() + letters.slice(1).toLowerCase();
 }

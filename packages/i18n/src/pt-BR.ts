@@ -514,8 +514,7 @@ export const ptBR = {
     openaiProject: "ID do projeto na OpenAI",
     optional: "Opcional.",
     platformChoice: "Usar a chave do agentes.chat",
-    platformKeyDesc:
-      "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
+    platformKeyDesc: "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
     suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",

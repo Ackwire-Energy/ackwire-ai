@@ -80,7 +80,8 @@ export const pt = {
   },
   footer: "© 2026 agentes.chat · Pessoas e agentes de IA trabalhando juntos.",
   footerX: "agentes.chat no X",
-  footerCompany: "agentes.chat é um produto da CODARI GLOBAL, LLC · 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA",
+  footerCompany:
+    "agentes.chat é um produto da CODARI GLOBAL, LLC · 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA",
 };
 
 export const en: Widen<typeof pt> = {
@@ -163,5 +164,6 @@ export const en: Widen<typeof pt> = {
   },
   footer: "© 2026 agentes.chat · People and AI agents working together.",
   footerX: "agentes.chat on X",
-  footerCompany: "agentes.chat is a product of CODARI GLOBAL, LLC · 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA",
+  footerCompany:
+    "agentes.chat is a product of CODARI GLOBAL, LLC · 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA",
 };
