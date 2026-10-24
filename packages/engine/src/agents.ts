@@ -3,6 +3,7 @@ import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agentesch
 import type { AgentAppearance } from "./appearance";
 import { caches } from "./cache";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { recordOperatorEvent } from "./operator-events";
 import { getMembership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
@@ -114,6 +115,7 @@ export async function createAgent(
     // from the start, so the first call reserves in one statement.
     caches.agents.delete(`${orgId}:team`);
     await resyncBudgetCounter(db, orgId, agent.id);
+    await recordOperatorEvent(db, { type: "agent.created", orgId, userId: actorId, data: { agentId: agent.id } });
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);

@@ -1,4 +1,5 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
+import { recordRunFinished } from "./operator-events";
 
 const { agentRuns, agentRunSteps } = schema;
 
@@ -125,6 +126,7 @@ export async function transitionRun(
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))
     .returning();
+  if (row && isTerminal(to)) await recordRunFinished(db, row);
   return row ?? null;
 }
 

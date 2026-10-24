@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { redactCommon } from "@agenteschat/adapters/redact";
 import { ActivityLog } from "../../runner/activity";
 import {
   configPath,
@@ -11,7 +12,7 @@ import {
   watchConfig,
   writeConfig,
 } from "../../runner/config";
-import { RotatingFile, redactCommon, rotatedName, tailLines } from "../../runner/logfile";
+import { RotatingFile, rotatedName, tailLines } from "../../runner/logfile";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];

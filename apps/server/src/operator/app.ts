@@ -4,6 +4,7 @@ import { safeEqual } from "@agenteschat/engine";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { apiError, domainErrorResponse, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
+import { registerOperatorEvents } from "./events";
 import { registerOperatorOrgs } from "./orgs";
 
 /** Versioned because its caller deploys apart from this server (ADR 0056 §3). */
@@ -36,12 +37,14 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
     await next();
   });
   registerOperatorOrgs(api, deps);
+  registerOperatorEvents(api, deps);
   api.doc31("/openapi.json", {
     openapi: "3.1.0",
     info: {
       title: "agentes.chat operator API",
       version: deps.version,
-      description: "Workspace and account lookups for the people who run this instance (ADR 0056).",
+      description:
+        "Workspace and account lookups, the events feed and review blocks, for the people who run this instance (ADR 0056).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],

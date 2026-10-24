@@ -445,6 +445,10 @@ then a second listener on `OPERATOR_API_PORT` (3001) serves `/api/operator/v1`, 
 `Authorization: Bearer <token>`, and its OpenAPI document is at `/api/operator/v1/openapi.json`. That
 port reaches every workspace, so never publish it or put it behind your proxy: the compose file
 doesn't publish it, and containers on the same Docker network reach it as `http://agentes:3001`.
+With the token set, the server also keeps 90 days of events for it to read (`GET /events`: sign-ups
+with their email, sign-ins with their IP address and browser, workspaces, invitations, agents, emails
+sent and runs finished, as metadata), and `GET /review/...` shows what one run or task did, with
+credentials masked; every such read is recorded as an event.
 
 </details>
 

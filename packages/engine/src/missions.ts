@@ -68,6 +68,7 @@ import {
   tellMainSession,
 } from "./missions-engine";
 import { notifyMissionEnded } from "./notification-producers";
+import { recordTaskFinished } from "./operator-events";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { SearchDeps } from "./search";
@@ -1718,7 +1719,10 @@ async function cancelMissionTasks(deps: MissionDeps, mission: MissionRow, actorI
         .set({ status: "canceled", endedAt: new Date(), wokeAt: new Date(), updatedAt: new Date() })
         .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt)))
         .returning();
-      if (ended) await publishTaskEvent(deps.pubsub, ended);
+      if (ended) {
+        await recordTaskFinished(deps.db, ended);
+        await publishTaskEvent(deps.pubsub, ended);
+      }
     }
     canceled++;
   }

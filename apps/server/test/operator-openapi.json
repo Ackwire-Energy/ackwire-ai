@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, the events feed and review blocks, for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -242,6 +242,77 @@
           }
         },
         "required": ["id", "email", "name", "emailVerified", "createdAt", "orgs", "sessions"]
+      },
+      "OperatorEventPage": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorEvent"
+            }
+          },
+          "next": {
+            "type": ["string", "null"],
+            "description": "`after` for the next call; the same value when there was nothing new, null only before any event."
+          }
+        },
+        "required": ["events", "next"]
+      },
+      "OperatorEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+          },
+          "orgId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "userId": {
+            "type": ["string", "null"],
+            "description": "The person the event is about or who acted."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["id", "at", "type", "orgId", "userId", "data"]
+      },
+      "OperatorReview": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["run", "task"]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orgId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string",
+            "description": "At most 12000 bytes of UTF-8."
+          }
+        },
+        "required": ["kind", "id", "orgId", "agentId", "text"]
       }
     },
     "parameters": {}
@@ -437,6 +508,162 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OperatorUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "What happened on this instance, oldest first, as metadata",
+        "description": "Recorded only while the operator API is on, and kept 90 days. Paging never skips an event: one is served only once its transaction, and every transaction that began before it, has ended.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "`next` of the previous page; absent: from the oldest event kept (90 days)."
+            },
+            "required": false,
+            "description": "`next` of the previous page; absent: from the oldest event kept (90 days).",
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorEventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/review/{kind}/{id}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "What one run or task did, as one redacted text block",
+        "description": "The only content this API gives: the request, the tool calls with their results, the reply (a run), or the prompt, command and output (a task). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["run", "task"]
+            },
+            "required": true,
+            "name": "kind",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "Why it is read (a sample, a report, a case): kept in the `content.viewed` event."
+            },
+            "required": true,
+            "description": "Why it is read (a sample, a report, a case): kept in the `content.viewed` event.",
+            "name": "reason",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Who reads it: an operator, or the service that samples."
+            },
+            "required": true,
+            "description": "Who reads it: an operator, or the service that samples.",
+            "name": "operator",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorReview"
                 }
               }
             }

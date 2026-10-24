@@ -4,6 +4,8 @@ import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { addressDomain } from "./mail/text";
+import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
 
 const {
   organizations,
@@ -109,6 +111,12 @@ export async function createOrganization(db: Database, userId: string, input: { 
       .returning();
     if (!general) throw new Error("channel insert returned nothing");
     await tx.insert(channelMembers).values({ orgId: organization.id, channelId: general.id, userId });
+    await recordOperatorEvent(tx, {
+      type: "organization.created",
+      orgId: organization.id,
+      userId,
+      data: { name: organization.name },
+    });
     return { organization, general };
   });
 }
@@ -478,6 +486,8 @@ export async function deleteAccount(
     }
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
     await tx.delete(users).where(eq(users.id, userId));
+    const gone = alone.map((orgId): OperatorEvent => ({ type: "organization.deleted", orgId, userId }));
+    await recordOperatorEvent(tx, ...gone, { type: "user.deleted", userId });
     return { left: leaving, deleted: alone };
   });
   // Their open WebSocket connections lose every subscription now.
@@ -543,6 +553,12 @@ export async function createInvitation(
     })
     .returning();
   if (!invitation) throw new Error("invitation insert returned nothing");
+  await recordOperatorEvent(db, {
+    type: "invitation.created",
+    orgId,
+    userId: actorId,
+    data: { emailDomain: addressDomain(email), role: input.role },
+  });
   /** `token` goes in the link and is never stored. */
   return { invitation, token };
 }
@@ -593,6 +609,7 @@ export async function createInviteLink(db: Database, actorId: string, orgId: str
     })
     .returning();
   if (!link) throw new Error("invite link insert returned nothing");
+  await recordOperatorEvent(db, { type: "invitation.created", orgId, userId: actorId, data: { link: true } });
   return { link, token };
 }
 
@@ -774,6 +791,12 @@ export async function resendInvitation(
     .where(eq(organizationInvitations.id, invitationId))
     .returning();
   if (!invitation) throw new ConflictError("This invitation can't be resent");
+  await recordOperatorEvent(db, {
+    type: "invitation.created",
+    orgId,
+    userId: actorId,
+    data: { emailDomain: addressDomain(invitation.email), role: invitation.role, resent: true },
+  });
   return { invitation, token };
 }
 

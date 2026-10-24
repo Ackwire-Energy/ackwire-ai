@@ -42,6 +42,7 @@ import {
 } from "./machine-tasks";
 import { MachineOfflineError, pausedMessage } from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
+import { recordTaskFinished } from "./operator-events";
 import { replyThreadOf } from "./runs";
 import {
   agentComputerInfo,
@@ -1230,7 +1231,10 @@ export function createSandboxToolSource(
             .set({ status: "canceled", endedAt: new Date(), updatedAt: new Date() })
             .where(and(eq(schema.machineTasks.id, row.id), eq(schema.machineTasks.canceledBy, by)))
             .returning();
-          if (ended) await publishTaskEvent(deps.pubsub, ended);
+          if (ended) {
+            await recordTaskFinished(ctx.db, ended);
+            await publishTaskEvent(deps.pubsub, ended);
+          }
           // A mission's task still gets its end handled (notes, inbox), even canceled by the agent.
           if (ended?.missionId) await enqueueWake(ctx.db, ended);
           await audit();

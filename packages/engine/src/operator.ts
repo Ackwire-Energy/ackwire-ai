@@ -1,6 +1,6 @@
 import { and, asc, type Database, desc, eq, gt, inArray, or, schema, sql } from "@agenteschat/db";
 import { z } from "zod";
-import { ValidationError } from "./errors";
+import { decodeCursor, encodeCursor } from "./cursor";
 
 /**
  * Reads of the operator API (ADR 0056): who and what is in a workspace, never what anyone wrote there,
@@ -37,14 +37,7 @@ export interface OperatorOrgQuery {
 
 /** Workspaces, newest first, in keyset pages: a workspace created while paging never shifts a page. */
 export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
-  let after: [string, string] | null = null;
-  if (query.cursor) {
-    try {
-      after = OrgCursor.parse(JSON.parse(Buffer.from(query.cursor, "base64url").toString()));
-    } catch {
-      throw new ValidationError("Invalid cursor", "invalid_cursor");
-    }
-  }
+  const after = query.cursor ? decodeCursor(query.cursor, OrgCursor) : null;
   const q = query.q?.trim();
   const rows = await db
     .select({
@@ -75,10 +68,7 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
     .limit(query.limit + 1);
   const orgs = rows.slice(0, query.limit);
   const last = orgs.at(-1);
-  const next =
-    rows.length > query.limit && last
-      ? Buffer.from(JSON.stringify([last.createdAt.toISOString(), last.id])).toString("base64url")
-      : null;
+  const next = rows.length > query.limit && last ? encodeCursor([last.createdAt.toISOString(), last.id]) : null;
   return { orgs, next };
 }
 

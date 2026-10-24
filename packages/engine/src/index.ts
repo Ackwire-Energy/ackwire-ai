@@ -126,6 +126,8 @@ export * from "./net-guard";
 export * from "./notification-producers";
 export * from "./notifications";
 export * from "./operator";
+export * from "./operator-events";
+export * from "./operator-review";
 export * from "./organizations";
 export * from "./outbox";
 export * from "./pdf";

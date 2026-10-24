@@ -19,6 +19,7 @@ import { getMachineById, MachineOfflineError, MachinePausedError, machineOnline 
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
+import { recordTaskFinished } from "./operator-events";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
 import { issueRunToolToken } from "./run-tool-tokens";
@@ -384,6 +385,7 @@ export async function launchTask(
       })
       .where(and(eq(machineTasks.id, row.id), eq(machineTasks.status, "queued")))
       .returning();
+    if (failed) await recordTaskFinished(deps.db, failed);
     if (failed && options.requeue) {
       // A queued task started by the server: its end is told like any other (the mission hears it failed).
       await enqueueWake(deps.db, failed);
@@ -650,6 +652,7 @@ export async function applyTaskDone(
       )
       .returning();
     if (!ended) return null;
+    await recordTaskFinished(tx, ended);
     // Commands it was refused with nobody to ask: its end notice lists them ("Liberar e repetir").
     await recordTaskDenials(tx, ended, frame.denials);
     // A task the agent canceled itself wakes nobody; a mission's still gets its end handled (notes, inbox).
@@ -713,6 +716,7 @@ export async function settleInterruptedTask(
     .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt), inArray(machineTasks.status, ACTIVE)))
     .returning();
   if (!claimed) return null;
+  await recordTaskFinished(deps.db, claimed);
   const machine = await getMachineById(deps.db, claimed.machineId);
   // A mission's task resumes when the mission says so and still runs (ADR 0029).
   const [mission] = claimed.missionId
