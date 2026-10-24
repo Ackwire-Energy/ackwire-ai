@@ -192,6 +192,7 @@ export {
   type PixelSpinnerSize,
 } from "./components/PixelSpinner";
 export { Popover } from "./components/Popover";
+export { ProviderLogo, type ProviderLogoProps } from "./components/ProviderLogo";
 export {
   modeOf,
   monthlyKindOf,

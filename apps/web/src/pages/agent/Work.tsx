@@ -45,6 +45,7 @@ import {
   Input,
   LogoMark,
   OptionList,
+  ProviderLogo,
   Segmented,
   Select,
   type SelectOption,
@@ -455,14 +456,6 @@ function BrainField({ label, children }: { label?: string; children: ReactNode }
   );
 }
 
-/** A model's maker as its mark (the API models): Claude's for Anthropic, OpenAI's for OpenAI. */
-const providerMark = (provider: string) =>
-  provider === "anthropic" ? (
-    <BrainLogo kind="claude_code" size="sm" />
-  ) : provider === "openai" ? (
-    <BrainLogo kind="codex" size="sm" />
-  ) : undefined;
-
 function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -756,7 +749,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 label: m.label,
                 group: providerLabel(provider),
                 disabled: !available,
-                leading: providerMark(provider),
+                leading: <ProviderLogo id={provider} size="sm" />,
                 description: available
                   ? modelDescription(t, i18n.language, m)
                   : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
@@ -773,14 +766,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           onValueChange={setKey}
           placeholder={t("newAgent.noKeys")}
           renderValue={pickerValue}
-          options={keyChoices.map((k) => ({
-            ...k,
-            leading: (
-              <span className="newag__ib">
-                <Icon name="key" size={16} />
-              </span>
-            ),
-          }))}
+          options={keyChoices}
         />
       </BrainField>
     </>

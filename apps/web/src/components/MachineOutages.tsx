@@ -26,6 +26,7 @@ import {
   Icon,
   OptionList,
   type OptionListItem,
+  ProviderLogo,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -375,7 +376,10 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
         <Icon name="waiting" size={16} />
         <span>{t("outage.card.waiting", { name })}</span>
       </span>
-      <p>{[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}</p>
+      <p>
+        <ProviderLogo id={notice.brain} size="xs" />
+        {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
+      </p>
       {manage && outage && outages.data && (
         <span className="waitcard__acts">
           <Button size="sm" onClick={() => setOpen(true)}>

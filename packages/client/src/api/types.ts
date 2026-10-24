@@ -195,6 +195,8 @@ export interface AgentBrainLine {
   /** A computer brain's model ("Sonnet"); null for the model brain. */
   model: string | null;
   computer?: string;
+  /** A plan account's provider (`zai`, `kimi`…), whose mark replaces the brain's; absent for the CLI's own sign-in. */
+  provider?: string | null;
 }
 
 /** `appearance` as stored: the UI only draws known values. */

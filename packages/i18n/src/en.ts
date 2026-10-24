@@ -495,6 +495,7 @@ export const en: Translations = {
     },
     provider: "Provider",
     keyFor: "{{provider}} API key",
+    keySite: "Create the key at {{site}}.",
     keyInvalid: {
       anthropic: "Anthropic keys start with sk-ant-. Check it and paste it again.",
       openai: "OpenAI keys start with sk-. Check it and paste it again.",

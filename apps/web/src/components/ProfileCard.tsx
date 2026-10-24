@@ -1,15 +1,15 @@
 import type { Actor, Agent } from "@agenteschat/client";
 import { useAgentDetail, useModels, usePeople, useSettings } from "@agenteschat/client";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
+import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAuto } from "@agenteschat/client/lib/providers";
-import { Avatar, BrainIcon, Button, Meter, Popover } from "@agenteschat/ui";
+import { Avatar, Button, Meter, Popover, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { agentBrainLine } from "@/components/AgentBrain";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -194,7 +194,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const model = isAuto(agent.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
-  const thinks = agent.brain && agent.brain.kind !== "model" ? agentBrainLine(t, agent, model) : null;
+  const thinks = agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model) : null;
   return (
     <div className="profile-card__body">
       <div className="profile-card__head">
@@ -219,7 +219,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         <dd>
           {thinks ? (
             <span className="profile-card__brain">
-              <BrainIcon kind={thinks.kind} size={14} />
+              {thinks.mark && <ProviderLogo id={thinks.mark} size="xs" />}
               {thinks.text}
             </span>
           ) : (

@@ -1,21 +1,35 @@
 import type { Credential, Model } from "../api/types";
 
 /**
- * Model providers the workspace can bring a key for. The backend catalog
- * starts with Anthropic and is adding OpenAI. Key formats are checked on the
- * client only to catch paste mistakes; the server validates for real.
+ * Model providers the workspace can bring a key for, the same ids as the backend catalog
+ * (`packages/providers/src/catalog.ts`); `site` is where the provider hands out keys. Key formats are checked
+ * on the client only to catch paste mistakes; the server validates for real.
  */
 export const PROVIDERS = [
-  { id: "anthropic", label: "Anthropic", placeholder: "sk-ant-…", pattern: /^sk-ant-[A-Za-z0-9_-]{16,}$/ },
-  { id: "openai", label: "OpenAI", placeholder: "sk-…", pattern: /^sk-(?!ant-)[A-Za-z0-9_-]{16,}$/ },
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    placeholder: "sk-ant-…",
+    pattern: /^sk-ant-[A-Za-z0-9_-]{16,}$/,
+    site: "console.anthropic.com/settings/keys",
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    placeholder: "sk-…",
+    pattern: /^sk-(?!ant-)[A-Za-z0-9_-]{16,}$/,
+    site: "platform.openai.com/api-keys",
+  },
 ] as const;
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];
 
-export const providerLabel = (id: string) => PROVIDERS.find((p) => p.id === id)?.label ?? id;
+/** A provider's entry; undefined for an id this client doesn't know (it then shows the id itself). */
+export const providerOf = (id: string) => PROVIDERS.find((p) => p.id === id);
+export const providerLabel = (id: string) => providerOf(id)?.label ?? id;
 export const isProviderId = (id: string): id is ProviderId => PROVIDERS.some((p) => p.id === id);
 export const keyLooksValid = (provider: ProviderId, key: string) =>
-  (PROVIDERS.find((p) => p.id === provider)?.pattern ?? /.{8,}/).test(key.trim());
+  (providerOf(provider)?.pattern ?? /.{8,}/).test(key.trim());
 
 /** Live keys per provider. */
 export function providersWithKeys(credentials: Credential[]) {

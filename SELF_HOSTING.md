@@ -499,6 +499,26 @@ load extra CA certificates.
 </details>
 
 <details>
+<summary><b>AI: plans and keys</b></summary>
+
+**API keys.** Each organization adds its own provider keys in **Settings → API keys**. They are
+stored encrypted with a key derived from `AGENTES_SECRET`, never sent back to a browser, and every
+model call goes through the server, which records its usage and cost per agent.
+
+**Plans.** An agent can think with a Claude or ChatGPT subscription instead of a key, on a connected
+computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder
+on that computer, `<runner home>/accounts/<kind>/<id>` (`~/.agentes-runner/accounts/…` for a runner
+installed with the command), and its sign-in never leaves it. The server keeps only the account's
+name, email, plan and status. The code pasted when signing in from a browser is encrypted there to a
+key made on the computer and relayed without being stored, so the server can't read it. A personal
+plan is meant for its owner: answering other people with it may go against the provider's terms.
+
+**Backups.** Leave `<runner home>/accounts`, and the CLIs' own `~/.claude` and `~/.codex`, out of the
+computer's backups: they hold sign-ins. The server's database never has them.
+
+</details>
+
+<details>
 <summary><b>Upgrades</b></summary>
 
 Download the compose file again with each release, since a release can change it, then pull and

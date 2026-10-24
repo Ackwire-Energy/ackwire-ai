@@ -503,6 +503,7 @@ export const ptBR = {
     },
     provider: "Provedor",
     keyFor: "Chave da API da {{provider}}",
+    keySite: "Crie a chave em {{site}}.",
     keyInvalid: {
       anthropic: "As chaves da Anthropic começam com sk-ant-. Confira e cole de novo.",
       openai: "As chaves da OpenAI começam com sk-. Confira e cole de novo.",

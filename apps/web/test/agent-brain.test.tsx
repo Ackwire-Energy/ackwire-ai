@@ -107,8 +107,8 @@ describe("Quem pensa (its dialog)", () => {
     expect(rows[0]?.getAttribute("aria-checked")).toBe("true");
     // The organization's model is the agent itself; the computer brains are their makers' marks.
     expect(rows[0]?.querySelector("canvas.ac-brain")?.getAttribute("data-kind")).toBe("agent");
-    expect(rows[1]?.querySelector(".ac-brand--claude")).not.toBeNull();
-    expect(rows[2]?.querySelector(".ac-brand--openai")).not.toBeNull();
+    expect(rows[1]?.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
+    expect(rows[2]?.querySelector(".ac-brand[data-mark='openai']")).not.toBeNull();
     // The agent is on the cloud: a plan brain says where it will go, before it is chosen.
     expect(rows.map((r) => r.querySelector(".ac-optrow__side")?.textContent)).toEqual([
       undefined,

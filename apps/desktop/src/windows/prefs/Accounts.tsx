@@ -16,6 +16,7 @@ import {
   DialogFooter,
   Icon,
   PixelSpinner,
+  ProviderLogo,
   Segmented,
 } from "@agenteschat/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -141,7 +142,10 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
     <>
       {kinds.map((kind, i) => (
         <section key={kind} aria-busy={loaded.state === "loading" || undefined}>
-          <CardTitle>{t(KINDS[kind].title)}</CardTitle>
+          <CardTitle>
+            <ProviderLogo id={kind} size="xs" />
+            {t(KINDS[kind].title)}
+          </CardTitle>
           {i === 0 && homes.length > 1 && (
             <div className="dk-orgpick">
               <Segmented

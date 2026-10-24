@@ -23,6 +23,7 @@ import {
   PROVIDERS,
   type ProviderId,
   providerLabel,
+  providerOf,
 } from "@agenteschat/client/lib/providers";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
@@ -39,6 +40,7 @@ import {
   Input,
   List,
   Meter,
+  ProviderLogo,
   Select,
   Textarea,
 } from "@agenteschat/ui";
@@ -471,6 +473,7 @@ function KeysSection() {
             const isDefault = settings.data?.defaultCredentialId === c.id;
             return (
               <div key={c.id} className="ac-list__row">
+                <ProviderLogo id={c.provider} size="sm" />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>{c.label}</span>
                   <span className="small muted">
@@ -579,6 +582,7 @@ function KeyDialog({
   const valid = keyLooksValid(provider, apiKey);
   const error = touched && !valid ? t(`onboarding.keyInvalid.${provider}`) : undefined;
   const pending = add.isPending || rotate.isPending;
+  const site = providerOf(provider)?.site;
   return (
     <Dialog
       open={mode !== null}
@@ -622,7 +626,17 @@ function KeyDialog({
               <Select
                 value={provider}
                 onValueChange={setProvider}
-                options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+                options={PROVIDERS.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                  leading: <ProviderLogo id={p.id} size="xs" />,
+                }))}
+                renderValue={(o) => (
+                  <span className="row">
+                    {o.leading}
+                    {o.label}
+                  </span>
+                )}
               />
             </Field>
           )}
@@ -635,11 +649,25 @@ function KeyDialog({
               />
             </Field>
           )}
-          <Field label={t("settings.keyValue")} id="key-value-set" error={error} help={t("connectors.apiKeyHelp")}>
+          <Field
+            label={t("settings.keyValue")}
+            id="key-value-set"
+            error={error}
+            help={
+              <>
+                {site && (
+                  <a href={`https://${site}`} target="_blank" rel="noreferrer">
+                    {t("onboarding.keySite", { site })}
+                  </a>
+                )}{" "}
+                {t("connectors.apiKeyHelp")}
+              </>
+            }
+          >
             <Input
               type="password"
               autoComplete="off"
-              placeholder={PROVIDERS.find((p) => p.id === provider)?.placeholder}
+              placeholder={providerOf(provider)?.placeholder}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />

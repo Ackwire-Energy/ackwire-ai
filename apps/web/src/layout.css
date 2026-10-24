@@ -110,6 +110,10 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
+/* A provider by its mark and name: one line, centered on the mark. */
+.onb__provider {
+  align-items: center;
+}
 .grid-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
@@ -346,9 +350,15 @@ p {
   color: var(--success);
 }
 .waitcard p {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   margin: 0;
   font-size: 13.5px;
   color: var(--ink-muted);
+}
+.waitcard p > .ac-brand {
+  margin-top: 2px;
 }
 .waitcard__acts {
   display: flex;
@@ -780,7 +790,9 @@ p {
   gap: 6px;
   vertical-align: top;
 }
-.profile-card__brain > .ac-icon {
+.profile-card__brain > .ac-icon,
+.profile-card__brain > .ac-brand,
+.channel__brain > .ac-brand {
   flex: none;
   margin-top: 2px;
 }
@@ -5855,6 +5867,9 @@ a.machine-row__name:hover {
   margin-top: 3px;
   color: var(--ok);
 }
+.computers-kind__points .ac-brand {
+  margin-top: 3px;
+}
 .computers-kind__head {
   display: flex;
   align-items: center;
@@ -6921,6 +6936,9 @@ a.machine-row__name:hover {
   font-size: 15px;
 }
 .newag__model-prov {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
   color: var(--faint);
   font-size: 12px;

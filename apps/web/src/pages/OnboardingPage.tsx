@@ -10,7 +10,14 @@ import {
   type OnboardingStepId,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
-import { AUTO, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@agenteschat/client/lib/providers";
+import {
+  AUTO,
+  keyLooksValid,
+  PROVIDERS,
+  type ProviderId,
+  providerLabel,
+  providerOf,
+} from "@agenteschat/client/lib/providers";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
@@ -28,6 +35,7 @@ import {
   Logo,
   normalizeAppearance,
   OptionCard,
+  ProviderLogo,
   Select,
   Spinner,
   Textarea,
@@ -842,6 +850,7 @@ export function OnboardingPage() {
                       pressed={brain === "claude_code"}
                       onClick={() => brain !== "claude_code" && setAskingTerms(true)}
                     >
+                      <ProviderLogo id="claude_code" size="sm" />
                       <span className="ac-option__text">
                         <span className="ac-option__title">
                           {t("onboarding.brain.claudeCode", { computer: machine.name })}
@@ -874,7 +883,8 @@ export function OnboardingPage() {
               {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
               <div className="grid-options grid-options--sm" role="group" aria-label={t("onboarding.provider")}>
                 {PROVIDERS.map((p) => (
-                  <OptionCard key={p.id} pressed={key === p.id} onClick={() => setKey(p.id)}>
+                  <OptionCard key={p.id} className="onb__provider" pressed={key === p.id} onClick={() => setKey(p.id)}>
+                    <ProviderLogo id={p.id} size="sm" />
                     <span className="ac-option__title">{p.label}</span>
                   </OptionCard>
                 ))}
@@ -893,11 +903,16 @@ export function OnboardingPage() {
                     label={t("onboarding.keyFor", { provider: providerLabel(key) })}
                     id="key-value"
                     error={keyTouched && !keyOk ? t(`onboarding.keyInvalid.${key}`) : undefined}
+                    help={
+                      <a href={`https://${providerOf(key)?.site}`} target="_blank" rel="noreferrer">
+                        {t("onboarding.keySite", { site: providerOf(key)?.site })}
+                      </a>
+                    }
                   >
                     <Input
                       className="onb__big"
                       type="password"
-                      placeholder={PROVIDERS.find((p) => p.id === key)?.placeholder}
+                      placeholder={providerOf(key)?.placeholder}
                       autoComplete="off"
                       autoFocus
                       value={apiKey}
