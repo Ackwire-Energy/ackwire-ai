@@ -24,6 +24,7 @@ import {
   expandHome,
   normalizeServerUrl,
   pairedConfig,
+  parseUidRange,
   readConfig,
   readStoredConfig,
   runnerHome,
@@ -40,8 +41,9 @@ import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
 import { devicePair, formatUserCode, PairingError } from "./pairing";
-import { installService, serviceStatus, uninstallService } from "./service";
+import { installService, installSystemService, serviceStatus, uninstallService } from "./service";
 import { runTaskWrapper } from "./tasks";
+import { runWorker } from "./worker";
 
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
 
@@ -57,6 +59,9 @@ Usage:
       Connects and stays connected (reconnects on its own).
   agentes-runner service install|uninstall
       Runs it in the background at login (systemd user unit, launchd agent, or Task Scheduler on Windows).
+  agentes-runner service install --system [--agent-uid-range <first-last>] [--no-start]
+      Linux, as root: the runner for the whole computer, each agent as its own user
+      (uids 20000-29999 unless given). install.sh --system runs it.
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
@@ -68,6 +73,8 @@ Usage:
       The desktop app's runner (a JSON-lines protocol on stdin/stdout; not for people).
   agentes-runner mcp --task <taskId> | --run <runId>
       The agentes MCP server of a mission task (started by Claude Code or Codex, not by people).
+  agentes-runner worker --agent <id> --dir <folder> --home <dir>
+      System mode: one agent's work, as that agent's own user (started by the runner, not by people).
   agentes-runner --help | --version
 
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
@@ -87,7 +94,7 @@ interface Parsed {
   lists: Map<string, string[]>;
 }
 
-const VALUE_FLAGS = new Set(["server", "dir", "name", "task", "run", "home", "agent", "code"]);
+const VALUE_FLAGS = new Set(["server", "dir", "name", "task", "run", "home", "agent", "code", "agent-uid-range"]);
 const LIST_FLAGS = new Set(["agent"]);
 
 function parseArgs(argv: string[]): Parsed {
@@ -301,11 +308,51 @@ async function app(): Promise<number> {
   }
 }
 
+/**
+ * `agentes-runner worker` (system mode): stdout is the link to the root
+ * runner, so it carries frames only; anything printed goes to stderr, which
+ * the root runner logs.
+ */
+async function worker(p: Parsed): Promise<number> {
+  const agentId = flagString(p, "agent");
+  const dir = flagString(p, "dir");
+  if (!agentId || !dir || !flagString(p, "home")) {
+    console.error("Usage: agentes-runner worker --agent <id> --dir <folder> --home <dir>");
+    return 1;
+  }
+  if (process.getuid?.() === 0) {
+    console.error("A worker runs as its agent's own user, never as root.");
+    return 1;
+  }
+  const toStderr = (...args: unknown[]) =>
+    process.stderr.write(`${args.map((a) => (a instanceof Error ? a.message : String(a))).join(" ")}\n`);
+  console.log = toStderr;
+  console.info = toStderr;
+  console.debug = toStderr;
+  process.stdout.on("error", () => {});
+  return runWorker({
+    agentId,
+    home: runnerHome(),
+    dir: expandHome(dir),
+    input: process.stdin,
+    output: process.stdout,
+    // The root runner's log stamps it.
+    log: (line) => toStderr(line),
+  });
+}
+
 /** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
 async function update(): Promise<number> {
   const stored = storedOrNull();
   if (stored?.managedBy === "desktop") {
     console.error(`${DESKTOP_MANAGED} To update, install the new version of the app.`);
+    return 1;
+  }
+  // A root runner never replaces itself with whatever the server sends.
+  if (stored?.mode === "system") {
+    console.error(
+      `This computer runs the runner for all its agents: update it with the installer, as root (curl -fsSL ${stored.server ?? "<server>"}/api/machines/install.sh | sh -s -- --system).`,
+    );
     return 1;
   }
   if (runningCompiled()) {
@@ -361,7 +408,7 @@ function status(): number {
       ? `Running: pid ${holder.pid}${holder.mode ? ` (${holder.mode})` : ""}`
       : "Running: no",
   );
-  const service = serviceStatus();
+  const service = serviceStatus(undefined, stored?.mode === "system");
   console.log(service ? `Service: ${service}` : "Service: not installed");
   return 0;
 }
@@ -547,6 +594,8 @@ async function main(argv: string[]): Promise<number> {
         ...(runId ? {} : { tokenFile: path.join(runnerHome(), "tasks", taskId, MCP_TOKEN_FILE) }),
       });
     }
+    case "worker":
+      return worker(p);
     case "task-wrapper": {
       // A compiled runner's background task wrapper (tasks.ts); it exits on its own when the task ends.
       if (!sub) return 1;
@@ -555,17 +604,33 @@ async function main(argv: string[]): Promise<number> {
     }
     case "update":
       return update();
-    case "service":
+    case "service": {
+      const stored = storedOrNull();
+      const system = p.flags.has("system") || stored?.mode === "system";
       if (sub === "install") {
-        if (storedOrNull()?.managedBy === "desktop") {
+        if (stored?.managedBy === "desktop") {
           console.error(DESKTOP_MANAGED);
           return 1;
         }
-        return installService({ print: (l) => console.log(l) });
+        if (!system) return installService({ print: (l) => console.log(l) });
+        const range = flagString(p, "agent-uid-range");
+        const agentUidRange = range === undefined ? undefined : parseUidRange(range);
+        if (agentUidRange === null) {
+          console.error(
+            "--agent-uid-range takes two uids between 1000 and 59999, the first not above the second, like 20000-29999",
+          );
+          return 1;
+        }
+        return installSystemService({
+          print: (l) => console.log(l),
+          start: !p.flags.has("no-start"),
+          ...(agentUidRange ? { agentUidRange } : {}),
+        });
       }
-      if (sub === "uninstall") return uninstallService({ print: (l) => console.log(l) });
+      if (sub === "uninstall") return uninstallService({ print: (l) => console.log(l), system });
       console.error("Usage: agentes-runner service install|uninstall");
       return 1;
+    }
     default:
       console.error(`Unknown command: ${command}\n\n${HELP}`);
       return 1;

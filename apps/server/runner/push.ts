@@ -42,6 +42,25 @@ export function contentTypeFor(name: string): string {
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
+/**
+ * Where an upload goes: the path of the URL the server gave, on the server
+ * this runner is paired with (`--server`). The server builds the URL from its
+ * public address, which its own computer may not reach (a tailnet name served
+ * from a container), and the machine token goes to no other host. Null when
+ * the URL isn't http(s).
+ */
+export function uploadUrl(server: string, url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  return `${new URL(server).origin}${u.pathname}${u.search}`;
+}
+
 export interface PushOptions {
   workspaceReal: string;
   token: string;
