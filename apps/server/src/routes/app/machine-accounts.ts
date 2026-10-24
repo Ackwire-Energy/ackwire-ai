@@ -49,6 +49,10 @@ const AccountLoginStatus = z
     state: z.enum(["waiting", "done", "failed", "expired"]),
     account: MachineAccount.optional().openapi({ description: "Once `done`: the account, stored." }),
     error: z.string().optional().openapi({ description: "`failed`: why, for people." }),
+    duplicate: z.object({ label: z.string() }).optional().openapi({
+      description:
+        "`failed`: the caller already has this account on this computer (named `label`); the new sign-in is removed there.",
+    }),
   })
   .openapi("AccountLoginStatus");
 
@@ -57,10 +61,13 @@ const offline = {
 };
 
 /**
- * Accounts of the computer brains on a connected computer (ADR 0041): only
- * the person who connected it adds (signs in through the provider's own
- * CLI on the computer), renames or removes them. Session + CSRF like the
- * rest of `/api/app`.
+ * Accounts of the computer brains on a connected computer (ADR 0041, ADR
+ * 0056): an account is the person's who started its sign-in (through the
+ * provider's own CLI on the computer). The person who connected the computer
+ * adds accounts there, or anyone on a computer nobody connected; only an
+ * account's owner sees its email, renames it, continues its sign-in or
+ * signs in to it again; its owner or whoever connected the computer removes it.
+ * Session + CSRF like the rest of `/api/app`.
  */
 export function machineAccountRoutes(deps: AppDeps) {
   const { db } = deps;
@@ -79,16 +86,19 @@ export function machineAccountRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/machines/{machineId}/accounts",
       tags,
       security,
-      summary: "The computer's Claude Code and Codex accounts (the person who connected it, or an admin)",
-      description: "Changes come as `machine.updated` org events with `accounts: true`.",
+      summary:
+        "The computer's Claude Code and Codex accounts (the person who connected it, an admin, or anyone where nobody did)",
+      description:
+        "Emails only of the caller's own accounts. Changes come as `machine.updated` org events with `accounts: true`.",
       request: { params: MachineParams },
       responses: {
         200: json(
           z.object({
             accounts: z.array(MachineAccount),
-            canManage: z
-              .boolean()
-              .openapi({ description: "The caller connected it and its runner knows accounts (protocol 13)." }),
+            canManage: z.boolean().openapi({
+              description:
+                "The caller adds accounts there (they connected it, or nobody did) and its runner knows accounts (protocol 13).",
+            }),
             supported: z.boolean().openapi({ description: "Its runner knows accounts (protocol 13)." }),
           }),
         ),
@@ -108,17 +118,31 @@ export function machineAccountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Start signing in an account on the computer, through the provider's own CLI there",
+      description:
+        "The account is the caller's from now on. The person who connected the computer adds accounts there, or anyone on a computer nobody connected.",
       request: {
         params: MachineParams,
-        // `accountId`: sign in again to that account (it was signed out) instead of adding one.
-        body: body(z.object({ kind: AccountKind, accountId: z.string().uuid().optional() })),
+        body: body(
+          z.object({
+            kind: AccountKind,
+            accountId: z
+              .string()
+              .uuid()
+              .optional()
+              .openapi({ description: "Sign in again to this account of the caller's (it was signed out)." }),
+            email: z.string().max(254).optional().openapi({
+              description:
+                "Claude Code: which account to sign in to (the CLI's login hint). Letters, digits and `._+-` only (`account.invalid_email`).",
+            }),
+          }),
+        ),
       },
       responses: { 201: json(AccountLogin, "Started"), ...errors, ...offline },
     }),
     async (c) => {
       const { orgId, machineId } = c.req.valid("param");
-      const { kind, accountId } = c.req.valid("json");
-      const login = await beginAccountLogin(withHub(), c.get("user").id, orgId, machineId, kind, accountId);
+      const { kind, accountId, email } = c.req.valid("json");
+      const login = await beginAccountLogin(withHub(), c.get("user").id, orgId, machineId, kind, accountId, email);
       return c.json(login, 201);
     },
   );
@@ -130,7 +154,8 @@ export function machineAccountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Hand the Claude code, sealed in the browser to the computer's key, to the waiting sign-in",
-      description: "We relay it to the computer in memory and keep nothing of it.",
+      description:
+        "Only the person who started the sign-in. We relay it to the computer in memory and keep nothing of it.",
       request: { params: LoginParams, body: body(z.object({ box: SecretBox })) },
       responses: { 204: noContent[204], ...errors, ...offline },
     }),
@@ -147,7 +172,7 @@ export function machineAccountRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}",
       tags,
       security,
-      summary: "Where a sign-in is; once done, the account is stored and returned",
+      summary: "Where a sign-in is; once done, the account is stored and returned (the person who started it)",
       request: { params: LoginParams },
       responses: { 200: json(AccountLoginStatus), ...errors, ...offline },
     }),
@@ -163,7 +188,7 @@ export function machineAccountRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}",
       tags,
       security,
-      summary: "Cancel a sign-in (the computer stops the CLI and removes its folder)",
+      summary: "Cancel a sign-in (the computer stops the CLI and removes its folder; the person who started it)",
       request: { params: LoginParams },
       responses: { 204: noContent[204], ...errors, ...offline },
     }),
@@ -180,7 +205,7 @@ export function machineAccountRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/machines/{machineId}/accounts/{accountId}",
       tags,
       security,
-      summary: "Rename an account (the person who connected the computer)",
+      summary: "Rename an account (its owner)",
       request: { params: AccountParams, body: body(z.object({ label: z.string().min(1).max(40) })) },
       responses: { 200: json(MachineAccount), ...errors },
     }),
@@ -206,8 +231,10 @@ export function machineAccountRoutes(deps: AppDeps) {
       security,
       summary:
         "Remove an account: the computer signs it out and deletes its folder; agents that used it go back to the computer's own sign-in",
+      description:
+        "Its owner, the person who connected the computer, or an admin where the computer or the account has no person. With the computer off, it is removed there when it comes back.",
       request: { params: AccountParams },
-      responses: { 204: noContent[204], ...errors, ...offline },
+      responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, machineId, accountId } = c.req.valid("param");

@@ -4,7 +4,8 @@
 // `signed-in` in that folder is the sign-in.
 // $FAKE_ACCOUNT_MODE: "silent" prints nothing and waits; "fail" refuses.
 // $FAKE_ACCOUNT_CODE: the Claude code it accepts (default "good-code").
-// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder).
+// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder). `auth login --email <address>`
+// signs in like `auth login` (the address is only the account to offer).
 import { appendFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -25,7 +26,7 @@ const CLAUDE_URL =
 const end = (code, text = "", stream = process.stdout) => stream.write(text, () => process.exit(code));
 const waitForever = () => setInterval(() => {}, 1000);
 
-switch (args) {
+switch (args.replace(/^auth login --email \S+$/, "auth login")) {
   case "auth login": {
     if (mode === "silent") {
       waitForever();

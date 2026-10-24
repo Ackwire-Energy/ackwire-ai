@@ -1,12 +1,12 @@
 import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, type BrainEffort, isBrainEffort } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import type { BrainKind } from "./brains/types";
 import { caches } from "./cache";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { getMachineAccount, listMachineAccounts, type MachineAccountView } from "./machine-accounts";
+import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { getListedAccount, listMachineAccounts, type MachineAccountView, mayAddAccounts } from "./machine-accounts";
 import { getMachine, type MachineRow, machineOnline } from "./machines";
 import {
   type MissionDeps,
@@ -193,11 +193,11 @@ export interface AgentBrainView {
   account: string | null;
   /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
   effort: BrainEffortSetting | null;
-  /** The accounts on the agent's computer, both kinds ([] without a computer). */
+  /** The accounts on the agent's computer, both kinds ([] without a computer); emails only of the caller's own. */
   accounts: MachineAccountView[];
-  /** Who connected the agent's computer: only they add accounts or pick one. */
+  /** Who connected the agent's computer (null: nobody did, or there is no computer). */
   accountsOwner: { id: string; name: string } | null;
-  /** The caller is that person and the computer's runner knows accounts. */
+  /** The caller adds accounts there (that person, or anyone where nobody did) and the computer's runner knows accounts. */
   canManageAccounts: boolean;
   /** The computer's runner knows accounts (protocol 13). */
   accountsSupported: boolean;
@@ -218,7 +218,7 @@ const NO_ACCOUNTS: BrainAccounts = {
   accountsSupported: false,
 };
 
-/** The accounts on the agent's computer, its owner, and whether the caller may manage them. */
+/** The accounts on the agent's computer, who connected it, and whether the caller adds accounts there. */
 async function brainAccounts(
   db: Database,
   userId: string,
@@ -228,7 +228,7 @@ async function brainAccounts(
   if (!machine) return NO_ACCOUNTS;
   const supported = machine.protocol >= ACCOUNTS_PROTOCOL;
   const [accounts, owner] = await Promise.all([
-    listMachineAccounts({ db }, orgId, machine.id),
+    listMachineAccounts({ db }, orgId, machine.id, userId),
     machine.pairedByUserId
       ? db
           .select({ id: schema.users.id, name: schema.users.name })
@@ -237,12 +237,10 @@ async function brainAccounts(
           .then((rows) => rows[0] ?? null)
       : Promise.resolve(null),
   ]);
-  const mine = machine.pairedByUserId === userId;
   return {
-    // The emails are the computer owner's: everyone else sees the account names only.
-    accounts: mine ? accounts : accounts.map((a) => ({ ...a, email: null })),
+    accounts,
     accountsOwner: owner,
-    canManageAccounts: supported && mine,
+    canManageAccounts: supported && mayAddAccounts(machine, userId),
     accountsSupported: supported,
   };
 }
@@ -448,6 +446,10 @@ export async function setAgentBrain(
       if (account && isForeignKeyViolation(error)) {
         throw new ValidationError("That account is no longer on this computer", "account.invalid");
       }
+      // Another agent took it meanwhile.
+      if (account && isUniqueViolation(error)) {
+        throw new ConflictError("That account already thinks for another agent", "account.in_use");
+      }
       throw error;
     });
   caches.agents.delete(`${orgId}:${agentId}`);
@@ -482,16 +484,17 @@ export async function setAgentBrain(
 }
 
 /**
- * The account the agent will run with (ADR 0041 §4): kept when nothing asks
- * otherwise, cleared when the brain kind changes; picking or clearing one is
- * for the person who connected the computer only, and the account must be on
- * the agent's computer and of the brain's kind.
+ * The account the agent will run with (ADR 0041 §4, ADR 0056 §1–2): kept
+ * when nothing asks otherwise, cleared when the brain kind changes. People
+ * choose only what is theirs: one of their own accounts (on the agent's
+ * computer, of the brain's kind, thinking for no other agent), or the
+ * computer's own sign-in when they connected it (anyone, where nobody did).
  */
 async function nextBrainAccount(
   db: Database,
   userId: string,
   orgId: string,
-  agent: { brainAccountId: string | null },
+  agent: { id: string; brainAccountId: string | null },
   brain: BrainKind,
   changed: boolean,
   machine: MachineRow | null,
@@ -504,18 +507,37 @@ async function nextBrainAccount(
   }
   const wanted = input || null;
   if (wanted === kept) return kept;
-  if (!machine || machine.pairedByUserId !== userId) {
-    throw new ForbiddenError(
-      "Only the person who connected the agent's computer can choose its account",
-      "account.not_owner",
-    );
+  if (wanted === null) {
+    if (machine && !mayAddAccounts(machine, userId)) {
+      throw new ForbiddenError(
+        "Only the person who connected the agent's computer can choose its own sign-in",
+        "account.not_owner",
+      );
+    }
+    return null;
   }
-  if (wanted === null) return null;
-  const row = isComputerBrain(brain) ? await getMachineAccount(db, orgId, machine.id, wanted) : null;
+  const row = machine && isComputerBrain(brain) ? await getListedAccount(db, orgId, machine.id, wanted) : null;
   if (!row || row.kind !== brain) {
     throw new ValidationError("Choose an account of this brain on the agent's computer", "account.invalid", {
       brain,
     });
+  }
+  if (row.createdBy !== userId) {
+    throw new ForbiddenError("Only the account's owner can choose it for an agent", "account.not_owner");
+  }
+  const [other] = await db
+    .select({ name: schema.agents.name })
+    .from(schema.agents)
+    .where(
+      and(
+        eq(schema.agents.orgId, orgId),
+        eq(schema.agents.brainAccountId, row.id),
+        ne(schema.agents.id, agent.id),
+        isNull(schema.agents.archivedAt),
+      ),
+    );
+  if (other) {
+    throw new ConflictError(`That account already thinks for ${other.name}`, "account.in_use", { agent: other.name });
   }
   return row.id;
 }

@@ -6,46 +6,79 @@ import {
   accountCodeAad,
   isAccountId,
   isAccountKind,
+  isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
+  type MachineReplies,
   type PubSub,
   parseSecretBox,
   type RunnerAccountInfo,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNotNull, isNull, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
-import { getMachine, MachineOfflineError, type MachineRow, publishMachineUpdated } from "./machines";
+import {
+  getMachine,
+  MACHINE_CONTROL_TOPIC,
+  MachineOfflineError,
+  type MachineRow,
+  publishMachineUpdated,
+} from "./machines";
 import { can, requirePermission } from "./organizations";
 
-const { machineAccounts, agents, machines } = schema;
+const { machineAccounts, agents, machines, users } = schema;
 
 /*
- * Accounts of the computer brains on a connected computer (ADR 0041): a
- * folder on the machine where Claude Code or Codex keeps its own sign-in.
- * We keep metadata only (email, plan, signed in or not); the sign-in itself
- * goes through the provider's CLI on the computer, and a Claude code typed in
- * the browser reaches the runner sealed to the machine's key. Only the
- * person who connected the computer adds, renames or removes its accounts
- * and picks one for an agent (the subscription is theirs).
+ * Accounts of the computer brains on a connected computer (ADR 0041, ADR
+ * 0056): a folder on the machine where Claude Code or Codex keeps its own
+ * sign-in. We keep metadata only (email, plan, signed in or not); the sign-in
+ * itself goes through the provider's CLI on the computer, and a Claude code
+ * typed in the browser reaches the runner sealed to the machine's key.
+ *
+ * An account belongs to the person who started its sign-in: its row is
+ * written when the sign-in starts (`signing_in`), never inferred later from
+ * who asked first. One the desktop app signed in is the computer's pairer's.
+ * Only the owner sees its email, renames it, picks it for an agent or signs
+ * in to it again; the owner or the computer's pairer removes it (an admin
+ * too, when the computer or the account has no person). The pairer adds
+ * accounts to a computer; on one nobody paired (the Cloud's, a server's own),
+ * any member does. Removing leaves a tombstone (`removing`) until the runner
+ * has signed the account out and deleted its folder, now or when it is back.
  */
 
 export type MachineAccountRow = typeof machineAccounts.$inferSelect;
 export type MachineAccountStatus = "active" | "signed_out";
 
+/** Rows that are accounts: not a sign-in still in progress, not a tombstone. */
+const LISTED = ["active", "signed_out"];
+
 export interface MachineAccountView {
   id: string;
   kind: AccountKind;
   label: string;
+  /** Its owner's eyes only. */
   email: string | null;
   plan: string | null;
   status: MachineAccountStatus;
+  /** Whose it is; null: nobody's (its person was deleted, or the desktop app signed it in where nobody paired). */
+  ownerId: string | null;
+  ownerName: string | null;
+  /** The viewer owns it. */
+  mine: boolean;
   /** Names of the agents that think with it. */
   usedBy: string[];
 }
 
+/** An account on a computer, by what the runner needs to remove it. */
+export interface MachineAccountRef {
+  kind: AccountKind;
+  id: string;
+}
+
 export const MACHINE_ACCOUNT_LIMITS = { labelChars: 40 };
+/** A sign-in started from the app stays one this long without the runner listing it (its TTL, plus a reply on its way). */
+const SIGNING_IN_KEEP_MS = ACCOUNT_LOGIN_TTL_MS + 60_000;
 
 export interface MachineAccountDeps {
   db: Database;
@@ -56,40 +89,81 @@ export interface MachineAccountHubDeps extends MachineAccountDeps {
   hub: Pick<MachineCaller, "call" | "status">;
 }
 
+const kindOf = (row: Pick<MachineAccountRow, "kind">): AccountKind =>
+  isAccountKind(row.kind) ? row.kind : "claude_code";
+
 /**
- * What a new account is called until its owner names it: the CLI and the plan
- * ("Claude Max", "Codex Plus"), never the email (others see the name, only the
- * computer's owner sees the email).
+ * What a new account is called until its owner names it: the maker and the
+ * plan ("Claude Max", "ChatGPT Plus"), numbered among the names its owner
+ * already has ("Claude Team 2"); never the email (others see the name).
  */
-export const defaultAccountLabel = (kind: AccountKind, plan?: string | null) => {
+export function defaultAccountLabel(kind: AccountKind, plan?: string | null, taken: readonly string[] = []) {
   const word = plan && /^[\w.-]{1,20}$/.test(plan) ? ` ${plan[0]?.toUpperCase()}${plan.slice(1)}` : "";
-  return `${kind === "codex" ? "Codex" : "Claude"}${word}`.slice(0, MACHINE_ACCOUNT_LIMITS.labelChars);
-};
+  const base = `${kind === "codex" ? "ChatGPT" : "Claude"}${word}`;
+  if (!taken.includes(base)) return base;
+  for (let n = 2; ; n++) if (!taken.includes(`${base} ${n}`)) return `${base} ${n}`;
+}
 
-const statusOf = (v: string): MachineAccountStatus => (v === "signed_out" ? "signed_out" : "active");
+/** The names of an owner's accounts in the organization (`exceptId`'s aside). */
+async function takenLabels(db: Executor, orgId: string, ownerId: string | null, exceptId: string) {
+  const rows = await db
+    .select({ label: machineAccounts.label })
+    .from(machineAccounts)
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        ownerId ? eq(machineAccounts.createdBy, ownerId) : isNull(machineAccounts.createdBy),
+        inArray(machineAccounts.status, LISTED),
+        ne(machineAccounts.id, exceptId),
+      ),
+    );
+  return rows.map((r) => r.label);
+}
 
-function accountView(row: MachineAccountRow, usedBy: string[]): MachineAccountView {
+const statusOf = (v: string): MachineAccountStatus => (v === "active" ? "active" : "signed_out");
+
+function accountView(
+  row: MachineAccountRow,
+  usedBy: string[],
+  viewerId: string | null,
+  ownerName: string | null,
+): MachineAccountView {
+  const mine = viewerId !== null && row.createdBy === viewerId;
   return {
     id: row.id,
-    kind: isAccountKind(row.kind) ? row.kind : "claude_code",
+    kind: kindOf(row),
     label: row.label,
-    email: row.email,
+    email: mine ? row.email : null,
     plan: row.plan,
     status: statusOf(row.status),
+    ownerId: row.createdBy,
+    ownerName,
+    mine,
     usedBy,
   };
 }
 
-/** The accounts on a machine, both kinds, oldest first, with the agents that use each. No permission check. */
+/**
+ * The accounts on a machine, both kinds, oldest first, with whose each is and
+ * the agents that use it; emails only of the viewer's own. No permission check.
+ */
 export async function listMachineAccounts(
   deps: Pick<MachineAccountDeps, "db">,
   orgId: string,
   machineId: string,
+  viewerId: string | null,
 ): Promise<MachineAccountView[]> {
   const rows = await deps.db
-    .select()
+    .select({ account: machineAccounts, ownerName: users.name })
     .from(machineAccounts)
-    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.machineId, machineId)))
+    .leftJoin(users, eq(users.id, machineAccounts.createdBy))
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        eq(machineAccounts.machineId, machineId),
+        inArray(machineAccounts.status, LISTED),
+      ),
+    )
     .orderBy(machineAccounts.createdAt, machineAccounts.id);
   if (rows.length === 0) return [];
   const using = await deps.db
@@ -100,23 +174,25 @@ export async function listMachineAccounts(
         eq(agents.orgId, orgId),
         inArray(
           agents.brainAccountId,
-          rows.map((r) => r.id),
+          rows.map((r) => r.account.id),
         ),
         isNull(agents.archivedAt),
       ),
     )
     .orderBy(agents.name);
-  return rows.map((r) =>
+  return rows.map(({ account, ownerName }) =>
     accountView(
-      r,
-      using.filter((a) => a.accountId === r.id).map((a) => a.name),
+      account,
+      using.filter((a) => a.accountId === account.id).map((a) => a.name),
+      viewerId,
+      ownerName,
     ),
   );
 }
 
-async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow) {
-  const views = await listMachineAccounts({ db }, orgId, row.machineId);
-  return views.find((v) => v.id === row.id) ?? accountView(row, []);
+async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow, viewerId: string) {
+  const views = await listMachineAccounts({ db }, orgId, row.machineId, viewerId);
+  return views.find((v) => v.id === row.id) ?? accountView(row, [], viewerId, null);
 }
 
 /** Agents that used these accounts go back to the computer's own sign-in (their cache too). */
@@ -138,105 +214,292 @@ const forgetAgents = (orgId: string, ids: string[]) => {
 const publishAccountsChanged = (pubsub: PubSub | undefined, orgId: string, machineId: string) =>
   publishMachineUpdated(pubsub, orgId, machineId, { accounts: true });
 
+/** These accounts are being removed: their agents are released now, the rows wait for the runner. */
+async function tombstone(db: Executor, orgId: string, ids: string[], now = new Date()) {
+  if (ids.length === 0) return [];
+  await db
+    .update(machineAccounts)
+    .set({ status: "removing", updatedAt: now })
+    .where(and(eq(machineAccounts.orgId, orgId), inArray(machineAccounts.id, ids)));
+  return releaseAgents(db, orgId, ids, now);
+}
+
+/** The runner removed it (or never had it): the tombstone goes. */
+export async function forgetRemovedAccount(db: Executor, orgId: string, accountId: string) {
+  await db
+    .delete(machineAccounts)
+    .where(
+      and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, accountId), eq(machineAccounts.status, "removing")),
+    );
+}
+
+/** The tombstones on a machine: what its runner still has to sign out and delete. */
+export async function accountsToRemove(db: Executor, orgId: string, machineId: string): Promise<MachineAccountRef[]> {
+  const rows = await db
+    .select({ id: machineAccounts.id, kind: machineAccounts.kind })
+    .from(machineAccounts)
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        eq(machineAccounts.machineId, machineId),
+        eq(machineAccounts.status, "removing"),
+      ),
+    );
+  return rows.map((r) => ({ id: r.id, kind: kindOf(r) }));
+}
+
+/** Signs these out and deletes their folders on the computer now; offline, it happens at its next hello. */
+async function removeOnComputer(
+  deps: MachineAccountHubDeps,
+  orgId: string,
+  machineId: string,
+  refs: MachineAccountRef[],
+) {
+  for (const ref of refs) {
+    try {
+      await deps.hub.call(machineId, { op: "account", action: "remove", kind: ref.kind, accountId: ref.id });
+    } catch (error) {
+      if (!(error instanceof MachineRequestError && error.code === "not_found")) continue;
+    }
+    await forgetRemovedAccount(deps.db, orgId, ref.id);
+  }
+}
+
+/** The account another of its owner's on this computer already is (same CLI, provider and email). */
+async function duplicateOf(
+  db: Executor,
+  row: Pick<MachineAccountRow, "orgId" | "machineId" | "id" | "kind" | "createdBy" | "provider">,
+  email: string,
+) {
+  const [other] = await db
+    .select()
+    .from(machineAccounts)
+    .where(
+      and(
+        eq(machineAccounts.orgId, row.orgId),
+        eq(machineAccounts.machineId, row.machineId),
+        ne(machineAccounts.id, row.id),
+        eq(machineAccounts.kind, row.kind),
+        row.createdBy ? eq(machineAccounts.createdBy, row.createdBy) : isNull(machineAccounts.createdBy),
+        row.provider ? eq(machineAccounts.provider, row.provider) : isNull(machineAccounts.provider),
+        inArray(machineAccounts.status, LISTED),
+        sql`lower(${machineAccounts.email}) = ${email.toLowerCase()}`,
+      ),
+    )
+    .limit(1);
+  return other ?? null;
+}
+
+interface Settled {
+  /** The account as stored now; null: it isn't this computer's. */
+  row: MachineAccountRow | null;
+  /** Its owner already has it on this computer: this one is a tombstone now, for the runner to remove. */
+  duplicate?: MachineAccountRow;
+  /** Agents released (a duplicate that some agent already used). */
+  released: string[];
+  /** Something people see changed. */
+  changed: boolean;
+}
+
+/**
+ * What the runner says about an account whose row exists: a sign-in started
+ * from the app finishes (named after its plan, audited for its owner, who
+ * never changes), a known one is refreshed. `dedupe` (the person who signed
+ * in is asking, so they hear why): one their own account on this computer
+ * already is becomes a tombstone.
+ */
+async function settleAccount(
+  db: Executor,
+  orgId: string,
+  machine: Pick<MachineRow, "id">,
+  info: RunnerAccountInfo,
+  dedupe: boolean,
+  now = new Date(),
+): Promise<Settled> {
+  const [row] = await db
+    .select()
+    .from(machineAccounts)
+    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, info.id)));
+  if (!row || row.machineId !== machine.id || row.kind !== info.kind)
+    return { row: null, released: [], changed: false };
+  if (row.status === "removing") {
+    const duplicate = row.email ? await duplicateOf(db, row, row.email) : null;
+    return { row, ...(duplicate ? { duplicate } : {}), released: [], changed: false };
+  }
+  // A signed-out CLI may not say its email or plan any more: keep what we knew.
+  const email = info.email ?? row.email;
+  const plan = info.plan ?? row.plan;
+  const status: MachineAccountStatus = info.loggedIn ? "active" : "signed_out";
+  const signingIn = row.status === "signing_in";
+  const duplicate = dedupe && email ? await duplicateOf(db, row, email) : null;
+  if (duplicate) {
+    const [gone] = await db
+      .update(machineAccounts)
+      .set({ status: "removing", email, plan, updatedAt: now })
+      .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
+      .returning();
+    const released = await releaseAgents(db, orgId, [row.id], now);
+    return { row: gone ?? row, duplicate, released, changed: !signingIn };
+  }
+  if (signingIn) {
+    const label = defaultAccountLabel(kindOf(row), plan, await takenLabels(db, orgId, row.createdBy, row.id));
+    const [done] = await db
+      .update(machineAccounts)
+      .set({ email, plan, status, label, updatedAt: now })
+      .where(
+        and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id), eq(machineAccounts.status, "signing_in")),
+      )
+      .returning();
+    // Finished meanwhile by the other path (the runner's report, the person's poll): as it is now.
+    if (!done) return settleAccount(db, orgId, machine, info, false, now);
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: row.createdBy },
+      action: "account.added",
+      target: { type: "machine_account", id: row.id },
+      details: { machineId: machine.id, kind: row.kind, plan },
+    });
+    return { row: done, released: [], changed: true };
+  }
+  if (email === row.email && plan === row.plan && status === row.status) return { row, released: [], changed: false };
+  const [fresh] = await db
+    .update(machineAccounts)
+    .set({ email, plan, status, updatedAt: now })
+    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
+    .returning();
+  return { row: fresh ?? row, released: [], changed: true };
+}
+
 /**
  * `hello.accounts` (protocol 13): the machine says which accounts it has.
- * New ones are added (named after their email, nobody as creator), known ones
- * get their email, plan and status, and the ones it no longer has are removed
- * (their agents go back to the computer's own sign-in). An id that belongs to
- * a disconnected machine of the organization (this computer, paired again as a
- * new one) moves here with its name; one that belongs to a live machine is
- * ignored. A list as long as `MAX_MACHINE_ACCOUNTS` may be cut, so nothing is
- * removed from it.
+ * Sign-ins started from the app finish, known accounts get their email, plan
+ * and status, ones it signed in by itself (the desktop app) are added as its
+ * pairer's, and the ones it no longer has are removed (their agents go back
+ * to the computer's own sign-in). A sign-in still in progress is kept until
+ * it would have expired. An id that belongs to a disconnected machine of the
+ * organization (this computer, paired again as a new one) moves here with its
+ * name and owner; one that belongs to a live machine is ignored. A list as
+ * long as `MAX_MACHINE_ACCOUNTS` may be cut, so nothing is removed from it.
+ * Returns the accounts the runner must still remove (tombstones it listed,
+ * duplicates of its pairer's that it signed in by itself).
  */
 export async function syncMachineAccounts(
   deps: MachineAccountDeps,
   orgId: string,
   machineId: string,
   accounts: RunnerAccountInfo[],
-) {
+): Promise<MachineAccountRef[]> {
   const reported = new Map<string, RunnerAccountInfo>();
   for (const a of accounts) if (isAccountId(a.id) && isAccountKind(a.kind)) reported.set(a.id, a);
   const now = new Date();
-  const { changed, released } = await deps.db.transaction(async (tx) => {
+  const out = await deps.db.transaction(async (tx) => {
+    const [machine] = await tx
+      .select()
+      .from(machines)
+      .where(and(eq(machines.orgId, orgId), eq(machines.id, machineId)));
+    if (!machine) return null;
     const existing = await tx
       .select()
       .from(machineAccounts)
       .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.machineId, machineId)));
     let changed = false;
-    const complete = accounts.length < MAX_MACHINE_ACCOUNTS;
-    const gone = complete ? existing.filter((r) => !reported.has(r.id)).map((r) => r.id) : [];
-    const released = await releaseAgents(tx, orgId, gone, now);
-    if (gone.length > 0) {
-      await tx
-        .delete(machineAccounts)
-        .where(
-          and(
-            eq(machineAccounts.orgId, orgId),
-            eq(machineAccounts.machineId, machineId),
-            inArray(machineAccounts.id, gone),
-          ),
-        );
-      changed = true;
-    }
-    for (const a of reported.values()) {
-      const status: MachineAccountStatus = a.loggedIn ? "active" : "signed_out";
-      const row = existing.find((r) => r.id === a.id);
-      if (!row) {
-        const inserted = await tx
-          .insert(machineAccounts)
-          .values({
-            id: a.id,
-            orgId,
-            machineId,
-            kind: a.kind,
-            label: defaultAccountLabel(a.kind, a.plan),
-            email: a.email ?? null,
-            plan: a.plan ?? null,
-            status,
-            createdBy: null,
-          })
-          .onConflictDoNothing()
-          .returning({ id: machineAccounts.id });
-        if (inserted.length > 0) {
-          changed = true;
-          continue;
-        }
-        // Taken: by a machine that was disconnected (this computer before it was paired again), it comes here.
-        const moved = await tx
-          .update(machineAccounts)
-          .set({ machineId, kind: a.kind, email: a.email ?? null, plan: a.plan ?? null, status, updatedAt: now })
+    const released: string[] = [];
+    const remove: MachineAccountRef[] = [];
+    if (accounts.length < MAX_MACHINE_ACCOUNTS) {
+      const gone = existing.filter(
+        (r) =>
+          !reported.has(r.id) &&
+          !(r.status === "signing_in" && now.getTime() - r.createdAt.getTime() < SIGNING_IN_KEEP_MS),
+      );
+      if (gone.length > 0) {
+        const ids = gone.map((r) => r.id);
+        released.push(...(await releaseAgents(tx, orgId, ids, now)));
+        await tx
+          .delete(machineAccounts)
           .where(
             and(
               eq(machineAccounts.orgId, orgId),
-              eq(machineAccounts.id, a.id),
-              inArray(
-                machineAccounts.machineId,
-                tx
-                  .select({ id: machines.id })
-                  .from(machines)
-                  .where(and(eq(machines.orgId, orgId), isNotNull(machines.deletedAt))),
-              ),
+              eq(machineAccounts.machineId, machineId),
+              inArray(machineAccounts.id, ids),
             ),
-          )
-          .returning({ id: machineAccounts.id });
-        if (moved.length > 0) changed = true;
+          );
+        changed ||= gone.some((r) => LISTED.includes(r.status));
+      }
+    }
+    for (const a of reported.values()) {
+      const row = existing.find((r) => r.id === a.id);
+      if (row?.status === "removing") {
+        remove.push({ kind: kindOf(row), id: row.id });
         continue;
       }
-      if (row.kind !== a.kind) continue;
-      // A signed-out CLI may not say its email or plan any more: keep what we knew.
-      const email = a.email ?? row.email;
-      const plan = a.plan ?? row.plan;
-      if (email === row.email && plan === row.plan && status === row.status) continue;
-      await tx
+      if (row) {
+        if ((await settleAccount(tx, orgId, machine, a, false, now)).changed) changed = true;
+        continue;
+      }
+      const [elsewhere] = await tx
+        .select()
+        .from(machineAccounts)
+        .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, a.id)));
+      if (!elsewhere) {
+        // Signed in on the computer itself (the desktop app): its pairer's.
+        const owner = machine.pairedByUserId;
+        const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider: null };
+        if (a.email && (await duplicateOf(tx, candidate, a.email))) {
+          remove.push({ kind: a.kind, id: a.id });
+          continue;
+        }
+        const inserted = await tx
+          .insert(machineAccounts)
+          .values({
+            ...candidate,
+            label: defaultAccountLabel(a.kind, a.plan, await takenLabels(tx, orgId, owner, a.id)),
+            email: a.email ?? null,
+            plan: a.plan ?? null,
+            status: a.loggedIn ? "active" : "signed_out",
+          })
+          .onConflictDoNothing()
+          .returning({ id: machineAccounts.id });
+        changed ||= inserted.length > 0;
+        continue;
+      }
+      // Taken: by a machine that was disconnected (this computer before it was paired again), it comes here.
+      const [moved] = await tx
         .update(machineAccounts)
-        .set({ email, plan, status, updatedAt: now })
-        .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)));
-      changed = true;
+        .set(
+          elsewhere.status === "removing"
+            ? { machineId, updatedAt: now }
+            : {
+                machineId,
+                email: a.email ?? elsewhere.email,
+                plan: a.plan ?? elsewhere.plan,
+                status: a.loggedIn ? "active" : "signed_out",
+                updatedAt: now,
+              },
+        )
+        .where(
+          and(
+            eq(machineAccounts.orgId, orgId),
+            eq(machineAccounts.id, a.id),
+            eq(machineAccounts.kind, a.kind),
+            inArray(
+              machineAccounts.machineId,
+              tx
+                .select({ id: machines.id })
+                .from(machines)
+                .where(and(eq(machines.orgId, orgId), isNotNull(machines.deletedAt))),
+            ),
+          ),
+        )
+        .returning({ status: machineAccounts.status });
+      if (moved?.status === "removing") remove.push({ kind: a.kind, id: a.id });
+      else if (moved) changed = true;
     }
-    return { changed, released };
+    return { changed, released, remove };
   });
-  forgetAgents(orgId, released);
-  if (changed) await publishAccountsChanged(deps.pubsub, orgId, machineId);
+  if (!out) return [];
+  forgetAgents(orgId, out.released);
+  if (out.changed) await publishAccountsChanged(deps.pubsub, orgId, machineId);
+  return out.remove;
 }
 
 /** A turn ran with it (best effort, after the turn). */
@@ -247,7 +510,7 @@ export async function touchMachineAccount(db: Executor, orgId: string, accountId
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, accountId)));
 }
 
-/** One account of the organization, on that machine. */
+/** One row of the organization's accounts, on that machine, whatever its status. */
 export async function getMachineAccount(db: Executor, orgId: string, machineId: string, accountId: string) {
   if (!isAccountId(accountId)) return null;
   const [row] = await db
@@ -263,20 +526,28 @@ export async function getMachineAccount(db: Executor, orgId: string, machineId: 
   return row ?? null;
 }
 
+/** An account on that machine (not a sign-in in progress, not one being removed). */
+export async function getListedAccount(db: Executor, orgId: string, machineId: string, accountId: string) {
+  const row = await getMachineAccount(db, orgId, machineId, accountId);
+  return row && LISTED.includes(row.status) ? row : null;
+}
+
 // ── Who may ─────────────────────────────────────────────────────────────────
 
-/** The machine, when `userId` is the person who connected it (the subscription is theirs). */
-async function ownedMachine(db: Database, userId: string, orgId: string, machineId: string) {
-  await requirePermission(db, userId, orgId, "read");
+/**
+ * Who adds accounts to a computer: the person who connected it (other
+ * people's sign-ins on someone's own computer would need their consent, and
+ * outlive it), or any member on one nobody did (the Cloud's, a server's own).
+ */
+export const mayAddAccounts = (machine: Pick<MachineRow, "pairedByUserId">, userId: string) =>
+  machine.pairedByUserId === null || machine.pairedByUserId === userId;
+
+/** A member and the machine of the organization. */
+async function memberMachine(db: Database, userId: string, orgId: string, machineId: string) {
+  const membership = await requirePermission(db, userId, orgId, "read");
   const machine = await getMachine(db, orgId, machineId);
   if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
-  if (machine.pairedByUserId !== userId) {
-    throw new ForbiddenError(
-      "Only the person who connected this computer can manage its accounts",
-      "account.not_owner",
-    );
-  }
-  return machine;
+  return { membership, machine };
 }
 
 const runnerOld = (machine: Pick<MachineRow, "name">) =>
@@ -284,14 +555,12 @@ const runnerOld = (machine: Pick<MachineRow, "name">) =>
     name: machine.name,
   });
 
-/** Owned, on a runner that knows accounts, and online now. */
-async function liveOwnedMachine(deps: MachineAccountHubDeps, userId: string, orgId: string, machineId: string) {
-  const machine = await ownedMachine(deps.db, userId, orgId, machineId);
+/** On a runner that knows accounts, and online now. */
+async function requireLive(deps: MachineAccountHubDeps, machine: MachineRow) {
   if (machine.protocol < ACCOUNTS_PROTOCOL) throw runnerOld(machine);
   const status = await deps.hub.status(machine.id);
   if (!status?.online) throw new MachineOfflineError(machine.name);
   if (status.protocol < ACCOUNTS_PROTOCOL) throw runnerOld(machine);
-  return machine;
 }
 
 const loginIdOf = (loginId: string) => {
@@ -299,11 +568,22 @@ const loginIdOf = (loginId: string) => {
   return loginId;
 };
 
+/** The sign-in `loginId` on the machine, when `userId` started it: nobody else sends its code, follows or stops it. */
+async function ownSignIn(db: Database, userId: string, orgId: string, machineId: string, loginId: string) {
+  const row = await getMachineAccount(db, orgId, machineId, loginIdOf(loginId));
+  if (!row || row.status === "removing") throw new NotFoundError("Sign-in not found", "account.login_not_found");
+  if (row.createdBy !== userId) {
+    throw new ForbiddenError("Only the person who started this sign-in can go on with it", "account.not_owner");
+  }
+  return row;
+}
+
 // ── The page ────────────────────────────────────────────────────────────────
 
 /**
- * `GET …/machines/{id}/accounts`: the person who connected it or an admin.
- * `canManage`: only the former, on a runner that knows accounts.
+ * `GET …/machines/{id}/accounts`: the person who connected it, an admin, or
+ * anyone on a computer nobody connected. Emails only of the caller's own.
+ * `canManage`: the caller adds accounts there, on a runner that knows them.
  */
 export async function getMachineAccounts(
   deps: Pick<MachineAccountDeps, "db">,
@@ -311,27 +591,23 @@ export async function getMachineAccounts(
   orgId: string,
   machineId: string,
 ) {
-  const membership = await requirePermission(deps.db, userId, orgId, "read");
-  const machine = await getMachine(deps.db, orgId, machineId);
-  if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
-  const mine = machine.pairedByUserId === userId;
-  if (!mine && !can(membership.role, "configure")) {
+  const { membership, machine } = await memberMachine(deps.db, userId, orgId, machineId);
+  const adds = mayAddAccounts(machine, userId);
+  if (!adds && !can(membership.role, "configure")) {
     throw new ForbiddenError(
       "Only an admin or the person who connected this computer can see its accounts",
       "machine.forbidden",
     );
   }
   const supported = machine.protocol >= ACCOUNTS_PROTOCOL;
-  const accounts = await listMachineAccounts(deps, orgId, machine.id);
   return {
-    // The emails are the computer owner's: an admin sees the accounts, not whose they are.
-    accounts: mine ? accounts : accounts.map((a) => ({ ...a, email: null })),
-    canManage: mine && supported,
+    accounts: await listMachineAccounts(deps, orgId, machine.id, userId),
+    canManage: adds && supported,
     supported,
   };
 }
 
-// ── Signing in (ADR 0041 §2) ────────────────────────────────────────────────
+// ── Signing in (ADR 0041 §2, ADR 0056 §1) ───────────────────────────────────
 
 export interface AccountLoginView {
   loginId: string;
@@ -348,34 +624,79 @@ export interface AccountLoginView {
 const PUBLIC_KEY = /^[A-Za-z0-9+/=_-]{20,200}$/;
 const USER_CODE = /^[A-Za-z0-9-]{4,20}$/;
 
-/** Starts the CLI's sign-in on the computer, in a new account folder named `loginId`. */
+/** A sign-in started from the app that didn't finish: its row goes (the runner removes its folder). */
+async function dropSignIn(db: Executor, orgId: string, loginId: string) {
+  await db
+    .delete(machineAccounts)
+    .where(
+      and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, loginId), eq(machineAccounts.status, "signing_in")),
+    );
+}
+
+/**
+ * Starts the CLI's sign-in on the computer, in a new account folder named
+ * `loginId`, as the caller's account from this moment on.
+ */
 export async function beginAccountLogin(
   deps: MachineAccountHubDeps,
   userId: string,
   orgId: string,
   machineId: string,
   kind: unknown,
-  /** Sign in again to this account (signed out): same id, same folder, the agents that use it keep it. */
+  /** Sign in again to this account (signed out): same id, same folder, the agents that use it keep it. Its owner's. */
   accountId?: string,
+  /** Claude Code: which account to sign in to, as the CLI's login hint. */
+  email?: string,
 ): Promise<AccountLoginView> {
   if (!isAccountKind(kind)) throw new ValidationError("Choose claude_code or codex", "account.invalid_kind");
-  const machine = await liveOwnedMachine(deps, userId, orgId, machineId);
+  if (email !== undefined && (kind !== "claude_code" || !isLoginEmail(email))) {
+    throw new ValidationError("Use a plain email address, like ana@example.com", "account.invalid_email");
+  }
+  const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
   if (accountId !== undefined) {
-    const existing = isAccountId(accountId) ? await getMachineAccount(deps.db, orgId, machine.id, accountId) : null;
+    const existing = await getListedAccount(deps.db, orgId, machine.id, accountId);
     if (!existing || existing.kind !== kind) {
       throw new ValidationError("That account isn't on this computer", "account.invalid");
     }
+    if (existing.createdBy !== userId) {
+      throw new ForbiddenError("Only the account's owner can sign in to it again", "account.not_owner");
+    }
+  } else if (!mayAddAccounts(machine, userId)) {
+    throw new ForbiddenError("Only the person who connected this computer can add accounts to it", "account.not_owner");
   }
+  await requireLive(deps, machine);
   const again = accountId !== undefined;
   const loginId = again ? accountId : crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ACCOUNT_LOGIN_TTL_MS).toISOString();
-  const reply = await deps.hub.call(machine.id, {
-    op: "account",
-    action: "begin",
-    kind,
-    loginId,
-    ...(again ? { again: true } : {}),
-  });
+  if (!again) {
+    await deps.db.insert(machineAccounts).values({
+      id: loginId,
+      orgId,
+      machineId: machine.id,
+      kind,
+      label: defaultAccountLabel(kind),
+      status: "signing_in",
+      createdBy: userId,
+    });
+  }
+  const fail = async () => {
+    await deps.hub.call(machine.id, { op: "account", action: "cancel", loginId }).catch(() => undefined);
+    if (!again) await dropSignIn(deps.db, orgId, loginId);
+  };
+  let reply: MachineReplies["account"];
+  try {
+    reply = await deps.hub.call(machine.id, {
+      op: "account",
+      action: "begin",
+      kind,
+      loginId,
+      ...(again ? { again: true } : {}),
+      ...(email ? { email } : {}),
+    });
+  } catch (error) {
+    await fail();
+    throw error;
+  }
   // Only a provider page the person can open: never another scheme.
   let url: URL | null = null;
   try {
@@ -384,7 +705,7 @@ export async function beginAccountLogin(
     url = null;
   }
   if (url?.protocol !== "https:") {
-    await deps.hub.call(machine.id, { op: "account", action: "cancel", loginId }).catch(() => undefined);
+    await fail();
     throw new ConflictError("The computer couldn't start the sign-in", "account.begin_failed", { name: machine.name });
   }
   const publicKey =
@@ -409,11 +730,18 @@ export async function sendAccountLoginCode(
   loginId: string,
   rawBox: unknown,
 ) {
-  const id = loginIdOf(loginId);
   const box = parseSecretBox(rawBox);
   if (!box) throw new ValidationError("The sealed code is malformed", "account.invalid_code");
-  const machine = await liveOwnedMachine(deps, userId, orgId, machineId);
-  await deps.hub.call(machine.id, { op: "account", action: "code", loginId: id, aad: accountCodeAad(id, orgId), box });
+  const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
+  const row = await ownSignIn(deps.db, userId, orgId, machine.id, loginId);
+  await requireLive(deps, machine);
+  await deps.hub.call(machine.id, {
+    op: "account",
+    action: "code",
+    loginId: row.id,
+    aad: accountCodeAad(row.id, orgId),
+    box,
+  });
 }
 
 export interface AccountLoginStatus {
@@ -421,11 +749,13 @@ export interface AccountLoginStatus {
   account?: MachineAccountView;
   /** `failed`: why, for people. */
   error?: string;
+  /** `failed`: the person already has this account on this computer (the new sign-in is removed there). */
+  duplicate?: { label: string };
 }
 
 const LOGIN_STATES: readonly AccountLoginState[] = ["waiting", "done", "failed", "expired"];
 
-/** Where a sign-in is; once done, the account is stored (named after its email) and returned. */
+/** Where a sign-in is; once done, the account is stored (named after its plan) and returned. */
 export async function accountLoginStatus(
   deps: MachineAccountHubDeps,
   userId: string,
@@ -433,95 +763,47 @@ export async function accountLoginStatus(
   machineId: string,
   loginId: string,
 ): Promise<AccountLoginStatus> {
-  const id = loginIdOf(loginId);
-  const machine = await liveOwnedMachine(deps, userId, orgId, machineId);
-  const reply = await deps.hub.call(machine.id, { op: "account", action: "status", loginId: id });
+  const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
+  const row = await ownSignIn(deps.db, userId, orgId, machine.id, loginId);
+  await requireLive(deps, machine);
+  const reply = await deps.hub.call(machine.id, { op: "account", action: "status", loginId: row.id });
   const state: AccountLoginState = LOGIN_STATES.includes(reply.state as AccountLoginState)
     ? (reply.state as AccountLoginState)
     : "failed";
   const error = typeof reply.error === "string" ? reply.error.slice(0, 300) : undefined;
-  if (state !== "done") return { state, ...(state === "failed" && error ? { error } : {}) };
+  if (state !== "done") {
+    // The runner removed the folder of a new sign-in that ended without signing in.
+    if (state !== "waiting") await dropSignIn(deps.db, orgId, row.id);
+    return { state, ...(state === "failed" && error ? { error } : {}) };
+  }
   const info = reply.account;
   if (!info || !isAccountId(info.id) || !isAccountKind(info.kind)) {
     return { state: "failed", error: "The computer didn't say which account signed in." };
   }
-  if (info.id !== id) return { state: "failed", error: "The computer reported another account." };
-  const row = await storeSignedInAccount(deps, userId, orgId, machine, info);
-  if (!row) return { state: "failed", error: "That account belongs to another computer." };
-  return { state, account: await accountViewOf(deps.db, orgId, row) };
-}
-
-/** Adds (audited) or refreshes the account a finished sign-in reported. Null: the id is another machine's. */
-async function storeSignedInAccount(
-  deps: MachineAccountDeps,
-  userId: string,
-  orgId: string,
-  machine: MachineRow,
-  info: RunnerAccountInfo,
-): Promise<MachineAccountRow | null> {
-  const now = new Date();
-  const email = info.email ?? null;
-  const plan = info.plan ?? null;
-  const [existing] = await deps.db
-    .select()
-    .from(machineAccounts)
-    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, info.id)));
-  if (existing) {
-    if (existing.machineId !== machine.id) return null;
-    const [row] = await deps.db
-      .update(machineAccounts)
-      .set({
-        email: email ?? existing.email,
-        plan: plan ?? existing.plan,
-        status: "active",
-        // The runner's hello may have reported it first: the person who signed in made it.
-        createdBy: existing.createdBy ?? userId,
-        updatedAt: now,
-      })
-      .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, info.id)))
-      .returning();
-    // The runner's `accounts.changed` usually arrives before this poll: the sign-in is still this person's, audited once.
-    if (!existing.createdBy) {
-      await recordAudit(deps.db, {
-        orgId,
-        actor: { type: "person", id: userId },
-        action: "account.added",
-        target: { type: "machine_account", id: existing.id },
-        details: { machineId: machine.id, kind: existing.kind, plan: plan ?? existing.plan },
-      });
-    }
-    if (existing.status !== "active") await publishAccountsChanged(deps.pubsub, orgId, machine.id);
-    return row ?? existing;
+  if (info.id !== row.id) return { state: "failed", error: "The computer reported another account." };
+  const settled = await deps.db.transaction((tx) => settleAccount(tx, orgId, machine, info, true));
+  forgetAgents(orgId, settled.released);
+  if (settled.duplicate) {
+    await removeOnComputer(deps, orgId, machine.id, [{ kind: info.kind, id: info.id }]);
+    if (settled.changed) await publishAccountsChanged(deps.pubsub, orgId, machine.id);
+    return {
+      state: "failed",
+      error: `That account is already on this computer (${settled.duplicate.label}).`,
+      duplicate: { label: settled.duplicate.label },
+    };
   }
-  const [row] = await deps.db
-    .insert(machineAccounts)
-    .values({
-      id: info.id,
-      orgId,
-      machineId: machine.id,
-      kind: info.kind,
-      label: defaultAccountLabel(info.kind, plan),
-      email,
-      plan,
-      status: "active",
-      createdBy: userId,
-    })
-    .onConflictDoNothing()
-    .returning();
-  // Added meanwhile (a hello, another poll): read it back.
-  if (!row) return getMachineAccount(deps.db, orgId, machine.id, info.id);
-  await recordAudit(deps.db, {
-    orgId,
-    actor: { type: "person", id: userId },
-    action: "account.added",
-    target: { type: "machine_account", id: row.id },
-    details: { machineId: machine.id, kind: row.kind, plan: row.plan },
-  });
-  await publishAccountsChanged(deps.pubsub, orgId, machine.id);
-  return row;
+  if (!settled.row || !LISTED.includes(settled.row.status)) {
+    return { state: "failed", error: "The account was removed from this computer." };
+  }
+  if (settled.changed) await publishAccountsChanged(deps.pubsub, orgId, machine.id);
+  return { state, account: await accountViewOf(deps.db, orgId, settled.row, userId) };
 }
 
-/** Stops a sign-in (the runner kills the CLI and removes its folder). */
+/**
+ * Stops a sign-in (the runner kills the CLI and removes its folder). The row
+ * stays until the runner's list goes without it: a sign-in that finished just
+ * before is still reported, and is still this person's.
+ */
 export async function cancelAccountLogin(
   deps: MachineAccountHubDeps,
   userId: string,
@@ -529,9 +811,10 @@ export async function cancelAccountLogin(
   machineId: string,
   loginId: string,
 ) {
-  const id = loginIdOf(loginId);
-  const machine = await liveOwnedMachine(deps, userId, orgId, machineId);
-  await deps.hub.call(machine.id, { op: "account", action: "cancel", loginId: id });
+  const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
+  const row = await ownSignIn(deps.db, userId, orgId, machine.id, loginId);
+  await requireLive(deps, machine);
+  await deps.hub.call(machine.id, { op: "account", action: "cancel", loginId: row.id });
 }
 
 // ── Naming and removing ─────────────────────────────────────────────────────
@@ -544,7 +827,7 @@ export const cleanAccountLabel = (label: unknown) =>
         .trim()
     : "";
 
-/** What people call it (1 to 40 characters). Works with the computer offline. Audited. */
+/** What people call it (1 to 40 characters): its owner only. Works with the computer offline. Audited. */
 export async function renameMachineAccount(
   deps: MachineAccountDeps,
   userId: string,
@@ -557,10 +840,13 @@ export async function renameMachineAccount(
   if (!label || label.length > MACHINE_ACCOUNT_LIMITS.labelChars) {
     throw new ValidationError("Give the account a name of up to 40 characters", "account.invalid_label");
   }
-  const machine = await ownedMachine(deps.db, userId, orgId, machineId);
-  const account = await getMachineAccount(deps.db, orgId, machine.id, accountId);
+  const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
+  const account = await getListedAccount(deps.db, orgId, machine.id, accountId);
   if (!account) throw new NotFoundError("Account not found", "account.not_found");
-  if (label === account.label) return accountViewOf(deps.db, orgId, account);
+  if (account.createdBy !== userId) {
+    throw new ForbiddenError("Only the account's owner can rename it", "account.not_owner");
+  }
+  if (label === account.label) return accountViewOf(deps.db, orgId, account, userId);
   const [row] = await deps.db
     .update(machineAccounts)
     .set({ label, updatedAt: new Date() })
@@ -574,13 +860,15 @@ export async function renameMachineAccount(
     details: { machineId: machine.id, from: account.label, to: label },
   });
   await publishAccountsChanged(deps.pubsub, orgId, machine.id);
-  return accountViewOf(deps.db, orgId, row ?? { ...account, label });
+  return accountViewOf(deps.db, orgId, row ?? { ...account, label }, userId);
 }
 
 /**
- * Removes an account (ADR 0041 §7): the runner signs the CLI out there and
- * deletes the folder, the agents that used it go back to the computer's own
- * sign-in, and the row goes. Audited.
+ * Removes an account (ADR 0041 §7, ADR 0056 §1): its owner, the computer's
+ * pairer, or an admin when the computer or the account has no person. The
+ * agents that used it go back to the computer's own sign-in now; the runner
+ * signs the CLI out there and deletes the folder now, or at its next hello
+ * when the computer is off, and the row goes then. Audited.
  */
 export async function removeMachineAccount(
   deps: MachineAccountHubDeps,
@@ -589,21 +877,20 @@ export async function removeMachineAccount(
   machineId: string,
   accountId: string,
 ) {
-  const machine = await liveOwnedMachine(deps, userId, orgId, machineId);
-  const account = await getMachineAccount(deps.db, orgId, machine.id, accountId);
+  const { membership, machine } = await memberMachine(deps.db, userId, orgId, machineId);
+  const account = await getListedAccount(deps.db, orgId, machine.id, accountId);
   if (!account) throw new NotFoundError("Account not found", "account.not_found");
-  const kind: AccountKind = isAccountKind(account.kind) ? account.kind : "claude_code";
-  try {
-    await deps.hub.call(machine.id, { op: "account", action: "remove", kind, accountId: account.id });
-  } catch (error) {
-    // Already gone from the computer: the row goes too.
-    if (!(error instanceof MachineRequestError && error.code === "not_found")) throw error;
+  const allowed =
+    account.createdBy === userId ||
+    machine.pairedByUserId === userId ||
+    (can(membership.role, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
+  if (!allowed) {
+    throw new ForbiddenError(
+      "Only the account's owner or the person who connected this computer can remove it",
+      "account.not_owner",
+    );
   }
-  const released = await deps.db.transaction(async (tx) => {
-    const ids = await releaseAgents(tx, orgId, [account.id]);
-    await tx.delete(machineAccounts).where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, account.id)));
-    return ids;
-  });
+  const released = await deps.db.transaction((tx) => tombstone(tx, orgId, [account.id]));
   forgetAgents(orgId, released);
   await recordAudit(deps.db, {
     orgId,
@@ -613,4 +900,65 @@ export async function removeMachineAccount(
     details: { machineId: machine.id, kind: account.kind, agents: released },
   });
   await publishAccountsChanged(deps.pubsub, orgId, machine.id);
+  await removeOnComputer(deps, orgId, machine.id, [{ kind: kindOf(account), id: account.id }]);
+}
+
+// ── People who leave ────────────────────────────────────────────────────────
+
+export interface ReleasedAccounts {
+  /** The machines with new tombstones, by organization. */
+  machines: { orgId: string; machineId: string }[];
+  /** The agents released, by organization. */
+  agents: { orgId: string; agentIds: string[] }[];
+}
+
+/**
+ * A person left `orgId`, or deleted their account (`orgId` null: every
+ * organization): their accounts become tombstones, never anyone else's, and
+ * the agents that thought with them are released. Runs in the caller's
+ * transaction; `announceReleasedAccounts` afterwards.
+ */
+export async function releaseMemberAccounts(
+  db: Executor,
+  userId: string,
+  orgId: string | null,
+): Promise<ReleasedAccounts> {
+  const now = new Date();
+  const rows = await db
+    .update(machineAccounts)
+    .set({ status: "removing", updatedAt: now })
+    .where(
+      and(
+        eq(machineAccounts.createdBy, userId),
+        ne(machineAccounts.status, "removing"),
+        orgId ? eq(machineAccounts.orgId, orgId) : undefined,
+      ),
+    )
+    .returning({ orgId: machineAccounts.orgId, id: machineAccounts.id, machineId: machineAccounts.machineId });
+  const out: ReleasedAccounts = { machines: [], agents: [] };
+  for (const org of new Set(rows.map((r) => r.orgId))) {
+    const mine = rows.filter((r) => r.orgId === org);
+    out.agents.push({
+      orgId: org,
+      agentIds: await releaseAgents(
+        db,
+        org,
+        mine.map((r) => r.id),
+        now,
+      ),
+    });
+    for (const machineId of new Set(mine.map((r) => r.machineId))) out.machines.push({ orgId: org, machineId });
+  }
+  return out;
+}
+
+/** After `releaseMemberAccounts`: pages refetch, and the replica holding each machine's runner removes them. */
+export async function announceReleasedAccounts(pubsub: PubSub | undefined, released: ReleasedAccounts) {
+  for (const a of released.agents) forgetAgents(a.orgId, a.agentIds);
+  for (const m of released.machines) {
+    await publishAccountsChanged(pubsub, m.orgId, m.machineId);
+    await pubsub
+      ?.publish(MACHINE_CONTROL_TOPIC, { type: "machine.accounts", machineId: m.machineId })
+      .catch(() => undefined);
+  }
 }

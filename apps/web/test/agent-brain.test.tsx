@@ -189,7 +189,10 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     email: "walt@acme.com",
     plan: "Team",
     status: "active",
-    usedBy: ["Theo"],
+    ownerId: "u-walter",
+    ownerName: "Walter Nogueira",
+    mine: true,
+    usedBy: [],
   };
   /** Ada thinks with Claude Code on the MacBook, which has the given accounts. */
   async function onMac(patch: Partial<AgentBrain> = {}) {
@@ -215,7 +218,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     const options = screen().getAllByRole("option");
     expect(options.map((o) => o.textContent)).toEqual([
       "Conta deste MacBookA que já está no MacBook",
-      "Trabalho · Teamwalt@acme.com · também Theo",
+      "Trabalho · Teamwalt@acme.com",
       "Adicionar conta",
     ]);
     await click(screen().getByRole("option", { name: /^Trabalho · Team/ }));
@@ -234,6 +237,34 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       effort: "high",
       account: "acct_work",
     });
+  });
+
+  test("one agent per account, each person's own: another agent's is in use, someone else's only shows while it's this one's", async () => {
+    const theo: MachineAccount = { ...work, id: "acct_theo", label: "Pessoal", plan: "Max", usedBy: ["Theo"] };
+    const hers: MachineAccount = {
+      ...work,
+      id: "acct_ana",
+      label: "Claude Team 2",
+      email: null,
+      ownerId: "u-ana",
+      ownerName: "Ana Lima",
+      mine: false,
+      usedBy: ["Ada"],
+    };
+    const other: MachineAccount = { ...hers, id: "acct_ana2", label: "Claude Team 3", usedBy: [] };
+    await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    const options = screen().getAllByRole("option");
+    expect(options.map((o) => [o.textContent, o.getAttribute("aria-disabled") === "true"])).toEqual([
+      ["Conta deste MacBookA que já está no MacBook", false],
+      ["Trabalho · Teamwalt@acme.com", false],
+      ["Pessoal · MaxEm uso por Theo", true],
+      ["Claude Team 2 · TeamDe Ana", true],
+      ["Adicionar conta", false],
+    ]);
   });
 
   test("only the computer's owner changes the account; an old app on the computer shows nothing about it", async () => {

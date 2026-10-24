@@ -507,12 +507,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
   const computerName = view.computer?.name ?? "";
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
+  // Each person picks among their own accounts; someone else's shows only while it is this agent's.
   const accounts = [
     ...view.accounts.map((v) => added.find((a) => a.id === v.id) ?? v),
     ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
-  ].filter((a) => a.kind === accountKind);
+  ].filter((a) => a.kind === accountKind && (a.mine || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
-  const signedOut = current?.status === "signed_out";
+  // Signing in to it again is its owner's.
+  const signedOut = current?.status === "signed_out" && current.mine;
   const accountChanged = accountsOn && account !== view.account;
   // An automatic model picks the effort too; a fixed one takes the ramp's level.
   const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
@@ -626,17 +628,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       leading: accountIcon,
     },
     ...accounts.map((a) => {
+      // One account thinks for one agent.
       const others = a.usedBy.filter((n) => n !== agent.name).join(", ");
       return {
         value: a.id,
         label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
-        description:
-          a.status === "signed_out"
+        disabled: !a.mine || others !== "",
+        description: !a.mine
+          ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
+          : a.status === "signed_out"
             ? t("agentPage.work.brain.accountSignedOut")
             : others
-              ? a.email
-                ? t("agentPage.work.brain.accountAlso", { email: a.email, agents: others })
-                : t("agentPage.work.brain.accountAlsoNoEmail", { agents: others })
+              ? t("agentPage.work.brain.accountInUse", { agents: others })
               : (a.email ?? undefined),
         leading: accountIcon,
       };
@@ -1005,7 +1008,9 @@ function AddAccountFlow({
     ? t("agentPage.work.brain.add.startFailed", { computer })
     : result?.state === "expired"
       ? t("agentPage.work.brain.add.expired")
-      : t("agentPage.work.brain.add.failed");
+      : result?.duplicate
+        ? t(`agentPage.work.brain.add.duplicate.${kind}`, { account: result.duplicate.label })
+        : t("agentPage.work.brain.add.failed");
   return (
     <section ref={box} tabIndex={-1} className="agp-addacct" aria-label={t(`agentPage.work.brain.add.title.${kind}`)}>
       <div className="agp-addacct__head">

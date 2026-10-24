@@ -784,12 +784,21 @@ export function cleanRules(rules: string) {
     .slice(0, 4000);
 }
 
-/** Where the task runs and its folders, for our MCP process (`AGENTES_MCP_CWD`, `AGENTES_MCP_FOLDERS`). */
+/**
+ * Where the task runs and its folders, for our MCP process (`AGENTES_MCP_CWD`, `AGENTES_MCP_FOLDERS`), and
+ * the runner's own home (`AGENTES_RUNNER_HOME`), which is never read.
+ */
 export function mcpScopeFromEnv(env: NodeJS.ProcessEnv): CommandScope | undefined {
   const cwd = env.AGENTES_MCP_CWD?.trim();
   if (!cwd || !path.isAbsolute(cwd)) return undefined;
   const folders = (env.AGENTES_MCP_FOLDERS ?? "").split(path.delimiter).filter((f) => f && path.isAbsolute(f));
-  return { cwd, folders: folders.length ? folders : [cwd], ...(env.HOME ? { home: env.HOME } : {}) };
+  const runnerHome = env.AGENTES_RUNNER_HOME?.trim();
+  return {
+    cwd,
+    folders: folders.length ? folders : [cwd],
+    ...(env.HOME ? { home: env.HOME } : {}),
+    ...(runnerHome && path.isAbsolute(runnerHome) ? { runnerHome } : {}),
+  };
 }
 
 /** The turn's permission profile for our MCP process (`AGENTES_MCP_PROFILE`): anything but `plan` is `work`. */
@@ -809,6 +818,8 @@ export function claudeMcpConfig(input: {
   alwaysLoad?: boolean;
   /** A `plan` turn: its permission prompts are answered by the computer alone (reads only). */
   profile?: CommandProfile;
+  /** The runner's home: the MCP process finds the runner there and never lets it be read. */
+  runnerHome?: string;
 }) {
   const [command, ...args] = input.command;
   return {
@@ -824,6 +835,7 @@ export function claudeMcpConfig(input: {
           ...(input.cwd ? { AGENTES_MCP_CWD: input.cwd } : {}),
           ...(input.folders?.length ? { AGENTES_MCP_FOLDERS: input.folders.join(path.delimiter) } : {}),
           ...(input.profile === "plan" ? { AGENTES_MCP_PROFILE: "plan" } : {}),
+          ...(input.runnerHome ? { AGENTES_RUNNER_HOME: input.runnerHome } : {}),
         },
       },
     },
@@ -954,9 +966,13 @@ export function claudePermissionSettings(
      * command reaches our prompt tool, where `localVerdict` allows plain reads at once and refuses secrets.
      */
     promptReads?: boolean;
+    /** The runner's home when it isn't under `.agentes-runner` (system mode): read by no tool or command either. */
+    runnerHome?: string;
   } = {},
 ) {
   const shellReads = opts.promptReads ? [] : readOnlyShell();
+  const home = opts.runnerHome?.startsWith("/") && !opts.runnerHome.includes("*") ? opts.runnerHome : null;
+  const homeDeny = home ? [`Read(/${home}/**)`, `Bash(*${home}/*)`] : [];
   if (mode === "plan") {
     return {
       permissions: {
@@ -970,7 +986,7 @@ export function claudePermissionSettings(
           ...(opts.promptReads ? [] : gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`]))),
           ...missionFolderRules(missionFolder, ["Read"]),
         ],
-        deny: [...PLAN_DENY, ...ALWAYS_DENY_RULES],
+        deny: [...PLAN_DENY, ...ALWAYS_DENY_RULES, ...homeDeny],
       },
     };
   }
@@ -997,7 +1013,7 @@ export function claudePermissionSettings(
         // What a person allowed for the whole mission ("Aprovar sempre nesta missão").
         ...missionAllow.filter(isSafeRule).slice(0, 100),
       ],
-      deny: [...ALWAYS_DENY_RULES],
+      deny: [...ALWAYS_DENY_RULES, ...homeDeny],
     },
   };
 }

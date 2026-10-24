@@ -1164,6 +1164,7 @@ export class CodexAppServers implements CodexAppRunner {
         cwd: input.cwd,
         folders: [...new Set([input.cwd, input.folder ?? input.cwd, ...(input.writableRoots ?? [])])],
         ...(process.env.HOME ? { home: process.env.HOME } : {}),
+        ...(opts.runnerHome ? { runnerHome: opts.runnerHome } : {}),
       };
       client.onRequest((method, params) => {
         if (settled) return null;

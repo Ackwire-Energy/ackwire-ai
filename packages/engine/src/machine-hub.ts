@@ -26,7 +26,12 @@ import {
 import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { applyAccessDecided, storeMachineAccess } from "./machine-access";
-import { syncMachineAccounts } from "./machine-accounts";
+import {
+  accountsToRemove,
+  forgetRemovedAccount,
+  type MachineAccountRef,
+  syncMachineAccounts,
+} from "./machine-accounts";
 import {
   applyTaskDone,
   applyTaskEvent,
@@ -460,9 +465,13 @@ export function createMachineHub(deps: MachineHubDeps) {
     }
     // Protocol 13 (ADR 0041): the accounts of the computer brains on it (an older runner says nothing: kept).
     if (frame.protocol >= ACCOUNTS_PROTOCOL && frame.accounts) {
-      await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch((error) =>
-        deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) }),
+      const remove = await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch(
+        (error) => {
+          deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) });
+          return [];
+        },
       );
+      removeAccounts(conn, remove);
     }
     if (frame.protocol >= TASKS_PROTOCOL) {
       await reconcileMachineTasks({ db, pubsub, start: localStarter(conn) }, machine.id, frame.tasks ?? []).catch(
@@ -478,6 +487,21 @@ export function createMachineHub(deps: MachineHubDeps) {
             deps.log?.warn("mission reconnect failed", { machineId: machine.id, error: String(error) }),
           ),
       );
+    }
+  }
+
+  /**
+   * Accounts whose row is a tombstone (removed while the computer was off, or
+   * their person left) that the runner still has: signed out and deleted
+   * there now, then the row goes. A failure leaves it for the next hello.
+   */
+  function removeAccounts(conn: MachineConnection, refs: MachineAccountRef[]) {
+    const { machineId, orgId } = conn;
+    if (!machineId || !orgId) return;
+    for (const ref of refs) {
+      void callLocal(conn, { op: "account", action: "remove", kind: ref.kind, accountId: ref.id })
+        .then(() => forgetRemovedAccount(db, orgId, ref.id))
+        .catch((error) => deps.log?.warn("account removal failed", { machineId, error: String(error) }));
     }
   }
 
@@ -826,6 +850,19 @@ export function createMachineHub(deps: MachineHubDeps) {
         });
         return;
       }
+      if (event.type === "machine.accounts" && typeof event.machineId === "string") {
+        // New tombstones (a person left): the runner here removes them now (outside the publisher's call stack).
+        const conn = local.get(event.machineId);
+        const { machineId, orgId } = conn ?? {};
+        if (!conn || !machineId || !orgId || conn.protocol < ACCOUNTS_PROTOCOL) return;
+        queueMicrotask(
+          () =>
+            void accountsToRemove(db, orgId, machineId)
+              .then((refs) => removeAccounts(conn, refs))
+              .catch(() => undefined),
+        );
+        return;
+      }
       if (event.type === "machine.agents" && typeof event.orgId === "string") {
         // The org's agents changed: its machines here list them again (outside the publisher's call stack).
         for (const conn of local.values()) {
@@ -924,9 +961,11 @@ export function createMachineHub(deps: MachineHubDeps) {
         if (conn.machineId && conn.orgId) {
           const machineId = conn.machineId;
           const orgId = conn.orgId;
-          await syncMachineAccounts({ db, pubsub }, orgId, machineId, frame.accounts).catch((error) =>
-            deps.log?.warn("account sync failed", { machineId, error: String(error) }),
-          );
+          const remove = await syncMachineAccounts({ db, pubsub }, orgId, machineId, frame.accounts).catch((error) => {
+            deps.log?.warn("account sync failed", { machineId, error: String(error) });
+            return [];
+          });
+          removeAccounts(conn, remove);
         }
       } else if (frame.type === "access.changed") {
         const machineId = conn.machineId;

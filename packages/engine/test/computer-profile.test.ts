@@ -180,6 +180,16 @@ describe("the server's rules for a run's prompts (Claude Code and Codex alike)",
     expect(ask("Bash", { command: "npm install" }).behavior).toBe("allow");
     expect(ask("Write", { file_path: "/w/dev/repos/acme/app/src/a.ts" }).behavior).toBe("allow");
   });
+
+  test("the runner's home, wherever the runner says it is, holds secrets (its AI accounts)", () => {
+    const system = { ...scope, runnerHome: "/var/lib/agentes-runner" };
+    const file = "/var/lib/agentes-runner/accounts/codex/0193dddd-0000-4000-8000-000000000002/sessions/x.jsonl";
+    const prompt = (s: Record<string, unknown>) =>
+      JSON.parse(runPermissionPrompt({ tool_name: "Read", input: { file_path: file }, scope: s }, { canRun: true }))
+        .behavior;
+    expect(prompt(system)).toBe("deny");
+    expect(prompt({ ...system, runnerHome: "relative/home" })).not.toBe("deny");
+  });
 });
 
 describe("Codex turns carry their profile", () => {

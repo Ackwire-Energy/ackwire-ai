@@ -387,13 +387,17 @@ export const MachineAccount = z
     id: z.uuid(),
     kind: AccountKind,
     label: z.string(),
-    email: z.string().nullable(),
+    email: z.string().nullable().openapi({ description: "Only for its owner." }),
     plan: z.string().nullable().openapi({ description: "`pro`, `max`, `team`, `plus`… as the CLI says." }),
     status: z.enum(["active", "signed_out"]),
-    usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it." }),
+    ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
+    ownerName: z.string().nullable(),
+    mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
+    usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it (one at most)." }),
   })
   .openapi("MachineAccount", {
-    description: "An account of a computer brain on a connected computer (ADR 0041). Metadata only, never a sign-in.",
+    description:
+      "An account of a computer brain on a connected computer (ADR 0041, ADR 0056). Metadata only, never a sign-in.",
   });
 
 export const AgentBrain = z
@@ -423,8 +427,10 @@ export const AgentBrain = z
     accountsOwner: z
       .object({ id: z.string(), name: z.string() })
       .nullable()
-      .openapi({ description: "Who connected the agent's computer: only they add accounts or pick one." }),
-    canManageAccounts: z.boolean(),
+      .openapi({ description: "Who connected the agent's computer; null: nobody did." }),
+    canManageAccounts: z.boolean().openapi({
+      description: "The caller adds accounts on the agent's computer (they connected it, or nobody did).",
+    }),
     accountsSupported: z.boolean().openapi({ description: "The computer's runner knows accounts (protocol 13)." }),
   })
   .openapi("AgentBrain");

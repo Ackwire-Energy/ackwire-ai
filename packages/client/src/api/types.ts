@@ -3137,9 +3137,9 @@ export interface AgentBrain {
   effort: BrainEffortSetting | null;
   /** The accounts added on the agent's computer (both kinds); "Conta deste computador" isn't listed. */
   accounts: MachineAccount[];
-  /** Whose subscriptions those are (the computer's owner); null without a computer. */
+  /** Who connected the agent's computer; null without one, or when nobody did (the Cloud's). */
   accountsOwner: { id: string; name: string } | null;
-  /** The viewer owns the computer: only they add accounts and pick an agent's. */
+  /** The viewer adds accounts there (they connected it, or nobody did); each account is picked by its owner only. */
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
@@ -3152,16 +3152,22 @@ export type BrainEffortSetting = BrainEffort | "auto";
 
 export type MachineAccountKind = "claude_code" | "codex";
 
-/** ADR 0041 §3: a Claude Code or Codex account signed in on a connected computer (metadata only). */
+/** ADR 0041 §3, ADR 0056: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
   id: string;
   kind: MachineAccountKind;
   label: string;
+  /** Only for its owner. */
   email: string | null;
   /** "Pro", "Max", "Team"… as the provider reports it. */
   plan: string | null;
   status: "active" | "signed_out";
-  /** Names of the agents that think with it. */
+  /** Whose it is (the person who signed it in); null: nobody's. */
+  ownerId: string | null;
+  ownerName: string | null;
+  /** The viewer owns it: only they rename it or pick it for an agent. */
+  mine: boolean;
+  /** Names of the agents that think with it (one at most). */
   usedBy: string[];
 }
 
@@ -3171,7 +3177,7 @@ export interface AgentBrainInput {
   fallback?: boolean;
   /** The person confirmed the personal-subscription warning (switching to Claude Code or Codex). */
   acceptPlanTerms?: boolean;
-  /** Only the computer's owner; null = "Conta deste computador". */
+  /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
   effort?: BrainEffortSetting | null;
 }
@@ -3194,6 +3200,8 @@ export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
+  /** `failed`: the viewer already has this account on that computer (named `label`). */
+  duplicate?: { label: string };
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */

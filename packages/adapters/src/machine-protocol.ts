@@ -187,8 +187,12 @@ export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
  * expires after `ACCOUNT_LOGIN_TTL_MS`.
  */
 export type AccountRequest =
-  /** `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure. */
-  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean }
+  /**
+   * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
+   * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
+   * an older runner leaves it out.
+   */
+  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
@@ -200,6 +204,15 @@ export const ACCOUNT_LOGIN_TTL_MS = 15 * 60_000;
 export const MAX_MACHINE_ACCOUNTS = 100;
 /** The AAD that binds a sealed Claude sign-in code to its sign-in and organization. */
 export const accountCodeAad = (loginId: string, orgId: string) => `${loginId}|${orgId}|account`;
+
+/**
+ * An email a sign-in may name as its account: letters, digits and `._+-` only, never first in either part.
+ * On Windows the CLI starts through the shell, so an address with `&`, `%`, `"` or `(` would run commands.
+ */
+export const isLoginEmail = (v: unknown): v is string =>
+  typeof v === "string" &&
+  v.length <= 254 &&
+  /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}@[A-Za-z0-9][A-Za-z0-9-]*(\.[A-Za-z0-9][A-Za-z0-9-]*)+$/.test(v);
 
 /** The `agent-browser` release the runner and the desktop app ship (ADR 0040 §2). */
 export const AGENT_BROWSER_VERSION = "0.39.1";

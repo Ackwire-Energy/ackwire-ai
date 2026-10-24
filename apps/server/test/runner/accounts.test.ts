@@ -205,6 +205,43 @@ test.if(posix)(
   15_000,
 );
 
+test.if(posix)(
+  "the account to sign in to: a plain email reaches the CLI as its login hint; any other is refused",
+  async () => {
+    const { m, root, runs } = setup();
+    await m.begin("claude_code", LOGIN(31), false, "ana.silva+work@acme.com.br");
+    expect(runs()[0]).toEqual({
+      args: "auth login --email ana.silva+work@acme.com.br",
+      home: path.join(root, "claude_code", LOGIN(31)),
+    });
+    // On Windows the CLI starts through the shell: nothing it would read as a command gets that far.
+    for (const [kind, email] of [
+      ["claude_code", "a&calc&x@y.z"],
+      ["claude_code", "a|b@y.z"],
+      ["claude_code", "%COMSPEC%@y.z"],
+      ["claude_code", "a@y.z\nrm"],
+      ["codex", "ana@example.com"],
+    ] as const) {
+      expect(await errorCode(() => m.begin(kind, LOGIN(32), false, email))).toBe("bad_request");
+    }
+    expect(runs().length).toBe(1);
+    expect(existsSync(path.join(root, "claude_code", LOGIN(32)))).toBe(false);
+    // Through the op too.
+    const ws = tempDir("accounts-ws-");
+    dirs.push(ws);
+    const ctx: HandlerContext = { workspaceReal: ws, exec: true, token: "t", accounts: m };
+    const req = { op: "account", action: "begin", kind: "claude_code", loginId: LOGIN(33), email: "a;b@y.z" };
+    expect(
+      await errorCode(() =>
+        handleRequest(ctx, req as unknown as MachineRequest, {
+          signal: new AbortController().signal,
+          output: () => {},
+        }),
+      ),
+    ).toBe("bad_request");
+  },
+);
+
 test.if(posix)("a Codex sign-in that fails is failed and its folder goes", async () => {
   process.env.FAKE_ACCOUNT_MODE = "fail";
   const { m, root } = setup();

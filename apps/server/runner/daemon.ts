@@ -579,6 +579,7 @@ export class RunnerDaemon implements RequestObserver {
     const brains = new BrainManager({
       root: path.join(home, "brains"),
       mcp: mcpCommand,
+      runnerHome: home,
       idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
       maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
       accounts: this.accounts,

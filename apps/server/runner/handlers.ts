@@ -433,7 +433,12 @@ async function handleAccount(
       if (ctx.paused?.()) {
         throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
       }
-      return accounts.begin(req.kind, requireString(req.loginId, "loginId"), req.again === true);
+      return accounts.begin(
+        req.kind,
+        requireString(req.loginId, "loginId"),
+        req.again === true,
+        req.email === undefined ? undefined : requireString(req.email, "email"),
+      );
     case "code":
       if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");
       await accounts.code(requireString(req.loginId, "loginId"), requireString(req.aad, "aad"), req.box);

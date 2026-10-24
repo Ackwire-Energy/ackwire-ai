@@ -1563,8 +1563,8 @@ export const ptBR = {
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
         thisComputerText: "A que já está no {{computer}}",
-        accountAlso: "{{email}} · também {{agents}}",
-        accountAlsoNoEmail: "Também {{agents}}",
+        accountInUse: "Em uso por {{agents}}",
+        accountOf: "De {{name}}",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
         keyLabel: "Chave da API",
@@ -1601,6 +1601,12 @@ export const ptBR = {
           safe: "A conta fica guardada só no {{computer}}. O agentes.chat nunca vê a senha nem o acesso.",
           failed: "Não deu para entrar nessa conta. Tente de novo.",
           expired: "O tempo para entrar acabou. Tente de novo.",
+          duplicate: {
+            claude_code:
+              "Essa conta já está aqui ({{account}}). Para adicionar outra, saia do Claude na página que abriu e entre com a outra conta.",
+            codex:
+              "Essa conta já está aqui ({{account}}). Para adicionar outra, saia do ChatGPT na página que abriu e entre com a outra conta.",
+          },
           startFailed: "O {{computer}} não respondeu. Veja se ele está ligado e tente de novo.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
           done: "A conta {{account}} entrou no {{computer}}. Clique em Usar para salvar.",

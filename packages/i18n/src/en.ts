@@ -1552,8 +1552,8 @@ export const en: Translations = {
         accountSignedOut: "Signed out, sign in again",
         thisComputer: "{{computer}}'s account",
         thisComputerText: "The one already on {{computer}}",
-        accountAlso: "{{email}} · also {{agents}}",
-        accountAlsoNoEmail: "Also {{agents}}",
+        accountInUse: "In use by {{agents}}",
+        accountOf: "{{name}}'s",
         addAccount: "Add account",
         signInAgain: "Sign in again",
         keyLabel: "API key",
@@ -1593,6 +1593,12 @@ export const en: Translations = {
           safe: "The account stays only on {{computer}}. agentes.chat never sees the password or the access.",
           failed: "Couldn't sign in to that account. Try again.",
           expired: "The time to sign in ran out. Try again.",
+          duplicate: {
+            claude_code:
+              "That account is already here ({{account}}). To add another, sign out of Claude on the page that opened and sign in with the other one.",
+            codex:
+              "That account is already here ({{account}}). To add another, sign out of ChatGPT on the page that opened and sign in with the other one.",
+          },
           startFailed: "{{computer}} didn't answer. Check that it's on and try again.",
           sendFailed: "Couldn't send the code. Check it and try again.",
           done: "The {{account}} account is on {{computer}}. Click Use to save.",

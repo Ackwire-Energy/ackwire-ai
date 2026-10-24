@@ -407,7 +407,9 @@ export async function removeMember(
     if (target.role === "owner" && !can(actor.role, "manage_owners"))
       throw new ForbiddenError("Only owners can remove owners");
   }
-  await db.transaction(async (tx) => {
+  // Loaded here: the accounts module builds on this one.
+  const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
+  const released = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -419,7 +421,10 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+    // Their AI accounts on the organization's computers are signed out and removed (ADR 0056 §1).
+    return releaseMemberAccounts(tx, targetUserId, orgId);
   });
+  await announceReleasedAccounts(options.pubsub, released);
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
@@ -433,17 +438,19 @@ export async function removeMember(
  * they are the only owner of an organization that has other members
  * (`sole_owner`, with the organizations' names: make someone else an owner
  * first). Organizations where they are the only member go with them, with
- * everything in them. The rest follows the foreign keys: sessions, sign-in
- * methods, memberships, channel memberships, notifications and phones are
- * deleted; messages and records they authored stay without an author (the
- * same as any deleted user).
+ * everything in them. Their AI accounts on computers are signed out and
+ * removed, never inherited (ADR 0056 §1). The rest follows the foreign keys:
+ * sessions, sign-in methods, memberships, channel memberships, notifications
+ * and phones are deleted; messages and records they authored stay without an
+ * author (the same as any deleted user).
  */
 export async function deleteAccount(
   db: Database,
   userId: string,
   options: { pubsub?: PubSub } = {},
 ): Promise<{ deletedOrgIds: string[] }> {
-  const { left, deleted } = await db.transaction(async (tx) => {
+  const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
+  const { left, deleted, released } = await db.transaction(async (tx) => {
     const mine = await tx
       .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
       .from(organizationMembers)
@@ -476,9 +483,15 @@ export async function deleteAccount(
         { organizations: blocking },
       );
     }
+    // Before the user row: `created_by` would turn null, and a null owner is nobody's.
+    const released = await releaseMemberAccounts(tx, userId, null);
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
     await tx.delete(users).where(eq(users.id, userId));
-    return { left: leaving, deleted: alone };
+    return { left: leaving, deleted: alone, released };
+  });
+  await announceReleasedAccounts(options.pubsub, {
+    machines: released.machines.filter((m) => left.includes(m.orgId)),
+    agents: released.agents.filter((a) => left.includes(a.orgId)),
   });
   // Their open WebSocket connections lose every subscription now.
   for (const orgId of left) await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });

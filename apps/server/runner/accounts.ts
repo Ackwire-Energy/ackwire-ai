@@ -11,6 +11,7 @@ import {
   accountCodeAad,
   isAccountId,
   isAccountKind,
+  isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
   type RunnerAccountInfo,
@@ -313,18 +314,18 @@ export class AccountManager {
   // ── Sign-in ────────────────────────────────────────────────────────────────
 
   /**
-   * Starts the CLI's sign-in in a new folder named `loginId` (the account id
-   * once it is signed in) and waits for what the person needs.
-   */
-  /**
    * Starts the CLI's sign-in in a new folder named `loginId`, or (`again`) in
    * the existing account `loginId` that was signed out: same account, same
-   * agents, and its folder stays if this sign-in fails.
+   * agents, and its folder stays if this sign-in fails. `email` (Claude Code):
+   * the account to sign in to, as the CLI's login hint.
    */
-  async begin(kind: AccountKind, loginId: string, again = false): Promise<MachineReplies["account"]> {
+  async begin(kind: AccountKind, loginId: string, again = false, email?: string): Promise<MachineReplies["account"]> {
     if (this.closed) throw new RunnerError("internal", "The runner is stopping");
     if (!isAccountKind(kind)) throw new RunnerError("bad_request", "Unknown account kind");
     if (!isAccountId(loginId)) throw new RunnerError("bad_request", "Invalid sign-in id");
+    if (email !== undefined && (kind !== "claude_code" || !isLoginEmail(email))) {
+      throw new RunnerError("bad_request", "That email can't name the account to sign in to");
+    }
     if (this.logins.get(loginId)?.state === "waiting") {
       throw new RunnerError("bad_request", "This sign-in already exists");
     }
@@ -363,15 +364,19 @@ export class AccountManager {
     const env = this.env(kind, dir);
     let child: ChildProcess;
     try {
-      child = spawn(resolveCommand(file ?? "", env.PATH), [...pre, ...LOGIN_ARGS[kind]], {
-        cwd: dir,
-        env,
-        stdio: ["pipe", "pipe", "pipe"],
-        windowsHide: true,
-        // Its own process group: a kill reaches what it started (posix).
-        detached: process.platform !== "win32",
-        shell: process.platform === "win32" && command.length === 1,
-      });
+      child = spawn(
+        resolveCommand(file ?? "", env.PATH),
+        [...pre, ...LOGIN_ARGS[kind], ...(email ? ["--email", email] : [])],
+        {
+          cwd: dir,
+          env,
+          stdio: ["pipe", "pipe", "pipe"],
+          windowsHide: true,
+          // Its own process group: a kill reaches what it started (posix).
+          detached: process.platform !== "win32",
+          shell: process.platform === "win32" && command.length === 1,
+        },
+      );
     } catch (err) {
       if (!again) await rm(dir, { recursive: true, force: true });
       const why = err instanceof Error ? err.message : String(err);

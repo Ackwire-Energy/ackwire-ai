@@ -222,7 +222,8 @@ async function brainAccountFor(
       ),
     );
   if (!row || row.kind !== kind) return undefined;
-  return { id: row.id, label: row.label, status: row.status === "signed_out" ? "signed_out" : "active" };
+  // A sign-in still in progress or an account being removed can't think: as good as signed out.
+  return { id: row.id, label: row.label, status: row.status === "active" ? "active" : "signed_out" };
 }
 
 /** The agent's effort when it thinks with its own brain (a mission's other brain: the CLI's default). */

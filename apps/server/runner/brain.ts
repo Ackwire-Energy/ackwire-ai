@@ -965,6 +965,8 @@ export interface BrainManagerOptions {
   accounts?: { accountDir(kind: AccountKind, id: string): string | null };
   /** The local MCP bridge (where the daemon listens and how to start `agentes-runner mcp`). */
   mcp?: { socketPath: string; command: string[] };
+  /** The runner's home (its accounts among it): turns never read it. */
+  runnerHome?: string;
   idleMs?: number;
   maxProcesses?: number;
   deltaMs?: number;
@@ -1389,6 +1391,7 @@ export class BrainManager {
             alwaysLoad: true,
             // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
             profile: mode,
+            ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),
           }),
         ),
         { mode: 0o600 },
@@ -1417,7 +1420,7 @@ export class BrainManager {
           allow,
           undefined,
           // Every command reaches our prompt tool: plain reads pass there at once, secrets never.
-          { promptReads: true },
+          { promptReads: true, ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}) },
         ),
       ),
       { mode: 0o600 },
