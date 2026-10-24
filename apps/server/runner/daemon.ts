@@ -648,6 +648,7 @@ export class RunnerDaemon implements RequestObserver {
         start: launchWorker(this.self.command),
         ...this.opts.workers,
         token: config.token,
+        server: config.server,
         send: (frame) => live?.send(frame) ?? false,
         state: () => this.workerState(),
         log,

@@ -3,6 +3,7 @@ import type { EventEmitter } from "node:events";
 import { chmodSync, chownSync, lstatSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
+import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   HEARTBEAT_MS,
@@ -21,7 +22,7 @@ import { RunnerError } from "./errors";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
-import { type FetchLike, UPLOAD_TIMEOUT_MS } from "./push";
+import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
 
 /**
  * System mode (`install.sh --system`): this root process keeps the server's
@@ -36,15 +37,14 @@ import { type FetchLike, UPLOAD_TIMEOUT_MS } from "./push";
  * to it, `brain.*` only for its turns, `task.*` only for its tasks, browser
  * frames only for its agent, and never the computer's own frames (pause,
  * access, accounts). Uploads go out from here, with the machine token no
- * worker ever holds, to the URL of the server's own request.
+ * worker ever holds, to the server's own request's upload on the server this
+ * computer is paired with.
  *
  * Worker sessions follow the server's: when the socket drops, theirs end too
  * (what they ran is aborted, as in a single runner) and they say hello again,
  * to be welcomed once the server is back.
  */
 
-/** Each worker's home is `<this>/<user>`: its task journal, secrets, git credentials and browser, outside the agent's own home. */
-const WORKER_HOMES = "/var/lib/agentes-runner-agents";
 /**
  * `<supervisor home>/worker-tasks.json`: whose each background task is, until
  * the server acknowledges its end. Root's, so no worker can claim another
@@ -105,6 +105,8 @@ export interface SupervisorOptions {
   start: StartWorker;
   /** The machine token, for uploads. */
   token: string;
+  /** The server this computer is paired with: the only place uploads go (`uploadUrl`). */
+  server: string;
   /** A frame for the server; false while it is offline. */
   send: (frame: RunnerFrame) => boolean;
   state: () => WorkerState;
@@ -589,14 +591,14 @@ export class Supervisor {
     void reply.then((r) => this.send(w, { type: "upload.reply", uploadId, ...r }));
   }
 
-  /** To the server's own upload URL with the machine token; from the worker only the file's name, type and hash. */
+  /** To the request's upload on the server this computer is paired with, with the machine token; from the worker only the file's name, type and hash. */
   private async upload(req: Push, body: Buffer, end: Record<string, unknown>, signal: AbortSignal) {
-    if (typeof req.url !== "string" || !/^https?:\/\//i.test(req.url))
-      return { error: "The upload URL must be http(s)" };
+    const target = uploadUrl(this.opts.server, req.url);
+    if (!target) return { error: "The upload URL must be http(s)" };
     const doFetch: FetchLike = this.opts.fetch ?? ((url, init) => fetch(url, init));
     const sha256 = typeof end.sha256 === "string" && /^[0-9a-f]{64}$/.test(end.sha256) ? end.sha256 : "";
     try {
-      const res = await doFetch(req.url, {
+      const res = await doFetch(target, {
         method: "PUT",
         body: body as unknown as RequestInit["body"],
         headers: {
@@ -646,7 +648,7 @@ export function workerCommand(user: AgentUser, runner: string[], home: string, s
 }
 
 /** Starts each agent's worker as a process (`runner`: how this runner starts itself). */
-export function launchWorker(runner: string[], base = WORKER_HOMES): StartWorker {
+export function launchWorker(runner: string[], base = AGENT_WORKER_HOMES): StartWorker {
   return (user) => {
     const { argv, cwd, env } = workerCommand(user, runner, workerHome(base, user));
     const [file = "", ...args] = argv;

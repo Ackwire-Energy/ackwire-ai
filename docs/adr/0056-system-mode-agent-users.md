@@ -3,7 +3,7 @@
 - Status: Accepted (2026-10-24)
 - Date: 2026-10-24
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets to agent computers), ADR 0029 (background tasks), ADR 0030 (isolation)
-- Code: `apps/server/runner/install-script.ts`, `service.ts`, `agent-users.ts`, `supervisor.ts`, `worker.ts`, `OP_ROUTES` in `handlers.ts`
+- Code: `apps/server/runner/install-script.ts`, `service.ts`, `agent-users.ts`, `supervisor.ts`, `worker.ts`, `OP_ROUTES` in `handlers.ts`, `uploadUrl` in `push.ts`; `AGENT_WORKER_HOMES` in `packages/adapters/src/command-policy.ts`
 
 ## Context
 
@@ -26,7 +26,7 @@ A connected computer runs every agent's work as the OS user that runs the runner
 
 - The root process keeps the server's socket and runs no agent work. Each op has a route in `OP_ROUTES`: `machine` ops (the computer's accounts, folder requests and reductions) are answered by root; pause is checked there before anything else; every `agent` op goes to the worker of the request's agent. A new op doesn't compile until it has a route.
 - A worker is `agentes-runner worker --agent <id>`, started through the agent's launcher on the agent's first request, or at boot when it has background tasks to watch. It refuses to run as root and serves only its own agent. It has the same managers and handlers as a single runner. The agent's folder is `<handle>-<id8>` in the agent's home, as in any workspace; the home itself keeps the agent's own dotfiles.
-- The worker's own state (task journal, secrets, git credentials, browser) is in `/var/lib/agentes-runner-agents/<user>` (the agent's, 0700, in a folder root owns, 0711): outside the agent's home, so the file tools never reach it, and no agent can list another's.
+- The worker's own state (task journal, secrets, git credentials, browser) is in `/var/lib/agentes-runner-agents/<user>` (the agent's, 0700, in a folder root owns, 0711): outside the agent's home, so the file tools never reach it, and no agent can list another's. The agent's own code runs as the same user, so the command rules treat that folder like the runner's own home: no read of it is allowed, by our check or by Claude Code's deny rules.
 - The link is the machine protocol as JSON lines on the worker's stdin and stdout, the supervisor playing the server, plus frames of its own: `worker.state` (pause, the tool switches, the limits and only this agent's allowed folders, sent after each hello and on every change), `worker.close` and the upload frames (§5). Its stderr is its log, prefixed with its user in the supervisor's.
 - Sessions follow the server's. When the socket drops, each worker's session ends (its requests are aborted and its MCP calls fail or wait, as in a single runner), and the worker says hello again; it is welcomed when the server is back. Pings every 10 s keep sessions up meanwhile.
 
@@ -45,7 +45,7 @@ A worker that sends a line longer than a frame, or leaves 64 MB of what it was s
 
 ### 5. Uploads without the machine token
 
-No worker holds the machine token. For `push`, the worker reads or zips the file with its own path checks and sends the bytes to the supervisor in 1 MB pieces. The supervisor uploads them once per `push` request, to that request's URL, with the token. Only the file's name, type and hash come from the worker; more bytes than the request allows are refused.
+No worker holds the machine token. For `push`, the worker reads or zips the file with its own path checks and sends the bytes to the supervisor in 1 MB pieces. The supervisor uploads them once per `push` request, with the token, to that request's URL path on the server the computer is paired with (`uploadUrl` in `push.ts`): the server builds the URL from its public address, which its own computer may not reach, and the token goes to no other host. Only the file's name, type and hash come from the worker; more bytes than the request allows are refused.
 
 ### 6. hello, restarts
 

@@ -161,6 +161,7 @@ function setup(over: Partial<SupervisorOptions> = {}, home = newHome()) {
       return w;
     },
     token: "agm_machine",
+    server: "https://agentes.test",
     send: (frame) => {
       up.push(frame as unknown as Record<string, unknown>);
       return true;
@@ -548,13 +549,14 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   expect(ana.of("worker.state")[2]).toMatchObject({ paused: { paused: true, until: null } });
 });
 
-test("push: the worker's bytes go out from here with the machine token, only to the server's own URL", async () => {
+test("push: the worker's bytes go out from here with the machine token, only to the server it is paired with", async () => {
   const puts: { url: string; init: RequestInit }[] = [];
   const fetch: FetchLike = async (url, init) => {
     puts.push({ url, init });
     return new Response('{"ok":true}', { status: 200 });
   };
-  const t = setup({ fetch });
+  // The server's own computer: paired on its local address, while the server names its public one.
+  const t = setup({ fetch, server: "http://127.0.0.1:3000" });
   t.sup.boot();
   t.sup.attach();
   const uploadId = "11111111-1111-4111-8111-111111111111";
@@ -581,7 +583,7 @@ test("push: the worker's bytes go out from here with the machine token, only to 
   await waitFor(() => ana.of("upload.reply").length === 1);
   expect(ana.of("upload.reply")).toEqual([{ type: "upload.reply", uploadId, status: 200, body: '{"ok":true}' }]);
   expect(puts).toHaveLength(1);
-  expect(puts[0]?.url).toBe("https://agentes.test/api/machines/uploads/1");
+  expect(puts[0]?.url).toBe("http://127.0.0.1:3000/api/machines/uploads/1");
   expect(puts[0]?.init.method).toBe("PUT");
   expect(puts[0]?.init.headers).toEqual({
     authorization: "Bearer agm_machine",
@@ -611,33 +613,51 @@ test("push: the worker's bytes go out from here with the machine token, only to 
   expect(puts).toHaveLength(1);
   ana.send({ type: "result", id: q2.id, ok: false, error: { code: "upload_failed", message: "too large" } });
   expect(await errorCode(() => small)).toBe("upload_failed");
+
+  // A URL that isn't http(s): the token goes nowhere.
+  const odd = handleRequest(t.ctx, { ...req, url: "file:///etc/passwd" }, scope().scope);
+  const q3 = await requestOn(ana, 3);
+  ana.send({ type: "upload.chunk", uploadId, data: Buffer.from("x").toString("base64") });
+  ana.send(end);
+  await waitFor(() => ana.of("upload.reply").length === 4);
+  expect(ana.of("upload.reply")[3]).toEqual({
+    type: "upload.reply",
+    uploadId,
+    error: "The upload URL must be http(s)",
+  });
+  expect(puts).toHaveLength(1);
+  ana.send({ type: "result", id: q3.id, ok: false, error: { code: "upload_failed", message: "no" } });
+  expect(await errorCode(() => odd)).toBe("upload_failed");
 });
 
-/** A real worker (`runWorker`) on the other end of in-memory pipes. */
-function realWorkers(over: Partial<SupervisorOptions> = {}) {
-  const agentHome = tempDir("agent-home-");
-  const ownHome = tempDir("worker-home-");
-  dirs.push(agentHome, ownHome);
+/** A real worker (`runWorker`) on the other end of in-memory pipes; `at`: the homes of an earlier supervisor (a restart). */
+function realWorkers(over: Partial<SupervisorOptions> = {}, at?: { home: string; agentHome: string; ownHome: string }) {
+  const agentHome = at?.agentHome ?? tempDir("agent-home-");
+  const ownHome = at?.ownHome ?? tempDir("worker-home-");
+  if (!at) dirs.push(agentHome, ownHome);
   const started: PassThrough[] = [];
-  const t = setup({
-    start: (user) => {
-      const stdin = new PassThrough();
-      const stdout = new PassThrough();
-      started.push(stdin);
-      const done = runWorker({
-        agentId: user.id,
-        home: ownHome,
-        dir: agentHome,
-        input: stdin,
-        output: stdout,
-        log: () => {},
-        self: { command: [process.execPath, "/nonexistent/agentes-runner.mjs"], compiled: false },
-      });
-      workerRuns.push(done);
-      return { stdin, stdout, exited: done, kill: () => stdin.end() };
+  const t = setup(
+    {
+      start: (user) => {
+        const stdin = new PassThrough();
+        const stdout = new PassThrough();
+        started.push(stdin);
+        const done = runWorker({
+          agentId: user.id,
+          home: ownHome,
+          dir: agentHome,
+          input: stdin,
+          output: stdout,
+          log: () => {},
+          self: { command: [process.execPath, "/nonexistent/agentes-runner.mjs"], compiled: false },
+        });
+        workerRuns.push(done);
+        return { stdin, stdout, exited: done, kill: () => stdin.end() };
+      },
+      ...over,
     },
-    ...over,
-  });
+    at?.home,
+  );
   return { ...t, agentHome, ownHome, started };
 }
 
@@ -690,6 +710,32 @@ test.if(posix)(
     expect(again.stdout).toBe("back\n");
     expect(t.started).toHaveLength(1);
   },
+);
+
+test.if(posix)(
+  "a real task keeps running through a restart of the supervisor, and the next worker reports its end",
+  async () => {
+    const t = realWorkers();
+    t.sup.boot();
+    t.sup.attach();
+    const taskId = "task-ana-0001";
+    const start = { op: "task.start", taskId, executor: "shell", command: "sleep 0.6; echo finished", agent: ANA };
+    expect(await handleRequest(t.ctx, start as MachineRequest, scope().scope)).toMatchObject({ taskId });
+    // The supervisor stops (a restart): its worker exits with it, the task goes on.
+    await t.sup.close(2000);
+    const t2 = realWorkers({}, t);
+    expect(t2.sup.list()).toMatchObject([{ taskId, agentId: ANA.id, status: "running" }]);
+    t2.sup.boot();
+    expect(t2.started).toHaveLength(1);
+    t2.sup.attach();
+    await waitFor(() => t2.up.some((f) => f.type === "task.done"), 8000);
+    expect(t2.up.filter((f) => f.type === "task.done")).toMatchObject([
+      { taskId, exitCode: 0, result: "finished", lastLine: "finished" },
+    ]);
+    t2.sup.ack(taskId);
+    expect(t2.sup.list()).toEqual([]);
+  },
+  15_000,
 );
 
 test.if(posix)(
