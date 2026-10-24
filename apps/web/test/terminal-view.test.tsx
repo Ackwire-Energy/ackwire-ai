@@ -18,6 +18,7 @@ class TerminalSocket {
   readyState = 0;
   sent: (string | Uint8Array)[] = [];
   closed = false;
+  closedWith?: number;
   private listeners = new Map<string, ((e: SocketEvent) => void)[]>();
   constructor(readonly url: string) {}
   addEventListener(type: string, fn: (e: SocketEvent) => void) {
@@ -26,8 +27,9 @@ class TerminalSocket {
   send(data: string | Uint8Array) {
     this.sent.push(data);
   }
-  close() {
+  close(code?: number) {
     this.closed = true;
+    this.closedWith = code;
   }
   private emit(type: string, e: SocketEvent) {
     for (const fn of this.listeners.get(type) ?? []) fn(e);
@@ -254,6 +256,26 @@ describe("a terminal on the agent's computer", () => {
     expect(t.terminals).toHaveLength(2);
     expect(FakeTerminal.all).toHaveLength(2);
     expect(screen().getByText("Abrindo o terminal…")).toBeTruthy();
+  });
+
+  test("a page kept for the Back button ends its shell: back, it says so, and only Abrir de novo opens one", async () => {
+    const t = await panel();
+    await server(() => {
+      t.ws().open();
+      t.ws().output("$ ");
+    });
+    const page = (type: "pagehide" | "pageshow", persisted: boolean) =>
+      act(async () => void window.dispatchEvent(Object.assign(new Event(type), { persisted })));
+    await page("pagehide", false);
+    expect(t.ws().closed).toBe(false);
+
+    await page("pagehide", true);
+    expect(t.ws().closedWith).toBe(1000);
+    await server(() => t.ws().serverClose(1000));
+    await page("pageshow", true);
+    await settle(4);
+    expect(screen().getByText("A sessão terminou.")).toBeTruthy();
+    expect(t.terminals).toHaveLength(1);
   });
 
   test("a dropped connection or a refusal says why and never opens again by itself", async () => {

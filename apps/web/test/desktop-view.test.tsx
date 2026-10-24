@@ -267,6 +267,27 @@ describe("the agent's desktop panel", () => {
     expect(copied).toEqual(["ls -la /tmp"]);
   });
 
+  test("a page kept for the Back button lets its screen go, and opens it again when the person comes back", async () => {
+    const t = await panel();
+    await connected();
+    const page = (type: "pagehide" | "pageshow", persisted: boolean) =>
+      act(async () => void window.dispatchEvent(Object.assign(new Event(type), { persisted })));
+    // A page really going away is the browser's to close.
+    await page("pagehide", false);
+    expect(t.sockets.desktops[0]?.closed).toBe(false);
+
+    await page("pagehide", true);
+    expect(t.sockets.desktops[0]?.closed).toBe(true);
+    // Its close arrives when the page is back: not a reason to stop opening the screen.
+    await act(async () => t.sockets.desktops[0]?.serverClose(1000));
+    await page("pageshow", true);
+    await settle(4);
+    expect(t.sockets.desktops).toHaveLength(2);
+    expect(t.sockets.desktops[1]?.url).toContain("mode=watch");
+    await connected();
+    expect(screen().getByText("Ao vivo · você só assiste")).toBeTruthy();
+  });
+
   test("the agent's page: a line under its browser; Ver a tela opens the live panel, as does ?desktop=1", async () => {
     const b = backend(RUNNING);
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: b.api, createSocket: b.sockets.factory });

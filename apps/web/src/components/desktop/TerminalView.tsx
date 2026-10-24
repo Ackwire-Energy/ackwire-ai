@@ -106,7 +106,14 @@ export function TerminalView({ agentId, name, onClose }: { agentId: string; name
         ];
         const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fitPanel);
         observer?.observe(el);
+        // A browser that keeps the page for its Back button can keep its sockets open there for minutes: a shell
+        // nobody sees. It ends with the page, which says so if the person comes back.
+        const leave = (e: PageTransitionEvent) => {
+          if (e.persisted && !closed) ws.close(1000);
+        };
+        window.addEventListener("pagehide", leave);
         stop = () => {
+          window.removeEventListener("pagehide", leave);
           observer?.disconnect();
           for (const sub of subs) sub.dispose();
           if (!closed) ws.close();

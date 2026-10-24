@@ -184,15 +184,33 @@ export function DesktopView({
         setGaveUp(true);
       },
     );
-    return () => {
+    const end = () => {
       cancelled = true;
       clearTimeout(timer);
       rfbRef.current = null;
       if (closed) return;
+      closed = true;
       if (rfb) rfb.disconnect();
       else ws?.close();
     };
+    // A browser that keeps the page for its Back button can keep its sockets open there for minutes: a viewer
+    // nobody sees, holding the desktop up and counted as watching. It goes with the page; coming back opens it again.
+    const leave = (e: PageTransitionEvent) => {
+      if (e.persisted) end();
+    };
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      end();
+    };
   }, [connect, mode, controlKeyboard, round, org.id, agentId, createSocket, refetch, inControl]);
+  useEffect(() => {
+    const back = (e: PageTransitionEvent) => {
+      if (e.persisted) setRound((r) => r + 1);
+    };
+    window.addEventListener("pageshow", back);
+    return () => window.removeEventListener("pageshow", back);
+  }, []);
 
   // Full screen: the browser's own when it allows it; either way the panel fills the window.
   useEffect(() => {
