@@ -220,7 +220,7 @@ fetch_bun() {
 ${shaCases}
   esac
   say "Downloading Bun $BUN_VERSION ..."
-  WORK=$(mktemp -d)
+  WORK=$(mktemp -d) || { WHY="no temporary folder for it"; return 1; }
   if ! download "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/bun-$BUN_TARGET.zip" "$WORK/bun.zip"; then
     WHY="the download failed"
   elif [ "$(sha256 "$WORK/bun.zip")" != "$BUN_SHA256" ]; then
