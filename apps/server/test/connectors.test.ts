@@ -100,7 +100,8 @@ test("connectors API: the phone app's OAuth hands the code back to the app, whic
   }) as unknown as typeof fetch;
   t = await createTestServer({
     http,
-    env: { CONNECTOR_GITHUB_CLIENT_ID: "gh-id", CONNECTOR_GITHUB_CLIENT_SECRET: "gh-secret" },
+    // A second person (the stranger below) signs up too.
+    env: { ALLOW_SIGNUP: "true", CONNECTOR_GITHUB_CLIENT_ID: "gh-id", CONNECTOR_GITHUB_CLIENT_SECRET: "gh-secret" },
   });
   // The phone app: our cookie, no Origin, the app's header.
   const app = browser(t);
