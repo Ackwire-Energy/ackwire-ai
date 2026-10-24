@@ -1539,12 +1539,6 @@ export const ptBR = {
       failed: "Não deu para salvar. Tente de novo.",
       use: "Usar",
       usePlan: { claude_code: "Usar meu plano do Claude", codex: "Usar meu plano do ChatGPT" },
-      planNote: {
-        claude_code:
-          "<b>O plano do Claude é seu, pessoal.</b> Responder outras pessoas com ele pode ir contra as regras da Anthropic.",
-        codex:
-          "<b>O plano do ChatGPT é seu, pessoal.</b> Responder outras pessoas com ele pode ir contra as regras da OpenAI.",
-      },
       brain: {
         sub: "Vale para todas as conversas.",
         model: "Modelo da organização",
@@ -4134,6 +4128,41 @@ export const ptBR = {
     unsaved: "Alterações não salvas",
     keepEditing: "Continuar editando",
     discard: "Descartar",
+  },
+  aiAccounts: {
+    share: {
+      switch: "Só responde a você",
+      switchOther: "Só responde a {{name}}",
+      on: "Usa o seu plano. Os outros veem que {{article}} {{name}} só responde a você.",
+      off: "Responde a outras pessoas com o seu plano.",
+      onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
+      offOther: "Responde a outras pessoas com o plano de {{owner}}.",
+      title: "Agora {{article}} {{name}} responde a todos",
+      titlePeople: "Agora {{article}} {{name}} responde a outras pessoas",
+      body: {
+        claude_code:
+          "A Anthropic diz que as assinaturas pessoais do Claude são para uso pessoal. Usar a sua para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+        codex:
+          "A OpenAI diz que o plano do ChatGPT é para uso pessoal. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+        seat: "A {{maker}} diz que cada assento do plano é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+        other:
+          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos. Se continuar, o risco é seu.",
+      },
+      accept: "Responder a todos",
+      acceptPeople: "Continuar",
+      keep: "Manter só comigo",
+      savedEveryone: "Agora {{article}} {{name}} responde a todos.",
+      savedOwner: "{{The}} {{name}} agora só responde a você.",
+      backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só responde a você.",
+      letEveryone: "Liberar para todos",
+      letPeople: "Liberar de novo",
+      ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
+      hereNotYours: "Só para agentes de quem conectou o {{computer}}",
+    },
+    errors: {
+      planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
+      planTermsRequired: "Confirme o aviso do plano pessoal antes de liberar para mais gente.",
+    },
   },
   audience: {
     section: "Quem pode falar",

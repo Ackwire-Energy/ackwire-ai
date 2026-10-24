@@ -911,7 +911,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
-        Object.assign(agent, input);
+        const { acceptPlanTerms: _, ...fields } = input;
+        Object.assign(agent, fields);
         return { ...agent };
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
@@ -1026,9 +1027,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.setBrain", orgId, agentId, input);
         const b = brainOf(agentId);
         const brain = input.brain ?? b.brain;
-        if (brain !== b.brain && brain !== "model" && !input.acceptPlanTerms)
-          throw new ApiError(400, "brain.terms_required", "Confirm the warning");
         const changed = brain !== b.brain;
+        // ADR 0056 §5: onto a plan, only its owner talks to it; letting others in is its owner's, with the terms.
+        const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
+        if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner)) {
+          if (!b.canUsePlans) throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
+          if (!input.acceptPlanTerms) throw new ApiError(400, "audience.plan_terms_required", "Confirm the warning");
+        }
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
         const option = b.options.find((o) => o.kind === brain);
         const next: AgentBrain = {
@@ -1040,6 +1045,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           // ADR 0041: another brain kind starts on the computer's own account.
           account: input.account !== undefined ? input.account : changed ? null : b.account,
           effort: input.effort !== undefined ? input.effort : b.effort,
+          onlyOwner,
         };
         brains.set(agentId, next);
         return structuredClone(next);
@@ -1719,9 +1725,11 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     account: null,
     effort: null,
     accounts: [],
-    accountsOwner: { id: "u-walter", name: "Walter Nogueira" },
     canManageAccounts: true,
     accountsSupported: true,
+    onlyOwner: false,
+    canUsePlans: true,
+    ownSignIn: true,
     ...patch,
   };
   // The computers the person may give the agent: the MacBook, with what it offers.

@@ -1529,11 +1529,6 @@ export const en: Translations = {
       failed: "Couldn't save. Try again.",
       use: "Use",
       usePlan: { claude_code: "Use my Claude plan", codex: "Use my ChatGPT plan" },
-      planNote: {
-        claude_code:
-          "<b>Your Claude plan is personal.</b> Answering other people with it may go against Anthropic's terms.",
-        codex: "<b>Your ChatGPT plan is personal.</b> Answering other people with it may go against OpenAI's terms.",
-      },
       brain: {
         sub: "Applies to every conversation.",
         model: "Organization's model",
@@ -4122,6 +4117,41 @@ export const en: Translations = {
     unsaved: "Unsaved changes",
     keepEditing: "Keep editing",
     discard: "Discard",
+  },
+  aiAccounts: {
+    share: {
+      switch: "Only replies to you",
+      switchOther: "Only replies to {{name}}",
+      on: "It uses your plan. Others see that {{name}} only replies to you.",
+      off: "Replies to other people on your plan.",
+      onOther: "It uses {{owner}}'s plan: only {{owner}} can let other people talk to it.",
+      offOther: "Replies to other people on {{owner}}'s plan.",
+      title: "Now {{name}} replies to everyone",
+      titlePeople: "Now {{name}} replies to other people",
+      body: {
+        claude_code:
+          "Anthropic says personal Claude subscriptions are meant for personal use. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
+        codex:
+          "OpenAI says ChatGPT plans are meant for personal use. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
+        seat: "{{maker}} says each seat on the plan belongs to one person. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
+        other:
+          "{{maker}} says the plan is for its subscriber only. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
+      },
+      accept: "Reply to everyone",
+      acceptPeople: "Continue",
+      keep: "Keep it just for me",
+      savedEveryone: "Now {{name}} replies to everyone.",
+      savedOwner: "{{name}} now only replies to you.",
+      backOnApi: "{{name}} is back on the API and still only replies to you.",
+      letEveryone: "Let everyone talk to it",
+      letPeople: "Open it up again",
+      ownerOnly: "{{name}} thinks with {{owner}}'s plan: only {{owner}} can let more people talk to it.",
+      hereNotYours: "Only for agents of whoever connected {{computer}}",
+    },
+    errors: {
+      planOwnerOnly: "Only {{agentName}}'s owner can let more people talk to it: it thinks with their plan.",
+      planTermsRequired: "Confirm the personal-plan warning before letting more people talk to it.",
+    },
   },
   audience: {
     section: "Who can talk",

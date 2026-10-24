@@ -618,9 +618,10 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
     brain: "claude_code",
     account: CLAUDE_ID,
     effort: "high",
-    accountsOwner: { id: f.owner.id, name: "ana" },
     canManageAccounts: true,
     accountsSupported: true,
+    canUsePlans: true,
+    ownSignIn: true,
   });
   expect(chosen.accounts.map((a) => [a.id, a.kind, a.usedBy, a.mine])).toEqual([
     [CLAUDE_ID, "claude_code", ["Dev"], true],
@@ -647,7 +648,7 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
 
   // An admin sees it locked: changes the effort, not the account (nor the computer's own sign-in, the pairer's).
   const seen = await getAgentBrain(deps, admin.id, f.org.id, f.agent.id);
-  expect(seen).toMatchObject({ account: CLAUDE_ID, canManageAccounts: false, accountsOwner: { id: f.owner.id } });
+  expect(seen).toMatchObject({ account: CLAUDE_ID, canManageAccounts: false, canUsePlans: false });
   expect(seen.accounts.map((a) => [a.email, a.mine])).toEqual([
     [null, false],
     [null, false],
@@ -715,9 +716,9 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
   expect(await getAgentBrain(deps, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
     account: null,
     accounts: [],
-    accountsOwner: null,
     canManageAccounts: false,
     accountsSupported: false,
+    ownSignIn: false,
   });
 });
 
@@ -727,8 +728,8 @@ test("a runner older than accounts: the page says accounts aren't supported", as
   await setAgentComputerTarget({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id, machineId);
   expect(await getAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
     accounts: [],
-    accountsOwner: { id: f.owner.id },
     canManageAccounts: false,
     accountsSupported: false,
+    ownSignIn: true,
   });
 });

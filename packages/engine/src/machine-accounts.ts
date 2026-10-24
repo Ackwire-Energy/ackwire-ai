@@ -195,18 +195,27 @@ async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow
   return views.find((v) => v.id === row.id) ?? accountView(row, [], viewerId, null);
 }
 
-/** Agents that used these accounts go back to the computer's own sign-in (their cache too). */
-async function releaseAgents(db: Executor, orgId: string, accountIds: string[], now = new Date()) {
+/**
+ * Agents that used these accounts lose them: back to the computer's own
+ * sign-in when that is their owner's, else to the API (a plan thinks only for
+ * its owner's agents, ADR 0056 §3). Their cache goes with `forgetAgents`.
+ */
+export async function releaseAgents(db: Executor, orgId: string, accountIds: string[], now = new Date()) {
   if (accountIds.length === 0) return [];
   const rows = await db
     .update(agents)
-    .set({ brainAccountId: null, updatedAt: now })
+    .set({
+      brainAccountId: null,
+      brain: sql`case when exists (select 1 from ${machines} m where m.id = "agents"."machine_id"
+        and m.paired_by_user_id = "agents"."owner_user_id") then "agents"."brain" else 'model' end`,
+      updatedAt: now,
+    })
     .where(and(eq(agents.orgId, orgId), inArray(agents.brainAccountId, accountIds)))
     .returning({ id: agents.id });
   return rows.map((r) => r.id);
 }
 
-const forgetAgents = (orgId: string, ids: string[]) => {
+export const forgetAgents = (orgId: string, ids: string[]) => {
   for (const id of ids) caches.agents.delete(`${orgId}:${id}`);
 };
 
@@ -374,8 +383,8 @@ async function settleAccount(
  * `hello.accounts` (protocol 13): the machine says which accounts it has.
  * Sign-ins started from the app finish, known accounts get their email, plan
  * and status, ones it signed in by itself (the desktop app) are added as its
- * pairer's, and the ones it no longer has are removed (their agents go back
- * to the computer's own sign-in). A sign-in still in progress is kept until
+ * pairer's, and the ones it no longer has are removed (their agents are
+ * released, `releaseAgents`). A sign-in still in progress is kept until
  * it would have expired. An id that belongs to a disconnected machine of the
  * organization (this computer, paired again as a new one) moves here with its
  * name and owner; one that belongs to a live machine is ignored. A list as
@@ -866,7 +875,7 @@ export async function renameMachineAccount(
 /**
  * Removes an account (ADR 0041 §7, ADR 0056 §1): its owner, the computer's
  * pairer, or an admin when the computer or the account has no person. The
- * agents that used it go back to the computer's own sign-in now; the runner
+ * agents that used it are released now (`releaseAgents`); the runner
  * signs the CLI out there and deletes the folder now, or at its next hello
  * when the computer is off, and the row goes then. Audited.
  */

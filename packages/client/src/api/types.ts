@@ -217,6 +217,8 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
+  /** Edits: the owner confirmed answering other people on their personal plan (a wider audience, the first time). */
+  acceptPlanTerms?: boolean;
 }
 
 export interface Model {
@@ -3135,14 +3137,21 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
-  /** The accounts added on the agent's computer (both kinds); "Conta deste computador" isn't listed. */
+  /**
+   * The agent's owner's accounts on its computer (both kinds) and the one it thinks with; "Conta deste
+   * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0056).
+   */
   accounts: MachineAccount[];
-  /** Who connected the agent's computer; null without one, or when nobody did (the Cloud's). */
-  accountsOwner: { id: string; name: string } | null;
-  /** The viewer adds accounts there (they connected it, or nobody did); each account is picked by its owner only. */
+  /** The viewer may add an account there for this agent: its owner, on a computer where they add accounts. */
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
+  /** "Só responde a você": nobody but the agent's owner talks to it. */
+  onlyOwner: boolean;
+  /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
+  canUsePlans: boolean;
+  /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
+  ownSignIn: boolean;
 }
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
@@ -3175,10 +3184,14 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** The person confirmed the personal-subscription warning (switching to Claude Code or Codex). */
+  /** "Só responde a você": false lets everyone talk to it (on the API, whoever did before a plan). */
+  onlyOwner?: boolean;
+  /** The owner confirmed answering other people on their personal plan (with `onlyOwner: false`, the first time). */
   acceptPlanTerms?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
+  /** The account thinks for another agent: take it from that one. */
+  moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
 }
 

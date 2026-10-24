@@ -58,6 +58,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { CLOUD } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
+import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
 import { cleanSite, SITE } from "@/components/browser/sites";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";
@@ -462,7 +463,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const api = useApi();
   const toast = useToast();
   const refresh = useRefresh();
-  const { agent, g, saved, can, draft } = useAgentEdit();
+  const { agent, g, saved, can, draft, ownerFirst } = useAgentEdit();
   const work = useWork();
   const models = useModels();
   const credentials = useCredentials(org.id, canDo(org.role, "manage_credentials"));
@@ -482,7 +483,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
+  // "Só responde a você" (ADR 0056 §5): switched onto a plan, the agent answers only its owner until they say otherwise.
+  const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
+  const [asking, setAsking] = useState(false);
   const offId = useId();
+  const shareId = useId();
   // A brain switched off in this very Mac's Ferramentas (agentes for Mac): one click to turn it on (ADR 0036).
   const toolOffHere =
     useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
@@ -520,14 +525,17 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
   const savedEffort: BrainEffortSetting = isAuto(view.effort) ? AUTO : shownEffort(view.effort);
   const effortChanged = kind !== "model" && effortToSave !== savedEffort;
-  // A plan brain not saved yet: the person confirms the warning with the button itself.
+  const savedOnlyOwner = kind === view.brain ? view.onlyOwner : true;
+  const onlyOwner = share?.kind === kind ? share.onlyOwner : savedOnlyOwner;
+  const shareChanged = kind !== "model" && onlyOwner !== savedOnlyOwner;
+  // A plan brain not saved yet: the button says whose plan it is.
   const planKind = kind !== "model" && kind !== view.brain ? kind : null;
-  const plan = planKind !== null;
   const unchanged =
     kind === view.brain &&
     fallback === view.fallback &&
     !accountChanged &&
     !effortChanged &&
+    !shareChanged &&
     (kind === "model"
       ? model === saved.model && key === (saved.key ?? DEFAULT_KEY)
       : planModel === view.effectiveModel);
@@ -558,27 +566,37 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           brain: kind,
           model: planModel === option?.defaultModel ? null : planModel,
           fallback,
-          ...(plan ? { acceptPlanTerms: true } : {}),
           ...(effortChanged ? { effort: effortToSave } : {}),
-          ...(accountChanged && view.canManageAccounts ? { account } : {}),
+          ...(accountChanged && view.canUsePlans ? { account } : {}),
+          ...(shareChanged ? { onlyOwner, ...(onlyOwner ? {} : { acceptPlanTerms: true }) } : {}),
         });
       }
       refresh();
-      const onlyAccount =
-        accountChanged &&
-        !effortChanged &&
-        kind === view.brain &&
-        fallback === view.fallback &&
-        planModel === view.effectiveModel;
-      toast.show(
-        onlyAccount
-          ? account === null
-            ? t("agentPage.work.saved.accountHere", { ...g, computer: computerName })
-            : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
-          : moves
-            ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName(kind), computer: moves.name })
-            : t("agentPage.work.saved.brain", { ...g, brain: brainName(kind) }),
-      );
+      const same =
+        !effortChanged && kind === view.brain && fallback === view.fallback && planModel === view.effectiveModel;
+      const onlyAccount = accountChanged && !shareChanged && same;
+      const onlyShare = shareChanged && !accountChanged && same;
+      if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
+        // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
+        toast.show(t("aiAccounts.share.backOnApi", g), "info", {
+          label: agent.audience?.userIds?.length ? t("aiAccounts.share.letPeople") : t("aiAccounts.share.letEveryone"),
+          run: () =>
+            void api.agents
+              .setBrain(org.id, agent.id, { onlyOwner: false })
+              .then(refresh, () => toast.show(t("agentPage.work.failed"), "error")),
+        });
+      } else
+        toast.show(
+          onlyShare
+            ? t(onlyOwner ? "aiAccounts.share.savedOwner" : "aiAccounts.share.savedEveryone", g)
+            : onlyAccount
+              ? account === null
+                ? t("agentPage.work.saved.accountHere", { ...g, computer: computerName })
+                : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
+              : moves
+                ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName(kind), computer: moves.name })
+                : t("agentPage.work.saved.brain", { ...g, brain: brainName(kind) }),
+        );
       onClose();
     } catch {
       toast.show(t("agentPage.work.failed"), "error");
@@ -624,7 +642,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     {
       value: HERE,
       label: t("agentPage.work.brain.thisComputer", { computer: computerName }),
-      description: t("agentPage.work.brain.thisComputerText", { computer: computerName }),
+      // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0056 §3).
+      disabled: !view.ownSignIn && view.account !== null,
+      description: view.ownSignIn
+        ? t("agentPage.work.brain.thisComputerText", { computer: computerName })
+        : t("aiAccounts.share.hereNotYours", { computer: computerName }),
       leading: accountIcon,
     },
     ...accounts.map((a) => {
@@ -654,12 +676,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ),
     },
   ];
-  const owner = view.accountsOwner?.name.split(" ")[0] ?? "";
-  // The account says why only when it must: signed out, or only the computer's owner changes it.
+  // The account says why only when it must: signed out, or only the agent's owner changes it.
   const accountNote = signedOut
     ? t("agentPage.work.brain.accountSignedOut")
-    : !view.canManageAccounts && owner
-      ? t("agentPage.work.brain.accountLocked", { name: owner })
+    : !view.canUsePlans && ownerFirst
+      ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
       : null;
   const accountField = accountsOn && accountKind && (
     <BrainField>
@@ -667,7 +688,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         className="agp-brainsel"
         aria-label={t(`agentPage.work.brain.account.${accountKind}`)}
         value={account ?? HERE}
-        disabled={!view.canManageAccounts}
+        disabled={!view.canUsePlans}
         onValueChange={(v) => {
           if (v === ADD) return setAdding(true);
           setArrived(null);
@@ -714,6 +735,42 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         />
       )}
       {accountField}
+      {agent.ownerUserId && (
+        <div className="agp-brainshare">
+          <label className="agp-brainoff" htmlFor={shareId}>
+            <b>
+              {view.canUsePlans
+                ? t("aiAccounts.share.switch")
+                : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" })}
+            </b>
+            <span>
+              {view.canUsePlans
+                ? t(onlyOwner ? "aiAccounts.share.on" : "aiAccounts.share.off", g)
+                : t(onlyOwner ? "aiAccounts.share.onOther" : "aiAccounts.share.offOther", { owner: ownerFirst ?? "" })}
+            </span>
+          </label>
+          <Switch
+            id={shareId}
+            checked={onlyOwner}
+            // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
+            disabled={!view.canUsePlans && onlyOwner}
+            onCheckedChange={(on) => (on ? setShare({ kind, onlyOwner: true }) : setAsking(true))}
+          />
+        </div>
+      )}
+      {asking && accountKind && (
+        <SharePlanDialog
+          agentName={agent.name}
+          brain={accountKind}
+          plan={current?.plan ?? null}
+          everyone
+          onAccept={() => {
+            setShare({ kind: accountKind, onlyOwner: false });
+            setAsking(false);
+          }}
+          onKeep={() => setAsking(false)}
+        />
+      )}
       <div className="ac-optcard__foot">
         <label className="agp-brainoff" htmlFor={offId}>
           <b>{t("agentPage.work.brain.fallbackTitle", { computer: whereName })}</b>
@@ -844,22 +901,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       </DialogBody>
       <Footer
         note={
-          planKind ? (
-            <span className="agp-wdlg__note">
-              <Icon name="alert" size={14} />
-              <span>
-                <Trans i18nKey={`agentPage.work.planNote.${planKind}`} components={{ b: <b /> }} />
-              </span>
-            </span>
-          ) : (
-            <span className="agp-wdlg__note">
-              <Trans
-                i18nKey={moves ? "agentPage.work.brain.previewMoved" : "agentPage.work.brain.preview"}
-                values={{ brain: brainName(kind), computer: moves?.name ?? "" }}
-                components={{ b: <b /> }}
-              />
-            </span>
-          )
+          <span className="agp-wdlg__note">
+            <Trans
+              i18nKey={moves ? "agentPage.work.brain.previewMoved" : "agentPage.work.brain.preview"}
+              values={{ brain: brainName(kind), computer: moves?.name ?? "" }}
+              components={{ b: <b /> }}
+            />
+          </span>
         }
         disabled={unchanged || adding || (kind !== "model" && !home)}
         busy={busy}

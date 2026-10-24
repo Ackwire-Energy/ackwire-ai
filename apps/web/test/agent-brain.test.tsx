@@ -5,7 +5,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { type BrainChoice, changedKeys, needsPlanWarning, type Saved, sameBrain, termsPending } from "@/lib/agent-edit";
+import { type BrainChoice, changedKeys, type Saved, sameBrain } from "@/lib/agent-edit";
 import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -123,11 +123,10 @@ describe("Quem pensa (its dialog)", () => {
     expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  test("Claude Code: the agent moves to the MacBook first, then thinks there; the plan warning is the button", async () => {
+  test("Claude Code: the agent moves to the MacBook first, then thinks there; the button says whose plan", async () => {
     const { state } = await open();
     const d = await brainDialog();
     await click(card(d, /^Claude Code/));
-    expect(d.textContent).toContain("O plano do Claude é seu, pessoal.");
     // The agent moves to the MacBook: its accounts there aren't offered yet.
     expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
     await model(d, /^Opus$/);
@@ -138,9 +137,8 @@ describe("Quem pensa (its dialog)", () => {
     await settle(6);
     expect(callOrder(state)).toEqual(["sandbox.setTarget", "agents.setBrain"]);
     expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args.slice(1)).toEqual([ADA_ID, "machine_1"]);
-    expect(brainCalls(state)).toEqual([
-      { brain: "claude_code", model: "opus", fallback: false, acceptPlanTerms: true },
-    ]);
+    // Choosing a plan asks nothing: it answers only its owner until they say otherwise.
+    expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: "opus", fallback: false }]);
     expect(document.body.textContent).toContain("A Ada agora pensa com Claude Code · Opus no MacBook.");
     expect(screen().queryByRole("dialog", { name: "Quem pensa" })).toBeNull();
   });
@@ -154,7 +152,6 @@ describe("Quem pensa (its dialog)", () => {
     const d = await brainDialog();
     expect(card(d, /^Codex/).getAttribute("aria-checked")).toBe("true");
     await model(d, /Luna/);
-    expect(d.textContent).not.toContain("é seu, pessoal");
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "codex", model: "gpt-6-luna", fallback: true });
@@ -267,11 +264,11 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     ]);
   });
 
-  test("only the computer's owner changes the account; an old app on the computer shows nothing about it", async () => {
-    await onMac({ canManageAccounts: false });
+  test("only the agent's owner changes the account; an old app on the computer shows nothing about it", async () => {
+    await onMac({ canUsePlans: false, canManageAccounts: false });
     let d = await brainDialog();
     expect(within(d).getByRole("combobox", { name: "Conta do Claude" }).hasAttribute("disabled")).toBe(true);
-    expect(d.textContent).toContain("Só Walter troca");
+    expect(d.textContent).toContain("Só João troca");
     cleanup();
     await onMac({ accountsSupported: false });
     expect(sentence().textContent).not.toContain("Conta deste MacBook");
@@ -382,30 +379,13 @@ describe("Quem pensa: the draft", () => {
   };
   const api: BrainChoice = { brain: "model", model: null, fallback: true };
 
-  test("only real differences count; the warning only for a plan brain not saved yet", () => {
+  test("only real differences count", () => {
     expect(changedKeys(saved, { brain: { ...api } })).toEqual([]);
     expect(sameBrain(api, { ...api, model: "opus" })).toBe(true);
     expect(changedKeys(saved, { brain: { ...api, fallback: false } }).map((c) => c.key)).toEqual(["brain"]);
     expect(
       changedKeys(saved, { brain: { brain: "claude_code", model: null, fallback: true } }).map((c) => c.key),
     ).toEqual(["brain"]);
-    expect(needsPlanWarning("model", "claude_code")).toBe(true);
-    expect(needsPlanWarning("claude_code", "claude_code")).toBe(false);
-    expect(needsPlanWarning("claude_code", "codex")).toBe(true);
-    expect(needsPlanWarning("codex", "model")).toBe(false);
-  });
-
-  test("acceptPlanTerms only after the person confirmed: an unconfirmed switch blocks the save", () => {
-    const cc: BrainChoice = { brain: "claude_code", model: null, fallback: true };
-    expect(termsPending("model", cc)).toBe(true);
-    expect(termsPending("model", { ...cc, termsAccepted: false })).toBe(true);
-    expect(termsPending("model", { ...cc, termsAccepted: true })).toBe(false);
-    // Already saved, or back to the API: nothing to confirm.
-    expect(termsPending("claude_code", cc)).toBe(false);
-    expect(termsPending("claude_code", api)).toBe(false);
-    expect(termsPending("model", undefined)).toBe(false);
-    // The confirmation doesn't count as a change.
-    expect(sameBrain(cc, { ...cc, termsAccepted: true })).toBe(true);
   });
 });
 
@@ -469,12 +449,7 @@ describe("Quem pensa: Automático", () => {
     expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
-    expect(brainCalls(state).at(-1)).toEqual({
-      brain: "claude_code",
-      model: "auto",
-      fallback: true,
-      acceptPlanTerms: true,
-    });
+    expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: "auto", fallback: true });
   });
 
   test("a saved Automático reads as such in the cell", async () => {

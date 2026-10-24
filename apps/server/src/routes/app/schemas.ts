@@ -64,7 +64,7 @@ export const Credential = z
   })
   .openapi("Credential");
 
-/** Who can talk to an agent. `userIds` only for `people`; the owner always can. */
+/** Who can talk to an agent. `userIds` for `people` (under `owner`: the people a plan kept out); the owner always can. */
 export const AgentAudience = z
   .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
   .openapi("AgentAudience");
@@ -423,15 +423,21 @@ export const AgentBrain = z
       .nullable()
       .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
     effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run; null = the CLI's default." }),
-    accounts: z.array(MachineAccount).openapi({ description: "The accounts on the agent's computer, both kinds." }),
-    accountsOwner: z
-      .object({ id: z.string(), name: z.string() })
-      .nullable()
-      .openapi({ description: "Who connected the agent's computer; null: nobody did." }),
+    accounts: z.array(MachineAccount).openapi({
+      description: "The agent's owner's accounts on its computer, both kinds, and the one it thinks with (ADR 0056).",
+    }),
     canManageAccounts: z.boolean().openapi({
-      description: "The caller adds accounts on the agent's computer (they connected it, or nobody did).",
+      description:
+        "The caller may add an account there for this agent: its owner, on a computer where they add accounts.",
     }),
     accountsSupported: z.boolean().openapi({ description: "The computer's runner knows accounts (protocol 13)." }),
+    onlyOwner: z.boolean().openapi({ description: '"Só responde a você": nobody but its owner talks to it.' }),
+    canUsePlans: z.boolean().openapi({
+      description: "The caller owns the agent: only they choose its plan and let other people talk to it on a plan.",
+    }),
+    ownSignIn: z.boolean().openapi({
+      description: "The computer's own sign-in can think for it: the person who connected the computer owns the agent.",
+    }),
   })
   .openapi("AgentBrain");
 

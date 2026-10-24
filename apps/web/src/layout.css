@@ -7615,6 +7615,12 @@ a.machine-row__name:hover {
   color: var(--muted);
   font-size: 12.5px;
 }
+/* "Só responde a você", under the account: what it means now, the switch at the end. */
+.agp-brainshare {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 /* "Adicionar conta": the provider's own sign-in, in numbered steps. */
 .agp-addacct {
   display: flex;
