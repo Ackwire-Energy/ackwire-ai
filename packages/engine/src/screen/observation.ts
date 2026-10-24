@@ -1,12 +1,17 @@
+import type { ScreenKind } from "@agenteschat/adapters";
+
 /**
  * What an agent sees on a screen (ADR 0054): the page or window as text, one
  * line per node with a ref for each element it can act on (`button "Save"
  * [ref=e3]`, as `agent-browser`'s snapshot writes it), and what changed
  * between two looks. Surface-agnostic: the browser fills it from its
- * snapshot today; a desktop surface can fill it from the OS accessibility
- * tree later, and everything built on it (targets in words, checks, plans)
+ * snapshot; a desktop surface fills it from the OS accessibility tree
+ * (ADR 0057), and everything built on it (targets in words, checks, plans)
  * works the same.
  */
+
+/** What a screen shows, in the words plans and reports use. */
+export const SCREEN_NOUN: Record<ScreenKind, string> = { browser: "page", desktop: "screen" };
 
 /** One element the agent can act on. */
 export interface ScreenElement {
@@ -24,6 +29,8 @@ export interface ScreenElement {
 
 export interface ScreenObservation {
   url: string | null;
+  /** The window's title, on a desktop (screen text). */
+  title?: string;
   /** The screen as text, one node per line (indentation is nesting). */
   lines: string[];
   elements: ScreenElement[];
@@ -31,14 +38,24 @@ export interface ScreenObservation {
   at: number;
 }
 
-/** A still image of the screen (JPEG), with the size of the page in CSS pixels it shows. */
+/** A rectangle in the surface's pixels: CSS pixels of a page, screen pixels of a desktop. */
+export interface ScreenRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A still image of the screen (JPEG), with the size of what it shows in the surface's pixels. */
 export interface ScreenImage {
   data: string;
   width: number;
   height: number;
-  /** The page's size in CSS pixels (points on the image map onto it). */
+  /** The size of what it shows (points on the image map onto it). */
   viewport: { width: number; height: number };
-  /** Elements drawn on it with their number and box (CSS pixels), when it was annotated. */
+  /** A close-up of part of the screen: where its top left corner is (the whole screen when absent). */
+  origin?: { x: number; y: number };
+  /** Elements drawn on it with their number and box, when it was annotated. */
   marks?: ScreenMark[];
 }
 
@@ -47,7 +64,7 @@ export interface ScreenMark {
   number: number;
   role: string;
   name?: string;
-  box: { x: number; y: number; width: number; height: number };
+  box: ScreenRegion;
 }
 
 const REF = /\bref=(e\d+)\b/;
@@ -81,6 +98,7 @@ const PLACES = new Set([
   "heading",
   "Iframe",
   "iframe",
+  "window",
 ]);
 
 /** A table row has no name of its own in the snapshot: its cells say which row it is. */
@@ -110,6 +128,7 @@ interface Node {
 export function observeSnapshot(input: {
   text: string;
   url?: string | null;
+  title?: string | null;
   refs?: unknown;
   at?: number;
 }): ScreenObservation {
@@ -184,7 +203,13 @@ export function observeSnapshot(input: {
     const name = typeof meta?.name === "string" ? meta.name : "";
     elements.push({ ref, role, name, line: `${role} "${name}" [ref=${ref}]`, context: [], index: lines.length });
   }
-  return { url: input.url ?? null, lines, elements, at: input.at ?? Date.now() };
+  return {
+    url: input.url ?? null,
+    ...(input.title ? { title: input.title } : {}),
+    lines,
+    elements,
+    at: input.at ?? Date.now(),
+  };
 }
 
 /** How an element reads to a judge: its line plus where it sits. */
@@ -255,7 +280,7 @@ export function screenDigest(o: ScreenObservation): string {
   return `${documentOf(o.url) ?? ""}#${(h >>> 0).toString(36)}:${o.lines.length}`;
 }
 
-const STRUCTURE = new Set(["heading", "dialog", "alertdialog", "alert", "status", "tab", "Iframe", "iframe"]);
+const STRUCTURE = new Set(["heading", "dialog", "alertdialog", "alert", "status", "tab", "Iframe", "iframe", "window"]);
 
 /**
  * What the agent can act on, for its first look at a page: elements with a

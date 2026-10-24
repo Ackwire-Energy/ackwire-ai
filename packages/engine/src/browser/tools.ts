@@ -255,6 +255,12 @@ const TRAIL_TOOL: Record<ScreenVerb, BrowserToolName> = {
   wait: "browser_wait",
   back: "browser_back",
   read: "browser_read",
+  // Desktop verbs: `browser_do` takes none of them (`VERBS`).
+  focus: "browser_click",
+  double_click: "browser_click",
+  right_click: "browser_click",
+  drag: "browser_click",
+  type: "browser_fill",
 };
 
 function trailOf(report: PlanReport) {
@@ -362,6 +368,8 @@ function stepOf(v: unknown): ScreenStep | null {
   }
   if (typeof s.pixels === "number") out.pixels = s.pixels;
   if (typeof s.seconds === "number") out.seconds = s.seconds;
+  // The browser scrolls the page: a scroll's target (scrolling over an element, on a desktop) isn't looked for.
+  if (out.do === "scroll") delete out.target;
   return out;
 }
 
