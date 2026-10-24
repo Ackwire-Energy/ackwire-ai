@@ -14,15 +14,22 @@ const ids = { orgId: "o", agentId: "a", runId: "r" };
 
 type Answer = { box: JudgeBox; present: number };
 
-/** Jev's Box: `full` on the whole screen, `close` on a close-up (the image's data says which). */
+const where = (call: { questions: Record<string, unknown> } | undefined) =>
+  (call?.questions.where as { instructions?: string } | undefined)?.instructions ?? "";
+
+/** Jev's Box: `full` on the whole screen, `close` on a close-up (the question says which). */
 function boxes(full: Answer, close?: Answer) {
   return createFakeJudge((kind, id, _state, _q, request) => {
     if (kind !== "screen_locate") return undefined;
-    const a = Object.values(request.images ?? {})[0]?.data === "CLOSE" ? close : full;
+    const a = where(request).includes("is a close-up") ? close : full;
     if (!a) return undefined;
     return id === "present" ? a.present : { box: a.box, confidence: 0.8 };
   });
 }
+
+/** The size and format of the image a judge was shown. */
+const shown = (call: { images?: Record<string, { data: string }> } | undefined) =>
+  new Bun.Image(Buffer.from(Object.values(call?.images ?? {})[0]?.data ?? "", "base64")).metadata();
 
 /** A close-up taker that records the regions asked for. */
 function zoomer(make: (region: ScreenRegion) => ScreenImage | null = closeUpOf) {
@@ -36,22 +43,21 @@ function zoomer(make: (region: ScreenRegion) => ScreenImage | null = closeUpOf) 
   };
 }
 
-const where = (call: { questions: Record<string, unknown> } | undefined) =>
-  (call?.questions.where as { instructions?: string } | undefined)?.instructions ?? "";
-
 /** A menu item's size on a 1280×800 screen, and where it sits once looked at up close. */
 const SMALL: Answer = { box: { top: 0.1, bottom: 0.13, left: 0.2, right: 0.25 }, present: 0.9 };
 const UP_CLOSE: Answer = { box: { top: 0.4, bottom: 0.5, left: 0.5, right: 0.6 }, present: 0.85 };
 
 describe("a target on the screen image", () => {
-  test("a small box is looked at again on a close-up around it, and the close-up's point is taken", async () => {
+  test("a small box is looked at again on an enlarged close-up around it, and the close-up's point is taken", async () => {
     const judge = boxes(SMALL, UP_CLOSE);
     const z = zoomer();
     const base = { ...ids, target: "Settings in the menu", kind: "desktop" as const, zoom: z.zoom };
     const spot = await locateOnImage({ ...base, judge, image: screenImage() });
-    // The first box's center (288, 92): 480×300 around it, moved down to stay on the screen.
-    expect(z.asked).toEqual([{ x: 48, y: 0, width: 480, height: 300 }]);
-    expect(spot).toEqual({ found: true, x: 312, y: 135, ref: null, confidence: 0.85 });
+    // The first box's center (288, 92): 240×150 around it, moved down to stay on the screen.
+    expect(z.asked).toEqual([{ x: 168, y: 17, width: 240, height: 150 }]);
+    // Jev sees it twice as large; its box maps back onto those 240×150 screen pixels.
+    expect(await shown(judge.calls[1])).toEqual({ width: 480, height: 300, format: "jpeg" });
+    expect(spot).toEqual({ found: true, x: 300, y: 85, ref: null, confidence: 0.85 });
     expect(judge.calls).toHaveLength(2);
     expect(where(judge.calls[0])).toStartWith("In `screenshot` (a computer's desktop: windows, menus, a panel)");
     expect(where(judge.calls[1])).toStartWith("`screenshot` is a close-up of part of a computer's desktop.");
@@ -59,16 +65,68 @@ describe("a target on the screen image", () => {
     const marked = await locateOnImage({
       ...base,
       judge,
-      image: screenImage([{ ref: "e7", number: 7, role: "menuitem", box: { x: 300, y: 125, width: 120, height: 24 } }]),
+      image: screenImage([{ ref: "e7", number: 7, role: "menuitem", box: { x: 250, y: 75, width: 120, height: 24 } }]),
     });
     expect(marked).toMatchObject({ found: true, ref: "e7" });
+  });
+
+  test("a close-up shows three times a taller box's height, and Jev sees it at 480×300", async () => {
+    // A folder's first box on its icon, 77×88 on the screen.
+    const folder: Answer = { box: { top: 0.29, bottom: 0.4, left: 0.7, right: 0.76 }, present: 0.9 };
+    const judge = boxes(folder, UP_CLOSE);
+    const z = zoomer();
+    const spot = await locateOnImage({ judge, ...ids, target: "x", image: screenImage(), zoom: z.zoom });
+    expect(z.asked).toEqual([{ x: 723, y: 144, width: 422, height: 264 }]);
+    expect(await shown(judge.calls[1])).toEqual({ width: 480, height: 300, format: "jpeg" });
+    expect(spot).toEqual({ found: true, x: 955, y: 263, ref: null, confidence: 0.85 });
+  });
+
+  test("a target boxed whole up close is taken, up to the largest first box that gets a close-up", async () => {
+    for (const screen of [
+      { width: 1280, height: 800 },
+      { width: 1280, height: 900 },
+    ]) {
+      // [width, height] of the first box: a glyph, a folder's icon, the largest, a menu row.
+      for (const [w, h] of [
+        [0.02, 0.02],
+        [0.06, 0.08],
+        [0.14, 0.14],
+        [0.14, 0.03],
+      ] as const) {
+        const first: JudgeBox = { top: 0.4, bottom: 0.4 + h, left: 0.5, right: 0.5 + w };
+        const at = { x: (0.5 + w / 2) * screen.width, y: (0.4 + h / 2) * screen.height };
+        const z = zoomer();
+        // Up close, the whole target: 1.4 times as tall and 1.15 times as wide as at first (an icon with its name).
+        const judge = createFakeJudge((kind, id, _state, _q, request) => {
+          if (kind !== "screen_locate") return undefined;
+          if (id === "present") return 0.9;
+          const r = z.asked[0];
+          if (!r || !where(request).includes("is a close-up")) return { box: first, confidence: 0.8 };
+          const [halfW, halfH] = [(1.15 * w * screen.width) / 2, (1.4 * h * screen.height) / 2];
+          const box = {
+            left: (at.x - halfW - r.x) / r.width,
+            right: (at.x + halfW - r.x) / r.width,
+            top: (at.y - halfH - r.y) / r.height,
+            bottom: (at.y + halfH - r.y) / r.height,
+          };
+          return { box, confidence: 0.8 };
+        });
+        const image = { ...screenImage(), width: screen.width, height: screen.height, viewport: screen };
+        const spot = await locateOnImage({ judge, ...ids, target: "x", kind: "desktop", image, zoom: z.zoom });
+        expect(spot).toMatchObject({ found: true });
+        if (!spot.found) continue;
+        expect(Math.abs(spot.x - at.x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(spot.y - at.y)).toBeLessThanOrEqual(1);
+        expect(judge.calls).toHaveLength(2);
+      }
+    }
   });
 
   test("the close-up stays inside the screen at its edge", async () => {
     const corner: Answer = { box: { top: 0.985, bottom: 0.99, left: 0.98, right: 0.99 }, present: 0.9 };
     const z = zoomer();
     await locateOnImage({ judge: boxes(corner, UP_CLOSE), ...ids, target: "x", image: screenImage(), zoom: z.zoom });
-    expect(z.asked).toEqual([{ x: 800, y: 500, width: 480, height: 300 }]);
+    expect(z.asked).toEqual([{ x: 1040, y: 650, width: 240, height: 150 }]);
   });
 
   test("a large box needs no close-up", async () => {
@@ -124,13 +182,18 @@ describe("a target on the screen image", () => {
     expect(
       await locateOnImage({ judge: none, ...ids, target: "x", image: screenImage(), zoom: zoomer(() => null).zoom }),
     ).toEqual(first);
-    // An image that doesn't say where it sits can't be mapped back: it isn't even asked about.
-    const nowhere = boxes(SMALL, UP_CLOSE);
-    const unplaced = zoomer((r) => ({ ...closeUpOf(r), origin: undefined }));
-    expect(
-      await locateOnImage({ judge: nowhere, ...ids, target: "x", image: screenImage(), zoom: unplaced.zoom }),
-    ).toEqual(first);
-    expect(nowhere.calls).toHaveLength(1);
+    // An image that doesn't say where it sits can't be mapped back, and one that can't be enlarged
+    // isn't one: neither is asked about.
+    for (const make of [
+      (r: ScreenRegion) => ({ ...closeUpOf(r), origin: undefined }),
+      (r: ScreenRegion) => ({ ...closeUpOf(r), data: "bm90IGFuIGltYWdl" }),
+    ]) {
+      const judge = boxes(SMALL, UP_CLOSE);
+      expect(
+        await locateOnImage({ judge, ...ids, target: "x", image: screenImage(), zoom: zoomer(make).zoom }),
+      ).toEqual(first);
+      expect(judge.calls).toHaveLength(1);
+    }
   });
 
   test("words that can't be undone are never taken at a bare point, on any screen", async () => {
@@ -162,8 +225,8 @@ describe("plans with images", () => {
       { do: "click", target: "the gear icon" },
     ]);
     expect(report.stopped).toBeUndefined();
-    expect(zooming.captures).toEqual([undefined, { x: 48, y: 0, width: 480, height: 300 }]);
-    expect(acted(zooming.actions)).toEqual([{ kind: "click", at: { x: 312, y: 135 } }]);
+    expect(zooming.captures).toEqual([undefined, { x: 168, y: 17, width: 240, height: 150 }]);
+    expect(acted(zooming.actions)).toEqual([{ kind: "click", at: { x: 300, y: 85 } }]);
     expect(report.steps[0]?.via).toBe("image");
 
     const flat = boxes(SMALL, UP_CLOSE);
