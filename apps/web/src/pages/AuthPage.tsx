@@ -1,4 +1,5 @@
 import { ApiError, type SignInOptions, type SignInProvider, useApi, useAuthConfig } from "@agenteschat/client";
+import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -138,7 +139,14 @@ export function AuthPage({
     setPending(false);
     if (!result.ok) {
       setWrong(result.status === 401);
-      setError(result.status === 401 ? null : result.message || t("common.unknownError"));
+      // Checked by code: a refused origin is a 403 too, and its own words tell an admin what to fix.
+      setError(
+        result.status === 401
+          ? null
+          : result.code === ACCOUNT_BLOCKED
+            ? t("auth.accountBlocked")
+            : result.message || t("common.unknownError"),
+      );
       return;
     }
     rememberSignIn("email");

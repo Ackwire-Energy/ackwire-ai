@@ -9,7 +9,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
- * An agent's action card (ADR 0057, `meta.actionCard`) in place of its text: what needs a person's
+ * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's
  * credentials or consent, one click away. "Conectar uma IA" opens the Connect dialog at the card's step for
  * the agents it names (the dialog says what each person may do), and reads "Conectado" once they can think.
  */

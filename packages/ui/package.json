@@ -22,6 +22,7 @@
       "types": "./src/computer/portrait.d.ts",
       "default": "./src/computer/portrait.js"
     },
+    "./brand/marks": "./src/brand/marks.ts",
     "./sky/engine": "./src/sky/engine.ts",
     "./sky/math": "./src/sky/math.ts",
     "./sky/avatar": "./src/sky/avatar.ts",

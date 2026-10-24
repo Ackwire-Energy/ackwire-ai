@@ -1,7 +1,7 @@
 import type { AiStatus, ConnectIntent, MachineAccountKind } from "../api/types";
 
 /**
- * No AI connected (ADR 0057): an agent's card when it can't answer, and the Connect step a person who
+ * No AI connected (ADR 0061): an agent's card when it can't answer, and the Connect step a person who
  * met it asked for. Platform-neutral (web and phone).
  */
 

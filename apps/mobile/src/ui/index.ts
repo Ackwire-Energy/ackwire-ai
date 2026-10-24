@@ -58,6 +58,7 @@ export {
   useScrollUnderPushedOptions,
 } from "./navigation";
 export { PressScale, type PressScaleProps } from "./PressScale";
+export { ProviderLogo, type ProviderLogoProps } from "./ProviderLogo";
 export { Row, type RowProps } from "./Row";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";

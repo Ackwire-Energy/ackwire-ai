@@ -672,6 +672,10 @@ export const featureKeysPtBR = {
       reaction_other: "{{names}} reagiram",
       browser_handoff_one: "{{names}} precisa de você no navegador",
       browser_handoff_other: "{{names}} precisam de você no navegador",
+      org_standing_one: "O status do workspace mudou",
+      org_standing_other: "O status do workspace mudou",
+      computer_ready_one: "O computador do seu workspace está pronto",
+      computer_ready_other: "O computador do seu workspace está pronto",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
@@ -1026,6 +1030,7 @@ export const featureKeysPtBR = {
       saved: "Memória corrigida",
       forgotten: "Esquecido",
     },
+    thinks: "Pensa com",
     uses: {
       title: "O que pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },

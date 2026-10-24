@@ -7,6 +7,8 @@ import type { BrowserFrameMetadata } from "@agenteschat/adapters";
 
 /** The scope of the browser tools: on by default, and not covered by "all tools". */
 export const BROWSER_SCOPE = "browser:use";
+/** The scope of the agent's desktop: driving it runs anything on the computer, so "all tools" never covers it. */
+export const DESKTOP_SCOPE = "desktop:use";
 
 /** The tools agents get with `browser:use`, the same for every brain. */
 export const BROWSER_TOOLS = [
@@ -62,6 +64,15 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
     description: "Asks a person to do something on the page (like signing in) and waits until they're done.",
   },
   browser_close: { label: "Close the browser", description: "Closes the agent's browser; logins stay saved." },
+};
+
+/** The desktop's own tools under `desktop:use` (ADR 0058); desktop computer use adds its own. */
+export const DESKTOP_TOOL_INFO = {
+  desktop_ask_person: {
+    label: "Ask for help on the desktop",
+    description:
+      "Asks a person to do something on the agent's desktop (like signing in to an app) and waits until they're done.",
+  },
 };
 
 /** How a handoff ended, as the agent reads it when it resumes (ADR 0040 §6). */

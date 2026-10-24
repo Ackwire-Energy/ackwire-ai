@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
+import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
 import { runRequester } from "./cancel";
 import { requireChannelAccess } from "./channels";
@@ -233,12 +234,13 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, role: Mem
 }
 
 /**
- * "Responder agora" (`POST …/messages/{id}/answer-now`, ADR 0057), once an AI is connected. The id is a
+ * "Responder agora" (`POST …/messages/{id}/answer-now`, ADR 0061), once an AI is connected. The id is a
  * no-AI card (its agent's newest run in that conversation) or the person's message (the runs it started,
  * else its `no_ai` routing decision). A failed `no_ai` run that did nothing starts again on the person's
  * own message (one that did something: 409 `run.not_restartable`); a `no_ai` decision is routed again. Who
  * asked, the agent's owner or an admin (like "Continuar"). 409 `ai.still_missing` while there's still none;
- * pressed again, it returns what answers the message.
+ * 403 `audience.*` when the agent no longer answers who asked; pressed again, it returns what answers the
+ * message.
  */
 export async function answerNow(
   deps: AnswerNowDeps,
@@ -260,9 +262,14 @@ export async function answerNow(
     const ready: AnsweringRun[] = [];
     for (const r of allowed) if ((await agentAiState(deps, r.agent, r.run)).state !== "no_ai") ready.push(r);
     if (ready.length === 0) throw stillMissing();
+    // Who the agent answers may have narrowed since (a personal plan answers only its owner, ADR 0059 §5):
+    // a run starts again only for someone it still answers.
+    const heard = ready.filter((r) => canTalkTo(r.agent, r.requester));
+    const [first] = ready;
+    if (heard.length === 0 && first) throw await audienceError(deps.db, first.agent);
     const runs: Answering = [];
     let worked = false;
-    for (const r of ready) {
+    for (const r of heard) {
       const started = await restartNoAiRun(deps, userId, r.run);
       if (started === "worked") worked = true;
       else if (started) runs.push(started);

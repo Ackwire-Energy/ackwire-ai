@@ -195,6 +195,8 @@ export interface AgentBrainLine {
   /** A computer brain's model ("Sonnet"); null for the model brain. */
   model: string | null;
   computer?: string;
+  /** A plan account's provider (`zai`, `kimi`…), whose mark replaces the brain's; absent for the CLI's own sign-in. */
+  provider?: string | null;
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -215,6 +217,8 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
+  /** Edits: the owner confirmed answering other people on their personal plan (a wider audience, the first time). */
+  acceptPlanTerms?: boolean;
 }
 
 export interface Model {
@@ -342,7 +346,7 @@ export interface MessageReceipts {
 /** What a person who met "no AI" asked for (Jev): a Connect dialog step; `any` and `task` open its first step. */
 export type ConnectIntent = "claude" | "chatgpt" | "api_key" | "any" | "task";
 
-/** `GET …/ai-status` (ADR 0057): whether each agent has an AI to think with, and whether the organization has any. */
+/** `GET …/ai-status` (ADR 0061): whether each agent has an AI to think with, and whether the organization has any. */
 export interface AiStatus {
   /** An agent that isn't archived is ready, or waits for its computer. */
   any: boolean;
@@ -2008,14 +2012,17 @@ export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: s
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
-/** `GET …/machines`: a computer connected with `agentes-runner`. */
-/** Where a computer came from: a person paired it, it is the server's own, or the workspace's own. */
+/** `connected`: a person paired it; `host`: the server's own; `managed`: the workspace's own (ADR 0056 §10). */
 export type MachineKind = "connected" | "host" | "managed";
 
+/** `GET …/machines`: a computer connected with `agentes-runner`. */
 export interface Machine {
   id: string;
   name: string;
-  /** Absent from a server that doesn't say: `connected`. */
+  /**
+   * Absent from a server that doesn't say: `connected`. A `managed` one can't be removed, and its hostname,
+   * OS and arch are blank.
+   */
   kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
@@ -2079,15 +2086,18 @@ export interface MachineFolderGrant {
 /** What the machine allows (the runner's `RunnerAccess`). Granting only ever happens on the machine. */
 export interface MachineAccess {
   folders: MachineFolderGrant[];
-  /** `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). */
-  tools: Record<MachineToolName, boolean> & { browser?: boolean };
+  /**
+   * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
+   * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
+   */
+  tools: Record<MachineToolName, boolean> & { browser?: boolean; desktop?: boolean; terminal?: boolean };
 }
 
 /** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
 export interface MachineAccessReduce {
   /** Without `agentId`: the folder for everyone. */
   removeFolder?: { path: string; agentId?: string };
-  disableTool?: MachineToolName | "browser";
+  disableTool?: MachineToolName | "browser" | "desktop" | "terminal";
 }
 
 /** Approximate location of the computer that asked for a code (best effort, from its IP). */
@@ -3177,14 +3187,23 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
-  /** The accounts added on the agent's computer (both kinds); "Conta deste computador" isn't listed. */
+  /**
+   * The agent's owner's accounts on its computer (both kinds) and the one it thinks with; "Conta deste
+   * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0059).
+   */
   accounts: MachineAccount[];
-  /** Whose subscriptions those are (the computer's owner); null without a computer. */
-  accountsOwner: { id: string; name: string } | null;
-  /** The viewer owns the computer: only they add accounts and pick an agent's. */
+  /** The viewer may add an account there for this agent: its owner, on a computer where they add accounts. */
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
+  /** "Só responde a você": nobody but the agent's owner talks to it. */
+  onlyOwner: boolean;
+  /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
+  canUsePlans: boolean;
+  /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
+  ownSignIn: boolean;
+  /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
+  ownUsage: Partial<Record<MachineAccountKind, PlanUsage>>;
 }
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
@@ -3194,27 +3213,81 @@ export type BrainEffortSetting = BrainEffort | "auto";
 
 export type MachineAccountKind = "claude_code" | "codex";
 
-/** ADR 0041 §3: a Claude Code or Codex account signed in on a connected computer (metadata only). */
+/** ADR 0041 §3, ADR 0059: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
   id: string;
   kind: MachineAccountKind;
   label: string;
+  /** Only for its owner. */
   email: string | null;
   /** "Pro", "Max", "Team"… as the provider reports it. */
   plan: string | null;
   status: "active" | "signed_out";
-  /** Names of the agents that think with it. */
+  /** Whose it is (the person who signed it in); null: nobody's. */
+  ownerId: string | null;
+  ownerName: string | null;
+  /** The viewer owns it: only they rename it or pick it for an agent. */
+  mine: boolean;
+  /** Names of the agents that think with it (one at most). */
   usedBy: string[];
+  /** Its plan's usage limits; null: not known yet. */
+  usage: PlanUsage | null;
+  /** A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in. */
+  provider: string | null;
+  /** The last 4 of a key account's key (its owner only). */
+  keyHint: string | null;
+}
+
+/** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */
+export interface AiAccounts {
+  accounts: (MachineAccount & { machineId: string; computer: string })[];
+  computers: AiComputer[];
+}
+
+export interface AiComputer {
+  machineId: string;
+  name: string;
+  online: boolean;
+  /** The viewer connected it. */
+  mine: boolean;
+  /** The viewer adds accounts there (they connected it, or nobody did), on a runner that knows accounts. */
+  canAdd: boolean;
+  /** Its runner takes coding plans' keys. */
+  keys: boolean;
+  /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
+  brains: { claude_code: boolean; codex: boolean };
+}
+
+/** A plan's usage window: how much of it is used (0–100) and when it resets. */
+export interface PlanWindow {
+  kind: "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+  /** `other`: the provider's name for it ("Extra usage", a model's name). */
+  label?: string;
+  usedPercent: number;
+  resetsAt?: string;
+}
+
+/** A plan's usage limits, as the CLI on its computer said them (`at`); no token is ever read. */
+export interface PlanUsage {
+  windows: PlanWindow[];
+  /** The plan refused a request for its limit (until a window resets). */
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
 }
 
 export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** The person confirmed the personal-subscription warning (switching to Claude Code or Codex). */
+  /** "Só responde a você": false lets everyone talk to it (on the API, whoever did before a plan). */
+  onlyOwner?: boolean;
+  /** The owner confirmed answering other people on their personal plan (with `onlyOwner: false`, the first time). */
   acceptPlanTerms?: boolean;
-  /** Only the computer's owner; null = "Conta deste computador". */
+  /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
+  /** The account thinks for another agent: take it from that one. */
+  moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
 }
 
@@ -3222,8 +3295,10 @@ export interface AgentBrainInput {
 export interface AccountLoginStart {
   loginId: string;
   kind: MachineAccountKind;
-  /** The provider's own page (Claude's sign-in, or the device page for Codex). */
+  /** The provider's own page (Claude's sign-in, the device page for Codex, or where a plan's key is made). */
   url: string;
+  /** A coding plan's key account. */
+  provider?: string;
   /** Claude Code: the computer's one-time key the pasted code is sealed to. */
   publicKey?: string;
   /** Codex: the one-time code to type on the device page. */
@@ -3236,6 +3311,8 @@ export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
+  /** `failed`: the viewer already has this account on that computer (named `label`). */
+  duplicate?: { label: string };
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */
@@ -3566,7 +3643,11 @@ export type NotificationKind =
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
-  | "browser_handoff";
+  | "browser_handoff"
+  /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
+  | "org_standing"
+  /** ADR 0056 §10: the workspace's own computer is ready (owners). `source.machineId`; `source.label` = its name. */
+  | "computer_ready";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -3591,6 +3672,8 @@ export interface NotificationSource {
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
+  /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
+  screen?: ScreenKind;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -3931,17 +4014,22 @@ export interface AgentDatabaseInput {
 
 export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled";
 
+/** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
+export type ScreenKind = "browser" | "desktop";
+
 /**
- * A person's turn in an agent's browser: the agent asked (`ask`, with a chat
- * card `meta.browserHandoff` whose message id is this id) or someone watching
- * took over (`takeover`: no card of its own; its browser card stays with the
- * run it is bound to, `runId`).
+ * A person's turn on one of an agent's screens: the agent asked (`ask`, with a
+ * chat card `meta.browserHandoff` whose message id is this id) or someone
+ * watching took over (`takeover`: no card of its own; its browser card stays
+ * with the run it is bound to, `runId`).
  */
 export interface BrowserHandoff {
   id: string;
   agentId: string;
   runId: string | null;
   machineId: string;
+  /** Absent from servers older than screens: the browser (`handoffScreen`). */
+  screen?: ScreenKind;
   kind: "ask" | "takeover";
   instructions: string;
   status: BrowserHandoffStatus;

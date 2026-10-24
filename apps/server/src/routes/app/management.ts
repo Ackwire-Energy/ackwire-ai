@@ -29,7 +29,7 @@ import {
 import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { AgentAppearance, AgentAudience, Credential, Role } from "./schemas";
+import { AgentAppearance, AgentAudience, Credential, ProviderId, Role } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -203,7 +203,7 @@ export function managementRoutes(deps: AppDeps) {
             name: z.string().trim().min(1).max(100).optional(),
             context: z.string().max(20_000).optional(),
             defaultCredentialId: z.uuid().nullable().optional(),
-            defaultCredentialIds: z.record(z.enum(["anthropic", "openai"]), z.uuid().nullable()).optional(),
+            defaultCredentialIds: z.partialRecord(ProviderId, z.uuid().nullable()).optional(),
             routerModel: ModelId.nullable().optional(),
             summaryModel: ModelId.nullable().optional(),
             timezone: z.string().max(64).optional(),

@@ -35,21 +35,25 @@ import {
   MigrationMismatchError,
 } from "@agenteschat/db";
 import {
+  adoptRestoredOperatorEvents,
   createLocalKeyWrapper,
   drainLocalRuns,
   enableCaches,
+  enableOperatorEvents,
   isBlockedAddress,
   resolveHostDns,
   retireHostTokens,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
-import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
+import { createModelProviders } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { createLogger, type Logger } from "./logger";
+import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
+import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
 import { startWorkers } from "./workers";
@@ -128,15 +132,24 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
   const base = { config, db: database.db, edition, version };
-  const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
-    anthropic: createAnthropicProvider(),
-    openai: createOpenAIProvider(),
-  });
+  const { adapters, modelProviders, overridden } = await resolveAdapters(
+    modules,
+    base,
+    defaults,
+    createModelProviders(),
+  );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   const ctx: ModuleContext = { ...base, adapters };
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
+  // The operator API's events feed records only while that API is on (ADR 0056).
+  if (config.OPERATOR_API_TOKEN) {
+    enableOperatorEvents();
+    // Before the API serves a page: a caller restarting after a restore must find these rows first.
+    const adopted = await adoptRestoredOperatorEvents(database.db);
+    if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
+  }
   const engine = buildEngine({
     db: database.db,
     config,
@@ -154,6 +167,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     browserLive: engine.browserLive,
+    desktops: engine.desktops,
     log,
   });
 
@@ -177,6 +191,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         context: engine.context,
         sandbox: engine.sandbox,
         browserLive: engine.browserLive,
+        streams: engine.streams,
         talker: engine.talker,
         router: engine.router,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
@@ -197,6 +212,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     ...adapters,
     machines: createMachineSockets(engine.machineHub),
     browserLive: engine.browserLive,
+    streams: createStreamSockets({ db: database.db, auth, config, broker: engine.streams }),
   });
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
@@ -208,6 +224,17 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
+  const operator = serveOperatorApi({
+    db: database.db,
+    config,
+    version,
+    log,
+    pubsub: adapters.pubsub,
+    hub: engine.machineHub,
+  });
+  if (operator) {
+    log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
+  }
 
   for (const module of modules) await module.onStart?.(ctx);
 
@@ -220,8 +247,10 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
     void server.stop();
-    // Runners reconnect to the next instance.
+    void operator?.stop();
+    // Runners reconnect to the next instance, and people's desktops and terminals open again there.
     await engine.machineHub.stop();
+    engine.streams.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
     const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });

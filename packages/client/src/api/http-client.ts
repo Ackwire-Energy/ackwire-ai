@@ -20,6 +20,7 @@ import type {
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiAccounts,
   AiStatus,
   AppNotification,
   Approval,
@@ -63,6 +64,7 @@ import type {
   IssueColumn,
   Machine,
   MachineAccess,
+  MachineAccount,
   MachineOutages,
   MachineTask,
   MailAccount,
@@ -254,8 +256,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           method: "PUT",
           json: { allowedDomains },
         }),
-      agentHandoff: async (orgId, agentId) =>
-        (await request<{ handoff: BrowserHandoff | null }>(`${org(orgId)}/agents/${enc(agentId)}/browser/handoff`))
+      agentHandoff: async (orgId, agentId, screen = "browser") =>
+        (await request<{ handoff: BrowserHandoff | null }>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/handoff`))
           .handoff,
       handoff: (orgId, handoffId) => request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}`),
       takeControl: (orgId, handoffId) =>
@@ -270,13 +272,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       cancel: (orgId, handoffId) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/cancel`, { json: {} }),
-      takeover: (orgId, agentId, runId) =>
-        request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/browser/takeover`, {
+      takeover: (orgId, agentId, runId, screen = "browser") =>
+        request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/takeover`, {
           json: runId ? { runId } : {},
         }),
       open: (orgId, agentId, url) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
-      stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
+      stop: (orgId, agentId, screen = "browser") =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/stop`, { json: {} }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),
@@ -567,9 +570,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
-      beginAccountLogin: (orgId, machineId, kind, accountId) =>
+      beginAccountLogin: (orgId, machineId, kind, options = {}) =>
         request<AccountLoginStart>(`${org(orgId)}/machines/${enc(machineId)}/account-logins`, {
-          json: { kind, ...(accountId ? { accountId } : {}) },
+          json: {
+            kind,
+            ...(options.accountId ? { accountId: options.accountId } : {}),
+            ...(options.email ? { email: options.email } : {}),
+            ...(options.provider ? { provider: options.provider } : {}),
+          },
         }),
       sendAccountCode: (orgId, machineId, loginId, box) =>
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}/code`, {
@@ -581,6 +589,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}`, {
           method: "DELETE",
         }),
+      refreshAccountUsage: (orgId) => request<void>(`${org(orgId)}/ai-accounts/refresh`, { json: {} }),
+      aiAccounts: (orgId) => request<AiAccounts>(`${org(orgId)}/ai-accounts`),
+      renameAccount: (orgId, machineId, accountId, label) =>
+        request<MachineAccount>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, {
+          method: "PATCH",
+          json: { label },
+        }),
+      removeAccount: (orgId, machineId, accountId) =>
+        request<void>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, { method: "DELETE" }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

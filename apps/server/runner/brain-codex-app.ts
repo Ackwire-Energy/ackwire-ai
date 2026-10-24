@@ -5,6 +5,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile, CommandScope } from "@agenteschat/adapters/command-policy";
 import { type BrainSteerReply, type BrainSteerRequest, isBrainEffort } from "@agenteschat/adapters/machine-protocol";
+import { accountEnv } from "./accounts";
 import {
   type CodexAppRunner,
   type CodexBrainEvent,
@@ -634,6 +635,8 @@ export interface CodexAppServersOptions {
    * endpoint, as the process's own bridge (its id and local token). Tests: a fake server.
    */
   ask?: (process: { id: string; token: string }, tool: string, args: Record<string, unknown>) => Promise<IpcReply>;
+  /** Protocol 19: Codex's `account/rateLimits/updated` (`rateLimits`), for the process's account (null: its own sign-in). */
+  onRateLimits?: (account: string | null, rateLimits: unknown) => void;
   log?: (line: string) => void;
 }
 
@@ -780,15 +783,15 @@ export class CodexAppServers implements CodexAppRunner {
   ): Promise<AppLive | null> {
     const id = randomUUID();
     const token = newMcpToken();
-    const env: NodeJS.ProcessEnv = {
+    const base: NodeJS.ProcessEnv = {
       ...process.env,
       ...(opts.env ?? {}),
       [CODEX_MCP_ENV[0]]: token,
       ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
       ...(opts.runnerHome ? { [CODEX_MCP_ENV[2]]: opts.runnerHome } : {}),
-      // ADR 0041: the account's folder is this process's Codex home.
-      ...(input.account ? { CODEX_HOME: input.account.home } : {}),
     };
+    // ADR 0041: the account's folder is this process's Codex home, and nothing else signs it in.
+    const env = input.account ? accountEnv("codex", input.account.home, base) : base;
     const args = codexAppServerArgs({
       processId: id,
       mcp: { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
@@ -862,6 +865,10 @@ export class CodexAppServers implements CodexAppRunner {
     // Gone while idle: forgotten; the next turn starts it again (resumed).
     client.onExit(() => {
       if (!live.busy) this.drop(live);
+    });
+    const account = input.account?.id ?? null;
+    client.onNotification((method, params) => {
+      if (method === "account/rateLimits/updated") this.opts.onRateLimits?.(account, params.rateLimits);
     });
     this.log(`codex app-server for ${input.sessionId.slice(0, 8)} started`);
     return live;
@@ -1164,6 +1171,7 @@ export class CodexAppServers implements CodexAppRunner {
         cwd: input.cwd,
         folders: [...new Set([input.cwd, input.folder ?? input.cwd, ...(input.writableRoots ?? [])])],
         ...(process.env.HOME ? { home: process.env.HOME } : {}),
+        ...(opts.runnerHome ? { runnerHome: opts.runnerHome } : {}),
       };
       client.onRequest((method, params) => {
         if (settled) return null;

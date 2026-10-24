@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
-/** No AI connected over HTTP (ADR 0057): the AI status, the card, and "Responder agora". */
+/** No AI connected over HTTP (ADR 0061): the AI status, the card, and "Responder agora". */
 
 let t: TestServer;
 afterEach(async () => {

@@ -84,7 +84,7 @@ describe("finding the settings", () => {
       ["access", "Agentes e acesso"],
       ["connectors", "Conectores"],
       ["skills", "Skills"],
-      ["keys", "Chaves de API"],
+      ["keys", "Contas de IA"],
       ["storage", "Armazenamento"],
       ["computers", "Computadores"],
       ["usage", "Orçamento e uso"],

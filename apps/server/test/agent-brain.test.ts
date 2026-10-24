@@ -88,7 +88,7 @@ function pairMac(api: (path: string, init?: Parameters<ReturnType<typeof browser
   return pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
 }
 
-test("agent brain: defaults, who may, the plan warning, what the computer has, model and fallback", async () => {
+test("agent brain: defaults, who may, letting others talk to a plan, what the computer has, model and fallback", async () => {
   const { api, asBia, agentId } = await workspace();
 
   // Defaults: the model (API), fallback on, nothing to offer without a computer.
@@ -101,9 +101,11 @@ test("agent brain: defaults, who may, the plan warning, what the computer has, m
     account: null,
     effort: null,
     accounts: [],
-    accountsOwner: null,
     canManageAccounts: false,
     accountsSupported: false,
+    onlyOwner: false,
+    canUsePlans: true,
+    ownSignIn: false,
   });
   expect(fresh.options.map((o) => [o.kind, o.available, o.reason ?? null])).toEqual([
     ["model", true, null],
@@ -140,19 +142,39 @@ test("agent brain: defaults, who may, the plan warning, what the computer has, m
   expect(withMac.options.find((o) => o.kind === "claude_code")?.available).toBe(true);
   expect(withMac.options.find((o) => o.kind === "codex")).toMatchObject({ available: false, reason: "not_installed" });
 
-  // The warning must be confirmed; never blocked once it is.
-  const unconfirmed = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "claude_code" } });
-  expect(unconfirmed.status).toBe(400);
-  expect(((await unconfirmed.json()) as { error: { code: string } }).error.code).toBe("brain.terms_required");
-  expect(
-    (await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "codex", acceptPlanTerms: true } })).status,
-  ).toBe(409);
+  // Choosing a plan asks nothing: it answers only its owner until they let others in, with the terms.
+  expect((await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "codex" } })).status).toBe(409);
   const chosen = await api(`/agents/${agentId}/brain`, {
     method: "PUT",
-    json: { brain: "claude_code", model: "Opus", acceptPlanTerms: true },
+    json: { brain: "claude_code", model: "Opus" },
   });
   expect(chosen.status).toBe(200);
-  expect(await chosen.json()).toMatchObject({ brain: "claude_code", model: "opus", effectiveModel: "opus" });
+  expect(await chosen.json()).toMatchObject({
+    brain: "claude_code",
+    model: "opus",
+    effectiveModel: "opus",
+    onlyOwner: true,
+    ownSignIn: true,
+  });
+  const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+  const unconfirmed = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { onlyOwner: false } });
+  expect(unconfirmed.status).toBe(400);
+  expect(await code(unconfirmed)).toBe("audience.plan_terms_required");
+  const shared = await api(`/agents/${agentId}/brain`, {
+    method: "PUT",
+    json: { onlyOwner: false, acceptPlanTerms: true },
+  });
+  expect(await shared.json()).toMatchObject({ onlyOwner: false });
+  // "Quem pode falar" goes through the same rule: narrowing is free, widening again asks once more.
+  const audience = (mode: string, extra = {}) =>
+    api(`/agents/${agentId}`, { method: "PATCH", json: { audience: { mode, userIds: [] }, ...extra } });
+  expect((await audience("owner")).status).toBe(200);
+  const again = await audience("everyone");
+  expect(again.status).toBe(400);
+  expect(await code(again)).toBe("audience.plan_terms_required");
+  expect(
+    (await (await audience("everyone", { acceptPlanTerms: true })).json()) as { audienceMode: string },
+  ).toMatchObject({ audienceMode: "everyone" });
 
   // Model and fallback change without confirming again; bad models are refused.
   const fallbackOff = await api(`/agents/${agentId}/brain`, { method: "PUT", json: { fallback: false } });
@@ -169,7 +191,7 @@ test("agent brain: defaults, who may, the plan warning, what the computer has, m
   const [row] = await t.db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
   expect(row).toMatchObject({ brain: "claude_code", brainModel: null, brainFallback: false });
   const audit = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "agent.brain"));
-  expect(audit.length).toBe(3);
+  expect(audit.length).toBe(4);
   expect(JSON.stringify(audit.map((a) => a.details))).toContain('"acceptedPlanTerms":true');
 
   // Codex appears once the computer has a recent one; any model name is taken as typed.

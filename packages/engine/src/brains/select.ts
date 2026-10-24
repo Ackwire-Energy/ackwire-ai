@@ -86,8 +86,8 @@ export interface BrainUnavailability {
 
 /**
  * Why a computer brain can't take the turn now (null: it can): no computer,
- * offline, paused by its owner, commands off, a runner older than protocol 8, the CLI missing or
- * not logged in (`hello.executors`), or over the plan limit.
+ * someone else's plan, offline, paused by its owner, commands off, a runner older than protocol 8,
+ * the CLI missing or not logged in (`hello.executors`), or over the plan limit.
  */
 export function computerBrainUnavailable(
   kind: BrainKind,
@@ -96,10 +96,18 @@ export function computerBrainUnavailable(
   now = Date.now(),
   /** The agent's account (ADR 0041): it decides the sign-in instead of the computer's own. */
   account?: BrainAccount,
+  /** The plan it would think with is the agent's owner's (`planIsOwners`). */
+  ownersPlan = true,
 ): BrainUnavailability | null {
   if (kind === "model") return null;
   const name = kind === "codex" ? "Codex" : "Claude Code";
   if (!machineId) return { code: "no_computer", message: `The agent has no computer for ${name}.` };
+  if (!ownersPlan) {
+    return {
+      code: "plan_not_owner",
+      message: `${name}${status ? ` on ${status.name}` : ""} would think with a plan that isn't the agent's owner's.`,
+    };
+  }
   const limited = planLimits.get(limitKey(machineId, kind, account?.id));
   if (limited && limited > now) {
     return {
@@ -156,6 +164,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "codex_missing",
   "codex_too_old",
   "plan_limit",
+  "plan_not_owner",
 ]);
 
 /**
@@ -233,7 +242,45 @@ export async function brainAccountFor(
       ),
     );
   if (!row || row.kind !== kind) return undefined;
-  return { id: row.id, label: row.label, status: row.status === "signed_out" ? "signed_out" : "active" };
+  // A sign-in still in progress or an account being removed can't think: as good as signed out.
+  return { id: row.id, label: row.label, status: row.status === "active" ? "active" : "signed_out" };
+}
+
+/**
+ * A plan thinks only for its owner's agents (ADR 0059 §3): the account's
+ * owner, or with the computer's own sign-in the person who connected that
+ * computer, must be the agent's owner, still in the organization.
+ */
+async function planIsOwners(
+  db: Executor,
+  agent: Pick<Agent, "orgId" | "ownerUserId">,
+  machineId: string,
+  account: BrainAccount | undefined,
+): Promise<boolean> {
+  const owner = agent.ownerUserId;
+  if (!owner) return false;
+  const { machineAccounts, machines, organizationMembers: members } = schema;
+  const rows = account
+    ? await db
+        .select({ id: machineAccounts.id })
+        .from(machineAccounts)
+        .innerJoin(
+          members,
+          and(eq(members.orgId, machineAccounts.orgId), eq(members.userId, machineAccounts.createdBy)),
+        )
+        .where(
+          and(
+            eq(machineAccounts.orgId, agent.orgId),
+            eq(machineAccounts.id, account.id),
+            eq(machineAccounts.createdBy, owner),
+          ),
+        )
+    : await db
+        .select({ id: machines.id })
+        .from(machines)
+        .innerJoin(members, and(eq(members.orgId, machines.orgId), eq(members.userId, machines.pairedByUserId)))
+        .where(and(eq(machines.orgId, agent.orgId), eq(machines.id, machineId), eq(machines.pairedByUserId, owner)));
+  return rows.length > 0;
 }
 
 /** The agent's effort when it thinks with its own brain (a mission's other brain: the CLI's default). */
@@ -367,7 +414,16 @@ export async function resolveBrain(
   ]);
   const effort = brainEffortFor(agent, kind);
   const unavailable =
-    machineId && !deps.machines ? null : computerBrainUnavailable(kind, machineId, status, Date.now(), account);
+    machineId && !deps.machines
+      ? null
+      : computerBrainUnavailable(
+          kind,
+          machineId,
+          status,
+          Date.now(),
+          account,
+          machineId ? await planIsOwners(deps.db, agent, machineId, account) : true,
+        );
   const session: BrainSession | undefined =
     mission?.session ??
     (machineId

@@ -40,6 +40,12 @@ const card = (noAi: Record<string, unknown> = {}): Message => ({
   createdAt: NOW.toISOString(),
 });
 
+/** A plan thinks only for its owner's agents (ADR 0059 §3): these become Walter's, so he may connect his. */
+const walters = (state: State, ...agentIds: string[]) => {
+  for (const a of state.agents) if (agentIds.includes(a.id)) a.ownerUserId = "u-walter";
+  return state;
+};
+
 const withCard = (noAi: Record<string, unknown> = {}, status = aiStatus(false, ADA_ID, ATLAS_ID)) => {
   const state = seedState({ aiStatus: status });
   state.messages.push(card(noAi));
@@ -83,7 +89,7 @@ const sendText = async (text: string) => {
 
 describe("no AI connected: above the composer", () => {
   test("the organization has none: everyone sees it in a channel with agents; Connect opens the first step", async () => {
-    await open(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }));
+    await open(walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID));
     const shown = banner();
     expect(shown?.textContent).toContain("Os agentes ainda não têm uma IA para pensar.");
     expect(shown?.textContent).toContain("escreva o que quer, como “usar meu plano do Claude”");
@@ -91,6 +97,15 @@ describe("no AI connected: above the composer", () => {
     const first = dialog("Conectar uma IA") as HTMLElement;
     for (const option of [/^Plano do Claude/, /^Plano do ChatGPT/, /^Chave de API/])
       expect(within(first).getByRole("button", { name: option })).toBeTruthy();
+  });
+
+  test("an admin with no agent of their own: only an API key (a plan thinks only for its owner's agents)", async () => {
+    await open(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }));
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }));
+    const first = dialog("Conectar uma IA") as HTMLElement;
+    expect(within(first).getByRole("button", { name: /^Chave de API/ })).toBeTruthy();
+    for (const option of [/^Plano do Claude/, /^Plano do ChatGPT/])
+      expect(within(first).queryByRole("button", { name: option })).toBeNull();
   });
 
   test("a DM with an agent that has none says so for that agent; an organization with AI shows nothing in channels", async () => {
@@ -141,9 +156,15 @@ describe("the agent's no-AI card", () => {
       email: "walter@acme.com.br",
       plan: "max",
       status: "active",
+      ownerId: "u-walter",
+      ownerName: "Walter",
+      mine: true,
       usedBy: [],
+      usage: null,
+      provider: null,
+      keyHint: null,
     };
-    const state = withCard({ intent: "claude" });
+    const state = walters(withCard({ intent: "claude" }), ADA_ID);
     const api = createFakeApi(state);
     // The computer finishes the sign-in as soon as the page asks.
     fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account });
@@ -151,14 +172,24 @@ describe("the agent's no-AI card", () => {
     await settle(5);
     await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
     const plan = dialog("Conectar o seu plano do Claude") as HTMLElement;
-    expect(plan.textContent).toContain("O plano do Claude é seu, pessoal.");
+    // Choosing a plan asks nothing: she then answers only him until he shares it (ADR 0059 §5).
+    expect(plan.textContent).toContain("Usa o seu plano. Os outros veem que a Ada só responde a você.");
+    // Claude's sign-in starts on its button, in a window of its own.
+    const realOpen = window.open;
+    const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
+    window.open = (() => popup) as unknown as typeof window.open;
+    try {
+      await click(within(plan).getByRole("button", { name: "Entrar com Claude" }), 8);
+    } finally {
+      window.open = realOpen;
+    }
     expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([ORG_ID, "machine_1", "claude_code"]);
     expect(plan.textContent).toContain("A conta Walter entrou no MacBook.");
     await click(within(plan).getByRole("button", { name: "Usar meu plano do Claude" }), 8);
     expect(calls(state, "agents.setBrain")[0]?.args).toEqual([
       ORG_ID,
       ADA_ID,
-      { brain: "claude_code", acceptPlanTerms: true, account: "acct_1" },
+      { brain: "claude_code", account: "acct_1" },
     ]);
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
     expect(dialog("Conectar o seu plano do Claude")).toBeNull();
@@ -239,7 +270,7 @@ describe("the dialog opens by itself only when Jev is sure, for the author, once
   });
 
   test("my message asking for a Claude plan (≥ 0.9): the plan step opens; never twice, never for someone else's", async () => {
-    const { socket, state } = await open(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }));
+    const { socket, state } = await open(walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID));
     // João's message: not mine.
     await push(socket, routed("m-1", { intent: "claude", autoOpen: true }));
     expect(dialog("Conectar o seu plano do Claude")).toBeNull();

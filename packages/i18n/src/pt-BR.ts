@@ -69,6 +69,7 @@ export const ptBR = {
     hidePassword: "Esconder senha",
     capsLock: "Caps Lock ligado",
     tooManyTries: "Muitas tentativas. Espere alguns minutos e tente de novo.",
+    accountBlocked: "Esta conta não pode entrar.",
     passwordHelp: "Pelo menos 8 caracteres.",
     passwordOk: "Senha ok.",
     passwordMissing_one: "Falta {{count}} caractere (mínimo de 8).",
@@ -499,23 +500,31 @@ export const ptBR = {
       noteKey:
         "Esse valor é cobrado pelo provedor da chave pelo uso da API, não pelo agentes.chat. Quando um agente chega no limite, ele para e te avisa. Quem usa o Claude Code de um computador conectado não conta aqui.",
       notePlatform:
-        "Com os créditos da plataforma, o uso da API é cobrado pelo agentes.chat. O limite vale só para esse uso: quando um agente chega nele, ele para e te avisa.",
+        "Com a chave do agentes.chat, o limite vale para o uso da API: quando um agente chega nele, ele para e te avisa.",
     },
     provider: "Provedor",
     keyFor: "Chave da API da {{provider}}",
+    keySite: "Crie a chave em {{site}}.",
+    keyNotPlan:
+      "Use uma chave de pagamento por uso: a de um plano de assinatura só funciona em ferramentas de programação.",
     keyInvalid: {
       anthropic: "As chaves da Anthropic começam com sk-ant-. Confira e cole de novo.",
       openai: "As chaves da OpenAI começam com sk-. Confira e cole de novo.",
+      deepseek: "As chaves da DeepSeek começam com sk-. Confira e cole de novo.",
+      moonshot: "As chaves da Kimi começam com sk-. Confira e cole de novo.",
+      zai: "Cole a chave inteira da Z.ai, sem espaços. Confira e cole de novo.",
+      minimax:
+        "Cole a chave inteira da MiniMax, sem espaços. As que começam com sk-cp- são do plano e não servem aqui.",
     },
+    keyFromOther: "É de outro provedor?",
     advanced: "Avançado",
     anthropicWorkspace: "ID do workspace da Anthropic",
     anthropicWorkspaceHelp: "Opcional. Só para chaves que não são de um workspace.",
     openaiOrg: "ID da organização na OpenAI",
     openaiProject: "ID do projeto na OpenAI",
     optional: "Opcional.",
-    platformChoice: "Usar créditos da plataforma",
-    platformKeyDesc:
-      "Sem chave: a plataforma cobra por uso, com US$ 5 grátis para testar. Você vê o custo de cada agente.",
+    platformChoice: "Usar a chave do agentes.chat",
+    platformKeyDesc: "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
     suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",
@@ -881,7 +890,7 @@ export const ptBR = {
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
   },
-  /** No AI connected (ADR 0057): the banner, the agent's card, its chip and the receipt under a message. */
+  /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
     banner: {
       org: "Os agentes ainda não têm uma IA para pensar.",
@@ -1597,12 +1606,6 @@ export const ptBR = {
       failed: "Não deu para salvar. Tente de novo.",
       use: "Usar",
       usePlan: { claude_code: "Usar meu plano do Claude", codex: "Usar meu plano do ChatGPT" },
-      planNote: {
-        claude_code:
-          "<b>O plano do Claude é seu, pessoal.</b> Responder outras pessoas com ele pode ir contra as regras da Anthropic.",
-        codex:
-          "<b>O plano do ChatGPT é seu, pessoal.</b> Responder outras pessoas com ele pode ir contra as regras da OpenAI.",
-      },
       brain: {
         sub: "Vale para todas as conversas.",
         model: "Modelo da organização",
@@ -1621,8 +1624,8 @@ export const ptBR = {
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
         thisComputerText: "A que já está no {{computer}}",
-        accountAlso: "{{email}} · também {{agents}}",
-        accountAlsoNoEmail: "Também {{agents}}",
+        accountMove: "Em uso por {{agents}} · Mover para cá",
+        accountOf: "De {{name}}",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
         keyLabel: "Chave da API",
@@ -1659,6 +1662,12 @@ export const ptBR = {
           safe: "A conta fica guardada só no {{computer}}. O agentes.chat nunca vê a senha nem o acesso.",
           failed: "Não deu para entrar nessa conta. Tente de novo.",
           expired: "O tempo para entrar acabou. Tente de novo.",
+          duplicate: {
+            claude_code:
+              "Essa conta já está aqui ({{account}}). Para adicionar outra, saia do Claude na página que abriu e entre com a outra conta.",
+            codex:
+              "Essa conta já está aqui ({{account}}). Para adicionar outra, saia do ChatGPT na página que abriu e entre com a outra conta.",
+          },
           startFailed: "O {{computer}} não respondeu. Veja se ele está ligado e tente de novo.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
           done: "A conta {{account}} entrou no {{computer}}. Clique em Usar para salvar.",
@@ -1912,6 +1921,9 @@ export const ptBR = {
         credential_revoked: "A chave deste agente foi revogada.",
         credential_wrong_provider: "O modelo é da {{modelProvider}}, mas a chave é da {{keyProvider}}.",
         no_ai: "O agente não tem uma IA conectada.",
+        org_paused: "Os agentes do workspace estão pausados.",
+        org_suspended: "O workspace está indisponível.",
+        agent_paused: "O agente está pausado.",
         unknown: "Falhou.",
       },
     },
@@ -2510,6 +2522,11 @@ export const ptBR = {
       description:
         "Navegar em sites no navegador próprio do agente, no computador conectado (o login fica salvo por agente). Precisa do navegador ligado nesse computador.",
     },
+    desktop_use: {
+      label: "Usar a própria tela",
+      description:
+        "Usar qualquer app na tela própria do agente, no computador dele; as pessoas podem assistir e assumir o controle. Ali ele pode rodar qualquer coisa, então também precisa de Rodar código e da tela ligada nesse computador.",
+    },
     setup_write: {
       label: "Configurar o workspace",
       description:
@@ -3052,6 +3069,9 @@ export const ptBR = {
       agent_archived: "O agente foi arquivado",
       interrupted: "Interrompida por uma atualização",
       no_ai: "O agente não tem uma IA conectada",
+      org_paused: "Não rodou: os agentes do workspace estavam pausados",
+      org_suspended: "Não rodou: o workspace estava indisponível",
+      agent_paused: "Não rodou: o agente estava pausado",
     },
     openInChat: "Abrir na conversa",
     stop: "Parar",
@@ -4194,6 +4214,135 @@ export const ptBR = {
     keepEditing: "Continuar editando",
     discard: "Descartar",
   },
+  aiAccounts: {
+    share: {
+      switch: "Só responde a você",
+      switchOther: "Só responde a {{name}}",
+      on: "Usa o seu plano. Os outros veem que {{article}} {{name}} só responde a você.",
+      off: "Responde a outras pessoas com o seu plano.",
+      onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
+      offOther: "Responde a outras pessoas com o plano de {{owner}}.",
+      title: "Agora {{article}} {{name}} responde a todos",
+      titlePeople: "Agora {{article}} {{name}} responde a outras pessoas",
+      body: {
+        claude_code:
+          "A Anthropic diz que as assinaturas pessoais do Claude são para uso pessoal. Usar a sua para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+        codex:
+          "A OpenAI diz que o plano do ChatGPT é para uso pessoal. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+        seat: "A {{maker}} diz que cada assento do plano é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+        other:
+          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos. Se continuar, o risco é seu.",
+      },
+      accept: "Responder a todos",
+      acceptPeople: "Continuar",
+      keep: "Manter só comigo",
+      savedEveryone: "Agora {{article}} {{name}} responde a todos.",
+      savedOwner: "{{The}} {{name}} agora só responde a você.",
+      backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só responde a você.",
+      letEveryone: "Liberar para todos",
+      letPeople: "Liberar de novo",
+      ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
+      hereNotYours: "Só para agentes de quem conectou o {{computer}}",
+    },
+    errors: {
+      planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
+      planTermsRequired: "Confirme o aviso do plano pessoal antes de liberar para mais gente.",
+    },
+    add: {
+      paste: "Colar",
+      pasteFailed: "O navegador não deixou colar. Cole com Ctrl+V (⌘V no Mac).",
+      email: "Qual conta? (opcional)",
+      emailHelp: "O email da conta do Claude que vai pensar. Vazio: você escolhe na página do Claude.",
+      emailInvalid: "Use um email simples, como ana@exemplo.com.",
+      emailPlaceholder: "ana@exemplo.com",
+      titleKey: "Conectar {{plan}}",
+      keyStep: "Crie a chave do seu plano",
+      keySite: "Fica em {{site}}. Copie a chave inteira.",
+      openKeys: "Abrir {{site}}",
+      keyTitle: "Cole a chave aqui",
+      keyLabel: "Chave do {{plan}}",
+      keyShape: "Isso não parece uma chave do {{plan}}. Copie a chave inteira.",
+      keySafe: "A chave vai criptografada para o {{computer}} e fica só lá. O agentes.chat não consegue lê-la.",
+      keySendFailed: "Não deu para enviar a chave. Confira se ela está inteira e tente de novo.",
+      duplicateKey: "Essa chave já está aqui ({{account}}).",
+    },
+    connect: {
+      title: "Conectar uma IA",
+      sub: "Seu plano pensa pelos seus agentes, no computador onde ele fica.",
+      claude_code: "Claude",
+      claude_codeText: "Seu plano Pro, Max ou Team",
+      codex: "ChatGPT",
+      codexText: "Seu plano Plus, Pro ou Business",
+      keyText: "Com a chave do plano",
+      needs: {
+        claude_code: "Precisa de um computador seu com o Claude Code",
+        codex: "Precisa de um computador seu com o Codex",
+        keys: "Atualize o agentes no computador para usar a chave de um plano",
+        online: "Seu computador está desligado agora",
+      },
+      noComputer: "As contas ficam num computador conectado. Conecte um seu primeiro.",
+      addComputer: "Conectar um computador",
+      computer: "Em qual computador?",
+    },
+    done: {
+      title: "Pronto: {{label}} está no {{computer}}.",
+      name: "Como quer chamar esta conta? Os outros veem este nome.",
+      agent: "Usar com qual agente?",
+      noAgent: "Nenhum agora",
+      noAgents: "Nenhum agente seu trabalha no {{computer}} ainda. Escolha esta conta na página do agente depois.",
+      finish: "Concluir",
+      saved: "{{label}} está pronta.",
+      savedAgent: "{{agent}} agora pensa com {{label}}.",
+    },
+    page: {
+      title: "Seus planos",
+      text: "Cada conta pensa por um agente. Ela fica no computador; o agentes.chat guarda só o nome, o email e o uso.",
+      empty: "Conecte o seu plano do Claude ou do ChatGPT e seus agentes pensam com ele, sem chave de API.",
+      connect: "Conectar uma IA",
+      keyEnds: "chave …{{hint}}",
+      on: "no {{computer}}",
+      thinksFor: "{{agent}} pensa com ela",
+      noAgent: "Nenhum agente ainda",
+      signedOut: "Saiu da conta: entre de novo para os agentes voltarem a usá-la.",
+      keyRefused: "A chave foi recusada: troque por uma nova.",
+      rename: "Renomear",
+      signInAgain: "Entrar de novo",
+      newKey: "Trocar a chave",
+      disconnect: "Desconectar",
+      renameTitle: "Renomear {{label}}",
+      nameLabel: "Nome",
+      renamed: "Agora se chama {{label}}.",
+      disconnectTitle: "Desconectar {{label}}?",
+      disconnectAgent:
+        "{{agent}} deixa de pensar com ela e volta para a API. O {{computer}} sai da conta e apaga o que guardava.",
+      disconnectNone: "O {{computer}} sai da conta e apaga o que guardava dela.",
+      disconnected: "{{label}} desconectada.",
+      where:
+        "As contas ficam nos computadores onde foram conectadas. Quem administra um computador pode acessar as contas dele.",
+    },
+    usage: {
+      window: {
+        five_hour: "5 horas",
+        seven_day: "Semana",
+        seven_day_opus: "Semana · Opus",
+        seven_day_sonnet: "Semana · Sonnet",
+        monthly: "Mês",
+        other: "Outro limite",
+      },
+      resetsAt: "volta às {{time}}",
+      resetsOn: "volta {{day}} às {{time}}",
+      almost: "Quase no limite",
+      limited: "No limite",
+      limitedUntil: "No limite até {{when}}",
+      updated: "Atualizado {{ago}}",
+      notShared: "{{maker}} não mostra o uso por aqui.",
+      offer: {
+        use: "Usar {{label}} ({{pct}}%)",
+        useUnknown: "Usar {{label}}",
+        connect: "Conectar outra conta",
+      },
+    },
+  },
   audience: {
     section: "Quem pode falar",
     title: "Quem pode falar com {{article}} {{name}}",
@@ -5203,6 +5352,9 @@ export const ptBR = {
       claude_codeNoComputer: "Claude Code · {{model}}",
       codex: "Codex · {{model}} no {{computer}}",
       codexNoComputer: "Codex · {{model}}",
+      plan: "{{model}} pelo Claude Code no {{computer}}",
+      planNoComputer: "{{model}} pelo Claude Code",
+      ofOwner: "{{line}} · plano de {{owner}}",
     },
     model: "Modelo (API)",
     modelText: "Um modelo de IA pela API, com uma chave do workspace.",
@@ -5236,13 +5388,13 @@ export const ptBR = {
     hidden: "{{owner}} ou um admin escolhe quem pensa.",
     hiddenAdmins: "Só admins escolhem quem pensa.",
     warning: {
-      title: "Usar o seu plano para o agente?",
+      title: "Usar o seu plano nos agentes?",
       claude_code:
-        "A assinatura do Claude é pessoal. Usar o seu plano para o agente responder a outras pessoas pode contrariar os termos da Anthropic. O risco é seu.",
+        "Os agentes vão pensar com o seu plano do Claude e responder só a você. Para outra pessoa falar com um deles, desligue Só responde a você em Quem pensa, na página do agente.",
       codex:
-        "A assinatura do ChatGPT é pessoal. Usar o seu plano para o agente responder a outras pessoas pode contrariar os termos da OpenAI. O risco é seu.",
-      confirm: "Entendi, usar mesmo assim",
-      cancel: "Cancelar",
+        "Os agentes vão pensar com o seu plano do ChatGPT e responder só a você. Para outra pessoa falar com um deles, desligue Só responde a você em Quem pensa, na página do agente.",
+      confirm: "Usar meu plano",
+      cancel: "Agora não",
     },
     summary: {
       model: "Modelo (API)",
@@ -5382,6 +5534,7 @@ export const ptBR = {
       sandbox: "Rodar código",
       browser: "Navegador",
       setup: "Configurar o workspace",
+      desktop: "Tela",
     },
     areaText: {
       context: {
@@ -5400,6 +5553,10 @@ export const ptBR = {
         write: "Navega em sites com o próprio navegador no computador conectado; os logins ficam por agente.",
       },
       setup: { write: "Oferece conectar uma IA e cria canais para quem pediu." },
+      desktop: {
+        write:
+          "Usa qualquer app na própria tela, no computador dele, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
+      },
     },
   },
   artifacts: {
@@ -6894,7 +7051,7 @@ export const ptBR = {
       access: "Agentes e acesso",
       connectors: "Conectores",
       skills: "Skills",
-      keys: "Chaves de API",
+      keys: "Contas de IA",
       storage: "Armazenamento",
       computers: "Computadores",
       usage: "Orçamento e uso",
@@ -6906,7 +7063,7 @@ export const ptBR = {
       access: "O que cada agente pode usar: um nível por conector.",
       connectors: "Serviços conectados uma vez para o workspace inteiro.",
       skills: "Instruções em Markdown que os agentes abrem quando precisam.",
-      keys: "Chaves dos provedores de modelo. Nunca saem do servidor.",
+      keys: "Seus planos e as chaves de API do workspace.",
       storage: "Onde ficam os arquivos do workspace.",
       computers:
         "Onde os agentes rodam código e mexem em arquivos. Cada agente usa um: o computador na nuvem, que já vem pronto, ou um computador seu.",
@@ -6939,7 +7096,7 @@ export const ptBR = {
       skills: "O que os agentes sabem fazer",
       computers: "Onde os agentes trabalham",
       usage: "Quanto os agentes gastam",
-      keys: "Chaves dos provedores de IA",
+      keys: "Planos e chaves de API",
       storage: "Onde ficam os arquivos",
       import: "Trazer e levar os agentes",
     },
@@ -6963,6 +7120,9 @@ export const ptBR = {
       keys_other: "{{count}} chaves",
       platformKey: "Usando a chave do agentes.chat",
       noKeys: "Nenhuma chave ainda",
+      plans_one: "{{count}} plano",
+      plans_other: "{{count}} planos",
+      noPlans: "Nenhum plano ainda",
     },
     import: {
       title: "Importar",
@@ -7321,6 +7481,7 @@ export const ptBR = {
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
+      desktop_handoff: "Preciso de ajuda no meu computador.",
       file_saved: "Arquivo salvo.",
       issue_work_start: "Pode fazer a tarefa #{{number}}.",
       issue_taken: "Peguei a tarefa #{{number}}.",
@@ -7608,6 +7769,11 @@ export const ptBR = {
       label: "Fechar o navegador",
       description: "Fecha o navegador do agente; os logins continuam salvos.",
     },
+    desktop_ask_person: {
+      label: "Pedir ajuda na tela do computador",
+      description:
+        "Pede para uma pessoa fazer algo na tela do agente (como entrar num aplicativo) e espera ela terminar.",
+    },
   },
   /** The agent browser (ADR 0040): the agent's page, the computer's page, the chat card, the live view. */
   browser: {
@@ -7865,6 +8031,30 @@ export const ptBR = {
         browser_close: "Fechou o navegador",
         other: "Usou o navegador",
       },
+    },
+  },
+  standing: {
+    paused: "Os agentes deste workspace estão pausados por enquanto.",
+    suspended: "Este workspace está indisponível por enquanto.",
+    createRefused: "Você não pode criar um workspace agora.",
+    agentPaused: "Este agente está pausado por enquanto.",
+    notification: {
+      hold: "O workspace está em espera: os agentes estão pausados",
+      suspended: "O workspace foi suspenso",
+      active: "O workspace voltou a funcionar",
+    },
+  },
+  computerSetup: {
+    managedNotRemovable: "Este é o computador do próprio workspace: ele não pode ser removido.",
+    notification: {
+      ready: "O computador do seu workspace está pronto",
+    },
+  },
+  /** The agent's desktop (ADR 0058): watching it, taking control, its terminal. */
+  desktop: {
+    control: {
+      notice:
+        "Enquanto você está no controle, os programas do computador do agente podem ver a tela e o que você digita.",
     },
   },
 };

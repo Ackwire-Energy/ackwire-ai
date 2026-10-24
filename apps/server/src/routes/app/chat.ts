@@ -381,7 +381,7 @@ export function chatRoutes(deps: AppDeps) {
       security,
       summary: "Once an AI is connected, the agent answers what it couldn't (Responder agora)",
       description:
-        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it. Pressed again, it returns the runs that answer it.",
+        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (a personal plan answers only its owner). Pressed again, it returns the runs that answer it.",
       request: { params: OrgParams.extend({ messageId: z.uuid() }) },
       responses: {
         200: json(z.object({ runs: z.array(z.object({ agentId: z.uuid(), runId: z.uuid() })) })),

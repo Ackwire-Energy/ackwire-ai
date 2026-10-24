@@ -276,6 +276,58 @@ test("the computer's own ops stay in the supervisor; an agent's go to its worker
   expect(ana.of("request")).toHaveLength(2);
 });
 
+test("a brain turn's account goes to its agent's user before the turn reaches the worker; root marks what it refused", async () => {
+  const lends: [string, string, number][] = [];
+  const refused: string[] = [];
+  const t = setup({
+    lend: async (kind, id, uid) => {
+      lends.push([kind, id, uid]);
+    },
+  });
+  t.ctx.accounts = {
+    refused: async (_kind: string, id: string) => {
+      refused.push(id);
+    },
+    invalidate: () => {},
+    refresh: async () => [],
+  } as unknown as AccountManager;
+  t.sup.boot();
+  t.sup.attach();
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+  const turn = (account?: string) =>
+    ({
+      op: "brain.turn",
+      kind: "claude_code",
+      runId: "run-00000001",
+      session: { id: "0193aaaa-0000-7000-8000-000000000001", resume: false },
+      prompt: "hi",
+      ...(account ? { account } : {}),
+      agent: BIA,
+    }) as MachineRequest;
+  const run = handleRequest(t.ctx, turn(ACCOUNT), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  expect(lends).toEqual([["claude_code", ACCOUNT, 21001]]);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const q = await requestOn(bia);
+  const final = { type: "error", code: "not_logged_in", message: "Invalid API key", retryable: true };
+  bia.send({ type: "result", id: q.id, ok: true, data: { runId: "run-00000001", final } });
+  expect(await run).toEqual({ runId: "run-00000001", final });
+  await waitFor(() => refused.length === 1);
+  expect(refused).toEqual([ACCOUNT]);
+  // Without an account nothing is lent.
+  const plain = handleRequest(t.ctx, turn(), scope().scope);
+  const q2 = await requestOn(bia, 2);
+  bia.send({
+    type: "result",
+    id: q2.id,
+    ok: true,
+    data: { runId: "run-00000001", final: { type: "done", text: "ok" } },
+  });
+  await plain;
+  expect(lends).toHaveLength(1);
+});
+
 test("a cancel reaches only the worker that runs that request", async () => {
   const t = setup();
   t.sup.boot();
@@ -852,6 +904,8 @@ test.if(posix)(
       expect(s.of("hello")[0]?.tasks).toEqual([
         { taskId: "task-ana-0001", agentId: ANA.id, status: "running", startedAt },
       ]);
+      // Each agent works as its own user, and hello says so: who may drive an agent's desktop follows it.
+      expect(s.of("hello")[0]?.mode).toBe("system");
       s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
       ana.hello();
       await waitFor(() => ana.of("welcome").length === 1);
@@ -870,6 +924,11 @@ test.if(posix)(
         ok: true,
         data: { ...execDone, stdout: "ag-a1b2c3d4\n" },
       });
+      // The desktops are this root process's own (the data sockets need the machine token): no worker hears of them.
+      s.frame({ type: "request", id: "d1", op: "desktop.session.status", agent: ANA });
+      await waitFor(() => s.sent.some((f) => f.id === "d1"));
+      expect(s.sent.find((f) => f.id === "d1")).toMatchObject({ ok: true, data: { running: false, streams: 0 } });
+      expect(ana.of("request")).toHaveLength(1);
       // Its task's end goes up; the server's ack comes back down to it.
       ana.send({ type: "task.done", taskId: "task-ana-0001", exitCode: 0, seconds: 3 });
       await waitFor(() => s.of("task.done").length === 1);

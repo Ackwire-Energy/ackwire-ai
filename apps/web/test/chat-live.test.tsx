@@ -370,7 +370,7 @@ describe("direct messages with an agent", () => {
     expect(document.body.textContent).toContain("Dev · responde a João · Claude Code · Sonnet no MacBook");
     expect(document.body.textContent).not.toContain("Claude Sonnet 5.5");
     const brain = document.querySelector(".channel__brain") as HTMLElement;
-    expect(brain.querySelector(".ac-icon")).not.toBeNull();
+    expect(brain.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     cleanup();
     // Without the computer's name (a member): just the brain and its model.
     const member = seedState();

@@ -18,7 +18,7 @@ import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
- * ADR 0057 §3–4: a message that meets no AI is read by Jev (calibrated) for the Connect step it asks for;
+ * ADR 0061 §3–4: a message that meets no AI is read by Jev (calibrated) for the Connect step it asks for;
  * without Jev it's `task`. The organization-level check runs before any router strategy (Jev only scores),
  * and an organization whose only AI is a plan is told to mention an agent instead.
  */

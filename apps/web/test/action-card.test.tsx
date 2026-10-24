@@ -49,6 +49,8 @@ const withBrain = (state: State, agentId: string, kind: NonNullable<Agent["brain
 describe("an agent's Connect card", () => {
   test("in place of its text: the step for the agents it names, the agent's line, and Connect opens that step for them", async () => {
     const state = seedState();
+    // A plan thinks only for its owner's agents (ADR 0059 §3): Walter connects his for his own.
+    for (const a of state.agents) a.ownerUserId = "u-walter";
     state.messages.push(
       card("c-ada", { what: "claude", agentIds: [ADA_ID], why: "Você pediu para a Ada usar o seu plano." }),
       card("c-both", { what: "claude", agentIds: [ATLAS_ID, ADA_ID], why: "Os dois com o seu plano." }, 1),

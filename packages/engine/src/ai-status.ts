@@ -10,7 +10,7 @@ import { missionTurnFor } from "./missions-engine";
 import type { AgentRun } from "./runs";
 
 /**
- * Whether an agent has an AI to think with (ADR 0057), from what the engine already uses: a key for its
+ * Whether an agent has an AI to think with (ADR 0061), from what the engine already uses: a key for its
  * model brain, or its computer brain's availability (with the model brain as the fallback). `waiting`:
  * its computer is away for now (offline, paused, a plan limit), which is not "no AI". Computed per
  * request, with no cache and no secrets: no key is decrypted.

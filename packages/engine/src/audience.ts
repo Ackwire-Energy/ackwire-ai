@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { type Agent, getAgent } from "./agents";
 import { recordAudit } from "./audit";
+import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
@@ -15,7 +16,10 @@ export const AUDIENCE_MODES: readonly AudienceMode[] = ["everyone", "people", "o
 
 export interface AgentAudience {
   mode: AudienceMode;
-  /** For `people`; the owner can always talk to the agent. */
+  /**
+   * For `people`; the owner can always talk to the agent. Under `owner`, the
+   * people a plan kept out (ADR 0059 §5), who come back when it is let out.
+   */
   userIds: string[];
 }
 
@@ -23,8 +27,55 @@ type AudienceFields = Pick<Agent, "audienceMode" | "audienceUserIds" | "ownerUse
 
 export const audienceOf = (a: AudienceFields): AgentAudience => ({
   mode: a.audienceMode,
-  userIds: a.audienceMode === "people" ? a.audienceUserIds : [],
+  userIds: a.audienceMode === "everyone" ? [] : a.audienceUserIds,
 });
+
+export const OWNER_ONLY: AgentAudience = { mode: "owner", userIds: [] };
+
+/** Whether `to` lets someone talk to the agent whom `from` didn't (its owner always can). */
+export function widensAudience(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
+  if (to.mode === "owner" || from.mode === "everyone") return false;
+  if (to.mode === "everyone") return true;
+  const before = new Set(from.mode === "people" ? from.userIds : []);
+  return to.userIds.some((id) => id !== ownerUserId && !before.has(id));
+}
+
+/** Someone besides its owner can talk to the agent. */
+export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
+  widensAudience(OWNER_ONLY, a, ownerUserId);
+
+/**
+ * More people for an agent that thinks with a personal plan (ADR 0059 §5):
+ * only the plan's owner, who is the agent's owner, lets them in; admins only
+ * narrow. The first time anyone else may talk to it, the owner accepts that
+ * answering other people on a personal plan might go against the provider's
+ * terms. True when this change is that acceptance (the caller audits it).
+ */
+export function planSharing(
+  agent: Pick<Agent, "name" | "brain" | "ownerUserId">,
+  actorId: string,
+  from: AgentAudience,
+  to: AgentAudience,
+  acceptPlanTerms: boolean,
+): boolean {
+  if (!isComputerBrain(agent.brain) || !widensAudience(from, to, agent.ownerUserId)) return false;
+  if (!agent.ownerUserId || agent.ownerUserId !== actorId) {
+    throw new ForbiddenError(
+      `Only ${agent.name}'s owner can let more people talk to it: it thinks with their plan`,
+      "audience.plan_owner_only",
+      { agentName: agent.name },
+    );
+  }
+  if (answersOthers(from, agent.ownerUserId)) return false;
+  if (!acceptPlanTerms) {
+    throw new ValidationError(
+      "Letting other people talk to an agent on your personal plan needs your confirmation",
+      "audience.plan_terms_required",
+      { brain: agent.brain },
+    );
+  }
+  return true;
+}
 
 /** Can this person's message start a run of the agent? (`null` = no person: routines and webhooks check their creator.) */
 export function canTalkTo(a: AudienceFields, userId: string | null): boolean {
@@ -118,13 +169,18 @@ export async function notifyBlocked(
   return out;
 }
 
-/** Changes who can talk to the agent: its owner or admins (with no owner, admins only). Audited. */
+/**
+ * Changes who can talk to the agent: its owner or admins (with no owner,
+ * admins only); on a personal plan, more people only by its owner
+ * (`planSharing`). Audited.
+ */
 export async function setAgentAudience(
   db: Database,
   actorId: string,
   orgId: string,
   agentId: string,
   audience: AgentAudience,
+  options: { acceptPlanTerms?: boolean } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
@@ -147,6 +203,13 @@ export async function setAgentAudience(
   if (audience.mode === "people" && userIds.length === 0 && !agent.ownerUserId) {
     throw new ValidationError("Pick at least one person");
   }
+  const accepted = planSharing(
+    agent,
+    actorId,
+    audienceOf(agent),
+    { mode: audience.mode, userIds },
+    options.acceptPlanTerms === true,
+  );
   const [updated] = await db
     .update(agents)
     .set({ audienceMode: audience.mode, audienceUserIds: userIds, updatedAt: new Date() })
@@ -160,7 +223,11 @@ export async function setAgentAudience(
     actor: { type: "person", id: actorId },
     action: "agent.audience_changed",
     target: { type: "agent", id: agentId },
-    details: { from: audienceOf(agent), to: audienceOf(updated) },
+    details: {
+      from: audienceOf(agent),
+      to: audienceOf(updated),
+      ...(accepted ? { acceptedPlanTerms: true } : {}),
+    },
   });
   return updated;
 }

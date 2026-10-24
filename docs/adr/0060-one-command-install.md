@@ -1,4 +1,4 @@
-# 0056. One-command install, native mode, and the server's computer
+# 0060. One-command install, native mode, and the server's computer
 
 - Status: Accepted. Built: the installer, the server's computer and plain words. Not built yet: native mode (§2), so a Mac needs Docker for now, and the setup's question for the server's computer (§3), which is set up by hand until then (`SELF_HOSTING.md`).
 - Date: 2026-10-24
@@ -69,7 +69,7 @@ The machine that runs agentes.chat is also a computer for its agents, "Computado
 **Which organizations it serves:**
 
 - Only organizations the installation's first account (the person who set it up) made and is still an owner or an admin of. Its rows are paired by that account.
-  - So that person is the computer's owner for ADR 0041: they add the Claude and ChatGPT sign-ins on it, and pick them per agent.
+  - So that person is the computer's owner for ADR 0041: they add the Claude and ChatGPT sign-ins on it, and pick them per agent. For ADR 0059 §1 it is a computer someone paired, so only they add accounts there, and their plans think only for their own agents (ADR 0059 §3); other members' agents there think with a key.
   - Someone who joins through an invitation and then creates an organization of their own doesn't get agents on the operator's machine. A role isn't enough on its own, since an organization's owner can make anyone an admin or an owner there; who made an organization is recorded on its #general, which can't be renamed or archived.
   - The server refuses to start with `HOST_COMPUTER_TOKEN` and `ALLOW_SIGNUP=true` together: with open sign-up, a stranger could be the installation's first account.
   - Serving more organizations is a later, explicit choice.

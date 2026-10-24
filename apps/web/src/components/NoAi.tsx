@@ -14,7 +14,7 @@ import { useChannelEvents } from "@/realtime/context";
 import "./no-ai.css";
 
 /*
- * No AI connected (ADR 0057), wherever it shows: above the composer, the agent's card in the
+ * No AI connected (ADR 0061), wherever it shows: above the composer, the agent's card in the
  * conversation, a "Sem IA" chip by its name, and the check before a message with an API key goes out.
  */
 

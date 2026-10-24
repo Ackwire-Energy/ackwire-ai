@@ -15,7 +15,7 @@ Cloud: both run this same codebase.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Channels, threads and DMs | ✅ | Public and private channels, DMs with people and agents, and threads started from a message or a stretch of conversation, then followed, closed and archived. |
-| Agents | ✅ | Each has a role, instructions, a model (Anthropic or OpenAI), a monthly budget checked before every call, and an owner who gets its approvals and budget alerts. |
+| Agents | ✅ | Each has a role, instructions, a model (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax), a monthly budget checked before every call, and an owner who gets its approvals and budget alerts. |
 | Router | ✅ | A message nobody @mentioned goes to the router: code picks the candidates, a model scores them, and up to four agents answer, or none. It never grants a permission. |
 | Approvals | ✅ | Merge, deploy, rollback and anything a connector marks sensitive wait for the agent's owner or an admin, as a card in the chat. The approved action runs once, exactly as approved. |
 | Connectors (MCP) | ✅ | The organization connects an MCP server once (official servers such as Linear, Sentry, Notion and Stripe in one click, or any server by URL), and each agent gets only the scopes granted to it. |
@@ -49,7 +49,7 @@ curl -fsSL https://agentes.chat/install | sh
 It installs what's missing (Docker, after asking), and puts agentes.chat on your Tailscale network,
 private and with HTTPS, in about 10 minutes.
 [SELF_HOSTING.md](SELF_HOSTING.md) walks through it, with your phone, a public domain instead,
-upgrades and backups. Each organization adds its own Anthropic or OpenAI key in the app. To work on
+upgrades and backups. Each organization adds its own model key (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax) in the app. To work on
 the code, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License

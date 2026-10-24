@@ -1,4 +1,6 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
+import { recordRunFinished } from "./operator-events";
+import { standingErrorDetail } from "./standing";
 
 const { agentRuns, agentRunSteps } = schema;
 
@@ -55,6 +57,8 @@ export function runErrorDetail(error: string | null | undefined): {
     return { errorCode: "run.provider_unavailable", errorParams: { detail: error.slice(8).trim() } };
   if (error.startsWith("canceled_by:"))
     return { errorCode: "run.canceled", errorParams: { byUserId: error.slice(12) } };
+  const standing = standingErrorDetail(error);
+  if (standing) return standing;
   // Older rows hold the Portuguese texts these errors used to have: still recognized.
   if (error === "Interrupted by a server update" || error === "Interrompida por uma atualização do servidor") {
     return { errorCode: "run.interrupted", errorParams: { reason: "deploy" } };
@@ -128,6 +132,7 @@ export async function transitionRun(
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))
     .returning();
+  if (row && isTerminal(to)) await recordRunFinished(db, row);
   return row ?? null;
 }
 

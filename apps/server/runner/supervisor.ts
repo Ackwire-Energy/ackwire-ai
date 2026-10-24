@@ -114,6 +114,8 @@ export interface SupervisorOptions {
   fetch?: FetchLike;
   /** System mode: the loopback firewall (root), started with the supervisor. Absent in single-user and in tests. */
   guard?: { start(): void; stop(): void };
+  /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
+  lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -198,6 +200,16 @@ export class Supervisor {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
     if (this.closed) throw new RunnerError("internal", "The runner is stopping; try again in a minute");
     const w = this.entry(this.opts.user(req.agent));
+    // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
+    if (req.op === "brain.turn" && typeof req.account === "string" && req.account && this.opts.lend) {
+      await this.opts
+        .lend(req.kind === "codex" ? "codex" : "claude_code", req.account, w.user.uid)
+        .catch((err: unknown) =>
+          this.opts.log(
+            `[${w.user.user}] couldn't hand it its account: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+    }
     await this.ready(w, scope.signal);
     if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now; try again");
     if (req.op === "task.start") this.own(req.taskId, w);

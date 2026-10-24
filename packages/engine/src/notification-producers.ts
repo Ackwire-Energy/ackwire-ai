@@ -10,6 +10,7 @@ import {
   notify,
   resolveNotifications,
 } from "./notifications";
+import type { MemberRole } from "./organizations";
 
 /**
  * Where notifications come from: each flow calls one of these after
@@ -677,6 +678,15 @@ export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
 }
 
+/** The organization's owners and admins (or only the roles given). */
+const adminsOf = async (deps: NotificationDeps, orgId: string, roles: MemberRole[] = ["owner", "admin"]) =>
+  (
+    await deps.db
+      .select({ userId: organizationMembers.userId })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, roles)))
+  ).map((a) => a.userId);
+
 // ── Connected computers ───────────────────────────────────────────────────────
 
 /**
@@ -689,18 +699,54 @@ export async function notifyMachineConnected(
   machine: { id: string; orgId: string; name: string; hostname: string },
   actorId: string,
 ) {
-  const admins = await deps.db
-    .select({ userId: organizationMembers.userId })
-    .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, machine.orgId), inArray(organizationMembers.role, ["owner", "admin"])));
   await notify(deps, {
     orgId: machine.orgId,
-    userIds: admins.map((a) => a.userId),
+    userIds: await adminsOf(deps, machine.orgId),
     kind: "machine_connected",
     groupKey: `machine_connected:${machine.id}`,
     actor: person(actorId),
     source: { machineId: machine.id, label: machine.name },
     latest: { title: machine.name, ...(machine.hostname ? { text: notificationSnippet(machine.hostname) } : {}) },
+  });
+}
+
+/**
+ * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
+ * from seconds to an approval hours later. One row each time it gets ready.
+ */
+export async function notifyComputerReady(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string },
+  readyAt: Date,
+) {
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: await adminsOf(deps, machine.orgId, ["owner"]),
+    kind: "computer_ready",
+    groupKey: `computer_ready:${machine.id}:${readyAt.getTime()}`,
+    source: { machineId: machine.id, label: machine.name },
+    latest: { title: machine.name },
+  });
+}
+
+// ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
+
+/**
+ * The people who run this server held, suspended or restored the workspace, with the notice shown: its
+ * owners and admins hear it, with the reason (`latest.text`). One row per change.
+ */
+export async function notifyOrgStanding(
+  deps: NotificationDeps,
+  orgId: string,
+  standing: { state: string; reason: string | null; changedAt: Date | null },
+) {
+  await notify(deps, {
+    orgId,
+    userIds: await adminsOf(deps, orgId),
+    kind: "org_standing",
+    groupKey: `org_standing:${orgId}:${standing.changedAt?.getTime() ?? 0}`,
+    source: {},
+    latest: { statusTo: standing.state, ...(standing.reason ? { text: notificationSnippet(standing.reason) } : {}) },
   });
 }
 
@@ -720,15 +766,17 @@ export async function browserHandoffRecipient(
  * An agent needs a person in its browser (`browser_ask_person`): in the
  * "Waiting for you" of whoever asked for the work and of the agent's
  * responsible person, with a push. Either may open it; the first in control
- * does it, the other sees who is helping.
+ * does it, the other sees who is helping. `to`: exactly who instead (a
+ * desktop's request goes only to who may drive its computer).
  */
 export async function notifyBrowserHandoff(
   deps: NotificationDeps,
   h: typeof schema.browserHandoffs.$inferSelect,
   where: { channelId: string; threadId: string | null },
+  to?: string[],
 ) {
   // Who asked for the work and the agent's responsible person (once when it's the same person).
-  const userIds = [...new Set([h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
+  const userIds = [...new Set(to ?? [h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
     (id): id is string => !!id,
   );
   if (userIds.length === 0) return;
@@ -750,6 +798,7 @@ export async function notifyBrowserHandoff(
       ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
       handoffId: h.id,
+      ...(h.screen !== "browser" ? { screen: h.screen } : {}),
     },
     latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });

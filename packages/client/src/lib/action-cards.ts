@@ -2,7 +2,7 @@ import type { Agent, AiStatus } from "../api/types";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
 
 /**
- * An agent's action card (ADR 0057, `meta.actionCard`): its button opens the app's own dialog, filled in.
+ * An agent's action card (ADR 0061, `meta.actionCard`): its button opens the app's own dialog, filled in.
  * The card keeps no state; whether it's done comes from live data. Platform-neutral (web and phone).
  */
 

@@ -1,4 +1,6 @@
-import type { BrainKind, BrainOption } from "../api/types";
+import type { TFunction } from "i18next";
+import type { AgentBrainLine, BrainKind, BrainOption } from "../api/types";
+import { isAuto } from "./providers";
 
 /*
  * The engine an agent thinks and works with, as its icon draws it
@@ -31,4 +33,29 @@ export function engineStateOfOption(
   if (option.kind === "model") return "idle";
   if (!option.available) return "off";
   return computer && !computer.online ? "off" : "idle";
+}
+
+/**
+ * What thinks for an agent, wherever it is shown (DM header, profile card, the phone's "Pensa com"):
+ * "Claude Code · Sonnet no mac", "GLM-5.3 pelo Claude Code", "Codex · GPT-6 Sol", or the API model's label.
+ * Whoever doesn't see its computer (not its owner nor an admin) also reads whose plan it is (`owner`).
+ * `mark` is the maker's (`ProviderLogo` id: a plan account's own provider when it has one), null for the API.
+ */
+export function brainLine(
+  t: TFunction,
+  brain: AgentBrainLine | null | undefined,
+  apiModelLabel: string,
+  owner?: string | null,
+): { text: string; kind: EngineKind; mark: string | null } {
+  if (!brain || brain.kind === "model") return { text: apiModelLabel, kind: "agent", mark: null };
+  const model = isAuto(brain.model) ? t("brain.auto.label") : (brain.model ?? "");
+  const line = brain.provider && brain.kind === "claude_code" ? "plan" : brain.kind;
+  const text = brain.computer
+    ? t(`brain.line.${line}`, { model, computer: brain.computer })
+    : t(`brain.line.${line}NoComputer`, { model });
+  return {
+    text: !brain.computer && owner ? t("brain.line.ofOwner", { line: text, owner }) : text,
+    kind: engineOfBrain(brain.kind),
+    mark: brain.provider ?? brain.kind,
+  };
 }

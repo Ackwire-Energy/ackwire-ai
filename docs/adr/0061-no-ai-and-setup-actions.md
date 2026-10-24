@@ -1,4 +1,4 @@
-# 0057. No AI connected, and agents that set up the workspace
+# 0061. No AI connected, and agents that set up the workspace
 
 - Status: Accepted
 - Date: 2026-10-24

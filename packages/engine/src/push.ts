@@ -30,6 +30,7 @@ export const PUSH_KINDS: ReadonlySet<string> = new Set([
   "routine_stalled",
   "machine_connected",
   "browser_handoff",
+  "computer_ready",
 ]);
 
 /** Expo keeps receipts for a day and has most ready within 15 minutes: ask then. */
@@ -196,6 +197,7 @@ export async function deliverPush(deps: PushDeps, notificationId: string): Promi
       text: latest.text,
       highRisk,
       routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
+      screen: source.screen ?? null,
     }),
     data,
     priority: row.waiting ? "high" : "default",

@@ -30,6 +30,7 @@ import {
   parseBrowserClientFrame,
 } from "./browser";
 import type { MachineSocketData, MachineSockets } from "./machines";
+import type { StreamSocketData, StreamSockets } from "./streams";
 
 /**
  * WebSocket endpoint `GET /api/ws?orgId=<uuid>` (docs/adr/0010-realtime.md).
@@ -65,6 +66,8 @@ export interface RealtimeDeps {
   machines?: MachineSockets;
   /** The agent browser's live view (ADR 0040, `browser.*` frames); absent = not offered. */
   browserLive?: BrowserLive;
+  /** Agents' desktops and terminals (ADR 0058): people's stream sockets and the runners' data sockets. */
+  streams?: StreamSockets;
 }
 
 /** A browser tab of the web app. */
@@ -82,12 +85,15 @@ export interface BrowserSocketData {
   browsers: Map<string, () => void>;
 }
 
-/** Every socket of the server: browsers (`/api/ws`) and runners (`/api/machines/connect`). */
-export type SocketData = BrowserSocketData | MachineSocketData;
+/** Every socket of the server: browsers (`/api/ws`), runners (`/api/machines/connect`) and streams (ADR 0058). */
+export type SocketData = BrowserSocketData | MachineSocketData | StreamSocketData;
 
 type BrowserSocket = Bun.ServerWebSocket<BrowserSocketData>;
 type MachineSocket = Bun.ServerWebSocket<MachineSocketData>;
+type StreamSocket = Bun.ServerWebSocket<StreamSocketData>;
 const isMachine = (ws: Bun.ServerWebSocket<SocketData>): ws is MachineSocket => ws.data.kind === "machine";
+const isStream = (ws: Bun.ServerWebSocket<SocketData>): ws is StreamSocket =>
+  ws.data.kind === "stream.viewer" || ws.data.kind === "stream.data";
 
 export type ClientFrame =
   | { type: "subscribe" | "unsubscribe"; channelId: string }
@@ -97,8 +103,32 @@ export type ClientFrame =
 /** How long a typing indicator lasts without a new `typing` frame. */
 export const TYPING_TTL_MS = 5000;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_SUBSCRIPTIONS = 200;
+
+/**
+ * The checks before a person's socket opens (`/api/ws`, and the desktop and
+ * terminal streams): our Origin, or the phone app without one (cross-site
+ * WebSocket hijacking); a session from the cookie; membership of `orgId`.
+ * The person, or the refusal.
+ */
+export async function personUpgrade(
+  deps: Pick<RealtimeDeps, "auth" | "db">,
+  origins: Set<string>,
+  req: Request,
+  orgId: string,
+): Promise<SessionUser | Response> {
+  if (!requestOriginAllowed(origins, req.headers)) {
+    return new Response("Cross-origin WebSocket refused", { status: 403 });
+  }
+  if (!UUID.test(orgId)) return new Response("orgId is required", { status: 400 });
+  const user = await sessionUser(deps.auth, req.headers);
+  if (!user) return new Response("Sign in to continue", { status: 401 });
+  if (!(await getMembership(deps.db, user.id, orgId))) {
+    return new Response("Not a member of this organization", { status: 403 });
+  }
+  return user;
+}
 
 export function parseClientFrame(raw: string | Buffer): ClientFrame | null {
   if (raw.length > 4096) return null;
@@ -240,20 +270,16 @@ export function createRealtime(deps: RealtimeDeps) {
       if (deps.machines && path === deps.machines.path) {
         return deps.machines.upgrade(req, server as unknown as Bun.Server<MachineSocketData>);
       }
+      if (deps.streams?.paths.has(path)) {
+        return deps.streams.upgrade(req, server as unknown as Bun.Server<StreamSocketData>);
+      }
       return next(req);
     },
 
     async upgrade(req: Request, server: Bun.Server<SocketData>): Promise<Response | undefined> {
-      // Our origin, or the phone app without one (ADR 0035); the session comes from the cookie either way.
-      if (!requestOriginAllowed(origins, req.headers)) {
-        return new Response("Cross-origin WebSocket refused", { status: 403 });
-      }
       const orgId = new URL(req.url).searchParams.get("orgId") ?? "";
-      if (!UUID.test(orgId)) return new Response("orgId is required", { status: 400 });
-      const user = await sessionUser(deps.auth, req.headers);
-      if (!user) return new Response("Sign in to continue", { status: 401 });
-      if (!(await getMembership(deps.db, user.id, orgId)))
-        return new Response("Not a member of this organization", { status: 403 });
+      const user = await personUpgrade(deps, origins, req, orgId);
+      if (user instanceof Response) return user;
       const data: BrowserSocketData = {
         kind: "browser",
         connectionId: crypto.randomUUID(),
@@ -273,6 +299,7 @@ export function createRealtime(deps: RealtimeDeps) {
       idleTimeout: 120,
       async open(socket: Bun.ServerWebSocket<SocketData>) {
         if (isMachine(socket)) return deps.machines?.open(socket);
+        if (isStream(socket)) return deps.streams?.open(socket);
         const ws = socket as BrowserSocket;
         const { orgId, user } = ws.data;
         const drop = (channelId: string, reason: string) => {
@@ -312,6 +339,7 @@ export function createRealtime(deps: RealtimeDeps) {
       },
       async message(socket: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
+        if (isStream(socket)) return deps.streams?.message(socket, raw);
         const ws = socket as BrowserSocket;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
         if (browserFrame) {
@@ -373,8 +401,9 @@ export function createRealtime(deps: RealtimeDeps) {
         ws.data.subscriptions.set(channelId, off);
         send(ws, { type: "subscribed", channelId });
       },
-      async close(socket: Bun.ServerWebSocket<SocketData>) {
+      async close(socket: Bun.ServerWebSocket<SocketData>, code: number) {
         if (isMachine(socket)) return deps.machines?.close(socket);
+        if (isStream(socket)) return deps.streams?.close(socket, code);
         const ws = socket as BrowserSocket;
         for (const off of ws.data.subscriptions.values()) off();
         ws.data.subscriptions.clear();

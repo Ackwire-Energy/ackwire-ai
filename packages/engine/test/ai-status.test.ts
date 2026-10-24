@@ -14,7 +14,7 @@ import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
- * ADR 0057 §1: whether an agent has an AI to think with — a key for its model brain (`auto` checked for
+ * ADR 0061 §1: whether an agent has an AI to think with — a key for its model brain (`auto` checked for
  * the provider its runs would pick), or its computer brain (signed out, missing or no computer: `no_ai`
  * unless it may fall back; away: `waiting`) — and whether the organization has any. No key is decrypted.
  */

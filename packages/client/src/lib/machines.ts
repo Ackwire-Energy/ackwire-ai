@@ -100,3 +100,19 @@ export function hostDescKey(os: string): "descUsers" | "descShared" | "desc" {
 /** What a computer is called on screen: its name, or `hostLabel` for the server's own until its runner names it. */
 export const machineTitle = (m: Pick<Machine, "name" | "kind">, hostLabel: string) =>
   m.name || (m.kind === "host" ? hostLabel : "");
+
+/**
+ * A code pasted for a Claude sign-in is this sign-in's when it ends with `#<state>` of its link (what
+ * Claude's page shows). Only then does a paste go to the computer without a tap: anything else from the
+ * clipboard (a password) waits for the person.
+ */
+export function isSignInCode(text: string, signInUrl: string): boolean {
+  let state: string | null = null;
+  try {
+    state = new URL(signInUrl).searchParams.get("state");
+  } catch {
+    return false;
+  }
+  const code = text.trim();
+  return Boolean(state) && code.length > (state?.length ?? 0) + 1 && code.endsWith(`#${state}`) && !/\s/.test(code);
+}

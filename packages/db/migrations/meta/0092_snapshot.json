@@ -1,6 +1,6 @@
 {
-  "id": "fd579569-8400-4df4-a137-8fc0a43ecf5d",
-  "prevId": "ed20f8fd-6e2e-40dc-b3fd-8ef0685bbb0f",
+  "id": "27512df4-50bb-4dda-8cc8-28e9e4c85e18",
+  "prevId": "12676b8d-8c87-40da-9353-694e459f4a28",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5892,13 +5892,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'connected'"
-        },
         "paired_by_user_id": {
           "name": "paired_by_user_id",
           "type": "text",
@@ -5907,12 +5900,6 @@
         },
         "token_hash": {
           "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "host_key": {
-          "name": "host_key",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -6058,22 +6045,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "machines_host_org": {
-          "name": "machines_host_org",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"machines\".\"kind\" = 'host'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -8606,6 +8577,101 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.operator_events": {
+      "name": "operator_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "xact_id": {
+          "name": "xact_id",
+          "type": "xid8",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "pg_current_xact_id()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "operator_events_xact_id_id_index": {
+          "name": "operator_events_xact_id_id_index",
+          "columns": [
+            {
+              "expression": "xact_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "operator_events_created_at_index": {
+          "name": "operator_events_created_at_index",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -13925,6 +13991,38 @@
         "logo": {
           "name": "logo",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "standing": {
+          "name": "standing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "standing_reason": {
+          "name": "standing_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "standing_note": {
+          "name": "standing_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "standing_notice": {
+          "name": "standing_notice",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'shown'"
+        },
+        "standing_changed_at": {
+          "name": "standing_changed_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

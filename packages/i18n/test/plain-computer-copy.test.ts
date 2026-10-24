@@ -7,7 +7,7 @@ import { leaves } from "./leaves";
  * developers: no system names, addresses or tool lists. Sizes ("4 CPUs · 8 GB de memória") and "um usuário
  * para cada agente" are fine. A new screen about computers adds its namespace here.
  */
-const NAMESPACES = ["onboarding.computer.", "computer.", "machine.", "machines.host."];
+const NAMESPACES = ["onboarding.computer.", "computer.", "computerSetup.", "machine.", "machines.host."];
 
 /** Case-insensitive, so the Go language is left out: it would match English "Go to…". */
 const TECHNICAL =

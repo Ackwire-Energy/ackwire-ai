@@ -1003,6 +1003,9 @@ body[data-window="popover"] {
   margin-top: 6px;
 }
 .dk-ctitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;

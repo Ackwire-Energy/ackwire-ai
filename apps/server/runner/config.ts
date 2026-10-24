@@ -96,11 +96,11 @@ export function normalizeServerUrl(raw: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
 }
 
-/** `https://host` → `wss://host/api/machines/connect`. */
-export function connectUrl(server: string): string {
+/** `https://host` → `wss://host/api/machines/connect` (or `/stream`, a desktop's or terminal's data socket). */
+export function connectUrl(server: string, socket: "connect" | "stream" = "connect"): string {
   const url = new URL(server);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/machines/connect`;
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/machines/${socket}`;
   url.search = "";
   url.hash = "";
   return url.toString();

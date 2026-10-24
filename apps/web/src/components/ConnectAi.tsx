@@ -1,6 +1,7 @@
 import type { ConnectIntent, MachineAccount, MachineAccountKind } from "@agenteschat/client";
-import { keys, useAgentBrain, useApi } from "@agenteschat/client";
+import { keys, useAgentBrain, useApi, useMachines } from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { PLAN_BRAIN } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -17,16 +18,16 @@ import {
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
+import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
-import { AddAccount } from "@/pages/agent/Work";
 import { KeyDialog } from "@/pages/SettingsPage";
 import "./no-ai.css";
 
 /*
- * "Conectar uma IA" (ADR 0057): one dialog for every place that says an agent has no AI (the banner,
+ * "Conectar uma IA" (ADR 0061): one dialog for every place that says an agent has no AI (the banner,
  * the agent's card, the receipt under a message, its "Sem IA" chip). Its first step offers a Claude or
  * ChatGPT plan, thinking on the agent's computer, or an API key; a message that asked for one of them
  * opens at that step. Connected from a card or a message, the agent then answers it by itself.
@@ -130,11 +131,11 @@ function ConnectAiDialog({
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const qc = useQueryClient();
-  // An API key is the organization's (admins); a plan changes who thinks for an agent (its owner or an admin).
+  // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org.role, "manage_credentials");
-  const editable = dir.agents.filter((a) => can(org.role, "manage_agents") || a.ownerUserId === me.user.id);
+  const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id);
   const named = request.agentIds?.length ? request.agentIds : request.agentId ? [request.agentId] : null;
-  const agents = named ? editable.filter((a) => named.includes(a.id)) : editable;
+  const agents = named ? mine.filter((a) => named.includes(a.id)) : mine;
   const plans = agents.length > 0;
   const step =
     request.step === "api_key"
@@ -228,8 +229,9 @@ function ConnectAiDialog({
 }
 
 /**
- * A Claude or ChatGPT plan for one agent: signed in on the agent's computer (the provider's own sign-in,
- * ADR 0041), then "Usar meu plano" makes it the agent's brain (the person confirms the plan warning).
+ * A Claude or ChatGPT plan for one of the person's agents: signed in on the agent's computer (the provider's
+ * own sign-in, ADR 0041), then "Usar meu plano" makes it the agent's brain, and the agent answers only them
+ * until they share it (ADR 0059 §5).
  */
 function PlanDialog({
   step,
@@ -262,6 +264,7 @@ function PlanDialog({
         key={agentId}
         kind={PLAN_BRAIN[step]}
         agentId={agentId}
+        agentName={agents.find((a) => a.id === agentId)?.name ?? ""}
         picker={
           agents.length > 1 && (
             <Select
@@ -284,6 +287,7 @@ function PlanDialog({
 function PlanForAgent({
   kind,
   agentId,
+  agentName,
   picker,
   onKey,
   onBack,
@@ -292,6 +296,7 @@ function PlanForAgent({
 }: {
   kind: MachineAccountKind;
   agentId: string;
+  agentName: string;
   /** Which agent, when there are several. */
   picker: ReactNode;
   onKey?: () => void;
@@ -305,6 +310,7 @@ function PlanForAgent({
   const qc = useQueryClient();
   const toast = useToast();
   const brain = useAgentBrain(org.id, agentId);
+  const machines = useMachines(org.id);
   const [added, setAdded] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const view = brain.data;
@@ -329,7 +335,8 @@ function PlanForAgent({
           ? t("brain.reasons.runner_old")
           : !view.canManageAccounts
             ? t("connectAi.accountsLocked", {
-                name: view.accountsOwner?.name.split(" ")[0] ?? "",
+                // Someone's own computer: only who connected it adds sign-ins there (ADR 0059 §1).
+                name: machines.data?.find((m) => m.id === computer.machineId)?.pairedBy?.name.split(" ")[0] ?? "",
                 computer: computer.name,
               })
             : null;
@@ -356,7 +363,7 @@ function PlanForAgent({
     if (!added) return;
     setBusy(true);
     try {
-      await api.agents.setBrain(org.id, agentId, { brain: kind, acceptPlanTerms: true, account: added.id });
+      await api.agents.setBrain(org.id, agentId, { brain: kind, account: added.id });
       for (const key of [keys.agentBrain(org.id, agentId), keys.agents(org.id), keys.machines(org.id)])
         void qc.invalidateQueries({ queryKey: key });
       onConnected();
@@ -369,9 +376,7 @@ function PlanForAgent({
     <>
       <DialogBody>
         {picker}
-        <SettingNote icon="alert">
-          <Trans i18nKey={`agentPage.work.planNote.${kind}`} components={{ b: <b /> }} />
-        </SettingNote>
+        <SettingNote icon="lock">{t("aiAccounts.share.on", agentGrammar(t, agentName))}</SettingNote>
         {added ? (
           <SettingNote icon="check" live>
             {t("agentPage.work.brain.add.done", { account: added.label, computer: computer.name })}

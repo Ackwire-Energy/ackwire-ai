@@ -1,6 +1,7 @@
 import {
   ARTIFACT_LIMITS,
   authenticateMachine,
+  computerSetup,
   confirmDeviceCode,
   DeviceCodeLimitError,
   deleteMachine,
@@ -12,6 +13,9 @@ import {
   listMachines,
   machineOrgLogo,
   moveAgentsFromMachine,
+  PROVISIONING_REASONS,
+  PROVISIONING_STATES,
+  PROVISIONING_STEPS,
   pollDeviceToken,
   receiveMachineUpload,
   reduceMachineAccess,
@@ -60,6 +64,14 @@ export const MachineAccess = z
         .boolean()
         .optional()
         .openapi({ description: "The agent browser (protocol 12, ADR 0040); absent = off." }),
+      desktop: z
+        .boolean()
+        .optional()
+        .openapi({ description: "The agents' desktops (protocol 18, ADR 0058); absent = off." }),
+      terminal: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Terminals people open as an agent (protocol 18, ADR 0058); absent = off." }),
     }),
   })
   .openapi("MachineAccess");
@@ -70,7 +82,7 @@ export const Machine = z
     name: z.string(),
     kind: z.enum(["connected", "host", "managed"]).openapi({
       description:
-        "`connected`: a person paired it; `host`: this server's own computer (`HOST_COMPUTER_TOKEN`); `managed`: the workspace's own.",
+        "`connected`: a person paired it; `host`: this server's own computer (`HOST_COMPUTER_TOKEN`); `managed`: the workspace's own computer (ADR 0056 §10), which people can't remove and whose hostname, OS and arch aren't shown.",
     }),
     online: z.boolean().openapi({ description: "Runner connected now. Changes come as `machine.status` events." }),
     lastSeenAt: z.string().nullable(),
@@ -123,6 +135,29 @@ const HostComputer = z
   .openapi("HostComputer");
 
 const MachineParams = OrgParams.extend({ machineId: z.uuid() });
+
+const ComputerSetup = z
+  .object({
+    mode: z.enum(["external", "pair"]).openapi({
+      description:
+        "`pair`: people connect their own computers (the other fields are null). `external`: the workspace gets its own computer, being prepared until `state` is `ready`.",
+    }),
+    state: z.enum(PROVISIONING_STATES).nullable(),
+    step: z
+      .enum(PROVISIONING_STEPS)
+      .nullable()
+      .openapi({ description: "While `preparing`: reserving, starting, installing or connecting." }),
+    reason: z
+      .enum(PROVISIONING_REASONS)
+      .nullable()
+      .openapi({ description: "While `waiting`: `approval` (soon) or `capacity` (taking longer than usual)." }),
+    since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
+    etaSeconds: z.number().int().nullable(),
+    specs: z.object({ cpus: z.number().int(), memoryGb: z.number(), diskGb: z.number() }).nullable(),
+    machineId: z.uuid().nullable().openapi({ description: "The workspace's computer, once it has one." }),
+  })
+  .openapi("ComputerSetup");
+
 const UserCode = z.string().min(6).max(16).openapi({ example: "K7Q4ZP" });
 const UserCodeParams = z.object({ userCode: UserCode });
 
@@ -321,7 +356,7 @@ export function machineAppRoutes(deps: AppDeps) {
           z
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
-              disableTool: z.enum(["claude", "codex", "commands", "browser"]).optional(),
+              disableTool: z.enum(["claude", "codex", "commands", "browser", "desktop", "terminal"]).optional(),
             })
             .strict(),
         ),
@@ -367,7 +402,8 @@ export function machineAppRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/machines/{machineId}",
       tags,
       security,
-      summary: "Remove it: the token stops working and its runner is disconnected at once",
+      summary:
+        "Remove it: the token stops working and its runner is disconnected at once (never the workspace's own computer: `machine.managed`)",
       request: { params: MachineParams },
       responses: { 204: noContent[204], ...errors },
     }),
@@ -415,6 +451,23 @@ export function machineAppRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       if (!deps.config.HOST_COMPUTER_TOKEN) return noHost(c);
       return c.json(await restoreHostComputer({ db, pubsub }, c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/computer-setup",
+      tags,
+      security,
+      summary: "Whether the workspace gets its own computer, and how far it is (every member)",
+      description: "Changes come as `machine.provisioning` org events, with the same fields but `mode`.",
+      request: { params: OrgParams },
+      responses: { 200: json(ComputerSetup), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await computerSetup(db, deps.config.MACHINE_PROVISIONING, c.get("user").id, orgId), 200);
     },
   );
 

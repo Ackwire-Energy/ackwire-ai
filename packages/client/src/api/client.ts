@@ -22,6 +22,7 @@ import type {
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiAccounts,
   AiStatus,
   ApiRule,
   AppNotification,
@@ -84,6 +85,7 @@ import type {
   Machine,
   MachineAccess,
   MachineAccessReduce,
+  MachineAccount,
   MachineAccountKind,
   MachineOutages,
   MachineTask,
@@ -146,6 +148,7 @@ import type {
   SandboxSettingsInput,
   ScheduleParse,
   ScopeGrant,
+  ScreenKind,
   SearchHit,
   SearchKind,
   SecretBox,
@@ -270,7 +273,7 @@ export interface ApiClient {
     removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
-    /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0057). */
+    /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
     aiStatus(orgId: string): Promise<AiStatus>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
@@ -438,19 +441,29 @@ export interface ApiClient {
     outages(orgId: string): Promise<MachineOutages>;
     /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
     moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
-    /** ADR 0041 §2: the computer starts the provider's own sign-in (its owner only). */
-    /** `accountId`: sign in again to that (signed out) account instead of adding a new one. */
+    /**
+     * ADR 0041 §2: the computer starts the provider's own sign-in. `accountId`: sign in again to that account
+     * of the viewer's; `email` (Claude): which account, as the CLI's hint; `provider`: a coding plan's key.
+     */
     beginAccountLogin(
       orgId: string,
       machineId: string,
       kind: MachineAccountKind,
-      accountId?: string,
+      options?: { accountId?: string; email?: string; provider?: string },
     ): Promise<AccountLoginStart>;
-    /** Claude Code: the code Claude showed, sealed in the browser to the computer's key (`sealSecret`). */
+    /** Claude Code: the code Claude showed (or a plan's key), sealed in the browser to the computer's key (`sealSecret`). */
     sendAccountCode(orgId: string, machineId: string, loginId: string, box: SecretBox): Promise<void>;
     accountLogin(orgId: string, machineId: string, loginId: string): Promise<AccountLoginStatus>;
     /** Gives up on a sign-in (Voltar, the dialog closed): the computer stops it. */
     cancelAccountLogin(orgId: string, machineId: string, loginId: string): Promise<void>;
+    /** An accounts screen opened: the viewer's plans look their usage up again (it arrives as `machine.updated`). */
+    refreshAccountUsage(orgId: string): Promise<void>;
+    /** "Contas de IA": the viewer's accounts on every computer, and where they can add one. */
+    aiAccounts(orgId: string): Promise<AiAccounts>;
+    /** Its owner names it (1 to 40 characters). */
+    renameAccount(orgId: string, machineId: string, accountId: string, label: string): Promise<MachineAccount>;
+    /** Its owner (or whoever connected the computer) disconnects it; the computer signs it out and deletes it. */
+    removeAccount(orgId: string, machineId: string, accountId: string): Promise<void>;
   };
   skills: {
     /** The org library. */
@@ -980,8 +993,8 @@ export interface ApiClient {
     settings(orgId: string, agentId: string): Promise<AgentBrowserSettings>;
     /** The sites (owner or admins); null or empty = any site. */
     setDomains(orgId: string, agentId: string, allowedDomains: string[] | null): Promise<AgentBrowserSettings>;
-    /** The agent's open request or take over, if any. */
-    agentHandoff(orgId: string, agentId: string): Promise<BrowserHandoff | null>;
+    /** The agent's open request or take over on that screen (the browser by default), if any. */
+    agentHandoff(orgId: string, agentId: string, screen?: ScreenKind): Promise<BrowserHandoff | null>;
     handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
     /** Take control of a request (one person at a time; 409 when someone else has it). */
     takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;
@@ -997,15 +1010,15 @@ export interface ApiClient {
      * Take over while watching; the agent waits until handed back. `runId`: the run whose card it
      * was taken from (the take over is bound to it, so its card stays in that conversation).
      */
-    takeover(orgId: string, agentId: string, runId?: string): Promise<BrowserHandoff>;
+    takeover(orgId: string, agentId: string, runId?: string, screen?: ScreenKind): Promise<BrowserHandoff>;
     /**
      * The person in control opens a site (a bare host gets https://); a closed browser opens. 409
      * `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
      * `browser.bad_address` or `browser.open_failed`.
      */
     open(orgId: string, agentId: string, url: string): Promise<void>;
-    /** "Parar": closes the agent's browser now (its logins stay). */
-    stop(orgId: string, agentId: string): Promise<void>;
+    /** "Parar": closes the agent's browser now (its logins stay), or stops that screen. */
+    stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

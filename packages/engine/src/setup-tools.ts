@@ -33,7 +33,7 @@ const STEPS: Record<ConnectAiStep, string> = {
 };
 
 /**
- * `meta.actionCard` of an agent's card (ADR 0057): its button opens the app's own dialog, filled in. It
+ * `meta.actionCard` of an agent's card (ADR 0061): its button opens the app's own dialog, filled in. It
  * keeps no state: the app tells it's done from live data (its agents can think; for a plan, with that plan).
  */
 export interface ActionCard {
@@ -68,7 +68,7 @@ async function hopOf(ctx: ToolContext) {
 }
 
 /**
- * Setting up the workspace from the chat, "anything the app can do" (ADR 0057 §8), under `setup:write`:
+ * Setting up the workspace from the chat, "anything the app can do" (ADR 0061 §8), under `setup:write`:
  * - `offer_connect_ai`: what needs a person's credentials or consent becomes a card in this conversation
  *   whose button opens the app's own dialog, filled in. The agent never holds a key or a sign-in.
  * - `create_channel`: internal and reversible, so it acts right away for the person who asked, with

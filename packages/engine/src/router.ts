@@ -9,6 +9,7 @@ import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage } from "./messages";
 import { type AgentRun, NO_AI } from "./runs";
+import { standingRefusal } from "./standing";
 
 const {
   agents,
@@ -327,7 +328,14 @@ export interface RouterDeps {
 
 export interface RouteResult {
   runs: AgentRun[];
-  skipped?: "message_missing" | "not_a_person" | "has_mentions" | "hop_limit" | "no_candidates" | "already_routed";
+  skipped?:
+    | "message_missing"
+    | "not_a_person"
+    | "has_mentions"
+    | "hop_limit"
+    | "no_candidates"
+    | "already_routed"
+    | "org_paused";
   selected?: string[];
   /** Candidates the strategy evaluated (receipts: "seen by"). */
   seenBy?: string[];
@@ -365,6 +373,8 @@ export async function routeMessage(
   options: { finalAttempt?: boolean } = {},
 ): Promise<RouteResult> {
   const { db } = deps;
+  // A workspace on hold or suspended asks no strategy (Jev bills the server): nobody answers there now.
+  if (await standingRefusal(db, input.orgId)) return { runs: [], skipped: "org_paused" };
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message) return { runs: [], skipped: "message_missing" };
   const byAgent = message.authorType === "agent" && message.authorAgentId !== null;
@@ -407,6 +417,8 @@ export async function routeMessage(
       and(
         eq(agents.orgId, message.orgId),
         isNull(agents.archivedAt),
+        // Held (`standing.ts`): the others answer instead.
+        isNull(agents.operatorHoldAt),
         eq(channelMembers.autoReply, true),
         // Never the agent that wrote it.
         byAgent && message.authorAgentId ? ne(agents.id, message.authorAgentId) : undefined,

@@ -24,7 +24,7 @@ import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
- * ADR 0057 §2 and §5: a run that can't think fails with `no_ai` right after its agent is read (no judge,
+ * ADR 0061 §2 and §5: a run that can't think fails with `no_ai` right after its agent is read (no judge,
  * no context, no model call), and the conversation gets one card; "Responder agora" starts it again on the
  * person's own message once an AI is connected, or routes the message again.
  */
@@ -242,6 +242,29 @@ test("Responder agora: 409 while there's no AI; then the person's own message is
   // The card still shows, its run gone.
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
   expect(timeline.some((m) => m.id === card.id)).toBe(true);
+});
+
+test("Responder agora for someone the agent no longer answers (a personal plan answers its owner): 403, nothing starts", async () => {
+  f = await setup();
+  await revokeKeys();
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, {
+    body: "@dev resume o canal",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [card] = await cards();
+  const [failed] = await runs();
+  if (!card || !failed) throw new Error("no card");
+  await restoreKeys();
+  // As choosing a personal plan does (ADR 0059 §5): only the agent's owner talks to it now.
+  await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, f.agent.id));
+  // Neither Bia, who asked, nor the owner makes it answer her on his plan.
+  for (const who of [bia.id, f.owner.id]) {
+    const refused = await answerNow(deps(), who, f.org.id, card.id).catch((e) => e);
+    expect(refused).toMatchObject({ name: "ForbiddenError", code: "audience.only" });
+  }
+  expect(await runs()).toMatchObject([{ id: failed.id, status: "failed", error: "no_ai" }]);
 });
 
 test("Responder agora never starts over a run that had done something: 409, and the run stays", async () => {

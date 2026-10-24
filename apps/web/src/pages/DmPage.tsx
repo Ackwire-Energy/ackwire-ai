@@ -1,16 +1,16 @@
 import type { DmTarget } from "@agenteschat/client";
 import { keys, useModels } from "@agenteschat/client";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { brainLine } from "@agenteschat/client/lib/brain";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isAuto } from "@agenteschat/client/lib/providers";
-import { Avatar, BrainIcon, Button } from "@agenteschat/ui";
+import { Avatar, BrainIcon, Button, ProviderLogo } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { agentBrainLine } from "@/components/AgentBrain";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { AgentBrowserButton } from "@/components/browser/AgentBrowser";
 import { ErrorState } from "@/components/Loading";
@@ -61,7 +61,7 @@ export function DmPage({ target }: { target: DmTarget }) {
       ? t("brain.auto.label")
       : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   // Who thinks: a computer brain ("Claude Code · Sonnet no mac") instead of the API model.
-  const brainLine = agent ? agentBrainLine(t, agent, model) : null;
+  const thinks = agent ? brainLine(t, agent.brain, model, owner?.name.split(" ")[0]) : null;
   const role = agent ? agent.role || `@${agent.handle}` : "";
   const header = (
     <header className="channel__header">
@@ -75,12 +75,16 @@ export function DmPage({ target }: { target: DmTarget }) {
         {agent && (
           <span className="channel__topic">
             {owner ? t("dm.subtitle", { role, owner: owner.name }) : t("dm.subtitleNoOwner", { role })}
-            {brainLine?.text && (
+            {thinks?.text && (
               <>
                 {" · "}
                 <span className="channel__brain">
-                  <BrainIcon kind={brainLine.kind} size={14} />
-                  {brainLine.text}
+                  {thinks.mark ? (
+                    <ProviderLogo id={thinks.mark} size="xs" />
+                  ) : (
+                    <BrainIcon kind={thinks.kind} size={14} />
+                  )}
+                  {thinks.text}
                 </span>
               </>
             )}
