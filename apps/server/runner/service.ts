@@ -12,6 +12,22 @@ export const SYSTEM_UNIT_PATH = `/etc/systemd/system/${SERVICE_NAME}.service`;
 /** The root service's PATH: only folders root owns, never the installing shell's. */
 const SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
+/** Whether systemd runs this computer (PID 1). */
+export const systemdBooted = () => existsSync("/run/systemd/system");
+
+/** System mode: each agent's processes run in its own slice, `agents-<uid>.slice` (inside `agents.slice`). */
+const AGENT_SLICE_PREFIX = "agents-";
+export const agentSlice = (uid: number) => `${AGENT_SLICE_PREFIX}${uid}.slice`;
+/**
+ * What every agent's slice may use, as a drop-in for the slice prefix: room
+ * for a desktop, a headed Chrome and one coding CLI, and no agent can starve
+ * the others or the computer.
+ */
+export const AGENT_SLICE_LIMITS = "[Slice]\nMemoryMax=1536M\nTasksMax=1024\nCPUQuota=200%\n";
+/** The drop-in sits next to the unit (`/etc/systemd/system`). */
+export const agentSliceLimitsPath = (unitPath = SYSTEM_UNIT_PATH) =>
+  path.join(path.dirname(unitPath), `${AGENT_SLICE_PREFIX}.slice.d`, "limits.conf");
+
 /**
  * How the service starts the runner: this runtime (node or bun) and this
  * script, absolute; or a compiled runner alone (`script` absent, ADR 0036).
@@ -165,7 +181,7 @@ interface RunResult {
 
 export type RunCommand = (file: string, args: string[]) => RunResult;
 
-const runSync: RunCommand = (file, args) => {
+export const runSync: RunCommand = (file, args) => {
   const r = spawnSync(file, args, { encoding: "utf8" });
   if (r.error) return { code: 127, output: r.error.message };
   return { code: r.status ?? 1, output: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
@@ -291,8 +307,11 @@ export function installSystemService(io: SystemServiceIo): number {
   const file = io.unitPath ?? SYSTEM_UNIT_PATH;
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, systemdSystemUnit(launch));
+  const limits = agentSliceLimitsPath(file);
+  mkdirSync(path.dirname(limits), { recursive: true });
+  writeFileSync(limits, AGENT_SLICE_LIMITS);
   const start = io.start !== false;
-  if (!(io.booted ?? existsSync("/run/systemd/system"))) {
+  if (!(io.booted ?? systemdBooted())) {
     print(`Installed ${file}, but systemd isn't running here.`);
     if (start) print(`Start the runner yourself: ${plainCommand(launch)} start`);
     return start ? 1 : 0;
@@ -329,6 +348,7 @@ export function uninstallService(io: ServiceIo & { system?: boolean }): number {
   if (io.system) {
     run("systemctl", ["disable", "--now", SERVICE_NAME]);
     if (existsSync(SYSTEM_UNIT_PATH)) rmSync(SYSTEM_UNIT_PATH);
+    rmSync(agentSliceLimitsPath(), { force: true });
     run("systemctl", ["daemon-reload"]);
     print(`Removed ${SYSTEM_UNIT_PATH}.`);
     return 0;

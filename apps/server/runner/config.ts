@@ -46,13 +46,13 @@ export interface RunnerConfig {
 export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
 export const DEFAULT_AGENT_UID_RANGE: [number, number] = [20000, 29999];
 
-/**
- * `[first, last]` when both are whole numbers in order within 1000–59999:
- * never a system account's uid, and below the ranges systemd hands out itself.
- */
+/** A uid an agent user may have (1000–59999): never a system account's, and below the ranges systemd hands out itself. */
+export const isAgentUid = (n: unknown): n is number =>
+  Number.isInteger(n) && (n as number) >= 1000 && (n as number) <= 59999;
+
+/** `[first, last]` when both are agent uids, in order. */
 function agentUidRange(first: unknown, last: unknown): [number, number] | null {
-  const ok = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1000 && (n as number) <= 59999;
-  return ok(first) && ok(last) && first <= last ? [first, last] : null;
+  return isAgentUid(first) && isAgentUid(last) && first <= last ? [first, last] : null;
 }
 
 /** `20000-29999` → `[20000, 29999]`; null when it isn't a valid range. */

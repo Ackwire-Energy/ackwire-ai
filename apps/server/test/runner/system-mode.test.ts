@@ -14,7 +14,14 @@ import {
 import { configFromGrant } from "../../runner/daemon";
 import { type HandlerContext, handleRequest, SYSTEM_MODE_OPS } from "../../runner/handlers";
 import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION } from "../../runner/install-script";
-import { installSystemService, SYSTEM_UNIT_PATH, systemdSystemUnit } from "../../runner/service";
+import {
+  AGENT_SLICE_LIMITS,
+  agentSlice,
+  agentSliceLimitsPath,
+  installSystemService,
+  SYSTEM_UNIT_PATH,
+  systemdSystemUnit,
+} from "../../runner/service";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -95,6 +102,7 @@ test.if(posix)("service install --system refuses without root and off Linux, and
   expect(lines.join("\n")).toContain("run it as root");
   expect(installSystemService({ ...io, uid: 0, platform: "darwin" })).toBe(1);
   expect(existsSync(unitPath)).toBe(false);
+  expect(existsSync(agentSliceLimitsPath(unitPath))).toBe(false);
   expect(readStoredConfig(h)).toBeNull();
 });
 
@@ -128,6 +136,12 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(calls).toEqual(["systemctl daemon-reload"]);
   expect(readFileSync(unitPath, "utf8")).toBe(systemdSystemUnit(launch));
   expect(readStoredConfig(h)).toEqual({ mode: "system", agentUidRange: [21000, 21099] });
+  // Every agent's slice (agents-<uid>.slice) gets the same limits, from one drop-in for the prefix.
+  expect(agentSlice(21003)).toBe("agents-21003.slice");
+  expect(agentSliceLimitsPath(unitPath)).toBe(path.join(h, "systemd", "agents-.slice.d", "limits.conf"));
+  expect(agentSliceLimitsPath()).toBe("/etc/systemd/system/agents-.slice.d/limits.conf");
+  expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8")).toBe(AGENT_SLICE_LIMITS);
+  expect(AGENT_SLICE_LIMITS.split("\n")).toEqual(["[Slice]", "MemoryMax=1536M", "TasksMax=1024", "CPUQuota=200%", ""]);
 
   // Not connected yet: an unpaired runner would only restart in a loop.
   expect(install()).toBe(0);
