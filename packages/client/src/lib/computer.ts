@@ -133,3 +133,10 @@ export const setupNoticeKey = (orgId: string, view: SetupView) =>
 /** "Oficina E2E's computer" until an admin gives it a name of its own (it starts with the workspace's). */
 export const managedTitle = (t: TFunction, name: string | null | undefined, orgName: string) =>
   name && name !== orgName ? name : t("computerSetup.title", { org: orgName });
+
+/** A computer as people call it: the workspace's own by `managedTitle` (a list row's `kind`, an outage's `managed`). */
+export const computerName = (
+  t: TFunction,
+  c: { name: string | null; kind?: string; managed?: boolean },
+  orgName: string,
+) => (c.kind === "managed" || c.managed ? managedTitle(t, c.name, orgName) : (c.name ?? ""));

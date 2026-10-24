@@ -1,5 +1,6 @@
 import type { ComputerBrain, MachineOutage, MachineOutages, OutageTarget } from "@agenteschat/client";
 import { useMachineOutages, useMachines, useMoveAgents } from "@agenteschat/client";
+import { computerName } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind } from "@agenteschat/client/lib/machines";
@@ -83,7 +84,12 @@ export function OutageNotices() {
   return (
     <section className="outages" aria-label={t("outage.region")} data-count={shown.length}>
       {shown.map((o) => (
-        <OutageNotice key={outageKey(o)} outage={o} data={outages.data} onDismiss={() => dismiss(o)} />
+        <OutageNotice
+          key={outageKey(o)}
+          outage={{ ...o, name: computerName(t, o, org.name) }}
+          data={outages.data}
+          onDismiss={() => dismiss(o)}
+        />
       ))}
     </section>
   );
@@ -121,7 +127,7 @@ function OutageNotice({
     .join(" · ");
   return (
     <div className="outage" role="status">
-      <ComputerIcon kind={computerKind(o.platform)} size={20} className="outage__icon" />
+      <ComputerIcon kind={computerKind(o.platform, o.managed)} size={20} className="outage__icon" />
       <span className="outage__text">
         <b>
           {here
@@ -163,7 +169,7 @@ function OutageNotice({
 const brainList = (t: TFunction, brains: string[]) => joinNames(brains.map(brainName), t("newAgent.and"));
 
 /** A target's row: its computer, whether it can take these agents, and why not in plain words. */
-function targetOption(t: TFunction, target: OutageTarget, brains: ComputerBrain[]) {
+function targetOption(t: TFunction, target: OutageTarget, brains: ComputerBrain[], orgName: string) {
   const needed = brainList(t, brains);
   const block = targetBlock(target, brains);
   if (target.kind === "cloud") {
@@ -187,10 +193,10 @@ function targetOption(t: TFunction, target: OutageTarget, brains: ComputerBrain[
         : t(`outage.dialog.block.${block}`, { brains: needed });
   return {
     value: target.machineId,
-    title: target.name,
+    title: computerName(t, target, orgName),
     tag: block ? undefined : t("outage.dialog.on"),
     description,
-    leading: <ComputerIcon kind={computerKind(target.platform)} size={20} />,
+    leading: <ComputerIcon kind={computerKind(target.platform, target.managed)} size={20} />,
     disabled: block !== null,
   } satisfies OptionListItem<string>;
 }
@@ -217,7 +223,7 @@ export function SwitchComputerDialog({
   // A target must run every brain of the agents chosen (all of them while none is chosen).
   const brains = brainsOf(chosenAgents.length > 0 ? chosenAgents : o.agents);
   const targets = targetsFor(data, o.machineId);
-  const options = targets.map((x) => targetOption(t, x, brains));
+  const options = targets.map((x) => targetOption(t, x, brains, org.name));
   const firstOpen = options.find((x) => !x.disabled)?.value ?? "";
   const [target, setTarget] = useState(firstOpen);
   // The chosen one can't take the agents anymore (a computer went off, other brains): the first that can.
@@ -231,7 +237,7 @@ export function SwitchComputerDialog({
   const submit = () => {
     const chosen = targets.find((x) => targetValue(x) === value);
     if (!chosen || picked.length === 0) return;
-    const targetName = chosen.kind === "cloud" ? t("outage.dialog.cloud") : chosen.name;
+    const targetName = chosen.kind === "cloud" ? t("outage.dialog.cloud") : computerName(t, chosen, org.name);
     move.mutate(
       {
         machineId: o.machineId,
@@ -357,8 +363,9 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
       : "waiting";
   // The name it had while offline stays once it is back (the computers list may not have it).
   const seen = useRef<string | null>(null);
-  if (outage) seen.current = outage.name;
-  const name = outage?.name ?? machine?.name ?? seen.current ?? t("outage.someComputer");
+  if (outage) seen.current = computerName(t, outage, org.name);
+  const known = outage ?? machine;
+  const name = (known && computerName(t, known, org.name)) || seen.current || t("outage.someComputer");
   const waiting = mine ? waitingText(t, mine.waiting) : null;
   if (state !== "waiting") {
     return (

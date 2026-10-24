@@ -25,7 +25,7 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { setupPending, setupPortrait } from "@agenteschat/client/lib/computer";
+import { computerName, setupPending, setupPortrait } from "@agenteschat/client/lib/computer";
 import { commandInReason, computerState, machineKind } from "@agenteschat/client/lib/machines";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
@@ -232,7 +232,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
               label={t(machine || waiting ? "agentPage.work.cell.computer" : "agentPage.work.cell.cloud")}
               value={
                 machine
-                  ? machine.name
+                  ? computerName(t, work.machines.data?.find((m) => m.id === machine.machineId) ?? machine, org.name)
                   : waiting
                     ? t("computerSetup.title", { org: org.name })
                     : t("agentPage.work.cloud")
@@ -1122,7 +1122,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
       refresh();
       toast.show(
         chosen
-          ? t("agentPage.work.saved.computer", { ...g, computer: chosen.name })
+          ? t("agentPage.work.saved.computer", { ...g, computer: computerName(t, chosen, org.name) })
           : pending
             ? t("agentPage.work.saved.computer", { ...g, computer: t("computerSetup.title", { org: org.name }) })
             : t("agentPage.work.saved.cloud", g),
@@ -1171,7 +1171,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
             ...listed.map((m) => ({
               value: m.id,
               leading: <ComputerPortrait kind={machineKind(m)} state={computerState(m)} />,
-              title: m.name,
+              title: computerName(t, m, org.name),
               description: `${status(m)} · ${offers(m)}`,
               children: note(m.id),
             })),
@@ -1197,7 +1197,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
         busy={busy}
         primary={
           chosen
-            ? t("agentPage.work.computer.useMachine", { computer: chosen.name })
+            ? t("agentPage.work.computer.useMachine", { computer: computerName(t, chosen, org.name) })
             : t("agentPage.work.computer.useCloud")
         }
         onClose={onClose}

@@ -171,6 +171,22 @@ describe("an agent's computer while the workspace's is on its way", () => {
     expect(document.body.textContent).toContain("A Ada começa a usar assim que ele ficar pronto.");
   });
 
+  test("once ready, the agent works on the workspace's computer, called by its workspace's name", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
+    const m = machines.pair({ name: "Acme", kind: "managed", os: "other", arch: "", hostname: "", mode: "system" });
+    machines.setSetup({ state: "ready", machineId: m.id, specs: SPECS });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
+    await settle(10);
+    const work = document.querySelector(".agp-workcard") as HTMLElement;
+    expect(work.textContent).toContain("Trabalha no");
+    expect(work.textContent).toContain("Computador da Acme");
+    expect(document.body.textContent).not.toContain("A Ada começa a usar");
+    expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
+  });
+
   test("Configurações › its computer: the progress, and no cloud PC to create", async () => {
     await open(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { state: "preparing", step: "installing" });
     const pc = document.querySelector(".agp-pc") as HTMLElement;

@@ -6,6 +6,7 @@ import { keys } from "../src/api/keys";
 import type { ComputerSetup, Me } from "../src/api/types";
 import {
   agentsWaitingForComputer,
+  computerName,
   managedTitle,
   SETUP_STEPS,
   setupNoticeKey,
@@ -144,6 +145,11 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(managedTitle(t, "Oficina E2E", "Oficina E2E")).toBe('computerSetup.title {"org":"Oficina E2E"}');
     expect(managedTitle(t, undefined, "Acme")).toBe('computerSetup.title {"org":"Acme"}');
     expect(managedTitle(t, "Servidor", "Acme")).toBe("Servidor");
+    // Every surface that names a computer: a list row (`kind`), an outage or a target (`managed`), any other.
+    expect(computerName(t, { name: "Acme", kind: "managed" }, "Acme")).toBe('computerSetup.title {"org":"Acme"}');
+    expect(computerName(t, { name: "Acme", managed: true }, "Acme")).toBe('computerSetup.title {"org":"Acme"}');
+    expect(computerName(t, { name: "MacBook", kind: "connected" }, "Acme")).toBe("MacBook");
+    expect(computerName(t, { name: "PC", managed: false }, "Acme")).toBe("PC");
     expect(machineKind({ os: "other", kind: "managed" })).toBe("cloud");
     expect(machineKind({ os: "darwin", kind: "connected" })).toBe("mac");
     expect(machineKind({ os: "linux" })).toBe("linux");

@@ -20,6 +20,7 @@ import {
   busyView,
   type ComputerAction,
   type ComputerDisplay,
+  computerName,
   POLL_MS,
   READY_FLASH_MS,
   reached,
@@ -303,7 +304,7 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
   return (
     <span className="stack-4" style={{ gap: 4 }}>
       <span className="row" style={{ gap: 8, alignItems: "center" }}>
-        <span className="computer-machine__name">{target.name}</span>
+        <span className="computer-machine__name">{computerName(t, { ...target, managed }, org.name)}</span>
         <MachineChip online={target.online} />
       </span>
       <span className="small muted">
@@ -369,7 +370,9 @@ function ComputerTargetSelect({
     { value: CLOUD, label: t("computer.target.cloud"), description: t("computer.target.cloudText") },
     ...list.map((m) => ({
       value: m.id,
-      label: m.online ? m.name : t("computer.target.offlineName", { name: m.name }),
+      label: m.online
+        ? computerName(t, m, org.name)
+        : t("computer.target.offlineName", { name: computerName(t, m, org.name) }),
       description: m.online ? t("machines.online") : t("computer.target.offlineText"),
     })),
   ];
@@ -464,6 +467,7 @@ export function AgentComputerPanel({
   const { org } = useOrg();
   const life = useComputerLifecycle(agent);
   const setup = useSetupView(org.id);
+  const machines = useMachines(org.id);
   const { pc } = life;
   const g = agentGrammar(t, agent.name);
   if (pc.isLoading) return <LoadingLine width={240} />;
@@ -520,7 +524,11 @@ export function AgentComputerPanel({
           <ComputerTargetSelect target={target} value={machine} onChange={onMachine} admin={admin} />
         ) : (
           <span className="agp-ro">
-            {target.kind === "machine" ? target.name : waiting ? workspaceComputer : t("computer.target.cloud")}
+            {target.kind === "machine"
+              ? computerName(t, machines.data?.find((m) => m.id === target.machineId) ?? target, org.name)
+              : waiting
+                ? workspaceComputer
+                : t("computer.target.cloud")}
           </span>
         )}
         {machineNote}
@@ -946,7 +954,10 @@ function AgentComputerRow({
   const canPick = (admin || agent.ownerUserId === me.user.id) && choices.length > 0;
   const kindOf = (id: string) => (id === CLOUD ? "cloud" : machineKind(machines.find((m) => m.id === id)));
   const cloudName = pending ? t("computerSetup.title", { org: org.name }) : t("computer.target.cloud");
-  const nameOf = (id: string) => (id === CLOUD ? cloudName : (machines.find((m) => m.id === id)?.name ?? id));
+  const nameOf = (id: string) => {
+    const m = machines.find((x) => x.id === id);
+    return id === CLOUD ? cloudName : m ? computerName(t, m, org.name) : id;
+  };
   const options: SelectOption[] = [
     {
       value: CLOUD,
@@ -955,7 +966,7 @@ function AgentComputerRow({
     },
     ...choices.map((m) => ({
       value: m.id,
-      label: m.name,
+      label: computerName(t, m, org.name),
       description: t(`computers.agents.state.${computerState(m)}`),
     })),
   ].map((o) => ({ ...o, leading: <ComputerIcon kind={kindOf(o.value)} size={16} /> }));
