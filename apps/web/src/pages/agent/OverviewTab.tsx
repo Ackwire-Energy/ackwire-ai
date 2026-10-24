@@ -258,12 +258,13 @@ export function OverviewTab() {
         {/* The quiet side column: how it works and its numbers, then who and where. */}
         <div className="agp-col agp-aside">
           {workInAside && (
-            <section className="agp-aside__work" aria-labelledby="ov-work">
-              <h2 id="ov-work" className="agp-aside__h">
+            // The card inside is the "Como trabalha" region; this only gives it its quiet heading.
+            <div className="agp-aside__work">
+              <h2 className="agp-aside__h" aria-hidden="true">
                 {t("agentPage.work.cell.label")}
               </h2>
               <WorkCard onOpen={openWork} footer={<Numbers />} />
-            </section>
+            </div>
           )}
           <Card as="section" className="agp-card" aria-labelledby="ov-who">
             <CardHead
