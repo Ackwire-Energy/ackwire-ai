@@ -98,7 +98,7 @@ function fakePlanAccount(money: boolean): PlanAccountUsage {
     },
     agents: [
       { agentId: ADA_ID, name: "Ada", tokens: 4_500_000, now: true },
-      { agentId: ATLAS_ID, name: "Atlas", tokens: 600_000, now: false },
+      { agentId: ATLAS_ID, name: "Atlas", tokens: 600_000, now: true },
     ],
     monthTokens: 5_100_000,
     ...(money ? { equivalentUsd: 92 } : {}),

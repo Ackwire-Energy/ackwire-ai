@@ -137,8 +137,9 @@ function Now({ data }: { data: AgentPlanUsage }) {
   const dir = useDirectory(org.id);
   const current = data.current;
   if (!current) return null;
+  // Who else thinks with it now; one that used it earlier this month only counts in the windows' parts.
   const others = current.agents
-    .filter((a) => a.agentId !== agent.id)
+    .filter((a) => a.now && a.agentId !== agent.id)
     .map((a) => dir.agentById.get(a.agentId)?.name ?? a.name);
   return (
     <Card as="section" className="agp-card" aria-labelledby="agent-usage-now">
