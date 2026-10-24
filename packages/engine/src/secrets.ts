@@ -3,9 +3,11 @@ import { parseSecretBox, SECRET_NAME, type SecretTarget, secretAad } from "@agen
 import { and, type Database, type Executor, eq, isNull, lt, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
+import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { enqueue } from "./outbox";
+import { personBehindCall } from "./requester";
 import {
   type ComputerHandle,
   requireComputerManager,
@@ -500,11 +502,15 @@ export async function removeAgentSecret(
   });
 }
 
-/** Only the person whose message started the run may be asked (a routine or another agent may not). */
+/**
+ * Who a secret may be asked of: the person behind the run (`authority.ts`), where they read the card.
+ * Nobody for a routine's or an unattended run, nor in an agents' DM (no person reads the card there).
+ */
 export async function requesterOfRun(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ userId: schema.messages.authorUserId })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
-  return m?.userId ?? null;
+  const [here] = await ctx.db
+    .select({ kind: schema.channels.kind, dmKey: schema.channels.dmKey })
+    .from(schema.channels)
+    .where(and(eq(schema.channels.orgId, ctx.orgId), eq(schema.channels.id, ctx.channelId)));
+  if (!here || isAgentOnlyDm(here)) return null;
+  return personBehindCall(ctx);
 }

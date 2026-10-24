@@ -8,6 +8,7 @@ import {
   postInForumAsAgent,
   suggestForumTopic,
 } from "./forum";
+import { personBehindCall } from "./requester";
 import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -18,15 +19,6 @@ const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
 });
-
-/** The person whose message started this run. */
-async function requesterOf(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ userId: schema.messages.authorUserId })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
-  return m?.userId ?? null;
-}
 
 /** `@handles` → agent ids of the org; the missing ones are named in the error. */
 async function agentsByHandle(ctx: ToolContext, raw: unknown) {
@@ -137,7 +129,7 @@ export function createForumToolSource(deps: { pubsub?: PubSub; artifacts?: Artif
       },
       async execute(input, ctx) {
         try {
-          const requester = await requesterOf(ctx);
+          const requester = await personBehindCall(ctx);
           if (!requester) return { content: "Only a person's request can open a forum topic.", isError: true };
           const { handles, rows, missing } = await agentsByHandle(ctx, input.agents);
           if (missing.length > 0)

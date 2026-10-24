@@ -9,6 +9,8 @@ import {
   type AgentScope,
   BRAIN_LIMITS,
   type BrainEffort,
+  type BrainSteerReply,
+  type BrainSteerRequest,
   type BrainTurnRequest,
   isAccountId,
   isBrainEffort,
@@ -34,8 +36,10 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   sonnet` under opus), the engine's context appended to the system prompt
  *   from a file (no shell, no quoting: the process is spawned with an argv),
  *   our MCP bridge (`--mcp-config`, `--strict-mcp-config` unless the agent
- *   opted into the owner's own servers) and the missions' command policy
- *   (`--settings`, the permission prompt tool, the deny list).
+ *   opted into the owner's own servers) and the turn's permission profile
+ *   (`brainProfileLaunch`: `--settings`, the permission prompt tool, the deny
+ *   list; a `plan` turn reads only, ADR 0053 §3). A background turn
+ *   (`keepAlive: false`) leaves no process behind.
  * - The turn's prompt goes in as a stream-json user message on stdin. Output
  *   lines become `WireBrainEvent`s: text deltas (batched every ~50 ms), tool
  *   calls with their results (already executed: our tools through the bridge,
@@ -52,6 +56,26 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   that account's folder (its sessions live there too; a missing folder is
  *   `account_missing`, never another account), and `effort` is `--effort`.
  *   A change of either starts the process again.
+ * - Protocol 15 (live steering): `steer` writes messages into the turn in
+ *   progress as stream-json user lines (each with its `uuid`); Claude Code
+ *   reads them at its next tool boundary (`priority: "next"`; "now" for an
+ *   urgent one where the CLI can move the running tool to the background).
+ *   Support is what the CLI's `system/init` `capabilities` say, not its
+ *   version (`steerSupport`). A message is read when its `command_lifecycle`
+ *   says `started` (`steer_read` at once); the result's `user_message_uuids`
+ *   confirm the same (deduplicated). One it hadn't read when the turn ended
+ *   starts the CLI's next turn: this request waits for that turn too and the
+ *   answers join, so nothing runs unheard.
+ * - Work moved to the background mid-turn (an urgent message) goes on after
+ *   the turn's `result`, and when it ends Claude Code starts another turn by
+ *   itself: the request stays open for it (bounded) and the answers join.
+ *   Past the bound the request ends and the process is left draining.
+ * - A turn the CLI runs by itself while no request listens (a background task
+ *   of the agent's own that ended later, or moved work past the bound): its
+ *   output goes nowhere. The next request waits for that turn's `result`
+ *   (`STRAY_TURN_WAIT_MS`) and then uses the same process, so the agent's
+ *   other background jobs (a dev server, a watcher) live on. Only a turn stuck
+ *   past that wait has its process killed (the next one resumes the session).
  */
 
 export const BRAIN_IDLE_MS = 10 * 60_000;
@@ -64,6 +88,55 @@ const SESSION_ID = /^[a-fA-F0-9-]{36}$/;
 const RUN_ID = /^[a-zA-Z0-9-]{8,64}$/;
 const MODEL = /^[A-Za-z0-9._:[\]-]{1,100}$/;
 const STDERR_KEEP = 4000;
+
+/**
+ * What Claude Code says it can do (`system/init` `capabilities`), as probed on
+ * 2026-10-23 (`scripts/probe-claude-steer.ts`; 2.1.175, 2.1.220, 2.1.258,
+ * 2.1.259, 2.1.309). Every one of them read a line sent mid-turn at the next
+ * tool boundary, but only with `msg_lifecycle_v1` (from 2.1.220; 2.1.175 has
+ * no `capabilities` at all) does each line with our `uuid` report
+ * `command_lifecycle` `queued` → `started` (the model picked it up: the read)
+ * → `completed`. Without it nothing says what was read: not steerable.
+ */
+export const STEER_CAPABILITY = "msg_lifecycle_v1";
+/**
+ * `priority: "now"` with a human origin moves the running tool to the
+ * background at once and reads the message within a moment (2.1.309). Without
+ * it an urgent message is `unsupported` (the engine stops and restarts the turn).
+ */
+export const STEER_NOW_CAPABILITY = "interrupt_send_now_v1";
+/** A result came while steered messages were still queued: how long the CLI's next turn (which reads them) may take to start. */
+export const STEER_FOLLOW_UP_MS = 30_000;
+/**
+ * A result came while work this turn moved to the background still runs: how
+ * long the request waits for it to end (and for the turn the CLI then starts
+ * by itself). Past it the request ends with what it has and the process is
+ * left draining: nothing is killed (the moved work may be a server that never
+ * ends); a turn the CLI later runs for it by itself is waited for by the next
+ * request (`STRAY_TURN_WAIT_MS`). 10 min: the run shows "working" meanwhile.
+ */
+export const STEER_BACKGROUND_WAIT_MS = 10 * 60_000;
+/**
+ * A request found the process in a turn of its own (or one due): how long it
+ * waits for that turn's `result` before killing the process and resuming fresh.
+ */
+export const STRAY_TURN_WAIT_MS = 60_000;
+/**
+ * Work moved to the background still runs and no turn of its own has begun: how long a request
+ * waits for one before going on, on the same process. Never a kill: the work may be a server that
+ * never ends (a dev server an urgent message moved aside), and killing the process would kill it.
+ */
+export const OWN_TURN_DUE_WAIT_MS = 5_000;
+
+/** The `capabilities` of a `system/init` line (none: an older CLI). */
+export const claudeCapabilities = (ev: Record<string, unknown>): string[] =>
+  Array.isArray(ev.capabilities) ? ev.capabilities.filter((c): c is string => typeof c === "string").slice(0, 100) : [];
+
+/** What a Claude Code with these capabilities takes mid-turn: messages at all (`next`), and urgent ones (`now`). */
+export const steerSupport = (capabilities: readonly string[] | undefined) => {
+  const next = capabilities?.includes(STEER_CAPABILITY) === true;
+  return { next, now: next && capabilities?.includes(STEER_NOW_CAPABILITY) === true };
+};
 
 /** The prefix Claude Code gives our bridge's tools; the engine knows them by their own names. */
 const OUR_TOOL_PREFIX = "mcp__agentes__";
@@ -94,6 +167,13 @@ const cutInput = (input: unknown): unknown => {
   }
 };
 
+/** The user messages (our `uuid`s) a reply or result says the turn read: the list, else the single field (older CLIs). */
+const readUuids = (ev: Record<string, unknown>): string[] => {
+  if (Array.isArray(ev.user_message_uuids))
+    return ev.user_message_uuids.filter((u): u is string => typeof u === "string");
+  return typeof ev.user_message_uuid === "string" ? [ev.user_message_uuid] : [];
+};
+
 const secondsToIso = (v: unknown) => {
   const n = num(v);
   if (n <= 0) return undefined;
@@ -105,6 +185,40 @@ const secondsToIso = (v: unknown) => {
 export interface ParsedBrainLine {
   events: WireBrainEvent[];
   final?: WireBrainEvent;
+  /** On a result: how many human messages still wait in the CLI's queue (`queued_turn_count`; absent: unknown). */
+  queued?: number;
+  task?: ParsedTask;
+  /** `system` `init`: a turn starts. */
+  turnStart?: boolean;
+  /** Tool results went back to the model (a tool boundary: queued messages and task notices are read there). */
+  boundary?: boolean;
+}
+
+/** A task of Claude Code's (`system/task_*`: a Bash command, a subagent…). */
+export interface ParsedTask {
+  id: string;
+  /** `task_started`. */
+  started?: boolean;
+  /** Runs in the background (started so, or moved there: `task_updated` `is_backgrounded`). */
+  backgrounded?: boolean;
+  /** Over (`task_notification`, or `task_updated` with a final status). */
+  ended?: boolean;
+}
+
+const TASK_OVER = new Set(["completed", "failed", "killed", "stopped", "cancelled", "canceled", "error"]);
+
+/** `system/task_started`, `task_updated`, `task_notification` → what changed for the task. */
+function taskOf(ev: Record<string, unknown>): ParsedTask | undefined {
+  const id = str(ev.task_id);
+  if (!id) return undefined;
+  if (ev.subtype === "task_started") return { id, started: true, backgrounded: ev.is_backgrounded === true };
+  if (ev.subtype === "task_notification") return { id, ended: true };
+  if (ev.subtype === "task_updated") {
+    const patch = isObj(ev.patch) ? ev.patch : {};
+    if (typeof patch.status === "string" && TASK_OVER.has(patch.status)) return { id, ended: true };
+    if (patch.is_backgrounded === true) return { id, backgrounded: true };
+  }
+  return undefined;
 }
 
 /**
@@ -150,10 +264,19 @@ export class ClaudeStreamParser {
     if (typeof ev.session_id === "string" && ev.session_id) this.session = ev.session_id;
     const main = ev.parent_tool_use_id === null || ev.parent_tool_use_id === undefined;
     switch (ev.type) {
-      case "system":
+      case "system": {
         if (ev.subtype === "api_retry" && ev.error === "authentication_failed") this.authFailed = true;
         if (ev.subtype === "api_retry" && ev.error === "rate_limit") this.limited = true;
-        return { events: [] };
+        // Claude Code says `init` as each turn starts (also one it starts by itself).
+        if (ev.subtype === "init") return { events: [], turnStart: true };
+        const task = taskOf(ev);
+        return task ? { events: [], task } : { events: [] };
+      }
+      case "command_lifecycle":
+        // The model picked one of our lines up (msg_lifecycle_v1): the moment it's read.
+        return ev.state === "started" && str(ev.command_uuid)
+          ? { events: [{ type: "steer_read", uuids: [str(ev.command_uuid)] }] }
+          : { events: [] };
       case "stream_event": {
         const e = isObj(ev.event) ? ev.event : {};
         const delta = isObj(e.delta) ? e.delta : {};
@@ -169,6 +292,9 @@ export class ClaudeStreamParser {
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
         const events: WireBrainEvent[] = [];
+        // A turn's first reply names the messages that started it (a steered one the CLI read after a result).
+        const read = readUuids(ev);
+        if (read.length) events.push({ type: "steer_read", uuids: read });
         for (const block of content) {
           if (!isObj(block)) continue;
           if (
@@ -190,8 +316,10 @@ export class ClaudeStreamParser {
         if (!main) return { events: [] };
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
         const events: WireBrainEvent[] = [];
+        let boundary = false;
         for (const block of content) {
           if (!isObj(block) || block.type !== "tool_result") continue;
+          boundary = true;
           const id = str(block.tool_use_id);
           const call = this.tools.get(id);
           if (!call) continue;
@@ -208,7 +336,7 @@ export class ClaudeStreamParser {
             },
           });
         }
-        return { events };
+        return boundary ? { events, boundary } : { events };
       }
       case "rate_limit_event": {
         const info = isObj(ev.rate_limit_info) ? ev.rate_limit_info : {};
@@ -227,6 +355,14 @@ export class ClaudeStreamParser {
   }
 
   private result(ev: Record<string, unknown>): ParsedBrainLine {
+    const parsed = this.resultInner(ev);
+    const read = readUuids(ev);
+    if (read.length) parsed.events.unshift({ type: "steer_read", uuids: read });
+    if (typeof ev.queued_turn_count === "number") parsed.queued = ev.queued_turn_count;
+    return parsed;
+  }
+
+  private resultInner(ev: Record<string, unknown>): ParsedBrainLine {
     const events: WireBrainEvent[] = [];
     const usage = isObj(ev.usage) ? ev.usage : {};
     const cacheRead = num(usage.cache_read_input_tokens);
@@ -311,14 +447,15 @@ export interface ClaudeLaunch {
   strictMcp: boolean;
   /** Commands off the allow list ask a person through our tool. */
   promptTool: boolean;
-  permissionMode: "acceptEdits" | "dontAsk";
+  permissionMode: "acceptEdits" | "dontAsk" | "default";
   /** Protocol 10: folders allowed for the agent besides its own (`--add-dir` each). */
   addDirs?: string[];
   /** Protocol 13: `--effort` (anything else is left out). */
   effort?: BrainEffort;
   /**
    * Which settings files load (`--setting-sources`). "project" leaves out the computer owner's own
-   * CLAUDE.md, skills and plugins, which every agent there paid for on every step.
+   * CLAUDE.md, skills and plugins, which every agent there paid for on every step; "" (a plan turn) loads
+   * none, so a folder's own settings can't allow it anything.
    */
   settingSources?: string;
   /** Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
@@ -330,6 +467,40 @@ export interface ClaudeLaunch {
  * and the web. Ours come through MCP. Names Claude Code doesn't know are ignored by it.
  */
 export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
+/** A plan turn's own tools (ADR 0053 §3): reading and a shell our prompt tool keeps read-only; no edits, no web. */
+export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep"] as const;
+
+/**
+ * How a brain turn's Claude Code starts for its permission profile (ADR 0053 §3).
+ * `work`: edits accepted in its folders, every command through our prompt tool
+ * (plain reads at once, the rest by the server's rules or a person), and with
+ * the owner's own MCP servers (`personalMcp`) the owner's settings and tools too.
+ * `plan` (a routine that only reads, an unattended run): our MCP tools only,
+ * no settings files of the folder or the owner, no edits and no web, and every
+ * command answered on the computer by `localVerdict` (reads only, never secrets);
+ * nothing is ever asked of a person.
+ */
+export function brainProfileLaunch(
+  mode: "plan" | "work",
+  personalMcp: boolean,
+): Pick<ClaudeLaunch, "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools"> {
+  if (mode === "plan") {
+    return {
+      strictMcp: true,
+      promptTool: true,
+      permissionMode: "default",
+      settingSources: "",
+      builtinTools: PLAN_BUILTIN_TOOLS,
+    };
+  }
+  return {
+    strictMcp: !personalMcp,
+    promptTool: true,
+    permissionMode: "acceptEdits",
+    // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
+    ...(personalMcp ? {} : { settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS }),
+  };
+}
 
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
 export const fallbackModelFor = (model: string | undefined) => (model && /opus/i.test(model) ? "sonnet" : undefined);
@@ -358,16 +529,32 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.mcpConfigFile ? ["--allowedTools", "mcp__agentes"] : []),
     ...(l.promptTool && l.mcpConfigFile ? ["--permission-prompt-tool", PERMISSION_PROMPT_TOOL] : []),
     ...(l.addDirs ?? []).flatMap((d) => ["--add-dir", d]),
-    ...(l.settingSources ? ["--setting-sources", l.settingSources] : []),
+    ...(l.settingSources !== undefined ? ["--setting-sources", l.settingSources] : []),
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
 }
 
-/** One user message on Claude Code's stream-json stdin. */
-export const userMessageLine = (prompt: string) =>
-  `${JSON.stringify({ type: "user", message: { role: "user", content: prompt }, parent_tool_use_id: null, session_id: "" })}\n`;
+/**
+ * One user message on Claude Code's stream-json stdin. Steered ones carry
+ * their `uuid` (the result lists it once read), a `priority` and the human
+ * origin (a person wrote it).
+ */
+export const userMessageLine = (
+  prompt: string,
+  steer?: { uuid: string; priority: "now" | "next" | "later"; origin?: { kind: "human" } },
+) =>
+  `${JSON.stringify({
+    type: "user",
+    message: { role: "user", content: prompt },
+    parent_tool_use_id: null,
+    session_id: "",
+    ...(steer ? { uuid: steer.uuid, priority: steer.priority, ...(steer.origin ? { origin: steer.origin } : {}) } : {}),
+  })}\n`;
+
+/** A message for a turn in progress (`brain.steer`). */
+export type SteerMessage = BrainSteerRequest["messages"][number];
 
 // ── One process ──────────────────────────────────────────────────────────────
 
@@ -379,6 +566,26 @@ export class ClaudeProcess {
   exited = false;
   exitCode: number | null = null;
   stderr = "";
+  /** Claude Code said `system` `init` (its version, when it has one, is known from then on). */
+  initSeen = false;
+  /** Claude Code's version, from its `system` `init` line (absent: not said yet, or an old CLI). Logs only. */
+  cliVersion?: string;
+  /** What it can do (`system` `init` `capabilities`): live steering is decided by these (`steerSupport`). */
+  capabilities: string[] = [];
+  /**
+   * Claude Code started a turn by itself while no request listened (a background
+   * task that ended after its turn): its output goes nowhere, and until its
+   * `result` a request here would read that turn's output as its own, so the
+   * manager waits for it (`waitOwnTurn`).
+   */
+  strayTurn = false;
+  /** Draining: work moved to the background outlived its request; the turn the CLI runs for it is still due. */
+  ownTurnDue = false;
+  /** Turns the CLI ran by itself and finished while no request listened (tests, logs). */
+  ownTurns = 0;
+  private ownTurnWaiters = new Set<() => void>();
+  /** The turn in progress on this process (set by `runTurnOnProcess`): messages for it mid-turn. */
+  turn: { steer(messages: SteerMessage[]): BrainSteerReply } | null = null;
   private lineHandler: ((line: string) => void) | null = null;
   private exitHandlers = new Set<() => void>();
 
@@ -403,12 +610,72 @@ export class ClaudeProcess {
     this.child.stdin?.on("error", () => {});
     if (this.child.stdout) {
       const rl = createInterface({ input: this.child.stdout, crlfDelay: Number.POSITIVE_INFINITY });
-      (rl as unknown as EventEmitter).on("line", (line: string) => this.lineHandler?.(line));
+      (rl as unknown as EventEmitter).on("line", (line: string) => {
+        // Read whether a turn listens or not (the CLI may say it before the first turn's prompt).
+        if (line.includes('"init"')) this.noteInit(line);
+        if (this.lineHandler) this.lineHandler(line);
+        else this.noteIdle(line);
+      });
     }
     this.child.stderr?.setEncoding("utf8");
     this.child.stderr?.on("data", (chunk: string) => {
       this.stderr = (this.stderr + chunk).slice(-STDERR_KEEP);
     });
+  }
+
+  private noteInit(line: string) {
+    try {
+      const ev = JSON.parse(line) as Record<string, unknown>;
+      if (ev.type !== "system" || ev.subtype !== "init") return;
+      this.initSeen = true;
+      if (typeof ev.claude_code_version === "string") this.cliVersion = ev.claude_code_version.slice(0, 40);
+      this.capabilities = claudeCapabilities(ev);
+    } catch {
+      // not a JSON line
+    }
+  }
+
+  /** A line no request listens to: a turn the CLI started by itself begins (or ends). */
+  private noteIdle(line: string) {
+    // Leftovers of the last turn (`command_lifecycle` completed, task summaries) say nothing.
+    if (!/"type":\s*"(result|assistant|stream_event)"|"subtype":\s*"(init|task_notification)"/.test(line)) return;
+    try {
+      const ev = JSON.parse(line) as Record<string, unknown>;
+      if (ev.type !== "result") {
+        this.strayTurn = true;
+        return;
+      }
+      // That turn is over (its output discarded): the process is clean again.
+      this.strayTurn = false;
+      this.ownTurnDue = false;
+      this.ownTurns++;
+      this.wakeOwnTurnWaiters();
+    } catch {
+      // not a JSON line
+    }
+  }
+
+  /** In a turn of its own, or one is due: a request here waits first (`awaitOwnTurn`). */
+  get onItsOwn() {
+    return !this.exited && (this.strayTurn || this.ownTurnDue);
+  }
+
+  /** Resolves true once no turn of its own runs or is due; false when `ms` pass first (or it exits). */
+  waitOwnTurn(ms: number): Promise<boolean> {
+    if (!this.onItsOwn) return Promise.resolve(!this.exited);
+    return new Promise<boolean>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.ownTurnWaiters.delete(done);
+        resolve(!this.onItsOwn && !this.exited);
+      };
+      const timer = setTimeout(done, ms);
+      this.ownTurnWaiters.add(done);
+    });
+  }
+
+  private wakeOwnTurnWaiters() {
+    for (const w of [...this.ownTurnWaiters]) w();
   }
 
   private markExit(code: number | null) {
@@ -417,6 +684,7 @@ export class ClaudeProcess {
     this.exitCode = code;
     // Lines still buffered in readline arrive first.
     setImmediate(() => {
+      this.wakeOwnTurnWaiters();
       for (const h of [...this.exitHandlers]) h();
     });
   }
@@ -475,12 +743,22 @@ export class ClaudeProcess {
 interface TurnOutcome {
   final?: WireBrainEvent;
   died?: boolean;
+  /** Steered messages (`uuid`s) the turn never said it read: the CLI would run them unheard, so the process goes. */
+  unread?: string[];
+  /** Ended while work it moved to the background still ran: the CLI answers it on its own later (draining). */
+  draining?: boolean;
 }
 
 /**
  * Runs one turn on a process: writes the prompt, emits events (text deltas
  * batched every `deltaMs`), resolves on the turn's `result` or the process
  * exiting first. Abort kills the process.
+ *
+ * The request goes on past a `result` (answers joined) while the CLI is sure
+ * to run another turn for it: steered messages still queued, work moved to the
+ * background still running (Claude Code answers it in a turn of its own when it
+ * ends, up to `backgroundWaitMs`), or a background task that ended after the
+ * model's last look (its notice starts the next turn).
  */
 export function runTurnOnProcess(
   proc: ClaudeProcess,
@@ -492,15 +770,78 @@ export function runTurnOnProcess(
     redact?: (text: string) => string;
     /** One-shot: stdin closes after the prompt. */
     endInput?: boolean;
+    /** How long the CLI's next turn may take to start when it still has steered messages (`STEER_FOLLOW_UP_MS`). */
+    followUpMs?: number;
+    /** How long work moved to the background may run on after a result (`STEER_BACKGROUND_WAIT_MS`). */
+    backgroundWaitMs?: number;
   },
 ): Promise<TurnOutcome> {
   const redact = opts.redact ?? ((s: string) => s);
   const deltaMs = opts.deltaMs ?? DELTA_FLUSH_MS;
+  const followUpMs = opts.followUpMs ?? STEER_FOLLOW_UP_MS;
   proc.parser.beginTurn();
   return new Promise<TurnOutcome>((resolve) => {
     let buf = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
     let settled = false;
+    /** Steered messages written to this turn and not yet said read. */
+    const outstanding = new Set<string>();
+    /** Answers of results that came while steered messages were still queued: they lead the final one. */
+    const held: string[] = [];
+    let followUp: ReturnType<typeof setTimeout> | null = null;
+    /** The last result the turn went on from (its answer is in `held`). */
+    let heldFinal: WireBrainEvent | null = null;
+    const joinText = (texts: string[]) => texts.filter(Boolean).join("\n\n").slice(0, BRAIN_LIMITS.doneText);
+    /** A final answer led by the held ones. */
+    const joined = (final: WireBrainEvent): WireBrainEvent =>
+      final.type === "done" && held.length ? { ...final, text: joinText([...held, final.text]) } : final;
+    /** No next turn came (or the process went): the result it went on from ends the turn, with the held answers. */
+    const heldEnd = (final: WireBrainEvent): WireBrainEvent =>
+      final.type === "done" ? { ...final, text: joinText(held) } : final;
+    /** Waiting for work moved to the background to end (not reset by lines: it may print nothing for long). */
+    let backgroundWait: ReturnType<typeof setTimeout> | null = null;
+    /** This request's tasks in the foreground (one that moves to the background later was "moved"). */
+    const foreground = new Set<string>();
+    /** Its tasks running in the background → moved there mid-turn (else started there by the model). */
+    const background = new Map<string, boolean>();
+    /** Background tasks that ended since the model last looked (a tool boundary, a turn start): their notice starts a turn. */
+    let unheard = 0;
+    /** Past a result, nothing of the next turn seen yet. */
+    let between = false;
+    const movedRunning = () => [...background.values()].some(Boolean);
+    const noteTask = (t: ParsedTask) => {
+      if (t.ended) {
+        foreground.delete(t.id);
+        if (background.delete(t.id)) unheard++;
+      } else if (t.backgrounded) {
+        // Moved (it ran in the foreground, or began before this request) or started there.
+        background.set(t.id, foreground.delete(t.id) || !t.started);
+      } else if (t.started) foreground.add(t.id);
+    };
+    const version = () => proc.cliVersion ?? "(version unknown)";
+    proc.turn = {
+      steer: (messages) => {
+        if (settled) return { status: "no_turn" };
+        // Stdin closes after a one-shot's prompt: nothing more can go in.
+        if (opts.endInput) return { status: "unsupported", reason: "one-shot process" };
+        // Not started yet (what it can do unknown): the messages wait for the turn's end, as before.
+        if (!proc.initSeen) return { status: "no_turn", reason: "Claude Code is still starting" };
+        const support = steerSupport(proc.capabilities);
+        if (!support.next) {
+          return { status: "unsupported", reason: `Claude Code ${version()} reads messages only between turns` };
+        }
+        // Urgent where the CLI can't move work aside: the engine stops the turn and starts it again instead.
+        if (messages.some((m) => m.urgent) && !support.now) {
+          return { status: "unsupported", reason: `Claude Code ${version()} can't take an urgent message mid-turn` };
+        }
+        for (const m of messages) {
+          const priority = m.urgent ? "now" : "next";
+          proc.write(userMessageLine(m.text, { uuid: m.uuid, priority, origin: { kind: "human" } }));
+          outstanding.add(m.uuid);
+        }
+        return { status: "accepted", accepted: messages.map((m) => m.uuid) };
+      },
+    };
     const flush = () => {
       if (timer) clearTimeout(timer);
       timer = null;
@@ -524,6 +865,10 @@ export function runTurnOnProcess(
     const finish = (out: TurnOutcome) => {
       if (settled) return;
       settled = true;
+      if (followUp) clearTimeout(followUp);
+      if (backgroundWait) clearTimeout(backgroundWait);
+      proc.turn = null;
+      if (outstanding.size) out = { ...out, unread: [...outstanding] };
       flush();
       proc.onLine(null);
       offExit();
@@ -532,8 +877,33 @@ export function runTurnOnProcess(
     };
     proc.onLine((line) => {
       if (settled) return;
+      if (followUp) clearTimeout(followUp);
+      followUp = null;
       const parsed = proc.parser.push(line);
+      // The next turn began: it reads the notices that came before it.
+      if (between && (parsed.turnStart || parsed.events.length > 0)) {
+        between = false;
+        unheard = 0;
+      }
+      if (parsed.boundary) unheard = 0;
+      if (parsed.task) noteTask(parsed.task);
+      // Past a result, the work moved aside is over: Claude Code answers it in a turn of its own, about to start.
+      if (backgroundWait && !movedRunning()) {
+        clearTimeout(backgroundWait);
+        backgroundWait = null;
+        const end = heldFinal;
+        if (end) followUp = setTimeout(() => finish({ final: heldEnd(end) }), followUpMs);
+      }
       for (const e of parsed.events) {
+        if (e.type === "steer_read") {
+          // Only ours (the list may name messages this turn never sent).
+          const ours = e.uuids.filter((u) => outstanding.delete(u));
+          if (ours.length) {
+            flush();
+            opts.emit({ type: "steer_read", uuids: ours });
+          }
+          continue;
+        }
         if (e.type === "text_delta") {
           buf += e.text;
           if (!timer) timer = setTimeout(flush, deltaMs);
@@ -542,9 +912,35 @@ export function runTurnOnProcess(
         flush();
         opts.emit(clean(e));
       }
-      if (parsed.final) finish({ final: parsed.final });
+      const final = parsed.final;
+      if (!final) return;
+      // The CLI runs another turn for this request: steered messages still queued (the turn ended before
+      // a tool boundary), work moved to the background still running, or a background task's notice the
+      // model never saw. This request goes on until that turn's result and the answers join. A plan
+      // limit or a failed login ends it (the next turn would fail the same way).
+      const goesOn = final.type === "done" || (final.type === "error" && final.code === "claude_failed");
+      const queuedMessages = outstanding.size > 0 && parsed.queued !== 0;
+      const work = movedRunning();
+      const notice = unheard > 0;
+      unheard = 0;
+      if (goesOn && !proc.exited && (queuedMessages || work || notice)) {
+        if (final.type === "done" && final.text) held.push(final.text);
+        heldFinal = final;
+        between = true;
+        proc.parser.beginTurn();
+        if (work) {
+          // Bounded: past it the request ends with what it has; the process drains (answers that work later, unheard).
+          backgroundWait ??= setTimeout(
+            () => finish({ final: heldEnd(final), draining: true }),
+            opts.backgroundWaitMs ?? STEER_BACKGROUND_WAIT_MS,
+          );
+        } else followUp = setTimeout(() => finish({ final: heldEnd(final) }), followUpMs);
+        return;
+      }
+      finish({ final: joined(final) });
     });
-    const offExit = proc.onExit(() => finish({ died: true }));
+    // Gone after a result it went on from: that result ends the turn (running it again would redo its tools).
+    const offExit = proc.onExit(() => finish(heldFinal ? { final: heldEnd(heldFinal) } : { died: true }));
     function onAbort() {
       proc.kill();
       finish({ final: { type: "error", code: "canceled", message: "The turn was canceled.", retryable: false } });
@@ -572,6 +968,14 @@ export interface BrainManagerOptions {
   idleMs?: number;
   maxProcesses?: number;
   deltaMs?: number;
+  /** Tests: `STEER_FOLLOW_UP_MS`. */
+  steerFollowUpMs?: number;
+  /** Tests: `STEER_BACKGROUND_WAIT_MS`. */
+  steerBackgroundWaitMs?: number;
+  /** Tests: `STRAY_TURN_WAIT_MS`. */
+  strayWaitMs?: number;
+  /** Tests: `OWN_TURN_DUE_WAIT_MS`. */
+  dueWaitMs?: number;
   log?: (line: string) => void;
 }
 
@@ -655,6 +1059,8 @@ export class BrainManager {
   private readonly live = new Map<string, Live>();
   private readonly chains = new Map<string, Promise<unknown>>();
   private readonly bridge = new Map<string, BridgeEntry>();
+  /** The process each run's turn is on now (live steering finds it by run). */
+  private readonly running = new Map<string, Live>();
   /** Sessions that answered here (`ranKeyOf`): resumed next time even where Claude Code's folder can't be looked at. */
   private readonly ran = new Set<string>();
   private closed = false;
@@ -700,6 +1106,16 @@ export class BrainManager {
       ...(b.runToken && isRunToolToken(b.runToken) ? { serverToken: b.runToken } : {}),
       ...(b.redact ? { redact: b.redact } : {}),
     };
+  }
+
+  /**
+   * Protocol 15: messages for the turn of `runId` in progress, on the agent's
+   * process for that session (another agent's turn is never reached).
+   */
+  steer(agentId: string, req: BrainSteerRequest): BrainSteerReply {
+    const live = this.running.get(req.runId);
+    if (!live || live.key !== `${agentId}:${req.session}` || live.proc.exited) return { status: "no_turn" };
+    return live.proc.turn?.steer(req.messages) ?? { status: "no_turn" };
   }
 
   /** One turn; resolves with its final event (also emitted). Turns of one session queue. */
@@ -773,6 +1189,9 @@ export class BrainManager {
     if (ctx.signal?.aborted) return errorEvent("canceled", "The turn was canceled.", false);
     const sig = this.signature(cwd, req, ctx);
     let live = this.live.get(key);
+    // A turn Claude Code runs by itself there (or one due): its output would read as this turn's. Wait for
+    // its end (output discarded) and keep the process, with the agent's background jobs; kill only a stuck one.
+    if (live && live.sig === sig && live.proc.onItsOwn) live = await this.awaitOwnTurn(live, session, ctx);
     if (live && (live.proc.exited || live.sig !== sig)) {
       this.drop(live);
       live = undefined;
@@ -786,6 +1205,8 @@ export class BrainManager {
     }
     if (live) {
       const out = await this.onLive(live, req, ctx);
+      // A background turn (a routine's run): nothing stays alive for it afterwards, not even a process it found.
+      if (!keepAlive) this.drop(live);
       if (out.final) return out.final;
       // Died mid-turn: the same turn again, one-shot, resuming the session.
       this.log(`[${ctx.agent.handle}] brain process for ${session.slice(0, 8)} died mid-turn; resuming one-shot`);
@@ -793,6 +1214,45 @@ export class BrainManager {
       return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx, true), true);
     }
     return this.oneShot(key, session, cwd, req, ctx, sig, this.resumeFor(cwd, session, req, ctx), true);
+  }
+
+  /**
+   * Waits for the process's own turn before a request uses it. A turn in flight: up to
+   * `STRAY_TURN_WAIT_MS`, then the process is killed (undefined; the session resumes in a new one).
+   * Only work still running (`ownTurnDue`), no turn begun: up to `OWN_TURN_DUE_WAIT_MS`, then the
+   * request goes on on the same process, nothing killed.
+   */
+  private async awaitOwnTurn(live: Live, session: string, ctx: BrainTurnContext): Promise<Live | undefined> {
+    const who = `[${ctx.agent.handle}] brain process for ${session.slice(0, 8)}`;
+    const strayMs = this.opts.strayWaitMs ?? STRAY_TURN_WAIT_MS;
+    // Busy meanwhile: neither evicted nor closed as idle.
+    live.busy = true;
+    if (live.idleTimer) clearTimeout(live.idleTimer);
+    live.idleTimer = null;
+    try {
+      if (!live.proc.strayTurn) {
+        this.log(`${who} has work moved to the background still running; waiting briefly for its turn`);
+        if (await live.proc.waitOwnTurn(this.opts.dueWaitMs ?? OWN_TURN_DUE_WAIT_MS)) return live;
+        // No turn began: the work goes on (maybe for good); so does the conversation, on this process.
+        if (!live.proc.strayTurn && !live.proc.exited) {
+          this.log(`${who}: no turn for the moved work yet; going on without it (nothing killed)`);
+          live.proc.ownTurnDue = false;
+          return live;
+        }
+      }
+      this.log(`${who} is in a turn of its own; waiting for it`);
+      if (await live.proc.waitOwnTurn(strayMs)) return live;
+      if (!live.proc.exited) {
+        this.log(
+          `${who} still in a turn of its own after ${Math.round(strayMs / 1000)} s; killing it (the session resumes in a new one)`,
+        );
+        live.proc.kill();
+      }
+      this.drop(live);
+      return undefined;
+    } finally {
+      live.busy = false;
+    }
   }
 
   private resumeFor(cwd: string, session: string, req: BrainTurnRequest, ctx: BrainTurnContext, ranBefore = false) {
@@ -819,6 +1279,7 @@ export class BrainManager {
       bridge.runId = req.runId;
       bridge.runToken = typeof req.mcp?.token === "string" ? req.mcp.token : null;
     }
+    this.running.set(req.runId, live);
     try {
       const out = await runTurnOnProcess(live.proc, req.prompt, {
         emit: ctx.emit,
@@ -826,11 +1287,28 @@ export class BrainManager {
         deltaMs: this.opts.deltaMs,
         redact: ctx.secrets?.redact,
         endInput: !live.persistent,
+        ...(this.opts.steerFollowUpMs !== undefined ? { followUpMs: this.opts.steerFollowUpMs } : {}),
+        ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
       if (out.final?.type === "done") this.ran.add(live.ranKey);
-      if (out.died || (out.final?.type === "error" && out.final.code === "canceled")) this.drop(live);
+      const short = live.key.split(":")[1]?.slice(0, 8) ?? "";
+      // A steered message it never read would start a turn nobody listens to: the process goes (the
+      // engine sends that message again with its next turn, on a resumed process; never read twice).
+      if (out.unread?.length && !out.died) {
+        this.log(
+          `brain process ${short} (Claude Code ${live.proc.cliVersion ?? "?"}) ended a turn with unread messages; closing`,
+        );
+        live.proc.kill();
+        this.drop(live);
+      } else if (out.died || (out.final?.type === "error" && out.final.code === "canceled")) this.drop(live);
+      else if (out.draining) {
+        // Work moved aside still runs: the CLI answers it on its own later (unheard); the next request waits for that.
+        this.log(`brain process ${short} ended a turn with background work still running; draining`);
+        live.proc.ownTurnDue = true;
+      }
       return out;
     } finally {
+      if (this.running.get(req.runId) === live) this.running.delete(req.runId);
       live.busy = false;
       live.lastUsed = Date.now();
       if (bridge) {
@@ -909,6 +1387,8 @@ export class BrainManager {
             folders: [...new Set([cwd, ctx.folder])],
             // Our tools always loaded (no ToolSearch call before each one; the list is short since ADR 0043).
             alwaysLoad: true,
+            // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
+            profile: mode,
           }),
         ),
         { mode: 0o600 },
@@ -931,7 +1411,14 @@ export class BrainManager {
     writeFileSync(
       settingsFile,
       JSON.stringify(
-        claudePermissionSettings(mode, missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix), allow),
+        claudePermissionSettings(
+          mode,
+          missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix),
+          allow,
+          undefined,
+          // Every command reaches our prompt tool: plain reads pass there at once, secrets never.
+          { promptReads: true },
+        ),
       ),
       { mode: 0o600 },
     );
@@ -947,13 +1434,9 @@ export class BrainManager {
       systemFile,
       ...(mcpConfigFile ? { mcpConfigFile } : {}),
       settingsFile,
-      strictMcp: req.personalMcp !== true,
-      promptTool: mode === "work",
-      permissionMode: mode === "plan" ? "dontAsk" : "acceptEdits",
+      ...brainProfileLaunch(mode, req.personalMcp === true),
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
-      // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
-      ...(req.personalMcp !== true ? { settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS } : {}),
     });
     const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
     const live: Live = {

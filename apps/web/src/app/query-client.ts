@@ -10,6 +10,8 @@ export function createQueryClient(handlers: {
   onUnauthorized: () => void;
   onMutationError: (message: string) => void;
   unknownError: () => string;
+  /** A failed write in the person's language, for the server codes the app knows; null: the server's message. */
+  describeError?: (error: unknown) => string | null;
 }) {
   return new QueryClient({
     defaultOptions: {
@@ -28,6 +30,8 @@ export function createQueryClient(handlers: {
         if (error instanceof ApiError && error.status === 401) return handlers.onUnauthorized();
         // Mutations that show their own inline error opt out with `meta: { silent: true }`.
         if (mutation.meta?.silent) return;
+        const known = handlers.describeError?.(error);
+        if (known) return handlers.onMutationError(known);
         handlers.onMutationError(error instanceof Error && error.message ? error.message : handlers.unknownError());
       },
     }),

@@ -1,0 +1,6 @@
+{
+  "identifier": "cover",
+  "description": "The main window's cover (cover.rs): a page of the app over the site. It may drag the window, load the site again once it is reachable, or step aside; nothing of the site, the runners or the Mac.",
+  "webviews": ["main-cover"],
+  "permissions": ["core:window:allow-start-dragging", "allow-cover-retry", "allow-cover-hide"]
+}

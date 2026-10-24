@@ -19,6 +19,7 @@ import {
   viewRange,
 } from "@agenteschat/client/lib/calendar";
 import { formatTime, joinNames, toYmd } from "@agenteschat/client/lib/format";
+import { runPixelStatus, runPixels } from "@agenteschat/client/lib/routine-view";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
   ApprovalCard,
@@ -49,6 +50,7 @@ import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useToast } from "@/lib/toast";
+import "./calendar.css";
 
 export { mondayOf } from "@agenteschat/client/lib/calendar";
 
@@ -128,16 +130,17 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
     if (!r) return it;
     if (!it.runs) {
       // A single run: how it went when it already ran (a run within 5 minutes of it), and the routine's last result.
-      const recent = r.recentRuns ?? [];
+      const recent = runPixels(r.recentRuns);
       const own = recent.find((x) => Math.abs(toView(new Date(x.at)).getTime() - it.start.getTime()) < 5 * 60_000);
-      return { ...it, result: own?.status, lastResult: recent[0]?.status ?? r.lastRun?.status };
+      const last = r.lastRun ? (runPixelStatus(r.lastRun.status) ?? undefined) : undefined;
+      return { ...it, result: own?.status, lastResult: recent[0]?.status ?? last };
     }
-    const pastRuns = (r.recentRuns ?? []).map((x) => ({
+    const pastRuns = runPixels(r.recentRuns).map((x) => ({
       at: toView(new Date(x.at)),
       status: x.status,
       weight: x.weight,
     }));
-    return { ...it, pastRuns, running: r.running };
+    return { ...it, pastRuns, running: r.state === "running" };
   });
   const counts = Object.fromEntries(
     SOURCES.map(({ source }) => [source, all.filter((it) => it.source === source).length]),

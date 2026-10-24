@@ -341,6 +341,7 @@ export async function updateMyProfile(
       .update(organizationMembers)
       .set(set)
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    caches.zones.delete(`${orgId}:${userId}`);
   }
   const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
   if (!me) throw new ForbiddenError("You are not a member of this organization");
@@ -421,6 +422,10 @@ export async function removeMember(
   });
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
+  // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
+  // Loaded here: the routine engine builds on this module.
+  const { pauseRoutinesOfCreator } = await import("./routine-firing");
+  await pauseRoutinesOfCreator({ db, pubsub: options.pubsub }, orgId, targetUserId).catch(() => 0);
 }
 
 /**

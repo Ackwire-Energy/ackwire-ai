@@ -313,7 +313,8 @@ describe("Onboarding", () => {
     expect(screen().queryByRole("button", { name: /Usar créditos da plataforma/ })).toBeNull();
     const save = () => button(/Salvar e criar 1 agente/);
     expect(save().hasAttribute("disabled")).toBe(true);
-    expect(document.body.textContent).toContain("Começa com Claude Sonnet 5.5.");
+    // New agents start on "Automático".
+    expect(document.body.textContent).toContain("Começa no Automático: escolhe o modelo e o esforço para cada tarefa.");
     await type("Chave da API da Anthropic", "sk-errado");
     await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Anthropic")));
     expect(document.body.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
@@ -372,7 +373,7 @@ describe("Onboarding", () => {
       name: "Theo",
       handle: "theo",
       role: "PM",
-      model: "claude-sonnet-5-5",
+      model: "auto",
       credentialId: null,
       appearance: { color: "indigo", eyes: "round", accessory: "cap" },
     });
@@ -550,7 +551,8 @@ describe("Onboarding", () => {
       name: "Morgan",
       handle: "lead",
       role: "Sales lead",
-      model: "claude-sonnet-5-5",
+      // The source names no model of ours: Automático.
+      model: "auto",
       appearance: { color: "violet" },
     });
     expect(String(morgan?.instructions)).toStartWith(

@@ -106,10 +106,14 @@ const live = new Set<Sky>();
 let raf = 0;
 let last = 0;
 const hasRaf = () => typeof requestAnimationFrame === "function";
+/** About 30 frames a second: the dither moves in whole cells, more frames only cost. */
+const FRAME_MS = 32;
 function tick(now: number) {
-  const dt = Math.min(0.05, (now - last) / 1000);
-  last = now;
-  for (const s of live) s.step(dt);
+  if (now - last >= FRAME_MS) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    for (const s of live) s.step(dt);
+  }
   raf = live.size && hasRaf() ? requestAnimationFrame(tick) : 0;
 }
 function wake() {
@@ -289,6 +293,8 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     dirty: true,
     step(dt) {
       if (!visible || !canvas.isConnected || canvas.offsetParent === null) return;
+      // Behind a full-screen menu (MenuOverlay) the app is blurred: hold still there.
+      if (document.documentElement.dataset.menuOverlay !== undefined && !canvas.closest(".ac-mo")) return;
       if (!img) resize();
       if (reduced && !sky.dirty) return;
       draw(reduced ? 0 : dt);

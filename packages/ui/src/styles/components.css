@@ -16,6 +16,8 @@ body {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 22px;
+  /* Letters as tall as the app's sizes were drawn for, whatever the face (Source Sans 3 draws small). */
+  font-size-adjust: var(--font-size-adjust, none);
   color: var(--ink);
   background: var(--surface);
   font-feature-settings: "ss01", "tnum";
@@ -845,6 +847,29 @@ textarea.ac-input {
 .ac-approval__who a {
   color: var(--ink);
 }
+/* Asked while nobody watched: one quiet line with its icon. */
+.ac-approval__origin {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ac-approval__origin > svg {
+  flex: none;
+  margin-top: 2px;
+}
+/* Why the agent asks, in its words, read before the action. */
+.ac-approval__why {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
 .ac-approval__title {
   margin: 0;
   font-size: 15px;
@@ -959,7 +984,7 @@ textarea.ac-input {
   align-items: center;
   gap: 0.16em;
   /* Funnel Display light (the landing's headings); the app falls back to its sans. */
-  font-family: var(--font-display, var(--font-sans));
+  font-family: var(--font-brand, var(--font-display, var(--font-sans)));
   font-weight: 300;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -1124,6 +1149,31 @@ textarea.ac-input {
   min-width: 200px;
   /* A dropdown shows all its actions; it scrolls only when the screen is short. */
   max-height: min(520px, var(--radix-dropdown-menu-content-available-height, 520px));
+}
+/* The right click (MenuAt): at the pointer at once, like the system's menus. */
+.ac-menu.ac-menu--at[data-state="open"] {
+  animation: none;
+}
+.ac-menu__reactions {
+  display: flex;
+  gap: 2px;
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--line);
+}
+.ac-menu__reaction {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.ac-menu__reaction[data-highlighted] {
+  background: var(--surface-sunken);
 }
 .ac-menu__note {
   margin: 0;
@@ -3345,6 +3395,27 @@ a.ac-list__row:focus-visible {
   border-radius: calc(var(--seg-r) - var(--seg-in));
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
+}
+/*
+ * Dark: the raised tone and the track were the same near-black, so the chosen segment vanished. The track
+ * sinks below the page and the pill lifts above it; the other segments step back to muted.
+ */
+[data-theme="dark"] .ac-seg {
+  background: color-mix(in srgb, #000 35%, var(--bg));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+[data-theme="dark"] .ac-seg__pill {
+  background: color-mix(in srgb, var(--ink) 13%, var(--raised));
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    var(--top);
+}
+[data-theme="dark"] .ac-seg__item:not([data-on]) {
+  color: var(--muted);
+}
+[data-theme="dark"] .ac-seg__item:not([data-on]):hover {
+  color: var(--ink);
 }
 
 /* Tool review pixels: swatch, subject strip, proportion bar, marks. */
@@ -6496,7 +6567,7 @@ label.ac-setrow__title {
 .ac-mo__title {
   margin: 0;
   font-family: var(--font-display, var(--font-sans));
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 48px;
   line-height: 52px;
   letter-spacing: -0.03em;

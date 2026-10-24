@@ -1,0 +1,86 @@
+import { routineReplyOf } from "./routines";
+
+type Meta = Record<string, unknown> | undefined;
+
+/** What reached the agent's conversation (packages/engine/src/notices.ts). */
+export type NoticeKind = "routine_handoff" | "consult_reply" | "agent_note" | "wait_result" | "talker_reply";
+
+/**
+ * An event an agent's conversation got (`meta.notice`): its routine's report,
+ * another agent's answer or note, the late result of a wait. The agent reads
+ * it as an event, never as a person's words; people see one compact line,
+ * the text on demand. `from` is written for the agent ("@infra"), so the app
+ * prefers its own words.
+ */
+export interface MessageNotice {
+  kind: NoticeKind | (string & {});
+  text: string;
+  from: string | null;
+  refs: Record<string, string>;
+}
+
+/** The notice card of a message, or null (none, or a fast reply that shows as a normal message). */
+export function noticeOf(meta: Meta): MessageNotice | null {
+  const n = meta?.notice as { kind?: unknown; text?: unknown; from?: unknown; refs?: unknown } | undefined;
+  if (!n || typeof n !== "object" || typeof n.kind !== "string" || typeof n.text !== "string") return null;
+  if (n.kind === "talker_reply" || isTalkerReply(meta)) return null;
+  const refs: Record<string, string> = {};
+  if (n.refs && typeof n.refs === "object") {
+    for (const [k, v] of Object.entries(n.refs)) if (typeof v === "string") refs[k] = v;
+  }
+  return { kind: n.kind, text: n.text, from: typeof n.from === "string" && n.from ? n.from : null, refs };
+}
+
+/**
+ * A short reply the agent gave while its task kept working (`meta.talker`, or a `talker_reply`
+ * notice): shown as its normal message, with a quiet "enquanto trabalha".
+ */
+export function isTalkerReply(meta: Meta): boolean {
+  const talker = meta?.talker as { runId?: unknown } | undefined;
+  if (talker && typeof talker === "object") return true;
+  return (meta?.notice as { kind?: unknown } | undefined)?.kind === "talker_reply";
+}
+
+/** The routine a report came from: the notice's refs, or the «name» in `from`. */
+export function noticeRoutineName(notice: MessageNotice): string | null {
+  if (notice.refs.routineName) return notice.refs.routineName;
+  return notice.from?.match(/«([^»]+)»/)?.[1] ?? null;
+}
+
+/** "@infra" in `from` (or `refs.agentHandle`): the other agent's handle, to show its name. */
+export function noticeAgentHandle(notice: MessageNotice): string | null {
+  const handle = notice.refs.agentHandle ?? notice.from?.match(/^@([\w.-]+)$/)?.[1];
+  return handle ? handle.replace(/^@/, "") : null;
+}
+
+/** An automatic line in the conversation (a notice): nothing groups with it. */
+export const isEventLine = (meta: Meta) => noticeOf(meta) !== null;
+
+type Said = { id: string; author: { type: string }; body: string; meta?: Record<string, unknown> };
+
+/**
+ * The routine reports the agent already told people about (ADR 0053 §7): the `noticeId` of every agent
+ * message that answers one. Such a `routine_handoff` notice folds into that message (hidden in the
+ * timeline); a report nobody answered still shows as its compact line.
+ */
+export function answeredNotices(messages: readonly Said[]): Set<string> {
+  const out = new Set<string>();
+  for (const m of messages) {
+    const noticeId = routineReplyOf(m)?.noticeId;
+    if (noticeId) out.add(noticeId);
+  }
+  return out;
+}
+
+/** A routine report answered by an agent's message in `answered`: left out of the timeline. */
+export const isAnsweredNotice = (m: Pick<Said, "id" | "meta">, answered: ReadonlySet<string>) =>
+  answered.has(m.id) && noticeOf(m.meta)?.kind === "routine_handoff";
+
+/** The report a routine's message answers (its notice's text), when that notice is loaded here. */
+export function routineReportText(messages: readonly Said[], noticeId: string | null): string | null {
+  if (!noticeId) return null;
+  const found = messages.find((m) => m.id === noticeId);
+  const notice = found ? noticeOf(found.meta) : null;
+  if (!found || !notice) return null;
+  return found.body.trim() || notice.text.trim() || null;
+}

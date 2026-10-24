@@ -1,5 +1,5 @@
 import type { Credential, Member, Model } from "@agenteschat/client";
-import { type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
   AffixInput,
   AGENT_ACCESSORIES,
@@ -400,7 +400,7 @@ function ModelCard({
   );
 }
 
-/** The models as cards, grouped by provider; those without a key say why. */
+/** "Automático" first, then the models as cards, grouped by provider; those without a key say why. */
 export function ModelCards({
   choices,
   value,
@@ -414,9 +414,27 @@ export function ModelCards({
 }) {
   const { t } = useTranslation();
   const all = choices.flatMap(([, list]) => list.map((c) => c.model));
+  // "Automático" picks from the line of the agent's key: usable once any model is.
+  const autoAvailable = choices.some(([, list]) => list.some((c) => c.available));
   return (
     // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
     <div className="newag__models" role="group" aria-label={t("newAgent.model")}>
+      <button
+        type="button"
+        className="newag__model"
+        aria-pressed={isAuto(value)}
+        aria-disabled={!autoAvailable || undefined}
+        onClick={() => autoAvailable && onChange(AUTO)}
+      >
+        <span className="newag__model-head">
+          <b>{t("brain.auto.label")}</b>
+        </span>
+        <span className="newag__model-desc">{t("brain.auto.hint")}</span>
+        <span className="newag__cost">
+          <Icon name="bulb" size={14} />
+          {t("newAgent.autoCost")}
+        </span>
+      </button>
       {choices.flatMap(([provider, list]) =>
         list.map(({ model, available }) => (
           <ModelCard

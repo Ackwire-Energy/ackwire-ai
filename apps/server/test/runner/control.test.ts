@@ -248,6 +248,20 @@ test("reconnect from the app: the socket is dropped and dialed again at once, wi
   expect(second.of("hello")[0]).toMatchObject({ type: "hello", token: TOKEN });
 });
 
+test("reconnect after a refusal: the same token dials again (the server may have refused by mistake)", async () => {
+  const { home } = pairedHome();
+  const c = control(home);
+  const first = await c.connect();
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "online"));
+  first.frame({ type: "refused", reason: "invalid_token", message: "No hello in time." });
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "refused"));
+
+  expect(await c.data({ type: "reconnect" })).toEqual({ reconnecting: true });
+  const second = await c.connect();
+  expect(second).not.toBe(first);
+  expect(second.of("hello")[0]).toMatchObject({ type: "hello", token: TOKEN });
+});
+
 test("every status (events and replies) carries a seq that only grows, in the order written", async () => {
   const { home } = pairedHome();
   const c = control(home);

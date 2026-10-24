@@ -1,6 +1,6 @@
 import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, type BrainEffort, isBrainEffort } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { MODEL_CATALOG } from "@agenteschat/providers";
+import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import type { BrainKind } from "./brains/types";
@@ -32,6 +32,11 @@ import { can, getMembership, requirePermission } from "./organizations";
 export const BRAIN_KINDS: readonly BrainKind[] = ["model", "claude_code", "codex"];
 export const isBrainKind = (v: unknown): v is BrainKind =>
   typeof v === "string" && (BRAIN_KINDS as readonly string[]).includes(v);
+/** An effort as stored: a level, or `auto` (the judge picks it per run). */
+export type BrainEffortSetting = BrainEffort | typeof AUTO_MODEL;
+export const isBrainEffortSetting = (v: unknown): v is BrainEffortSetting =>
+  isBrainEffort(v) || isAutoModel(v as string);
+
 /** Brains that run on the agent's computer with a person's plan. */
 export const isComputerBrain = (v: unknown): v is "claude_code" | "codex" => v === "claude_code" || v === "codex";
 /** A stored value read back (anything unknown is the model brain). */
@@ -94,6 +99,8 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
   if (kind === "model") {
     throw new ValidationError("The API brain uses the agent's model", "brain.invalid_model");
   }
+  // "Automático": each run picks the tier (`auto-model.ts`).
+  if (v.toLowerCase() === AUTO_MODEL) return AUTO_MODEL;
   if (kind === "claude_code") {
     const alias = CLAUDE_CODE_MODELS.find((o) => o.value === v.toLowerCase() || o.modelId === v);
     if (alias) return alias.value;
@@ -184,8 +191,8 @@ export interface AgentBrainView {
   canEdit: boolean;
   /** The account its computer brain runs with (ADR 0041); null = the computer's own sign-in. */
   account: string | null;
-  /** How hard its computer brain thinks; null = the CLI's default. */
-  effort: BrainEffort | null;
+  /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
+  effort: BrainEffortSetting | null;
   /** The accounts on the agent's computer, both kinds ([] without a computer). */
   accounts: MachineAccountView[];
   /** Who connected the agent's computer: only they add accounts or pick one. */
@@ -304,7 +311,7 @@ function view(
     machines,
     canEdit: true,
     account: agent.brainAccountId,
-    effort: isBrainEffort(agent.brainEffort) ? agent.brainEffort : null,
+    effort: isBrainEffortSetting(agent.brainEffort) ? agent.brainEffort : null,
     ...accounts,
   };
 }
@@ -353,7 +360,7 @@ export interface AgentBrainInput {
    * keep it (cleared when the brain kind changes).
    */
   account?: unknown;
-  /** `low`…`max`, or null for the CLI's default. Omitted = keep it. */
+  /** `low`…`max`, `auto` (picked per run), or null for the CLI's default. Omitted = keep it. */
   effort?: unknown;
 }
 
@@ -398,21 +405,21 @@ export async function setAgentBrain(
       );
     }
   }
+  // "Automático" is one choice for every brain: it stays through a switch (and while on the API brain, for
+  // the next one), so an agent born automatic is automatic on Claude Code or Codex too. A fixed model belongs to
+  // its brain: another brain starts on its default.
+  const carried = isAutoModel(agent.brainModel) ? AUTO_MODEL : null;
   const model =
-    brain === "model"
-      ? input.model === undefined || input.model === null || input.model === ""
-        ? null
-        : normalizeBrainModel(brain, input.model)
-      : input.model !== undefined
-        ? normalizeBrainModel(brain, input.model)
-        : changed
-          ? null
-          : agent.brainModel;
+    input.model !== undefined
+      ? normalizeBrainModel(brain, input.model)
+      : brain === "model" || changed
+        ? carried
+        : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
-  if (input.effort !== undefined && input.effort !== null && !isBrainEffort(input.effort)) {
-    throw new ValidationError("Choose low, medium, high, xhigh or max", "brain.invalid_effort");
+  if (input.effort !== undefined && input.effort !== null && !isBrainEffortSetting(input.effort)) {
+    throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
-  const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffort | null);
+  const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
   const account = await nextBrainAccount(deps.db, userId, orgId, agent, brain, changed, machine, input.account);
   const accounts = await brainAccounts(deps.db, userId, orgId, machine);
   if (
@@ -611,6 +618,10 @@ export async function setMissionBrain(
       : brainChanged
         ? null
         : mission.brainModel;
+  // A mission names its model; "Automático" is the agent's own setting, which a mission without one follows.
+  if (isAutoModel(model) && model !== mission.brainModel) {
+    throw new ValidationError("Choose a model for the mission", "brain.invalid_model", { brain: effective });
+  }
   if (!brainChanged && model === mission.brainModel) return missionBrainView(deps, mission, role);
   const row = await deps.db.transaction(async (tx) => {
     const [next] = await tx

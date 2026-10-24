@@ -1,5 +1,5 @@
 {
-  "id": "ab0bfaa3-1eaa-4600-8381-6a8efdc1ffc9",
+  "id": "4e274d40-2232-424c-ba61-50df08b17a88",
   "prevId": "16f0e474-8e35-4fad-843d-022a37f878d5",
   "version": "7",
   "dialect": "postgresql",
@@ -9471,6 +9471,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "background": {
+          "name": "background",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -12940,7 +12947,7 @@
           "name": "org_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "content_type": {
           "name": "content_type",

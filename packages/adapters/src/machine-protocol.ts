@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 14;
+export const MACHINE_PROTOCOL_VERSION = 17;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -116,6 +116,39 @@ export const ACCOUNTS_PROTOCOL = 13;
  * starts a mission on an older runner.
  */
 export const MISSION_WORKTREE_PROTOCOL = 14;
+/**
+ * From this protocol on (live steering): `brain.steer` hands messages to a
+ * Claude Code turn in progress (stream-json user lines on its stdin, read at
+ * its next tool boundary), and the turn reports which it read
+ * (`brain.event` `steer_read`). Older runners would drop the unknown op: the
+ * server never sends it to them (their turns read new messages at the end).
+ * A Codex turn on the runner's `codex app-server` takes them too (`turn/steer`,
+ * read at its next model request); one run by `codex exec` answers
+ * `unsupported` (no new protocol number: the reply already says what it can).
+ */
+export const STEER_PROTOCOL = 15;
+/**
+ * From this protocol on (ADR 0053 §3): a Codex `brain.turn` honours
+ * `permissions` and `keepAlive`. `plan`: a read-only sandbox without network;
+ * `work`: a workspace sandbox without network where each command or file
+ * approval Codex asks (`approvalPolicy: "untrusted"`) is answered by the same
+ * command policy as Claude Code's permission prompt. `keepAlive: false` (a
+ * background turn) leaves no app-server behind. Claude Code's `plan` turns read
+ * only on our prompt tool, with no settings files. An older runner would run
+ * Codex with no approvals and the network on, and its Claude Code `plan` reads
+ * secrets and loads the project's settings files: the server never sends it a
+ * Codex turn nor a Claude Code `plan` turn (`runner_outdated`).
+ */
+export const BRAIN_PROFILES_PROTOCOL = 16;
+/**
+ * From this protocol on (ADR 0054): `browser.batch` runs several browser
+ * commands in one round trip (an action, the wait for the page to settle and
+ * the look after it), and `browser.capture` returns the page as a JPEG with
+ * its elements numbered and boxed. Older runners get the same commands one
+ * `browser.act` at a time, and no images: targets are then found on the
+ * page's text only.
+ */
+export const BROWSER_FAST_PROTOCOL = 17;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -195,6 +228,8 @@ export const BROWSER_LIMITS = {
   /** A `browser.act` command name, and its arguments as JSON characters. */
   command: 64,
   args: 64 * 1024,
+  /** Commands in one `browser.batch` (protocol 17). */
+  batchCommands: 40,
   url: 2048,
   title: 300,
   message: 500,
@@ -521,7 +556,38 @@ export type WireBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean };
+  | { type: "error"; code: string; message: string; retryable?: boolean }
+  /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
+  | { type: "steer_read"; uuids: string[] };
+
+/**
+ * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
+ * Each has its own `uuid` (a UUID the engine maps to its message); `urgent`
+ * ("Parar e mandar") asks the CLI to read it now, moving the running tool to
+ * the background. Support is what Claude Code's `system/init` says it can do
+ * (`msg_lifecycle_v1` for any message, `interrupt_send_now_v1` for urgent
+ * ones); a turn that can't take an urgent one answers `unsupported` (the
+ * engine stops and restarts the turn instead).
+ */
+export interface BrainSteerRequest {
+  runId: string;
+  /** The turn's session (as in its `brain.turn`): with the request's agent, it names the process. */
+  session: string;
+  messages: Array<{ uuid: string; text: string; urgent?: boolean }>;
+}
+
+/**
+ * `accepted`: written to the turn (their `uuid`s; read later, `steer_read`).
+ * `unsupported`: this turn can't take messages mid-turn (an older CLI, a
+ * one-shot process, Codex run as `codex exec`), or not urgent ones (no `now` on that CLI). `no_turn`: no turn of that
+ * run runs now.
+ */
+export type BrainSteerReply =
+  | { status: "accepted"; accepted: string[] }
+  | { status: "unsupported" | "no_turn"; reason?: string };
+
+/** Most messages and characters per message in one `brain.steer`. */
+export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
 
 /**
  * `brain.turn` (protocol 8, ADR 0032): one conversational turn of an agent
@@ -544,11 +610,14 @@ export interface BrainTurnRequest {
   prompt: string;
   /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
   mcp: { token: string; url?: string };
-  /** Keep one process per (agent, session) alive between turns (default true). */
+  /** Keep one process per (agent, session) alive between turns (default true; false for a background turn). Codex: protocol 16. */
   keepAlive?: boolean;
-  /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`). */
+  /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`; never in a `plan` turn). */
   personalMcp?: boolean;
-  /** Command policy (as missions): `work` (default) edits and asks a person for the rest; `plan` reads only. */
+  /**
+   * The turn's permission profile (ADR 0053 §3): `work` (default) edits and asks a person (or the server's
+   * rules) for the rest; `plan` reads only. Codex honours it from `BRAIN_PROFILES_PROTOCOL` on.
+   */
   permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
   /** Protocol 13: the account folder to run in (`accounts/<kind>/<id>`); absent: the machine's own sign-in. */
   account?: string;
@@ -752,6 +821,8 @@ export type MachineRequest = (
   | { op: "task.output"; taskId: string; tail: number }
   /** Protocol 8: one brain turn (ADR 0032); streams `brain.event` frames while it runs. */
   | ({ op: "brain.turn" } & BrainTurnRequest)
+  /** Protocol 15: messages for a brain turn in progress (live steering). */
+  | ({ op: "brain.steer" } & BrainSteerRequest)
   /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
   | ({ op: "git.sync" } & GitSyncRequest)
   /** Protocol 14: the mission's worktree (ADR 0044). */
@@ -799,7 +870,29 @@ export type MachineRequest = (
   | { op: "browser.stream.stop" }
   /** Protocol 12: a person's input during a take over, in order. */
   | { op: "browser.input"; events: BrowserInputEvent[] }
+  /**
+   * Protocol 17: several `browser.act` commands in one round trip, run back to
+   * back in the agent's session (nothing else in between), each with the
+   * same checks. Stops at the first failure of a command without `tolerate`.
+   */
+  | {
+      op: "browser.batch";
+      commands: BrowserBatchCommand[];
+      allowedDomains?: string[];
+      link?: string;
+    }
+  /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
+  | { op: "browser.capture"; allowedDomains?: string[] }
 ) & { agent?: AgentScope };
+
+/** One command of a `browser.batch` (protocol 17). */
+export interface BrowserBatchCommand {
+  command: string;
+  args: string[];
+  timeoutSeconds: number;
+  /** Its failure doesn't stop the batch (a wait that may time out, a settle check). */
+  tolerate?: boolean;
+}
 
 export type MachineOp = MachineRequest["op"];
 
@@ -816,6 +909,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.cancel",
   "task.output",
   "brain.turn",
+  "brain.steer",
   "git.sync",
   "mission.worktree",
   "access.request",
@@ -825,6 +919,8 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.stream.start",
   "browser.stream.stop",
   "browser.input",
+  "browser.batch",
+  "browser.capture",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -870,6 +966,7 @@ export interface MachineReplies {
   "task.output": { lines: string[]; truncated: boolean };
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
+  "brain.steer": BrainSteerReply;
   "git.sync": { repos: GitSyncRepo[] };
   /** `remove` answers `{ removed }` (`false`: the folder was already gone). */
   "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };
@@ -884,6 +981,29 @@ export interface MachineReplies {
   /** Events sent to the page. */
   /** `failed`: events the browser didn't confirm (absent when all went through). */
   "browser.input": { accepted: number; failed?: number };
+  /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
+  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[] };
+  /**
+   * The page as a JPEG (base64), its size in pixels, the page's size in CSS
+   * pixels, and its numbered elements with their boxes (CSS pixels).
+   */
+  "browser.capture": {
+    data: string;
+    width: number;
+    height: number;
+    viewport: { width: number; height: number };
+    marks: BrowserCaptureMark[];
+    url?: string;
+  };
+}
+
+/** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
+export interface BrowserCaptureMark {
+  ref: string;
+  number: number;
+  role: string;
+  name?: string;
+  box: { x: number; y: number; width: number; height: number };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -1175,6 +1295,14 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
         ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
       };
+    case "steer_read": {
+      if (!Array.isArray(v.uuids)) return null;
+      const uuids = v.uuids
+        .filter(isString)
+        .slice(0, STEER_LIMITS.messages * 4)
+        .map((u) => u.slice(0, 64));
+      return uuids.length ? { type: "steer_read", uuids } : null;
+    }
     default:
       return null;
   }

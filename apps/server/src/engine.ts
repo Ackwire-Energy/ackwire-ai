@@ -1,11 +1,13 @@
-import type { Adapters, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
+import type { Adapters, BrainTurnRequest, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   agentScopeFromDb,
+  type BrainTurn,
   CodexBrain,
   type ContextDeps,
+  computerTurnProfile,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -22,6 +24,7 @@ import {
   createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
+  createHandOffToolSource,
   createIssueToolSource,
   createJevJudge,
   createJobHandlers,
@@ -32,11 +35,13 @@ import {
   createMissionRunToolSource,
   createMissionToolSource,
   createModelGateway,
+  createPassToolSource,
   createPermissionToolSource,
   createReactToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
   createSkillToolSource,
+  createTalker,
   createToolGateway,
   createWikiToolSource,
   createWorkspaceToolSource,
@@ -143,12 +148,20 @@ export function buildEngine(o: EngineOptions) {
             apiKey: config.TYPESAFE_API_KEY,
             gateway,
             timeoutMs: config.JEV_TIMEOUT_MS,
+            visionModel: config.JEV_VISION_MODEL,
             fetch: o.jevFetch,
           }),
           llmJudge,
         )
       : llmJudge;
   }
+  // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
+  const talker = createTalker({
+    db,
+    pubsub: adapters.pubsub,
+    gateway,
+    resolveModel: (orgId) => resolveSummaryModel(context, orgId),
+  });
   const connectorDeps = {
     db,
     keyWrappers,
@@ -211,6 +224,10 @@ export function buildEngine(o: EngineOptions) {
       createAskAgentToolSource({ pubsub: adapters.pubsub }),
       createFindAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // Background runs (routines) speak only through it.
+      createHandOffToolSource({ pubsub: adapters.pubsub }),
+      // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
+      createPassToolSource(),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
@@ -243,7 +260,13 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
       }),
       // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
-      createBrowserToolSource({ machines: { hub: machineHub }, pubsub: adapters.pubsub }),
+      // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
+      createBrowserToolSource({
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+      }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
       createGitToolSource({
@@ -265,9 +288,19 @@ export function buildEngine(o: EngineOptions) {
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
-  /** A mission run's command policy (plan before Start and while a write item is live, work otherwise; ADR 0044). */
-  const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) =>
-    (await missionTurnPermissions(db, turn)) ?? undefined;
+  /**
+   * A computer turn's permission profile (ADR 0053 §3), the same for Claude Code and Codex: a mission run
+   * keeps its own (plan before Start, while a write item is live and for a run news from a routine or
+   * another agent woke there, work otherwise; ADR 0044); any other
+   * run follows who is behind it, read again every turn (`computerTurnProfile`: `plan` for a routine that
+   * only reads and for unattended runs, `work` for an `act` routine and a person's run). Its own branches
+   * are agentes/<handle>/… (what the git proxy accepts).
+   */
+  const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
+    (await missionTurnPermissions(db, turn)) ?? {
+      mode: await computerTurnProfile(db, turn),
+      branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
+    };
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
@@ -278,26 +311,25 @@ export function buildEngine(o: EngineOptions) {
         signal,
       },
     );
+  // A background run (a routine's) keeps no computer process alive after its turn.
   const brains: RunExecutorDeps["brains"] = {
-    claude_code: (_agent, _run, setup) =>
+    claude_code: (_agent, run, setup) =>
       createClaudeCodeBrain({
         hub: machineHub,
         pubsub: adapters.pubsub,
         agentScope,
         mcpToken: () => setup.mcpToken(),
-        // Outside missions: its own branches are agentes/<handle>/… (what the git proxy accepts).
-        permissions: async (turn) =>
-          (await missionPermissions(turn)) ?? {
-            mode: "work" as const,
-            branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
-          },
+        permissions: turnPermissions,
+        keepAlive: !run.background,
         prepare: prepareCode,
       }),
-    codex: (_agent, _run, setup) =>
+    codex: (_agent, run, setup) =>
       new CodexBrain({
         link: brainLink,
         mcp: async () => ({ token: setup.mcpToken() }),
         agent: agentScope,
+        permissions: turnPermissions,
+        keepAlive: !run.background,
         prepare: prepareCode,
       }),
   };
@@ -357,6 +389,7 @@ export function buildEngine(o: EngineOptions) {
     machineHub,
     browserLive,
     mail,
+    talker,
   };
 }
 

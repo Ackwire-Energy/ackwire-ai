@@ -196,6 +196,15 @@ export function createApp(options: AppOptions) {
       if (c.req.path.endsWith(".mjs")) res.headers.set("content-type", "text/javascript; charset=utf-8");
       return res;
     });
+    // Hashed build files never change: the browser (and the Mac app's window) opens them from disk.
+    // index.html is always revalidated, so a new deploy shows on the next open.
+    app.use("/*", async (c, next) => {
+      await next();
+      if (isApi(c.req.path) || !c.res.ok || c.res.headers.has("cache-control")) return;
+      if (c.res.headers.get("content-type")?.startsWith("text/html")) c.res.headers.set("cache-control", "no-cache");
+      else if (c.req.path.startsWith("/assets/"))
+        c.res.headers.set("cache-control", "public, max-age=31536000, immutable");
+    });
     app.use("/*", (c, next) => (isApi(c.req.path) ? next() : assets(c, next)));
     app.get("/*", (c, next) => (isApi(c.req.path) ? next() : spa(c, next)));
   }

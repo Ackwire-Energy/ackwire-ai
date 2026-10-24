@@ -1,4 +1,5 @@
 import { ApiError } from "@agenteschat/client";
+import { legalDocument } from "@agenteschat/i18n/legal";
 import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -36,10 +37,6 @@ const SECTIONS = [
   ["perguntas", "faq"],
 ] as const;
 const hash = (id: string) => `#${id}`;
-/** Who made it (a name and a handle, never translated). */
-const AUTHOR = "Walter (@wescld)";
-const AUTHOR_URL = "https://wescld.com";
-
 /**
  * The public landing page (signed-out `/`). Dark by default; the only call to
  * action is the waiting list. Everything is scoped under `.lp`.
@@ -313,12 +310,11 @@ export function LandingPage() {
           <div className="lp-wrap">
             <Logo variant="expanded" size={18} />
             <span>{t("landing.footer")}</span>
-            <span className="lp-footer__by">
-              {t("landing.footerBy")}{" "}
-              <a href={AUTHOR_URL} target="_blank" rel="noopener">
-                {AUTHOR}
-              </a>
-            </span>
+            {/* The legal pages open in English (the reader can switch on the page). */}
+            <nav className="lp-footer__legal">
+              <a href="/terms">{legalDocument("terms", "en").title}</a>
+              <a href="/privacy">{legalDocument("privacy", "en").title}</a>
+            </nav>
           </div>
         </footer>
       </div>

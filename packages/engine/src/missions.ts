@@ -44,6 +44,7 @@ import {
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
 import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
+import { MISSION_LIMITS } from "./mission-limits";
 import { MISSION_RULES } from "./mission-rules";
 import {
   closeMissionWorktree,
@@ -72,6 +73,8 @@ import { enqueue } from "./outbox";
 import type { SearchDeps } from "./search";
 import { autoThreadTitle, createThreadFromRange } from "./threads";
 import { createWikiPage } from "./wiki";
+
+export { MISSION_LIMITS };
 
 const {
   missions,
@@ -202,27 +205,6 @@ export const MISSION_STUCK = { failures: 3, idleWakeups: 5 } as const;
 
 /** The mission's branches start with this (the runner lets its executor push only these). */
 export const missionBranchPrefix = (missionId: string) => `agentes/${missionId.replace(/-/g, "").slice(-8)}/`;
-export const MISSION_LIMITS = {
-  title: 120,
-  goal: 2000,
-  planItems: 60,
-  itemTitle: 200,
-  itemNote: 500,
-  sendText: 8000,
-  inbox: 50,
-  repoDir: 300,
-  /** Plan items in a mission view (the strip); the full plan is `GET …/plan`. */
-  viewItems: 40,
-  /** `GET …/tasks/{id}/output`: at most this many lines. */
-  outputLines: 200,
-  /** Findings of the investigation before the proposal (ADR 0037 round 2). */
-  findings: 12,
-  findingText: 600,
-  findingRefs: 8,
-  findingRef: 300,
-  /** Plan items an agent may propose with the mission. */
-  proposedPlan: 20,
-} as const;
 /** Open: work may still happen (`awaiting_close` waits for its owner to conclude it). */
 export const OPEN_MISSION_STATUSES: MissionStatus[] = ["proposed", "active", "paused", "awaiting_close"];
 const OPEN = OPEN_MISSION_STATUSES;

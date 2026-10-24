@@ -17,6 +17,7 @@ import {
   newHelpRequests,
   siteLink,
 } from "../control/browser";
+import { DOCK_PREF } from "../control/dock";
 import { NOTCH_PREF } from "../control/notch";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
@@ -50,6 +51,8 @@ export function Popover() {
   const pause = combinedPause(homes.map((h) => h.status?.paused ?? { paused: false }));
   const allOffline = homes.length > 0 && homes.every((h) => !isOnline(h));
   const jobs = homes.flatMap((h) => h.jobs);
+  const runningJobs = useRef(0);
+  runningJobs.current = jobs.length;
   const requests = homes.flatMap((h) => h.requests.map((r) => ({ home: h, request: r })));
   const incompatible = snap.homes.some(isIncompatible);
   const refused = homes.find(isRefusedHome);
@@ -117,22 +120,50 @@ export function Popover() {
   }, [host, confirmQuit]);
 
   // The site in the main window asking this Mac (ADR 0036): the popover owns the runners, so it answers.
+  useEffect(() => {
+    const off = host.onThisMac((id, request) => {
+      const openPrefsOn = async (tab: PrefsTab) => {
+        writePref("prefsTab", tab);
+        await host.showWindow("prefs");
+      };
+      const showRequests = () => host.showWindow("popover");
+      answerThisMac({ store, openPrefs: openPrefsOn, showRequests }, request)
+        .then(
+          (data) => host.thisMacReply(id, true, data ?? null),
+          (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),
+        )
+        .catch(() => {});
+    });
+    // Requests the site sent while this window was starting were waiting for this (main_window.rs).
+    void host.thisMacListening().catch(() => {});
+    return off;
+  }, [host, store]);
+
+  // In the Dock like Slack, unless the person took it out (Preferências → Geral).
+  useEffect(() => {
+    void host.setDock(readPref(DOCK_PREF, true)).catch(() => {});
+  }, [host]);
+
+  // The Mac's menu bar in the app's language (menus.rs); the choices the popover owns come back here.
+  useEffect(() => {
+    void host.setAppMenu(t("desktop.menu", { returnObjects: true }) as Record<string, string>).catch(() => {});
+  }, [host, t]);
   useEffect(
     () =>
-      host.onThisMac((id, request) => {
-        const openPrefsOn = async (tab: PrefsTab) => {
-          writePref("prefsTab", tab);
-          await host.showWindow("prefs");
-        };
-        const showRequests = () => host.showWindow("popover");
-        answerThisMac({ store, openPrefs: openPrefsOn, showRequests }, request)
-          .then(
-            (data) => host.thisMacReply(id, true, data ?? null),
-            (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),
-          )
-          .catch(() => {});
+      host.onMenuAction((action) => {
+        if (action === "updates" || action === "thisMac") {
+          if (action === "updates") writePref("prefsTab", "updates");
+          void host.showWindow("prefs").catch(() => {});
+        } else if (action === "quit" && runningJobs.current === 0) {
+          // Nothing running on this Mac: quits at once, like any Mac app.
+          void host.quit().catch(() => {});
+        } else {
+          // Agents working here: ask first, as ⌘Q in the popover does.
+          if (action === "quit") setConfirmQuit(true);
+          void host.showWindow("popover").catch(() => {});
+        }
       }),
-    [host, store],
+    [host],
   );
 
   const openSite = () => {

@@ -4,9 +4,17 @@
  * the top-left corner (main_window.rs puts them in the middle of these 40px).
  */
 :root {
-  --titlebar-h: 40px;
+  /*
+   * The app sets --app-zoom with ⌘+/⌘− (main_window.rs `fit_page`): the bar stays 40pt and the room for the
+   * window's buttons stays theirs, which don't zoom.
+   */
+  --titlebar-h: calc(40px / var(--app-zoom, 1));
   /* The window's close, minimize and zoom buttons. */
-  --titlebar-lights: 78px;
+  --titlebar-lights: calc(78px / var(--app-zoom, 1));
+}
+/* Full screen: the buttons hide, so does their room. */
+html[data-fullscreen] {
+  --titlebar-lights: 12px;
 }
 
 .titlebar {
@@ -90,4 +98,24 @@ html[data-desktop] .sidebar__jump-row {
 /* Sign-in: the logo clears the window's buttons. */
 html[data-desktop] .auth__logo {
   top: calc(var(--titlebar-h) + 16px);
+}
+
+/*
+ * An app, not a page: the interface's own words don't select (messages, pages and
+ * fields still do), buttons keep the Mac's arrow (links keep the hand), nothing of the interface drags out
+ * as a picture of the page, and scrolling past the end doesn't bounce the whole window.
+ */
+html[data-desktop],
+html[data-desktop] body {
+  overscroll-behavior: none;
+}
+html[data-desktop] :is(.sidebar, .titlebar, nav, button, [role="button"], [role="tab"], [role="menuitem"], label) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+html[data-desktop] :is(button, [role="button"], [role="tab"], [role="menuitem"], summary) {
+  cursor: default;
+}
+html[data-desktop] :is(.sidebar img, .sidebar a, .titlebar, svg, button) {
+  -webkit-user-drag: none;
 }

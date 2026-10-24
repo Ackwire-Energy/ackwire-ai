@@ -26,6 +26,8 @@ export interface WorkingRun {
   label: string | null;
   /** Messages sent to it while it works that it hasn't read yet. */
   pendingMessageIds: string[];
+  /** A routine's work in the background: it holds no conversation (people's messages never go to it). */
+  background: boolean;
 }
 
 /**
@@ -52,10 +54,11 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
     title: string | null;
     root_body: string | null;
     pending: string[] | string | null;
+    background: boolean | string;
   }>(
     await db.execute(sql`select r.id, r.agent_id, r.channel_id, r.status, r.thread_root_id, r.trigger_message_id,
         r.started_at, r.created_at, c.kind, c.name, t.title, root.body as root_body,
-        array_to_json(r.pending_message_ids) as pending
+        array_to_json(r.pending_message_ids) as pending, r.background
       from ${agentRuns} r
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
         and c.archived_at is null and c.kind in ('channel', 'dm')
@@ -87,6 +90,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
       createdAt: iso(r.created_at) as string,
       label: label || null,
       pendingMessageIds: pendingIds(r.pending),
+      background: r.background === true || r.background === "t",
     };
   });
 }

@@ -5,10 +5,13 @@ import {
   deniedInMissions,
   forbiddenHint,
   forbiddenReason,
+  inlineCodeCall,
   PERMISSION_TIMEOUT_MESSAGE,
   PERMISSION_WAIT_MS,
   readOnlyCall,
   rulesFor,
+  SECRET_MESSAGE,
+  secretRead,
   TASK_LIMITS,
 } from "@agenteschat/adapters";
 import { type Executor, rowsOf, schema, sql } from "@agenteschat/db";
@@ -307,6 +310,8 @@ export async function handlePermissionPrompt(
   // The deny list: refused, never shown, never judged.
   if (deniedInMissions(tool, input)) return deny(NEVER_MESSAGE);
   const scope = scopeOf(args.scope);
+  // Secrets, with any tool that reads: refused the same way (ADR 0053 §3).
+  if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE);
   // Plain reads (`ls` of any folder, read-only git, a GET): allowed, nothing posted.
   if (scope && readOnlyCall(tool, input, scope)) return allow();
   if (mission.status !== "active" && mission.status !== "awaiting_close")
@@ -318,7 +323,8 @@ export async function handlePermissionPrompt(
   const open = recent.find((p) => p.state === "pending" && p.command === command && p.tool === tool);
   if (open) return JSON.stringify({ status: "pending", request_id: open.id });
   const mode = commandApprovalOf(mission.commandApproval);
-  if (mode === "never") {
+  // Code given inline to an interpreter is never allowed without a person, whatever the mission's setting.
+  if (mode === "never" && !inlineCodeCall(tool, input)) {
     await autoApproved(deps, mission, task, { tool, command }, "never", null);
     return allow();
   }
@@ -511,11 +517,12 @@ export async function setCommandApproval(
 
 /**
  * A computer-brain run outside a mission (ADR 0032): Claude Code's
- * permission prompt with no mission to post a card in. The deny list is
- * refused; plain reads are allowed; anything else is allowed only when the
- * agent may run commands on its computer (`canRun`: the sandbox scope) and
- * code allows it (`forbiddenReason`: no sudo, no deletes or writes outside its
- * folder, no uploads, remote shells or global installs). The rest is denied
+ * permission prompt, or one of Codex's approvals (ADR 0053 §3), with no
+ * mission to post a card in. The deny list and secrets are refused; plain
+ * reads are allowed; anything else is allowed only when the agent may run
+ * commands on its computer (`canRun`: the sandbox scope) and code allows it
+ * (`forbiddenReason`: no sudo, no deletes or writes outside its folder, no
+ * uploads, remote shells, global installs or inline code). The rest is denied
  * with what to do instead (nothing waits for a person here).
  */
 export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRun: boolean }): string {
@@ -531,6 +538,7 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
     return deny("This command is never allowed for agents (merges, pushes to the default branch, deploys).");
   }
   const scope = scopeOf(args.scope);
+  if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE);
   if (scope && readOnlyCall(tool, input, scope)) return allow();
   if (!opts.canRun) {
     return deny(
