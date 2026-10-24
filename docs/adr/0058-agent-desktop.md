@@ -1,6 +1,6 @@
 # 0058. The agent's computer as a desktop people watch and control, and a terminal
 
-- Status: Accepted (2026-10-24)
+- Status: Accepted (2026-10-24). Superseded in part by ADR 0059 (§4: in system mode, only the agent's owner controls its desktop or opens its terminal while its user holds the owner's sign-in)
 - Date: 2026-10-24
 - Builds on: ADR 0025 (connected computers), ADR 0030 (isolation), ADR 0031 (computer use), ADR 0036 (switches on the machine), ADR 0040 (the agent browser and its handoffs), ADR 0054 (the screen layer computer use reuses), ADR 0057 (system mode: each agent its own OS user)
 - Changes: ADR 0031 §6 (on a connected Linux computer the virtual display is an Xtigervnc desktop per agent, §1) and §8 (a person drives a desktop over RFB, not frames and injected input, §5); ADR 0031 §10 and ADR 0030 level 3 (system mode gives each agent its own OS user, §10)

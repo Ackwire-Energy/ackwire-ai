@@ -3,7 +3,7 @@
 - Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first
 - Date: 2026-10-24
 - Extends: ADR 0018 (providers), ADR 0027 (secrets end to end), ADR 0032 (computer brains), ADR 0041 (accounts per agent)
-- Supersedes in part: ADR 0041 §2 (who adds accounts), §4 (who decides) and §7 (removing); ADR 0032 §5 (when the plan warning shows)
+- Supersedes in part: ADR 0041 §2 (who adds accounts), §4 (who decides) and §7 (removing); ADR 0032 §5 (when the plan warning shows); ADR 0058 §4 (who drives an agent's computer in system mode while its user holds a sign-in)
 - Out of scope for now: accounts switching by themselves, a fourth CLI brain, Chinese regional endpoints
 
 ## Context
@@ -62,6 +62,7 @@ Each account's usage comes from the CLIs themselves: the rate-limit events durin
 - A key account's turn gets the key in the process environment only (redacted from everything the runner sends) and keeps Claude Code's model aliases, each mapped to the plan's own models; no CLI signs in or out there, and a key its endpoint refuses reads as signed out until a new one comes. A sign-in account's turn pins Anthropic's own endpoint the same way, and a turn on the computer's own sign-in pins the endpoint, cloud and proxies the runner itself runs with (unless the computer's owner chose to load their own Claude Code settings).
 - Account folders are secret paths for agent file operations, and environment names reserved for providers and the runtime are refused as agent secrets.
 - Where each agent runs as its own OS user (system mode), account folders live outside root's home and belong to the user of the agent that thinks with one only while it does: handed over before its first turn (from a tree only root can change, its top last), and taken back to root as soon as the agents frame no longer says so (top-down, each folder root's before it is read, never through a link). Root never runs a CLI against a folder an agent's user could write: its status is what its turns said, signing in again starts it over, and removing it signs nothing out.
+- While an agent's user holds its owner's sign-in, controlling its desktop or opening its terminal (a shell as that user, ADR 0058 §4) is only the agent's owner's: admins drive it again once it thinks with something else. Watching it stays as it was.
 
 ### 9. Official marks, next to the provider's name
 
