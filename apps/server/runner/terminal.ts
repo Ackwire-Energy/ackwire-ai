@@ -1,4 +1,4 @@
-import { existsSync, lstatSync } from "node:fs";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -56,17 +56,17 @@ export const runnerTerminalUser = (agentFolder: string): TerminalUser => ({
 
 /**
  * System mode: the agent's own OS user through its launcher, in the agent's folder in its home once its
- * worker made it, else in its home. Root never makes that folder (it would be root's) nor follows a link there.
+ * worker made it, else in its home. Root changes only into the home, which root made where the agent can't
+ * replace it; the agent can swap its folder for a link at any moment, even between a check and the spawn,
+ * so the agent's own user changes into it. Root never makes that folder (it would be root's).
  */
 export function systemTerminalUser(launcher: Launcher, agent: AgentScope): TerminalUser {
   const folder = path.join(launcher.home, agentFolderName(agent).name);
-  let made = false;
-  try {
-    made = lstatSync(folder).isDirectory();
-  } catch {
-    // not made yet
-  }
-  return { prefix: launcher.prefix, env: launcher.env, cwd: made ? folder : launcher.home };
+  return {
+    prefix: [...launcher.prefix, "/bin/sh", "-c", 'cd "$1" 2>/dev/null; shift; exec "$@"', "sh", folder],
+    env: launcher.env,
+    cwd: launcher.home,
+  };
 }
 
 export interface PtyOptions {

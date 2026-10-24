@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, symlinkSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
@@ -168,7 +168,7 @@ test("the agent's login shell in its folder, through its launcher, with TERM and
   expect(shell.argv).toEqual([...prefix, "/bin/sh", "-l"]);
 });
 
-test("system mode's terminal: the agent's launcher, in its folder once its worker made it, else its home", () => {
+test("system mode's terminal: root starts it in the agent's home, the agent's own user moves to its folder", () => {
   const home = tempDir("term-home-");
   dirs.push(home);
   const launcher = {
@@ -176,14 +176,20 @@ test("system mode's terminal: the agent's launcher, in its folder once its worke
     env: { HOME: home, USER: "ag-01a142cb", PATH: "/usr/bin:/bin", SHELL: "/bin/bash" },
     home,
   };
-  expect(systemTerminalUser(launcher, dev)).toEqual({ prefix: launcher.prefix, env: launcher.env, cwd: home });
-  // A link where the folder goes is the agent's own doing: root doesn't follow it.
-  const elsewhere = tempDir("term-elsewhere-");
-  dirs.push(elsewhere);
-  symlinkSync(elsewhere, path.join(home, "dev-01a142cb"));
-  expect(systemTerminalUser(launcher, dev).cwd).toBe(home);
-  mkdirSync(path.join(home, "ops-9f00aa11"));
-  expect(systemTerminalUser(launcher, ops).cwd).toBe(path.join(home, "ops-9f00aa11"));
+  const folder = path.join(home, "dev-01a142cb");
+  mkdirSync(folder);
+  // Even with the folder there: the agent could swap it for a link before root's chdir.
+  const user = systemTerminalUser(launcher, dev);
+  expect(user.cwd).toBe(home);
+  expect(user.env).toEqual(launcher.env);
+  expect(user.prefix.slice(0, launcher.prefix.length)).toEqual(launcher.prefix);
+  // What runs after the launcher, here as this test's user: in the folder once made, else in the home.
+  const pwd = (agent: AgentScope) => {
+    const rest = systemTerminalUser(launcher, agent).prefix.slice(launcher.prefix.length);
+    return Bun.spawnSync([...rest, "/bin/sh", "-c", "pwd -P"], { cwd: home, env: launcher.env }).stdout.toString();
+  };
+  expect(pwd(dev).trim()).toBe(realpathSync(folder));
+  expect(pwd(ops).trim()).toBe(realpathSync(home));
 });
 
 test("what the shell prints before the data socket is ready waits for it; keys and a resize reach the shell", async () => {
