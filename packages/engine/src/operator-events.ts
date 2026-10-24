@@ -1,6 +1,7 @@
-import { and, asc, type Database, type Executor, eq, lt, type SQL, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, lt, rowsOf, type SQL, schema, sql } from "@agenteschat/db";
 import { z } from "zod";
 import { decodeCursor, encodeCursor } from "./cursor";
+import { ValidationError } from "./errors";
 
 /**
  * The operator API's events feed (ADR 0056 §5): what happened on this instance, for the operator's own
@@ -120,6 +121,14 @@ export const recordTaskFinished = (
 
 const EventCursor = z.tuple([z.string().regex(/^\d{1,20}$/), z.uuid()]);
 
+/** The first transaction id this database hasn't given out: none of its own rows is at or past it. */
+const NEXT_XACT = sql`pg_snapshot_xmax(pg_current_snapshot())`;
+
+async function pastNextXact(db: Executor, xactId: string) {
+  const [row] = rowsOf<{ past: boolean }>(await db.execute(sql`select ${xactId}::xid8 >= ${NEXT_XACT} as past`));
+  return row?.past === true;
+}
+
 /**
  * Events after `after` (the previous page's `next`), in commit order, at most `limit`. Only rows below the
  * commit horizon are served: every transaction that began before them has ended, so a row that commits
@@ -150,11 +159,33 @@ export async function listOperatorEvents(db: Database, query: { after?: string; 
     .orderBy(asc(operatorEvents.xactId), asc(operatorEvents.id))
     .limit(Math.min(query.limit, OPERATOR_EVENTS_PAGE_MAX));
   const last = rows.at(-1);
+  // Only an empty page can come from a cursor past every id this database gave out: one from before it
+  // was restored from a dump, which numbers transactions anew. Kept, it would never see a new event.
+  if (!last && after && (await pastNextXact(db, after[0]))) {
+    throw new ValidationError(
+      "This cursor is from before the database was restored: start again without `after`",
+      "stale_cursor",
+    );
+  }
   return {
     events: rows.map(({ xactId: _, ...event }) => event),
     // An empty page keeps the caller's place.
     next: last ? encodeCursor([last.xactId, last.id]) : (query.after ?? null),
   };
+}
+
+/**
+ * Rows a restore from a dump brought along sort past every transaction id of the restored database, so
+ * the commit horizon would hold them back until its counter got there: they go first instead, by id.
+ * Returns how many (none but right after such a restore).
+ */
+export async function adoptRestoredOperatorEvents(db: Executor): Promise<number> {
+  const moved = await db
+    .update(operatorEvents)
+    .set({ xactId: sql`'0'::xid8` })
+    .where(sql`${operatorEvents.xactId} >= ${NEXT_XACT}`)
+    .returning({ id: operatorEvents.id });
+  return moved.length;
 }
 
 /** Deletes events older than `days`; returns how many. */

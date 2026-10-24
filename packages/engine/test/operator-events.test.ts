@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { asc, type Database, eq, rowsOf, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
+  adoptRestoredOperatorEvents,
   applyTaskDone,
   createInvitation,
   createInviteLink,
@@ -288,6 +289,39 @@ test("the feed serves rows in commit order and never skips one still being writt
   expect(new Set(seen).size).toBe(4);
 
   await expect(listOperatorEvents(db, { after: "nope", limit: 10 })).rejects.toBeInstanceOf(ValidationError);
+});
+
+test("after a restore from a dump: a cursor from before is refused, and the rows it brought come first", async () => {
+  enableOperatorEvents();
+  const { db, close: done } = await createTestDatabase();
+  close = done;
+  const next = async () =>
+    BigInt(
+      rowsOf<{ x: string }>(await db.execute(sql`select pg_snapshot_xmax(pg_current_snapshot())::text as x`))[0]?.x ??
+        "0",
+    );
+  // The dumped database had given out far more transaction ids than this one has.
+  const restored = Bun.randomUUIDv7();
+  const theirs = String((await next()) + 5_000_000n);
+  await db.insert(schema.operatorEvents).values({ id: restored, type: "user.deleted", xactId: theirs });
+  await recordOperatorEvent(db, { type: "agent.created", data: { n: 1 } });
+
+  // The caller's cursor from before the restore would never see a new event: refused, not left waiting.
+  const before = Buffer.from(JSON.stringify([theirs, restored])).toString("base64url");
+  await expect(listOperatorEvents(db, { after: before, limit: 10 })).rejects.toMatchObject({ code: "stale_cursor" });
+  // Until they are adopted, the restored rows sit past the horizon.
+  expect((await listOperatorEvents(db, { limit: 10 })).events.map((e) => e.type)).toEqual(["agent.created"]);
+
+  expect(await adoptRestoredOperatorEvents(db)).toBe(1);
+  expect(await adoptRestoredOperatorEvents(db)).toBe(0);
+  const fresh = await listOperatorEvents(db, { limit: 10 });
+  expect(fresh.events.map((e) => e.id)[0]).toBe(restored);
+  expect(fresh.events.map((e) => e.type)).toEqual(["user.deleted", "agent.created"]);
+  // A cursor of this database is never taken for a stale one.
+  expect(await listOperatorEvents(db, { after: fresh.next ?? undefined, limit: 10 })).toEqual({
+    events: [],
+    next: fresh.next,
+  });
 });
 
 test("prune drops events older than 90 days", async () => {

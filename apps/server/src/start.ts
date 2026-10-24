@@ -35,6 +35,7 @@ import {
   MigrationMismatchError,
 } from "@agenteschat/db";
 import {
+  adoptRestoredOperatorEvents,
   createLocalKeyWrapper,
   drainLocalRuns,
   enableCaches,
@@ -133,7 +134,12 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
   // The operator API's events feed records only while that API is on (ADR 0056).
-  if (config.OPERATOR_API_TOKEN) enableOperatorEvents();
+  if (config.OPERATOR_API_TOKEN) {
+    enableOperatorEvents();
+    // Before the API serves a page: a caller restarting after a restore must find these rows first.
+    const adopted = await adoptRestoredOperatorEvents(database.db);
+    if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
+  }
   const engine = buildEngine({
     db: database.db,
     config,

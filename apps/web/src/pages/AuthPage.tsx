@@ -1,4 +1,5 @@
 import { ApiError, type SignInOptions, type SignInProvider, useApi, useAuthConfig } from "@agenteschat/client";
+import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -138,11 +139,11 @@ export function AuthPage({
     setPending(false);
     if (!result.ok) {
       setWrong(result.status === 401);
-      // 403: the account is blocked (the server's own text is English).
+      // Checked by code: a refused origin is a 403 too, and its own words tell an admin what to fix.
       setError(
         result.status === 401
           ? null
-          : result.status === 403
+          : result.code === ACCOUNT_BLOCKED
             ? t("auth.accountBlocked")
             : result.message || t("common.unknownError"),
       );

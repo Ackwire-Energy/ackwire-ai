@@ -1071,10 +1071,10 @@
             "schema": {
               "type": "string",
               "maxLength": 200,
-              "description": "`next` of the previous page; absent: from the oldest event kept (90 days)."
+              "description": "`next` of the previous page; absent: from the oldest event kept (90 days). One from before the database was restored from a dump is refused (400 `stale_cursor`): start again without it and skip the event ids you already have."
             },
             "required": false,
-            "description": "`next` of the previous page; absent: from the oldest event kept (90 days).",
+            "description": "`next` of the previous page; absent: from the oldest event kept (90 days). One from before the database was restored from a dump is refused (400 `stale_cursor`): start again without it and skip the event ids you already have.",
             "name": "after",
             "in": "query"
           },

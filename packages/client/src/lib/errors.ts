@@ -85,6 +85,9 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 
+/** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
+export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+
 /** A known server code in the person's language; null for anything else (the caller keeps its own words). */
 export function knownErrorText(t: TFunction, error: unknown): string | null {
   if (!(error instanceof ApiError)) return null;

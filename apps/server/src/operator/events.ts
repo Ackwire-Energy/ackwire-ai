@@ -35,11 +35,10 @@ const EventPage = z
   .openapi("OperatorEventPage");
 
 const EventQuery = z.object({
-  after: z
-    .string()
-    .max(200)
-    .optional()
-    .openapi({ description: "`next` of the previous page; absent: from the oldest event kept (90 days)." }),
+  after: z.string().max(200).optional().openapi({
+    description:
+      "`next` of the previous page; absent: from the oldest event kept (90 days). One from before the database was restored from a dump is refused (400 `stale_cursor`): start again without it and skip the event ids you already have.",
+  }),
   limit: z.coerce.number().int().min(1).max(OPERATOR_EVENTS_PAGE_MAX).default(100),
 });
 
