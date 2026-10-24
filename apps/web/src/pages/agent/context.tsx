@@ -62,6 +62,8 @@ export interface AgentEdit {
   ownerFirst: string | null;
   /** Opens a dialog of the sentence under the name (who thinks, where it works, the browser); each saves at once. */
   openWork: (dialog: "brain" | "computer" | "browser") => void;
+  /** "Como trabalha" sits in the overview's side column (the full page, wide), else under the name on every tab. */
+  workInAside: boolean;
 }
 
 const Ctx = createContext<AgentEdit | null>(null);

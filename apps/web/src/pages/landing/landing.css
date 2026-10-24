@@ -935,3 +935,10 @@
   font-size: 13px;
   color: var(--faint);
 }
+/* Who makes it, on its own line at the very bottom, smaller than the rest. */
+.lp .lp-footer__company {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+}

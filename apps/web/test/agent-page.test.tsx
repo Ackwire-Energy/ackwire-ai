@@ -82,14 +82,17 @@ describe("agent page: tabs and the URL", () => {
     expect(screen().getByRole("article", { name: "Atualizar as instruções da Ada" })).toBeTruthy();
   });
 
-  test("the cover with its actions; the agent, name and @ in the middle; Como trabalha with the numbers", async () => {
+  test("the cover with its actions; the agent, name and @ under it; Como trabalha with the numbers in the side column", async () => {
     await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
     const cover = hero.querySelector(".agp-cover") as HTMLElement;
     // No status pill.
     expect(hero.textContent).not.toContain("Esperando aprovação");
     expect(hero.querySelector(".agp-face")).toBeTruthy();
-    const work = within(hero).getByRole("region", { name: "Como trabalha" });
+    // A wide page: how it works is the overview's side column, not under the name.
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(hero.contains(work)).toBe(false);
+    expect(work.closest(".agp-aside")).toBeTruthy();
     expect(work.textContent).toContain("US$ 12,30");
     expect(work.textContent).toContain("de US$ 40");
     expect(within(cover).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(

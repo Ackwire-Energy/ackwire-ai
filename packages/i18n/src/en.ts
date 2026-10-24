@@ -492,7 +492,7 @@ export const en: Translations = {
       noteKey:
         "This amount is charged by the key's provider for API usage, not by agentes.chat. When an agent hits the limit, it stops and tells you. Claude Code on a connected computer doesn't count here.",
       notePlatform:
-        "With the platform credits, API usage is charged by agentes.chat. The limit only covers that usage: when an agent hits it, it stops and tells you.",
+        "With the agentes.chat key, the limit covers API usage: when an agent hits it, it stops and tells you.",
     },
     provider: "Provider",
     keyFor: "{{provider}} API key",
@@ -506,8 +506,8 @@ export const en: Translations = {
     openaiOrg: "OpenAI organization ID",
     openaiProject: "OpenAI project ID",
     optional: "Optional.",
-    platformChoice: "Use platform credits",
-    platformKeyDesc: "No key: the platform charges per use, with US$ 5 free to try. You see each agent's cost.",
+    platformChoice: "Use the agentes.chat key",
+    platformKeyDesc: "No key of your own: agents use the agentes.chat key. You see each agent's cost.",
     suggestedAuto: "Starts on Automatic: it picks the model and effort for each task. You can change it later.",
     computer: {
       title: "Where will we work?",

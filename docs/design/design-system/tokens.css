@@ -2,8 +2,8 @@
 :root, [data-theme="light"] {
   /* Light is near white: white work area, paper sidebar; gray only in fields' tracks and chosen states. */
   --bg: #fbfbfa; --raised: #ffffff; --raised-2: #ffffff; --sunken: #f3f3f0;
-  /* The app shell: the sidebar's paper and the work area beside it. */
-  --side: #f8f8f6; --pane: #ffffff;
+  /* The app shell: the sidebar on the sky's paper (the faintest cool tint) and the work area beside it. */
+  --side: #f6f9fd; --pane: #ffffff;
   /* The open book of the memory mark. */
   --book-page: #fffdf6; --book-line: #cfc8b6;
   --glass: rgba(255, 255, 255, 0.88); --glass-solid: #fbfbf9;
@@ -29,7 +29,7 @@
 }
 [data-theme="dark"] {
   --bg: #0f0f0e; --raised: #1c1c1b; --raised-2: #242423; --sunken: #0a0a09;
-  --side: #0a0a09; --pane: #0f0f0e;
+  --side: #0d1015; --pane: #0f0f0e;
   --book-page: #ebe6d8; --book-line: #a59e8c;
   --glass: rgba(30, 30, 28, 0.86); --glass-solid: #1e1e1c;
   --line: rgba(255, 255, 255, 0.1); --line2: rgba(255, 255, 255, 0.15); --line-strong: #71716c;
