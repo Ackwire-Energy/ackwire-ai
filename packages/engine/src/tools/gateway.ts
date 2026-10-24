@@ -1,9 +1,20 @@
+import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import { type RunAuthority, runAuthorityById } from "../authority";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
+import {
+  callTargets,
+  checkTeamAction,
+  commandAction,
+  forgetPendingCommand,
+  isOutsideTool,
+  recordTeamAction,
+  summarizeCall,
+  type TeamCheck,
+} from "../team-actions";
 import { carriesCredential } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
@@ -56,6 +67,30 @@ const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool
 const asksPerson = (tool: ToolDefinition, decision: PolicyDecision) =>
   decision.action === "approve" || isSensitive(tool) || (tool.name === ASK_USER && isBuiltIn(tool));
 
+/** A check that failed for any reason never stops the action (ADR 0058): it only misses a notice. */
+const UNCHECKED: TeamCheck = { proceed: true, reason: null };
+
+/** `permission_prompt`'s question (Claude Code and Codex commands): a new command, or the state of one asked. */
+function promptQuestion(input: Record<string, unknown>) {
+  if (typeof input.request_id === "string" && input.request_id) return { poll: input.request_id, action: null };
+  const inner = input.input;
+  const action =
+    typeof input.tool_name === "string" && inner && typeof inner === "object" && !Array.isArray(inner)
+      ? commandAction(input.tool_name, inner as Record<string, unknown>)
+      : null;
+  return { poll: null, action };
+}
+
+/** `permission_prompt`'s answer: `{behavior}` when decided, `{status: "pending", request_id}` while a person decides. */
+function promptAnswer(content: string): { behavior?: string; status?: string; request_id?: string } {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
 /** Who is behind the call's run (ADR 0053). Null for a mission task's call: no run, the mission's own gates. */
 const authorityOf = (ctx: ToolContext): Promise<RunAuthority | null> =>
   ctx.runId ? runAuthorityById(ctx.db, ctx.orgId, ctx.runId) : Promise.resolve(null);
@@ -101,7 +136,10 @@ export type InvokeResult =
  *    `why` is taken out of the input and kept on the approval or question;
  * 6. sensitive tools create an `approvals` row bound to the action hash and
  *    stop there; others run, with errors turned into error results;
- * 7. `tool_call` / `tool_result` / `approval` steps are recorded.
+ * 7. `tool_call` / `tool_result` / `approval` steps are recorded;
+ * 8. an outside call (a connected app's write, a command that leaves the
+ *    computer) is held once when the team already did it to the same target,
+ *    and recorded for the team once it went out (ADR 0058, `team-actions.ts`).
  */
 export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Date }) {
   const now = deps.now ?? (() => new Date());
@@ -254,6 +292,16 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         whyMissing = !taken.why;
         call = { ...call, input: taken.input };
       }
+      // Team actions (ADR 0058): an outside call repeated after the agent was told the team already did it
+      // may say why (kept on the record); the tool never sees it.
+      const outside = isOutsideTool(tool);
+      let repeatWhy: string | null = null;
+      const schemaProps = tool.inputSchema.properties as Record<string, unknown> | undefined;
+      if (outside && !asksPerson(tool, decision) && "why" in call.input && schemaProps?.why === undefined) {
+        const { why: given, ...rest } = call.input;
+        repeatWhy = typeof given === "string" ? given : null;
+        call = { ...call, input: rest };
+      }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) {
         // Through a directory the model never saw the schema up front: show it, so the next call can be right.
@@ -271,6 +319,42 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       if (whyMissing) return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
+
+      // Team actions (ADR 0058): before acting outside, has the team already done this to the same target?
+      // A routine's action belongs where it delivers, never to its room.
+      const actionChannel =
+        authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
+      const prompt = tool.name === PERMISSION_TOOL && builtIn ? promptQuestion(call.input) : null;
+      const targets = outside ? callTargets(call.input) : (prompt?.action?.targets ?? []);
+      let teamReason: string | null = null;
+      if (outside || prompt?.action) {
+        const seen = await checkTeamAction(ctx.db, ctx, {
+          tool: prompt?.action?.tool ?? tool.name,
+          targets,
+          why: repeatWhy ?? (why || null),
+        }).catch(() => UNCHECKED);
+        if (!seen.proceed) {
+          // A computer command is answered the way its prompt expects: a refusal with the notice.
+          const content = prompt ? JSON.stringify({ behavior: "deny", message: seen.notice }) : seen.notice;
+          return finish({ content, isError: !prompt, data: { code: "team.action_seen" } });
+        }
+        teamReason = seen.reason;
+      }
+      const recordAction = (input: {
+        source: "tool" | "command";
+        tool: string;
+        summary: string;
+        targets: string[];
+        ref?: string;
+      }) =>
+        recordTeamAction(ctx.db, {
+          orgId: ctx.orgId,
+          agentId: ctx.agentId,
+          runId: ctx.runId || null,
+          channelId: actionChannel || null,
+          reason: teamReason,
+          ...input,
+        });
 
       if (approves) {
         const owner = await ownerOf(ctx);
@@ -321,6 +405,28 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         return { type: "approval", approval: row };
       }
       const output = withRepo(await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId }));
+      if (outside && !output.isError) {
+        await recordAction({
+          source: "tool",
+          tool: tool.name,
+          summary: summarizeCall(tool, call.input),
+          targets: callTargets(call.input, output.data),
+        });
+      }
+      if (prompt) {
+        const answer = promptAnswer(output.content);
+        if (prompt.action && (answer.behavior === "allow" || answer.status === "pending")) {
+          // A command waiting for a person counts already; it goes away if they say no.
+          await recordAction({
+            source: "command",
+            tool: prompt.action.tool,
+            summary: prompt.action.command,
+            targets: prompt.action.targets,
+            ...(answer.status === "pending" && answer.request_id ? { ref: answer.request_id } : {}),
+          });
+        }
+        if (prompt.poll && answer.behavior === "deny") await forgetPendingCommand(ctx.db, ctx.orgId, prompt.poll);
+      }
       if (builtIn && output.waitForAnswer?.text) {
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices, why };
       }
@@ -370,6 +476,19 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           .returning({ id: approvals.id });
         if (claimed.length === 0) return { content: "Already executed", isError: false };
         output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId });
+        // Team actions (ADR 0058): what a person approved and went out is the team's too.
+        if (isOutsideTool(tool) && !output.isError) {
+          await recordTeamAction(ctx.db, {
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            runId: ctx.runId || null,
+            channelId: approval.channelId,
+            source: "approval",
+            tool: tool.name,
+            summary: summarizeCall(tool, approval.params),
+            targets: callTargets(approval.params, output.data),
+          });
+        }
       }
       await ctx.db
         .update(approvals)

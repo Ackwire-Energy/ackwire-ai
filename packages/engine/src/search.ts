@@ -248,7 +248,7 @@ export interface HitSource {
   author: { type: "person" | "agent"; id: string; name: string } | null;
 }
 
-/** Adds where a message hit lives and who wrote it, so the app can jump to it. */
+/** Adds where a message hit lives and who wrote it (an action hit: the agent that did it), so the app can jump to it. */
 export async function describeHits<H extends SearchHit>(
   db: Database,
   orgId: string,
@@ -272,7 +272,26 @@ export async function describeHits<H extends SearchHit>(
         .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids)))
     : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
+  // The team's outside actions (ADR 0058): the agent that did it.
+  const actionIds = hits.filter((h) => h.kind === "action").map((h) => h.sourceId);
+  const actionRows = actionIds.length
+    ? await db
+        .select({ id: schema.teamActions.id, agentId: schema.teamActions.agentId, agentName: schema.agents.name })
+        .from(schema.teamActions)
+        .leftJoin(schema.agents, eq(schema.agents.id, schema.teamActions.agentId))
+        .where(and(eq(schema.teamActions.orgId, orgId), inArray(schema.teamActions.id, actionIds)))
+    : [];
+  const actionsById = new Map(actionRows.map((r) => [r.id, r]));
   return hits.map((h) => {
+    const a = h.kind === "action" ? actionsById.get(h.sourceId) : undefined;
+    if (a) {
+      return {
+        ...h,
+        messageId: null,
+        threadId: null,
+        author: { type: "agent" as const, id: a.agentId, name: a.agentName ?? "" },
+      };
+    }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
     if (!m) return { ...h, messageId: null, threadId: null, author: null };
     const author =

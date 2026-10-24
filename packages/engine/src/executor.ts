@@ -130,6 +130,7 @@ import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
 import { FIND_AGENT_TOOL } from "./team";
+import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import { presentTools } from "./tools/directory";
@@ -729,7 +730,22 @@ async function executeRunInner(
       !note && carriesCredential(body) && (await runAuthority(tx, current)).kind !== "person"
         ? maskCredentials(body)
         : body;
-    const m = await postAgentMessage(tx, run, threadId, said, { ...meta, ...runMeta, ...tagged }, createdAt);
+    // Team actions (ADR 0058): what the run didn't repeat because the team already did it rides on its reply.
+    const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
+    const m = await postAgentMessage(
+      tx,
+      run,
+      threadId,
+      said,
+      { ...meta, ...runMeta, ...tagged, ...(teamChecks.length > 0 ? { teamChecks } : {}) },
+      createdAt,
+    );
+    await linkRunChecks(
+      tx,
+      run.orgId,
+      teamChecks.map((c) => c.id),
+      m.id,
+    );
     if (report && !note && !reportMessage) {
       reportMessage = {
         routineRunId: report.runId,
