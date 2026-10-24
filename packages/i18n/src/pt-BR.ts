@@ -504,10 +504,18 @@ export const ptBR = {
     provider: "Provedor",
     keyFor: "Chave da API da {{provider}}",
     keySite: "Crie a chave em {{site}}.",
+    keyNotPlan:
+      "Use uma chave de pagamento por uso: a de um plano de assinatura só funciona em ferramentas de programação.",
     keyInvalid: {
       anthropic: "As chaves da Anthropic começam com sk-ant-. Confira e cole de novo.",
       openai: "As chaves da OpenAI começam com sk-. Confira e cole de novo.",
+      deepseek: "As chaves da DeepSeek começam com sk-. Confira e cole de novo.",
+      moonshot: "As chaves da Kimi começam com sk-. Confira e cole de novo.",
+      zai: "Cole a chave inteira da Z.ai, sem espaços. Confira e cole de novo.",
+      minimax:
+        "Cole a chave inteira da MiniMax, sem espaços. As que começam com sk-cp- são do plano e não servem aqui.",
     },
+    keyFromOther: "É de outro provedor?",
     advanced: "Avançado",
     anthropicWorkspace: "ID do workspace da Anthropic",
     anthropicWorkspaceHelp: "Opcional. Só para chaves que não são de um workspace.",

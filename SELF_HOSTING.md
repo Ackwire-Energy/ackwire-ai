@@ -11,8 +11,8 @@ own machine). The setup writes it for you. Sign-in cookies, the only browser ori
 anything, and every link the app sends come from it. Opened at any other address, sign-in fails with
 "Invalid origin" and saving fails with `bad_origin`.
 
-The server needs no model key of its own. Each organization adds its Anthropic or OpenAI keys in
-**Settings → API keys**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+The server needs no model key of its own. Each organization adds its own keys (Anthropic, OpenAI,
+DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → API keys**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -417,8 +417,8 @@ ones a self-hosted instance usually touches:
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 
-**Model keys.** Each organization adds its own Anthropic or OpenAI keys in **Settings → API keys**,
-and each agent uses one of them. Usage and cost are recorded per agent.
+**Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
+MiniMax) in **Settings → API keys**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Sign-up.** The first account is always allowed. After it, with `ALLOW_SIGNUP=false` (the default),
 only invited people get in: invited by email from **Settings → Members and invitations**, or through
@@ -449,7 +449,7 @@ organization chooses, it talks to a third party only when you turn that service 
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
-| Anthropic, OpenAI | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| Anthropic, OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
 | TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory). Without it, the organization's own model does this. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |

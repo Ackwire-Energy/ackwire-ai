@@ -56,6 +56,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
+import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
@@ -580,9 +581,13 @@ function KeyDialog({
     setTouched(false);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
-  const error = touched && !valid ? t(`onboarding.keyInvalid.${provider}`) : undefined;
+  const error =
+    !touched || valid ? undefined : mode === "add" ? (
+      <KeyMismatch provider={provider} apiKey={apiKey} onPick={setProvider} />
+    ) : (
+      t(`onboarding.keyInvalid.${provider}`)
+    );
   const pending = add.isPending || rotate.isPending;
-  const site = providerOf(provider)?.site;
   return (
     <Dialog
       open={mode !== null}
@@ -655,12 +660,7 @@ function KeyDialog({
             error={error}
             help={
               <>
-                {site && (
-                  <a href={`https://${site}`} target="_blank" rel="noreferrer">
-                    {t("onboarding.keySite", { site })}
-                  </a>
-                )}{" "}
-                {t("connectors.apiKeyHelp")}
+                <KeySite provider={provider} /> {t("connectors.apiKeyHelp")}
               </>
             }
           >

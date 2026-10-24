@@ -57,7 +57,7 @@ Each account's usage comes from the CLIs themselves: the rate-limit events durin
 
 ### 8. More providers, on the right side of their terms
 
-- **API keys** (pay per use, the workspace's): DeepSeek, Kimi (Moonshot), Z.ai (GLM) and MiniMax join Anthropic and OpenAI through the Model Gateway, all four through the existing Anthropic-Messages adapter with a base URL, stripping only the fields a provider rejects. Usage and cost are recorded per agent as for every model call.
+- **API keys** (pay per use, the workspace's): DeepSeek, Kimi (Moonshot), Z.ai (GLM) and MiniMax join Anthropic and OpenAI through the Model Gateway, all four through the existing Anthropic-Messages adapter with a base URL, sent only what they all take; structured output becomes a tool, forced where the provider honors `tool_choice: any` (DeepSeek, Kimi) and offered where it takes only `auto` (Z.ai, MiniMax). Usage and cost are recorded per agent as for every model call.
 - **Coding plans** (GLM Coding Plan, Kimi Code, MiniMax, OpenCode Go) run only on a computer, through Claude Code with a base URL, as a "key account". The key is sealed to the runner like a sign-in code and kept in the account folder; base URLs come from the runner's own plan list and are pinned in the runner's own settings file, which outranks project settings an agent could write. The plans' terms allow only coding tools, so our server never holds, routes or sees a plan key.
 - Account folders are secret paths for agent file operations, environment names reserved for providers and the runtime are refused as agent secrets, and where each agent runs as its own OS user the folder belongs to that user.
 

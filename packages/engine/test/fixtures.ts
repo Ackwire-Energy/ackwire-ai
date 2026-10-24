@@ -12,6 +12,7 @@ import {
 } from "@agenteschat/adapters";
 import { type Database, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
+import { PROVIDER_IDS } from "@agenteschat/providers";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
 import {
   type ArtifactDeps,
@@ -201,7 +202,8 @@ export async function setup(
   const gateway = createModelGateway({
     db,
     keyWrappers: [keyWrapper],
-    providers: { anthropic: provider, openai: openaiProvider },
+    // Every Anthropic-protocol provider (Anthropic and the compatible ones) answers through `provider`.
+    providers: { ...Object.fromEntries(PROVIDER_IDS.map((id) => [id, provider])), openai: openaiProvider },
     platformCredentials: options.platform ?? noPlatformCredentials,
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
   });

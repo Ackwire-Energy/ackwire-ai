@@ -45,3 +45,34 @@ test("keys per provider: create as default in one call, Tornar padrão, models a
   };
   expect(channels.channels.find((c) => c.id === channelId)?.createdByUserId).toBeTruthy();
 });
+
+test("an Anthropic-compatible provider's key: its models become available, and its default is set on its own", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+
+  const created = await api("/credentials", {
+    json: { provider: "deepseek", label: "DeepSeek", apiKey: "sk-deepseek-abcdefgh" },
+  });
+  expect(created.status).toBe(201);
+  const key = (await created.json()) as { id: string; provider: string };
+  expect(key.provider).toBe("deepseek");
+  const models = (await (await api("/models")).json()) as {
+    models: { id: string; available: boolean; recommended: boolean }[];
+    providers: { id: string; label: string; hasKey: boolean }[];
+  };
+  expect(models.models.find((m) => m.id === "deepseek-flash")).toMatchObject({ available: true, recommended: true });
+  expect(models.models.find((m) => m.id === "glm-5.3")).toMatchObject({ available: false, recommended: false });
+  expect(models.providers.find((p) => p.id === "deepseek")).toMatchObject({ label: "DeepSeek", hasKey: true });
+  const patched = await api("/settings", { method: "PATCH", json: { defaultCredentialIds: { deepseek: key.id } } });
+  expect(patched.status).toBe(200);
+  expect(
+    ((await patched.json()) as { defaultCredentialIds: Record<string, string> }).defaultCredentialIds,
+  ).toMatchObject({ deepseek: key.id });
+  expect(
+    (await api("/credentials", { json: { provider: "mistral", label: "x", apiKey: "abcdefgh1234" } })).status,
+  ).toBe(400);
+});

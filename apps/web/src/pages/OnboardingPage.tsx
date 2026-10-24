@@ -50,6 +50,7 @@ import { PlanTermsDialog } from "@/components/AgentBrain";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
+import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton } from "@/components/ThisMac";
@@ -902,12 +903,10 @@ export function OnboardingPage() {
                   <Field
                     label={t("onboarding.keyFor", { provider: providerLabel(key) })}
                     id="key-value"
-                    error={keyTouched && !keyOk ? t(`onboarding.keyInvalid.${key}`) : undefined}
-                    help={
-                      <a href={`https://${providerOf(key)?.site}`} target="_blank" rel="noreferrer">
-                        {t("onboarding.keySite", { site: providerOf(key)?.site })}
-                      </a>
+                    error={
+                      keyTouched && !keyOk ? <KeyMismatch provider={key} apiKey={apiKey} onPick={setKey} /> : undefined
                     }
+                    help={<KeySite provider={key} />}
                   >
                     <Input
                       className="onb__big"
@@ -920,16 +919,18 @@ export function OnboardingPage() {
                       onBlur={() => setKeyTouched(apiKey.trim().length > 0)}
                     />
                   </Field>
-                  <div>
-                    <Button variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
-                      <Icon
-                        name="chevronDown"
-                        size={16}
-                        style={advanced ? { transform: "rotate(180deg)" } : undefined}
-                      />
-                      {t("onboarding.advanced")}
-                    </Button>
-                  </div>
+                  {(key === "anthropic" || key === "openai") && (
+                    <div>
+                      <Button variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
+                        <Icon
+                          name="chevronDown"
+                          size={16}
+                          style={advanced ? { transform: "rotate(180deg)" } : undefined}
+                        />
+                        {t("onboarding.advanced")}
+                      </Button>
+                    </div>
+                  )}
                   {advanced && key === "anthropic" && (
                     <Field
                       label={t("onboarding.anthropicWorkspace")}

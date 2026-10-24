@@ -496,10 +496,17 @@ export const en: Translations = {
     provider: "Provider",
     keyFor: "{{provider}} API key",
     keySite: "Create the key at {{site}}.",
+    keyNotPlan: "Use a pay-as-you-go key: a subscription plan's key only works in coding tools.",
     keyInvalid: {
       anthropic: "Anthropic keys start with sk-ant-. Check it and paste it again.",
       openai: "OpenAI keys start with sk-. Check it and paste it again.",
+      deepseek: "DeepSeek keys start with sk-. Check it and paste it again.",
+      moonshot: "Kimi keys start with sk-. Check it and paste it again.",
+      zai: "Paste the whole Z.ai key, with no spaces. Check it and paste it again.",
+      minimax:
+        "Paste the whole MiniMax key, with no spaces. Keys starting with sk-cp- belong to the plan and don't work here.",
     },
+    keyFromOther: "Is it from another provider?",
     advanced: "Advanced",
     anthropicWorkspace: "Anthropic workspace ID",
     anthropicWorkspaceHelp: "Optional. Only for keys that aren't scoped to a workspace.",

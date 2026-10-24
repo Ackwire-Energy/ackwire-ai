@@ -50,6 +50,7 @@ import {
   BrainKind,
   Credential,
   Model,
+  ProviderId,
   Usage,
 } from "./schemas";
 
@@ -179,7 +180,7 @@ export function agentRoutes(deps: AppDeps) {
         params: OrgParams,
         body: body(
           z.object({
-            provider: z.enum(["anthropic", "openai"]),
+            provider: ProviderId,
             label: z.string().trim().min(1).max(80),
             apiKey: z.string().min(8).max(500),
             workspaceId: z

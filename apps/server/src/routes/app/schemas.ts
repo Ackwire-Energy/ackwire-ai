@@ -1,4 +1,5 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
+import { PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
@@ -8,6 +9,8 @@ export const PreviewMeta = z.record(z.string(), z.unknown()).nullable().openapi(
 });
 
 export const Role = z.enum(["owner", "admin", "member"]).openapi("Role");
+
+export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
 
 export const Organization = z
   .object({
@@ -44,7 +47,7 @@ export const Invitation = z
 export const Credential = z
   .object({
     id: z.uuid(),
-    provider: z.enum(["anthropic", "openai"]),
+    provider: ProviderId,
     label: z.string(),
     keyHint: z.string().openapi({ description: "Last 4 characters of the key. The key itself is never returned." }),
     workspaceIdHint: z

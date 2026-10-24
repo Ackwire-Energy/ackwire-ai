@@ -104,6 +104,45 @@ describe("Configurações da organização", () => {
     expect(connect.textContent).toContain("Use um endereço que comece com https://.");
   });
 
+  test("a key that isn't the chosen provider's: it asks whose it is (any sk- key could be several) and saves it there", async () => {
+    const { state } = await go(seedState(), "settings/keys");
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    const choose = async (name: string) => {
+      const trigger = within(add).getByRole("combobox", { name: "Provedor" });
+      trigger.focus();
+      await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+      await act(async () => fireEvent.click(screen().getByRole("option", { name })));
+      await settle();
+    };
+    const field = within(add).getByLabelText("Chave da API");
+
+    // MiniMax also sells a plan: the help says its key won't do, and its sk-cp- keys are refused.
+    await choose("MiniMax");
+    expect(add.textContent).toContain("Use uma chave de pagamento por uso");
+    await type(field, "sk-cp-abcdefghijklmnopqrst");
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    expect(add.textContent).toContain("As que começam com sk-cp- são do plano");
+
+    // A DeepSeek key while Anthropic is chosen: whose is it?
+    await choose("Anthropic");
+    await type(field, "sk-0123456789abcdef0123456789abcdef");
+    expect(add.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
+    expect(add.textContent).toContain("É de outro provedor?");
+    for (const name of ["OpenAI", "DeepSeek", "Kimi", "MiniMax"])
+      expect(within(add).getByRole("button", { name })).toBeTruthy();
+    await click(within(add).getByRole("button", { name: "DeepSeek" }));
+    expect(add.textContent).not.toContain("É de outro provedor?");
+    expect(within(add).getByRole("link", { name: "Crie a chave em platform.deepseek.com/api_keys." })).toBeTruthy();
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
+      provider: "deepseek",
+      label: "DeepSeek",
+    });
+  });
+
   test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
     const { state, router } = await go(seedState(), "settings/keys");
     const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
