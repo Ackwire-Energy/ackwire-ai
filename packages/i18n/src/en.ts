@@ -962,6 +962,14 @@ export const en: Translations = {
     undone: "Undone",
     group: "Memory updated by {{name}}",
   },
+  teamChecks: {
+    group: "What the agent didn't repeat",
+    teammate: "Didn't repeat: <b>{{who}}</b> already did this with {{target}} {{when}}",
+    self: "Didn't repeat: I already did this with {{target}} {{when}}",
+    someone: "Didn't repeat: someone on the team already did this with {{target}} {{when}}",
+    inChannel: "in #{{channel}}",
+    open: "View",
+  },
   agentActions: {
     issue: {
       created: "Created task <b>#{{number}}</b> · {{title}}",
@@ -6614,12 +6622,12 @@ export const en: Translations = {
   searchPage: {
     title: "Search the workspace",
     label: "Search",
-    placeholder: "Search messages, decisions and summaries",
+    placeholder: "Search messages, decisions, summaries and what the team already did",
     filter: "Type",
     all: "All",
-    kinds: { message: "Messages", context_item: "Context" },
+    kinds: { message: "Messages", context_item: "Context", action: "Team actions" },
     empty: "Nothing found for “{{q}}”.",
-    hint: "Search messages, decisions, facts and summaries from the channels you're in.",
+    hint: "Search messages, decisions, facts, summaries and what agents already did (emails, PRs) in the channels you're in.",
     inChannel: "in #{{channel}}",
     count_one: "{{count}} result",
     count_other: "{{count}} results",
@@ -7068,6 +7076,9 @@ export const en: Translations = {
     contextHelp: "Write it as if explaining {{name}} to someone who started today.",
     timezone: "Time zone",
     timezoneHelp: "Used by routines and summaries.",
+    actionCheck: "Agents check what the team already did",
+    actionCheckHelp:
+      "Before an email, a message or a pull request, the agent checks whether anyone on the team already did it to the same person or place in the last 30 days, and doesn't repeat it.",
     tilesTitle: "Everything in the organization",
     tile: {
       members: "Who is in the organization",

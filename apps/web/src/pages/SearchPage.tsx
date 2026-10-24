@@ -8,21 +8,25 @@ import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 
-type Filter = "all" | "message" | "context_item";
+type Filter = "all" | "message" | "context_item" | "action";
 const KINDS: Record<Filter, SearchKind[]> = {
-  all: ["message", "context_item"],
+  all: ["action", "message", "context_item"],
   message: ["message"],
   context_item: ["context_item"],
+  action: ["action"],
 };
+/** The team's outside actions (ADR 0058) come first: "has anyone already…?" is what they answer. */
+const ORDER: SearchKind[] = ["action", "message", "context_item"];
 
-/** Hits grouped by kind, in the order the server ranked them. */
+/** Hits grouped by kind (the team's actions first), each group in the order the server ranked it. */
 export function groupHits(hits: SearchHit[]) {
   const groups = new Map<SearchKind, SearchHit[]>();
   for (const h of hits) groups.set(h.kind, [...(groups.get(h.kind) ?? []), h]);
-  return [...groups.entries()];
+  const rank = (k: SearchKind) => (ORDER.includes(k) ? ORDER.indexOf(k) : ORDER.length);
+  return [...groups.entries()].sort(([a], [b]) => rank(a) - rank(b));
 }
 
-/** "Buscar no workspace" (`GET …/search`): messages and context items, grouped, linking to the source. */
+/** "Buscar no workspace" (`GET …/search`): the team's actions, messages and context items, grouped, linking to the source. */
 export function SearchPage() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -59,6 +63,7 @@ export function SearchPage() {
         label={t("searchPage.filter")}
         items={[
           { value: "all", label: t("searchPage.all") },
+          { value: "action", label: t("searchPage.kinds.action") },
           { value: "message", label: t("searchPage.kinds.message") },
           { value: "context_item", label: t("searchPage.kinds.context_item") },
         ]}
@@ -89,8 +94,9 @@ export function SearchPage() {
               <List>
                 {list.map((h) => {
                   const c = channel(h.channelIds[0]);
+                  // An action's title is the tool's id: people see who did it instead.
                   const meta = [
-                    h.title,
+                    h.kind === "action" ? (h.author?.name ?? null) : h.title,
                     c ? t("searchPage.inChannel", { channel: c.name }) : null,
                     relativeTime(t, i18n.language, h.createdAt),
                   ]

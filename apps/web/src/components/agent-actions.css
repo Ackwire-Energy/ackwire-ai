@@ -7,6 +7,12 @@
 .ag-rcs {
   margin-top: 8px;
 }
+/* Several rows of their own (team checks, ADR 0058): one under the other. */
+.ag-rcs--stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .ag-rc {
   display: flex;
   align-items: center;

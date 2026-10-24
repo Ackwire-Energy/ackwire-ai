@@ -153,6 +153,7 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  actionCheck?: boolean;
   /** My inbox (`notifications.*`); empty unless a test fills it. */
   notifications?: AppNotification[];
   /** `actions.undo`/`redo`/`undoMessage` fail for these receipt ids with this error (`action.changed_since`…). */
@@ -830,6 +831,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         routerModel: null,
         summaryModel: null,
         timezone: "America/Sao_Paulo",
+        actionCheck: state.actionCheck ?? true,
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
@@ -838,6 +840,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.context !== undefined) state.context = input.context;
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
+        if (input.actionCheck !== undefined) state.actionCheck = input.actionCheck;
         return {
           name: input.name ?? "Acme",
           context: state.context ?? "",
@@ -845,6 +848,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           routerModel: null,
           summaryModel: null,
           timezone: input.timezone ?? "America/Sao_Paulo",
+          actionCheck: state.actionCheck ?? true,
         };
       },
       overview: async () => ({

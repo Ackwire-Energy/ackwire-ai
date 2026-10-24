@@ -975,6 +975,14 @@ export const ptBR = {
     undone: "Desfeito",
     group: "Memória atualizada por {{name}}",
   },
+  teamChecks: {
+    group: "O que o agente não repetiu",
+    teammate: "Não repeti: <b>{{who}}</b> já tinha feito isso com {{target}} {{when}}",
+    self: "Não repeti: eu já tinha feito isso com {{target}} {{when}}",
+    someone: "Não repeti: alguém do time já tinha feito isso com {{target}} {{when}}",
+    inChannel: "em #{{channel}}",
+    open: "Ver",
+  },
   agentActions: {
     issue: {
       created: "Criei a tarefa <b>#{{number}}</b> · {{title}}",
@@ -6635,12 +6643,12 @@ export const ptBR = {
   searchPage: {
     title: "Buscar no workspace",
     label: "Buscar",
-    placeholder: "Buscar em mensagens, decisões e resumos",
+    placeholder: "Buscar em mensagens, decisões, resumos e no que o time já fez",
     filter: "Tipo",
     all: "Tudo",
-    kinds: { message: "Mensagens", context_item: "Contexto" },
+    kinds: { message: "Mensagens", context_item: "Contexto", action: "Ações do time" },
     empty: "Nada encontrado com “{{q}}”.",
-    hint: "Busque mensagens, decisões, fatos e resumos dos canais em que você está.",
+    hint: "Busque mensagens, decisões, fatos, resumos e o que os agentes já fizeram (e-mails, PRs) nos canais em que você está.",
     inChannel: "em #{{channel}}",
     count_one: "{{count}} resultado",
     count_other: "{{count}} resultados",
@@ -7090,6 +7098,9 @@ export const ptBR = {
     contextHelp: "Escreva como se explicasse a {{name}} para alguém que começou hoje.",
     timezone: "Fuso horário",
     timezoneHelp: "Usado nas rotinas e nos resumos.",
+    actionCheck: "Agentes conferem o que o time já fez",
+    actionCheckHelp:
+      "Antes de mandar e-mail, mensagem ou abrir PR, o agente vê se alguém do time já fez isso com a mesma pessoa ou lugar nos últimos 30 dias, e não repete.",
     tilesTitle: "Tudo da organização",
     tile: {
       members: "Quem está na organização",

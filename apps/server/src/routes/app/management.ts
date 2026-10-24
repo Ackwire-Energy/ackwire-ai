@@ -54,6 +54,9 @@ const Settings = z
     defaultAgentBudgetUsd: z.number().optional().openapi({
       description: "Monthly budget of every agent without its own. Admins only (absent for members).",
     }),
+    actionCheck: z.boolean().openapi({
+      description: "Agents check what the team already did before acting outside (ADR 0058). On by default.",
+    }),
   })
   .openapi("OrgSettings");
 
@@ -214,6 +217,7 @@ export function managementRoutes(deps: AppDeps) {
               .max(1_000_000)
               .optional()
               .openapi({ description: "Monthly budget of every agent without its own." }),
+            actionCheck: z.boolean().optional(),
           }),
         ),
       },

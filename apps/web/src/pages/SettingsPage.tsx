@@ -44,6 +44,7 @@ import {
   Meter,
   ProviderLogo,
   Select,
+  Switch,
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -306,6 +307,25 @@ function GeneralSection() {
                 }}
                 disabled={!editable}
                 aria-label={t("settings.timezone")}
+              />
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label className="settings-row__label" htmlFor="set-action-check">
+                {t("settings.actionCheck")}
+              </label>
+              <span className="settings-row__help" id="set-action-check-help">
+                {t("settings.actionCheckHelp")}
+              </span>
+            </div>
+            <div className="settings-row__control">
+              <Switch
+                id="set-action-check"
+                checked={settings.data?.actionCheck ?? true}
+                onCheckedChange={(on) => save({ actionCheck: on })}
+                disabled={!editable || !settings.data}
+                aria-describedby="set-action-check-help"
               />
             </div>
           </div>

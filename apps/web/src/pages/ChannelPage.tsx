@@ -223,6 +223,7 @@ import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
+import { TeamChecks } from "@/components/TeamChecks";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -3168,6 +3169,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             </p>
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
+          {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
           {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
           {proposalId && <InlineProposal proposalId={proposalId} />}
           {agent &&
