@@ -41,7 +41,8 @@ test("routines API: parse, create, run now, history, pause", async () => {
   await api(`/routines/${routine.id}/run`, { json: {} });
   await t.drain();
   const runs = (await (await api(`/routines/${routine.id}/runs`)).json()) as { runs: { status: string }[] };
-  expect(runs.runs.map((r) => r.status)).toEqual(["ok"]);
+  // Background work that handed nothing off: silent (nothing posted in the channel).
+  expect(runs.runs.map((r) => r.status)).toEqual(["silent"]);
   const paused = await api(`/routines/${routine.id}`, { method: "PATCH", json: { active: false } });
   expect(await paused.json()).toMatchObject({ active: false, nextRunAt: null });
 });
@@ -86,6 +87,8 @@ test("webhooks: signature checked; a GitHub PR opened fires the routine listenin
   expect(ok.status).toBe(202);
   expect(await ok.json()).toMatchObject({ event: "github.pr_opened", fired: 1 });
   await t.drain();
-  const trigger = (await t.db.select().from(schema.messages)).find((m) => typeof m.meta.routineId === "string");
-  expect(trigger?.body).toContain("PR #7 opened in acme/app: Fix login");
+  // The event stays in the routine run (the context gives it to the model as outside data).
+  const run = (await t.db.select().from(schema.routineRuns)).find((r) => r.event?.type === "github.pr_opened");
+  expect(run?.event).toMatchObject({ summary: "PR #7 opened in acme/app: Fix login" });
+  expect((await t.db.select().from(schema.messages)).some((m) => m.meta.routineBrief !== undefined)).toBe(true);
 });

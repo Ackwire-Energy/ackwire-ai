@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import {
   ACCOUNTS_PROTOCOL,
+  BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   brainTopic,
   createMemoryPubSub,
@@ -262,6 +263,28 @@ test("not reachable: each reason ends the turn at once, retryable, without calli
   expect(await collect(brainWith(pubsub, hub).run(turn({ session: undefined }), io()))).toEqual([
     expect.objectContaining({ code: "no_session", retryable: true }),
   ]);
+});
+
+test("a plan turn needs a runner that keeps plan to reading (ADR 0053 §3); a work turn still goes to an older one", async () => {
+  const sent = async (protocol: number, mode: "plan" | "work") => {
+    const pubsub = createMemoryPubSub();
+    const { hub, calls } = fakeHub(pubsub, { status: status({ protocol }) });
+    const brain = createClaudeCodeBrain({
+      hub,
+      pubsub,
+      agentScope: async (t) => ({ id: t.agentId, handle: "dev" }),
+      permissions: async () => ({ mode, branchPrefix: "agentes/dev/" }),
+      finalGraceMs: 20,
+    });
+    return { events: await collect(brain.run(turn(), io())), calls };
+  };
+  const old = await sent(BRAIN_PROFILES_PROTOCOL - 1, "plan");
+  expect(old.events).toEqual([expect.objectContaining({ type: "error", code: "runner_outdated", retryable: true })]);
+  expect(old.calls).toHaveLength(0);
+  const current = await sent(BRAIN_PROFILES_PROTOCOL, "plan");
+  expect(current.calls[0]?.request).toMatchObject({ op: "brain.turn", permissions: { mode: "plan" } });
+  const work = await sent(BRAIN_PROFILES_PROTOCOL - 1, "work");
+  expect(work.calls[0]?.request).toMatchObject({ op: "brain.turn", permissions: { mode: "work" } });
 });
 
 test("accounts (ADR 0041): the account and effort go to a runner that knows them; a signed-out account ends the turn", async () => {

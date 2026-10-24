@@ -29,7 +29,15 @@ beforeEach(async () => {
       const last = JSON.stringify(req.messages.at(-1)?.content);
       if (last.includes("merged")) return { chunks: ["Merge done."] };
       if (last.includes("refused")) return { chunks: ["OK, leaving it."] };
-      return { chunks: [], toolUses: [{ name: "github_merge_pr", input: { pr: 42 } }] };
+      return {
+        chunks: [],
+        toolUses: [
+          {
+            name: "github_merge_pr",
+            input: { pr: 42, why: "CI passed and the review is done: merging ships the fix today." },
+          },
+        ],
+      };
     },
   });
 });

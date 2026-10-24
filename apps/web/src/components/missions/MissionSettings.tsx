@@ -12,6 +12,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { whenAt } from "@agenteschat/client/lib/format";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import {
   AutonomyPixels,
   Button,
@@ -339,8 +340,14 @@ function SettingsBody({
                     label: o.label,
                     description: o.recommended ? t("brain.recommended") : undefined,
                   })),
+                  // The agent's own model when it isn't one of the list (a typed one, or "Automático").
                   ...(brainView.effectiveModel && !brainOption.models.some((o) => o.value === brainView.effectiveModel)
-                    ? [{ value: brainView.effectiveModel, label: brainView.effectiveModel }]
+                    ? [
+                        {
+                          value: brainView.effectiveModel,
+                          label: isAuto(brainView.effectiveModel) ? t("brain.auto.label") : brainView.effectiveModel,
+                        },
+                      ]
                     : []),
                 ]}
               />

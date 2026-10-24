@@ -30,6 +30,15 @@ describe("web app serving", () => {
     expect(await res.text()).toBe("console.log(1)");
   });
 
+  test("hashed assets open from disk; index.html is always revalidated", async () => {
+    const asset = await app.request("/assets/app.js");
+    expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    for (const path of ["/", "/org/abc/c/def", "/assets/missing.js"]) {
+      const res = await app.request(path);
+      expect(res.headers.get("cache-control")).toBe("no-cache");
+    }
+  });
+
   test("client-side routes get index.html", async () => {
     for (const path of ["/", "/login", "/org/abc/c/def", "/invite/some-token"]) {
       const res = await app.request(path);

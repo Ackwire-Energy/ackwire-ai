@@ -15,6 +15,7 @@ import {
 import { type ArtifactDeps, createArtifact, updateArtifact } from "./artifacts";
 import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
+import { runBrainOf } from "./brains/select";
 import { caches } from "./cache";
 import { requireChannelAccess } from "./channels";
 import { createAgentRuns } from "./dispatch";
@@ -264,20 +265,26 @@ const sameSeat = (a: ForumSeat, t: { seatType: string; seatId: string }) => a.ty
 
 /**
  * Agents whose own monthly budget is used up (the same counter the gateway
- * reserves against). An agent that thinks with a computer brain (Claude Code,
- * Codex) runs on the person's plan, not the budget: it keeps its turn, and if
- * the computer is out and the turn falls back to the model, that run ends
- * `budget_exceeded` and the turn is skipped then.
+ * reserves against). An agent whose runs think with a computer brain (Claude
+ * Code, Codex) runs on the person's plan, not the budget: it keeps its turn.
+ * The brain is the one its latest run thought with (`agent_runs.brain`, ADR
+ * 0053 §10): while its computer is away its runs fall back to the model, and
+ * then the budget counts.
  */
 async function agentsOutOfBudget(db: Database, orgId: string, agentIds: string[], now: Date) {
   const out = new Set<string>();
   if (agentIds.length === 0) return out;
   const rows = await db
-    .select()
+    .select({
+      agent: agents,
+      lastBrain: sql<string | null>`(select r.brain from ${agentRuns} r
+        where r.org_id = ${agents.orgId} and r.agent_id = ${agents.id} and r.brain is not null
+        order by r.created_at desc limit 1)`,
+    })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds)));
-  for (const a of rows) {
-    if (a.brain === "claude_code" || a.brain === "codex") continue;
+  for (const { agent: a, lastBrain } of rows) {
+    if (runBrainOf({ brain: lastBrain }, a) !== "model") continue;
     const budget = await effectiveAgentBudget(db, a);
     const state = await agentBudgetState(db, orgId, a.id, now);
     // No counter row yet this month: the gateway starts it from the recorded usage.

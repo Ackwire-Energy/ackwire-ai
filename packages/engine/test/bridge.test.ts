@@ -172,7 +172,11 @@ describe("runner MCP bridge (ADR 0032)", () => {
       error: { code: "tool.not_allowed" },
     });
 
-    const merge = await runner.call(token, "github_merge_pr", { repo: "a/b", pr: 3 });
+    const merge = await runner.call(token, "github_merge_pr", {
+      repo: "a/b",
+      pr: 3,
+      why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+    });
     expect(merge.ok && merge.text).toContain("Waiting for a person to approve");
     expect(gh.executed).toHaveLength(1);
     const [approval] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.runId, run.id));

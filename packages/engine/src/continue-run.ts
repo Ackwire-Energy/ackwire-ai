@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { runBrainOf } from "./brains/select";
 import { canceledBy, runRequester } from "./cancel";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -8,10 +9,9 @@ import { continuedTranscript, type Transcript } from "./executor";
 import { getMessage } from "./messages";
 import { can, getMembership } from "./organizations";
 import { enqueue } from "./outbox";
+import { ACTIVE_RUN_STATUSES, takeInbox } from "./run-inbox";
 
 const { agentRuns, agents, messages, channels, users } = schema;
-
-const ACTIVE = ["queued", "running", "waiting_approval", "waiting_input"] as const;
 
 /**
  * "Continuar" under a reply a person stopped (`POST …/runs/{runId}/continue`):
@@ -72,7 +72,9 @@ export async function continueRun(
         eq(agentRuns.orgId, orgId),
         eq(agentRuns.agentId, stopped.agentId),
         eq(agentRuns.channelId, stopped.channelId),
-        inArray(agentRuns.status, [...ACTIVE]),
+        inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
+        // A background run (a routine's) holds no conversation.
+        eq(agentRuns.background, false),
         inConversation,
       ),
     )
@@ -141,13 +143,17 @@ export async function continueRun(
   return { runId: newRunId };
 }
 
+/** The stop-and-send message left the stopped run's inbox before the restart (handed on already). */
+class AlreadyHandedOn extends Error {}
+
 /**
  * "Parar e mandar" to a computer brain (Claude Code, Codex): its turn can't be cut halfway, so the
  * task was stopped (`postPersonMessage`). Once its stop is posted (`stopped`, the reply), a new run
  * of the same agent starts from that message: same conversation, the stopped run's context and its
  * computer session, plus "[Ana stopped you to say this:] …". Only for a message of the person who
  * stopped it, still unread (`meta.steerNow`). The stopped reply is marked continued (no "Continuar"),
- * and the app hears it read the message. Returns the new run's id, or null when there is nothing to do.
+ * and the app hears it read the message. The stopped run's other unread messages go along (the new
+ * run reads them at its first step). Returns the new run's id, or null when there is nothing to do.
  */
 export async function restartAfterStopAndSend(
   deps: { db: Database; pubsub?: PubSub },
@@ -160,8 +166,9 @@ export async function restartAfterStopAndSend(
   const by = canceledBy(stopped?.error);
   if (!stopped || !by || stopped.pendingMessageIds.length === 0) return null;
   // A model brain reads a "Parar e mandar" mid-task (its call is cut); only a computer brain is restarted.
+  // The brain the stopped run thought with (a fallback ran on the model brain), the agent's before its first turn.
   const [agent] = await db.select({ brain: agents.brain }).from(agents).where(eq(agents.id, stopped.agentId));
-  if (!agent || agent.brain === "model") return null;
+  if (!agent || runBrainOf(stopped, agent) === "model") return null;
   const [said] = await db
     .select()
     .from(messages)
@@ -179,40 +186,52 @@ export async function restartAfterStopAndSend(
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, by));
   const line = `[${person?.name ?? "A person"} stopped you to say this:]\n\n${said.body}`;
   const newRunId = Bun.randomUUIDv7();
-  const created = await db.transaction(async (tx) => {
-    // The message is its trigger (it started no run of this agent: it went into the stopped one).
-    const [inserted] = await tx
-      .insert(agentRuns)
-      .values({
-        id: newRunId,
+  const created = await db
+    .transaction(async (tx) => {
+      // The message is its trigger (it started no run of this agent: it went into the stopped one).
+      const [inserted] = await tx
+        .insert(agentRuns)
+        .values({
+          id: newRunId,
+          orgId: stopped.orgId,
+          agentId: stopped.agentId,
+          channelId: stopped.channelId,
+          threadRootId: said.threadId ?? said.id,
+          triggerMessageId: said.id,
+          trigger: stopped.trigger === "router" ? "mention" : stopped.trigger,
+          hop: stopped.hop,
+          transcript: continuedTranscript(transcript, line) as unknown as Record<string, unknown>,
+          issueId: stopped.issueId,
+          brainSessionId: stopped.brainSessionId,
+        })
+        .onConflictDoNothing()
+        .returning({ id: agentRuns.id });
+      if (!inserted) return false;
+      // The stopped run's unread messages move to the new run (taken: nothing is handed on twice).
+      // Already handed on (the message is no longer there): nothing to restart; undo the insert.
+      const unread = await takeInbox(tx, stopped.id);
+      if (!unread.includes(said.id)) throw new AlreadyHandedOn();
+      const rest = unread.filter((id) => id !== said.id);
+      if (rest.length > 0)
+        await tx.update(agentRuns).set({ pendingMessageIds: rest }).where(eq(agentRuns.id, newRunId));
+      const mark = JSON.stringify({ continuedRunId: newRunId, continuedByUserId: by });
+      await tx
+        .update(messages)
+        .set({ meta: sql`jsonb_set(${messages.meta}, '{canceled}', (${messages.meta}->'canceled') || ${mark}::jsonb)` })
+        .where(and(eq(messages.orgId, stopped.orgId), eq(messages.id, reply.id)));
+      await enqueue(tx, {
         orgId: stopped.orgId,
-        agentId: stopped.agentId,
-        channelId: stopped.channelId,
-        threadRootId: said.threadId ?? said.id,
-        triggerMessageId: said.id,
-        trigger: stopped.trigger === "router" ? "mention" : stopped.trigger,
-        hop: stopped.hop,
-        transcript: continuedTranscript(transcript, line) as unknown as Record<string, unknown>,
-        issueId: stopped.issueId,
-        brainSessionId: stopped.brainSessionId,
-      })
-      .onConflictDoNothing()
-      .returning({ id: agentRuns.id });
-    if (!inserted) return false;
-    const mark = JSON.stringify({ continuedRunId: newRunId, continuedByUserId: by });
-    await tx
-      .update(messages)
-      .set({ meta: sql`jsonb_set(${messages.meta}, '{canceled}', (${messages.meta}->'canceled') || ${mark}::jsonb)` })
-      .where(and(eq(messages.orgId, stopped.orgId), eq(messages.id, reply.id)));
-    await enqueue(tx, {
-      orgId: stopped.orgId,
-      kind: "agent_run.execute",
-      payload: { runId: newRunId },
-      dedupeKey: `agent_run.execute:${newRunId}`,
-      maxAttempts: 4,
+        kind: "agent_run.execute",
+        payload: { runId: newRunId },
+        dedupeKey: `agent_run.execute:${newRunId}`,
+        maxAttempts: 4,
+      });
+      return true;
+    })
+    .catch((error: unknown) => {
+      if (error instanceof AlreadyHandedOn) return false;
+      throw error;
     });
-    return true;
-  });
   if (!created) return null;
   const where = { channelId: stopped.channelId, threadId: reply.threadId, agentId: stopped.agentId };
   await publishChannelEvent(deps.pubsub, {

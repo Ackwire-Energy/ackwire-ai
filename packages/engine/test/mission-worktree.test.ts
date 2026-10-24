@@ -20,6 +20,7 @@ import {
   setMissionMachine,
   startMission,
 } from "../src";
+import { deliverNotice } from "../src/delivery";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { pairedMachine, RUNNER } from "./mission-helpers";
@@ -512,6 +513,29 @@ describe("one worktree per mission (ADR 0044)", () => {
     await drainOutbox(f.db, f.handlers);
     expect(await missionTurnPermissions(f.db, turn)).toMatchObject({ mode: "work" });
     expect(await missionTurnPermissions(f.db, { ...turn, threadRootId: crypto.randomUUID() })).toBeNull();
+  });
+
+  test("a run a routine's report woke in the mission's thread only reads; the mission's own runs work", async () => {
+    await started();
+    const mission = await missionRow();
+    const turn = { orgId: f.org.id, agentId: f.agent.id, threadRootId: mission.threadRootId };
+    const delivered = await f.db.transaction((tx) =>
+      deliverNotice(tx, {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: mission.channelId,
+        threadId: mission.threadRootId,
+        hop: 0,
+        notice: { kind: "routine_handoff", text: "3 new errors in checkout.", from: "Routine «Sentry»" },
+      }),
+    );
+    const woken = delivered.runs[0];
+    expect(woken).toBeDefined();
+    expect(await missionTurnPermissions(f.db, { ...turn, runId: woken?.id })).toMatchObject({ mode: "plan" });
+    // The mission's own run (woken by its inbox, nobody behind it) keeps the mission's profile.
+    const own = (await f.db.select().from(schema.agentRuns)).find((r) => r.id !== woken?.id);
+    expect(own).toBeDefined();
+    expect(await missionTurnPermissions(f.db, { ...turn, runId: own?.id })).toMatchObject({ mode: "work" });
   });
 
   test("moving to another computer removes the copy on the old one (the branch stays)", async () => {

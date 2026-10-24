@@ -30,6 +30,7 @@ import {
   createFakeScheduleReader,
   createFindAgentToolSource,
   createForumToolSource,
+  createHandOffToolSource,
   createIssueToolSource,
   createJobHandlers,
   createLocalKeyWrapper,
@@ -126,6 +127,8 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
+    /** Add the built-in `hand_off` tool (background runs: routines). */
+    handOff?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
     artifactTools?: boolean;
     chatTools?: boolean;
@@ -257,6 +260,7 @@ export async function setup(
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent ? [createAskAgentToolSource({ pubsub }), createFindAgentToolSource()] : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
+    ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),

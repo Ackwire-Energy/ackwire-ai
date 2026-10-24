@@ -18,11 +18,20 @@ export interface EmailMessage {
   tags?: { name: string; value: string }[];
 }
 
+/** A marketing contact (e.g. a confirmed waiting list address), keyed by email. */
+export interface EmailContact {
+  email: string;
+  /** Custom properties, merged into what the provider already has. */
+  properties: Record<string, string | number>;
+}
+
 export interface EmailSender {
   readonly id: string;
   /** Whether real delivery is configured (enables password reset and email verification). */
   readonly delivers: boolean;
   send(message: EmailMessage): Promise<{ id: string }>;
+  /** Creates or updates a contact in the provider's list; absent = the provider keeps no contacts. */
+  saveContact?(contact: EmailContact): Promise<void>;
 }
 
 /** A send failure; `retryable` drives the outbox retry. */
@@ -87,6 +96,31 @@ export function createMillionSendSender(options: {
         );
       }
       return { id: body.id };
+    },
+    /** `POST /contacts`; an existing contact (409) gets its properties merged with `PATCH /contacts/{email}`. */
+    async saveContact(contact) {
+      const call = async (method: string, path: string, body: unknown) => {
+        try {
+          return await http(`${base}${path}`, {
+            method,
+            headers: { authorization: `Bearer ${options.apiKey}`, "content-type": "application/json" },
+            body: JSON.stringify(body),
+          });
+        } catch (error) {
+          throw new EmailError(`could not reach MillionSend: ${String(error)}`, true);
+        }
+      };
+      let res = await call("POST", "/contacts", { email: contact.email, properties: contact.properties });
+      if (res.status === 409)
+        res = await call("PATCH", `/contacts/${encodeURIComponent(contact.email)}`, { properties: contact.properties });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string; name?: string };
+        throw new EmailError(
+          `MillionSend refused the contact (${res.status}${body.name ? ` ${body.name}` : ""}): ${body.message ?? ""}`.trim(),
+          res.status === 429 || res.status >= 500,
+          res.status,
+        );
+      }
     },
   };
 }
@@ -160,13 +194,18 @@ export function createLogEmailSender(log: (line: string, data: Record<string, un
 /** Test sender: records every message, never sends. */
 export function createFakeEmailSender(options: { delivers?: boolean } = {}) {
   const sent: EmailMessage[] = [];
-  const sender: EmailSender & { sent: EmailMessage[] } = {
+  const contacts: EmailContact[] = [];
+  const sender: EmailSender & { sent: EmailMessage[]; contacts: EmailContact[] } = {
     id: "fake",
     delivers: options.delivers ?? true,
     sent,
+    contacts,
     async send(message) {
       sent.push(message);
       return { id: `fake-${sent.length}` };
+    },
+    async saveContact(contact) {
+      contacts.push(contact);
     },
   };
   return sender;

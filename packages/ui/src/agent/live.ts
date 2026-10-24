@@ -1,9 +1,11 @@
 /**
  * Living agents: one shared loop draws every agent avatar on screen from the
- * agent engine (engine.js). Only visible avatars are drawn (about 24 times a
- * second); with reduced motion each one is drawn once, still. A page can set a
- * gaze point (the landing's pointer): avatars inside an element marked
- * `data-gaze` turn their heads toward it.
+ * agent engine (engine.js). Only visible avatars are drawn: about 24 times a
+ * second while the agent works, reacts or follows the gaze, about 12 at rest
+ * (every blink still shows; a slow turn reads the same); with reduced motion
+ * each one is drawn once, still. A page can set a gaze point (the landing's
+ * pointer): avatars inside an element marked `data-gaze` turn their heads
+ * toward it.
  */
 import { avatarSky } from "../sky/avatar";
 import { ACCESSORY_REACH, type DrawAgentOptions, drawAccessory, drawAgent, idlePose, type Pose } from "./engine.js";
@@ -98,11 +100,31 @@ const agents = new Set<LiveAgent>();
 const visible = new WeakSet<HTMLElement>();
 let raf = 0;
 let last = 0;
+let lastRest = 0;
 let gaze: { x: number; y: number } | null = null;
 let observer: IntersectionObserver | null = null;
+/** Frame gaps (ms): an agent at work, and one at rest. */
+const ACTIVE_MS = 40;
+const REST_MS = 80;
 
-const reduced = () =>
-  typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches === true;
+// Read every frame for every avatar: kept here instead of asking the page (a layout read, a media query).
+const sizes = new WeakMap<HTMLElement, number>();
+let resizes: ResizeObserver | null = null;
+let darkCache = new WeakMap<Element, boolean>();
+let motionQuery: MediaQueryList | null | undefined;
+const reduced = () => {
+  if (motionQuery === undefined) {
+    motionQuery = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+    // Motion allowed again: the loop starts moving.
+    motionQuery?.addEventListener?.("change", () => {
+      if (!motionQuery?.matches && !raf && agents.size && typeof requestAnimationFrame === "function")
+        raf = requestAnimationFrame(tick);
+    });
+  }
+  return motionQuery?.matches === true;
+};
+
+const sizeOf = (box: HTMLElement) => sizes.get(box) ?? box.clientWidth;
 
 /** How many agents the loop is drawing (tests). */
 export function liveAgentCount() {
@@ -145,7 +167,14 @@ function poseFor(a: ReturnType<LiveAgent["look"]>, t: number, box: HTMLElement, 
 /** Smallest framed tile (CSS px) that still shows the accessory. */
 const FRAMED_ACCESSORY_MIN = 24;
 
-const isDark = (el: Element) => el.closest("[data-theme]")?.getAttribute("data-theme") === "dark";
+const isDark = (el: Element) => {
+  let dark = darkCache.get(el);
+  if (dark === undefined) {
+    dark = el.closest("[data-theme]")?.getAttribute("data-theme") === "dark";
+    darkCache.set(el, dark);
+  }
+  return dark;
+};
 
 /**
  * Draws one agent now. Framed: the canvas is the tile (the agent's sky, then
@@ -154,7 +183,7 @@ const isDark = (el: Element) => el.closest("[data-theme]")?.getAttribute("data-t
  */
 export function drawLive(agent: LiveAgent, t: number) {
   const { canvas, box } = agent;
-  const size = box.clientWidth;
+  const size = sizeOf(box);
   if (!size) return;
   let ctx: CanvasRenderingContext2D | null = null;
   try {
@@ -240,6 +269,7 @@ function drawFramed(agent: LiveAgent, ctx: CanvasRenderingContext2D, size: numbe
 
 /** Redraws every agent at once (a new theme changes their skies; the loop may be standing still). */
 function redrawAll() {
+  darkCache = new WeakMap();
   const t = clock() / 1000;
   for (const a of agents) drawLive(a, t);
 }
@@ -252,12 +282,28 @@ function watchTheme() {
   themeWatch.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["data-theme"] });
 }
 
+/** Working, waiting on someone, making a face or following the gaze: drawn at the full rate. */
+const busy = (a: LiveAgent) => {
+  const look = a.look();
+  if (look.state !== "idle" || (look.reactionKey && reactions.has(look.reactionKey))) return true;
+  return Boolean(gaze && a.box.closest("[data-gaze]"));
+};
+
 function tick(now: number) {
   raf = 0;
-  if (now - last >= 40) {
+  if (now - last >= ACTIVE_MS) {
     last = now;
+    const rest = now - lastRest >= REST_MS;
+    if (rest) lastRest = now;
     const t = now / 1000;
-    for (const a of agents) if (visible.has(a.box)) drawLive(a, t);
+    // A full-screen menu is open (MenuOverlay): the app behind is blurred, so its avatars hold still
+    // (each frame there would blur the whole screen again); the ones in the menu keep moving.
+    const covered = typeof document !== "undefined" && document.documentElement.dataset.menuOverlay !== undefined;
+    for (const a of agents) {
+      if (!visible.has(a.box) || !(rest || busy(a))) continue;
+      if (covered && !a.box.closest(".ac-mo")) continue;
+      drawLive(a, t);
+    }
   }
   if (agents.size && !reduced()) raf = requestAnimationFrame(tick);
 }
@@ -275,11 +321,24 @@ export function addLiveAgent(agent: LiveAgent): () => void {
     });
     observer.observe(agent.box);
   } else visible.add(agent.box);
+  if (typeof ResizeObserver === "function") {
+    resizes ??= new ResizeObserver((entries) => {
+      const t = clock() / 1000;
+      for (const e of entries) {
+        const box = e.target as HTMLElement;
+        sizes.set(box, box.clientWidth);
+        for (const a of agents) if (a.box === box) drawLive(a, t);
+      }
+    });
+    resizes.observe(agent.box);
+  }
   drawLive(agent, typeof performance === "object" ? performance.now() / 1000 : 0);
   if (!raf && !reduced() && typeof requestAnimationFrame === "function") raf = requestAnimationFrame(tick);
   return () => {
     agents.delete(agent);
     observer?.unobserve(agent.box);
+    resizes?.unobserve(agent.box);
+    sizes.delete(agent.box);
     visible.delete(agent.box);
   };
 }

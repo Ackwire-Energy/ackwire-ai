@@ -165,6 +165,7 @@ export async function updateOrgSettings(
   });
   caches.orgs.delete(`${orgId}:`);
   caches.orgs.delete(`${orgId}:agent-budget`);
+  caches.zones.deletePrefix(`${orgId}:`);
   invalidateDefaults(orgId);
   return getOrgSettings(db, actorId, orgId);
 }

@@ -1,4 +1,4 @@
-import type { ThreadActor, ThreadInfo, ThreadTab } from "@agenteschat/client";
+import type { ThreadActor, ThreadInfo } from "@agenteschat/client";
 import { useChannels, useMissionList, useThreadList } from "@agenteschat/client";
 import { formatFullDate, relativeTime } from "@agenteschat/client/lib/format";
 import { previewBody } from "@agenteschat/client/lib/message-body";
@@ -35,6 +35,7 @@ import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
 import { ThreadStatusChip, useThreadControls } from "@/components/threads/ThreadBits";
 import { useOpenParam } from "@/lib/open-param";
+import { THREAD_TABS, type ThreadsTab } from "./thread-tabs";
 import "./threads.css";
 
 /**
@@ -44,10 +45,6 @@ import "./threads.css";
  * floating bar, and the details panel. No unread counts (reads are per
  * channel) and no counts on the tabs (the API doesn't give them).
  */
-
-/** "Missões" sits between "Com trabalho" and "Fechadas" (ADR 0029 §11); the sidebar's "Missões" opens it. */
-export const THREAD_TABS = ["all", "working", "missions", "closed", "archived"] as const satisfies readonly ThreadTab[];
-export type ThreadsTab = (typeof THREAD_TABS)[number];
 
 const actorsOf = (t: ThreadInfo): { type: ThreadActor["type"]; id: string }[] =>
   t.participants.flatMap((p) => (p.id ? [{ type: p.type, id: p.id }] : []));

@@ -59,11 +59,26 @@ async function runContext(fx: Fixture, body = "please organize this", inThread =
     author: { type: "person", userId: fx.owner.id },
     body,
   });
+  // A real run on the person's message: who asked is read from it (ADR 0053's authority gate).
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId: root?.id ?? trigger.id,
+      triggerMessageId: trigger.id,
+      trigger: "mention",
+      hop: 1,
+      status: "running",
+    })
+    .returning();
+  if (!run) throw new Error("no run");
   return {
     db: fx.db,
     orgId: fx.org.id,
     agentId: fx.agent.id,
-    runId: crypto.randomUUID(),
+    runId: run.id,
     channelId: fx.general.id,
     threadRootId: root?.id ?? trigger.id,
     triggerMessageId: trigger.id,

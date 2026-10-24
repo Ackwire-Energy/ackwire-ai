@@ -386,7 +386,7 @@ function findTools(
   }
   const lines = matches.map(
     (t) =>
-      `- ${t.name}${sensitive(t) ? " (asks a person's approval)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
+      `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
   );
   return `${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`;
 }

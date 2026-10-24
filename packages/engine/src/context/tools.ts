@@ -4,6 +4,7 @@ import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
+import { personBehindCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
@@ -370,13 +371,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
 }
 
 /** Memory tools only act on a person's request in the current turn (never on tool, webhook or document text). */
-async function personRequester(ctx: ToolContext): Promise<string | null> {
-  const [trigger] = await ctx.db
-    .select({ authorType: messages.authorType, authorUserId: messages.authorUserId })
-    .from(messages)
-    .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
-  return trigger?.authorType === "person" ? trigger.authorUserId : null;
-}
+/** The person behind the run (`authority.ts`); null for a routine's work and unattended runs. */
+const personRequester = (ctx: ToolContext): Promise<string | null> => personBehindCall(ctx);
 
 const notRequested = {
   content: "Memory changes need a person's request in this conversation; nothing was changed.",

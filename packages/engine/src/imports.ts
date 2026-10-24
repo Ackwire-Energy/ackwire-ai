@@ -24,7 +24,7 @@ import { canonicalJson } from "./tools/json-schema";
 
 const { importItems, agents, skills, channels, channelMembers, routines, contextItems, organizationMembers } = schema;
 
-// The bundle (ADR 0053). Mirrors `MigrationBundle` in packages/client/src/api/types.ts; the route validates it.
+// The bundle (ADR 0055). Mirrors `MigrationBundle` in packages/client/src/api/types.ts; the route validates it.
 
 export interface MigrationBundle {
   format: "agenteschat.bundle";

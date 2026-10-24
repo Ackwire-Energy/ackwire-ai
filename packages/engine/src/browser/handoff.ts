@@ -610,13 +610,18 @@ export function createBrowserHandoffToolSource(
 
 // ── A person's side ───────────────────────────────────────────────────────────
 
-/** Resumes the run waiting on a handoff (if any) with what the agent should read. Idempotent. */
-async function resumeWaitingRun(db: Database, row: BrowserHandoffRow, result: BrowserHandoffResult) {
+/**
+ * Resumes the run waiting on a handoff (if any) with what the agent should
+ * read; a run that stopped waiting on it (a person wrote meanwhile,
+ * `waits.ts`) hears it as a notice instead. Idempotent.
+ */
+async function resumeWaitingRun(deps: HandoffDeps, row: BrowserHandoffRow, result: BrowserHandoffResult) {
   if (!row.runId) return;
-  await resumeRunWithResult(db, {
+  await resumeRunWithResult(deps.db, {
     runId: row.runId,
     waitId: row.id,
-    result: { content: handoffResultText(result, row.kind, await handoffFacts(db, row)) },
+    result: { content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row)) },
+    pubsub: deps.pubsub,
   });
 }
 
@@ -636,7 +641,7 @@ function endedResult(row: BrowserHandoffRow): BrowserHandoffResult {
  */
 async function settle(deps: HandoffDeps, row: BrowserHandoffRow) {
   await noteControlEnded(deps, row).catch(() => {});
-  await resumeWaitingRun(deps.db, row, endedResult(row)).catch(() => {});
+  await resumeWaitingRun(deps, row, endedResult(row)).catch(() => {});
   await afterChange(deps, row).catch(() => {});
 }
 
@@ -812,10 +817,11 @@ export async function startTakeover(
  * Before an agent acts in its browser: a person in control, or asked to take
  * it, makes the call wait (the run pauses on that handoff and resumes when
  * it ends); another run of the agent is refused while the run the handoff
- * belongs to still goes on. A take over whose run ended (done, failed,
- * canceled) while the person kept control is this run's to wait on: it
- * moves here, and its card with it. Null: go on. For the browser tools
- * (`tools.ts`).
+ * belongs to still goes on. A handoff whose run ended (done, failed,
+ * canceled) while it stayed open (a person kept control, or the run read a
+ * message instead of waiting for the help it asked, `waits.ts`) is this
+ * run's to wait on: it moves here (a take over's card with it). Null: go
+ * on. For the browser tools (`tools.ts`).
  */
 export async function waitIfPersonInControl(
   db: Database,
@@ -827,7 +833,7 @@ export async function waitIfPersonInControl(
   const busy = "A person has control of your browser, or has been asked to take it.";
   if (open.runId !== ctx.runId) {
     const from = open.runId;
-    if (from && (open.kind !== "takeover" || (await runIsLive(db, ctx.orgId, from)))) {
+    if (from && (await runIsLive(db, ctx.orgId, from))) {
       return { content: `${busy} Try again later, or say so in your reply.`, isError: true };
     }
     const [bound] = await db
@@ -891,6 +897,26 @@ export async function requirePageRead(
     )}`,
     isError: true,
   };
+}
+
+/**
+ * A person had the agent's browser and gave it back after `since` (a take over that began and
+ * ended within one step of a plan): the page may not be what the plan's next steps expect.
+ */
+export async function handedBackSince(db: Database, ctx: { orgId: string; agentId: string }, since: Date) {
+  const [row] = await db
+    .select({ id: browserHandoffs.id })
+    .from(browserHandoffs)
+    .where(
+      and(
+        eq(browserHandoffs.orgId, ctx.orgId),
+        eq(browserHandoffs.agentId, ctx.agentId),
+        isNotNull(browserHandoffs.controllerUserId),
+        gt(browserHandoffs.resolvedAt, since),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 /** The agent read its page: whatever a person changed before is now seen. */
@@ -1006,7 +1032,7 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
     .limit(50);
   for (const { handoff } of stranded) {
     if (OPEN.includes(handoff.status)) continue;
-    await resumeWaitingRun(deps.db, handoff, endedResult(handoff)).catch(() => {});
+    await resumeWaitingRun(deps, handoff, endedResult(handoff)).catch(() => {});
   }
   return expired.length;
 }

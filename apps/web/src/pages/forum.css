@@ -63,7 +63,7 @@
 .forum-th h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -1329,7 +1329,7 @@ a.forum-facts__lnk:hover {
 .forum-dec p {
   margin: 6px 0 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(19px, 2.2vw, 23px);
   line-height: 1.32;
   letter-spacing: -0.015em;

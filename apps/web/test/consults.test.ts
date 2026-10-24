@@ -58,7 +58,7 @@ describe("live consultations (agent.consulting / agent.consulted)", () => {
       type: "message.created",
       channelId: "c",
       messageId: "m9",
-      message: { agentRunId: "r-dev" } as Message,
+      message: { agentRunId: "r-dev", channelId: "c", author: { type: "agent", id: "dev" } } as Message,
     } as ChannelEvent;
     expect(applyConsultEvent(asking, created, 2)["r-dev"]).toBeUndefined();
     expect(applyConsultEvent(asking, ev({ type: "run.finished", status: "failed" }), 2)["r-dev"]).toBeUndefined();

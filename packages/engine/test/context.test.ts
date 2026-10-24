@@ -39,6 +39,28 @@ test("toTurns: own messages are assistant turns, others are prefixed user turns,
   ]);
 });
 
+test("toTurns: a routine's call reads as the routine's; an agent's message about its report keeps its author", () => {
+  const names = new Map([
+    ["u1", "Ana"],
+    ["a2", "QA (@qa)"],
+  ]);
+  const routine = { routine: { id: "r", name: "Sentry", runId: "rr" } };
+  const turns = toTurns(
+    [
+      msg({ authorType: "person", authorUserId: "u1", body: "Veja os erros novos.", meta: routine }),
+      msg({ authorType: "agent", authorAgentId: "a2", body: "3 erros novos no checkout.", meta: routine }),
+    ],
+    "me",
+    names,
+  );
+  expect(turns).toEqual([
+    {
+      role: "user",
+      content: '[Routine "Sentry", created by Ana]: Veja os erros novos.\n\n[QA (@qa)]: 3 erros novos no checkout.',
+    },
+  ]);
+});
+
 test("toTurns: with older unanswered messages, the one being answered is marked current", () => {
   const names = new Map([["u1", "Ana"]]);
   const older = msg({ id: "m1", authorUserId: "u1", body: "alguém viu o deploy?" });
@@ -90,6 +112,11 @@ test("system prompt carries org context, agent instructions and channel; history
   expect(withTools).toContain("when a search finds nothing, say so");
   expect(withTools).toContain("ask the one question that decides it");
   expect(withTools).toContain("it posts only the text of that same turn");
+  // Eval 2026-10-23: an issue it opened on its own cut the data out of a product answer; a thanks
+  // in a DM sent it to re-check the deploy.
+  expect(withTools).toContain("when the person asked for an internal change");
+  expect(withTools).toContain("A change you made on your own doesn't shorten the answer");
+  expect(withTools).toContain("A thanks or an ok asks nothing");
   expect(withTools).not.toContain("Use your tools when they help");
   expect(ctx.messages).toEqual([
     {

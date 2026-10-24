@@ -24,7 +24,7 @@ import {
 /**
  * Bringing a workspace from another product: the files (a folder, an archive
  * read by `readImportFiles`, a GitHub link's files, or a pasted reply) become
- * one `MigrationBundle`, which the server plans and applies (ADR 0053). The
+ * one `MigrationBundle`, which the server plans and applies (ADR 0055). The
  * source is recognized by content, never by file name alone. Pure and
  * synchronous; nothing here touches the network.
  */

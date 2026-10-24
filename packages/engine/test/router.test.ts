@@ -295,6 +295,30 @@ describe("routeMessage", () => {
     expect(inputs[0]?.body).toStartWith("(replying to Dev:");
   });
 
+  test("a reply under an agent's message goes to that agent, long after it, with the message in view", async () => {
+    f = await setup();
+    const report = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      body: "A new loved review came in right after a subscription; that prompt was the one we decided to remove.",
+      createdAt: new Date(Date.now() - 2 * 60 * 60_000),
+    });
+    const threads: string[][] = [];
+    const strategy: RouterStrategy = {
+      name: "fixed",
+      async decide(input) {
+        threads.push(input.thread.map((m) => m.body));
+        // Without the report in view, a plain statement reads as for nobody.
+        return { agents: input.candidates.map((c) => ({ agentId: c.agentId, score: 0.1 })), needsAgent: 0.1 };
+      },
+    };
+    const reply = await post("we haven't shipped that removal yet, I'm still thinking it over", report.id);
+    const result = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: reply.id });
+    expect(result.selected).toEqual([f.agent.id]);
+    expect(threads[0]?.[0]).toBe(report.body);
+  });
+
   test("no candidates: no strategy call", async () => {
     f = await setup();
     await f.db

@@ -42,7 +42,7 @@ pub fn set_enabled(app: &AppHandle, on: bool) -> Result<(), String> {
         return Ok(());
     }
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
-        .title("agentes")
+        .title("agentes.chat")
         .inner_size(400.0, 40.0)
         .visible(false)
         .decorations(false)

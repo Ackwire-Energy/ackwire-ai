@@ -50,15 +50,27 @@ export function questionView(q: AgentQuestionRow): AgentQuestion {
 }
 
 /**
+ * A question card's meta: the question as the app renders it, and the agent's required reason
+ * (`why`, ADR 0053), which the gateway took out of the call. `syncQuestionMessage` only rewrites
+ * `meta.question`, so the reason stays on the card.
+ */
+export const questionCardMeta = (q: AgentQuestionRow, why: string) => ({
+  questionId: q.id,
+  question: questionView(q),
+  ...(why ? { why } : {}),
+});
+
+/**
  * The built-in `ask_user` tool: no scope needed (every agent may ask). It
- * doesn't run anything; the Tool Gateway hands the question to the executor,
- * which posts it in the thread and suspends the run (`waiting_input`).
+ * doesn't run anything; the Tool Gateway hands the question (and its `why`)
+ * to the executor, which posts it in the thread and suspends the run
+ * (`waiting_input`).
  */
 export function createAskUserToolSource(): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_USER_TOOL,
     description:
-      "Ask the person a short clarifying question and wait for the answer. Use it when the request is still ambiguous after you looked with your tools, for a decision that is really theirs, or before a sensitive or irreversible action. Don't use it for what you can just do: internal changes (issues, priorities, assignments, memories, routines) need no ok, the person can undo them. Not for choosing between fixes: recommend one yourself. The question shows as a card with its choices: before calling, write only the short context it needs (what you found), never the question or the choices themselves; after calling, write nothing else and end your turn. Offer 2 to 4 short choices when the answer is one of a few options.",
+      "Ask the person a short clarifying question and wait for the answer. Use it when the request is still ambiguous after you looked with your tools, for a decision that is really theirs, or before a sensitive or irreversible action. Don't use it for what you can just do: internal changes (issues, priorities, assignments, memories, routines) need no ok, the person can undo them. Not for choosing between fixes: recommend one yourself. The question shows as a card with its choices and your `why` (what you found and why you ask): never write the question or the choices in your text; after calling, write nothing else and end your turn. Offer 2 to 4 short choices when the answer is one of a few options.",
     scope: "",
     inputSchema: {
       type: "object",
