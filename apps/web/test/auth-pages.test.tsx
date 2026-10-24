@@ -310,7 +310,7 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.create")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Falta a chave de API." })).toBeTruthy();
     // The key is required there; the platform key isn't offered by this server.
-    expect(screen().queryByRole("button", { name: /Usar créditos da plataforma/ })).toBeNull();
+    expect(screen().queryByRole("button", { name: /Usar a chave do agentes.chat/ })).toBeNull();
     const save = () => button(/Salvar e criar 1 agente/);
     expect(save().hasAttribute("disabled")).toBe(true);
     // New agents start on "Automático".
