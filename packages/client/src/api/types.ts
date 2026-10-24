@@ -2040,15 +2040,18 @@ export interface MachineFolderGrant {
 /** What the machine allows (the runner's `RunnerAccess`). Granting only ever happens on the machine. */
 export interface MachineAccess {
   folders: MachineFolderGrant[];
-  /** `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). */
-  tools: Record<MachineToolName, boolean> & { browser?: boolean };
+  /**
+   * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
+   * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
+   */
+  tools: Record<MachineToolName, boolean> & { browser?: boolean; desktop?: boolean; terminal?: boolean };
 }
 
 /** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
 export interface MachineAccessReduce {
   /** Without `agentId`: the folder for everyone. */
   removeFolder?: { path: string; agentId?: string };
-  disableTool?: MachineToolName | "browser";
+  disableTool?: MachineToolName | "browser" | "desktop" | "terminal";
 }
 
 /** Approximate location of the computer that asked for a code (best effort, from its IP). */
@@ -3556,6 +3559,8 @@ export interface NotificationSource {
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
+  /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
+  screen?: ScreenKind;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }
@@ -3896,17 +3901,22 @@ export interface AgentDatabaseInput {
 
 export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled";
 
+/** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
+export type ScreenKind = "browser" | "desktop";
+
 /**
- * A person's turn in an agent's browser: the agent asked (`ask`, with a chat
- * card `meta.browserHandoff` whose message id is this id) or someone watching
- * took over (`takeover`: no card of its own; its browser card stays with the
- * run it is bound to, `runId`).
+ * A person's turn on one of an agent's screens: the agent asked (`ask`, with a
+ * chat card `meta.browserHandoff` whose message id is this id) or someone
+ * watching took over (`takeover`: no card of its own; its browser card stays
+ * with the run it is bound to, `runId`).
  */
 export interface BrowserHandoff {
   id: string;
   agentId: string;
   runId: string | null;
   machineId: string;
+  /** Absent from servers older than screens: the browser (`handoffScreen`). */
+  screen?: ScreenKind;
   kind: "ask" | "takeover";
   instructions: string;
   status: BrowserHandoffStatus;

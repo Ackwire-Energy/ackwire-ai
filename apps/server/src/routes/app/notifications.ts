@@ -1,3 +1,4 @@
+import { SCREEN_KINDS } from "@agenteschat/adapters";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -37,6 +38,7 @@ const Notification = z
       routineId: z.string().optional(),
       machineId: z.string().optional(),
       handoffId: z.string().optional(),
+      screen: z.enum(SCREEN_KINDS).optional(),
       label: z.string().optional(),
     }),
     latest: z.object({

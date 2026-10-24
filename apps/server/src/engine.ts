@@ -4,6 +4,7 @@ import type { Database } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   agentScopeFromDb,
+  authorizeStream,
   type BrainTurn,
   CodexBrain,
   type ContextDeps,
@@ -21,6 +22,7 @@ import {
   createConnectorToolSource,
   createContextToolSource,
   createDatabaseToolSource,
+  createDesktopControl,
   createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
@@ -41,6 +43,7 @@ import {
   createSandboxToolSource,
   createScheduleToolSource,
   createSkillToolSource,
+  createStreamBroker,
   createTalker,
   createToolGateway,
   createWikiToolSource,
@@ -56,11 +59,13 @@ import {
   queueBudgetEmail,
   type ResolveHost,
   type RunExecutorDeps,
+  recheckStream,
   resolveSummaryModel,
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
   standingJudge,
+  streamClosed,
   type ToolSource,
   withJudgeFallback,
 } from "@agenteschat/engine";
@@ -287,6 +292,16 @@ export function buildEngine(o: EngineOptions) {
   // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
   const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
   machineHub.setBrowserHooks(browserLive.hubHooks);
+  // Agents' desktops and terminals (ADR 0058): each person's stream paired with the runner's data socket for it,
+  // its access checked again while open; control changing hands closes the views it hides.
+  const streams = createStreamBroker({
+    db,
+    hub: machineHub,
+    authorize: (input) => authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
+    recheck: (stream) => recheckStream(db, stream),
+    onClosed: (stream) => streamClosed(db, stream),
+  });
+  const desktops = createDesktopControl({ db, pubsub: adapters.pubsub, hub: machineHub, streams });
   // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
@@ -391,6 +406,8 @@ export function buildEngine(o: EngineOptions) {
     gitProxy,
     machineHub,
     browserLive,
+    streams,
+    desktops,
     mail,
     talker,
   };

@@ -233,9 +233,15 @@ export function isNewWork(request: MachineRequest) {
     case "brain.steer":
     // The owner managing the brains' accounts (ADR 0041) isn't agent work.
     case "account":
+    // Ending an agent's desktop, or asking about it (ADR 0058).
+    case "desktop.session.stop":
+    case "desktop.session.status":
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove";
+    // Watching a desktop that already runs starts nothing; taking control of it or a terminal is work on it.
+    case "stream.open":
+      return request.kind === "terminal" || request.mode === "control";
     default:
       return true;
   }
@@ -404,6 +410,9 @@ export function createMachineHub(deps: MachineHubDeps) {
       await closeConn(old);
     }
     const now = new Date();
+    // In single-user mode the agents' own code runs as the runner's user and can send any hello: system mode
+    // is believed only from a computer's first hello, and from one that has said so ever since.
+    const system = frame.mode === "system" && (machine.lastSeenAt === null || machine.executors?.mode === "system");
     await db
       .update(machines)
       .set({
@@ -418,12 +427,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         workspace: frame.workspace,
         execAllowed: frame.exec,
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
-        // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found.
-        ...(frame.executors || frame.browser
+        // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
+        // the same for the agents' desktops and the terminal, and whether each agent is its own OS user (ADR 0058).
+        ...(frame.executors || frame.browser || frame.desktop || frame.terminal
           ? {
               executors: {
                 ...(frame.executors ?? {}),
                 ...(frame.browser ? { browser: frame.browser } : {}),
+                ...(frame.desktop ? { desktop: frame.desktop } : {}),
+                ...(frame.terminal ? { terminal: frame.terminal } : {}),
+                ...(system ? { mode: "system" as const } : {}),
                 detectedAt: now.toISOString(),
               },
             }

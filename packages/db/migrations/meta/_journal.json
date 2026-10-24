@@ -666,6 +666,20 @@
       "when": 1792820665374,
       "tag": "0094_managed_machines",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792842956318,
+      "tag": "0095_handoff_screen",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792842961842,
+      "tag": "0096_desktop_scope",
+      "breakpoints": true
     }
   ]
 }

@@ -8,13 +8,11 @@ import {
   grantScopes,
   impliedByWrite,
   mailConnectionIds,
+  NOT_IN_ALL,
 } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolSource } from "./types";
 
 export const REQUEST_PERMISSION_TOOL = "request_permission";
-
-/** Scopes "all tools" never covers (kept in step with `toolAccess`). */
-const OUTSIDE_ALL = new Set(["sandbox:run", "browser:use"]);
 
 export interface MissingPermission {
   /** A built-in scope (`browser:use`) or `connector:<connectionId>`. */
@@ -37,7 +35,7 @@ export async function missingPermissions(ctx: Pick<ToolContext, "db" | "orgId" |
     if (granted.has(grantKey(null, scope))) continue;
     const write = impliedByWrite(scope);
     if (write && granted.has(grantKey(null, write))) continue;
-    if (all && !OUTSIDE_ALL.has(scope)) continue;
+    if (all && !NOT_IN_ALL.has(scope)) continue;
     out.push({ id: scope, label: info.label, connectionId: null, scope });
   }
   const connections = await ctx.db

@@ -69,3 +69,10 @@ export const thisRunner = () => selfCommand(currentProcess());
 
 /** `isCompiled(currentProcess())`. */
 export const runningCompiled = () => isCompiled(currentProcess());
+
+/** `Bun.Terminal` is there (Bun 1.3.5 and newer): the agents' desktops and terminals need it. */
+export const hasBunTerminal = () => typeof Bun !== "undefined" && "Terminal" in Bun;
+
+/** The runtime this runner runs on, for people (`Bun 1.4.4`, `Node 22.12.0`). */
+export const runtimeName = () =>
+  process.versions.bun ? `Bun ${process.versions.bun}` : `Node ${process.versions.node}`;

@@ -7,10 +7,10 @@ import { agentRuns } from "./runtime";
 import { organizations } from "./tenancy";
 
 /**
- * A person's turn in an agent's browser (ADR 0040 §6): the agent asked
- * (`ask`, from `browser_ask_person`, its run suspended) or a person watching
- * took over (`takeover`). One record per handoff: who, when, the result.
- * Frames and what the person typed are never stored.
+ * A person's turn on one of an agent's screens (ADR 0040 §6): the agent
+ * asked (`ask`, from `browser_ask_person`, its run suspended) or a person
+ * watching took over (`takeover`). One record per handoff: who, when, the
+ * result. Frames and what the person typed are never stored.
  */
 export const browserHandoffs = pgTable(
   "browser_handoffs",
@@ -25,6 +25,8 @@ export const browserHandoffs = pgTable(
     /** The run waiting on it (`ask`); null for a take over outside a run. */
     runId: uuid().references(() => agentRuns.id, { onDelete: "set null" }),
     machineId: uuid().notNull(),
+    /** Which screen: the machine protocol's `ScreenKind` (this package can't import it). */
+    screen: text().$type<"browser" | "desktop">().notNull().default("browser"),
     kind: text().$type<"ask" | "takeover">().notNull(),
     /** What the agent asked for, in its words ("Sign in to Stripe with the shop's test account"). */
     instructions: text().notNull().default(""),
@@ -58,7 +60,7 @@ export const browserHandoffs = pgTable(
     foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }),
     index().on(t.orgId, t.status),
     index().on(t.agentId, t.status),
-    // One open handoff per agent's browser: two people (or a person and the agent) can't race in.
-    uniqueIndex("browser_handoffs_one_open").on(t.agentId).where(sql`${t.status} in ('pending', 'active')`),
+    // One open handoff per agent's screen: two people (or a person and the agent) can't race in.
+    uniqueIndex("browser_handoffs_one_open").on(t.agentId, t.screen).where(sql`${t.status} in ('pending', 'active')`),
   ],
 );

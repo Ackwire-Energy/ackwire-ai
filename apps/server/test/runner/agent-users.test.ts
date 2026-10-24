@@ -2,7 +2,14 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeAgents } from "../../runner/access";
-import { AGENT_USERS_FILE, AgentUsers, agentUserName, readAgentUsers, systemLauncher } from "../../runner/agent-users";
+import {
+  AGENT_USERS_FILE,
+  AgentUsers,
+  agentGid,
+  agentUserName,
+  readAgentUsers,
+  systemLauncher,
+} from "../../runner/agent-users";
 import type { RunCommand } from "../../runner/service";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
@@ -243,4 +250,19 @@ test("the launcher: the agent's slice and user, absolute paths, and a fixed envi
     env,
     home: "/home/ag-a1b2c3d4",
   });
+});
+
+test("an agent user's group, as the computer says it (`id -g`): never root's, never a guess", async () => {
+  const calls: string[] = [];
+  const answer =
+    (code: number, output: string): RunCommand =>
+    (file, args) => {
+      calls.push([file, ...args].join(" "));
+      return { code, output };
+    };
+  expect(agentGid("ag-a1b2c3d4", answer(0, "21007"))).toBe(21007);
+  expect(calls).toEqual(["id -g ag-a1b2c3d4"]);
+  expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(1, "id: 'ag-a1b2c3d4': no such user")))).toBe("internal");
+  expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(0, "0")))).toBe("internal");
+  expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(0, "21007 21008")))).toBe("internal");
 });

@@ -52,6 +52,7 @@ import { buildEngine } from "./engine";
 import { createLogger, type Logger } from "./logger";
 import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
+import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
 import { startWorkers } from "./workers";
@@ -157,6 +158,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     browserLive: engine.browserLive,
+    desktops: engine.desktops,
     log,
   });
 
@@ -180,6 +182,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         context: engine.context,
         sandbox: engine.sandbox,
         browserLive: engine.browserLive,
+        streams: engine.streams,
         talker: engine.talker,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: appleTokenRevoker(config),
@@ -199,6 +202,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     ...adapters,
     machines: createMachineSockets(engine.machineHub),
     browserLive: engine.browserLive,
+    streams: createStreamSockets({ db: database.db, auth, config, broker: engine.streams }),
   });
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
@@ -234,8 +238,9 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     workers.stop();
     void server.stop();
     void operator?.stop();
-    // Runners reconnect to the next instance.
+    // Runners reconnect to the next instance, and people's desktops and terminals open again there.
     await engine.machineHub.stop();
+    engine.streams.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
     const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });

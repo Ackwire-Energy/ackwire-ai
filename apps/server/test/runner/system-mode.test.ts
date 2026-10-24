@@ -200,17 +200,33 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
   const read = { op: "read", path: "x", maxBytes: 10 } as unknown as MachineRequest;
   expect(await errorCode(() => handleRequest(ctx, read, scope))).toBe("not_allowed");
   expect(existsSync(marker)).toBe(false);
-  // Past the system-mode check: this context simply keeps no accounts or access settings.
+  // Past the system-mode check: this context simply keeps no accounts, access settings, desktops or streams.
   const account = { op: "account", action: "list" } as unknown as MachineRequest;
   expect(await errorCode(() => handleRequest(ctx, account, scope))).toBe("bad_request");
   const reduce = { op: "access.reduce", folders: [] } as unknown as MachineRequest;
   expect(await errorCode(() => handleRequest(ctx, reduce, scope))).toBe("bad_request");
-  // Every op has its place; only the computer's accounts and access settings stay in the root process.
+  const desktop = { op: "desktop.session.status", agent: exec.agent } as unknown as MachineRequest;
+  expect(await errorCode(() => handleRequest(ctx, desktop, scope))).toBe("desktop_unavailable");
+  const stream = {
+    op: "stream.open",
+    streamId: "s".repeat(43),
+    kind: "terminal",
+    cols: 80,
+    rows: 24,
+    agent: exec.agent,
+  } as unknown as MachineRequest;
+  expect(await errorCode(() => handleRequest(ctx, stream, scope))).toBe("bad_request");
+  // Every op has its place. The root process keeps the computer's accounts and access settings, and the
+  // desktops and streams: a stream's data socket needs the machine token, which no worker holds.
   expect(Object.keys(OP_ROUTES).sort()).toEqual([...MACHINE_OPS].sort());
   expect(MACHINE_OPS.filter((op) => OP_ROUTES[op] === "machine")).toEqual([
     "account",
     "access.request",
     "access.reduce",
+    "desktop.session.start",
+    "desktop.session.stop",
+    "desktop.session.status",
+    "stream.open",
   ]);
 
   if (posix) {

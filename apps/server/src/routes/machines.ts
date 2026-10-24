@@ -59,6 +59,14 @@ export const MachineAccess = z
         .boolean()
         .optional()
         .openapi({ description: "The agent browser (protocol 12, ADR 0040); absent = off." }),
+      desktop: z
+        .boolean()
+        .optional()
+        .openapi({ description: "The agents' desktops (protocol 18, ADR 0058); absent = off." }),
+      terminal: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Terminals people open as an agent (protocol 18, ADR 0058); absent = off." }),
     }),
   })
   .openapi("MachineAccess");
@@ -339,7 +347,7 @@ export function machineAppRoutes(deps: AppDeps) {
           z
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
-              disableTool: z.enum(["claude", "codex", "commands", "browser"]).optional(),
+              disableTool: z.enum(["claude", "codex", "commands", "browser", "desktop", "terminal"]).optional(),
             })
             .strict(),
         ),

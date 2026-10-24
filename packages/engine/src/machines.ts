@@ -1,18 +1,19 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  DESKTOP_PROTOCOL,
   HEARTBEAT_MS,
   MACHINE_TOKEN_PREFIX,
   type MachineAgent,
   MIN_RUNNER_PROTOCOL,
   type PubSub,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, or, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { type AuditEntry, recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { can, requirePermission } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
 
 const { machines, agents, users, organizationMembers } = schema;
 
@@ -167,6 +168,90 @@ export async function getMachine(db: Database, orgId: string, machineId: string)
 export async function getMachineById(db: Database, machineId: string): Promise<MachineRow | null> {
   const [row] = await db.select().from(machines).where(eq(machines.id, machineId));
   return row ?? null;
+}
+
+/** Whether a computer serves the agents' desktops (ADR 0058 §9): protocol 18, its switch on, and able to. */
+export const servesDesktops = (m: {
+  protocol: number;
+  access?: { tools: { desktop?: boolean } } | null;
+  executors?: MachineRow["executors"] | null;
+}) => m.protocol >= DESKTOP_PROTOCOL && m.access?.tools.desktop === true && m.executors?.desktop?.available === true;
+
+/**
+ * Whether a person may run commands as the OS user an agent's desktop and terminal run as (ADR 0058 §4): what
+ * controlling the desktop or opening the terminal gives. In system mode each agent is its own user: the org's
+ * admins and the agent's owner. Otherwise every agent is the runner's own user, which holds every agent's
+ * folder, the computer's sign-ins and its token: only the person who paired the computer, and nobody on one
+ * nobody paired.
+ */
+export function drivesComputer(
+  machine: Pick<MachineRow, "pairedByUserId" | "executors">,
+  person: { userId: string; admin: boolean; owner: boolean },
+) {
+  if (machine.executors?.mode === "system") return person.admin || person.owner;
+  return machine.pairedByUserId === person.userId;
+}
+
+/** The computer of an agent that the person may drive (`drivesComputer`); refused otherwise. */
+export async function requireComputerDriver(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agentId: string,
+): Promise<MachineRow> {
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const [agent] = await db
+    .select({ machineId: agents.machineId, owner: agents.ownerUserId })
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+  if (!agent) throw new NotFoundError("Agent not found");
+  const machine = agent.machineId ? await getMachine(db, orgId, agent.machineId) : null;
+  if (!machine) throw new NotFoundError("This agent has no computer");
+  const person = { userId, admin: can(membership.role, "manage_agents"), owner: agent.owner === userId };
+  if (!drivesComputer(machine, person)) {
+    throw new ForbiddenError(
+      machine.executors?.mode === "system"
+        ? "Only admins and the agent's owner can use its computer as the agent"
+        : "Only the person who connected this computer can use it as the agent",
+    );
+  }
+  return machine;
+}
+
+/**
+ * Who an agent asks for help on its desktop: only people who may drive its computer. Its owner when they may,
+ * else everyone who may (the person who paired it; the admins in system mode). Empty: nobody here may.
+ */
+export async function computerDrivers(db: Database, orgId: string, agentId: string): Promise<string[]> {
+  const [agent] = await db
+    .select({ machineId: agents.machineId, owner: agents.ownerUserId })
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+  const machine = agent?.machineId ? await getMachine(db, orgId, agent.machineId) : null;
+  if (!agent || !machine) return [];
+  const named = [agent.owner, machine.pairedByUserId].filter((id): id is string => !!id);
+  const admins = inArray(organizationMembers.role, ["owner", "admin"]);
+  const members = await db
+    .select({ userId: organizationMembers.userId, role: organizationMembers.role })
+    .from(organizationMembers)
+    .where(
+      and(
+        eq(organizationMembers.orgId, orgId),
+        named.length > 0 ? or(admins, inArray(organizationMembers.userId, named)) : admins,
+      ),
+    )
+    .orderBy(organizationMembers.createdAt);
+  const drivers = members
+    .filter((m) =>
+      drivesComputer(machine, {
+        userId: m.userId,
+        admin: can(m.role, "manage_agents"),
+        owner: m.userId === agent.owner,
+      }),
+    )
+    .map((m) => m.userId);
+  return agent.owner && drivers.includes(agent.owner) ? [agent.owner] : drivers;
 }
 
 /**

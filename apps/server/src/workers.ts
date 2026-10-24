@@ -5,6 +5,7 @@ import {
   type BrowserLive,
   type ContextDeps,
   createOutboxPump,
+  type DesktopControl,
   enqueue,
   enqueueIdleReflections,
   enqueueWaitlistContacts,
@@ -44,6 +45,8 @@ export interface WorkerDeps {
   mail?: { deps: MailDeps; pollSeconds: number };
   /** The agent browser's live view (ADR 0040): expired handoffs are told to its viewers. */
   browserLive?: BrowserLive;
+  /** Agents' desktops (ADR 0058): the ones with an open handoff stay up. */
+  desktops?: Pick<DesktopControl, "keepAlive">;
   log: Logger;
   workerId?: string;
 }
@@ -157,8 +160,9 @@ export function startWorkers(deps: WorkerDeps) {
   every("browserHandoffs", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireBrowserHandoffs(deps.browserLive?.handoffDeps ?? { db, pubsub: deps.pubsub });
     if (expired > 0) log.info("browser handoffs expired", { expired });
-    // A page a person was asked to work in stays open past the runner's idle shutdown.
+    // A page or a desktop a person was asked to work in stays open past the runner's idle shutdown.
     await deps.browserLive?.keepAlive();
+    await deps.desktops?.keepAlive();
   });
 
   every("consultations", WORKER_INTERVALS_MS.approvals, async () => {

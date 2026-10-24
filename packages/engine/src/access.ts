@@ -1,7 +1,7 @@
 import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
-import { BROWSER_SCOPE, BROWSER_TOOL_INFO, BROWSER_TOOLS } from "./browser/types";
+import { BROWSER_SCOPE, BROWSER_TOOL_INFO, BROWSER_TOOLS, DESKTOP_SCOPE, DESKTOP_TOOL_INFO } from "./browser/types";
 import { caches } from "./cache";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorGrantValidator } from "./connectors/connections";
@@ -26,7 +26,11 @@ import {
 
 const { agentScopes, connectorConnections, agents } = schema;
 
-/** Built-in tools by scope (what the built-in sources offer). `ask_user` and `react` need no scope. */
+/**
+ * Built-in tools by scope (what the built-in sources offer). `ask_user` and `react` need no scope. Every
+ * built-in scope has an entry, with tools or not: the app saves an agent's access from this tree, so a
+ * scope missing here would be dropped by any save.
+ */
 export const BUILTIN_TOOLS: Record<string, string[]> = {
   "": ["ask_user", "react"],
   "context:read": ["search_context", "get_summary", "expand"],
@@ -63,6 +67,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "computer_status",
   ],
   [BROWSER_SCOPE]: [...BROWSER_TOOLS],
+  [DESKTOP_SCOPE]: Object.keys(DESKTOP_TOOL_INFO),
 };
 
 export interface ToolRef {
@@ -180,6 +185,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     description: "Says whether it is on, the disk used and this month's cost.",
   },
   ...BROWSER_TOOL_INFO,
+  ...DESKTOP_TOOL_INFO,
 };
 
 const humanize = (name: string) => {
