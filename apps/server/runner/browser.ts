@@ -1356,18 +1356,30 @@ export class BrowserManager {
       const exe = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
       const start = this.opts.startChrome ?? launchChrome;
-      const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), where !== null, page);
-      if (where) useOwnFrame(profile);
+      const launch = async (on: ChromeDisplay | null) => {
+        if (on) useOwnFrame(profile);
+        const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), on !== null, page);
+        const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
+        if (on) started.display = on.display;
+        return started;
+      };
       let chrome: OwnChrome;
       try {
-        chrome = await start(exe, args, profile, where ? chromeEnv(where) : undefined);
+        chrome = await launch(where).catch((err: unknown) => {
+          if (!where) throw err;
+          // Its desktop went away while it started there: headless for now, like a desktop that can't start.
+          session.desktopFailedAt = this.now();
+          this.opts.log(
+            `the browser of ${agent.handle} runs headless: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return launch(null);
+        });
       } catch (err) {
         throw new RunnerError(
           "internal",
           `Couldn't start the agent's browser: ${err instanceof Error ? err.message : String(err)}`.slice(0, 400),
         );
       }
-      if (where) chrome.display = where.display;
       session.chrome = chrome;
       session.aliveAt = null;
       await this.rememberChrome(chrome.pid, profile, chrome.display);
