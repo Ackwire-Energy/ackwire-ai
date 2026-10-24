@@ -106,6 +106,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 
 - Two machine switches, `access.tools.desktop` and `access.tools.terminal`, turned on at the machine (`agentes-runner tools enable desktop terminal`): off by default on a personal computer, on in the Cloud. The server can only turn them off.
 - `hello.desktop` and `hello.terminal` say whether the runner can serve them, and why not: Linux, the runner on Bun 1.3.5 or newer (`Bun.Terminal`), and for the desktop the packages above. A runner on Node says so with the fix. Mac and Windows get no virtual desktop (the browser stays headless with its own live view); a Mac command-line runner on Bun 1.3.5 or newer serves the terminal.
+- The runner's installer runs it on the computer's own Bun when that has `Bun.Terminal`, else on a pinned Bun it downloads and checks against its SHA-256 (Linux and macOS, x64 and arm64); on Node.js 22+ or an older Bun only when that can't be had, saying what that runner lacks. `agentes-runner status` prints both availabilities, with the reasons.
 - A paused computer (ADR 0036 §6) still shows a desktop that runs; starting one, taking control and a terminal are new work and wait for the resume (`isNewWork`).
 
 ### 10. OS users: single-user and system mode

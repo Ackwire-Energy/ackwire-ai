@@ -6572,7 +6572,7 @@ export const en: Translations = {
       other: "Other ways: server or Linux",
       otherText:
         "Run this in the computer's terminal. It shows a code and a link: open the link, check the code and confirm with your account.",
-      otherNeeds: "It needs Node 22 or newer, or Bun.",
+      otherNeeds: "Nothing to install first: it brings what it runs on.",
       waiting: "Waiting for the computer to connect…",
     },
     page: {

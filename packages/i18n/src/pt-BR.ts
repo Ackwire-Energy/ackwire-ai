@@ -6588,7 +6588,7 @@ export const ptBR = {
       other: "Outras formas: servidor ou Linux",
       otherText:
         "Rode no terminal do computador. Ele mostra um código e um link: abra o link, confira o código e confirme com a sua conta.",
-      otherNeeds: "Precisa de Node 22 ou mais novo, ou Bun.",
+      otherNeeds: "Não precisa instalar nada antes: ele traz o que precisa para rodar.",
       waiting: "Esperando o computador conectar…",
     },
     page: {
