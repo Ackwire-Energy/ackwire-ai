@@ -961,8 +961,10 @@ class Desktop:
             raise bad("extents: nodes is a list of [bus, path]")
         for node in nodes:
             check_node(node)
-        boxes = self.bus().extents(nodes)
-        return {"boxes": {"%s %s" % (bus, path): box for (bus, path), box in zip(nodes, boxes)}}
+        boxes = self.bus().extents(nodes) if nodes else []
+        # The window stack as it is now, so the runner sees what covers an element right before acting on it.
+        windows = self.display().windows()
+        return {"boxes": {"%s %s" % (bus, path): box for (bus, path), box in zip(nodes, boxes)}, "windows": windows}
 
     def input(self, req):
         t0 = time.monotonic()

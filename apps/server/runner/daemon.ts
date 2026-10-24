@@ -64,6 +64,7 @@ import {
   writeConfig,
 } from "./config";
 import { type ConnectionOutcome, type Dial, RunnerConnection } from "./connection";
+import { DesktopManager } from "./desktop";
 import { DesktopSessions, runnerUser } from "./desktop-session";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
@@ -209,6 +210,8 @@ interface Session {
   browser: BrowserManager;
   /** Desktop and terminal streams (ADR 0056): they end with the session. */
   streams: DataSockets;
+  /** The agents' use of their desktops (ADR 0057): its helpers end with the session, the desktops don't. */
+  desktopUse: DesktopManager;
   connection: RunnerConnection;
 }
 
@@ -477,6 +480,9 @@ export class RunnerDaemon implements RequestObserver {
       }
       if (prevAccess.tools.desktop === true && nextAccess.tools.desktop !== true) void this.desktops.stopAll();
       if (prevAccess.tools.terminal === true && nextAccess.tools.terminal !== true) this.terminals.closeAll();
+      // Desktop use needs both: its helpers stop with either.
+      const use = (a: RunnerAccess) => a.tools.desktop === true && a.tools.commands;
+      if (use(prevAccess) && !use(nextAccess)) this.session?.desktopUse.stopAll();
     }
 
     if (this.session && paired) {
@@ -644,6 +650,13 @@ export class RunnerDaemon implements RequestObserver {
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
+    // Every agent here works as this runner's own user, so no `uids`: desktop use stays off (ADR 0057 §3).
+    const desktopUse = new DesktopManager({
+      desktops: this.desktops,
+      secrets: (agent) => agentSecrets(secretsDir, agent),
+      browserPid: (agentId) => browser.chromePid(agentId),
+      log,
+    });
     const streams = new DataSockets({ url: connectUrl(config.server, "stream"), token: config.token });
     const context: HandlerContext = {
       workspaceReal,
@@ -667,6 +680,7 @@ export class RunnerDaemon implements RequestObserver {
       desktops: this.desktops,
       terminals: this.terminals,
       streams,
+      desktopUse,
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
     // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
@@ -681,6 +695,7 @@ export class RunnerDaemon implements RequestObserver {
           browser: browser.info(),
           desktop: this.desktops.info(),
           terminal: this.terminals.info(),
+          desktopUse: desktopUse.info(),
           ...(accounts ? { accounts } : {}),
         };
       },
@@ -707,7 +722,18 @@ export class RunnerDaemon implements RequestObserver {
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
     live = connection;
-    const session: Session = { config, workspaceReal, tasks, brains, codexApp, mcp, browser, streams, connection };
+    const session: Session = {
+      config,
+      workspaceReal,
+      tasks,
+      brains,
+      codexApp,
+      mcp,
+      browser,
+      streams,
+      desktopUse,
+      connection,
+    };
     this.session = session;
     log(
       `agentes-runner ${RUNNER_VERSION}: connecting to ${config.server} (workspace ${workspaceReal}${this.access().tools.commands ? "" : ", commands off"})`,
@@ -718,6 +744,7 @@ export class RunnerDaemon implements RequestObserver {
   private async closeSession(s: Session) {
     s.connection.stop();
     s.streams.closeAll();
+    s.desktopUse.stopAll();
     s.tasks.close();
     s.brains.close();
     s.codexApp.close();

@@ -28,6 +28,7 @@ import { readJson, writeJson } from "./json-file";
 import { hasBunTerminal, runtimeName } from "./launch";
 import { tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
+import { KeyedQueue } from "./queue";
 
 /**
  * The agents' desktops (ADR 0056 §1): per agent, one Xtigervnc (the X server
@@ -256,7 +257,7 @@ function spawnProcess(argv: string[], opts: DesktopSpawnOptions): DesktopProcess
   return { pid: child.pid ?? 0, exited };
 }
 
-const hostSystem = (): DesktopSystem => ({
+export const hostSystem = (): DesktopSystem => ({
   platform: process.platform,
   pty: hasBunTerminal(),
   runtime: runtimeName(),
@@ -349,7 +350,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 export class DesktopSessions {
   private readonly desktops = new Map<string, Desktop>();
   /** Each agent's starts, stops and restarts, one after another. */
-  private readonly queues = new Map<string, Promise<void>>();
+  private readonly queue = new KeyedQueue();
   /** When each agent's desktop was started again after ending by itself. */
   private readonly restarts = new Map<string, number[]>();
   /** Displays of desktops being started. */
@@ -512,16 +513,7 @@ export class DesktopSessions {
   }
 
   private serial<T>(agentId: string, fn: () => Promise<T>): Promise<T> {
-    const run = (this.queues.get(agentId) ?? Promise.resolve()).then(fn);
-    const tail = run.then(
-      () => undefined,
-      () => undefined,
-    );
-    this.queues.set(agentId, tail);
-    void tail.then(() => {
-      if (this.queues.get(agentId) === tail) this.queues.delete(agentId);
-    });
-    return run;
+    return this.queue.run(agentId, fn);
   }
 
   private add(d: Desktop) {

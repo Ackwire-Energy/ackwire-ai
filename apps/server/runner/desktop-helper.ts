@@ -175,8 +175,8 @@ export interface HelperRequests {
 export interface HelperReplies {
   hello: HelperHello;
   snapshot: HelperSnapshot;
-  /** Keyed `"<bus> <path>"`; null for an element that's gone. */
-  extents: { boxes: Record<string, HelperBox | null> };
+  /** Keyed `"<bus> <path>"`; null for an element that's gone. And the windows as they are now, bottom to top. */
+  extents: { boxes: Record<string, HelperBox | null>; windows: HelperWindow[] };
   /** `settled` and `changed` when it settled: false `settled` means the cap ended the wait. */
   input: { ms: number; settled?: boolean; changed?: boolean };
   /** `jpeg` in base64; the region as taken, kept inside the screen. */

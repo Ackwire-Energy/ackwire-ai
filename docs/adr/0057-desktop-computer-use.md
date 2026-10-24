@@ -6,7 +6,7 @@
 - Supersedes, for the agent's desktop on a connected Linux computer: ADR 0031 §1 (one `computer_*` tool family under `computer:use`), §1a (`agents.screen`) and §6 (the virtual desktop's tools). None of them was built.
 - Changes ADR 0054 for the browser too (§5, §8): a box taller than half the screenshot or wider than 80% of it is refused; words that can't be undone are never taken at a bare point; more words count as costly; an unsure check is judged once more with an image when the judge sees images
 - Code: `packages/engine/src/screen/*` (desktop verbs, `ScreenSurface.kind`, `capture(region)` and `regions`, the close-up, `dismiss: false`); then the desktop surface and tools, and the runner's `desktop.ts`, `desktop-tree.ts` and `desktop-helper.py`
-- Protocol: the next number after ADR 0056's 18 (`DESKTOP_USE_PROTOCOL`)
+- Protocol: 19 (`DESKTOP_USE_PROTOCOL`), the next after ADR 0056's 18
 
 ## Context
 
@@ -33,6 +33,7 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 | The helper's start | Python with Gio, Xlib and the bus: 186 ms, 28 MB |
 | The helper on Xtigervnc at 1280×800 (`--self-check`) | a look with a native app in front 62–88 ms (p50), with Chromium's whole tree (950 items) 296 ms; capture 29–49 ms, a region 12–21 ms; act and settle 409–650 ms; a 2,000-character fill 130 ms; the pt-BR and symbol strings above typed and filled exactly |
 | Apps' caches | at-spi2-core 2.56's apps answer `GetItems` only once some client listens for an event; until then the method doesn't exist |
+| The runner's `desktop-check` on Xtigervnc at 1280×800 | a desktop's first look 4–5 s after it starts (its session coming up: the panel's window shows about half a second before its elements answer); then a look with the panel only 138 ms; an action checked, done, settled and looked at 0.55–0.9 s (the Applications menu opened 566 ms); launching the terminal, waiting for its window, 1.3 s; a screenshot 59 ms, a close-up 37 ms; a pt-BR line with capitals and `Ç` typed into the terminal exactly; the panel's Log Out refused |
 
 ### Alternatives considered
 
@@ -62,7 +63,8 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 ### 3. Desktop use is running commands
 
 - Its tools use ADR 0056's `desktop:use` and are offered, and allowed on each call, only with `sandbox:run`, the org's sandbox setting on, and the machine's `commands` and `desktop` switches on. No new scope and no migration. Routines follow ADR 0056 §8.
-- `hello.desktopUse` is available only when the agent runs as its own OS user (system mode), different from the runner's and from every other agent's. A desktop as the runner's user would put a terminal in reach of every agent's delivered secrets and the machine's token, on a machine that self-hosters share across workspaces.
+- `hello.desktopUse` is available only when the agent runs as its own OS user (system mode), different from the runner's and from every other agent's. A desktop as the runner's user would put a terminal in reach of every agent's delivered secrets and the machine's token, on a machine that self-hosters share across workspaces. The helper runs as the process that serves the agent (its worker, as that user), and the runner checks the rule on every request too; a runner where every agent works as the runner's own user reports it unavailable, with the reason.
+- The runner also needs the machine's `desktop` and `commands` switches on for every desktop use request.
 - Mac and Windows runners have none: the reason says it needs a Linux machine with the agents' desktops.
 
 ### 4. What the agent sees: the accessibility tree of what is in front
@@ -93,8 +95,9 @@ The browser closes a covering banner once (ADR 0054 §5). On a desktop what cove
 
 ### 7. Acting and settling, in one round trip
 
-- `desktop.act` does the action, waits for the screen to settle and looks again, in one runner op, like `browser.batch`.
-- Settling by XDamage: changed rectangles arrive as events; 32 px tiles that were already changing in the 150 ms before the action (clocks, animations) are ignored; quiet after 120 ms, up to 400 ms for a late first change, 2 s at most. Starting an app, opening a file or a double click first waits for a new window or a change of the active one, up to about 10 s.
+- `desktop.act` does the action, waits for the screen to settle and looks again, in one runner op, like `browser.batch`. Right before it acts, the runner asks for the element's box and the window stack again: an element that is gone or moved since the look is a stale ref (the plan finds it again on a new look), one under another window is `covered by window "…"`, and an action on a desktop that started again since the look is stale too.
+- Settling by XDamage: changed rectangles arrive as events; 32 px tiles that were already changing in the 150 ms before the action (clocks, animations) are ignored; quiet after 120 ms, up to 400 ms for a late first change, 2 s at most. Starting an app or opening a file first waits for a new window or a change of the active one, up to about 10 s. A double click doesn't: it mostly opens a folder in place, where no window comes and the step would always wait the whole time; a step that starts an app that way says what it waits for with `expect`.
+- A desktop that just started has nothing to act on until its session is up: its first look waits for the panel's elements (seconds, at most 20 s after the start).
 - Input goes through xdotool or XTEST; windows are focused and closed by their id, not by pixels.
 - Text: a field with `EditableText` is set with `SetTextContents` and read back. Other text goes as keys, at least 12 ms apart, when it is ASCII, and through the clipboard when it isn't. A read-back that doesn't match fails the step ("the text didn't come out as written"). The helper runs with `LC_ALL=C.UTF-8`. At most 4,000 characters a step.
 - Targets that would end the session (Log Out, Shut Down, Restart, Suspend, Lock, Switch User, and their pt-BR names) are refused inside the session's and the panel's own apps, with `bad_request` (`not_allowed` stays for a switch that is off). This is a convenience: the real guard is the session's own config (no logout actions or shortcuts) and ADR 0056's supervisor.
@@ -118,17 +121,17 @@ The browser closes a covering banner once (ADR 0054 §5). On a desktop what cove
 RunnerInfo (hello): desktopUse?: { available: boolean; reason?: string }
 MachineRequest (each carries `agent`):
   { op: "desktop.look" }                                    // → { snapshot, refs, address, title, screen: { width, height } }
-  { op: "desktop.act"; action: DesktopAction; settle }      // → { look? }
+  { op: "desktop.act"; action: DesktopAction; settle }      // → { look?, settled? } (false: still changing at the cap)
   { op: "desktop.capture"; region?: { x, y, width, height } } // → { data (JPEG q70), width, height, screen, region, marks }
   { op: "desktop.apps" }                                    // → { apps: { id, name, generic? }[] }
 DesktopAction:
   { kind: "click" | "double_click" | "right_click" | "hover" | "focus" | "check" | "uncheck"; at: { ref } | { x, y } }
   { kind: "drag"; from; to }   { kind: "fill"; at; text }   { kind: "type"; text; at? }   { kind: "select"; at: { ref }; value }
   { kind: "press"; key }   { kind: "scroll"; direction; pixels; at? }   { kind: "launch"; app }   { kind: "open_file"; path }   { kind: "pause"; ms }
-DESKTOP_LIMITS: text 4,000 characters, key 64, path 1,024
+DESKTOP_LIMITS: text 4,000 characters, key 64, path 1,024, pause 10 s
 ```
 
-Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` (the target is found again once), `covered by window "…"` (§6), and `desktop_unavailable` when the session is gone (ADR 0056's supervisor starts it again).
+Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` and `stale ref: e12 moved since the last look` (the target is found again once), `covered by window "…"` (§6), `the text didn't come out as written`, a refused session ending as `bad_request`, and `desktop_unavailable` when the session or the helper is gone (ADR 0056's supervisor starts the session again, the runner the helper).
 
 ### 11. Safety and its limits
 

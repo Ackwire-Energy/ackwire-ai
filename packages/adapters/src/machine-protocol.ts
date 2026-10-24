@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 18;
+export const MACHINE_PROTOCOL_VERSION = 19;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -160,9 +160,72 @@ export const BROWSER_FAST_PROTOCOL = 17;
  * never sends these to an older runner.
  */
 export const DESKTOP_PROTOCOL = 18;
+/**
+ * From this protocol on (ADR 0057): the agent uses its own desktop.
+ * `desktop.look` reads what it shows as screen text, `desktop.act` does one
+ * action, waits for the screen to settle and looks again, `desktop.capture`
+ * returns a JPEG with the look's elements boxed, `desktop.apps` lists the apps
+ * it can start. `hello.desktopUse` says whether the runner serves it: only
+ * where each agent works as its own OS user. The server never sends these to
+ * an older runner.
+ */
+export const DESKTOP_USE_PROTOCOL = 19;
 
 /** Every agent desktop's size: viewers scale it, they never resize it. */
 export const DESKTOP_SIZE = { width: 1280, height: 800 } as const;
+
+/** Protocol 19: the largest parts of a `desktop.act`. */
+export const DESKTOP_LIMITS = {
+  /** Characters typed or filled in one action. */
+  text: 4000,
+  /** A key combination (`ctrl+shift+t`). */
+  key: 64,
+  /** A path to open, or an app's desktop entry id. */
+  path: 1024,
+  pauseMs: 10_000,
+} as const;
+
+/** Protocol 19: where a desktop action lands: an element of the last look, or a point on the screen (pixels). */
+export type DesktopPoint = { ref: string } | { x: number; y: number };
+
+/** Protocol 19: one action on the agent's desktop. */
+export type DesktopAction =
+  | { kind: "click" | "double_click" | "right_click" | "hover" | "focus" | "check" | "uncheck"; at: DesktopPoint }
+  | { kind: "drag"; from: DesktopPoint; to: DesktopPoint }
+  /** The element's whole text: set and read back where it takes text that way, else selected and typed over. */
+  | { kind: "fill"; at: DesktopPoint; text: string }
+  /** Into the element (clicked first), or wherever the focus is. */
+  | { kind: "type"; text: string; at?: DesktopPoint }
+  /** Opens the element's list and picks the option named `value`. */
+  | { kind: "select"; at: { ref: string }; value: string }
+  /** Key names joined by `+`: `ctrl+s`, `Enter`, `alt+F4`. */
+  | { kind: "press"; key: string }
+  /** Over the element, else over the active window. */
+  | { kind: "scroll"; direction: "up" | "down" | "left" | "right"; pixels: number; at?: DesktopPoint }
+  /** An app by its desktop entry id (`thunar.desktop`, as `desktop.apps` lists it). */
+  | { kind: "launch"; app: string }
+  /** A file in the agent's folder (a relative path), or an absolute one in its home or a folder allowed for it. */
+  | { kind: "open_file"; path: string }
+  | { kind: "pause"; ms: number };
+
+/** Protocol 19: a part of the screen, in pixels. */
+export interface DesktopRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Protocol 19: the agent's desktop as screen text (lines `observeSnapshot` reads), its refs, app and window. */
+export interface DesktopLookReply {
+  snapshot: string;
+  refs: Record<string, { role: string; name: string }>;
+  /** `desktop://<app>/<main|dialog>`: the app in front, and whether its window is a dialog. */
+  address: string;
+  /** The active window's title. */
+  title: string;
+  screen: { width: number; height: number };
+}
 
 /** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
 export const SCREEN_KINDS = ["browser", "desktop"] as const;
@@ -280,6 +343,9 @@ export interface RunnerTerminalInfo {
   available: boolean;
   reason?: string;
 }
+
+/** `hello.desktopUse` (protocol 19): whether agents can use their desktops here; `reason` says what is missing. */
+export type RunnerDesktopUseInfo = RunnerTerminalInfo;
 
 /** Desktop and terminal streams (protocol 18): sizes, rates, caps and timeouts. */
 export const STREAM_LIMITS = {
@@ -912,6 +978,8 @@ export interface RunnerInfo {
   desktop?: RunnerDesktopInfo;
   /** Protocol 18: whether people can open a terminal here. */
   terminal?: RunnerTerminalInfo;
+  /** Protocol 19: whether agents can use their own desktops here (ADR 0057). */
+  desktopUse?: RunnerDesktopUseInfo;
   /**
    * Protocol 18: `system` when each agent works as its own OS user (ADR 0056 §10); absent, every agent
    * works as the runner's own user. Who may control a desktop or open a terminal follows it (§4).
@@ -1032,6 +1100,14 @@ export type MachineRequest = (
   | { op: "desktop.session.status" }
   /** Protocol 18: answered once the data socket for `streamId` got `stream.ready`. */
   | ({ op: "stream.open" } & StreamOpenRequest)
+  /** Protocol 19: what the agent's desktop shows now (it starts when it isn't running). */
+  | { op: "desktop.look" }
+  /** Protocol 19: one action on the agent's desktop; with `settle`, the screen settles and the answer has a look. */
+  | { op: "desktop.act"; action: DesktopAction; settle: boolean }
+  /** Protocol 19: a JPEG of the screen, or of a region of it at its own size. */
+  | { op: "desktop.capture"; region?: DesktopRegion }
+  /** Protocol 19: the apps the agent can start. */
+  | { op: "desktop.apps" }
 ) & { agent?: AgentScope };
 
 /** One command of a `browser.batch` (protocol 17). */
@@ -1074,6 +1150,10 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.session.stop",
   "desktop.session.status",
   "stream.open",
+  "desktop.look",
+  "desktop.act",
+  "desktop.capture",
+  "desktop.apps",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1155,6 +1235,23 @@ export interface MachineReplies {
   /** `streams`: the agent's open desktop and terminal streams. */
   "desktop.session.status": { running: boolean; startedAt?: string; lastUsedAt?: string; streams: number };
   "stream.open": { opened: true };
+  "desktop.look": DesktopLookReply;
+  /** `look` with `settle`; `settled: false`: the screen kept changing until the wait's cap. */
+  "desktop.act": { look?: DesktopLookReply; settled?: boolean };
+  /**
+   * A JPEG (base64) of the screen, or of `region` at its own size; the last look's elements and their boxes,
+   * in screen pixels.
+   */
+  "desktop.capture": {
+    data: string;
+    width: number;
+    height: number;
+    screen: { width: number; height: number };
+    region: DesktopRegion | null;
+    marks: BrowserCaptureMark[];
+  };
+  /** The apps a person could start from the menu: what `launch` takes, and their names. */
+  "desktop.apps": { apps: { id: string; name: string; generic?: string }[] };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -1195,7 +1292,10 @@ export type MachineErrorCode =
    * `bad_request` instead.
    */
   | "browser_closed"
-  /** Protocol 18: desktops can't run on this computer at all; the message says what is missing. */
+  /**
+   * Protocol 18: desktops can't run on this computer at all; the message says what is missing. Protocol 19:
+   * desktop use can't run here either, or the agent's desktop went away mid-use (it starts again on the next one).
+   */
   | "desktop_unavailable"
   /** Protocol 18: the agent's desktop isn't running (a viewer never starts it). */
   | "desktop_off"
@@ -1538,6 +1638,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(Array.isArray(f.accounts) ? { accounts: parseAccounts(f.accounts) } : {}),
         ...(isObject(f.desktop) ? { desktop: parseDesktopInfo(f.desktop) } : {}),
         ...(isObject(f.terminal) ? { terminal: parseAvailability(f.terminal) } : {}),
+        ...(isObject(f.desktopUse) ? { desktopUse: parseAvailability(f.desktopUse) } : {}),
         ...(f.mode === "system" ? { mode: "system" as const } : {}),
       };
     }
@@ -2160,7 +2261,7 @@ const smallJson = (raw: string, max: number): unknown => {
   }
 };
 
-/** `hello.terminal` (protocol 18), and the part `hello.desktop` shares with it, cut. */
+/** `hello.terminal` (protocol 18), `hello.desktopUse` (19) and the part `hello.desktop` shares with them, cut. */
 export function parseAvailability(v: Record<string, unknown>): RunnerTerminalInfo {
   const reason = cut(v.reason, BROWSER_LIMITS.message);
   return { available: v.available === true, ...(reason !== undefined ? { reason } : {}) };

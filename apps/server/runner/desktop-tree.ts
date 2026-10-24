@@ -187,6 +187,10 @@ export interface DesktopTarget {
   name: string;
   /** Its visible part when the look was taken, in screen pixels. */
   box: HelperBox;
+  /** Its whole box as its app (or the window manager) gave it then: a fresh one that differs means it moved. */
+  extents: HelperBox;
+  /** A checkbox, switch or radio: whether it was checked. */
+  checked?: boolean;
   /** The element on the accessibility bus; a window's own line has none. */
   node?: HelperNodeRef;
   /** The window it stands for (a window's line, a panel's button for a window): what `activate` takes. */
@@ -238,14 +242,14 @@ export function desktopRefs(): DesktopRefs {
   };
 }
 
-type Point = [x: number, y: number];
+export type Point = [x: number, y: number];
 
 const valid = (b: HelperBox | undefined): b is HelperBox => !!b && b[2] > 0 && b[3] > 0;
-const centerOf = (b: HelperBox): Point => [b[0] + b[2] / 2, b[1] + b[3] / 2];
-const contains = (b: HelperBox, [x, y]: Point) => x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
+export const centerOf = (b: HelperBox): Point => [b[0] + b[2] / 2, b[1] + b[3] / 2];
+export const contains = (b: HelperBox, [x, y]: Point) => x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
 const NOWHERE: HelperBox = [0, 0, 0, 0];
 
-function intersect(a: HelperBox, b: HelperBox): HelperBox {
+export function intersect(a: HelperBox, b: HelperBox): HelperBox {
   const x = Math.max(a[0], b[0]);
   const y = Math.max(a[1], b[1]);
   const right = Math.min(a[0] + a[2], b[0] + b[2]);
@@ -279,7 +283,13 @@ export function coveringWindow(windows: readonly HelperWindow[], own: HelperWind
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
 /** Screen text on one line: control characters (newlines too) as spaces, `ref=` broken so nothing reads it as a ref. */
 const flat = (s: string) => s.replace(CONTROL, " ").replace(/(ref)=/gi, "$1 =");
-const quote = (s: string) => `"${s.replace(/[\\"]/g, "\\$&")}"`;
+export const quote = (s: string) => `"${s.replace(/[\\"]/g, "\\$&")}"`;
+
+/** A name or title from the screen as the agent may read it: redacted, on one line, `ref=` broken. */
+export const screenText = (raw: string, secrets?: DesktopLookOptions["secrets"]) =>
+  flat(secrets ? secrets.redact(raw) : raw)
+    .replace(/\s+/g, " ")
+    .trim();
 /** A window's class as an address host: `Xfce4-terminal` → `xfce4-terminal`. */
 const hostOf = (s: string) =>
   s
@@ -348,7 +358,7 @@ export function desktopLook(snap: HelperSnapshot, refOf: DesktopRefs, options: D
   const browser = new Set(options.browserPids ?? []);
   const windows = snap.windows;
   const activeAt = windows.findIndex((w) => w.active);
-  const nameOf = (raw: string) => flat(redact(raw)).replace(/\s+/g, " ").trim();
+  const nameOf = (raw: string) => screenText(raw, secrets);
   const appWindows = windows.filter((w) => !w.override && !w.types.some((t) => t === "dock" || t === "desktop"));
 
   // Each X window's top-levels: its app's windows on the bus, matched by process and box.
@@ -474,6 +484,8 @@ export function desktopLook(snap: HelperSnapshot, refOf: DesktopRefs, options: D
       line.target = {
         key: `${ctx.tree.app.bus} ${n.path}`,
         box: intersect(box, clip),
+        extents: box,
+        ...(CHECKABLE.has(role) ? { checked: has(n, STATE.CHECKED) } : {}),
         node: [ctx.tree.app.bus, n.path],
         window: own.xid,
         app: ctx.tree.app.name || ctx.win.class[1],
@@ -557,6 +569,7 @@ export function desktopLook(snap: HelperSnapshot, refOf: DesktopRefs, options: D
       target: {
         key: `x${w.xid}`,
         box: intersect(w.box, screen),
+        extents: w.box,
         xid: w.xid,
         window: w.xid,
         app: first?.tree.app.name || w.class[1],
