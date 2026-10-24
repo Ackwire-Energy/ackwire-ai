@@ -141,6 +141,10 @@ const imageCases: ImageCase[] = [
   },
   { scene: "dialog", target: "the Cancel button of the dialog", at: [markBox("dialog", "button", "Cancel")] },
   { scene: "dialog", target: "Save in the dialog", at: [markBox("dialog", "button", "Save")] },
+  // Small, but taller than half of a 240×150 close-up when boxed whole: a folder with its name, a picture.
+  { scene: "files", target: "the Downloads folder in the file manager", at: [[915, 235, 70, 82]] },
+  { scene: "files", target: "the Pictures folder in the file manager", at: [[1058, 235, 56, 82]] },
+  { scene: "files", target: "the blue robot picture at the bottom of the web page", at: [[510, 575, 115, 112]] },
   // Large: wider or taller than the close-up is for.
   { scene: "files", target: "the location bar of the file manager", at: [markBox("files", "textbox", "")] },
   { scene: "files", target: "the browser's address bar", at: [[148, 94, 445, 35]] },
@@ -354,10 +358,13 @@ report.judge = {
  * and a worse model does.
  */
 const box = report.box as Record<string, Record<string, { share: number; right: string }>>;
+const none = { share: 0, right: "-" };
+// The desktop's own path: with the close-up, when one can be cut.
+const [desktop, via] = CUTTER ? (["closeUp", "with the close-up"] as const) : (["first", "first pass"] as const);
 const bars: [string, { share: number; right: string }, number][] = [
-  ["small targets with the close-up", box.small?.closeUp ?? { share: 0, right: "-" }, 0.9],
-  ["large targets, first pass", box.large?.first ?? { share: 0, right: "-" }, 0.9],
-  ["absent targets said absent", box.absent?.first ?? { share: 0, right: "-" }, 0.9],
+  ["small targets with the close-up", box.small?.closeUp ?? none, 0.9],
+  [`large targets, ${via}`, box.large?.[desktop] ?? none, 0.9],
+  [`absent targets said absent, ${via}`, box.absent?.[desktop] ?? none, 0.9],
   ["Choice over the tree", report.choice as { share: number; right: string }, 0.9],
 ];
 if (!CUTTER) bars.shift();

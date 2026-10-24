@@ -70,6 +70,58 @@ describe("a target on the screen image", () => {
     expect(marked).toMatchObject({ found: true, ref: "e7" });
   });
 
+  test("a close-up shows three times a taller box's height, and Jev sees it at 480×300", async () => {
+    // A folder's first box on its icon, 77×88 on the screen.
+    const folder: Answer = { box: { top: 0.29, bottom: 0.4, left: 0.7, right: 0.76 }, present: 0.9 };
+    const judge = boxes(folder, UP_CLOSE);
+    const z = zoomer();
+    const spot = await locateOnImage({ judge, ...ids, target: "x", image: screenImage(), zoom: z.zoom });
+    expect(z.asked).toEqual([{ x: 723, y: 144, width: 422, height: 264 }]);
+    expect(await shown(judge.calls[1])).toEqual({ width: 480, height: 300, format: "jpeg" });
+    expect(spot).toEqual({ found: true, x: 955, y: 263, ref: null, confidence: 0.85 });
+  });
+
+  test("a target boxed whole up close is taken, up to the largest first box that gets a close-up", async () => {
+    for (const screen of [
+      { width: 1280, height: 800 },
+      { width: 1280, height: 900 },
+    ]) {
+      // [width, height] of the first box: a glyph, a folder's icon, the largest, a menu row.
+      for (const [w, h] of [
+        [0.02, 0.02],
+        [0.06, 0.08],
+        [0.14, 0.14],
+        [0.14, 0.03],
+      ] as const) {
+        const first: JudgeBox = { top: 0.4, bottom: 0.4 + h, left: 0.5, right: 0.5 + w };
+        const at = { x: (0.5 + w / 2) * screen.width, y: (0.4 + h / 2) * screen.height };
+        const z = zoomer();
+        // Up close, the whole target: 1.4 times as tall and 1.15 times as wide as at first (an icon with its name).
+        const judge = createFakeJudge((kind, id, _state, _q, request) => {
+          if (kind !== "screen_locate") return undefined;
+          if (id === "present") return 0.9;
+          const r = z.asked[0];
+          if (!r || !where(request).includes("is a close-up")) return { box: first, confidence: 0.8 };
+          const [halfW, halfH] = [(1.15 * w * screen.width) / 2, (1.4 * h * screen.height) / 2];
+          const box = {
+            left: (at.x - halfW - r.x) / r.width,
+            right: (at.x + halfW - r.x) / r.width,
+            top: (at.y - halfH - r.y) / r.height,
+            bottom: (at.y + halfH - r.y) / r.height,
+          };
+          return { box, confidence: 0.8 };
+        });
+        const image = { ...screenImage(), width: screen.width, height: screen.height, viewport: screen };
+        const spot = await locateOnImage({ judge, ...ids, target: "x", kind: "desktop", image, zoom: z.zoom });
+        expect(spot).toMatchObject({ found: true });
+        if (!spot.found) continue;
+        expect(Math.abs(spot.x - at.x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(spot.y - at.y)).toBeLessThanOrEqual(1);
+        expect(judge.calls).toHaveLength(2);
+      }
+    }
+  });
+
   test("the close-up stays inside the screen at its edge", async () => {
     const corner: Answer = { box: { top: 0.985, bottom: 0.99, left: 0.98, right: 0.99 }, present: 0.9 };
     const z = zoomer();
