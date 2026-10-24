@@ -25,6 +25,7 @@ import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun } from "./run-scope";
+import { NO_AI } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
@@ -152,11 +153,15 @@ export interface Receipts {
     /** The run answering it: its own, the task it was steered into, or the run its answer resumed. */
     runId: string;
     status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" | "canceled";
+    /** `no_ai`: it failed for want of an AI to think with. */
+    reason?: typeof NO_AI;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
   blocked: string[];
   /** Agents it only mentions as part of the request to another agent: no run, by design (not blocked). */
   referenced?: string[];
+  /** Routed to nobody: the organization had no AI connected. */
+  noAi?: true;
 }
 
 /** `meta.referencedAgentIds`: agents a person's message only references (no run; see `classifyAddressees`). */
@@ -185,10 +190,15 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     triggerMessageId: schema.agentRuns.triggerMessageId,
     agentId: schema.agentRuns.agentId,
     status: schema.agentRuns.status,
+    error: schema.agentRuns.error,
   };
   const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
     db
-      .select({ messageId: schema.routingDecisions.messageId, candidates: schema.routingDecisions.candidates })
+      .select({
+        messageId: schema.routingDecisions.messageId,
+        candidates: schema.routingDecisions.candidates,
+        error: schema.routingDecisions.error,
+      })
       .from(schema.routingDecisions)
       .where(and(eq(schema.routingDecisions.orgId, orgId), inArray(schema.routingDecisions.messageId, ids))),
     db
@@ -210,6 +220,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
       : Promise.resolve([]),
   ]);
   const seen = new Map(decisions.map((d) => [d.messageId, d.candidates.map((c) => c.agentId)]));
+  const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
   const steeredById = new Map(steeredRuns.map((r) => [r.id, r]));
   const answeredByQuestion = new Map(answeredRuns.map((r) => [r.questionId, r]));
   for (const m of list) {
@@ -227,7 +238,12 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     out.set(m.id, {
       seenBy,
       pickedBy: [...picked],
-      handled: mine.map((r) => ({ agentId: r.agentId, runId: r.id, status: r.status })),
+      handled: mine.map((r) => ({
+        agentId: r.agentId,
+        runId: r.id,
+        status: r.status,
+        ...(r.error === NO_AI ? { reason: NO_AI } : {}),
+      })),
       // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
       // or the message only references it.
       blocked:
@@ -235,6 +251,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
           ? m.mentionedAgentIds.filter((id) => !picked.has(id) && !referenced.includes(id))
           : [],
       ...(referenced.length > 0 ? { referenced } : {}),
+      ...(noAi.has(m.id) ? { noAi: true as const } : {}),
     });
   }
   return out;

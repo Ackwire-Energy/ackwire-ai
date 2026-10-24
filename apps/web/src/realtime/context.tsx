@@ -688,6 +688,17 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   }, [connection, enabled, orgId, channelId, qc, streams]);
 }
 
+/** Each live event of a channel while mounted and `enabled` (the handler is read through a ref). */
+export function useChannelEvents(channelId: string, enabled: boolean, onEvent: (event: ChannelEvent) => void) {
+  const { connection } = useRealtime();
+  const handler = useRef(onEvent);
+  handler.current = onEvent;
+  useEffect(() => {
+    if (!connection || !enabled) return;
+    return connection.subscribe(channelId, (event) => handler.current(event));
+  }, [connection, enabled, channelId]);
+}
+
 /** Same items in the same order (lists), or the same keys with the same values (plain objects). */
 function shallowEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;

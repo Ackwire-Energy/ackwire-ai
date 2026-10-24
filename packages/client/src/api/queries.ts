@@ -854,6 +854,12 @@ export const usePlatformKey = (orgId: string) => {
   });
 };
 
+/** Whether each agent has an AI to think with (the no-AI banner, card and chip). */
+export const useAiStatus = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.aiStatus(orgId), queryFn: () => api.agents.aiStatus(orgId), staleTime: 30_000 });
+};
+
 export function useRotateCredential(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();

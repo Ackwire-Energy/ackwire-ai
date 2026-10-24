@@ -322,10 +322,11 @@ export function OnboardingPage() {
   const budgetOk = budgetValue === "" || (Number.isFinite(Number(budgetValue)) && Number(budgetValue) >= 0);
 
   const saveAgents = useMutation({
-    mutationFn: async () => {
+    /** `keyLater`: "Conectar depois", the agents come without a key (they answer once an AI is connected). */
+    mutationFn: async (keyLater: boolean) => {
       if (!created) return;
       // No key needed when the agents think on the connected computer; one pasted is still saved.
-      if (key !== "platform" && !keySaved && apiKey.trim()) {
+      if (!keyLater && key !== "platform" && !keySaved && apiKey.trim()) {
         const cred = await api.agents.addCredential(created.orgId, {
           provider: key,
           label: providerLabel(key),
@@ -437,8 +438,12 @@ export function OnboardingPage() {
     }
   };
 
-  /** Saves what the step needs, marks it done and moves on. `skip` leaves an optional step as it is. */
-  const advance = async (skip = false) => {
+  /**
+   * Saves what the step needs, marks it done and moves on. `skip` leaves an optional step as it is;
+   * `keyLater` creates the agents without a key.
+   */
+  const advance = async (how?: "skip" | "keyLater") => {
+    const skip = how === "skip";
     if (step.id === "done") {
       await finish.mutateAsync();
       return;
@@ -456,7 +461,7 @@ export function OnboardingPage() {
           setAgentsPhase("key");
           return;
         }
-        await saveAgents.mutateAsync();
+        await saveAgents.mutateAsync(how === "keyLater");
       }
       if (step.id === "computer") await saveComputer.mutateAsync();
       if (step.id === "team") await sendInvites.mutateAsync();
@@ -1000,9 +1005,17 @@ export function OnboardingPage() {
               {primaryLabel}
             </Button>
             {showSkip && (
-              <Button variant="ghost" onClick={() => void advance(true).catch(() => {})} disabled={busy}>
+              <Button variant="ghost" onClick={() => void advance("skip").catch(() => {})} disabled={busy}>
                 {t("onboarding.skip")}
               </Button>
+            )}
+            {step.id === "agents" && agentsPhase === "key" && (
+              <>
+                <Button variant="ghost" onClick={() => void advance("keyLater").catch(() => {})} disabled={busy}>
+                  {t("connectAi.later")}
+                </Button>
+                <p className="onb__help">{t("connectAi.laterNote")}</p>
+              </>
             )}
           </div>
         </div>

@@ -29,7 +29,6 @@ import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
-  NO_AI,
   type RouterDeps,
   type RouterStrategy,
   resolveRouterModel,
@@ -37,7 +36,7 @@ import {
 } from "./router";
 import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
 import { executeRoutineRun } from "./routines";
-import type { AgentRun } from "./runs";
+import { type AgentRun, NO_AI } from "./runs";
 import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";

@@ -34,6 +34,9 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
   canceled: [],
 };
 
+/** A run's error (and a routing decision's) when nobody could think: no AI connected. */
+export const NO_AI = "no_ai" as const;
+
 /**
  * The stable code (and params) of a run's stored `error`, for the app to
  * word it in the person's language; the stored text stays as the fallback.
@@ -43,7 +46,7 @@ export function runErrorDetail(error: string | null | undefined): {
   errorParams?: Record<string, string>;
 } | null {
   if (!error) return null;
-  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived", "no_ai"];
+  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived", NO_AI];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error.startsWith("provider_error:")) {
     return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };

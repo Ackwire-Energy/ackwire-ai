@@ -8,7 +8,7 @@ import { createAgentRuns, requesterOf } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage } from "./messages";
-import type { AgentRun } from "./runs";
+import { type AgentRun, NO_AI } from "./runs";
 
 const {
   agents,
@@ -324,9 +324,6 @@ export interface RouterDeps {
   /** Whether the organization has any AI (`orgHasAi`); without it the strategy is always asked. */
   hasAi?(orgId: string): Promise<boolean>;
 }
-
-/** A routing decision (and a run's error) when nobody could think: no AI connected. */
-export const NO_AI = "no_ai";
 
 export interface RouteResult {
   runs: AgentRun[];

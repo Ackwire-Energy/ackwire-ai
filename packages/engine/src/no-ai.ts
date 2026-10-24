@@ -11,9 +11,9 @@ import { publishChannelEvent, publishMessageCreated, publishRouted } from "./eve
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { can, type MemberRole } from "./organizations";
-import { NO_AI, type RouterDeps, routeMessage } from "./router";
+import { type RouterDeps, routeMessage } from "./router";
 import { bodyCode } from "./run-tools";
-import { type AgentRun, replyThreadOf } from "./runs";
+import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
 import { withWikiLinks } from "./wiki-links";
 
 const { agentRuns, agents, messages, routingDecisions } = schema;

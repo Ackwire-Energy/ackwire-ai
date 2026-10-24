@@ -22,6 +22,7 @@ import type {
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiStatus,
   ApiRule,
   AppNotification,
   Approval,
@@ -268,6 +269,8 @@ export interface ApiClient {
     removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
+    /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0057). */
+    aiStatus(orgId: string): Promise<AiStatus>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
       orgId: string,
@@ -356,6 +359,11 @@ export interface ApiClient {
     unreact(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;
     /** Corrects an agent's reply: it becomes a lesson for that agent. */
     correct(orgId: string, messageId: string, body: string): Promise<void>;
+    /**
+     * "Responder agora" once an AI is connected: the agent answers what it couldn't. `messageId` is its
+     * no-AI card or the person's message. 409 `ai.still_missing` while there's still no AI.
+     */
+    answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
   };
 
   approvals: {

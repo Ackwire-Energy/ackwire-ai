@@ -93,7 +93,6 @@ import {
   stripSentinel,
   visibleText,
 } from "./reply-policy";
-import { NO_AI } from "./router";
 import { routineBriefOf } from "./routine-brief";
 import { routineRunWaitingForComputer } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -121,6 +120,7 @@ import {
   type AgentRun,
   addRunStep,
   isTerminal,
+  NO_AI,
   type RunStatus,
   replyThreadOf,
   runErrorDetail,

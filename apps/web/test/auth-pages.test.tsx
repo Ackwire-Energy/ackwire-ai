@@ -389,6 +389,22 @@ describe("Onboarding", () => {
     expect(screen().getByText("Falta 1 etapa")).toBeTruthy();
   });
 
+  test("Conectar depois: the agents come without a key and answer once an AI is connected", async () => {
+    const { state } = await start();
+    await throughImport(state);
+    await skip();
+    await keepOnly("Theo · PM");
+    await next();
+    expect(screen().getByRole("heading", { name: "Falta a chave de API." })).toBeTruthy();
+    expect(document.body.textContent).toContain("Os agentes começam a responder quando uma IA estiver conectada.");
+    // A key typed and then left for later isn't saved.
+    await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
+    await click(button("Conectar depois"), 8);
+    expect(calls(state, "agents.addCredential")).toHaveLength(0);
+    expect(calls(state, "agents.create")).toHaveLength(2);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+  });
+
   test("computer before the agents: it connects live, its Claude Code thinks for them (no key); team invites go out", async () => {
     const { state, api, services, router } = await start();
     await throughImport(state);

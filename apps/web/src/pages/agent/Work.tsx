@@ -353,6 +353,7 @@ function useRefresh() {
   return () => {
     for (const key of [
       keys.agentBrain(org.id, agent.id),
+      keys.aiStatus(org.id),
       keys.computer(org.id, agent.id),
       keys.agentBrowser(org.id, agent.id),
       keys.scopes(org.id, agent.id),
@@ -890,7 +891,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
  * the device page and the one-time code to type there. The page asks every
  * 2 s; Voltar or closing the dialog stops the sign-in on the computer.
  */
-function AddAccount(props: {
+export function AddAccount(props: {
   machineId: string;
   kind: MachineAccountKind;
   computer: string;

@@ -60,6 +60,7 @@ import {
   useWikiTree,
 } from "@agenteschat/client";
 import { activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import {
@@ -89,6 +90,7 @@ import {
   parseMissionCommand,
   taskNoticeOf,
 } from "@agenteschat/client/lib/missions";
+import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -211,6 +213,7 @@ import {
 import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
+import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
@@ -594,6 +597,7 @@ function ChannelView({
     [t],
   );
   useChannelRealtime(org.id, channel.id, isMember);
+  useNoAiAutoOpen(channel.id, isMember);
 
   const channelAgents = useMemo(
     () =>
@@ -1358,8 +1362,15 @@ function ChannelView({
   const attached = files.flatMap((f) => (f.status === "done" && f.ref ? [f.ref] : []));
   const uploading = files.some((f) => f.status === "uploading");
 
-  const onSend = (text: string, opts?: { interrupt?: boolean }) => {
+  // A key pasted in the message: nothing goes out until the person chooses (`KeyGuardDialog`).
+  const [keyAsk, setKeyAsk] = useState<{ text: string; key: string; interrupt?: boolean } | null>(null);
+  const onSend = (text: string, opts?: { interrupt?: boolean; keyChecked?: boolean }) => {
     if (uploading || (!text && attached.length === 0)) return;
+    const key = opts?.keyChecked ? null : looksLikeApiKey(text);
+    if (key) {
+      setKeyAsk({ text, key, interrupt: opts?.interrupt });
+      return;
+    }
     if (attached.length === 0 && parseMissionCommand(text)) {
       void runCommand(text);
       return;
@@ -1792,6 +1803,7 @@ function ChannelView({
                 </div>
                 <div className="channel__composer">
                   <ConnectionBanner status={status} />
+                  <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
                   <ActivityBar
                     channelId={channel.id}
                     visible={runVisible}
@@ -1891,6 +1903,19 @@ function ChannelView({
                       {offer && (
                         <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
                       )}
+                      <KeyGuardDialog
+                        ask={keyAsk}
+                        onClose={() => setKeyAsk(null)}
+                        onSend={() => {
+                          setKeyAsk(null);
+                          if (keyAsk) onSend(keyAsk.text, { interrupt: keyAsk.interrupt, keyChecked: true });
+                        }}
+                        onEdit={(text) => {
+                          setKeyAsk(null);
+                          setDraft(text);
+                          composer.current?.focus();
+                        }}
+                      />
                       {chrome?.composerNote && !chrome.locked && (
                         <p className="ac-composer__hint">{chrome.composerNote}</p>
                       )}
@@ -2902,9 +2927,12 @@ export const TimelineMessage = memo(function TimelineMessage({
   // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
   const brainNotice = m.author.type === "agent" ? brainUnavailableOf(meta) : null;
   const waitNotice = brainNotice && isOfflineNotice(brainNotice) ? brainNotice : null;
+  // "Ada não vai responder porque não tem uma IA conectada": one card with Connect, in place of its text.
+  const noAi = m.author.type === "agent" && noAiCardOf(meta) !== null;
   const card =
     approvalId ||
     waitNotice ||
+    noAi ||
     proposalId ||
     memoryUpdates.length > 0 ||
     question ||
@@ -3088,6 +3116,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             !forumSuggestion &&
             !issueWork &&
             !waitNotice &&
+            !noAi &&
             // A question's card already says it: its own text isn't repeated above.
             !(question && body.trim() === question.text.trim()) &&
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0)) && (
@@ -3130,6 +3159,7 @@ export const TimelineMessage = memo(function TimelineMessage({
               <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />
             ))}
           {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+          {noAi && <NoAiCard message={m} />}
           {question && <QuestionCard question={question} />}
           {secretRequest && <SecretCard request={secretRequest} />}
           {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}

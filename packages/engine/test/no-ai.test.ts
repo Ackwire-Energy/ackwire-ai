@@ -106,6 +106,11 @@ test("no key: the run fails with no_ai before any judge or model call, and one c
     expect.objectContaining({ type: "agent.run", status: "failed", error: "no_ai", errorCode: "run.no_ai" }),
   );
   expect(events.some((e) => e.type === "agent.run" && e.status === "running")).toBe(false);
+  // The list's receipts say why (a reload shows the same row as the live event).
+  const listed = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find((m) => m.id === asked.id);
+  expect(listed?.receipts?.handled).toEqual([
+    { agentId: f.agent.id, runId: run?.id ?? "", status: "failed", reason: "no_ai" },
+  ]);
   // The card routes nobody (like a notice).
   const decided = await f.db
     .select()
@@ -253,6 +258,8 @@ test("Responder agora on a message nobody could route: 409, then it is routed ag
   const asked = await post("alguém resume o canal?");
   await drainOutbox(f.db, handlers);
   expect(await runs()).toHaveLength(0);
+  const listed = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find((m) => m.id === asked.id);
+  expect(listed?.receipts).toMatchObject({ seenBy: [], noAi: true });
 
   const refused = await answerNow({ ...deps(), router }, f.owner.id, f.org.id, asked.id).catch((e) => e);
   expect(refused).toMatchObject({ code: "ai.still_missing" });

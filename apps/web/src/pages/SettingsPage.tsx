@@ -549,14 +549,26 @@ function KeysSection() {
   );
 }
 
-function KeyDialog({
+/**
+ * Adds or rotates a key. The Connect dialog (`ConnectAi`) opens it to add one with the provider it
+ * guessed, or the key a person pasted in the chat, and hears when it was saved (`onAdded`).
+ */
+export function KeyDialog({
   mode,
   cred,
   onClose,
+  provider: suggested,
+  apiKey: pasted,
+  title,
+  onAdded,
 }: {
   mode: "add" | "rotate" | null;
   cred: Credential | undefined;
   onClose: () => void;
+  provider?: string;
+  apiKey?: string;
+  title?: string;
+  onAdded?: (cred: Credential) => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -571,9 +583,11 @@ function KeyDialog({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset the form each time it opens
   useEffect(() => {
     setLabel("");
-    setApiKey("");
+    setApiKey(pasted ?? "");
     setWorkspaceId("");
-    setProvider(cred && isProviderId(cred.provider) ? cred.provider : "anthropic");
+    // A pasted key says whose it is; else the provider asked for.
+    const guess = PROVIDERS.find((p) => pasted && p.pattern.test(pasted.trim()))?.id ?? suggested ?? cred?.provider;
+    setProvider(guess && isProviderId(guess) ? guess : "anthropic");
     setTouched(false);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
@@ -583,7 +597,11 @@ function KeyDialog({
     <Dialog
       open={mode !== null}
       onOpenChange={(o) => !o && onClose()}
-      title={mode === "rotate" ? t("settings.rotateTitle", { label: cred?.label ?? "" }) : t("settings.addKeyTitle")}
+      title={
+        mode === "rotate"
+          ? t("settings.rotateTitle", { label: cred?.label ?? "" })
+          : (title ?? t("settings.addKeyTitle"))
+      }
       description={mode === "rotate" ? t("settings.rotateHelp") : undefined}
       closeLabel={t("common.close")}
       width={440}
@@ -611,7 +629,12 @@ function KeyDialog({
                 apiKey: apiKey.trim(),
                 ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
               },
-              { onSuccess: onClose },
+              {
+                onSuccess: (saved) => {
+                  onAdded?.(saved);
+                  onClose();
+                },
+              },
             );
           }
         }}

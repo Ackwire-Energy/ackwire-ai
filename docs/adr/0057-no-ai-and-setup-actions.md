@@ -59,9 +59,10 @@ This changes one behavior: a signed-out or missing command-line tool used to mak
 **The Connect dialog**, `open({ intent?, provider?, agentId?, from? })`:
 
 - `any`: the choice of a Claude plan, a ChatGPT plan or an API key.
-- A plan goes to the account sign-in on the organization's computer (ADR 0041).
+- A plan goes to the account sign-in on the agent's computer (ADR 0041); once the account is in, "Usar meu plano" makes it the agent's brain, with the plan warning shown first.
 - An API key goes to the key dialog, with the provider already picked.
-- It shows what that person may do: keys need `manage_credentials` (admins), and a plan sign-in needs the computer's owner.
+- It shows what that person may do: keys need `manage_credentials` (admins), changing who thinks for an agent needs its owner or an admin, and a sign-in on a computer needs whoever may add accounts there.
+- The banner above the composer (the organization has no AI, or a DM's agent has none), the card, the receipt under a message ("Ninguém vai responder: falta uma IA") and the "Sem IA" chip by an agent's name all open it.
 
 **"Responder agora"** is `POST /api/app/organizations/{orgId}/messages/{id}/answer-now`, with the card's id or the person's message id:
 
@@ -79,7 +80,7 @@ The key step gets "Conectar depois". The agents are created without one, and the
 
 ### 7. API keys pasted in the chat
 
-- Before sending, every web composer (channels, threads, the forum, DMs) looks for key shapes: `sk-ant-…`, `sk-proj-…` or `sk-…` of 20 characters or more, `AIza…`.
+- Before sending, the chat composer (channels, threads and DMs, where people ask agents) looks for key shapes: `sk-ant-…`, `sk-proj-…` or `sk-…` of 20 characters or more, `AIza…`. A hyphenated word like `sk-learn` isn't one: a key has a long random run with digits.
 - Admins get "save it as an organization key"; everyone else gets "remove it" or "send anyway".
 - It runs in the browser only: nothing is sent until the person chooses.
 

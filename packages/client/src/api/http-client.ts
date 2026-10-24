@@ -20,6 +20,7 @@ import type {
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiStatus,
   AppNotification,
   Approval,
   Artifact,
@@ -364,6 +365,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
+      aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
       importFromGithub: (orgId, url) =>
         request<{ files: { path: string; text: string }[]; skipped?: string[] }>(`${org(orgId)}/agent-imports/github`, {
           json: { url },
@@ -429,6 +431,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       correct: async (orgId, messageId, body) => {
         await request<unknown>(`${org(orgId)}/messages/${enc(messageId)}/correction`, { json: { body } });
       },
+      answerNow: (orgId, messageId) =>
+        request<{ runs: { agentId: string; runId: string }[] }>(`${org(orgId)}/messages/${enc(messageId)}/answer-now`, {
+          json: {},
+        }),
       roster: async (orgId, channelId) =>
         (await request<{ members: RosterMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/roster`)).members,
       members: async (orgId, channelId) =>

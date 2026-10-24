@@ -324,11 +324,34 @@ export interface MessageConsultation {
 export interface MessageReceipts {
   seenBy: string[];
   pickedBy: string[];
-  handled: { agentId: string; runId?: string; status: RunStatus | "waiting_input" | "canceled" }[];
+  handled: {
+    agentId: string;
+    runId?: string;
+    status: RunStatus | "waiting_input" | "canceled";
+    /** `no_ai`: it couldn't answer, it has no AI connected. */
+    reason?: string;
+  }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
   /** Agents it only references as part of the request to another agent: no run, by design. */
   referenced?: string[];
+  /** Nobody was asked: the organization has no AI connected. */
+  noAi?: boolean;
+}
+
+/** What a person who met "no AI" asked for (Jev): a Connect dialog step; `any` and `task` open its first step. */
+export type ConnectIntent = "claude" | "chatgpt" | "api_key" | "any" | "task";
+
+/** `GET …/ai-status` (ADR 0057): whether each agent has an AI to think with, and whether the organization has any. */
+export interface AiStatus {
+  /** An agent that isn't archived is ready, or waits for its computer. */
+  any: boolean;
+  agents: {
+    agentId: string;
+    /** `waiting`: its computer is away for now (not "no AI"). */
+    state: "ready" | "no_ai" | "waiting";
+    reason?: "no_key" | "not_signed_in" | "no_computer" | "cli_missing";
+  }[];
 }
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
@@ -524,7 +547,12 @@ export type ChannelEvent =
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy?: "mention" | "dm" | "router" | "none";
+      /** `no_ai`: the organization has no AI connected; `mention_needed`: only a mention gets an answer. */
       reason?: string;
+      /** With `no_ai`: the Connect step the message asked for, and whether it opens by itself (Jev ≥ 0.9). */
+      intent?: ConnectIntent;
+      provider?: string;
+      autoOpen?: boolean;
     }
   | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId?: string }
   | {
@@ -534,6 +562,8 @@ export type ChannelEvent =
       agentId: string;
       runId?: string;
       status?: "done" | "failed" | "waiting_approval";
+      /** `no_ai`: the agent has no AI to think with. */
+      reason?: string;
     }
   /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
   | {

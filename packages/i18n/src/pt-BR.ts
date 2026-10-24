@@ -879,6 +879,59 @@ export const ptBR = {
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
   },
+  /** No AI connected (ADR 0057): the banner, the agent's card, its chip and the receipt under a message. */
+  noAi: {
+    banner: {
+      org: "Os agentes ainda não têm uma IA para pensar.",
+      orgHint: "Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
+      orgAction: "Conectar uma IA",
+    },
+    agent: "{{name}} não vai responder porque não tem uma IA conectada.",
+    card: {
+      line: "Depois de conectar, {{name}} responde a sua mensagem.",
+      connected: "Pronto: {{name}} já tem uma IA.",
+      answerNow: "Responder agora",
+      answering: "{{name}} está respondendo…",
+      stillMissing: "Ainda falta conectar uma IA para {{name}}.",
+    },
+    action: "Conectar",
+    locked: "Quem conecta a IA de {{name}}: um admin, com uma chave de API, ou {{owner}}, com o próprio plano.",
+    lockedAdmins: "Só um admin pode conectar uma IA.",
+    receipt: "Ninguém vai responder: falta uma IA",
+    chip: "Sem IA",
+  },
+  /** The Connect dialog: its first step and the plan sign-in around the existing flows. */
+  connectAi: {
+    title: {
+      any: "Conectar uma IA",
+      claude: "Conectar o seu plano do Claude",
+      chatgpt: "Conectar o seu plano do ChatGPT",
+      api_key: "Adicionar uma chave de API",
+    },
+    option: {
+      claude: "Plano do Claude",
+      claudeDesc: "Pro, Max ou Team, pelo Claude Code",
+      chatgpt: "Plano do ChatGPT",
+      chatgptDesc: "Plus, Pro ou Team, pelo Codex",
+      api_key: "Chave de API",
+      api_keyDesc: "Anthropic, OpenAI e outros; paga pelo uso",
+    },
+    waitComputer: "Disponível quando o computador ficar pronto (alguns minutos). Dá para usar uma chave de API agora.",
+    agent: "Para qual agente",
+    keyLocked: "Uma chave de API, só um admin adiciona.",
+    accountsLocked: "Só {{name}} conecta um plano no {{computer}}.",
+    later: "Conectar depois",
+    laterNote: "Os agentes começam a responder quando uma IA estiver conectada.",
+  },
+  /** An API key pasted in a message, before it goes out. */
+  keyGuard: {
+    title: "Isso parece uma chave de API",
+    text: "Tudo o que vai no chat fica visível para as pessoas e os agentes. Salve como chave da organização: ela fica cifrada e ninguém vê.",
+    textMember: "Tudo o que vai no chat fica visível para as pessoas e os agentes. Uma chave é como uma senha.",
+    save: "Salvar como chave",
+    remove: "Tirar do texto",
+    send: "Enviar mesmo assim",
+  },
   dm: {
     subtitle: "{{role}} · responde a {{owner}}",
     subtitleNoOwner: "{{role}} · sem responsável",
