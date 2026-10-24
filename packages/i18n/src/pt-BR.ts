@@ -499,7 +499,7 @@ export const ptBR = {
       noteKey:
         "Esse valor é cobrado pelo provedor da chave pelo uso da API, não pelo agentes.chat. Quando um agente chega no limite, ele para e te avisa. Quem usa o Claude Code de um computador conectado não conta aqui.",
       notePlatform:
-        "Com os créditos da plataforma, o uso da API é cobrado pelo agentes.chat. O limite vale só para esse uso: quando um agente chega nele, ele para e te avisa.",
+        "Com a chave do agentes.chat, o limite vale para o uso da API: quando um agente chega nele, ele para e te avisa.",
     },
     provider: "Provedor",
     keyFor: "Chave da API da {{provider}}",
@@ -513,9 +513,9 @@ export const ptBR = {
     openaiOrg: "ID da organização na OpenAI",
     openaiProject: "ID do projeto na OpenAI",
     optional: "Opcional.",
-    platformChoice: "Usar créditos da plataforma",
+    platformChoice: "Usar a chave do agentes.chat",
     platformKeyDesc:
-      "Sem chave: a plataforma cobra por uso, com US$ 5 grátis para testar. Você vê o custo de cada agente.",
+      "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
     suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",
