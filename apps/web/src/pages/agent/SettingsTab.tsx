@@ -119,7 +119,7 @@ export function SettingsTab({
   const month = formatMonth(locale, new Date());
   const visibleChannels = useVisibleChannels().list;
   const look = draft.look;
-  // On a personal plan (ADR 0056 §5) only its owner lets more people in, and accepts the provider's terms once.
+  // On a personal plan (ADR 0058 §5) only its owner lets more people in, and accepts the provider's terms once.
   const plan = engineOfBrain(agent.brain?.kind);
   // A coding plan's account: its maker's own words in the warning.
   const maker = agent.brain?.kind === "claude_code" ? planOf(agent.brain.provider)?.maker : undefined;

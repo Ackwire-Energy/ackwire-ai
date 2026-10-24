@@ -439,6 +439,26 @@ volume. With all four `S3_*` variables set they go to that bucket instead, and w
 Postgres. Choose before the first upload: a file stays in the store it was written to. An
 organization can also keep its files in a bucket of its own (**Settings → Storage**).
 
+**Operator API (optional).** For your own automation: look up any workspace or account on the
+instance. Off unless `OPERATOR_API_TOKEN` is set (at least 32 characters, `openssl rand -base64 48`);
+then a second listener on `OPERATOR_API_PORT` (3001) serves `/api/operator/v1`, called with
+`Authorization: Bearer <token>`, and its OpenAPI document is at `/api/operator/v1/openapi.json`. That
+port reaches every workspace, so never publish it or put it behind your proxy: the compose file
+doesn't publish it, and containers on the same Docker network reach it as `http://agentes:3001`.
+With the token set, the server also keeps 90 days of events for it to read (`GET /events`: sign-ups
+with their email, sign-ins with their IP address and browser, workspaces, invitations, agents, emails
+sent and runs finished, as metadata), and `GET /review/...` shows what one run or task did, with
+credentials masked; every such read is recorded as an event. `PUT /orgs/{orgId}/standing` puts a
+workspace on hold (its agents stop) or suspends it (nobody can use it, and what its agents are doing
+stops), and brings it back; `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
+`PUT /users/{userId}/block` signs an account out everywhere and keeps it out until you unblock it.
+`MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
+from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
+far each one is, and asks for a single-use code that the computer connects with
+(`POST /orgs/{orgId}/machines`): write it to a file only the runner's user can read and run
+`agentes-runner pair --server <url> --enroll-file <file>` there (or pass `--enroll-file` to the installer),
+which removes the file as soon as it is read. Leave it `off` and people connect their own computers.
+
 </details>
 
 <details>

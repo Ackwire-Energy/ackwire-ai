@@ -68,6 +68,10 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * `--runner-sha256 HEX` (any mode) installs the bundle only when it has that
  * SHA-256: whoever runs the installer for a fleet pins the runner it vouches
  * for, so a root runner never runs whatever the server happens to serve.
+ *
+ * `--enroll-file FILE` (any mode) connects with a code issued for this
+ * computer instead (`agentes-runner pair --enroll-file`, ADR 0056 §10),
+ * connected before or not.
  */
 export function installScript(publicUrl: string): string {
   const server = shQuote(publicUrl.trim().replace(/\/+$/, ""));
@@ -77,9 +81,9 @@ export function installScript(publicUrl: string): string {
     .join("\n");
   return `#!/bin/sh
 # agentes.chat runner installer: connects this computer to your organization.
-# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service]
+# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE]
 # On a Linux server, as root, the runner for the whole computer with each agent as its own user:
-#        curl -fsSL <server>/api/machines/install.sh | sh -s -- --system [--desktop] [--no-pair] [--no-start] [--agent-uid-range FIRST-LAST]
+#        curl -fsSL <server>/api/machines/install.sh | sh -s -- --system [--desktop] [--no-pair] [--no-start] [--agent-uid-range FIRST-LAST] [--enroll-file FILE]
 set -eu
 
 SERVER=${server}
@@ -96,6 +100,7 @@ NO_PAIR=0
 NO_START=0
 UID_RANGE=""
 RUNNER_SHA256=""
+ENROLL_FILE=""
 
 say() { printf '%s\\n' "$*"; }
 die() { printf 'agentes-runner: %s\\n' "$*" >&2; exit 1; }
@@ -106,8 +111,8 @@ sha256() {
 }
 
 usage() {
-  say "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service]"
-  say "       sh install.sh --system [--desktop] [--no-pair] [--no-start] [--agent-uid-range FIRST-LAST]"
+  say "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE]"
+  say "       sh install.sh --system [--desktop] [--no-pair] [--no-start] [--agent-uid-range FIRST-LAST] [--enroll-file FILE]"
   say ""
   say "  --system           Linux, as root: the runner for the whole computer, each agent as its own user"
   say "  --desktop          with --system: also the packages for the agents' screens"
@@ -115,6 +120,7 @@ usage() {
   say "  --no-start         with --system: install or update without starting or restarting the service"
   say "  --agent-uid-range  with --system: the uids agent users get (default ${uids})"
   say "  --runner-sha256    install the runner only if its download has this SHA-256 (64 hex digits)"
+  say "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not"
 }
 
 download() {
@@ -147,13 +153,14 @@ get_runner() {
   mv -f "$LAUNCHER.new" "$LAUNCHER"
 }
 
-# Connects this computer, unless it already is or --no-pair.
+# Connects this computer, unless it already is (and no code was issued for it) or --no-pair.
 connect() {
-  if [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
+  if [ -z "$ENROLL_FILE" ] && [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
     say "This computer is already connected (runner updated). To connect it again: $LAUNCHER pair --server $SERVER"
   elif [ "$NO_PAIR" -eq 0 ]; then
-    # Prints a code and a link, and waits until someone confirms it on the site.
+    # Prints a code and a link, and waits until someone confirms it on the site (an issued code needs nobody).
     set -- pair --server "$SERVER"
+    if [ -n "$ENROLL_FILE" ]; then set -- "$@" --enroll-file "$ENROLL_FILE"; fi
     if [ -n "$DIR" ]; then set -- "$@" --dir "$DIR"; fi
     if [ -n "$NAME" ]; then set -- "$@" --name "$NAME"; fi
     if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
@@ -313,6 +320,8 @@ main() {
       --agent-uid-range=*) UID_RANGE="\${1#--agent-uid-range=}"; shift ;;
       --runner-sha256) need_value "$1" $#; RUNNER_SHA256="$2"; shift 2 ;;
       --runner-sha256=*) RUNNER_SHA256="\${1#--runner-sha256=}"; shift ;;
+      --enroll-file) need_value "$1" $#; ENROLL_FILE="$2"; shift 2 ;;
+      --enroll-file=*) ENROLL_FILE="\${1#--enroll-file=}"; shift ;;
       -h|--help) usage; exit 0 ;;
       *) die "unknown option: $1" ;;
     esac
@@ -323,6 +332,7 @@ main() {
   esac
   [ -z "$RUNNER_SHA256" ] || [ \${#RUNNER_SHA256} -eq 64 ] ||
     die "--runner-sha256 takes the bundle's SHA-256 as 64 lowercase hex digits"
+  [ -z "$ENROLL_FILE" ] || [ "$NO_PAIR" -eq 0 ] || die "--enroll-file connects this computer, so it doesn't go with --no-pair"
   if [ "$SYSTEM" -eq 1 ]; then
     [ "$NO_SERVICE" -eq 0 ] || die "--system always installs the service; to leave it stopped, use --no-start"
     [ -z "$DIR" ] || die "--dir doesn't go with --system: each agent works in its own user's home"

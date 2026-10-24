@@ -18,7 +18,7 @@ export interface AgentAudience {
   mode: AudienceMode;
   /**
    * For `people`; the owner can always talk to the agent. Under `owner`, the
-   * people a plan kept out (ADR 0056 §5), who come back when it is let out.
+   * people a plan kept out (ADR 0058 §5), who come back when it is let out.
    */
   userIds: string[];
 }
@@ -45,7 +45,7 @@ export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
   widensAudience(OWNER_ONLY, a, ownerUserId);
 
 /**
- * More people for an agent that thinks with a personal plan (ADR 0056 §5):
+ * More people for an agent that thinks with a personal plan (ADR 0058 §5):
  * only the plan's owner, who is the agent's owner, lets them in; admins only
  * narrow. The first time anyone else may talk to it, the owner accepts that
  * answering other people on a personal plan might go against the provider's

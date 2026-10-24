@@ -1028,7 +1028,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const b = brainOf(agentId);
         const brain = input.brain ?? b.brain;
         const changed = brain !== b.brain;
-        // ADR 0056 §5: onto a plan, only its owner talks to it; letting others in is its owner's, with the terms.
+        // ADR 0058 §5: onto a plan, only its owner talks to it; letting others in is its owner's, with the terms.
         const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
         if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner)) {
           if (!b.canUsePlans) throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");

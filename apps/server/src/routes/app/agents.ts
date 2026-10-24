@@ -341,6 +341,8 @@ export function agentRoutes(deps: AppDeps) {
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
+      // Born on the workspace's own computer: it lists its agents again.
+      if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
     },
   );
@@ -473,7 +475,7 @@ export function agentRoutes(deps: AppDeps) {
             fallback: z.boolean().optional(),
             onlyOwner: z.boolean().optional().openapi({
               description:
-                "\"Só responde a você\" (ADR 0056): true, only its owner talks to it; false, on a plan everyone does (only its owner, `audience.plan_owner_only`), on the API whoever did before a plan made it the owner's only. Omitted = keep; switching onto a plan makes it the owner's only.",
+                "\"Só responde a você\" (ADR 0058): true, only its owner talks to it; false, on a plan everyone does (only its owner, `audience.plan_owner_only`), on the API whoever did before a plan made it the owner's only. Omitted = keep; switching onto a plan makes it the owner's only.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               description:

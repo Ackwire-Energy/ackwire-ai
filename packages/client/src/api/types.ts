@@ -1980,10 +1980,15 @@ export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: s
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
+/** `connected`: a person paired it; `host`: the server's own; `managed`: the workspace's own (ADR 0056 §10). */
+export type MachineKind = "connected" | "host" | "managed";
+
 /** `GET …/machines`: a computer connected with `agentes-runner`. */
 export interface Machine {
   id: string;
   name: string;
+  /** A `managed` one can't be removed, and its hostname, OS and arch are blank. Absent from older servers. */
+  kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
   lastSeenAt: string | null;
@@ -3139,7 +3144,7 @@ export interface AgentBrain {
   effort: BrainEffortSetting | null;
   /**
    * The agent's owner's accounts on its computer (both kinds) and the one it thinks with; "Conta deste
-   * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0056).
+   * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0058).
    */
   accounts: MachineAccount[];
   /** The viewer may add an account there for this agent: its owner, on a computer where they add accounts. */
@@ -3163,7 +3168,7 @@ export type BrainEffortSetting = BrainEffort | "auto";
 
 export type MachineAccountKind = "claude_code" | "codex";
 
-/** ADR 0041 §3, ADR 0056: a Claude Code or Codex account signed in on a connected computer (metadata only). */
+/** ADR 0041 §3, ADR 0058: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
   id: string;
   kind: MachineAccountKind;
@@ -3593,7 +3598,11 @@ export type NotificationKind =
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
-  | "browser_handoff";
+  | "browser_handoff"
+  /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
+  | "org_standing"
+  /** ADR 0056 §10: the workspace's own computer is ready (owners). `source.machineId`; `source.label` = its name. */
+  | "computer_ready";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {

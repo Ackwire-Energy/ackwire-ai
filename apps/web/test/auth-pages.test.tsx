@@ -123,6 +123,25 @@ describe("Entrar (e-mail primeiro)", () => {
     await press(/^Continuar(?! com)/);
     expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
   });
+
+  test("a blocked account is told so; another refusal keeps the server's words", async () => {
+    for (const [signIn, says] of [
+      [
+        { ok: false, status: 403, message: "This account can't sign in.", code: "ACCOUNT_BLOCKED" },
+        "Esta conta não pode entrar.",
+      ],
+      [{ ok: false, status: 403, message: "Invalid origin" }, "Invalid origin"],
+    ] as const) {
+      const { api } = authApi(ACCOUNT);
+      await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
+      await type("E-mail", "marina@acme.com.br");
+      await press(/^Continuar(?! com)/);
+      await type("Senha", "correct horse");
+      await press(/^Entrar/);
+      expect(screen().getByRole("alert").textContent).toContain(says);
+      cleanup();
+    }
+  });
 });
 
 describe("Criar conta (e-mail novo)", () => {
@@ -310,7 +329,7 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.create")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Falta a chave de API." })).toBeTruthy();
     // The key is required there; the platform key isn't offered by this server.
-    expect(screen().queryByRole("button", { name: /Usar créditos da plataforma/ })).toBeNull();
+    expect(screen().queryByRole("button", { name: /Usar a chave do agentes.chat/ })).toBeNull();
     const save = () => button(/Salvar e criar 1 agente/);
     expect(save().hasAttribute("disabled")).toBe(true);
     // New agents start on "Automático".

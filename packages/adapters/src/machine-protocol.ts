@@ -160,7 +160,7 @@ export const BROWSER_FAST_PROTOCOL = 17;
 export const PLAN_USAGE_PROTOCOL = 18;
 /**
  * From this protocol on: coding plans as key accounts on Claude Code (ADR
- * 0056). `begin` with `provider` (a plan of `@agenteschat/providers/plans`)
+ * 0058). `begin` with `provider` (a plan of `@agenteschat/providers/plans`)
  * starts no CLI: the runner makes the folder and a key the browser seals the
  * plan's key to, and `code` hands it over (kept in the folder,
  * `provider.json`, mode 600). Turns in that folder think through the

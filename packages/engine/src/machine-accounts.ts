@@ -38,7 +38,7 @@ const { machineAccounts, agents, machines, users } = schema;
 
 /*
  * Accounts of the computer brains on a connected computer (ADR 0041, ADR
- * 0056): a folder on the machine where Claude Code or Codex keeps its own
+ * 0058): a folder on the machine where Claude Code or Codex keeps its own
  * sign-in. We keep metadata only (email, plan, signed in or not); the sign-in
  * itself goes through the provider's CLI on the computer, and a Claude code
  * typed in the browser reaches the runner sealed to the machine's key.
@@ -238,7 +238,7 @@ async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow
 /**
  * Agents that used these accounts lose them: back to the computer's own
  * sign-in when that is their owner's, else to the API (a plan thinks only for
- * its owner's agents, ADR 0056 §3). Their cache goes with `forgetAgents`.
+ * its owner's agents, ADR 0058 §3). Their cache goes with `forgetAgents`.
  */
 export async function releaseAgents(db: Executor, orgId: string, accountIds: string[], now = new Date()) {
   if (accountIds.length === 0) return [];
@@ -731,7 +731,7 @@ export async function getMachineAccounts(
   };
 }
 
-// ── Signing in (ADR 0041 §2, ADR 0056 §1) ───────────────────────────────────
+// ── Signing in (ADR 0041 §2, ADR 0058 §1) ───────────────────────────────────
 
 export interface AccountLoginView {
   loginId: string;
@@ -1008,7 +1008,7 @@ export async function renameMachineAccount(
 }
 
 /**
- * Removes an account (ADR 0041 §7, ADR 0056 §1): its owner, the computer's
+ * Removes an account (ADR 0041 §7, ADR 0058 §1): its owner, the computer's
  * pairer, or an admin when the computer or the account has no person. The
  * agents that used it are released now (`releaseAgents`); the runner
  * signs the CLI out there and deletes the folder now, or at its next hello

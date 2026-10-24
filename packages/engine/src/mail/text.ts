@@ -36,6 +36,12 @@ export const formatAddress = (a: MailAddress | null | undefined) =>
 
 export const normalizeAddress = (s: string) => s.trim().toLowerCase();
 
+/** The domain of an address, lowercased (empty when it has no `@`). */
+export const addressDomain = (address: string) => {
+  const a = normalizeAddress(address);
+  return a.includes("@") ? a.slice(a.lastIndexOf("@") + 1) : "";
+};
+
 const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
 const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 

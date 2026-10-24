@@ -47,7 +47,7 @@ import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
- * ADR 0041 and ADR 0056: accounts of the computer brains on a connected
+ * ADR 0041 and ADR 0058: accounts of the computer brains on a connected
  * computer. An account is the person's who started its sign-in, bound when
  * it starts; one the desktop app signed in is the pairer's. The runner's
  * hello keeps the rows in sync; only the owner renames an account or picks

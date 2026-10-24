@@ -1,6 +1,6 @@
 # 0041. Claude and Codex accounts on a connected computer, chosen per agent; effort per agent
 
-- Status: Accepted (2026-10-20). Superseded in part by ADR 0056 (§2 who adds accounts, §4 who decides, §7 removing)
+- Status: Accepted (2026-10-20). Superseded in part by ADR 0058 (§2 who adds accounts, §4 who decides, §7 removing)
 - Date: 2026-10-20
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets, end to end), ADR 0032 (Claude Code and Codex as brains), ADR 0036 (desktop app)
 - Out of scope for now: cloud computers, switching accounts by itself when a plan runs out

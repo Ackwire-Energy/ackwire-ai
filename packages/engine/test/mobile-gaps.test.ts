@@ -45,11 +45,6 @@ const general = async (userId: string) => {
   if (!found) throw new Error("general not listed");
   return found;
 };
-/**
- * PGlite's clock ticks in whole milliseconds, so a message written in the same millisecond as a join or a read
- * ties with it and doesn't count as after it (Postgres keeps microseconds).
- */
-const nextMillisecond = () => Bun.sleep(2);
 
 /** Bia, a member, in #general. */
 async function withBia() {
@@ -58,6 +53,12 @@ async function withBia() {
   await nextMillisecond();
   return bia;
 }
+
+/**
+ * PGlite's clock counts whole milliseconds, so a message posted in the same millisecond as a join or a
+ * read ties with it and isn't unread; waiting for the next one keeps what a test posts next after it.
+ */
+const nextMillisecond = () => Bun.sleep(2);
 
 const threadReplies = async (userId: string) =>
   f.db
@@ -77,8 +78,8 @@ describe("channel list: unread and last message", () => {
     expect(before.unreadCount).toBe(2);
     expect(before.lastMessage).toMatchObject({ authorType: "person", authorId: bia.id, authorName: "bia" });
     await markChannelRead(f.db, bia.id, f.org.id, f.general.id);
-    expect((await general(bia.id)).unreadCount).toBe(0);
     await nextMillisecond();
+    expect((await general(bia.id)).unreadCount).toBe(0);
     const last = await post(f.owner.id, f.general.id, `**Deploy** ${"y".repeat(300)}`);
     const after = await general(bia.id);
     expect(after.unreadCount).toBe(1);

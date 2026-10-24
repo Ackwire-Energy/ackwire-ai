@@ -66,6 +66,7 @@ import {
   type ScheduleRule,
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
+import { standingRefusal } from "./standing";
 
 export { startRoutineRun } from "./routine-room";
 
@@ -1504,6 +1505,10 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
   if (!routine || routine.deletedAt) return skip("deleted");
   if (!routine.active && run.trigger !== "manual") return skip("paused");
+  // Its workspace is on hold or suspended, or its agent held: the slot passes, the routine keeps its
+  // schedule (`standing.ts`).
+  const refusal = await standingRefusal(db, run.orgId, routine.agentId);
+  if (refusal) return skip(refusal.code.replace(".", "_"));
   const paused = async (reason: RoutinePausedReason) => {
     await pauseRoutine(deps, routine, reason);
     return skip(reason);

@@ -32,6 +32,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     );
   }
   const config = result.data;
+  // Its requests are read only through the operator API: without it every workspace would wait forever.
+  if (config.MACHINE_PROVISIONING === "external" && !config.OPERATOR_API_TOKEN) {
+    throw new ConfigError(["MACHINE_PROVISIONING=external needs OPERATOR_API_TOKEN"]);
+  }
   const site = new URL(config.PUBLIC_URL);
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     if (raw.LANDING_PAGE === undefined) config.LANDING_PAGE = true;

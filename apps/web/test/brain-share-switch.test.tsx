@@ -9,7 +9,7 @@ import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedStat
 import { renderApp, screen, settle } from "./render";
 
 /*
- * "Só responde a você" (ADR 0056 §5): an agent on its owner's personal plan
+ * "Só responde a você" (ADR 0058 §5): an agent on its owner's personal plan
  * answers only them until they let others in, after the provider's own words
  * about personal use. Admins only narrow it.
  */

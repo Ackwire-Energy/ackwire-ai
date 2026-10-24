@@ -55,6 +55,13 @@ export interface MachineAccess {
 }
 
 /**
+ * Where a computer came from: `connected` (a person paired it, ADR 0036 §5),
+ * `host` (the server's own computer) or `managed` (the workspace's computer,
+ * given by the operator's provisioner: ADR 0056 §10; one per organization).
+ */
+export type MachineKind = "connected" | "host" | "managed";
+
+/**
  * Connected computers (ADR 0025): machines people paired, where our runner
  * keeps one outbound WebSocket open. The token is stored as SHA-256 only;
  * deleting a machine (soft) clears it, so the runner is refused at once.
@@ -69,6 +76,7 @@ export const machines = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text().notNull(),
+    kind: text().$type<MachineKind>().notNull().default("connected"),
     pairedByUserId: text().references(() => users.id, { onDelete: "set null" }),
     /** SHA-256 (hex) of `agm_…`; null once deleted. */
     tokenHash: text().unique(),
@@ -114,11 +122,37 @@ export const machines = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [unique().on(t.orgId, t.id), index().on(t.orgId)],
+  (t) => [
+    unique().on(t.orgId, t.id),
+    index().on(t.orgId),
+    // Removed ones too: issuing a computer again brings the same row back.
+    uniqueIndex("machines_managed_org").on(t.orgId).where(sql`${t.kind} = 'managed'`),
+  ],
 );
 
 /**
- * Accounts of the computer brains on a machine (ADR 0041, ADR 0056): a folder
+ * How far the workspace's computer is (ADR 0056 §10), with
+ * `MACHINE_PROVISIONING=external`: `preparing` (`step`: reserving, starting,
+ * installing, connecting), `waiting` (`reason`: approval, capacity) and
+ * `problem` are the provisioner's to set; `ready` is set here, on the managed
+ * computer's first hello. No row: nothing reported yet.
+ */
+export const machineProvisioning = pgTable("machine_provisioning", {
+  orgId: uuid()
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  state: text().notNull(),
+  step: text(),
+  reason: text(),
+  etaSeconds: integer(),
+  specs: jsonb().$type<{ cpus: number; memoryGb: number; diskGb: number }>(),
+  /** When this state (and step or reason) began. */
+  since: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Accounts of the computer brains on a machine (ADR 0041, ADR 0058): a folder
  * on the computer (`<runner home>/accounts/<kind>/<id>`) where Claude Code or
  * Codex keeps its own sign-in. Nothing secret here: what the CLI's status
  * command says (email, plan) and whether it is still signed in. `id` is the

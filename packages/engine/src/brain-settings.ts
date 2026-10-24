@@ -219,14 +219,14 @@ export interface AgentBrainView {
   effort: BrainEffortSetting | null;
   /**
    * The agent's owner's accounts on its computer, both kinds ([] without a computer), and the one it thinks
-   * with; emails only of the caller's own. A plan thinks only for its owner's agents (ADR 0056 §3).
+   * with; emails only of the caller's own. A plan thinks only for its owner's agents (ADR 0058 §3).
    */
   accounts: MachineAccountView[];
   /** The caller may add an account there for this agent: its owner, on a computer where they add accounts. */
   canManageAccounts: boolean;
   /** The computer's runner knows accounts (protocol 13). */
   accountsSupported: boolean;
-  /** "Só responde a você" (ADR 0056 §5): nobody but its owner talks to it. */
+  /** "Só responde a você" (ADR 0058 §5): nobody but its owner talks to it. */
   onlyOwner: boolean;
   /** The caller owns the agent: only they choose its plan and let other people talk to it on a plan. */
   canUsePlans: boolean;
@@ -364,7 +364,7 @@ export interface AgentBrainInput {
   model?: unknown;
   fallback?: unknown;
   /**
-   * "Só responde a você" (ADR 0056 §5): true, only its owner talks to it;
+   * "Só responde a você" (ADR 0058 §5): true, only its owner talks to it;
    * false, on a plan everyone does, and on the API whoever did before a plan
    * made it its owner's only. Omitted = keep it; a switch onto a plan makes
    * it its owner's only.
@@ -391,7 +391,7 @@ export interface AgentBrainInput {
 
 const EVERYONE: AgentAudience = { mode: "everyone", userIds: [] };
 
-/** Who it answers after this change: a switch onto a plan makes it its owner's only (ADR 0056 §5). */
+/** Who it answers after this change: a switch onto a plan makes it its owner's only (ADR 0058 §5). */
 function nextAudience(
   agent: Agent,
   brain: BrainKind,
@@ -555,7 +555,7 @@ export async function setAgentBrain(
 }
 
 /**
- * The account the agent will run with (ADR 0041 §4, ADR 0056 §1–3): kept
+ * The account the agent will run with (ADR 0041 §4, ADR 0058 §1–3): kept
  * when nothing asks otherwise, cleared when the brain kind changes. A plan
  * thinks only for its owner's agents, so only the agent's owner chooses: one
  * of their own accounts (on the agent's computer, of the brain's kind; one

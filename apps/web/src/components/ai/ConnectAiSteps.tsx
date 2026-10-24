@@ -23,7 +23,7 @@ import { useToast } from "@/lib/toast";
 import { AddAccount } from "./AddAccountFlow";
 
 /*
- * "Conectar uma IA" (ADR 0056): what to bring (a Claude or ChatGPT plan, or a
+ * "Conectar uma IA" (ADR 0058): what to bring (a Claude or ChatGPT plan, or a
  * coding plan's key), on which of the caller's computers when more than one
  * can take it, the provider's own sign-in (`AddAccount`), then its name and
  * the agent it thinks for.

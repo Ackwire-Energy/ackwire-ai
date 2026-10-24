@@ -40,7 +40,14 @@ import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
-import { devicePair, formatUserCode, PairingError } from "./pairing";
+import {
+  type DeviceGrant,
+  devicePair,
+  formatUserCode,
+  PairingError,
+  redeemIssuedCode,
+  takeEnrollCode,
+} from "./pairing";
 import { installService, installSystemService, serviceStatus, uninstallService } from "./service";
 import { runTaskWrapper } from "./tasks";
 import { runWorker } from "./worker";
@@ -55,6 +62,9 @@ Usage:
       --dir      the folder agents work in (default ~/agentes)
       --no-exec  files and uploads only; agents can't run commands
       --new      connect as a new computer instead
+  agentes-runner pair --server <url> --enroll-file <path> [--dir <workspace>] [--name <name>] [--no-exec]
+      Connects with a code issued for this computer by whoever provisions it; nobody confirms it.
+      The file is removed as soon as it is read.
   agentes-runner start
       Connects and stays connected (reconnects on its own).
   agentes-runner service install|uninstall
@@ -94,7 +104,18 @@ interface Parsed {
   lists: Map<string, string[]>;
 }
 
-const VALUE_FLAGS = new Set(["server", "dir", "name", "task", "run", "home", "agent", "code", "agent-uid-range"]);
+const VALUE_FLAGS = new Set([
+  "server",
+  "dir",
+  "name",
+  "task",
+  "run",
+  "home",
+  "agent",
+  "code",
+  "agent-uid-range",
+  "enroll-file",
+]);
 const LIST_FLAGS = new Set(["agent"]);
 
 function parseArgs(argv: string[]): Parsed {
@@ -140,9 +161,23 @@ function storedOrNull(home = runnerHome()): StoredConfig | null {
   }
 }
 
-/** The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site. */
+/**
+ * The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site.
+ * With `--enroll-file`, redeems a code issued for this computer instead (ADR 0056 §10).
+ */
 async function pair(p: Parsed): Promise<number> {
-  const usage = "Usage: agentes-runner pair --server <url> [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
+  const usage =
+    "Usage: agentes-runner pair --server <url> [--enroll-file <path>] [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
+  let enrollCode: string | undefined;
+  if (p.flags.has("enroll-file")) {
+    // Taken first, so no failure below leaves the code on disk.
+    try {
+      enrollCode = takeEnrollCode(flagString(p, "enroll-file") ?? "");
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      return 1;
+    }
+  }
   if (p.flags.has("code")) {
     console.error(
       "Pairing codes from the site are gone: run agentes-runner pair --server <url> and confirm the code it shows.",
@@ -168,26 +203,31 @@ async function pair(p: Parsed): Promise<number> {
   const ac = new AbortController();
   const onSignal = () => ac.abort();
   process.once("SIGINT", onSignal);
-  let grant: Awaited<ReturnType<typeof devicePair>>;
+  let grant: DeviceGrant;
   try {
-    grant = await devicePair(
-      server,
-      deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
-      (code) => {
-        console.log("");
-        console.log(`To connect this computer, open this link and confirm the code ${formatUserCode(code.userCode)}:`);
-        console.log("");
-        console.log(`  ${code.verificationUrl}`);
-        console.log("");
-        console.log(
-          `The code expires in ${Math.max(1, Math.round(code.expiresIn / 60))} minutes. Waiting for the confirmation...`,
+    grant = enrollCode
+      ? await redeemIssuedCode(server, enrollCode, { signal: ac.signal })
+      : await devicePair(
+          server,
+          deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
+          (code) => {
+            console.log("");
+            console.log(
+              `To connect this computer, open this link and confirm the code ${formatUserCode(code.userCode)}:`,
+            );
+            console.log("");
+            console.log(`  ${code.verificationUrl}`);
+            console.log("");
+            console.log(
+              `The code expires in ${Math.max(1, Math.round(code.expiresIn / 60))} minutes. Waiting for the confirmation...`,
+            );
+          },
+          { signal: ac.signal },
         );
-      },
-      { signal: ac.signal },
-    );
   } catch (err) {
     if (err instanceof PairingError) {
       if (err.code === "canceled") console.error("Canceled.");
+      else if (enrollCode) console.error(err.message);
       else if (err.code === "denied") console.error("The connection was refused on the site. Nothing changed.");
       else if (err.code === "expired") console.error("The code expired before it was confirmed. Run this again.");
       else console.error(err.message);

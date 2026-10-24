@@ -238,6 +238,7 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
     [["--system", "--agent-uid-range"], "--agent-uid-range needs a value"],
     [["--system", "--no-service"], "use --no-start"],
     [["--system", "--dir", "/srv/agents"], "--dir doesn't go with --system"],
+    [["--system", "--no-pair", "--enroll-file", "/run/agentes/enroll-code"], "doesn't go with --no-pair"],
     [["--runner-sha256"], "--runner-sha256 needs a value"],
     [["--runner-sha256", "abc"], "64 lowercase hex digits"],
     [["--runner-sha256", "A".repeat(64)], "64 lowercase hex digits"],
@@ -254,6 +255,7 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
     expect(help.stdout).toContain(flag);
   }
   expect(help.stdout).toContain("--runner-sha256");
+  expect(help.stdout).toContain("--enroll-file");
 });
 
 test.if(posix)("install.sh --runner-sha256: a bundle with another SHA-256 is never installed", () => {

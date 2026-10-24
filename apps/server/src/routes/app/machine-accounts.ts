@@ -67,7 +67,7 @@ const offline = {
 
 /**
  * Accounts of the computer brains on a connected computer (ADR 0041, ADR
- * 0056): an account is the person's who started its sign-in (through the
+ * 0058): an account is the person's who started its sign-in (through the
  * provider's own CLI on the computer). The person who connected the computer
  * adds accounts there, or anyone on a computer nobody connected; only an
  * account's owner sees its email, renames it, continues its sign-in or

@@ -236,7 +236,7 @@ async function brainAccountFor(
 }
 
 /**
- * A plan thinks only for its owner's agents (ADR 0056 §3): the account's
+ * A plan thinks only for its owner's agents (ADR 0058 §3): the account's
  * owner, or with the computer's own sign-in the person who connected that
  * computer, must be the agent's owner, still in the organization.
  */

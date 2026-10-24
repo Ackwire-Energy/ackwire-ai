@@ -423,7 +423,7 @@ export const MachineAccount = z
   })
   .openapi("MachineAccount", {
     description:
-      "An account of a computer brain on a connected computer (ADR 0041, ADR 0056). Metadata only, never a sign-in.",
+      "An account of a computer brain on a connected computer (ADR 0041, ADR 0058). Metadata only, never a sign-in.",
   });
 
 export const AgentBrain = z
@@ -450,7 +450,7 @@ export const AgentBrain = z
       .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
     effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run; null = the CLI's default." }),
     accounts: z.array(MachineAccount).openapi({
-      description: "The agent's owner's accounts on its computer, both kinds, and the one it thinks with (ADR 0056).",
+      description: "The agent's owner's accounts on its computer, both kinds, and the one it thinks with (ADR 0058).",
     }),
     canManageAccounts: z.boolean().openapi({
       description:
