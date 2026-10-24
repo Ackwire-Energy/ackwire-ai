@@ -5974,7 +5974,11 @@ a.machine-row__name:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-/* A suspended workspace's screen: its other workspaces under the notice. */
+/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. */
+.suspended-page .support-line {
+  display: block;
+  margin-top: 6px;
+}
 .suspended-page__others {
   display: flex;
   flex-wrap: wrap;

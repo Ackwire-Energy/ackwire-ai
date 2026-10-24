@@ -80,7 +80,8 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
           </Button>
         }
       >
-        {reason ? t("standing.suspendedFor", { reason }) : t("standing.screen.text")} <SupportLine />
+        {reason ? t("standing.suspendedFor", { reason }) : t("standing.screen.text")}
+        <SupportLine />
       </EmptyState>
       {others.length > 0 && (
         <nav className="suspended-page__others" aria-label={t("standing.screen.others")}>
