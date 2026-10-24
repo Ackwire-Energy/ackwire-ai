@@ -32,6 +32,33 @@ export interface RunnerConfig {
   /** The organization this home belongs to (from the device-code pairing). */
   orgId?: string;
   orgName?: string;
+  /**
+   * `system` (`install.sh --system`, Linux): the runner is a root service and
+   * each agent works as its own OS user; the root process runs no agent work
+   * itself. Absent or `user`: everything runs as the runner's own user.
+   */
+  mode?: "user" | "system";
+  /** System mode: the uids agent users get, `[first, last]` (default `DEFAULT_AGENT_UID_RANGE`). */
+  agentUidRange?: [number, number];
+}
+
+/** System mode's home (`install.sh --system`). */
+export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
+export const DEFAULT_AGENT_UID_RANGE: [number, number] = [20000, 29999];
+
+/**
+ * `[first, last]` when both are whole numbers in order within 1000–59999:
+ * never a system account's uid, and below the ranges systemd hands out itself.
+ */
+function agentUidRange(first: unknown, last: unknown): [number, number] | null {
+  const ok = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1000 && (n as number) <= 59999;
+  return ok(first) && ok(last) && first <= last ? [first, last] : null;
+}
+
+/** `20000-29999` → `[20000, 29999]`; null when it isn't a valid range. */
+export function parseUidRange(text: string): [number, number] | null {
+  const m = /^(\d{1,9})-(\d{1,9})$/.exec(text.trim());
+  return m ? agentUidRange(Number(m[1]), Number(m[2])) : null;
 }
 
 /** The file as stored: a home that isn't paired (or was unpaired) keeps only some fields. */
@@ -98,6 +125,8 @@ export function readStoredConfig(home = runnerHome()): StoredConfig | null {
 export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
   const access = raw.access === undefined ? undefined : parseAccess(raw.access);
   const paused = parsePaused(raw.paused);
+  const range = raw.agentUidRange;
+  const uids = Array.isArray(range) && range.length === 2 ? agentUidRange(range[0], range[1]) : null;
   return {
     ...(text(raw.server) ? { server: text(raw.server) } : {}),
     ...(text(raw.machineId) ? { machineId: text(raw.machineId) } : {}),
@@ -114,6 +143,8 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(access ? { access } : {}),
     ...(text(raw.orgId, 100) ? { orgId: text(raw.orgId, 100) } : {}),
     ...(text(raw.orgName, 200) ? { orgName: text(raw.orgName, 200) } : {}),
+    ...(raw.mode === "system" || raw.mode === "user" ? { mode: raw.mode } : {}),
+    ...(uids ? { agentUidRange: uids } : {}),
   };
 }
 

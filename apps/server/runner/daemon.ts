@@ -136,6 +136,8 @@ export function prepareWorkspace(dir: string): string {
  * The config after a device-code pairing. Limits of an earlier pairing of
  * this home stay; access starts from `tools` with no folders, except when
  * the server gave back the same machine (a reconnect): its folders and tools stay.
+ * The mode always stays: a system home paired again must never become a
+ * root runner that does agents' work itself.
  */
 export function configFromGrant(
   prev: StoredConfig | null,
@@ -144,6 +146,8 @@ export function configFromGrant(
   const { grant, tools } = input;
   const same = prev?.machineId === grant.machineId && prev?.server === input.server;
   return {
+    ...(prev?.mode ? { mode: prev.mode } : {}),
+    ...(prev?.agentUidRange ? { agentUidRange: prev.agentUidRange } : {}),
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
     ...(prev?.brainIdleMinutes ? { brainIdleMinutes: prev.brainIdleMinutes } : {}),
@@ -624,6 +628,8 @@ export class RunnerDaemon implements RequestObserver {
       brains,
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
+      // A config written later without the mode never turns a system session back into one that does agents' work.
+      systemMode: () => config.mode === "system" || this.stored?.mode === "system",
       access: () => this.access(),
       accessOps: {
         request: (agent, req) => this.accessRequest(agent, req),

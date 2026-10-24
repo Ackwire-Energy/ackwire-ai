@@ -48,6 +48,14 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "browser.stream.start",
 ]);
 
+/**
+ * System mode: the only ops the root process answers itself (the machine's
+ * accounts and access settings). Everything else is an agent's work, done
+ * only as that agent's own OS user; an allowlist, so a new op is refused
+ * until someone decides where it runs.
+ */
+export const SYSTEM_MODE_OPS: ReadonlySet<string> = new Set(["account", "access.request", "access.reduce"]);
+
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
 type AccessReduceOp = Extract<MachineRequest, { op: "access.reduce" }>;
 
@@ -88,6 +96,8 @@ export interface HandlerContext {
   };
   /** Protocol 9: whether the owner paused this computer (new work is refused with `paused`). */
   paused?: () => boolean;
+  /** System mode: this process is root and answers only `SYSTEM_MODE_OPS`. */
+  systemMode?: () => boolean;
   /**
    * Protocol 10: what the machine allows. With it, absolute paths inside the
    * agent's allowed folders are accepted and each tool needs to be on;
@@ -287,6 +297,12 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
   if (NEW_WORK_OPS.has(req.op) && ctx.paused?.()) {
     throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
+  }
+  if (!SYSTEM_MODE_OPS.has(req.op) && ctx.systemMode?.()) {
+    throw new RunnerError(
+      "not_allowed",
+      "This computer runs each agent as its own user, and its runner can't do that yet; update the runner on this computer",
+    );
   }
   if (req.op === "access.request" || req.op === "access.reduce") return handleAccess(ctx, req);
   // Protocol 13: accounts belong to the machine, not to an agent.
