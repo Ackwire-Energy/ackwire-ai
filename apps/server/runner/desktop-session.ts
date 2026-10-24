@@ -44,8 +44,8 @@ import { agentFolderName } from "./paths";
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
  * - Started on demand (`ensure`), stopped after `DESKTOP_IDLE_MS` with no
- *   stream and no use, started again (at most 3 times in 10 minutes) when it
- *   ends by itself.
+ *   stream and no use (the agent's Chrome on it in use counts), started again
+ *   (at most 3 times in 10 minutes) when it ends by itself.
  * - Desktops outlive the runner (their own sessions; the service has
  *   `KillMode=process`): the next runner takes them back from
  *   `<runner home>/desktop/<id8>.json` once the pid there is still that
@@ -289,6 +289,8 @@ export interface DesktopSessionsOptions {
   maxDesktops?: number;
   idleMs?: number;
   now?: () => number;
+  /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): not idle then. */
+  inUse?: (agentId: string) => boolean;
 }
 
 /** What `<runner home>/desktop/<id8>.json` keeps of a running desktop. */
@@ -398,7 +400,7 @@ export class DesktopSessions {
     });
   }
 
-  status(agent: AgentScope): MachineReplies["desktop.session.status"] {
+  status(agent: Pick<AgentScope, "id">): MachineReplies["desktop.session.status"] {
     const d = this.desktops.get(agent.id);
     if (!d || !this.alive(d)) return { running: false, streams: 0 };
     return { running: true, startedAt: iso(d.startedAt), lastUsedAt: iso(d.lastUsed), streams: d.streams };
@@ -460,7 +462,7 @@ export class DesktopSessions {
   /** Desktops that ended by themselves start again; idle ones stop. */
   async sweep() {
     const idleMs = this.opts.idleMs ?? DESKTOP_IDLE_MS;
-    const idle = (d: Desktop) => d.streams === 0 && this.now() - d.lastUsed >= idleMs;
+    const idle = (d: Desktop) => d.streams === 0 && this.now() - d.lastUsed >= idleMs && !this.opts.inUse?.(d.agent.id);
     for (const d of [...this.desktops.values()]) {
       if (!this.alive(d)) {
         this.ended(d);

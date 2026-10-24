@@ -447,6 +447,9 @@ async function handleStream(
   return { opened: true };
 }
 
+/** Protocol 18: the agent's Chrome goes on its desktop only while the machine's desktop switch is on too. */
+const onDesktop = (ctx: HandlerContext, req: { desktop?: unknown }) => req.desktop === true && toolOn(ctx, "desktop");
+
 /**
  * Protocol 12: the agent's browser (ADR 0040); `browser.batch` and
  * `browser.capture` from protocol 17 (ADR 0054). Needs the machine's browser
@@ -480,10 +483,10 @@ async function handleBrowser(
       return browser.streamStop(req.agent);
     case "browser.act":
       requireTool(ctx, "browser");
-      return browser.act(req.agent, ctx.workspaceReal, req, scope.signal);
+      return browser.act(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
     case "browser.batch":
       requireTool(ctx, "browser");
-      return browser.batch(req.agent, ctx.workspaceReal, req, scope.signal);
+      return browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal);
     case "browser.capture":
       requireTool(ctx, "browser");
       return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);

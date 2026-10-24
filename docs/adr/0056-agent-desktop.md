@@ -36,9 +36,9 @@ People want to see everything an agent does on its computer, not only its browse
 
 ### 1. One desktop per agent: Xtigervnc and XFCE, on demand
 
-- One `Xtigervnc` per agent display (X server and VNC server in one process): `:N -geometry 1280x800 -depth 24 -rfbport -1 -rfbunixpath <session folder>/vnc.sock -rfbunixmode 0600 -SecurityTypes VncAuth -PasswordFile <file> -AlwaysShared -AcceptSetDesktopSize=0 -FrameRate=30 -UseBlacklist=0 -auth <Xauthority> -nolisten tcp -s 0`. Never `-ac` or `-nopw`.
+- One `Xtigervnc` per agent display (X server and VNC server in one process): `:N -geometry 1280x900 -depth 24 -rfbport -1 -rfbunixpath <session folder>/vnc.sock -rfbunixmode 0600 -SecurityTypes VncAuth -PasswordFile <file> -AlwaysShared -AcceptSetDesktopSize=0 -FrameRate=30 -UseBlacklist=0 -auth <Xauthority> -nolisten tcp -s 0`. Never `-ac` or `-nopw`.
 - No TCP listener: a loopback port can be taken first by another agent's process, which would then show a fake screen to the people watching and read what the person in control types.
-- `DESKTOP_SIZE` is 1280×800 (inside the screen layer's image limits, ADR 0054). Viewers scale it and never resize it.
+- `DESKTOP_SIZE` is 1280×900 (inside the screen layer's image limits, ADR 0054): the agent's Chrome, maximized under the panel, shows a page of 1280×786, close to the 1280×800 of the headless Chrome the screen layer was measured on (§7). Viewers scale it and never resize it.
 - An XFCE session (`dbus-launch --exit-with-session xfce4-session`), restarted up to 3 times in 10 minutes. Its own ssh-agent is off (the session's settings, written once into its `HOME`): it daemonizes and would outlive every desktop. The packages go in with `--no-install-recommends` (otherwise a screen locker nobody can unlock, more daemons and eight folders in each home): `tigervnc-standalone-server xauth dbus-x11 xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-settings thunar xfce4-terminal adwaita-icon-theme elementary-xfce-icon-theme fonts-noto-core`.
 - Started on demand: the agent uses its screen or its browser, or a person presses "Ligar". A viewer alone never starts it. Stopped after 15 minutes without a stream, the agent's use, an open handoff or a viewer of the browser card; the agent's Chrome on it closes with it.
 - Desktops per machine: `max(1, floor((RAM − 2 GiB) / 800 MiB))`, 7 on 8 GB. Over it, `desktop_busy`.
@@ -87,10 +87,13 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 
 ### 7. The agent's browser on its desktop
 
-- For an agent with `desktop:use` on a computer that serves desktops, the runner's Chrome runs headed on the agent's display (`--start-maximized`; `--test-type` hides the bar the automation flag shows; `DISPLAY` and `XAUTHORITY`). `agent-browser` still attaches over CDP, on an OS-assigned port.
-- The request says so (`desktop: true` on the agent's `browser.*` requests), which also covers a mission's computer.
-- Chrome never restarts in the other mode while a handoff is open or someone watches.
-- Its viewport is smaller than headless (about 686 px tall under the panel): ADR 0054's numbers are measured again headed.
+- For an agent with `desktop:use` whose browser runs on its own computer, when that computer serves desktops, the runner's Chrome runs headed on the agent's display; the desktop starts first. `agent-browser` still attaches over CDP, on an OS-assigned port. On a mission's other computer the browser stays headless: the desktop people watch is the one on the agent's own computer.
+- The server says so on each request that may start Chrome (`desktop: true` on `browser.act` and `browser.batch`); the runner follows it only while its own desktop switch is on.
+- The flags: `--start-maximized`; `--test-type=gpu` (`--test-type` hides the bar a headed Chrome shows for the automation flag, and the value `gpu` the one Chrome for Testing shows about being only for automated tests: both take the page's height, and people see them); `--ozone-platform=x11`. Its environment is the runner's on the agent's `DISPLAY` and `XAUTHORITY`, without the runner's own Wayland display and session bus, so nothing it opens lands on the screen of the person running the runner.
+- Chrome draws its own frame only when a window manager runs as it starts, and a desktop that just started gets its window manager a moment later: the runner sets Chrome's own frame in the profile (`browser.custom_chrome_frame`) before a headed start, so the window is the same either way.
+- A Chrome in the other mode (the desktop came or went, the switch or the scope changed) starts again in this one at the next command that may start Chrome, on the same profile and the same page; never while someone watches it (the browser card, or the desktop it is on) or a person's turn is open. A desktop that can't start leaves Chrome headless, tried again after 5 minutes.
+- The two idle stops know each other: a desktop isn't idle while its Chrome is in use (a command within 15 minutes, the browser card's viewers, a person's turn), and a Chrome isn't idle while its desktop is watched (a person may be working in it without a command). Stopping the desktop ends Chrome with it; the next command starts both.
+- Measured (Chrome for Testing 156, 1280×900, XFCE): a page of 1280×786 with `navigator.webdriver` false and no bar, maximized under the panel, its own frame even when started 2 s after a new desktop; the browser card's live view keeps working.
 
 ### 8. The scope: `desktop:use`, always together with `sandbox:run`
 
@@ -117,7 +120,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 ### 11. Protocol 18
 
 ```ts
-DESKTOP_SIZE = { width: 1280, height: 800 }
+DESKTOP_SIZE = { width: 1280, height: 900 }
 RunnerInfo (hello): desktop?: { available; reason?; width?; height? }; terminal?: { available; reason? }; mode?: "system"
 RunnerTools (switches, absent = off): desktop?: boolean; terminal?: boolean
 MachineRequest (each carries `agent`):

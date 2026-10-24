@@ -161,8 +161,12 @@ export const BROWSER_FAST_PROTOCOL = 17;
  */
 export const DESKTOP_PROTOCOL = 18;
 
-/** Every agent desktop's size: viewers scale it, they never resize it. */
-export const DESKTOP_SIZE = { width: 1280, height: 800 } as const;
+/**
+ * Every agent desktop's size: viewers scale it, they never resize it. 900 tall
+ * so the agent's Chrome, maximized under the panel, still shows a page about
+ * 800 tall, like the headless one the screen layer was measured on (ADR 0054).
+ */
+export const DESKTOP_SIZE = { width: 1280, height: 900 } as const;
 
 /** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
 export const SCREEN_KINDS = ["browser", "desktop"] as const;
@@ -1004,6 +1008,12 @@ export type MachineRequest = (
       allowedDomains?: string[];
       /** The conversation the command is for (`/org/…/c/…`): the desktop app's "Ver" opens it. */
       link?: string;
+      /**
+       * Protocol 18: the agent's Chrome belongs on its desktop (ADR 0056 §7). The runner
+       * starts it there (the desktop first), or moves it there or back at a command that
+       * may start Chrome, never while someone watches it or a person's turn is open.
+       */
+      desktop?: boolean;
     }
   /** Protocol 12: close the agent's browser session (Stop, idle). */
   | { op: "browser.stop" }
@@ -1022,6 +1032,8 @@ export type MachineRequest = (
       commands: BrowserBatchCommand[];
       allowedDomains?: string[];
       link?: string;
+      /** Protocol 18: as on `browser.act`. */
+      desktop?: boolean;
     }
   /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
   | { op: "browser.capture"; allowedDomains?: string[] }

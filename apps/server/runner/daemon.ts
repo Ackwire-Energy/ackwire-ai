@@ -307,6 +307,7 @@ export class RunnerDaemon implements RequestObserver {
       home: opts.home,
       log: opts.log,
       user: async (agent) => runnerUser(opts.home, await this.agentFolder(agent), agent),
+      inUse: (agentId) => this.session?.browser.onDesktopInUse(agentId) ?? false,
     });
     this.terminals = new Terminals({
       log: opts.log,
@@ -640,6 +641,7 @@ export class RunnerDaemon implements RequestObserver {
       send: (frame) => live?.send(frame) ?? false,
       secret: (agent, name) => secretValue(secretsDir, agent, name),
       onChange: () => queueMicrotask(() => this.browsersChanged()),
+      desktops: this.desktops,
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
